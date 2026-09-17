@@ -97,12 +97,15 @@ test("dependency-free workflow contracts run before installation", () => {
 test("protected core aggregates every mandatory lane without another checkout", () => {
   const core = job("core");
   assert.match(core, new RegExp(`needs: \\[${REQUIRED_CORE_GATES.join(", ")}\\]`));
-  assert.match(core, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(core, /if: \$\{\{ always\(\) && !cancelled\(\) \}\}/);
   assert.match(core, /CORE_RESULTS: \$\{\{ toJSON\(needs\) \}\}/);
   assert.doesNotMatch(core, /actions\/checkout|actions\/setup-node|pnpm install/);
   for (const name of REQUIRED_CORE_GATES) assert.match(core, new RegExp(`"${name}"`));
-  assert.match(job("verify"), /needs: core/);
-  assert.match(job("verify"), /test "\$CORE_RESULT" = success/);
+
+  const verify = job("verify");
+  assert.match(verify, /needs: core/);
+  assert.match(verify, /if: \$\{\{ always\(\) && !cancelled\(\) \}\}/);
+  assert.match(verify, /test "\$CORE_RESULT" = success/);
 });
 
 test("focused workflows preserve one setup and distinct status names", () => {

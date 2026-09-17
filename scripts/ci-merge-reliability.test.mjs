@@ -105,9 +105,12 @@ test("preflight contracts run dependency-free and aggregate performs no setup", 
   assert.match(typecheck, /filter: blob:none/);
 
   const core = job("core");
-  assert.match(core, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(core, /if: \$\{\{ always\(\) && !cancelled\(\) \}\}/);
   assert.match(core, /CORE_RESULTS: \$\{\{ toJSON\(needs\) \}\}/);
   assert.doesNotMatch(core, /actions\/checkout|actions\/setup-node|pnpm/);
+
+  const verify = job("verify");
+  assert.match(verify, /if: \$\{\{ always\(\) && !cancelled\(\) \}\}/);
 });
 
 test("market delivery replaces stale runs without weakening its regressions", () => {
