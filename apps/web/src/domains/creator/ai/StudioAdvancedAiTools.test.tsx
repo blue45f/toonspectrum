@@ -53,9 +53,23 @@ describe("StudioAdvancedAiTools", () => {
     const threeD = screen.getByRole("tab", { name: /AI 3D/u });
 
     expect(stroke.id).not.toBe(threeD.id);
-    fireEvent.keyDown(stroke, { key: "ArrowRight" });
+
+    const home = new KeyboardEvent("keydown", {
+      key: "Home",
+      bubbles: true,
+      cancelable: true,
+    });
+    fireEvent(stroke, home);
+    expect(home.defaultPrevented).toBe(true);
+    expect(stroke.getAttribute("aria-selected")).toBe("true");
+
+    fireEvent.keyDown(stroke, { key: "End" });
     expect(threeD.getAttribute("aria-selected")).toBe("true");
     expect(threeD.getAttribute("tabindex")).toBe("0");
+
+    fireEvent.keyDown(threeD, { key: "ArrowRight" });
+    expect(stroke.getAttribute("aria-selected")).toBe("true");
+    expect(stroke.getAttribute("tabindex")).toBe("0");
   });
 
   it("explains login and personal-key requirements before exposing external 3D generation", () => {

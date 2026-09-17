@@ -58,8 +58,9 @@ export function StudioAdvancedAiTools({
           : event.key === "ArrowRight" || event.key === "ArrowDown"
             ? current === "three-d" ? "stroke" : "three-d"
             : null;
-    if (!next || next === current) return;
+    if (!next) return;
     event.preventDefault();
+    if (next === current) return;
     setActive(next);
     globalThis.requestAnimationFrame(() => document.getElementById(tabId(next))?.focus());
   };
