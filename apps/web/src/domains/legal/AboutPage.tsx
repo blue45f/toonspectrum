@@ -144,6 +144,21 @@ const GUIDE_CARDS = [
       cta: "See technology and trust",
     },
   },
+  {
+    href: "/about/principles",
+    icon: ShieldCheck,
+    eyebrow: "03 · PRINCIPLES",
+    ko: {
+      title: "어떤 기준으로 제품과 정책을 결정할까요?",
+      body: "창작 흐름, 작품 권리, AI 보조, 열린 파일, 협업, 수익화와 접근성을 판단하는 창작자 중심 제품 원칙을 공개합니다.",
+      cta: "제품 원칙 보기",
+    },
+    en: {
+      title: "What standards guide product and policy decisions?",
+      body: "Review creator-first principles for creative flow, rights, AI assistance, open files, collaboration, monetisation and accessibility.",
+      cta: "See product principles",
+    },
+  },
 ] as const;
 
 export function AboutPage() {
@@ -297,7 +312,7 @@ export function AboutPage() {
           {ko ? "제작 흐름과 기술을 더 깊이 살펴보세요." : "Go deeper into the workflow and technology."}
         </h2>
 
-        <div className="mt-7 grid gap-5 lg:grid-cols-2">
+        <div className="mt-7 grid gap-5 lg:grid-cols-3">
           {GUIDE_CARDS.map((guide) => {
             const Icon = guide.icon;
             const copy = guide[locale];

@@ -6,6 +6,7 @@ import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
 
 import { STUDIO_AI_COLORIZE_PRESETS } from "./studio-ai-assist-ux";
 
+import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
 import { cn } from "@/shared/lib/utils";
 
 export function StudioAiColorizePanel({
@@ -35,11 +36,13 @@ export function StudioAiColorizePanel({
         AI 자동 채색
       </div>
 
-      {!configured && (
-        <p className="text-[0.63rem] leading-relaxed text-fg-3">
-          AI 어시스트 설정에서 이미지 API 키를 등록하면 쓸 수 있어요.
-        </p>
-      )}
+      {!configured ? (
+        <AiRecoveryNotice
+          code="not_configured"
+          message="채색 지시를 먼저 준비할 수 있어요. 실행하려면 통합 AI 설정에서 개인 이미지 API 키와 편집 모델을 연결하세요."
+          compact
+        />
+      ) : null}
 
       <div className="flex flex-wrap gap-1">
         {STUDIO_AI_COLORIZE_PRESETS.map((preset) => (
@@ -86,9 +89,13 @@ export function StudioAiColorizePanel({
         {busy ? "채색하는 중…" : "선택 이미지 채색"}
       </button>
 
-      {error && (
-        <p className="rounded-lg border border-bad/35 bg-bad/10 px-2 py-1.5 text-xs text-bad">{error}</p>
-      )}
+      {error ? (
+        <AiRecoveryNotice
+          message={error}
+          onRetry={canRun ? onColorize : undefined}
+          compact
+        />
+      ) : null}
     </div>
   );
 }

@@ -5,7 +5,7 @@ export const DISCOVER_PURPOSE_PREFIXES = [
 ] as const;
 
 const PUBLIC_PAGES = new Set([
-  "/", "/references", "/about", "/about/workflow", "/about/technology", "/about/data", "/about/crawler", "/contact", "/support", "/help", "/sitemap",
+  "/", "/references", "/about", "/about/workflow", "/about/technology", "/about/principles", "/about/data", "/about/crawler", "/contact", "/support", "/help", "/sitemap",
   "/discover", "/discover/works", "/search", "/explore", "/ranking", "/recommend",
   "/calendar", "/compare", "/random", "/tags", "/authors", "/insights", "/insights/resources", "/news", "/guide",
   "/research", "/research/assets", "/research/books", "/research/3d-assets", "/references", "/now", "/opportunities", "/story-lab",

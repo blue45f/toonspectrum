@@ -63,7 +63,7 @@ const STUDIO_PUBLIC_ROUTES = [
 const LEARNING_ROUTES = ["/about/workflow", "/learn", "/references", "/research"] as const;
 const CONNECT_ROUTES = ["/collaborate", "/community", "/contact", "/feedback", "/messages", "/showcase", "/support"] as const;
 const MANAGE_ROUTES = ["/library", "/me", "/my", "/settings"] as const;
-const TRUST_ROUTES = ["/about", "/accessibility", "/copyright", "/design", "/guide", "/help", "/privacy", "/sitemap", "/terms"] as const;
+const TRUST_ROUTES = ["/about", "/about/principles", "/accessibility", "/copyright", "/design", "/guide", "/help", "/privacy", "/sitemap", "/terms"] as const;
 const CREATE_ROUTES = ["/market", "/now", "/opportunities", "/story-lab", "/studio"] as const;
 
 const EXPERIMENTAL_ROUTES = [

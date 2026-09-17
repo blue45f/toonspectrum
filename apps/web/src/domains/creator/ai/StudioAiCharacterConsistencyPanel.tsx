@@ -12,6 +12,8 @@
 // 피한다).
 import { Loader2, MousePointer2, UserRoundCheck } from "lucide-react";
 
+import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
+
 export function StudioAiCharacterConsistencyPanel({
   configured,
   hasReference,
@@ -45,12 +47,13 @@ export function StudioAiCharacterConsistencyPanel({
         AI 캐릭터 일관성 생성
       </div>
 
-      {!configured && (
-        <p className="rounded-md border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
-          기준 이미지와 상황 프롬프트는 먼저 준비할 수 있어요. 실행하려면 위{" "}
-          <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 이미지 API를 연결하세요.
-        </p>
-      )}
+      {!configured ? (
+        <AiRecoveryNotice
+          code="not_configured"
+          message="기준 이미지와 상황 프롬프트는 먼저 준비할 수 있어요. 생성하려면 통합 AI 설정에서 개인 이미지 API 키와 모델을 연결하세요."
+          compact
+        />
+      ) : null}
 
       {!hasReference && (
         <div
@@ -104,7 +107,13 @@ export function StudioAiCharacterConsistencyPanel({
         {busy ? "생성하는 중…" : "같은 캐릭터로 생성"}
       </button>
 
-      {error && <p className="text-xs text-bad">{error}</p>}
+      {error ? (
+        <AiRecoveryNotice
+          message={error}
+          onRetry={canGenerate ? onGenerate : undefined}
+          compact
+        />
+      ) : null}
 
       <p className="text-[0.6rem] leading-relaxed text-fg-3">
         참고 이미지 기반 근사치예요 — 매번 완벽히 동일한 얼굴을 보장하진 않아요. 생성된 이미지는 캔버스에
