@@ -40,10 +40,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(64);
+  expect(manifest).toHaveLength(65);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0064_studio_project_graph_v3");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(64);
+  expect(manifest.at(-1).id).toBe("0065_creator_series_lifecycle");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(65);
 });
 
 test("applied studio media inference migration remains checksum-immutable", () => {
@@ -130,6 +130,22 @@ test("Studio ProjectGraph migration installs immutable revisions and loss-visibl
   ]) {
     expect(sql).toContain(requiredFragment);
   }
+  expect(sql).toMatch(/^BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
+});
+
+test("creator series lifecycle migration adds hiatus without accepting arbitrary states", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0065_creator_series_lifecycle",
+  );
+  expect(migration?.id).toBe("0065_creator_series_lifecycle");
+  const sql = migration?.contents ?? "";
+
+  expect(sql).toContain("UPDATE public.creator_series");
+  expect(sql).toContain("DROP CONSTRAINT IF EXISTS creator_series_status_check");
+  expect(sql).toContain("ADD CONSTRAINT creator_series_status_check");
+  expect(sql).toContain("'ongoing', 'hiatus', 'completed'");
+  expect(sql).toContain("VALIDATE CONSTRAINT creator_series_status_check");
   expect(sql).toMatch(/^BEGIN;[\s\S]*COMMIT;\s*$/u);
   expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
 });
