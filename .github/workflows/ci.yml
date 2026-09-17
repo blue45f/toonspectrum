@@ -22,27 +22,6 @@ env:
   NODE_OPTIONS: --max-old-space-size=12288
 
 jobs:
-  preflight:
-    name: Core workflow contract preflight
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-          filter: blob:none
-          sparse-checkout: |
-            .github
-            scripts
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          package-manager-cache: false
-      - name: Verify mandatory CI wiring before installing dependencies
-        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs scripts/ci-merge-reliability.test.mjs
-      - name: Verify deduplicated PR workflow policy
-        run: python3 scripts/verify-pr-workflow-fanout.py
-
   lint:
     name: Core strict lint
     runs-on: ubuntu-24.04
@@ -51,6 +30,16 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/apps/web/public/assets/
+            /apps/web/public/assets/reference-rebuild/
+            !/apps/web/public/vrm/
+            !/artifacts/
+            !/docs/
+            !/tests/benchmarks/results/
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -68,7 +57,7 @@ jobs:
         run: pnpm run lint:strict
 
   typecheck:
-    name: Core application typecheck
+    name: Core preflight and application typecheck
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -80,6 +69,8 @@ jobs:
           sparse-checkout: |
             /*
             !/apps/web/public/assets/
+            /apps/web/public/assets/3d/environments/refined-v6/manifest.json
+            /apps/web/public/assets/3d/environments/expansion-v1/manifest.json
             !/apps/web/public/vrm/
             !/artifacts/
             !/docs/
@@ -89,6 +80,10 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      - name: Verify mandatory CI wiring before installing dependencies
+        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs scripts/ci-merge-reliability.test.mjs
+      - name: Verify deduplicated PR workflow policy
+        run: python3 scripts/verify-pr-workflow-fanout.py
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Restore TypeScript incremental state
         uses: actions/cache@v4
@@ -413,7 +408,7 @@ jobs:
   core:
     name: core
     if: ${{ always() }}
-    needs: [preflight, lint, typecheck, static, serial, build]
+    needs: [lint, typecheck, static, serial, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
@@ -422,7 +417,7 @@ jobs:
           CORE_RESULTS: ${{ toJSON(needs) }}
         run: |
           node --input-type=module <<'NODE'
-          const required = ["preflight", "lint", "typecheck", "static", "serial", "build"];
+          const required = ["lint", "typecheck", "static", "serial", "build"];
           const results = JSON.parse(process.env.CORE_RESULTS ?? "null");
           if (!results || typeof results !== "object" || Array.isArray(results)) {
             throw new Error("core requires the GitHub needs object");

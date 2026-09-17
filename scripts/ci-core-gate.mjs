@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 
 /** Must match the real protected dependencies in .github/workflows/ci.yml. */
 export const REQUIRED_CORE_GATES = Object.freeze([
-  "preflight",
   "lint",
   "typecheck",
   "static",

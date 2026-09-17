@@ -121,16 +121,20 @@ test("protected core aggregates every lane without checking out the repository a
   assert.ok(job("verify").includes('test "$CORE_RESULT" = success'));
 });
 
-test("preflight is sparse and independent expensive lanes start in parallel", () => {
-  assert.doesNotMatch(job("preflight"), /^\s+(?:if|continue-on-error):/m);
-  assert.ok(job("preflight").includes("node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs"));
-  assert.ok(job("preflight").includes("filter: blob:none"));
-  assert.ok(job("preflight").includes("sparse-checkout:"));
-  assert.doesNotMatch(job("preflight"), /pnpm (?:install|exec|run)|cache: pnpm/);
-  assert.ok(job("preflight").includes("package-manager-cache: false"));
+test("workflow contracts share the sparse typecheck lane while expensive lanes start independently", () => {
+  assert.doesNotMatch(source, /^ {2}preflight:\n/m, "standalone preflight should not consume a runner");
   for (const name of ["lint", "typecheck", "static", "serial", "build"]) {
     assert.doesNotMatch(job(name), /^ {4}needs:/m, `${name} should start independently`);
   }
+
+  const typecheck = job("typecheck");
+  const contractTest = typecheck.indexOf("node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs");
+  const fanoutPolicy = typecheck.indexOf("python3 scripts/verify-pr-workflow-fanout.py");
+  const install = typecheck.indexOf("pnpm install --frozen-lockfile");
+  assert.ok(contractTest >= 0, "typecheck lane must execute CI contract tests");
+  assert.ok(fanoutPolicy > contractTest, "fanout policy should follow the contract suite");
+  assert.ok(install > fanoutPolicy, "dependency installation must follow dependency-free preflight checks");
+
   for (const excludedPath of [
     "!/apps/web/public/assets/",
     "!/apps/web/public/vrm/",
@@ -138,9 +142,21 @@ test("preflight is sparse and independent expensive lanes start in parallel", ()
     "!/docs/",
     "!/tests/benchmarks/results/",
   ]) {
-    assert.ok(job("typecheck").includes(excludedPath), `typecheck sparse checkout is missing ${excludedPath}`);
+    assert.ok(typecheck.includes(excludedPath), `typecheck sparse checkout is missing ${excludedPath}`);
   }
-  assert.ok(job("typecheck").includes("filter: blob:none"));
+  for (const requiredManifest of [
+    "/apps/web/public/assets/3d/environments/refined-v6/manifest.json",
+    "/apps/web/public/assets/3d/environments/expansion-v1/manifest.json",
+  ]) {
+    assert.ok(typecheck.includes(requiredManifest), `typecheck sparse checkout is missing ${requiredManifest}`);
+  }
+  assert.ok(typecheck.includes("filter: blob:none"));
+
+  const lint = job("lint");
+  assert.ok(lint.includes("filter: blob:none"));
+  assert.ok(lint.includes("!/apps/web/public/assets/"));
+  assert.ok(lint.includes("/apps/web/public/assets/reference-rebuild/"));
+  assert.ok(lint.includes("!/apps/web/public/vrm/"));
   assert.doesNotMatch(job("static"), /^\s+if:/m, "mandatory regressions cannot be skipped");
 });
 

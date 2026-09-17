@@ -74,7 +74,7 @@ test("lint, typecheck and regressions run as independent installed lanes", () =>
     const execute = block.indexOf(command);
     assert.ok(install >= 0, `${name} must install dependencies`);
     assert.ok(execute > install, `${name} must execute after installation`);
-    assert.doesNotMatch(block, /^ {4}needs:/m, `${name} must not wait behind preflight`);
+    assert.doesNotMatch(block, /^ {4}needs:/m, `${name} must start independently`);
   }
   assert.match(job("typecheck"), /pnpm run typecheck:cloudflare-realtime/);
   assert.doesNotMatch(job("static"), /pnpm run lint:strict|pnpm run typecheck(?:\s|$)/);
@@ -98,16 +98,25 @@ test("required core runs on every main PR, main push and merge group without pat
   assert.match(workflow, new RegExp(`needs: \\[${REQUIRED_CORE_GATES.join(", ")}\\]`));
 });
 
-test("preflight validates workflow policy in parallel and uses a sparse checkout", () => {
-  const preflight = job("preflight");
-  assert.match(preflight, /node --test .*scripts\/ci-merge-reliability.test.mjs/);
-  assert.match(preflight, /run: python3 scripts\/verify-pr-workflow-fanout.py/);
-  assert.match(preflight, /filter: blob:none/);
-  assert.match(preflight, /sparse-checkout:/);
-  assert.doesNotMatch(preflight, /pnpm install/);
-  for (const name of ["lint", "typecheck", "static", "serial", "build"]) {
-    assert.doesNotMatch(job(name), /^ {4}needs: preflight$/m);
-  }
+test("dependency-free workflow policy checks run before installation in the sparse typecheck lane", () => {
+  assert.doesNotMatch(workflow, /^ {2}preflight:\n/m);
+  const typecheck = job("typecheck");
+  const contracts = typecheck.indexOf("node --test scripts/ci-core-gate.test.mjs");
+  const fanout = typecheck.indexOf("python3 scripts/verify-pr-workflow-fanout.py");
+  const install = typecheck.indexOf("pnpm install --frozen-lockfile");
+  assert.ok(contracts >= 0);
+  assert.ok(fanout > contracts);
+  assert.ok(install > fanout);
+  assert.match(typecheck, /filter: blob:none/);
+  assert.match(typecheck, /sparse-checkout:/);
+  assert.match(typecheck, /\/apps\/web\/public\/assets\/3d\/environments\/refined-v6\/manifest\.json/);
+  assert.match(typecheck, /\/apps\/web\/public\/assets\/3d\/environments\/expansion-v1\/manifest\.json/);
+
+  const lint = job("lint");
+  assert.match(lint, /filter: blob:none/);
+  assert.match(lint, /!\/apps\/web\/public\/assets\//);
+  assert.match(lint, /\/apps\/web\/public\/assets\/reference-rebuild\//);
+  assert.match(lint, /!\/apps\/web\/public\/vrm\//);
 });
 
 test("the protected aggregate performs no repository checkout or dependency setup", () => {
