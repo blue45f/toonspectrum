@@ -174,6 +174,7 @@ export function SiteHeader() {
   useSiteHeaderHeight(headerRef);
   const primaryNavigation = primarySiteNavigationForPath(pathname);
   const create = SITE_NAVIGATION_ITEMS.make;
+  const technology = SITE_NAVIGATION_ITEMS.technology;
   const brandHref = "/";
   const brandName = navigationContext === "studio" ? "ToonStudio" : t("app.name");
   const brandDescription = navigationContext === "studio"
@@ -264,6 +265,20 @@ export function SiteHeader() {
                 </Link>
               );
             })}
+            <Link
+              href={technology.href}
+              aria-current={isPurposeActive(technology.href) ? "page" : undefined}
+              title={siteNavigationText(technology.description, locale)}
+              data-navigation-entry="technology"
+              className={cx(
+                "relative inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-xl border px-3 py-2 text-[0.82rem] font-bold transition-all duration-150",
+                isPurposeActive(technology.href)
+                  ? "border-accent bg-accent text-on-accent shadow-sm"
+                  : "border-accent/30 bg-accent-soft/70 text-accent hover:border-accent/50 hover:bg-accent-soft"
+              )}
+            >
+              {siteNavigationText(technology.label, locale)}
+            </Link>
             <Link
               href="/sitemap"
               title={locale === "ko" ? "목적별 전체 메뉴 보기" : "Browse every destination by purpose"}

@@ -2,6 +2,7 @@ import {
   BarChart3,
   BookOpen,
   CalendarDays,
+  Code2,
   Compass,
   Gamepad2,
   Home,
@@ -110,6 +111,15 @@ export const SITE_NAVIGATION_ITEMS = {
     "Learn",
     "처음 시작부터 전문 제작과 문제 해결까지",
     "From first steps to professional workflows and troubleshooting",
+  ),
+  technology: item(
+    "technology",
+    "/about/technology",
+    Code2,
+    "제작 기술",
+    "Engineering",
+    "제작 과정·아키텍처·오픈소스·적용 가이드",
+    "Build process, architecture, open source and implementation guides",
   ),
   comic: item(
     "comic",
@@ -329,7 +339,7 @@ export const TOONSTUDIO_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
       ko: "작품 재료와 참고자료를 작업 가까이에",
       en: "Keep assets and references close to the work",
     },
-    items: [I.studioAssets, I.research, I.learn],
+    items: [I.studioAssets, I.research, I.learn, I.technology],
   },
   {
     id: "production-delivery",
@@ -359,7 +369,7 @@ export const TOONSPECTRUM_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
       ko: "영감·자료·기회를 실제 작업으로",
       en: "Connect inspiration, research and opportunity",
     },
-    items: [I.now, I.fortune, I.research, I.opportunities, I.insights],
+    items: [I.now, I.fortune, I.research, I.opportunities, I.insights, I.technology],
   },
   {
     id: "connect",
@@ -408,6 +418,7 @@ export const SITE_UTILITY_NAVIGATION = [I.help, I.settings, I.me] as const;
 const STUDIO_CONTEXT_PREFIXES = [
   "/",
   "/brand-film",
+  "/about/technology",
   "/studio",
   "/production",
   "/make",

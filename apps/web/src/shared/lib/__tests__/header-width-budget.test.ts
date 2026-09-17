@@ -23,6 +23,8 @@ describe("header width budget", () => {
     );
     expect(primaryNavigation).not.toContain("xl:grid");
     expect(primaryNavigation).not.toContain("<Icon");
+    expect(primaryNavigation).toContain('data-navigation-entry="technology"');
+    expect(primaryNavigation).toContain("siteNavigationText(technology.label, locale)");
   });
 
   it("narrows the search trigger before restoring its roomy xl width", () => {
