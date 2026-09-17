@@ -610,8 +610,8 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     extensions: [".inkml"],
     mime: ["application/inkml+xml"],
     category: "vector",
-    import: "engine-ready",
-    export: "engine-ready",
+    import: "available",
+    export: "partial",
     roundTrip: "partial",
     lossModel: [
       "좌표·필압·기울기·회전·속도·배럴압은 보존하지만 ToonSpectrum 레이어·그룹·브러시 질감은 네이티브 프로젝트에만 유지",
@@ -720,8 +720,8 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     extensions: [".icc", ".icm"],
     mime: ["application/vnd.iccprofile", "application/octet-stream"],
     category: "publication",
-    import: "engine-ready",
-    export: "engine-ready",
+    import: "available",
+    export: "partial",
     roundTrip: "partial",
     lossModel: [
       "RGB matrix/TRC만 Studio 내부 색 변환에 사용하며 LUT·CMYK는 권리가 확인된 검사·원본 임베딩 경계로 제한",
@@ -737,8 +737,10 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
       maxFileBytes: 16 * MiB,
       notes: "헤더·tag table·reserved 영역·profile ID·checksum·provider 권한을 적용 전에 검증",
     },
-    status: "engine-ready",
+    status: "partial",
     notes: [
+      "페이지 색보정의 ICC 색상 확인·출력 UI에서 사용자 RGB matrix/TRC 프로필을 권한 확인 후 가져와 문서에 보존하고 소프트 프루프합니다.",
+      "ICC 포함 RGB PNG 출력까지 연결되어 있으며, 범용 CMYK/LUT 관리나 모든 PDF OutputIntent 선택을 의미하지 않습니다.",
       "제품 생성 sRGB는 고정 SHA-256 allowlist로 감사하며, 외부 프로파일은 출처·권한·identity가 일치해야 합니다.",
       "성공 영수증은 ToonSpectrum 정책 통과이며 ICC·인쇄소·vendor의 제3자 공식 인증이 아닙니다.",
     ],
@@ -753,9 +755,9 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
       notes: ["원본 검사·권한 정책과 결정적 ToonSpectrum sRGB profile builder 구현"],
     },
     uiWiring: {
-      import: "not-wired",
-      export: "not-wired",
-      notes: ["전문 PDF OutputIntent orchestration에서 engine API를 사용하며 독립 ICC 메뉴는 후속 연결"],
+      import: "wired",
+      export: "wired",
+      notes: ["페이지 색보정 패널의 ICC 색상 확인·출력 런처에서 가져오기·소프트 프루프·ICC 포함 PNG 출력에 연결"],
     },
     metadata: {
       general: "preserved",
