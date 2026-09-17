@@ -13,6 +13,7 @@ import {
 } from "../studio-template-catalog";
 import { StudioNewIntegratedPage as StudioProjectCreatePage } from "./StudioProjectCreatePage";
 import "./studio-new-visual-first.css";
+import "./studio-new-visual-gallery.css";
 
 type Locale = "ko" | "en";
 
