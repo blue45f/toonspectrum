@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 
 import { Container } from "@/shared/components/section";
@@ -18,13 +18,57 @@ import { StudioProjectFeatureSuitePanel } from "./StudioProjectFeatureSuitePanel
 import { StudioReviewPanel } from "./StudioReviewPanel";
 import { StudioProductionToolchainPanel } from "../toolchain/StudioProductionToolchainPanel";
 import { StudioSeriesKitPanel } from "./StudioSeriesKitPanel";
-import { StudioWebtoonOnboardingPanel } from "./StudioWebtoonOnboardingPanel";
 import {
   StudioProjectShellPage,
   type StudioProjectSection,
 } from "./StudioProjectShellPage";
 
 type Locale = "ko" | "en";
+
+const WEBTOON_ONBOARDING_PROFILE_PREFIX = "toonstudio:webtoon-onboarding:v1:";
+const LazyStudioWebtoonOnboardingPanel = lazy(async () => {
+  const module = await import("./StudioWebtoonOnboardingPanel");
+  return { default: module.StudioWebtoonOnboardingPanel };
+});
+
+function hasStoredWebtoonOnboarding(projectId: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(`${WEBTOON_ONBOARDING_PROFILE_PREFIX}${projectId}`) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function StudioWebtoonOnboardingPanelSlot({
+  projectId,
+  locale,
+}: {
+  readonly projectId: string;
+  readonly locale: Locale;
+}) {
+  const [enabled, setEnabled] = useState(() => hasStoredWebtoonOnboarding(projectId));
+
+  useEffect(() => {
+    setEnabled(hasStoredWebtoonOnboarding(projectId));
+  }, [projectId]);
+
+  if (!enabled) return null;
+
+  return (
+    <Suspense
+      fallback={(
+        <div
+          className="min-h-28 animate-pulse rounded-3xl border border-accent/20 bg-accent-soft/15"
+          aria-busy="true"
+          aria-label={locale === "ko" ? "제작 온보딩 불러오는 중" : "Loading production onboarding"}
+        />
+      )}
+    >
+      <LazyStudioWebtoonOnboardingPanel projectId={projectId} locale={locale} />
+    </Suspense>
+  );
+}
 
 const StudioCompatibilityReportsPanel = lazy(async () => {
   const module = await import("../project-graph/StudioCompatibilityReportsPanel");
@@ -159,7 +203,7 @@ export function StudioProjectIntegratedPage({
       <StudioProjectShellPage section={section} />
       {decodedProjectId ? (
         <Container size="wide" className="-mt-3 space-y-5 pb-10 sm:-mt-5 sm:pb-14">
-          <StudioWebtoonOnboardingPanel projectId={decodedProjectId} locale={locale} />
+          <StudioWebtoonOnboardingPanelSlot projectId={decodedProjectId} locale={locale} />
           <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
             <StudioProjectGraphContextBar projectId={decodedProjectId} locale={locale} />
           </Suspense>
