@@ -631,7 +631,7 @@ import {
   removeStudioLinked3dRenderLinks,
   upsertStudioLinked3dRenderLink,
 } from "./studio-linked-3d-render-document";
-import { resolveStudioScene3dLinkedLayerRoundTrip } from "./scene3d/studio-scene3d-linked-layer-bridge";
+import { resolveStudioScene3dLinkedLayerEditSource } from "./scene3d/studio-scene3d-linked-layer-source";
 import type { StudioLiquifyMode } from "./studio-liquify-contract";
 import { mapLiquifyRoiToDocumentFrame, planStudioLiquifyLivePreview } from "./studio-liquify-live-preview";
 import {
@@ -14433,14 +14433,14 @@ const puppetWarpArmed =
       if (!element || element.type !== "image") return null;
       if (element.bg3dLtBundleId) {
         if (activePage.linked3dRender && activePage.shared3dStage) {
-          const linkedRoundTrip = resolveStudioScene3dLinkedLayerRoundTrip({
+          const linkedScene = resolveStudioScene3dLinkedLayerEditSource({
             bundleId: element.bg3dLtBundleId,
             linked3dRender: activePage.linked3dRender,
             shared3dStage: activePage.shared3dStage,
             elements,
           });
-          if (!linkedRoundTrip.ok) return null;
-          return { scene: linkedRoundTrip.authority.bg3d };
+          if (!linkedScene) return null;
+          return { scene: linkedScene };
         }
         const anchor = elements.find(
           (candidate): candidate is ImageEl =>
