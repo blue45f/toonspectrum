@@ -5,9 +5,11 @@ import {
   type DesktopCloudProviderId,
 } from "./types.js";
 
+import type { DesktopCloudAccessTokenSource } from "../oauth.js";
+
 export interface DesktopCloudHttpOptions {
   readonly provider: DesktopCloudProviderId;
-  readonly accessToken: string;
+  readonly accessToken: string | DesktopCloudAccessTokenSource;
   readonly fetchImpl?: typeof fetch;
 }
 
@@ -32,6 +34,7 @@ export function normalizeCloudRelativePath(value: string): string {
   }
   return normalized;
 }
+
 export function cloudPathSegments(value: string): readonly string[] {
   return normalizeCloudRelativePath(value).split("/");
 }
@@ -73,24 +76,28 @@ export async function jsonObject(
     `cloud provider returned a non-object response (${response.status})`,
   );
 }
+
 function providerStatusCode(status: number):
   | "unauthorized"
   | "not-found"
   | "version-conflict"
   | "network" {
   if (status === 401 || status === 403) return "unauthorized";
-  if (status === 404) return "not-found";
+  if (status === 404 || status === 410) return "not-found";
   if (status === 409 || status === 412) return "version-conflict";
   return "network";
 }
 
 export class DesktopCloudHttpClient {
   readonly provider: DesktopCloudProviderId;
-  private readonly accessToken: string;
+  private readonly accessToken: string | DesktopCloudAccessTokenSource;
   private readonly fetchImpl: typeof fetch;
 
   constructor(options: DesktopCloudHttpOptions) {
-    if (!options.accessToken.trim()) {
+    if (
+      typeof options.accessToken === "string"
+      && !options.accessToken.trim()
+    ) {
       throw new TypeError("cloud access token must not be empty");
     }
     this.provider = options.provider;
@@ -98,9 +105,22 @@ export class DesktopCloudHttpClient {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
-  authorizationHeaders(extra: ConstructorParameters<typeof Headers>[0] = {}): Headers {
+  async authorizationHeaders(
+    extra: ConstructorParameters<typeof Headers>[0] = {},
+    signal?: AbortSignal,
+  ): Promise<Headers> {
+    const accessToken = typeof this.accessToken === "string"
+      ? this.accessToken
+      : await this.accessToken(signal);
+    if (!accessToken.trim()) {
+      throw new DesktopCloudError(
+        this.provider,
+        "unauthorized",
+        "cloud access token source returned an empty token",
+      );
+    }
     const headers = new Headers(extra);
-    headers.set("Authorization", `Bearer ${this.accessToken}`);
+    headers.set("Authorization", `Bearer ${accessToken}`);
     return headers;
   }
 
@@ -122,7 +142,7 @@ export class DesktopCloudHttpClient {
     }
     const headers = options.anonymous
       ? new Headers(init.headers)
-      : this.authorizationHeaders(init.headers);
+      : await this.authorizationHeaders(init.headers, options.signal);
     let response: Response;
     try {
       response = await this.fetchImpl(url, {

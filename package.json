@@ -92,7 +92,7 @@
     "verify:studio-lifecycle": "tsx scripts/verify-studio-lifecycle.mts",
     "verify:studio-service-worker": "tsx scripts/verify-studio-service-worker.mts",
     "verify:studio-artist-journey": "tsx scripts/verify-studio-artist-journey.mts",
-    "verify:studio-competitor-replacement": "tsx scripts/verify-studio-competitor-replacement.mts && vitest run scripts/verify-studio-competitor-replacement.test.ts && pnpm --filter @toonspectrum/desktop-sync-agent test && pnpm --filter @toonspectrum/desktop-sync-agent typecheck && pnpm run verify:studio-professional-validation-kit",
+    "verify:studio-competitor-replacement": "tsx scripts/verify-studio-competitor-replacement.mts && vitest run scripts/verify-studio-competitor-replacement.test.ts && pnpm --filter @toonspectrum/desktop-sync-agent test && pnpm --filter @toonspectrum/desktop-sync-agent typecheck && pnpm run verify:studio-professional-validation-kit && pnpm run test:desktop-sync-release",
     "verify:studio-autosave-opfs": "tsx scripts/verify-studio-autosave-opfs-session.mts",
     "verify:studio-autosave-two-tab": "tsx scripts/verify-studio-autosave-two-tab-leader.mts",
     "verify:studio-brushes": "tsx scripts/verify-studio-brushes.mts",
@@ -198,7 +198,11 @@
     "update:studio-publish-goldens": "tsx scripts/verify-studio-publish-package-goldens.mts --write",
     "verify:studio-publish-goldens": "tsx scripts/verify-studio-publish-package-goldens.mts && vitest run scripts/verify-studio-publish-package-goldens.test.ts",
     "verify:studio-publishing-lifecycle": "node scripts/verify-studio-publishing-lifecycle.mjs --run --receipt qa-results/studio-publishing-lifecycle/receipt.json && node --test scripts/verify-studio-publishing-lifecycle.test.mjs",
-    "verify:studio-operational-validation": "node scripts/verify-studio-operational-validation.mjs --run --receipt qa-results/studio-operational-validation/receipt.json && node --test scripts/verify-studio-operational-validation.test.mjs"
+    "verify:studio-operational-validation": "node scripts/verify-studio-operational-validation.mjs --run --receipt qa-results/studio-operational-validation/receipt.json && node --test scripts/verify-studio-operational-validation.test.mjs",
+    "desktop:sync:release:package": "pnpm --filter @toonspectrum/desktop-sync-agent build && node scripts/package-desktop-sync-release.mjs",
+    "desktop:sync:release:sign": "node scripts/sign-desktop-sync-release.mjs",
+    "desktop:sync:release:verify": "node scripts/verify-desktop-sync-release.mjs",
+    "test:desktop-sync-release": "pnpm --filter @toonspectrum/desktop-sync-agent build && node --test scripts/desktop-sync-release.test.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",
