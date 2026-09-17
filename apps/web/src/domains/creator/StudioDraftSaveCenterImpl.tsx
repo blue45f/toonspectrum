@@ -551,6 +551,9 @@ export function StudioDraftSaveCenter({
     <div
       data-studio-draft-save-center
       data-studio-draft-save-phase={model.phase}
+      data-studio-shell-force-visible={
+        model.tone === "danger" || model.tone === "warning" ? "true" : undefined
+      }
       className={cn(
         // Mobile tool sheets occupy z53–55; the passive save launcher must not cover their controls.
         "pointer-events-auto fixed right-[max(0.75rem,env(safe-area-inset-right))] lg:z-[58]",

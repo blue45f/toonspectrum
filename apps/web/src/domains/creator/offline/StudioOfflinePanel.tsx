@@ -155,6 +155,12 @@ export function StudioOfflinePanel() {
     <aside
       className="fixed bottom-24 right-3 z-40 max-w-[min(25rem,calc(100vw-1.5rem))]"
       aria-label="스튜디오 연결 및 오프라인 작업 안내"
+      data-studio-shell-floating-target="offline-readiness"
+      data-studio-shell-force-visible={
+        connectivity.localOnly || (storagePercent !== null && storagePercent >= 90)
+          ? "true"
+          : undefined
+      }
     >
       <details
         className="rounded-xl border border-line bg-panel p-3 text-xs text-fg shadow-lg"

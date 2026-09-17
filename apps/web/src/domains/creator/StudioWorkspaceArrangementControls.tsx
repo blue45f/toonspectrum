@@ -128,6 +128,8 @@ export function StudioWorkspaceArrangementControls({
   return (
     <div
       data-studio-workspace-arrangement="true"
+      data-studio-shell-floating-target="workspace-arrangement"
+      data-studio-shell-force-visible={arranging ? "true" : undefined}
       className={cn(
         "pointer-events-auto fixed bottom-3 right-3 z-[69] hidden",
         arranging
