@@ -39,7 +39,6 @@ import { WorkFxPanel } from "./WorkFxPanel";
 
 import { CoverImage } from "@/shared/components/cover-image";
 import { Container } from "@/shared/components/section";
-import { SharePageButton } from "@/shared/components/share-page-button";
 import { ThreadedCommentSection } from "@/shared/components/comments/threaded-comment-section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
@@ -70,6 +69,11 @@ import {
   type WorkComment,
   type WorkDetail,
 } from "@/infrastructure/creator-client";
+
+const SharePageButton = lazy(async () => {
+  const module = await import("@/shared/components/share-page-button");
+  return { default: module.SharePageButton };
+});
 
 const MAX_COMMENT_LENGTH = 700;
 const BUBBLE_LABEL_BY_ID: ReadonlyMap<string, string> = new Map(
@@ -769,15 +773,17 @@ export function CreateWorkPage() {
             <span className="numeral">{formatCount(work.bookmarks ?? 0)}</span>
           </button>
           {shareable && (
-            <SharePageButton
-              path={sharePath}
-              text={shareTitle}
-              description={shareDescription}
-              imageUrl={shareImage}
-              label="작품 공유"
-              actionLabel="작품 감상하기"
-              className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
-            />
+            <Suspense fallback={null}>
+              <SharePageButton
+                path={sharePath}
+                text={shareTitle}
+                description={shareDescription}
+                imageUrl={shareImage}
+                label="작품 공유"
+                actionLabel="작품 감상하기"
+                className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
+              />
+            </Suspense>
           )}
           <span className="inline-flex items-center gap-1.5 text-xs text-fg-3">
             <Eye size={14} />

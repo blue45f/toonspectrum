@@ -13,7 +13,7 @@ import {
   Sparkles,
   Upload,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 import { useMarketDeviceInstall } from "../hooks/use-market-device-install";
 import { useMarketLibrary } from "../hooks/use-market-library";
@@ -58,11 +58,15 @@ import { StaleNoticeBar } from "./StaleNoticeBar";
 
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
-import { SharePageButton } from "@/shared/components/share-page-button";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { compactPublicShareDescription } from "@/shared/lib/public-share-policy";
 import { cn } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
+
+const SharePageButton = lazy(async () => {
+  const module = await import("@/shared/components/share-page-button");
+  return { default: module.SharePageButton };
+});
 
 const ENGINE_LABELS: Record<string, string> = {
   canvas2d: "Canvas 2D",
@@ -687,17 +691,19 @@ export function MarketResourceDetailArticle({
             >
               같은 종류의 리소스 더 보기
             </Link>
-            <SharePageButton
-              path={`/market/resource/${encodeURIComponent(currentRecord.id)}`}
-              text={currentRecord.name}
-              description={compactPublicShareDescription(
-                currentRecord.description,
-                `${kind.label} 리소스의 구성과 사용권, Studio 적용 방법을 확인해 보세요.`,
-              )}
-              label="리소스 공유"
-              actionLabel="리소스 보기"
-              className={buttonClass({ variant: "ghost", size: "sm", className: "w-full" })}
-            />
+            <Suspense fallback={null}>
+              <SharePageButton
+                path={`/market/resource/${encodeURIComponent(currentRecord.id)}`}
+                text={currentRecord.name}
+                description={compactPublicShareDescription(
+                  currentRecord.description,
+                  `${kind.label} 리소스의 구성과 사용권, Studio 적용 방법을 확인해 보세요.`,
+                )}
+                label="리소스 공유"
+                actionLabel="리소스 보기"
+                className={buttonClass({ variant: "ghost", size: "sm", className: "w-full" })}
+              />
+            </Suspense>
             <CreatorMarketplaceReportAction record={record} />
             <p className="text-center text-[0.68rem] leading-relaxed text-fg-3">
               {studioActionSummary}
