@@ -371,7 +371,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
                     : "border-line bg-card text-fg-3 hover:border-line-strong hover:text-fg",
                 )}
               >
-                {locale === "ko" ? viewLabel.labelKo : viewLabel.labelEn}
+                {bt(viewLabel.labelKo, viewLabel.labelEn)}
               </Link>
             );
           })}
@@ -388,20 +388,20 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
               {destination.owner === "project-shell" ? "PROJECT OWNED" : "CONNECTED WORKSPACE"}
             </p>
             <h2 className="mt-1 text-lg font-black text-fg">
-              {locale === "ko" ? destination.labelKo : destination.labelEn}
+              {bt(destination.labelKo, destination.labelEn)}
             </h2>
             <p className="mt-1 text-sm leading-6 text-fg-2">
-              {locale === "ko" ? destination.descriptionKo : destination.descriptionEn}
+              {bt(destination.descriptionKo, destination.descriptionEn)}
             </p>
           </div>
           {destination.href ? (
             <Link href={destination.href} className={buttonClass({ className: "shrink-0 gap-2" })}>
-              {locale === "ko" ? destination.ctaKo : destination.ctaEn}
+              {bt(destination.ctaKo, destination.ctaEn)}
               <ArrowRight size={15} aria-hidden="true" />
             </Link>
           ) : (
             <span className="rounded-full border border-line bg-card px-3 py-2 text-xs font-bold text-fg-2">
-              {locale === "ko" ? destination.ctaKo : destination.ctaEn}
+              {bt(destination.ctaKo, destination.ctaEn)}
             </span>
           )}
         </div>
