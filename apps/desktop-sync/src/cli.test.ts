@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   executeDesktopSyncCli,
   parseDesktopSyncCliArguments,
+  parseDesktopSyncResolveArguments,
   runDesktopSyncCli,
 } from "./cli.js";
 
@@ -236,5 +237,91 @@ describe("desktop sync cloud CLI", () => {
     await expect(executeDesktopSyncCli(options, {
       environment: {},
     })).rejects.toThrow(/OAuth credential exists for profile default/u);
+  });
+});
+
+describe("desktop sync conflict resolver CLI", () => {
+  it("parses the bounded loopback resolver options", () => {
+    const options = parseDesktopSyncResolveArguments([
+      "--local", "./local",
+      "--remote-folder", "./remote",
+      "--no-browser",
+      "--port", "4567",
+    ]);
+    expect(options).toMatchObject({
+      noBrowser: true,
+      port: 4567,
+      sync: { mode: "once" },
+    });
+    expect(() => parseDesktopSyncResolveArguments([
+      "--local", "./local",
+      "--remote-folder", "./remote",
+      "--watch",
+    ])).toThrow(/does not accept/u);
+    expect(() => parseDesktopSyncResolveArguments([
+      "--local", "./local",
+      "--remote-folder", "./remote",
+      "--port", "70000",
+    ])).toThrow(/between 0 and 65535/u);
+  });
+
+  it("runs the protected resolver from CLI through receipt completion", async () => {
+    const local = await temporaryRoot("toonstudio-cli-resolve-local");
+    const remote = await temporaryRoot("toonstudio-cli-resolve-remote");
+    await writeFile(join(local, "episode.psd"), "local conflict body");
+    await writeFile(join(remote, "episode.psd"), "remote conflict body");
+    const collected = outputCollector();
+
+    const execution = runDesktopSyncCli([
+      "resolve",
+      "--local", local,
+      "--remote-folder", remote,
+      "--no-browser",
+      "--json",
+    ], collected.io);
+
+    await vi.waitFor(() => {
+      expect(collected.stdout.length).toBeGreaterThan(0);
+    });
+    const initial = JSON.parse(collected.stdout[0]!);
+    expect(initial).toMatchObject({
+      event: "review-required",
+      status: "conflict",
+      conflictCount: 1,
+    });
+    const protectedUrl = new URL(initial.url);
+    const token = new URLSearchParams(protectedUrl.hash.slice(1)).get("token")!;
+    const origin = protectedUrl.origin;
+    const reportResponse = await fetch(`${origin}/api/report`, {
+      headers: { "X-ToonStudio-Token": token },
+    });
+    const report = await reportResponse.json() as {
+      reportId: string;
+      conflicts: Array<{ id: string }>;
+    };
+    const applyResponse = await fetch(`${origin}/api/apply`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: origin,
+        "X-ToonStudio-Token": token,
+      },
+      body: JSON.stringify({
+        reportId: report.reportId,
+        decisions: [{
+          conflictId: report.conflicts[0]!.id,
+          resolution: "keep-both-local-primary",
+        }],
+      }),
+    });
+    expect(applyResponse.status).toBe(200);
+    await expect(execution).resolves.toBe(0);
+    const completed = JSON.parse(collected.stdout.at(-1)!);
+    expect(completed).toMatchObject({
+      event: "complete",
+      status: "resolved",
+      counts: { conflict: 0 },
+    });
+    expect(completed.receiptSha256).toMatch(/^[a-f0-9]{64}$/u);
   });
 });
