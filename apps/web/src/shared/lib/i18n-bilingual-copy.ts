@@ -1,6 +1,7 @@
 import {
   registerI18nEnglishSourceEntries,
   registerI18nLocaleEntries,
+  useT,
 } from "./i18n-core";
 
 export interface BilingualText {
@@ -90,6 +91,12 @@ export function translateBilingual(
   en: string,
 ): string {
   return t(defineBilingualAutoText(scope, ko, en));
+}
+
+/** React bridge for incrementally migrating legacy inline bilingual copy. */
+export function useBilingual(scope: string): (ko: string, en: string) => string {
+  const t = useT();
+  return (ko, en) => translateBilingual(t, scope, ko, en);
 }
 
 function translateParallelNode(
