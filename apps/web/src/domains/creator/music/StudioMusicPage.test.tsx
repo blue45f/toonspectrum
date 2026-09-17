@@ -14,12 +14,14 @@ import { defaultMusicBrief, MUSIC_TERMS_URL } from "@toonspectrum/core/studio-mu
 const mocks = vi.hoisted(() => ({
   ownerId: "owner-a",
   load: vi.fn(), save: vi.fn(), remove: vi.fn(), generate: vi.fn(), status: vi.fn(), error: vi.fn(), lyrics: vi.fn(),
+  getWork: vi.fn(), updateWork: vi.fn(),
 }));
 vi.mock("./studio-music-client", () => ({ generateMusic: mocks.generate, getMusicStatus: mocks.status }));
 vi.mock("./studio-music-library", () => ({ loadMusicTracks: mocks.load, saveMusicTrack: mocks.save, deleteMusicTrack: mocks.remove }));
 vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: mocks.ownerId ? { user: { id: mocks.ownerId } } : null }) }));
 vi.mock("@/domains/creator/studio-server-ai-client", () => ({ completeAutomaticFreeText: mocks.lyrics }));
 vi.mock("@/infrastructure/api", () => ({ getApiErrorMessage: mocks.error }));
+vi.mock("@/infrastructure/creator-client", () => ({ getWork: mocks.getWork, updateWork: mocks.updateWork }));
 
 function output(index = 1, ownerId = "owner-a", workId = "work-a"): LocalMusicTrack {
   return {
@@ -95,6 +97,8 @@ beforeEach(() => {
   mocks.load.mockReset().mockResolvedValue([]);
   mocks.save.mockReset().mockResolvedValue(undefined);
   mocks.remove.mockReset().mockResolvedValue(undefined);
+  mocks.getWork.mockReset().mockResolvedValue({ id: "work-a", doc: {}, isOwner: true, revision: 3 });
+  mocks.updateWork.mockReset().mockResolvedValue({ id: "work-a" });
   mocks.status.mockReset().mockResolvedValue({ enabled: true, reason: "ready", provider: "elevenlabs", maxSeconds: 60 });
   mocks.generate.mockReset().mockImplementation(async (brief: MusicBrief, ownerId: string, requestId: string) => {
     const result = output(1, ownerId, brief.workId);
@@ -263,6 +267,35 @@ describe("music workspace rendered recovery and route regression", () => {
       episodeId: "episode-12",
       rightsConfirmed: true,
     });
+  });
+
+  it("publishes a work-linked soundtrack into the reader BGM document path", async () => {
+    mocks.load.mockResolvedValue([output()]);
+    mocks.getWork.mockResolvedValue({
+      id: "work-a",
+      doc: { fx: { reveal: "fade-up", ambient: "none", bgmMood: "calm", bgmUrl: "", bgmVolume: 0.4, cuts: [] } },
+      isOwner: true,
+      revision: 3,
+    });
+    render(<Harness />); await ready();
+    const publication = await screen.findByRole("complementary", { name: "독자용 BGM 게시 연결" });
+    fireEvent.change(within(publication).getByLabelText("배포용 HTTPS MP3 URL"), {
+      target: { value: "https://cdn.example.test/work-a-opening.mp3" },
+    });
+    fireEvent.click(within(publication).getByRole("button", { name: "작품 독자용 BGM으로 저장" }));
+    await waitFor(() => expect(mocks.updateWork).toHaveBeenCalledTimes(1));
+    expect(mocks.getWork).toHaveBeenCalledWith("work-a");
+    expect(mocks.updateWork).toHaveBeenCalledWith("work-a", expect.objectContaining({
+      baseRevision: 3,
+      doc: expect.objectContaining({
+        fx: expect.objectContaining({
+          bgmMood: "",
+          bgmUrl: "https://cdn.example.test/work-a-opening.mp3",
+          bgmVolume: 0.4,
+        }),
+      }),
+    }));
+    expect(await within(publication).findByText(/독자용 BGM을 저장했습니다/)).toBeTruthy();
   });
 
   it("preserves original lyric text when toggling vocals off and on", async () => {

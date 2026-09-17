@@ -70,6 +70,11 @@ import { WebtoonSfxLexiconEngine, type SfxCategory } from "./webtoon-sfx-lexicon
 
 import type { ReactNode } from "react";
 
+import type {
+  StudioWebtoonAssistantPanel,
+  StudioWebtoonAssistantProtectedRegion,
+} from "./studio-webtoon-assistant-document";
+
 import { cn } from "@/shared/lib/utils";
 
 export type AssistantActiveTab =
@@ -135,25 +140,6 @@ const CROQUIS_INTERVALS: readonly CroquisTimerIntervalSec[] = [30, 60, 180];
 /** 최소 슬라이스 높이. 0 이 들어가면 planAutoSlices 의 while 루프가 끝나지 않는다. */
 const MIN_SLICE_HEIGHT_PX = 1000;
 
-/**
- * 아래 두 묶음은 실제 원고에서 읽어온 값이 아니라 데모용 고정 픽스처다.
- * 화면에서도 "샘플 데이터"라고 명시한다 — 작가가 자기 원고의 분석 결과로 오해하면 안 된다.
- * 실제 문서 배선(studioCanvasSnapshotFromElements) 전까지는 이 표기가 유일한 방어선이다.
- */
-const SAMPLE_PROTECTED_REGIONS = [
-  { top: 2900, bottom: 3200, label: "인물 얼굴 컷" },
-  { top: 6200, bottom: 6600, label: "액션 컷" },
-  { top: 9800, bottom: 10200, label: "클리프행어 컷" },
-] as const;
-
-const SAMPLE_PANELS = [
-  { id: "p1", topY: 100, bottomY: 700, heightPx: 600, dialogueCount: 1 },
-  { id: "p2", topY: 850, bottomY: 1400, heightPx: 550, dialogueCount: 2 },
-  { id: "p3", topY: 1700, bottomY: 2300, heightPx: 600, dialogueCount: 1 },
-  { id: "p4", topY: 2800, bottomY: 3400, heightPx: 600, dialogueCount: 2 },
-  { id: "p5", topY: 4200, bottomY: 5000, heightPx: 800, dialogueCount: 1 },
-] as const;
-
 function asCroquisInterval(seconds: number): CroquisTimerIntervalSec {
   return seconds === 30 || seconds === 180 ? seconds : 60;
 }
@@ -178,6 +164,8 @@ export interface StudioWebtoonAssistantModalProps {
   readonly onClose: () => void;
   readonly canvasWidth?: number;
   readonly canvasHeight?: number;
+  readonly protectedRegions?: readonly StudioWebtoonAssistantProtectedRegion[];
+  readonly panels?: readonly StudioWebtoonAssistantPanel[];
   readonly onInsertSfxText?: (text: string) => void;
 }
 
@@ -186,6 +174,8 @@ export function StudioWebtoonAssistantModal({
   onClose,
   canvasWidth = 690,
   canvasHeight = 15000,
+  protectedRegions = [],
+  panels = [],
   onInsertSfxText,
 }: StudioWebtoonAssistantModalProps) {
   // 저장된 선택 상태는 마운트 시 한 번만 읽는다. 화면 카탈로그로 한 번 걸러서
@@ -231,16 +221,15 @@ export function StudioWebtoonAssistantModal({
     [specValidator, selectedPlatform, canvasWidth, canvasHeight],
   );
   const slicePlan = useMemo(
-    () => specValidator.planAutoSlices(canvasHeight, sliceTargetHeight, SAMPLE_PROTECTED_REGIONS),
-    [specValidator, canvasHeight, sliceTargetHeight],
+    () => specValidator.planAutoSlices(canvasHeight, sliceTargetHeight, protectedRegions),
+    [specValidator, canvasHeight, sliceTargetHeight, protectedRegions],
   );
 
   // Tab 2: Scroll Pacing State
   const scrollSimulator = useMemo(() => new WebtoonScrollPacingSimulator(), []);
-  const samplePanels = useMemo(() => SAMPLE_PANELS.map((panel) => ({ ...panel })), []);
   const pacingResult = useMemo(
-    () => scrollSimulator.analyze(samplePanels, canvasHeight),
-    [scrollSimulator, samplePanels, canvasHeight],
+    () => scrollSimulator.analyze(panels, canvasHeight),
+    [scrollSimulator, panels, canvasHeight],
   );
   const [readerSpeed, setReaderSpeed] = useState<ReaderScrollSpeedProfile>(restored.readerSpeed);
   const activeReaderProfile =
@@ -619,9 +608,17 @@ export function StudioWebtoonAssistantModal({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <SampleDataBadge>샘플 보호 영역 {SAMPLE_PROTECTED_REGIONS.length}곳 기준 예시</SampleDataBadge>
+                  {protectedRegions.length > 0 ? (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded border border-good/35 bg-good/10 px-1.5 py-0.5 text-[0.58rem] font-bold text-good">
+                      <CheckCircle2 size={11} aria-hidden /> 실제 원고 컷 {protectedRegions.length}곳 분석
+                    </span>
+                  ) : (
+                    <SampleDataBadge>현재 원고에서 컷을 찾지 못함</SampleDataBadge>
+                  )}
                   <span className="text-[0.6rem] text-fg-3">
-                    실제 원고의 컷 좌표가 아직 연결되지 않아 성공률과 절단 위치는 예시 값입니다.
+                    {protectedRegions.length > 0
+                      ? "현재 페이지의 컷 경계를 보호 영역으로 사용해 절단 위치를 계산합니다."
+                      : "컷 경계가 없으므로 캔버스 높이만 기준으로 분할합니다."}
                   </span>
                 </div>
 
@@ -658,9 +655,17 @@ export function StudioWebtoonAssistantModal({
           {activeTab === "scroll-pacing" && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-center gap-2">
-                <SampleDataBadge>샘플 컷 {SAMPLE_PANELS.length}개 기준 예시</SampleDataBadge>
+                {panels.length > 0 ? (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded border border-good/35 bg-good/10 px-1.5 py-0.5 text-[0.58rem] font-bold text-good">
+                    <CheckCircle2 size={11} aria-hidden /> 실제 원고 컷 {panels.length}개 분석
+                  </span>
+                ) : (
+                  <SampleDataBadge>현재 원고에서 컷을 찾지 못함</SampleDataBadge>
+                )}
                 <span className="text-[0.6rem] text-fg-3">
-                  아래 점수·시간·호흡 분석은 데모용 컷 배치를 분석한 결과입니다. 실제 원고 배선 전까지는 참고용으로만 보세요.
+                  {panels.length > 0
+                    ? "현재 페이지의 실제 컷 위치와 컷 안의 대사 요소를 기준으로 페이싱을 계산합니다."
+                    : "컷을 추가하면 현재 페이지 기준 페이싱 분석이 자동으로 활성화됩니다."}
                 </span>
               </div>
 

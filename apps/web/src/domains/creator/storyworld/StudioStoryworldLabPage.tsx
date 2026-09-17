@@ -33,6 +33,8 @@ import {
 } from "react";
 
 import { storyworldDraftStore } from "./draft-store";
+import { projectStoryworldToStudioProjectStory } from "./studio-storyworld-project-projection";
+import { updateStudioProjectStory } from "../studio-project-feature-adapters";
 import {
   STORYWORLD_CAPABILITIES,
   STORYWORLD_CAPABILITY_GROUPS,
@@ -114,8 +116,20 @@ const MATURITY_LABELS: Readonly<Record<StoryworldCapabilityMaturity, string>> = 
   experimental: "실험실",
 };
 
+const STORYWORLD_DEMO_SEED_FLAG = "toonSpectrumDemoSeed";
+
 function cloneDemoProject(): StoryworldProject {
-  return JSON.parse(JSON.stringify(STORYWORLD_DEMO_PROJECT)) as StoryworldProject;
+  const project = JSON.parse(JSON.stringify(STORYWORLD_DEMO_PROJECT)) as StoryworldProject;
+  return { ...project, metadata: { ...project.metadata, [STORYWORLD_DEMO_SEED_FLAG]: true } };
+}
+
+function authoredStoryworldProject(project: StoryworldProject): StoryworldProject {
+  const metadata = { ...project.metadata, [STORYWORLD_DEMO_SEED_FLAG]: false };
+  return { ...project, metadata };
+}
+
+function isDemoStoryworldSeed(project: StoryworldProject): boolean {
+  return project.metadata?.[STORYWORLD_DEMO_SEED_FLAG] === true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -876,16 +890,35 @@ function StudioStoryworldLabEditor({
     setSaveState("idle");
     // Complete JSON edits queue immediately; only obsolete UI receipts are cancelled.
     void storyworldDraftStore.save(storageKey, project).then(() => {
+      let readinessProjected: boolean | null = workId && !isDemoStoryworldSeed(project) ? true : null;
+      if (readinessProjected !== null && workId && typeof window !== "undefined") {
+        try {
+          updateStudioProjectStory(
+            window.localStorage,
+            workId,
+            projectStoryworldToStudioProjectStory(project, workId),
+            { target: window },
+          );
+        } catch {
+          readinessProjected = false;
+        }
+      }
       if (!active) return;
       setSaveState("saved");
-      setStatusText("SQLite/OPFS에 스토리월드 초안을 저장했습니다.");
+      setStatusText(readinessProjected === null
+        ? workId
+          ? "데모 스토리월드는 저장했지만 실제 프로젝트 준비도에는 반영하지 않았습니다."
+          : "SQLite/OPFS에 스토리월드 초안을 저장했습니다."
+        : readinessProjected
+          ? "SQLite/OPFS에 스토리월드 초안을 저장하고 프로젝트 준비도에 반영했습니다."
+          : "스토리월드 초안은 저장했지만 프로젝트 준비도에는 반영하지 못했습니다.");
     }).catch(() => {
       if (!active) return;
       setSaveState("error");
       setStatusText("SQLite/OPFS에 저장하지 못했습니다. 현재 편집은 이 탭에만 남아 있습니다. JSON으로 내보내 보관하세요.");
     });
     return () => { active = false; };
-  }, [project, storageKey]);
+  }, [project, storageKey, workId]);
 
   const reset = () => {
     setProject(cloneDemoProject());
@@ -905,7 +938,7 @@ function StudioStoryworldLabEditor({
     if (!file) return;
     try {
       if (file.size > 1_000_000) throw new Error("스토리월드 JSON은 1MB 이하여야 합니다.");
-      const next = parseStoryworldProject(await file.text());
+      const next = authoredStoryworldProject(parseStoryworldProject(await file.text()));
       setProject(next);
       setActiveTab("overview");
       setStatusText(`‘${next.title}’ 데이터를 가져와 분석했습니다.`);
@@ -967,7 +1000,7 @@ function StudioStoryworldLabEditor({
         <div className="storyworld-main">
           <div className="storyworld-page-heading">
             <div>
-              <span className="storyworld-eyebrow">{documentScope} · 캔버스 원고와 자동 연결되지 않은 로컬 실험</span>
+              <span className="storyworld-eyebrow">{documentScope} · 원고 캔버스와 직접 병합하지 않고 프로젝트 준비도에 투영되는 스토리월드</span>
               <h1>{TAB_ITEMS.find((tab) => tab.id === activeTab)?.label}</h1>
             </div>
             <div className="storyworld-run-badge">
@@ -982,7 +1015,7 @@ function StudioStoryworldLabEditor({
           {activeTab === "knowledge" ? <KnowledgeTab project={project} result={result} /> : null}
           {activeTab === "contracts" ? <ContractsTab result={result} /> : null}
           {activeTab === "capabilities" ? <CapabilitiesTab /> : null}
-          {activeTab === "json" ? <JsonTab onApply={(next) => { setProject(next); setStatusText("JSON 변경을 적용해 다시 분석했습니다."); }} project={project} /> : null}
+          {activeTab === "json" ? <JsonTab onApply={(next) => { setProject(authoredStoryworldProject(next)); setStatusText("JSON 변경을 적용해 다시 분석했습니다."); }} project={project} /> : null}
         </div>
       </div>
       <div aria-live="polite" className="storyworld-statusbar">

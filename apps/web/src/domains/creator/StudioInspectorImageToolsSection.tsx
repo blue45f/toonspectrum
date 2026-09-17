@@ -56,6 +56,7 @@ import {
   isSelectionUsable,
 } from "./studio-selection-tools";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
+import { StudioRasterVectorizeButton } from "./StudioRasterVectorizeButton";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioSelectionWorkbenchPanel } from "./StudioSelectionWorkbenchPanel";
@@ -336,6 +337,17 @@ export function StudioInspectorSelectedImageTools({
                                 error={aiColorizeError}
                                 onColorize={onColorizeSelected}
                               />
+                              {selectedReadableImageSource ? (
+                                <StudioRasterVectorizeButton
+                                  src={selectedReadableImageSource}
+                                  image={selected}
+                                  onInsert={(vectorElements) => {
+                                    const committed = commit([...elements, ...vectorElements]);
+                                    if (committed && vectorElements[0]) setSelectedId(vectorElements[0].id);
+                                    return committed;
+                                  }}
+                                />
+                              ) : null}
                             </>
                           ) : null}
                           {selected.stockImageCredit && (
