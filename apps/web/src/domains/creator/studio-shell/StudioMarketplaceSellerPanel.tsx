@@ -57,7 +57,7 @@ function statusTone(status: string): string {
   return "border-warning/35 bg-warning-soft/15 text-warning";
 }
 
-function statusLabel(status: string, locale: Locale): string {
+function statusLabel(status: string, bt: (ko: string, en: string) => string): string {
   const ko: Readonly<Record<string, string>> = {
     draft: "작성 중",
     submitted: "심사 중",
@@ -82,7 +82,7 @@ function statusLabel(status: string, locale: Locale): string {
     review: "Review",
     blocked: "Blocked",
   };
-  return (locale === "ko" ? ko[status] : en[status]) ?? status;
+  return ko[status] && en[status] ? bt(ko[status]!, en[status]!) : status;
 }
 
 /** A real seller draft, file checksum, readiness and moderation-state workflow. */
@@ -202,10 +202,10 @@ export function StudioMarketplaceSellerPanel({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className={cn("rounded-full border px-3 py-1.5 text-xs font-black", statusTone(submission.status))}>
-            {statusLabel(submission.status, locale)}
+            {statusLabel(submission.status, bt)}
           </span>
           <span className={cn("rounded-full border px-3 py-1.5 text-xs font-black", statusTone(readiness.status))}>
-            {statusLabel(readiness.status, locale)}
+            {statusLabel(readiness.status, bt)}
           </span>
         </div>
       </div>
@@ -343,7 +343,7 @@ export function StudioMarketplaceSellerPanel({
                   : "border-warning/30 bg-warning-soft/10 text-fg-2",
               )}>
                 <CircleAlert size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
-                {locale === "ko" ? finding.messageKo : finding.messageEn}
+                {bt(finding.messageKo, finding.messageEn)}
               </div>
             ))}
             {readiness.findings.length === 0 ? (
