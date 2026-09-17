@@ -448,10 +448,10 @@ export function creatorRoleWorkspacePreferenceForProfile(
     detailedLens: activeRole ? creatorDetailedRoleLens(activeRole) : null,
     workspacePreset: activeRole ? creatorRoleStudioWorkspace(activeRole) : null,
     visibility: {
-      roles: profile?.roleVisibility === true,
-      specialties: false,
-      experienceLevel: false,
-      collaborationStatus: false,
+      roles: profile?.visibility.roles === true,
+      specialties: profile?.visibility.specialties === true,
+      experienceLevel: profile?.visibility.experienceLevel === true,
+      collaborationStatus: profile?.visibility.collaborationStatus === true,
     },
   });
 }
