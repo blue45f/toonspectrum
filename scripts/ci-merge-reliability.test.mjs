@@ -5,13 +5,23 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { REQUIRED_CORE_GATES } from "./ci-core-gate.mjs";
+
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 const root = fileURLToPath(new URL("../", import.meta.url));
 const policy = join(root, "scripts/verify-pr-workflow-fanout.py");
 const workflow = readFileSync(join(root, ".github/workflows/ci.yml"), "utf8");
+const jobs = workflow.slice(workflow.indexOf("\njobs:\n") + 7).split(/(?=^ {2}[a-z][a-z0-9-]*:\n)/m);
 const guard = (directory) => spawnSync("python3", [policy, "--root", directory], {
-  encoding: "utf8", timeout: 10_000,
+  encoding: "utf8",
+  timeout: 10_000,
 });
+
+function job(name) {
+  const block = jobs.find((entry) => entry.startsWith(`  ${name}:\n`));
+  assert.ok(block, `missing job: ${name}`);
+  return block;
+}
 
 test("the production trigger policy succeeds without installing project dependencies", () => {
   const result = guard(root);
@@ -33,56 +43,87 @@ const mutations = [
   ["commented cancellation policy", (text) => text.replace("  cancel-in-progress:", "  # cancel-in-progress:")],
 ];
 
-for (const [label, mutate] of mutations) {
-  test(`fanout guard rejects ${label}`, () => {
+test("fanout guard rejects every unsafe trigger mutation in one table-driven contract", () => {
+  for (const [label, mutate] of mutations) {
     const fixture = mkdtempSync(join(tmpdir(), "toon-ci-policy-"));
     try {
       cpSync(join(root, ".github"), join(fixture, ".github"), { recursive: true });
       const target = join(fixture, ".github/workflows/character-merge-validation.yml");
       const original = readFileSync(target, "utf8");
       const modified = mutate(original);
-      assert.notEqual(modified, original, "mutation must actually modify the workflow");
+      assert.notEqual(modified, original, `${label}: mutation must modify the workflow`);
       writeFileSync(target, modified);
       const result = guard(fixture);
-      assert.equal(result.status, 1, result.stdout + result.stderr);
-      assert.match(result.stderr, /character-merge-validation.yml/);
+      assert.equal(result.status, 1, `${label}: ${result.stdout}${result.stderr}`);
+      assert.match(result.stderr, /character-merge-validation.yml/, label);
     } finally {
       rmSync(fixture, { recursive: true, force: true });
     }
-  });
-}
-
-test("lint and all typechecks fail fast before product regressions, after installation", () => {
-  const source = workflow.split("\n  static:\n")[1].split("\n  serial:\n")[0];
-  const commands = [
-    "pnpm install --frozen-lockfile",
-    "pnpm run lint:strict",
-    "pnpm run typecheck\n",
-    "pnpm run typecheck:cloudflare-realtime",
-    "pnpm exec vitest run",
-  ];
-  let previous = -1;
-  for (const command of commands) {
-    const index = source.indexOf(command);
-    assert.ok(index > previous, `${command} must execute in fail-fast order`);
-    previous = index;
   }
 });
 
-test("required core still runs on every main PR, main push and merge group without path skipping", () => {
+test("lint, typecheck and regressions run as independent installed lanes", () => {
+  const expectations = [
+    ["lint", "pnpm run lint:strict"],
+    ["typecheck", "pnpm run typecheck"],
+    ["static", "pnpm exec vitest run"],
+  ];
+  for (const [name, command] of expectations) {
+    const block = job(name);
+    const install = block.indexOf("pnpm install --frozen-lockfile");
+    const execute = block.indexOf(command);
+    assert.ok(install >= 0, `${name} must install dependencies`);
+    assert.ok(execute > install, `${name} must execute after installation`);
+    assert.doesNotMatch(block, /^ {4}needs:/m, `${name} must start independently`);
+  }
+  assert.match(job("typecheck"), /pnpm run typecheck:cloudflare-realtime/);
+  assert.doesNotMatch(job("static"), /pnpm run lint:strict|pnpm run typecheck(?:\s|$)/);
+});
+
+test("build trusts the protected typecheck lane and only creates deployable artifacts", () => {
+  const build = job("build");
+  assert.match(build, /pnpm run build:bundle/);
+  assert.doesNotMatch(build, /pnpm run build(?!:)/);
+  assert.match(build, /pnpm run check:studio-bundle/);
+  assert.match(build, /test -s dist\/\.vite\/manifest\.json/);
+});
+
+test("required core runs on every main PR, main push and merge group without path skipping", () => {
   const events = workflow.split("\non:\n")[1].split("\npermissions:\n")[0];
   assert.match(events, / {2}pull_request:\n {4}branches: \[main\]/);
   assert.match(events, / {2}push:\n {4}branches: \[main\]/);
   assert.match(events, / {2}merge_group:/);
   assert.doesNotMatch(events, /paths(?:-ignore)?:|types:/);
   assert.doesNotMatch(workflow, /continue-on-error|CI_CORE_BYPASS/);
-  assert.match(workflow, /needs: \[static, serial, build\]/);
+  assert.match(workflow, new RegExp(`needs: \\[${REQUIRED_CORE_GATES.join(", ")}\\]`));
 });
 
-test("preflight executes the fanout guard and its regression tests before costly jobs", () => {
-  const preflight = workflow.split("\n  preflight:\n")[1].split("\n  static:\n")[0];
-  assert.match(preflight, /node --test .*scripts\/ci-merge-reliability.test.mjs/);
-  assert.match(preflight, /run: python3 scripts\/verify-pr-workflow-fanout.py/);
+test("dependency-free workflow policy checks run before installation in the sparse typecheck lane", () => {
+  assert.doesNotMatch(workflow, /^ {2}preflight:\n/m);
+  const typecheck = job("typecheck");
+  const contracts = typecheck.indexOf("node --test scripts/ci-core-gate.test.mjs");
+  const fanout = typecheck.indexOf("python3 scripts/verify-pr-workflow-fanout.py");
+  const install = typecheck.indexOf("pnpm install --frozen-lockfile");
+  assert.ok(contracts >= 0);
+  assert.ok(fanout > contracts);
+  assert.ok(install > fanout);
+  assert.match(typecheck, /filter: blob:none/);
+  assert.match(typecheck, /sparse-checkout:/);
+  assert.match(typecheck, /\/apps\/web\/public\/assets\/3d\/environments\/refined-v6\/manifest\.json/);
+  assert.match(typecheck, /\/apps\/web\/public\/assets\/3d\/environments\/expansion-v1\/manifest\.json/);
+
+  const lint = job("lint");
+  assert.match(lint, /filter: blob:none/);
+  assert.match(lint, /!\/apps\/web\/public\/assets\//);
+  assert.match(lint, /\/apps\/web\/public\/assets\/reference-rebuild\//);
+  assert.match(lint, /!\/apps\/web\/public\/vrm\//);
+});
+
+test("the protected aggregate performs no repository checkout or dependency setup", () => {
+  const core = job("core");
+  assert.match(core, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(core, /CORE_RESULTS: \$\{\{ toJSON\(needs\) \}\}/);
+  assert.doesNotMatch(core, /actions\/checkout|actions\/setup-node|pnpm/);
 });
 
 test("the market delivery lane replaces stale runs without skipping its regressions", () => {

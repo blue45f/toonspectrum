@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { STUDIO_GZIP_ALLOWANCE as policy, resolveTemporaryBundleCeiling } from "./lib/studio-bundle-temporary-allowance.mjs";
 
-// Run both in the dependency-free mandatory preflight and the full Vitest suite.
+// Run both before dependency installation in the mandatory typecheck lane and in Vitest.
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 const activeAt = Date.parse("2026-09-14T00:00:00+09:00");
 const expiresAt = Date.parse(policy.expiresAt);
@@ -58,10 +58,13 @@ test("admits the reported overrun only before expiry and still bounds further gr
   assert.ok(1_967_362 > resolve().ceiling);
 });
 
-test("is run by mandatory preflight and does not change the accepted baseline policy", () => {
+test("is run before dependency installation in the mandatory typecheck lane", () => {
   const source = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
-  const preflight = source.slice(source.indexOf("  preflight:"), source.indexOf("  static:"));
-  assert.match(preflight, /run: node --test[^\n]*scripts\/studio-bundle-temporary-allowance\.test\.mjs/);
+  const typecheck = source.slice(source.indexOf("  typecheck:"), source.indexOf("  static:"));
+  const policyTest = typecheck.indexOf("scripts/studio-bundle-temporary-allowance.test.mjs");
+  const install = typecheck.indexOf("pnpm install --frozen-lockfile");
+  assert.ok(policyTest >= 0);
+  assert.ok(install > policyTest);
   const baseline = JSON.parse(readFileSync(new URL("./bundle-baseline.json", import.meta.url), "utf8"));
   assert.equal(baseline.policy.byteTolerance, 0.02);
   assert.equal(baseline.policy.countTolerance, 0.02);
