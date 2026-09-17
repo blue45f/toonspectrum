@@ -12,14 +12,16 @@ const admission = readFileSync(
 );
 
 describe("Studio 3D entry continuity boundary", () => {
-  it("makes an asset 3D open request route-authoritative even if open state was already stale", () => {
+  it("keeps seeded asset insertion on the routed open-edge path", () => {
     const start = host.indexOf("function openStudioObjectInsert(");
     const end = host.indexOf("function clearStudioObjectInsertSeeds()", start);
     const source = host.slice(start, end);
 
     expect(start).toBeGreaterThanOrEqual(0);
-    expect(source).toContain('navigateStudio2dSurface("poser")');
-    expect(source).toContain('navigateStudio2dSurface("bg3d")');
+    expect(source).toContain("resolveStudioObjectInsertOpenSeed(request)");
+    expect(source).toContain("setPoserVrmOpen(true)");
+    expect(source).toContain("setBg3dOpen(true)");
+    expect(source).not.toContain('navigateStudio2dSurface("bg3d")');
   });
 
   it("allows routed 3D requests to replace another visible Studio surface", () => {
