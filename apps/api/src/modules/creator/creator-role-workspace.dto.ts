@@ -46,7 +46,7 @@ const CapacitySchema = z.object({
   unavailableUntil: z.iso.datetime({ offset: true }).nullable(),
 }).strict();
 
-const NotificationOverridesSchema = z.record(
+const NotificationOverridesSchema = z.partialRecord(
   z.enum(CREATOR_ROLE_NOTIFICATION_EVENTS),
   z.boolean(),
 );

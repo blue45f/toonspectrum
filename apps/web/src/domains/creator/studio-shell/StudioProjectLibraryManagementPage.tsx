@@ -4,6 +4,7 @@ import { StudioProjectLibraryManagementContent } from "./StudioProjectLibraryMan
 import { StudioProjectLibraryManagementDialogs } from "./StudioProjectLibraryManagementDialogs";
 import { StudioProjectLibraryManagementHeader } from "./StudioProjectLibraryManagementHeader";
 import { StudioProjectStartPanel } from "./StudioProjectStartPanel";
+import { StudioRolePersonalizationCenter } from "./StudioRolePersonalizationCenter";
 import { StudioRoleWorkspacePanel } from "./StudioRoleWorkspacePanel";
 import { useStudioProjectLibraryManagementController } from "./useStudioProjectLibraryManagementController";
 
@@ -16,6 +17,7 @@ export function StudioProjectLibraryManagementPage() {
         {controller.view === "active" ? (
           <>
             <StudioRoleWorkspacePanel locale={controller.locale} />
+            <StudioRolePersonalizationCenter locale={controller.locale} />
             <StudioProjectStartPanel locale={controller.locale} />
           </>
         ) : null}

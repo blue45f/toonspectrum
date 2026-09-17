@@ -7,7 +7,7 @@ import { readStudioLaunchDensity, readStudioLaunchPrimaryTool } from "./studio-l
 import { createStudioProjectWithInitialDocument } from "./studio-project-creation";
 import { ensureInitialStudioProjectDocument } from "./studio-project-document-store";
 import { preserveStudioTaskToolbarPreference, projectStudioTaskAppSettings } from "./studio-task-tools";
-import { applyStudioTaskWorkspace, studioTaskWorkspaceId } from "./studio-task-workspace";
+import { applyStudioTaskWorkspace, studioRoleWorkspaceId, studioTaskWorkspaceId } from "./studio-task-workspace";
 import { createStudioWorkspaceDefaultState } from "./studio-workspaces";
 
 // Isolated in-memory fixture. Tests never access the user's stored documents.
@@ -64,11 +64,17 @@ describe("quick and task-specific studio workspaces", () => {
     const initial = createStudioWorkspaceDefaultState(null);
     const before = JSON.stringify(initial);
     const layouts = ["draw", "comic", "design"] as const;
-    expect(layouts.map((task) => applyStudioTaskWorkspace(initial, studioTaskWorkspaceId(task, "simple")).activeWorkspaceId))
+    expect(layouts.map((task) => applyStudioTaskWorkspace(initial, studioTaskWorkspaceId(task, "simple", "")).activeWorkspaceId))
       .toEqual(["lineart", "pro-comic", "vector-design"]);
     expect(JSON.stringify(initial)).toBe(before);
-    expect(studioTaskWorkspaceId(null, "simple")).toBeNull();
-    expect(studioTaskWorkspaceId("3d", "simple")).toBeNull();
+    expect(studioTaskWorkspaceId(null, "simple", "")).toBeNull();
+    expect(studioTaskWorkspaceId("3d", "simple", "")).toBeNull();
+  });
+  it("uses a validated project role layout without interpreting duplicates or unknown ids", () => {
+    expect(studioRoleWorkspaceId("?roleWorkspace=coloring")).toBe("coloring");
+    expect(studioTaskWorkspaceId("draw", "focus", "?roleWorkspace=review")).toBe("review");
+    expect(studioRoleWorkspaceId("?roleWorkspace=unknown")).toBeNull();
+    expect(studioRoleWorkspaceId("?roleWorkspace=lineart&roleWorkspace=review")).toBeNull();
   });
   it("preserves custom layouts and edits to the current task profile", () => {
     const initial = createStudioWorkspaceDefaultState(null);
