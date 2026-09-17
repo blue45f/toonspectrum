@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 
@@ -30,6 +31,10 @@ import {
   type StudioShellFloatingLayoutRuntime,
   type StudioShellFloatingVisibilityAuthority,
 } from "./studio-shell-floating-layout-context";
+import {
+  studioWorkspaceArrangingSnapshot,
+  subscribeStudioWorkspaceArranging,
+} from "../studio-workspace-arrangement";
 
 import type {
   StudioShellFloatingVisibilityRepository,
@@ -91,6 +96,14 @@ export function StudioShellFloatingLayoutProvider({
     useState<StudioShellFloatingLayoutRuntime["failure"]>(null);
   const [resetRevisions, setResetRevisions] = useState(createStudioShellFloatingResetRevisions);
   const [drawingAutoHideActive, setDrawingAutoHideActive] = useState(false);
+  const [focusModeActive, setFocusModeActive] = useState(false);
+  const [mountedSurfaceIds, setMountedSurfaceIds] =
+    useState<readonly StudioShellFloatingSurfaceId[]>([]);
+  const arranging = useSyncExternalStore(
+    subscribeStudioWorkspaceArranging,
+    studioWorkspaceArrangingSnapshot,
+    () => false,
+  );
   const drawingPointerId = useRef<number | null>(null);
   const drawingReleaseTimer = useRef<number | null>(null);
   const liveVisibility = useRef(visibility);
@@ -142,7 +155,7 @@ export function StudioShellFloatingLayoutProvider({
       drawingPointerId.current = null;
       setDrawingAutoHideActive(false);
     };
-    if (!visibility.autoHideWhileDrawing) {
+    if (!visibility.autoHideWhileDrawing || arranging) {
       stopImmediately();
       return undefined;
     }
@@ -183,7 +196,7 @@ export function StudioShellFloatingLayoutProvider({
       clearReleaseTimer();
       drawingPointerId.current = null;
     };
-  }, [visibility.autoHideWhileDrawing]);
+  }, [arranging, visibility.autoHideWhileDrawing]);
 
   const commit = useCallback((next: StudioShellFloatingVisibilityState) => {
     const normalized = normalizeStudioShellFloatingVisibility(next);
@@ -207,10 +220,30 @@ export function StudioShellFloatingLayoutProvider({
       });
   }, [repository]);
 
+  const setSurfaceMounted = useCallback((
+    id: StudioShellFloatingSurfaceId,
+    mounted: boolean,
+  ) => {
+    setMountedSurfaceIds((current) => {
+      const next = new Set(current);
+      if (mounted) next.add(id);
+      else next.delete(id);
+      const ordered = STUDIO_SHELL_FLOATING_SURFACE_IDS.filter((candidate) =>
+        next.has(candidate)
+      );
+      if (
+        ordered.length === current.length
+        && ordered.every((candidate, index) => candidate === current[index])
+      ) return current;
+      return ordered;
+    });
+  }, []);
+
   const setVisible = useCallback((
     id: StudioShellFloatingVisibilityId,
     visible: boolean,
   ) => {
+    setFocusModeActive(false);
     commit(setStudioShellFloatingSurfaceVisible(liveVisibility.current, id, visible));
   }, [commit]);
 
@@ -222,15 +255,26 @@ export function StudioShellFloatingLayoutProvider({
     commit(setStudioShellFloatingAutoHideWhileDrawing(liveVisibility.current, enabled));
   }, [commit]);
 
+  const enterFocusMode = useCallback(() => {
+    setFocusModeActive(true);
+  }, []);
+
+  const exitFocusMode = useCallback(() => {
+    setFocusModeActive(false);
+  }, []);
+
   const applyPreset = useCallback((preset: StudioShellFloatingPresetId) => {
+    setFocusModeActive(false);
     commit(applyStudioShellFloatingPreset(preset, liveVisibility.current));
   }, [commit]);
 
   const showAll = useCallback(() => {
+    setFocusModeActive(false);
     commit(applyStudioShellFloatingPreset("all", liveVisibility.current));
   }, [commit]);
 
   const hideAll = useCallback(() => {
+    setFocusModeActive(false);
     commit(hideAllStudioShellFloatingSurfaces(liveVisibility.current));
   }, [commit]);
 
@@ -251,13 +295,22 @@ export function StudioShellFloatingLayoutProvider({
     visibility,
     autoHideWhileDrawing: visibility.autoHideWhileDrawing,
     drawingAutoHideActive,
+    focusModeActive,
+    mountedSurfaceIds,
     authority,
     failure,
     resetRevisions,
-    isVisible: (id) => isStudioShellFloatingSurfaceVisible(visibility, id),
+    isVisible: (id) => focusModeActive
+      ? id === "workspace-switcher"
+      : isStudioShellFloatingSurfaceVisible(visibility, id),
+    isConfiguredVisible: (id) => isStudioShellFloatingSurfaceVisible(visibility, id),
+    isSurfaceMounted: (id) => mountedSurfaceIds.includes(id),
+    setSurfaceMounted,
     setVisible,
     toggleVisible,
     setAutoHideWhileDrawing,
+    enterFocusMode,
+    exitFocusMode,
     applyPreset,
     showAll,
     hideAll,
@@ -267,12 +320,17 @@ export function StudioShellFloatingLayoutProvider({
     applyPreset,
     authority,
     drawingAutoHideActive,
+    enterFocusMode,
+    exitFocusMode,
     failure,
+    focusModeActive,
     hideAll,
+    mountedSurfaceIds,
     resetAllSurfaces,
     resetRevisions,
     resetSurface,
     setAutoHideWhileDrawing,
+    setSurfaceMounted,
     setVisible,
     showAll,
     toggleVisible,

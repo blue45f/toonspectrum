@@ -1075,6 +1075,18 @@ async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
       await dialog.getByRole("switch", { name: "그리기 옵션 표시하기" }).click();
       await drawingOptions.waitFor({ state: "visible", timeout: 3000 });
 
+      if (await dialog.locator('[data-studio-shell-mounted-state="available"]').count() === 0) {
+        failures.push("현재 화면에서 사용 가능한 플로팅 요소 상태가 표시되지 않음");
+      }
+      await dialog.getByRole("button", { name: /캔버스 집중/ }).click();
+      await drawingOptions.waitFor({ state: "hidden", timeout: 3000 });
+      await dialog.locator('[data-studio-shell-focus-mode="true"]').waitFor({
+        state: "visible",
+        timeout: 3000,
+      });
+      await dialog.getByRole("button", { name: "원래 보기", exact: true }).click();
+      await drawingOptions.waitFor({ state: "visible", timeout: 3000 });
+
       await dialog.getByRole("button", { name: "배치 편집", exact: true }).click();
       const handle = page.locator('[data-studio-shell-floating-handle="drawing-options"]');
       await handle.waitFor({ state: "visible", timeout: 3000 });
@@ -1113,6 +1125,10 @@ async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
         , undefined, { timeout: 2500 });
       }
 
+      if (!(await dialog.isVisible().catch(() => false))) {
+        await launcher.click();
+        await dialog.waitFor({ state: "visible", timeout: 3000 });
+      }
       await dialog.getByRole("button", { name: "모두 숨김" }).click();
       await drawingOptions.waitFor({ state: "hidden", timeout: 3000 });
       if (!(await launcher.isVisible())) failures.push("모두 숨김 후 보기 복구 버튼이 사라짐");

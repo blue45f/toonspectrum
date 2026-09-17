@@ -225,6 +225,7 @@ export function StudioShellFloatingTarget({
     [surfaceId],
   );
   const shell = useStudioShellFloatingLayout();
+  const { setSurfaceMounted } = shell;
   const preferredVisible = shell.isVisible(definition.visibilityId);
   const [node, setNode] = useState<HTMLElement | null>(null);
   const [forceVisible, setForceVisible] = useState(false);
@@ -298,6 +299,12 @@ export function StudioShellFloatingTarget({
       observer.disconnect();
     };
   }, [definition.selector]);
+
+  useEffect(() => {
+    setSurfaceMounted(surfaceId, node !== null);
+    if (!node) return undefined;
+    return () => setSurfaceMounted(surfaceId, false);
+  }, [node, setSurfaceMounted, surfaceId]);
 
   useLayoutEffect(() => {
     if (!node) return undefined;

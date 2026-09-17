@@ -56,6 +56,7 @@ describe("studio shell floating integration", () => {
     expect(target).toContain('data-studio-shell-floating-dock-guide={surfaceId}');
     expect(target).toContain('aria-label={`${definition.label} 도킹 위치`}');
     expect(target).toContain("const managedVisible = preferredVisible || forceVisible");
+    expect(target).toContain("setSurfaceMounted(surfaceId, node !== null)");
     expect(target).toContain("if (!node || !managedVisible || !positionEnabled)");
     expect(target).toContain("zIndex: 119");
     expect(target).not.toContain('node.style.removeProperty("width")');
@@ -66,6 +67,9 @@ describe("studio shell floating integration", () => {
     const provider = source("studio-shell/StudioShellFloatingLayoutProvider.tsx");
     expect(provider).not.toContain("navigator.storage");
     expect(provider).toContain('event.pointerType !== "pen"');
+    expect(provider).toContain("focusModeActive");
+    expect(provider).toContain("setSurfaceMounted");
+    expect(provider).toContain("visibility.autoHideWhileDrawing || arranging");
     const drawingAutoHide = source("studio-shell/studio-shell-drawing-auto-hide.ts");
     expect(drawingAutoHide).toContain('[data-studio-canvas-viewport]');
 
@@ -75,5 +79,8 @@ describe("studio shell floating integration", () => {
     expect(manager).toContain("플랫폼 규격");
     expect(manager).toContain("펜으로 그리는 동안 자동 숨김");
     expect(manager).toContain("data-studio-shell-drawing-auto-hide-active");
+    expect(manager).toContain("data-studio-shell-mounted-state");
+    expect(manager).toContain("data-studio-shell-focus-mode");
+    expect(manager).toContain("--studio-canvas-bottom-inset");
   });
 });
