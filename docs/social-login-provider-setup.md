@@ -187,21 +187,65 @@ https://www.toonstudio.cloud/api/auth/oauth/google/callback
 - 공급자 토큰으로 신원을 확인한 뒤 ToonSpectrum이 자체 HttpOnly, Secure, SameSite=Lax 세션을 발급한다.
 - 설정 변경은 운영 배포가 아니다. 검토된 SHA의 별도 수동 배포와 canary 승인이 필요하다.
 
-## 배포 전 검증
+## 로컬 자격증명 정본과 재발급 정책
 
-환경변수만 설정한 뒤에는 아직 사용자 트래픽을 전환하지 않는다. 검토된 릴리스에서 다음을 확인한다.
+운영 Client ID와 Client Secret은 공급자 콘솔과 Core API secret store가 권위 원본이며,
+운영 담당자의 Mac에는 **재발급 방지용 복구 정본**을 한 벌만 둔다. 저장소나 프로젝트 내부
+`.env`에는 보관하지 않는다. 기존 자격증명이 정상이라면 새 키를 만들지 않고 그대로 재사용한다.
+키가 실제로 노출·폐기됐거나 공급자가 회전을 요구할 때만 새로 발급한다.
+
+로컬 정본 기본 경로와 권한은 다음과 같다.
 
 ```bash
-curl -sS https://www.toonstudio.cloud/api/auth/providers
+mkdir -p ~/.config/toonstudio/secrets
+chmod 700 ~/.config/toonstudio ~/.config/toonstudio/secrets
+chmod 600 ~/.config/toonstudio/secrets/oauth-production.env
 ```
+
+파일에는 아래 여섯 항목만 두며 실제 값은 문서, 이슈, PR, 셸 기록에 붙여넣지 않는다.
+
+```dotenv
+KAKAO_REST_API_KEY=<existing value>
+KAKAO_CLIENT_SECRET=<existing value>
+NAVER_OAUTH_CLIENT_ID=<existing value>
+NAVER_OAUTH_CLIENT_SECRET=<existing value>
+GITHUB_OAUTH_CLIENT_ID=<existing value>
+GITHUB_OAUTH_CLIENT_SECRET=<existing value>
+```
+
+macOS에서는 저장 후 Keychain으로 동기화한다. 스크립트는 값 자체를 출력하지 않고
+`toonstudio:<환경변수명>` 서비스 항목으로 저장한다.
+
+```bash
+pnpm run auth:social-login:keychain
+pnpm run auth:social-login:keychain -- --status
+```
+
+운영 값을 회전해야 할 때는 공급자 콘솔 → 로컬 정본 → Keychain → Render secret store 순서로
+같은 변경 창에서 반영하고, 검증된 배포가 완료된 뒤에만 이전 자격증명을 폐기한다. 다운로드 폴더나
+임시 파일에 남은 사본은 즉시 삭제하고 시스템 클립보드도 비운다.
+
+## 배포·운영 검증
+
+환경변수 저장만으로 실행 중인 인스턴스는 갱신되지 않는다. Render의 검토된 `main` SHA를
+수동 배포한 뒤 다음 검증기를 실행한다.
+
+```bash
+pnpm run verify:social-login-production
+# 다른 정본 origin을 확인할 때만 명시적으로 지정
+pnpm run verify:social-login-production -- --origin=https://www.toonstudio.cloud
+```
+
+검증기는 `/api/auth/providers`뿐 아니라 카카오·네이버·GitHub 로그인 시작 경로도 직접 확인한다.
+공식 공급자 HTTPS 호스트, 정본 callback, browser-bound state 쿠키, GitHub S256 PKCE,
+카카오 최소 프로필 scope와 이메일 scope 비활성화까지 모두 통과해야 성공한다.
 
 기대 상태:
 
-- `google.mode`: Google Client ID가 있으면 `oauth`, 없으면 `disabled`
-- `kakao.mode`: REST API 키와 Client Secret이 모두 있으면 `oauth`
-- `naver.mode`: Client ID와 Client Secret이 모두 있으면 `oauth`
-- `github.mode`: Client ID와 Client Secret이 모두 있으면 `oauth`
-- `github.redirectAvailable`: 완전한 설정일 때만 `true`
+- `google.mode`, `kakao.mode`, `naver.mode`, `github.mode`: 모두 `oauth`
+- `kakao.redirectAvailable`, `naver.redirectAvailable`, `github.redirectAvailable`: 모두 `true`
+- `google.clientId`: 올바른 GIS Web Client ID이며 Secret 필드는 공개 응답에 없음
+- 네이버 검수 승인 전에는 등록된 개발 계정만 실제 로그인을 완료할 수 있음
 
 공급자별 실제 계정으로 다음 canary를 수행한다.
 

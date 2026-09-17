@@ -6,10 +6,12 @@ import { createMusicRecovery, type MusicRecoveryPort } from "./studio-music-reco
 
 import type { LocalMusicTrack } from "./studio-music-client";
 
+import { defaultMusicBrief } from "@toonspectrum/core/studio-music";
+
 function track(id = "one", ownerId = "owner-a"): LocalMusicTrack {
   return { ownerId, audio: new Blob(["ID3test-audio"], { type: "audio/mpeg" }), metadata: {
     id, createdAt: "2026-09-06T01:00:00Z", provider: "elevenlabs", model: "music_v1", format: "mp3_44100_128", termsUrl: "",
-    brief: { title: id, scene: "재회의 장면", mood: "romance", purpose: "bgm", seconds: 30, bpm: 78, instruments: ["piano"], vocals: false, lyrics: "", loop: false, workId: "", rightsConfirmed: true },
+    brief: { ...defaultMusicBrief(), title: id, scene: "재회의 장면", instruments: ["piano"], rightsConfirmed: true },
   } };
 }
 function deferred<T>() {

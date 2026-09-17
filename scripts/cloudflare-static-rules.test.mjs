@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   renderCloudflareHeaders,
+  renderCloudflareWorkerSecurityPolicy,
   verifyCloudflareStaticRules,
 } from "./cloudflare-static-rules.mjs";
 
@@ -28,7 +29,26 @@ describe("Cloudflare static response rules", () => {
     );
   });
 
-  it("keeps the committed _headers artifact synchronized", () => {
+  it("projects the canonical CSP into the edge worker without touching other headers", () => {
+    const source = `export const COMMON_SECURITY_HEADERS = {\n  "Content-Security-Policy": "old",\n  "X-Test": "kept",\n};\n`;
+    const output = renderCloudflareWorkerSecurityPolicy(source, {
+      headers: [
+        {
+          source: "/(.*)",
+          headers: [
+            { key: "Content-Security-Policy", value: "default-src 'self'; object-src 'none'" },
+          ],
+        },
+      ],
+    });
+
+    expect(output).toContain(
+      `"Content-Security-Policy": "default-src 'self'; object-src 'none'",`,
+    );
+    expect(output).toContain(`"X-Test": "kept"`);
+  });
+
+  it("keeps static and edge response policy artifacts synchronized", () => {
     expect(verifyCloudflareStaticRules()).toEqual([]);
     expect(readFileSync("apps/web/public/_headers", "utf8")).toContain(
       "Content-Security-Policy:",

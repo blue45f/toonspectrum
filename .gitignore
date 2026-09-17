@@ -134,3 +134,7 @@ crates/**/target/
 
 # Local P2P browser verification cache
 .qa/p2p-vite-cache/
+
+# Local social-login credential vault exports (never commit)
+/oauth-production.env
+/toonstudio-oauth-production.env

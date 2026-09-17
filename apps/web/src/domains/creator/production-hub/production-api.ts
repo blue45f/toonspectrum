@@ -103,6 +103,13 @@ export type ProductionClientCommand =
   | { readonly type: "record-review-decision"; readonly policyId: string; readonly decision: ReviewDecision }
   | { readonly type: "upsert-task"; readonly task: ProductionTask }
   | {
+      readonly type: "upsert-episode-operations";
+      readonly episodeId: string;
+      readonly episode?: EpisodeCollaboration;
+      readonly episodePlan?: EpisodePlan;
+      readonly tasks: readonly ProductionTask[];
+    }
+  | {
       readonly type: "upsert-change-request";
       readonly request: ChangeRequest;
       readonly impactHints?: {

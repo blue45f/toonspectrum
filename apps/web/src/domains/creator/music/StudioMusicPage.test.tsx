@@ -13,11 +13,12 @@ import { defaultMusicBrief, MUSIC_TERMS_URL } from "@toonspectrum/core/studio-mu
 
 const mocks = vi.hoisted(() => ({
   ownerId: "owner-a",
-  load: vi.fn(), save: vi.fn(), remove: vi.fn(), generate: vi.fn(), status: vi.fn(), error: vi.fn(),
+  load: vi.fn(), save: vi.fn(), remove: vi.fn(), generate: vi.fn(), status: vi.fn(), error: vi.fn(), lyrics: vi.fn(),
 }));
 vi.mock("./studio-music-client", () => ({ generateMusic: mocks.generate, getMusicStatus: mocks.status }));
 vi.mock("./studio-music-library", () => ({ loadMusicTracks: mocks.load, saveMusicTrack: mocks.save, deleteMusicTrack: mocks.remove }));
 vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: mocks.ownerId ? { user: { id: mocks.ownerId } } : null }) }));
+vi.mock("@/domains/creator/studio-server-ai-client", () => ({ completeAutomaticFreeText: mocks.lyrics }));
 vi.mock("@/infrastructure/api", () => ({ getApiErrorMessage: mocks.error }));
 
 function output(index = 1, ownerId = "owner-a", workId = "work-a"): LocalMusicTrack {
@@ -99,6 +100,10 @@ beforeEach(() => {
     return result;
   });
   mocks.error.mockReset().mockImplementation(async (reason: unknown, fallback: string) => reason instanceof Error ? reason.message : fallback);
+  mocks.lyrics.mockReset().mockResolvedValue({
+    ok: true,
+    data: { content: "[Verse]\n비가 멎은 플랫폼\n\n[Chorus]\n다시 너를 불러", provider: "gemini", model: "gemini-test" },
+  });
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -223,6 +228,39 @@ describe("music workspace rendered recovery and route regression", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "현재 작품에 연결해 만든 음악만 보기" }));
     await generatedCard();
     expect(mocks.load).toHaveBeenCalledTimes(1); expect(mocks.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies a complete webtoon theme pack without sending a paid request", async () => {
+    render(<Harness />); await ready();
+    fireEvent.click(screen.getByRole("button", { name: /헌터 레이드/u }));
+    expect(screen.getByLabelText("장면 분위기")).toHaveProperty("value", "hunter");
+    expect(screen.getByLabelText("음악 용도")).toHaveProperty("value", "trailer");
+    expect(screen.getByLabelText("장면 설명")).not.toHaveProperty("value", "");
+    expect(consent()).toHaveProperty("checked", false);
+    expect(mocks.generate).not.toHaveBeenCalled();
+  });
+
+  it("creates an AI lyric draft without dispatching a paid music request", async () => {
+    render(<Harness />); await ready(); fillBrief();
+    expect(consent()).toHaveProperty("checked", true);
+    fireEvent.click(screen.getByRole("button", { name: "장면으로 AI 가사 초안" }));
+    const lyrics = await screen.findByLabelText(/직접 작성한 가사 또는 AI 초안/u);
+    expect(lyrics).toHaveProperty("value", "[Verse]\n비가 멎은 플랫폼\n\n[Chorus]\n다시 너를 불러");
+    expect(consent()).toHaveProperty("checked", false);
+    expect(mocks.lyrics).toHaveBeenCalledTimes(1);
+    expect(mocks.generate).not.toHaveBeenCalled();
+  });
+
+  it("binds a generated soundtrack to the current work and episode route", async () => {
+    render(<Harness initial="/music?workId=work-a&episodeId=episode-12" />); await ready(); fillBrief();
+    expect(screen.getByText("새 음악 연결 작품: work-a · 회차: episode-12")).toBeTruthy();
+    fireEvent.submit(submit());
+    await waitFor(() => expect(mocks.generate).toHaveBeenCalledTimes(1));
+    expect(mocks.generate.mock.calls[0][0]).toMatchObject({
+      workId: "work-a",
+      episodeId: "episode-12",
+      rightsConfirmed: true,
+    });
   });
 
   it("preserves original lyric text when toggling vocals off and on", async () => {
