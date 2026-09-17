@@ -68,14 +68,18 @@ const WORKSPACE_LABELS: Readonly<Record<StudioDocumentWorkspace, Readonly<Record
   review: { ko: "검토", en: "Review" },
 });
 
-function defaultTitle(kind: StudioDocumentKind, locale: Locale): string {
+function defaultTitle(
+  kind: StudioDocumentKind,
+  bt: (ko: string, en: string) => string,
+): string {
   const item = DOCUMENT_KIND_OPTIONS.find((option) => option.id === kind);
-  const label = locale === "ko" ? item?.labelKo : item?.labelEn;
-  return bt(`새 ${label ?? "문서"}`, `New ${label ?? "document"}`);
+  return item
+    ? bt(`새 ${item.labelKo}`, `New ${item.labelEn}`)
+    : bt("새 문서", "New document");
 }
 
 function formatDate(value: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(bt("ko-KR", "en-US"), {
+  return new Intl.DateTimeFormat(locale || "en", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -83,9 +87,12 @@ function formatDate(value: string, locale: Locale): string {
   }).format(new Date(value));
 }
 
-function documentKindLabel(kind: StudioDocumentKind, locale: Locale): string {
+function documentKindLabel(
+  kind: StudioDocumentKind,
+  bt: (ko: string, en: string) => string,
+): string {
   const item = DOCUMENT_KIND_OPTIONS.find((option) => option.id === kind);
-  return locale === "ko" ? item?.labelKo ?? kind : item?.labelEn ?? kind;
+  return item ? bt(item.labelKo, item.labelEn) : kind;
 }
 
 function DocumentRow({
@@ -111,6 +118,7 @@ function DocumentRow({
   readonly onRestore: () => void;
   readonly onDelete: () => void;
 }) {
+  const bt = useBilingual("StudioProjectDocumentsPanel.row");
   return (
     <article className="rounded-2xl border border-line bg-card p-4 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -118,7 +126,7 @@ function DocumentRow({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate text-base font-black text-fg">{document.title}</h3>
             <span className="rounded-full bg-accent-soft px-2 py-1 text-[0.62rem] font-bold text-accent">
-              {documentKindLabel(document.kind, locale)}
+              {documentKindLabel(document.kind, bt)}
             </span>
           </div>
           <p className="mt-1 text-xs text-fg-3">
@@ -136,7 +144,7 @@ function DocumentRow({
               className="mt-1 min-h-10 rounded-xl border border-line bg-panel px-3 text-xs font-semibold text-fg"
             >
               {document.allowedWorkspaces.map((workspace) => (
-                <option key={workspace} value={workspace}>{WORKSPACE_LABELS[workspace][locale]}</option>
+                <option key={workspace} value={workspace}>{bt(WORKSPACE_LABELS[workspace].ko, WORKSPACE_LABELS[workspace].en)}</option>
               ))}
             </select>
           </label>
@@ -202,7 +210,7 @@ export function StudioProjectDocumentsPanel({
   const [view, setView] = useState<DocumentView>("active");
   const documents = useStudioProjectDocuments(projectId, locale, VIEW_STATUS[view]);
   const [kind, setKind] = useState<StudioDocumentKind>("webtoon");
-  const [title, setTitle] = useState(() => defaultTitle("webtoon", locale));
+  const [title, setTitle] = useState(() => defaultTitle("webtoon", bt));
   const [width, setWidth] = useState<number | null>(1_080);
   const [height, setHeight] = useState<number | null>(8_000);
   const [pageCount, setPageCount] = useState(1);
@@ -217,7 +225,7 @@ export function StudioProjectDocumentsPanel({
 
   const selectKind = (next: StudioDocumentKind) => {
     setKind(next);
-    setTitle(defaultTitle(next, locale));
+    setTitle(defaultTitle(next, bt));
     if (next === "webtoon") {
       setWidth(1_080);
       setHeight(8_000);
@@ -236,7 +244,7 @@ export function StudioProjectDocumentsPanel({
   const create = () => {
     const created = documents.create({ title, kind, width, height, pageCount });
     if (!created) return;
-    setTitle(defaultTitle(kind, locale));
+    setTitle(defaultTitle(kind, bt));
     setMessage(bt(`“${created.title}” 문서를 만들었습니다.`, `Created “${created.title}”.`));
   };
 
@@ -307,7 +315,7 @@ export function StudioProjectDocumentsPanel({
               {bt("문서 종류", "Document type")}
               <select value={kind} onChange={(event) => selectKind(event.target.value as StudioDocumentKind)} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg">
                 {DOCUMENT_KIND_OPTIONS.map((option) => (
-                  <option key={option.id} value={option.id}>{locale === "ko" ? option.labelKo : option.labelEn}</option>
+                  <option key={option.id} value={option.id}>{bt(option.labelKo, option.labelEn)}</option>
                 ))}
               </select>
             </label>
