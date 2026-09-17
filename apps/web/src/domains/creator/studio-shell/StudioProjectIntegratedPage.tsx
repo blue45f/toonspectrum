@@ -18,6 +18,7 @@ import { StudioProjectFeatureSuitePanel } from "./StudioProjectFeatureSuitePanel
 import { StudioReviewPanel } from "./StudioReviewPanel";
 import { StudioProductionToolchainPanel } from "../toolchain/StudioProductionToolchainPanel";
 import { StudioSeriesKitPanel } from "./StudioSeriesKitPanel";
+import { StudioWebtoonProductionCompanion } from "./StudioWebtoonProductionCompanion";
 import {
   StudioProjectShellPage,
   type StudioProjectSection,
@@ -208,6 +209,12 @@ export function StudioProjectIntegratedPage({
             <StudioProjectGraphContextBar projectId={decodedProjectId} locale={locale} />
           </Suspense>
 
+          <StudioWebtoonProductionCompanion
+            projectId={decodedProjectId}
+            section={section}
+            view={view}
+            locale={locale}
+          />
           <SectionWorkflow
             projectId={decodedProjectId}
             section={section}
