@@ -627,7 +627,7 @@ export function StudioLocalizationPanel({
                 ) : (
                   <ul className="mt-2 space-y-1.5 text-xs leading-5 text-fg-2">
                     {qa.map((finding) => (
-                      <li key={finding.code}>• {locale === "ko" ? finding.messageKo : finding.messageEn}</li>
+                      <li key={finding.code}>• {bt(finding.messageKo, finding.messageEn)}</li>
                     ))}
                   </ul>
                 )}
