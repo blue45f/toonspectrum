@@ -258,6 +258,7 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
     },
     items: [
       destination("/about", "서비스 소개", "About ToonStudio", "기능과 운영 원칙", "Features and operating principles"),
+      destination("/brand-film", "브랜드 필름", "Brand film", "Remotion으로 제작한 24초 툰스튜디오 소개 영상", "Watch the 24-second ToonStudio introduction rendered with Remotion"),
       destination(
         "/about/workflow",
         "웹툰 제작 과정",

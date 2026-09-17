@@ -94,6 +94,7 @@ const COPY = {
     primary: "새 작품 시작하기",
     secondary: "전체 제작 흐름 보기",
     projects: "내 프로젝트",
+    brandFilm: "24초 브랜드 필름",
     trust: ["전문 2D·3D 제작", "자동 저장·버전·복구", "일정·협업·검수·연재"],
     previewAlt: "기획, 2D·3D 제작, 검토와 연재 준비가 한 프로젝트에서 이어지는 ToonStudio 제품 예시 화면",
     previewCaption: "대본 → 콘티 → 2D·3D 제작 → 검토 → 연재 준비가 하나의 작품 기록으로 이어집니다.",
@@ -154,6 +155,7 @@ const COPY = {
     primary: "Start a new work",
     secondary: "See the full workflow",
     projects: "My projects",
+    brandFilm: "24-second brand film",
     trust: ["Professional 2D and 3D creation", "Autosave, versions and recovery", "Scheduling, collaboration, review and publishing"],
     previewAlt: "A ToonStudio product concept connecting planning, 2D and 3D creation, review and publishing inside one project",
     previewCaption: "Script, storyboard, 2D and 3D creation, review and publishing stay connected to one work.",
@@ -242,7 +244,10 @@ export function CreatorHomeExperience() {
             <Link href="/studio/new" className="cf-button cf-primary">{copy.primary}<ArrowRight size={17} aria-hidden="true" /></Link>
             <Link href="/production" className="cf-button cf-secondary">{copy.secondary}</Link>
           </div>
-          <div className="cf-hero-links"><Link href="/studio/projects">{copy.projects}<ArrowRight size={14} aria-hidden="true" /></Link></div>
+          <div className="cf-hero-links">
+            <Link href="/studio/projects">{copy.projects}<ArrowRight size={14} aria-hidden="true" /></Link>
+            <Link href="/brand-film">{copy.brandFilm}<ArrowRight size={14} aria-hidden="true" /></Link>
+          </div>
           <div className="cf-trust" aria-label={locale === "ko" ? "핵심 제작 기능" : "Core creation capabilities"}>
             {copy.trust.map((item) => <span key={item}><Check size={12} aria-hidden="true" />{item}</span>)}
           </div>
