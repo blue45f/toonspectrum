@@ -98,6 +98,35 @@ if (/\{prop\.emoji\}/.test(scenePropPanel)) {
   violations.push("StudioVrmPoserPanelBodyD.tsx still renders OS emoji for scene prop visuals");
 }
 
+const highFidelityEmojiGuards = [
+  ["apps/web/src/domains/creator/StudioHandPosePanel.tsx", /🔴|✋/u, "hand-pose controls"],
+  ["apps/web/src/domains/creator/scene-3d/StudioMannequinPoserPanel.tsx", /🔒|🔓|🖐|😀|↔️/u, "mannequin controls"],
+  ["apps/web/src/domains/creator/vrm/StudioVrmCharacterLibraryPanel.tsx", /💡/u, "VRM library guidance"],
+  ["apps/web/src/shared/components/SiteBackgroundMusicPlayer.tsx", /preset\.emoji/u, "site BGM native select"],
+  ["apps/web/src/domains/fortune/tarot-visuals.ts", /\p{Extended_Pictographic}/u, "tarot card motifs"],
+];
+for (const [file, pattern, label] of highFidelityEmojiGuards) {
+  const text = readFileSync(join(root, file), "utf8");
+  if (pattern.test(text)) violations.push(`${file}: ${label} still depends on an OS emoji glyph`);
+}
+
+const creatorPropPreviewIds = [
+  "prop-desk", "prop-chair", "prop-bench", "prop-bookshelf",
+  "prop-streetlamp", "prop-window-wall", "prop-doorway", "prop-stairs",
+];
+for (const id of creatorPropPreviewIds) {
+  const file = `apps/web/public/creator-essentials/${id}.preview.png`;
+  try {
+    const bytes = readFileSync(join(root, file));
+    const size = dimensions(bytes);
+    if (!size || Math.min(size.width, size.height) < 768) {
+      violations.push(`${file}: source-of-truth GLB preview must be a >=768px PNG render`);
+    }
+  } catch {
+    violations.push(`${file}: missing source-of-truth GLB preview`);
+  }
+}
+
 const extensionCounts = Object.fromEntries(
   [...visualExtensions].map((ext) => [ext, visuals.filter((file) => extname(file).toLowerCase() === ext).length]).filter(([, count]) => count > 0),
 );
