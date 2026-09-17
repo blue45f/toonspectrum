@@ -55,3 +55,14 @@
 ## 6. 판정 원칙
 
 실제 참가자 실행과 서명된 결과가 없으면 `PR-057`은 `external-validation-required`로 유지한다. 자동 테스트, 내부 스크린샷 또는 개발자 자체 사용은 전문 창작자 검증을 대체하지 않는다.
+
+## Automated A–D prerequisite gate
+
+External sessions start only after `pnpm run verify:studio-reference-projects` passes. The automated gate runs four deterministic project suites:
+
+- A · solo vertical webtoon: project creation, durable resume, lettering and publish package
+- B · team production: role gates, exact ProjectGraph revision binding, review and comment re-anchoring
+- C · PSD and CLIP interchange: import, editable text, adjustment graph, selection round-trip and loss reporting
+- D · editable 3D production: scene document, camera, multi-pass output, archive restore and VRM editing
+
+The gate records evidence hashes and explicitly leaves `professionalReplacementClaimAllowed=false`. Passing it is a prerequisite, not a substitute, for signed participant evidence.

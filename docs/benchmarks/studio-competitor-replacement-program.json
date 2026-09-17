@@ -535,7 +535,10 @@
       "track": "validation",
       "state": "external-validation-required",
       "evidence": [
-        "docs/validation/studio-professional-creator-validation-plan.md"
+        "docs/validation/studio-professional-creator-validation-plan.md",
+        "docs/benchmarks/studio-reference-project-certification.json",
+        "scripts/verify-studio-reference-projects.mjs",
+        "scripts/verify-studio-reference-projects.test.mjs"
       ]
     }
   ],
