@@ -226,7 +226,7 @@ describe("desktop sync cloud CLI", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("requires the configured token environment variable", async () => {
+  it("falls back to the credential vault when the legacy token variable is absent", async () => {
     const local = await temporaryRoot("toonstudio-cli-cloud-missing-token");
     const options = parseDesktopSyncCliArguments([
       "--local", local,
@@ -235,6 +235,6 @@ describe("desktop sync cloud CLI", () => {
     ]);
     await expect(executeDesktopSyncCli(options, {
       environment: {},
-    })).rejects.toThrow(/TOONSTUDIO_GOOGLE_DRIVE_ACCESS_TOKEN/u);
+    })).rejects.toThrow(/OAuth credential exists for profile default/u);
   });
 });

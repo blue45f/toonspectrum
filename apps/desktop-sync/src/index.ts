@@ -1,3 +1,6 @@
+export * from "./upload-session-store.js";
+export * from "./oauth.js";
+export * from "./credential-vault.js";
 export * from "./agent.js";
 export * from "./cloud/index.js";
 export * from "./filesystem-remote.js";
