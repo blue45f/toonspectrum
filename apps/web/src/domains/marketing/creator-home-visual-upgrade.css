@@ -1,0 +1,206 @@
+/*
+ * Visual-first layer for the creator home.
+ *
+ * Keep semantic HTML and routing contracts in the existing components while
+ * turning text-heavy task cards into recognisable visual choices using only
+ * repository-owned artwork. Motion is intentionally subtle and removable via
+ * prefers-reduced-motion.
+ */
+
+.creator-home[data-creator-home="production-first"] .cf-start-card {
+  isolation: isolate;
+  padding-top: 152px;
+}
+
+.creator-home[data-creator-home="production-first"] .cf-start-card::after {
+  position: absolute;
+  z-index: 0;
+  inset: 12px 12px auto;
+  height: 118px;
+  overflow: hidden;
+  border: 1px solid oklch(1 0 0 / 0.08);
+  border-radius: 13px;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 104%;
+  box-shadow: inset 0 -35px 50px oklch(0.12 0.02 285 / 0.28);
+  content: "";
+  filter: saturate(0.96) contrast(1.03);
+  transition:
+    background-size 650ms cubic-bezier(.16, 1, .3, 1),
+    filter 250ms ease,
+    opacity 250ms ease;
+}
+
+.creator-home[data-creator-home="production-first"] .cf-start-card:nth-child(1)::after {
+  background-image:
+    linear-gradient(180deg, transparent 48%, oklch(0.13 0.02 285 / .52)),
+    url("/brand/atelier-process-640.webp");
+}
+
+.creator-home[data-creator-home="production-first"] .cf-start-card:nth-child(2)::after {
+  background-image:
+    linear-gradient(180deg, transparent 48%, oklch(0.13 0.02 285 / .52)),
+    url("/brand/atelier-world-640.webp");
+}
+
+.creator-home[data-creator-home="production-first"] .cf-start-card:nth-child(3)::after {
+  background-image:
+    linear-gradient(180deg, transparent 46%, oklch(0.13 0.02 285 / .55)),
+    url("/brand/production-os-workspace.svg");
+}
+
+.creator-home[data-creator-home="production-first"] .cf-start-card:nth-child(4)::after {
+  background-image:
+    linear-gradient(180deg, transparent 48%, oklch(0.13 0.02 285 / .52)),
+    url("/brand/atelier-materials-640.webp");
+}
+
+.creator-home[data-creator-home="production-first"] .cf-start-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+.creator-home[data-creator-home="production-first"] .cf-start-card .cf-start-icon {
+  position: absolute;
+  z-index: 3;
+  top: 96px;
+  left: 23px;
+  border-color: oklch(1 0 0 / .18);
+  color: white;
+  background: oklch(0.15 0.025 285 / .7);
+  backdrop-filter: blur(11px);
+  box-shadow: 0 12px 30px oklch(0 0 0 / .22);
+  transition: transform 260ms cubic-bezier(.16, 1, .3, 1), background 220ms ease;
+}
+
+.creator-home[data-creator-home="production-first"] .cf-start-card .cf-start-tag {
+  margin-top: 4px;
+}
+
+.creator-home[data-creator-home="production-first"] .cf-start-card:hover::after,
+.creator-home[data-creator-home="production-first"] .cf-start-card:focus-visible::after {
+  background-size: 111%;
+  filter: saturate(1.08) contrast(1.04);
+}
+
+.creator-home[data-creator-home="production-first"] .cf-start-card:hover .cf-start-icon,
+.creator-home[data-creator-home="production-first"] .cf-start-card:focus-visible .cf-start-icon {
+  background: color-mix(in oklch, var(--cf-accent) 80%, black);
+  transform: translateY(-3px) scale(1.04);
+}
+
+.creator-home[data-creator-home="production-first"] .cf-bridge-visual img {
+  transform: scale(1.002);
+  transition: transform 950ms cubic-bezier(.16, 1, .3, 1), filter 320ms ease;
+}
+
+.creator-home[data-creator-home="production-first"] .cf-bridge-visual:hover img {
+  filter: saturate(1.06) contrast(1.02);
+  transform: scale(1.027) translate3d(0, -3px, 0);
+}
+
+.creator-home[data-creator-home="production-first"] .cf-production-journey {
+  position: relative;
+  overflow: hidden;
+}
+
+.creator-home[data-creator-home="production-first"] .cf-production-journey::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 24%, oklch(0.86 0.11 292 / .09) 49%, transparent 70%);
+  content: "";
+  pointer-events: none;
+  transform: translateX(-75%);
+  transition: transform 1.1s cubic-bezier(.16, 1, .3, 1);
+}
+
+.creator-home[data-creator-home="production-first"] .cf-production-journey:hover::after {
+  transform: translateX(75%);
+}
+
+.creator-home[data-creator-home="production-first"] .cf-flow-grid > li {
+  overflow: hidden;
+}
+
+.creator-home[data-creator-home="production-first"] .cf-flow-grid > li::after {
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--cf-accent), var(--cf-cyan));
+  content: "";
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 360ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.creator-home[data-creator-home="production-first"] .cf-flow-grid > li:hover::after,
+.creator-home[data-creator-home="production-first"] .cf-flow-grid > li:focus-within::after {
+  transform: scaleX(1);
+}
+
+.creator-home[data-creator-home="production-first"] .cf-support-grid > a {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in oklch, var(--cf-accent) 9%, transparent), transparent 12rem),
+    var(--cf-card);
+  transition: border-color 200ms ease, transform 220ms cubic-bezier(.16, 1, .3, 1), background 200ms ease;
+}
+
+.creator-home[data-creator-home="production-first"] .cf-support-grid > a:hover,
+.creator-home[data-creator-home="production-first"] .cf-support-grid > a:focus-visible {
+  border-color: color-mix(in oklch, var(--cf-accent) 45%, var(--cf-line));
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in oklch, var(--cf-accent) 16%, transparent), transparent 14rem),
+    var(--cf-raised);
+  transform: translateY(-3px);
+}
+
+.creator-home[data-creator-home="production-first"] .cf-simple-closing::after {
+  position: absolute;
+  inset: -35% -20%;
+  background: radial-gradient(circle, color-mix(in oklch, var(--cf-accent) 16%, transparent), transparent 56%);
+  content: "";
+  pointer-events: none;
+  transform: translate3d(25%, -8%, 0);
+  animation: cf-closing-orbit 12s ease-in-out infinite alternate;
+}
+
+.creator-home[data-creator-home="production-first"] .cf-simple-closing > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes cf-closing-orbit {
+  from { transform: translate3d(19%, -10%, 0) scale(.96); }
+  to { transform: translate3d(29%, 2%, 0) scale(1.08); }
+}
+
+@media (max-width: 720px) {
+  .creator-home[data-creator-home="production-first"] .cf-start-card {
+    padding-top: 138px;
+  }
+
+  .creator-home[data-creator-home="production-first"] .cf-start-card::after {
+    height: 104px;
+  }
+
+  .creator-home[data-creator-home="production-first"] .cf-start-card .cf-start-icon {
+    top: 82px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .creator-home[data-creator-home="production-first"] .cf-start-card::after,
+  .creator-home[data-creator-home="production-first"] .cf-start-card .cf-start-icon,
+  .creator-home[data-creator-home="production-first"] .cf-bridge-visual img,
+  .creator-home[data-creator-home="production-first"] .cf-production-journey::after,
+  .creator-home[data-creator-home="production-first"] .cf-flow-grid > li::after,
+  .creator-home[data-creator-home="production-first"] .cf-support-grid > a,
+  .creator-home[data-creator-home="production-first"] .cf-simple-closing::after {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
