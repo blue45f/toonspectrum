@@ -49,6 +49,37 @@ function requiresLods(asset: StudioScene3dAssetReference): boolean {
   return asset.kind === "character" || asset.kind === "mesh";
 }
 
+function finitePositiveTriangleCount(value: number | undefined): value is number {
+  return typeof value === "number"
+    && Number.isSafeInteger(value)
+    && value > 0;
+}
+
+function inspectLodEvidence(
+  technical: StudioScene3dAssetTechnicalEvidence,
+): {
+  readonly validCount: number;
+  readonly strictlyDecreasing: boolean;
+  readonly reductionRatio: number | null;
+} {
+  const declaredCount = Number.isSafeInteger(technical.lodCount)
+    ? Math.max(0, technical.lodCount)
+    : 0;
+  const samples = technical.trianglesByLod
+    .slice(0, declaredCount)
+    .filter(finitePositiveTriangleCount);
+  const strictlyDecreasing = samples.length === declaredCount
+    && samples.every((triangles, index) => index === 0 || triangles < samples[index - 1]!);
+  const reductionRatio = samples.length >= 2 && samples[0]! > 0
+    ? samples[samples.length - 1]! / samples[0]!
+    : null;
+  return Object.freeze({
+    validCount: samples.length,
+    strictlyDecreasing,
+    reductionRatio,
+  });
+}
+
 export function evaluateStudioScene3dAssetAdmission(
   asset: StudioScene3dAssetReference,
   evidence: StudioScene3dAssetAdmissionEvidence,
@@ -57,6 +88,7 @@ export function evaluateStudioScene3dAssetAdmission(
   const warnings: string[] = [];
   const visual = evidence.visual;
   const technical = evidence.technical;
+  const lodEvidence = inspectLodEvidence(technical);
 
   if (!asset.quality.accepted || asset.quality.score < 95) {
     blockers.push("production 품질 승인이 95점 이상이 아닙니다.");
@@ -86,6 +118,34 @@ export function evaluateStudioScene3dAssetAdmission(
   if (requiresLods(asset) && technical.lodCount < 3) {
     blockers.push("근·중·원거리 3단계 LOD가 없습니다.");
   }
+  if (requiresLods(asset) && lodEvidence.validCount < Math.max(3, technical.lodCount)) {
+    blockers.push("LOD 선언과 실제 삼각형 증거가 일치하지 않습니다.");
+  }
+  if (requiresLods(asset) && technical.lodCount >= 3 && !lodEvidence.strictlyDecreasing) {
+    blockers.push("LOD별 삼각형 수가 근거리에서 원거리로 엄격히 감소하지 않습니다.");
+  }
+  if (
+    requiresLods(asset)
+    && lodEvidence.reductionRatio !== null
+    && lodEvidence.reductionRatio > 0.5
+  ) {
+    warnings.push("최원거리 LOD가 LOD0의 50%를 초과해 실제 스트리밍/렌더 절감 효과가 작습니다.");
+  }
+  if (!Number.isFinite(technical.gpuBytesEstimate) || technical.gpuBytesEstimate <= 0) {
+    blockers.push("GPU 메모리 추정치가 유효한 양수로 측정되지 않았습니다.");
+  }
+  if (!Number.isSafeInteger(technical.drawCalls) || technical.drawCalls < 0) {
+    blockers.push("draw call 측정값이 유효하지 않습니다.");
+  }
+  if (!Number.isSafeInteger(technical.materialCount) || technical.materialCount < 0) {
+    blockers.push("머티리얼 수 측정값이 유효하지 않습니다.");
+  }
+  if (!Number.isSafeInteger(technical.textureCount) || technical.textureCount < 0) {
+    blockers.push("텍스처 수 측정값이 유효하지 않습니다.");
+  }
+  if (!Number.isSafeInteger(technical.maxTextureDimension) || technical.maxTextureDimension < 0) {
+    blockers.push("최대 텍스처 크기 측정값이 유효하지 않습니다.");
+  }
   if (technical.textureCount > 0 && technical.textureCompression !== "ktx2") {
     warnings.push("GPU texture가 KTX2/Basis production 경로를 사용하지 않습니다.");
   }
@@ -106,7 +166,11 @@ export function evaluateStudioScene3dAssetAdmission(
     visual.compositionScore,
   ]);
   const technicalScore = average([
-    technical.lodCount >= 3 || !requiresLods(asset) ? 100 : technical.lodCount * 30,
+    !requiresLods(asset)
+      ? 100
+      : lodEvidence.validCount >= 3 && lodEvidence.strictlyDecreasing
+        ? 100
+        : Math.min(90, lodEvidence.validCount * 30),
     technical.geometryCompression !== "none" || asset.kind === "gaussian-splat" ? 100 : 75,
     technical.textureCount === 0 || technical.textureCompression === "ktx2" ? 100 : 80,
     technical.drawCalls <= 80 ? 100 : technical.drawCalls <= 120 ? 90 : 70,
