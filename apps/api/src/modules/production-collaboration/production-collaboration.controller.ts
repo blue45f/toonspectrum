@@ -7,6 +7,7 @@ import {
   Headers,
   Param,
   Post,
+  Query,
 } from "@nestjs/common";
 
 import { ZodValidationPipe } from "../../common/zod-validation.pipe";
@@ -14,8 +15,11 @@ import { ZodValidationPipe } from "../../common/zod-validation.pipe";
 import {
   CreateProductionProjectDto,
   ExecuteProductionCommandDto,
+  ProductionExternalReviewParamsDto,
+  ProductionExternalReviewQueryDto,
   ProductionProjectByWorkParamsDto,
   ProductionProjectParamsDto,
+  SubmitProductionExternalReviewDto,
 } from "./production-collaboration.dto";
 import { ProductionCollaborationService } from "./production-collaboration.service";
 
@@ -36,6 +40,18 @@ export class ProductionCollaborationController {
     @Headers("x-user-id") userId?: string,
   ) {
     return this.service.createProject(authenticatedProductionUserId(userId), body);
+  }
+
+  @Get("/projects")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  listProjects(@Headers("x-user-id") userId?: string) {
+    return this.service.listProjects(authenticatedProductionUserId(userId));
+  }
+
+  @Get("/inbox")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  getPersonalInbox(@Headers("x-user-id") userId?: string) {
+    return this.service.getPersonalInbox(authenticatedProductionUserId(userId));
   }
 
   @Get("/projects/:projectId")
@@ -62,6 +78,28 @@ export class ProductionCollaborationController {
       authenticatedProductionUserId(userId),
       params.workId,
     );
+  }
+
+  @Get("/public-reviews/:projectId/:reviewId")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  getExternalReview(
+    @Param(new ZodValidationPipe(ProductionExternalReviewParamsDto))
+    params: ProductionExternalReviewParamsDto,
+    @Query(new ZodValidationPipe(ProductionExternalReviewQueryDto))
+    query: ProductionExternalReviewQueryDto,
+  ) {
+    return this.service.getExternalReview(params.projectId, params.reviewId, query.token);
+  }
+
+  @Post("/public-reviews/:projectId/:reviewId/responses")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  submitExternalReview(
+    @Param(new ZodValidationPipe(ProductionExternalReviewParamsDto))
+    params: ProductionExternalReviewParamsDto,
+    @Body(new ZodValidationPipe(SubmitProductionExternalReviewDto))
+    body: SubmitProductionExternalReviewDto,
+  ) {
+    return this.service.submitExternalReview(params.projectId, params.reviewId, body);
   }
 
   @Post("/projects/:projectId/commands")

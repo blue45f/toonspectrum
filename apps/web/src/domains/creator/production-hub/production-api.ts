@@ -22,6 +22,7 @@ import type {
   ProductionAgreement,
   ProductionDispute,
   ProductionInvoice,
+  ProductionOperationsRecord,
   ProductionProjectAggregate,
   ProductionRisk,
   ProjectBrief,
@@ -33,6 +34,7 @@ import type {
   SeriesMaster,
   RightsInterest,
   RoleAssignment,
+  ScheduleBaseline,
   ScopePackage,
   Submission,
   StoryToArtHandoffPackage,
@@ -76,6 +78,49 @@ export interface ProductionProjectRecord {
   readonly access: ProductionProjectAccess;
 }
 
+export interface ProductionProjectSummary {
+  readonly projectId: string;
+  readonly workId: string;
+  readonly title: string;
+  readonly collaborationModel: ProductionProjectAggregate["collaborationModel"];
+  readonly revision: number;
+  readonly updatedAt: string;
+  readonly access: ProductionProjectAccess;
+  readonly healthScore: number;
+  readonly activeEpisodeCount: number;
+  readonly readyBufferCount: number;
+  readonly criticalRiskCount: number;
+  readonly overdueTaskCount: number;
+  readonly blockedTaskCount: number;
+  readonly unassignedTaskCount: number;
+  readonly reviewTaskCount: number;
+  readonly nextReleaseAt: string | null;
+  readonly forecastFinishAt: string | null;
+  readonly scheduleConfidencePercent: number | null;
+}
+
+export interface ProductionProjectListResponse {
+  readonly projects: readonly ProductionProjectSummary[];
+}
+
+export interface ProductionPersonalInboxItem {
+  readonly bucket: "dueToday" | "inProgress" | "review" | "ready" | "waitingInput" | "blockingOthers";
+  readonly projectId: string;
+  readonly projectTitle: string;
+  readonly taskId: string;
+  readonly taskTitle: string;
+  readonly processKey: string;
+  readonly status: string;
+  readonly dueAt: string | null;
+  readonly estimateHours: number;
+  readonly episodeId: string | null;
+}
+
+export interface ProductionPersonalInboxResponse {
+  readonly items: readonly ProductionPersonalInboxItem[];
+  readonly counts: Readonly<Record<ProductionPersonalInboxItem["bucket"], number>>;
+}
+
 export interface ProductionMutationResponse {
   readonly aggregate: ProductionProjectAggregate;
   readonly derived?: unknown;
@@ -102,6 +147,9 @@ export type ProductionClientCommand =
   | { readonly type: "upsert-review-policy"; readonly policy: ReviewPolicy }
   | { readonly type: "record-review-decision"; readonly policyId: string; readonly decision: ReviewDecision }
   | { readonly type: "upsert-task"; readonly task: ProductionTask }
+  | { readonly type: "upsert-task-batch"; readonly tasks: readonly ProductionTask[] }
+  | { readonly type: "upsert-operations-record"; readonly record: ProductionOperationsRecord }
+  | { readonly type: "apply-schedule-scenario"; readonly baseline: ScheduleBaseline; readonly tasks: readonly ProductionTask[] }
   | {
       readonly type: "upsert-episode-operations";
       readonly episodeId: string;
@@ -144,6 +192,14 @@ function mutationId(): string {
     ?? `00000000-0000-4000-8000-${Date.now().toString(16).padStart(12, "0").slice(-12)}`;
 }
 
+export function listProductionProjects(): Promise<ProductionProjectListResponse> {
+  return api.get("/production/projects");
+}
+
+export function getProductionPersonalInbox(): Promise<ProductionPersonalInboxResponse> {
+  return api.get("/production/inbox");
+}
+
 export function getProductionProject(projectId: string): Promise<ProductionProjectRecord> {
   return api.get(`/production/projects/${encodeURIComponent(projectId)}`);
 }
@@ -184,6 +240,69 @@ export function executeProductionCommand(
     expectedRevision,
     mutationId: mutationId(),
     command,
+  });
+}
+
+export interface ProductionExternalReviewView {
+  readonly projectId: string;
+  readonly projectTitle: string;
+  readonly review: {
+    readonly id: string;
+    readonly label: string;
+    readonly watermark: boolean;
+    readonly permissions: readonly ("view" | "comment" | "approve" | "download")[];
+    readonly expiresAt: string;
+    readonly responses: readonly {
+      readonly id: string;
+      readonly reviewerName: string;
+      readonly decision: "comment" | "approve" | "request-changes";
+      readonly note: string;
+      readonly createdAt: string;
+    }[];
+  };
+  readonly submissions: readonly {
+    readonly id: string;
+    readonly status: string;
+    readonly submittedAt: string;
+    readonly revisionRef: {
+      readonly id: string;
+      readonly lineage: "narrative" | "visual" | "integrated";
+      readonly revision: number;
+      readonly digest: string;
+      readonly createdAt: string;
+    };
+    readonly evidenceRefs: readonly string[];
+    readonly deliverable: {
+      readonly id: string;
+      readonly type: string;
+      readonly expectedFormat: string;
+      readonly completionCriteria: readonly string[];
+    } | null;
+  }[];
+}
+
+export function getProductionExternalReview(
+  projectId: string,
+  reviewId: string,
+  token: string,
+): Promise<ProductionExternalReviewView> {
+  const query = new URLSearchParams({ token });
+  return api.get(`/production/public-reviews/${encodeURIComponent(projectId)}/${encodeURIComponent(reviewId)}?${query.toString()}`);
+}
+
+export function submitProductionExternalReview(
+  projectId: string,
+  reviewId: string,
+  input: {
+    readonly token: string;
+    readonly reviewerName: string;
+    readonly decision: "comment" | "approve" | "request-changes";
+    readonly note: string;
+  },
+): Promise<ProductionExternalReviewView> {
+  return api.post(`/production/public-reviews/${encodeURIComponent(projectId)}/${encodeURIComponent(reviewId)}/responses`, {
+    responseId: mutationId(),
+    ...input,
   });
 }
 

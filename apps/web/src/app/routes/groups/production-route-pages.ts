@@ -20,3 +20,10 @@ export const ProductionEpisodeRoomPage = lazyRetry(
   })),
   "ProductionEpisodeRoomPage",
 );
+
+export const ProductionExternalReviewPage = lazyRetry(
+  () => import("@/domains/creator/production-hub/ProductionExternalReviewPage").then((module) => ({
+    default: module.ProductionExternalReviewPage,
+  })),
+  "ProductionExternalReviewPage",
+);
