@@ -10,8 +10,9 @@
 - `/studio?...&drawingShell=app`: the same Studio editor in canvas-first drawing chrome.
   The app bar projects the current Studio brush, size, opacity, stabilizer and color and
   exposes the existing brush catalogue, color wheel, quick access, page/layer panels and
-  canvas-only mode. Two-finger tap maps to undo, three-finger tap to redo and four-finger
-  tap toggles canvas-only without replacing the existing pinch/rotate canvas gestures.
+  canvas-only mode. Touch gestures use the same Studio preferences in both presentations:
+  the configured two/three-finger actions remain authoritative, while a four-finger tap adds
+  a canvas-only toggle without replacing pinch/rotate navigation.
 - `/studio?...&drawingShell=integrated`: return the same document to the normal full
   production Studio. No project conversion, document copy or alternate drawing format is
   involved in switching presentation.
