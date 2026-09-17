@@ -35,6 +35,7 @@ interface ProfilePayload {
   name?: unknown;
   bio?: unknown;
   image?: unknown;
+  creatorRoleProfile?: unknown;
 }
 
 interface MergePayload {

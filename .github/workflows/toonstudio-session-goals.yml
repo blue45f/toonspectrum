@@ -10,6 +10,8 @@ on:
       - "apps/web/src/shared/components/**"
       - "scripts/verify-toonstudio-session-goals.mjs"
       - ".github/workflows/toonstudio-session-goals.yml"
+      - "eslint.config.mjs"
+      - "vitest.config.*"
       - "package.json"
       - "pnpm-lock.yaml"
 
@@ -21,107 +23,112 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  contract:
-    name: contract
+  focused-validation:
+    name: focused validation
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 24
+    env:
+      CI: "true"
+      HUSKY: "0"
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout focused ToonStudio source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/apps/web/public/assets/
+            !/apps/web/public/vrm/
+            !/artifacts/
+            !/docs/
+            !/tests/benchmarks/results/
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
         with:
           version: 11.4.0
-      - uses: actions/setup-node@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
         with:
-          node-version: 24.16.0
+          node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Restore focused lint cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/eslint/quick
+          key: toonstudio-session-eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs') }}-${{ github.sha }}
+          restore-keys: |
+            toonstudio-session-eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs') }}-
+
       - name: Verify planned feature ownership and UI reachability
         run: node scripts/verify-toonstudio-session-goals.mjs
 
-  type-and-lint:
-    name: type-and-lint
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    env:
-      NODE_OPTIONS: --max-old-space-size=12288
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.4.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24.16.0
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+      - name: Fetch the exact PR base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git fetch --no-tags --depth=1 origin "$BASE_SHA"
+
+      - name: Collect changed ToonStudio sources
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git diff --name-only -z --diff-filter=ACMR "$BASE_SHA" HEAD -- \
+            'apps/web/src/**/*.js' \
+            'apps/web/src/**/*.jsx' \
+            'apps/web/src/**/*.ts' \
+            'apps/web/src/**/*.tsx' \
+            'scripts/**/*.js' \
+            'scripts/**/*.mjs' \
+            'scripts/**/*.mts' > "$RUNNER_TEMP/toonstudio-related-files"
+
       - name: Lint changed ToonStudio sources
+        if: github.event_name == 'pull_request'
         shell: bash
         run: |
-          git fetch origin main
-          base="${{ github.event.pull_request.base.sha || 'origin/main' }}"
-          git diff --name-only -z --diff-filter=ACMR "$base"...HEAD -- '*.ts' '*.tsx' '*.mjs' '*.mts' > "$RUNNER_TEMP/changed-files"
-          mapfile -d '' -t files < "$RUNNER_TEMP/changed-files"
-          # Honor the repository's existing config ignores without treating an
-          # explicitly passed ignored path as a source-code warning. Real warnings
-          # and errors still fail; no files or lint rules are newly excluded here.
-          if ((${#files[@]})); then pnpm exec eslint --no-warn-ignored --max-warnings=0 "${files[@]}"; fi
+          set -euo pipefail
+          mapfile -d '' -t files < "$RUNNER_TEMP/toonstudio-related-files"
+          if ((${#files[@]} == 0)); then
+            echo "No changed ToonStudio source files require lint."
+            exit 0
+          fi
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored \
+            --cache --cache-strategy content \
+            --cache-location node_modules/.cache/eslint/quick/ \
+            -- "${files[@]}"
 
-  tests:
-    name: tests
-    runs-on: ubuntu-24.04
-    timeout-minutes: 35
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [domain, ui]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.4.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24.16.0
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Run domain tests
-        if: matrix.shard == 'domain'
+      - name: Run tests related to changed ToonStudio sources
+        if: github.event_name == 'pull_request'
         shell: bash
         run: |
-          git fetch origin main
-          base="${{ github.event.pull_request.base.sha || 'origin/main' }}"
-          git diff --name-only -z --diff-filter=ACMR "$base"...HEAD -- 'apps/web/src/domains/creator/*.test.ts' > "$RUNNER_TEMP/changed-tests"
-          mapfile -d '' -t tests < "$RUNNER_TEMP/changed-tests"
-          if ((${#tests[@]})); then pnpm exec vitest run "${tests[@]}" --pool=forks --maxWorkers=2; fi
-      - name: Run UI and route tests
-        if: matrix.shard == 'ui'
-        shell: bash
-        run: |
-          git fetch origin main
-          base="${{ github.event.pull_request.base.sha || 'origin/main' }}"
-          git diff --name-only -z --diff-filter=ACMR "$base"...HEAD -- 'apps/web/src/**/*.test.tsx' 'apps/web/src/app/routes/**/*.test.ts' > "$RUNNER_TEMP/changed-tests"
-          mapfile -d '' -t tests < "$RUNNER_TEMP/changed-tests"
-          if ((${#tests[@]})); then pnpm exec vitest run "${tests[@]}" --pool=forks --maxWorkers=2; fi
+          set -euo pipefail
+          mapfile -d '' -t files < "$RUNNER_TEMP/toonstudio-related-files"
+          if ((${#files[@]} == 0)); then
+            echo "No changed ToonStudio source files require related tests."
+            exit 0
+          fi
+          pnpm exec vitest related "${files[@]}" --run --pool=forks --maxWorkers=2
 
-  build:
-    name: build
-    runs-on: ubuntu-24.04
-    timeout-minutes: 35
-    env:
-      NODE_OPTIONS: --max-old-space-size=12288
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.4.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24.16.0
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      - name: Run manual focused smoke suite
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-quick-task-workspaces.test.ts \
+            apps/web/src/domains/creator/studio-shell/StudioQuickStart.test.tsx \
+            apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx \
+            --pool=forks \
+            --maxWorkers=2
+

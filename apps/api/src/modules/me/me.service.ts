@@ -6,6 +6,7 @@ import {
   normalizeCollectionEmoji,
   normalizeCollectionName,
 } from "../../../../web/src/shared/lib/collection-contract";
+import { parseCreatorRoleProfileInput } from "../../../../web/src/shared/lib/creator-role-contract";
 import { db, ratings, reviews, reviewLikes, reads, subscriptions } from "../../db";
 import { deleteMyAccount, loadMe, updateProfile, type UpdateProfileInput } from "../../server/me";
 
@@ -51,6 +52,7 @@ interface ProfilePayload {
   name?: unknown;
   bio?: unknown;
   image?: unknown;
+  creatorRoleProfile?: unknown;
 }
 
 type MergePayload = {
@@ -237,6 +239,13 @@ export class MeService {
     if (typeof payload.bio === "string") input.bio = payload.bio;
     if (payload.image !== undefined) {
       input.image = payload.image === null ? null : String(payload.image ?? "");
+    }
+    if (payload.creatorRoleProfile !== undefined) {
+      const creatorRoleProfile = parseCreatorRoleProfileInput(payload.creatorRoleProfile);
+      if (!creatorRoleProfile) {
+        throw new BadRequestException("직무 프로필 형식이 올바르지 않습니다.");
+      }
+      input.creatorRoleProfile = creatorRoleProfile;
     }
     const result = await updateProfile(uid, input);
     if ("error" in result) throw new BadRequestException(result.error);

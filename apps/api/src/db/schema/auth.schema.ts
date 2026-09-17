@@ -1,12 +1,18 @@
 import {
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+
+import {
+  EMPTY_CREATOR_ROLE_PROFILE,
+  type CreatorRoleProfile,
+} from "../../../../web/src/shared/lib/creator-role-contract";
 
 // libSQL(SQLite) → PostgreSQL(Neon) 마이그레이션:
 //  - integer{mode:"timestamp_ms"} → timestamp({mode:"date"})  (Drizzle가 Date로 주고받음)
@@ -41,6 +47,10 @@ export const users = pgTable(
     passwordHash: text("passwordHash"),
     avatar: text("avatar"), // 아바타 컬러 hex
     bio: text("bio"),
+    creatorRoleProfile: jsonb("creatorRoleProfile")
+      .$type<CreatorRoleProfile>()
+      .notNull()
+      .default(EMPTY_CREATOR_ROLE_PROFILE),
     createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
   },
   (u) => [index("idx_user_status_created").on(u.status, u.createdAt)]

@@ -1,6 +1,7 @@
 import {
   Box,
   Clapperboard,
+  ClipboardCheck,
   FileImage,
   Images,
   LayoutTemplate,
@@ -21,6 +22,24 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { WorkflowTrustBadge } from "@/shared/components/WorkflowTrustBadge";
 import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
+
+import {
+  DEFAULT_WEBTOON_ONBOARDING_SELECTION,
+  WEBTOON_CADENCES,
+  WEBTOON_ONBOARDING_GOALS,
+  WEBTOON_STARTING_POINTS,
+  WEBTOON_TEAM_MODELS,
+  buildWebtoonOnboardingPlan,
+  createStudioWebtoonOnboardingProfile,
+  webtoonOnboardingProjectHref,
+  webtoonOnboardingSelectionFromSearchParams,
+  writeStudioWebtoonOnboardingProfile,
+  type WebtoonCadenceId,
+  type WebtoonOnboardingGoalId,
+  type WebtoonOnboardingSelection,
+  type WebtoonStartingPointId,
+  type WebtoonTeamModelId,
+} from "@/shared/lib/webtoon-production-onboarding";
 
 import {
   STUDIO_PROJECT_CREATE_KINDS,
@@ -72,12 +91,55 @@ function requestedProjectKind(kind: string | null, templateId: string | null): S
   )?.id ?? null;
 }
 
+type WebtoonChoiceOption<T extends string> = {
+  readonly id: T;
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly descriptionKo?: string;
+  readonly descriptionEn?: string;
+};
+
+function WebtoonOnboardingSelect<T extends string>({
+  id,
+  label,
+  value,
+  options,
+  locale,
+  onChange,
+}: {
+  readonly id: string;
+  readonly label: string;
+  readonly value: T;
+  readonly options: readonly WebtoonChoiceOption<T>[];
+  readonly locale: Locale;
+  readonly onChange: (value: T) => void;
+}) {
+  return (
+    <label className="min-w-0 text-xs font-bold text-fg-2" htmlFor={id}>
+      {label}
+      <select
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value as T)}
+        className="mt-2 min-h-12 w-full min-w-0 rounded-xl border border-line bg-panel px-3 text-sm font-bold text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+      >
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {locale === "ko" ? option.labelKo : option.labelEn}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function StudioDeferredSaveProjectCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const language = useI18n((state) => state.lang);
   const locale = localeFromLanguage(language);
   const requestedTemplateId = searchParams.get("template");
+  const requestedWebtoonSelection = webtoonOnboardingSelectionFromSearchParams(searchParams);
   const requestedKindId = requestedProjectKind(searchParams.get("kind"), requestedTemplateId);
   const initialKind = STUDIO_PROJECT_CREATE_KINDS.find((option) => option.id === requestedKindId)
     ?? STUDIO_PROJECT_CREATE_KINDS[0]!;
@@ -91,6 +153,10 @@ export function StudioDeferredSaveProjectCreatePage() {
   const [titleEdited, setTitleEdited] = useState(false);
   const [templateId, setTemplateId] = useState(initialTemplateId);
   const [showMoreKinds, setShowMoreKinds] = useState(false);
+  const [webtoonOnboardingEnabled, setWebtoonOnboardingEnabled] = useState(Boolean(requestedWebtoonSelection));
+  const [webtoonSelection, setWebtoonSelection] = useState<WebtoonOnboardingSelection>(
+    requestedWebtoonSelection ?? DEFAULT_WEBTOON_ONBOARDING_SELECTION,
+  );
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,6 +170,11 @@ export function StudioDeferredSaveProjectCreatePage() {
     () => STUDIO_PROJECT_CREATE_KINDS.filter((option) => option.featured || showMoreKinds),
     [showMoreKinds],
   );
+  const onboardingPlan = useMemo(
+    () => buildWebtoonOnboardingPlan(webtoonSelection),
+    [webtoonSelection],
+  );
+  const structuredWebtoonFlow = kind === "webtoon" && webtoonOnboardingEnabled;
   const titleReady = title.trim().length > 0;
 
   const steps: readonly StudioTaskFlowStep[] = [
@@ -119,10 +190,18 @@ export function StudioDeferredSaveProjectCreatePage() {
       description: selectedTemplateLabel,
       state: titleReady ? "complete" : "current",
     },
+    ...(structuredWebtoonFlow ? [{
+      id: "production-track",
+      label: locale === "ko" ? "제작 트랙 확인" : "Confirm production track",
+      description: locale === "ko" ? onboardingPlan.titleKo : onboardingPlan.titleEn,
+      state: "complete" as const,
+    }] : []),
     {
       id: "start",
       label: locale === "ko" ? "자동 저장하며 시작" : "Start with autosave",
-      description: locale === "ko" ? "기기 복구 저장 후 클라우드 연결" : "Device recovery first, cloud next",
+      description: structuredWebtoonFlow
+        ? (locale === "ko" ? "프로젝트와 첫 제작 계획 생성" : "Create the project and first production plan")
+        : (locale === "ko" ? "기기 복구 저장 후 클라우드 연결" : "Device recovery first, cloud next"),
       state: titleReady ? "current" : "upcoming",
     },
   ];
@@ -151,7 +230,17 @@ export function StudioDeferredSaveProjectCreatePage() {
         createVersions: true,
         target: window,
       });
-      navigate(`${result.href}&uiMode=basic&startTool=draw`, { replace: true });
+      let destination = `${result.href}&uiMode=basic&startTool=draw`;
+      if (structuredWebtoonFlow) {
+        const profile = createStudioWebtoonOnboardingProfile(
+          result.project.id,
+          webtoonSelection,
+          result.project.createdAt,
+        );
+        writeStudioWebtoonOnboardingProfile(window.localStorage, profile);
+        destination = webtoonOnboardingProjectHref(result.project.id, webtoonSelection);
+      }
+      navigate(destination, { replace: true });
     } catch (cause) {
       setError(cause instanceof Error
         ? cause.message
@@ -162,9 +251,11 @@ export function StudioDeferredSaveProjectCreatePage() {
     }
   };
 
-  const startLabel = locale === "ko"
-    ? `${selected.titleKo} 시작`
-    : `Start ${selected.titleEn}`;
+  const startLabel = structuredWebtoonFlow
+    ? (locale === "ko" ? "프로젝트와 제작 계획 만들기" : "Create project and production plan")
+    : locale === "ko"
+      ? `${selected.titleKo} 시작`
+      : `Start ${selected.titleEn}`;
 
   return (
     <div className="min-h-[calc(100vh-4rem)] min-w-0 bg-bg">
@@ -303,6 +394,102 @@ export function StudioDeferredSaveProjectCreatePage() {
             </div>
           </section>
 
+          {kind === "webtoon" ? (
+            <section className="mt-5 min-w-0 rounded-3xl border border-line bg-card p-5 shadow-sm sm:p-7" aria-labelledby="webtoon-production-onboarding-title">
+              <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
+                    <ClipboardCheck size={18} aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-accent">PRODUCTION ONBOARDING</p>
+                    <h2 id="webtoon-production-onboarding-title" className="mt-1 break-words text-xl font-black text-fg">
+                      {locale === "ko" ? "실제 제작 단계에 맞춰 시작" : "Start from your real production stage"}
+                    </h2>
+                    <p className="mt-1 max-w-3xl break-words text-xs leading-5 text-fg-3">
+                      {locale === "ko"
+                        ? "현재 가진 자료와 목표를 기준으로 첫 승인 마일스톤과 작업 체크리스트를 만듭니다. 기능 설명만 보고 끝나는 온보딩이 아닙니다."
+                        : "Create the first approval milestone and task checklist from the material and goal you already have."}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  aria-pressed={webtoonOnboardingEnabled}
+                  onClick={() => setWebtoonOnboardingEnabled((enabled) => !enabled)}
+                  className={buttonClass({
+                    variant: webtoonOnboardingEnabled ? "solid" : "outline",
+                    size: "sm",
+                    className: "w-full min-w-0 sm:w-auto sm:shrink-0",
+                  })}
+                >
+                  {webtoonOnboardingEnabled
+                    ? (locale === "ko" ? "제작 트랙 사용 중" : "Production track enabled")
+                    : (locale === "ko" ? "제작 트랙 설정" : "Set production track")}
+                </button>
+              </div>
+
+              {webtoonOnboardingEnabled ? (
+                <div className="mt-5">
+                  <div className="grid min-w-0 gap-4 md:grid-cols-2">
+                    <WebtoonOnboardingSelect<WebtoonStartingPointId>
+                      id="webtoon-onboarding-start"
+                      label={locale === "ko" ? "현재 가지고 있는 자료" : "What you already have"}
+                      value={webtoonSelection.startingPoint}
+                      options={WEBTOON_STARTING_POINTS}
+                      locale={locale}
+                      onChange={(startingPoint) => setWebtoonSelection((current) => ({ ...current, startingPoint }))}
+                    />
+                    <WebtoonOnboardingSelect<WebtoonOnboardingGoalId>
+                      id="webtoon-onboarding-goal"
+                      label={locale === "ko" ? "프로젝트 목표" : "Project goal"}
+                      value={webtoonSelection.goal}
+                      options={WEBTOON_ONBOARDING_GOALS}
+                      locale={locale}
+                      onChange={(goal) => setWebtoonSelection((current) => ({ ...current, goal }))}
+                    />
+                    <WebtoonOnboardingSelect<WebtoonTeamModelId>
+                      id="webtoon-onboarding-team"
+                      label={locale === "ko" ? "제작 인원" : "Team model"}
+                      value={webtoonSelection.teamModel}
+                      options={WEBTOON_TEAM_MODELS}
+                      locale={locale}
+                      onChange={(teamModel) => setWebtoonSelection((current) => ({ ...current, teamModel }))}
+                    />
+                    <WebtoonOnboardingSelect<WebtoonCadenceId>
+                      id="webtoon-onboarding-cadence"
+                      label={locale === "ko" ? "예상 연재 주기" : "Publishing cadence"}
+                      value={webtoonSelection.cadence}
+                      options={WEBTOON_CADENCES}
+                      locale={locale}
+                      onChange={(cadence) => setWebtoonSelection((current) => ({ ...current, cadence }))}
+                    />
+                  </div>
+                  <div className="mt-5 grid gap-4 rounded-2xl border border-accent/25 bg-accent-soft/20 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,.8fr)]">
+                    <div>
+                      <p className="text-xs font-black text-accent">{locale === "ko" ? "추천 제작 트랙" : "Recommended production track"}</p>
+                      <h3 className="mt-1 text-lg font-black text-fg">{locale === "ko" ? onboardingPlan.titleKo : onboardingPlan.titleEn}</h3>
+                      <p className="mt-2 text-xs leading-5 text-fg-2">{locale === "ko" ? onboardingPlan.summaryKo : onboardingPlan.summaryEn}</p>
+                    </div>
+                    <div className="rounded-xl bg-panel p-3">
+                      <p className="text-[0.65rem] font-bold text-fg-3">{locale === "ko" ? "첫 승인 마일스톤" : "First approval milestone"}</p>
+                      <p className="mt-1 text-sm font-bold text-fg">{locale === "ko" ? onboardingPlan.milestoneKo : onboardingPlan.milestoneEn}</p>
+                    </div>
+                  </div>
+                  <Link href="/learn/process#production-onboarding" className={buttonClass({ variant: "quiet", size: "sm", className: "mt-3 w-full min-w-0 sm:w-auto" })}>
+                    <span className="break-words">{locale === "ko" ? "업계 제작 과정과 트랙 설명 보기" : "Review the industry workflow and tracks"}</span>
+                  </Link>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-2xl bg-panel p-4 text-xs leading-5 text-fg-2">
+                  {locale === "ko"
+                    ? "바로 드로잉으로 시작하려면 지금 상태를 유지하세요. 기획·대본·콘티·완성 원고·연재 중 상태에서 이어가려면 제작 트랙을 설정하세요."
+                    : "Keep this off to open the drawing workspace immediately, or enable it to continue from planning, script, storyboard, finished art or a live series."}
+                </div>
+              )}
+            </section>
+          ) : null}
+
           <section className="mt-5 flex min-w-0 items-start gap-3 rounded-2xl border border-success/30 bg-success-soft/15 p-4" aria-label={locale === "ko" ? "자동 저장 안내" : "Autosave notice"}>
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-card text-success">
               <ShieldCheck size={18} aria-hidden="true" />
@@ -346,9 +533,13 @@ export function StudioDeferredSaveProjectCreatePage() {
             <StudioTaskSummary
               eyebrow={locale === "ko" ? "시작할 작업" : "Ready to start"}
               title={`${title.trim() || (locale === "ko" ? "이름 없는 프로젝트" : "Untitled project")} · ${projectTitle(selected, locale)}`}
-              description={locale === "ko"
-                ? `${selectedTemplateLabel} 템플릿을 적용하고 드로잉 도구로 시작합니다.`
-                : `Apply the ${selectedTemplateLabel} template and open the drawing tool.`}
+              description={structuredWebtoonFlow
+                ? (locale === "ko"
+                    ? `${onboardingPlan.titleKo} · ${onboardingPlan.milestoneKo}`
+                    : `${onboardingPlan.titleEn} · ${onboardingPlan.milestoneEn}`)
+                : locale === "ko"
+                  ? `${selectedTemplateLabel} 템플릿을 적용하고 드로잉 도구로 시작합니다.`
+                  : `Apply the ${selectedTemplateLabel} template and open the drawing tool.`}
               meta={<WorkflowTrustBadge state="device-saved" locale={locale} compact={false} />}
             />
             <div className="flex min-w-0 flex-col gap-3 lg:min-w-72">
