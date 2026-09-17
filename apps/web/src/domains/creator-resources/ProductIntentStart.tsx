@@ -4,7 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "@/compat/router-link";
 import { WorkflowTrustBadge } from "@/shared/components/WorkflowTrustBadge";
 import {
-  creatorDestinationDescription,
+  creatorRecentDestinationDescription,
   creatorDestinationLabel,
   formatCreatorRelativeTime,
   getCreatorContinuityServerSnapshot,
@@ -73,7 +73,7 @@ export function ProductIntentStart() {
         <p><Clock3 size={16} aria-hidden="true" />{copy.recent}</p>
         <Link className="cf-recent-card" href={recent?.href ?? "/studio/projects"}>
           <strong>{recent ? creatorDestinationLabel(recent.id, locale) : copy.fallback}</strong>
-          <span>{recent ? creatorDestinationDescription(recent.id, locale) : copy.fallbackBody}</span>
+          <span>{recent ? creatorRecentDestinationDescription(recent, locale) : copy.fallbackBody}</span>
           {recent && now > 0 ? <small>{formatCreatorRelativeTime(recent.visitedAt, locale, now)}</small> : null}
           {recent ? <WorkflowTrustBadge state="resume-ready" locale={locale} className="w-fit" /> : null}
           <ArrowRight size={18} aria-hidden="true" />
