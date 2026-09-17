@@ -137,6 +137,19 @@ describe("Studio Scene3D asset admission", () => {
     ]));
   });
 
+  it("rejects malformed LOD count receipts instead of treating them as review-only metadata", () => {
+    const result = evaluateStudioScene3dAssetAdmission(asset, {
+      ...excellentEvidence,
+      technical: {
+        ...excellentEvidence.technical,
+        lodCount: Number.NaN,
+      },
+    });
+
+    expect(result.status).toBe("reject");
+    expect(result.blockers).toContain("LOD 단계 수 측정값이 유효하지 않습니다.");
+  });
+
   it("keeps non-KTX2 or uncompressed geometry out of automatic production promotion", () => {
     const result = evaluateStudioScene3dAssetAdmission(asset, {
       ...excellentEvidence,
