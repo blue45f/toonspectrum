@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, GripHorizontal, MoreHorizontal, PanelLeftClose, Pin } from "lucide-react";
+import { ChevronDown, ChevronUp, GripHorizontal, Maximize2, MoreHorizontal, PanelLeftClose, Pin } from "lucide-react";
 import type { KeyboardEvent, PointerEvent, RefObject } from "react";
 import type { StudioFloatingSurfaceResizeEdge } from "./studio-floating-surface";
 import { STUDIO_FOCUS_RING } from "./studio-panel-ui";
@@ -17,6 +17,7 @@ export interface StudioWorkspaceRegionChromeProps {
   readonly onBegin: (event: PointerEvent<HTMLButtonElement>, edge?: StudioFloatingSurfaceResizeEdge) => void;
   readonly onMoveKey: (event: KeyboardEvent<HTMLButtonElement>, edge?: StudioFloatingSurfaceResizeEdge) => void;
   readonly onToggleCollapsed: () => void;
+  readonly onMaximize: () => void;
   readonly onToggleMenu: () => void;
   readonly onAttach: () => void;
 }
@@ -32,7 +33,7 @@ const RESIZERS: readonly [StudioFloatingSurfaceResizeEdge, string, string][] = [
   ["nw", "왼쪽 위", "left-0 top-0 size-4 cursor-nw-resize"],
 ];
 /** Editing affordances load on intent; panel content keeps its stable DOM owner. */
-export function StudioWorkspaceRegionChrome({ label, buttonClass, floating, compact, folded, positionLocked, sizeLocked, menuOpen, menuButtonRef, onBegin, onMoveKey, onToggleCollapsed, onToggleMenu, onAttach }: StudioWorkspaceRegionChromeProps) {
+export function StudioWorkspaceRegionChrome({ label, buttonClass, floating, compact, folded, positionLocked, sizeLocked, menuOpen, menuButtonRef, onBegin, onMoveKey, onToggleCollapsed, onMaximize, onToggleMenu, onAttach }: StudioWorkspaceRegionChromeProps) {
   return <>
       <div 
         className={cn("flex shrink-0 items-center border-b border-line bg-raised text-fg", compact ? "h-20 flex-wrap justify-center" : "h-10", floating ? "z-10" : "absolute inset-x-0 top-0 z-30 rounded-t-md")}>
@@ -48,6 +49,9 @@ export function StudioWorkspaceRegionChrome({ label, buttonClass, floating, comp
           onClick={onToggleCollapsed}>
           {folded ? <ChevronDown size={16} aria-hidden /> : <ChevronUp size={16} aria-hidden />}
         </button>}
+        {floating && <button type="button" className={buttonClass} aria-label={`${label} 최대 크기`} disabled={sizeLocked}
+          title={sizeLocked ? "크기 잠금을 해제한 뒤 확대할 수 있어요." : "화면에 맞춰 최대 크기로 확대"}
+          onClick={onMaximize}><Maximize2 size={15} aria-hidden /></button>}
         <button ref={menuButtonRef} type="button" className={buttonClass} aria-label={`${label} 배치 설정`} aria-expanded={menuOpen}
           onClick={onToggleMenu}><MoreHorizontal size={16} aria-hidden /></button>
         {floating && !compact && <button type="button" className={buttonClass} aria-label={`${label} 원래 자리로 붙이기`} onClick={onAttach}><PanelLeftClose size={16} aria-hidden /></button>}

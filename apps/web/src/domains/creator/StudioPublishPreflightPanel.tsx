@@ -145,7 +145,7 @@ export function StudioPublishPreflightPanel({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className={isDesktop ? "grid gap-3 @lg:grid-cols-2" : "grid gap-3 sm:grid-cols-2"}>
             <label className="text-xs font-semibold text-fg-2">
               게시 목적지
               <select
@@ -201,7 +201,7 @@ export function StudioPublishPreflightPanel({
               </span>
             </div>
 
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className={isDesktop ? "mt-3 grid gap-3 @lg:grid-cols-2" : "mt-3 grid gap-3 sm:grid-cols-2"}>
               <label className="text-xs font-semibold text-fg-2">
                 예상 독자 등급
                 <select
@@ -251,7 +251,7 @@ export function StudioPublishPreflightPanel({
 
             <fieldset className="mt-3">
               <legend className="text-xs font-semibold text-fg-2">민감 표현 포함 여부</legend>
-              <div className="mt-1.5 grid gap-2 sm:grid-cols-3">
+              <div className={isDesktop ? "mt-1.5 grid gap-2 @xl:grid-cols-3" : "mt-1.5 grid gap-2 sm:grid-cols-3"}>
                 {(Object.keys(CONTENT_FLAG_LABELS) as Array<keyof StudioPublishContentFlags>).map((flag) => (
                   <label key={flag} className="text-[0.7rem] font-semibold text-fg-3">
                     {CONTENT_FLAG_LABELS[flag]}
@@ -277,7 +277,7 @@ export function StudioPublishPreflightPanel({
               </div>
             </fieldset>
 
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className={isDesktop ? "mt-3 grid gap-2 @lg:grid-cols-2" : "mt-3 grid gap-2 sm:grid-cols-2"}>
               <label className="flex min-h-11 items-start gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-xs leading-relaxed text-fg-2">
                 <input
                   type="checkbox"

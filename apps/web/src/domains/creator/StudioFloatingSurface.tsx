@@ -1,5 +1,7 @@
 import {
   Check,
+  ChevronDown,
+  ChevronUp,
   GripHorizontal,
   Maximize2,
   Minimize2,
@@ -35,6 +37,7 @@ import {
   moveStudioFloatingSurfaceRect,
   normalizeStudioFloatingSurfaceLayout,
   resizeStudioFloatingSurfaceRectFromEdge,
+  resizeStudioFloatingSurfaceRectToPreset,
   resolveStudioFloatingSurfaceDock,
   resolveStudioFloatingSurfaceRect,
   setStudioFloatingSurfaceDock,
@@ -45,6 +48,7 @@ import {
   type StudioFloatingSurfaceLayout,
   type StudioFloatingSurfaceRect,
   type StudioFloatingSurfaceResizeEdge,
+  type StudioFloatingSurfaceSizePreset,
   type StudioFloatingSurfaceViewport,
 } from "./studio-floating-surface";
 import {
@@ -406,6 +410,22 @@ export const StudioFloatingSurface = forwardRef<
     ));
   };
 
+  const resizeToPreset = (preset: StudioFloatingSurfaceSizePreset): void => {
+    if (committedLayout.sizeLocked) return;
+    setMenuOpen(false);
+    setMinimized(false);
+    commitRect(
+      resizeStudioFloatingSurfaceRectToPreset(
+        committedRect,
+        preset,
+        viewport,
+        constraints,
+        normalizedDefault,
+      ),
+      committedLayout.dock,
+    );
+  };
+
   const resetLayout = (): void => {
     setMenuOpen(false);
     setMinimized(false);
@@ -697,6 +717,9 @@ export const StudioFloatingSurface = forwardRef<
       data-position-locked={committedLayout.positionLocked ? "true" : "false"}
       data-size-locked={committedLayout.sizeLocked ? "true" : "false"}
       data-minimized={minimized ? "true" : "false"}
+      data-studio-floating-size={
+        committedRect.width < 360 ? "compact" : committedRect.width < 720 ? "comfortable" : "wide"
+      }
       data-dragging={dragging ? "true" : "false"}
       data-resizing={resizing ? "true" : "false"}
       className={cn(
@@ -751,17 +774,32 @@ export const StudioFloatingSurface = forwardRef<
             onClick={() => setMinimized((value) => !value)}
           >
             {minimized
-              ? <Maximize2 size={15} aria-hidden />
-              : <Minimize2 size={15} aria-hidden />}
+              ? <ChevronDown size={15} aria-hidden />
+              : <ChevronUp size={15} aria-hidden />}
           </button>
         ) : null}
+        <button
+          type="button"
+          disabled={committedLayout.sizeLocked}
+          aria-label={`${label} 최대 크기`}
+          title={committedLayout.sizeLocked ? "크기 잠금을 해제한 뒤 확대할 수 있어요." : "화면에 맞춰 최대 크기로 확대"}
+          className={cn(
+            "inline-flex size-10 shrink-0 items-center justify-center text-fg-3 hover:bg-card hover:text-fg disabled:cursor-not-allowed disabled:opacity-40",
+            STUDIO_TOUCH_TARGET,
+            STUDIO_EASE,
+            STUDIO_FOCUS_RING,
+          )}
+          onClick={() => resizeToPreset("maximum")}
+        >
+          <Maximize2 size={15} aria-hidden />
+        </button>
         <button
           ref={menuButtonRef}
           type="button"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           aria-label={`${label} 창 배치 메뉴`}
-          title="도킹·잠금·초기화"
+          title="도킹·크기·잠금·초기화"
           className={cn(
             "inline-flex size-10 shrink-0 items-center justify-center text-fg-3 hover:bg-card hover:text-fg",
             menuOpen && "bg-accent-soft text-accent",
@@ -831,6 +869,60 @@ export const StudioFloatingSurface = forwardRef<
               ) : null}
             </button>
           ))}
+          <div role="separator" className="mx-2 my-1 h-px bg-line" />
+          <p className="px-2 py-1 text-[0.62rem] font-bold uppercase tracking-wider text-fg-3">
+            창 크기
+          </p>
+          <div className="grid grid-cols-3 gap-1 px-1 pb-1" role="group" aria-label={`${label} 빠른 크기`}>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={committedLayout.sizeLocked}
+              aria-label={`${label} 최소 크기`}
+              title="콘텐츠가 사용할 수 있는 최소 안전 크기"
+              className={cn(
+                "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-fg-2 hover:border-accent/50 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-40",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+              )}
+              onClick={() => resizeToPreset("minimum")}
+            >
+              <Minimize2 size={14} aria-hidden />
+              최소
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={committedLayout.sizeLocked}
+              aria-label={`${label} 권장 크기`}
+              title="이 패널의 콘텐츠에 맞춘 기본 권장 크기"
+              className={cn(
+                "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-fg-2 hover:border-accent/50 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-40",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+              )}
+              onClick={() => resizeToPreset("default")}
+            >
+              <RotateCcw size={14} aria-hidden />
+              권장
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={committedLayout.sizeLocked}
+              aria-label={`${label} 최대 크기`}
+              title="현재 화면과 패널 제한 안에서 최대 크기"
+              className={cn(
+                "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-fg-2 hover:border-accent/50 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-40",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+              )}
+              onClick={() => resizeToPreset("maximum")}
+            >
+              <Maximize2 size={14} aria-hidden />
+              최대
+            </button>
+          </div>
           <div role="separator" className="mx-2 my-1 h-px bg-line" />
           <button
             type="button"
@@ -904,7 +996,11 @@ export const StudioFloatingSurface = forwardRef<
       <div
         hidden={minimized}
         inert={minimized ? true : undefined}
-        className={cn("min-h-0 flex-1", contentClassName)}
+        data-studio-floating-content="true"
+        className={cn(
+          "min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain [container-type:inline-size] [scrollbar-gutter:stable]",
+          contentClassName,
+        )}
       >
         {children}
       </div>
