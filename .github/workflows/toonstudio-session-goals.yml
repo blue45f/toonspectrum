@@ -9,7 +9,6 @@ on:
       - "apps/web/src/domains/creator/**"
       - "apps/web/src/shared/components/**"
       - "scripts/verify-toonstudio-session-goals.mjs"
-      - "scripts/lint-changed.mjs"
       - ".github/workflows/toonstudio-session-goals.yml"
       - "eslint.config.mjs"
       - "vitest.config.*"
@@ -33,11 +32,20 @@ jobs:
       HUSKY: "0"
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - name: Checkout ToonStudio source
+      - name: Checkout focused ToonStudio source
         uses: actions/checkout@v6
         with:
           persist-credentials: false
           fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/apps/web/public/assets/
+            !/apps/web/public/vrm/
+            !/artifacts/
+            !/docs/
+            !/tests/benchmarks/results/
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
@@ -47,7 +55,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v6
         with:
-          node-version: 24.16.0
+          node-version: 24
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -71,13 +79,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: git fetch --no-tags --depth=1 origin "$BASE_SHA"
 
-      - name: Lint changed ToonStudio sources
-        if: github.event_name == 'pull_request'
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: pnpm run lint:quick -- --base="$BASE_SHA"
-
-      - name: Run tests related to changed ToonStudio sources
+      - name: Collect changed ToonStudio sources
         if: github.event_name == 'pull_request'
         shell: bash
         env:
@@ -85,10 +87,34 @@ jobs:
         run: |
           set -euo pipefail
           git diff --name-only -z --diff-filter=ACMR "$BASE_SHA" HEAD -- \
+            'apps/web/src/**/*.js' \
+            'apps/web/src/**/*.jsx' \
             'apps/web/src/**/*.ts' \
             'apps/web/src/**/*.tsx' \
+            'scripts/**/*.js' \
             'scripts/**/*.mjs' \
             'scripts/**/*.mts' > "$RUNNER_TEMP/toonstudio-related-files"
+
+      - name: Lint changed ToonStudio sources
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' -t files < "$RUNNER_TEMP/toonstudio-related-files"
+          if ((${#files[@]} == 0)); then
+            echo "No changed ToonStudio source files require lint."
+            exit 0
+          fi
+          pnpm exec eslint --max-warnings=0 --no-warn-ignored \
+            --cache --cache-strategy content \
+            --cache-location node_modules/.cache/eslint/quick/ \
+            -- "${files[@]}"
+
+      - name: Run tests related to changed ToonStudio sources
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
           mapfile -d '' -t files < "$RUNNER_TEMP/toonstudio-related-files"
           if ((${#files[@]} == 0)); then
             echo "No changed ToonStudio source files require related tests."

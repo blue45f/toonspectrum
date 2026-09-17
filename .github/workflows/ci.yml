@@ -75,6 +75,15 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/apps/web/public/assets/
+            !/apps/web/public/vrm/
+            !/artifacts/
+            !/docs/
+            !/tests/benchmarks/results/
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
