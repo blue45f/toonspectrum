@@ -64,7 +64,7 @@
     "lint:ci": "pnpm run lint:strict",
     "audit:security": "node scripts/verify-security-advisory-exceptions.mjs && pnpm audit --audit-level low",
     "audit:studio-brush-mark-distance": "tsx scripts/audit-studio-brush-mark-distance.mts",
-    "audit:visual-assets": "node scripts/audit-visual-assets.mjs --check",
+    "audit:visual-assets": "node scripts/audit-visual-assets.mjs --check && node scripts/audit-visual-asset-quality.mjs --strict",
     "audit:sitewide-visual-ux": "node scripts/audit-sitewide-visual-ux.mjs",
     "audit:auth-modal-visual-ux": "node scripts/audit-auth-modal-visual-ux.mjs",
     "audit:licenses": "node scripts/generate-third-party-notices.mjs --check",
@@ -205,7 +205,8 @@
     "desktop:sync:release:package": "pnpm --filter @toonspectrum/desktop-sync-agent build && node scripts/package-desktop-sync-release.mjs",
     "desktop:sync:release:sign": "node scripts/sign-desktop-sync-release.mjs",
     "desktop:sync:release:verify": "node scripts/verify-desktop-sync-release.mjs",
-    "test:desktop-sync-release": "pnpm --filter @toonspectrum/desktop-sync-agent build && node --test scripts/desktop-sync-release.test.mjs"
+    "test:desktop-sync-release": "pnpm --filter @toonspectrum/desktop-sync-agent build && node --test scripts/desktop-sync-release.test.mjs",
+    "test:studio-2d-legacy-gpt25": "node scripts/studio-2d-legacy-gpt25-replacements.test.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",
