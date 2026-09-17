@@ -47,6 +47,19 @@ test("mandatory lanes start independently and retain fail-closed coverage", () =
   assert.doesNotMatch(job("build"), /pnpm run build(?!:)/);
 });
 
+test("PR caches restore without paying cache-save post steps", () => {
+  for (const [name, cacheId] of [
+    ["lint", "eslint-cache"],
+    ["typecheck", "typescript-cache"],
+  ]) {
+    const block = job(name);
+    assert.ok(block.includes(`id: ${cacheId}\n        uses: actions/cache/restore@v4`));
+    assert.match(block, /uses: actions\/cache\/save@v4/);
+    assert.match(block, /if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/);
+    assert.doesNotMatch(block, /uses: actions\/cache@v4/);
+  }
+});
+
 test("product regressions execute as five semantic matrix shards", () => {
   const block = job("static");
   assert.match(block, /name: Core regression shard \/ \$\{\{ matrix\.shard \}\}/);
