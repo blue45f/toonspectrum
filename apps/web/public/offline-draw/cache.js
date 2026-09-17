@@ -5,17 +5,13 @@
   const legacyNames = ['toonstudio-emergency-drawing-shell-v1'];
   const files = [
     ['/offline-draw/index.html', /text\/html/i],
-    ['/offline-draw/install.html', /text\/html/i],
     ['/offline-draw/portable.html', /text\/html/i],
     ['/offline-draw/styles.css', /text\/css/i],
-    ['/offline-draw/install.css', /text\/css/i],
     ['/offline-draw/model.js', /(javascript|ecmascript)/i],
     ['/offline-draw/storage.js', /(javascript|ecmascript)/i],
     ['/offline-draw/editor.js', /(javascript|ecmascript)/i],
-    ['/offline-draw/install.js', /(javascript|ecmascript)/i],
     ['/offline-draw/cache.js', /(javascript|ecmascript)/i],
     ['/offline-draw/bootstrap.js', /(javascript|ecmascript)/i],
-    ['/offline-draw/manifest.webmanifest', /(manifest\+json|application\/json)/i],
   ];
   let preparing = null;
   const cleanupLegacy = () => Promise.all(

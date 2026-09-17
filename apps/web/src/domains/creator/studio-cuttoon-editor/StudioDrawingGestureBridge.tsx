@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
 interface GestureState {
-  count: number;
+  count: 2 | 3 | 4;
   startedAt: number;
   moved: boolean;
   points: Map<number, { x: number; y: number }>;
@@ -13,14 +13,15 @@ const TAP_DURATION_MS = 280;
 const TAP_MOVE_TOLERANCE_PX = 18;
 
 /**
- * Pro drawing gesture projection shared by browser and installed-app presentations.
+ * Professional touch gestures shared by integrated Studio and ToonStudio Draw.
  *
- * - two-finger tap: undo (Procreate muscle memory)
- * - three-finger tap: redo
- * - four-finger tap: canvas-only (Krita canvas-only gesture parity)
+ * Existing Studio touch preferences remain authoritative:
+ * - two fingers run undo only when `twoFinger=undo-redo`; `pan-zoom` is left untouched;
+ * - three fingers follow the user's `undo | toggle-ui | none` preference;
+ * - four fingers add a non-document canvas-only toggle inspired by dedicated art apps.
  *
- * Pinch/rotate remain untouched: this bridge never prevents default browser/canvas behavior and
- * cancels the tap candidate as soon as any participating finger moves beyond the tolerance.
+ * Pinch/rotate remain untouched: candidates are cancelled after real movement and this bridge
+ * never takes ownership during touchmove. The recognized tap is suppressed only at touchend.
  */
 export function StudioDrawingGestureBridge({
   enabled,
@@ -37,12 +38,21 @@ export function StudioDrawingGestureBridge({
     let gesture: GestureState | null = null;
 
     const onTouchStart = (event: TouchEvent) => {
-      if (![2, 3, 4].includes(event.touches.length)) {
+      const count = event.touches.length;
+      if (count !== 2 && count !== 3 && count !== 4) {
+        gesture = null;
+        return;
+      }
+      const touchPrefs = session.appSettings?.touch;
+      if (
+        (count === 2 && touchPrefs?.twoFinger !== "undo-redo")
+        || (count === 3 && touchPrefs?.threeFinger === "none")
+      ) {
         gesture = null;
         return;
       }
       gesture = {
-        count: event.touches.length,
+        count,
         startedAt: performance.now(),
         moved: false,
         points: new Map(
@@ -56,13 +66,16 @@ export function StudioDrawingGestureBridge({
 
     const onTouchMove = (event: TouchEvent) => {
       if (!gesture) return;
-      if (event.touches.length > gesture.count) {
+      if (event.touches.length !== gesture.count) {
         gesture = null;
         return;
       }
       for (const touch of Array.from(event.touches)) {
         const origin = gesture.points.get(touch.identifier);
-        if (!origin) continue;
+        if (!origin) {
+          gesture = null;
+          return;
+        }
         if (Math.hypot(touch.clientX - origin.x, touch.clientY - origin.y) > TAP_MOVE_TOLERANCE_PX) {
           gesture.moved = true;
           return;
@@ -76,24 +89,36 @@ export function StudioDrawingGestureBridge({
       gesture = null;
       if (candidate.moved || performance.now() - candidate.startedAt > TAP_DURATION_MS) return;
 
-      if (candidate.count === 2) {
+      const touchPrefs = session.appSettings?.touch;
+      if (candidate.count === 2 && touchPrefs?.twoFinger === "undo-redo") {
+        event.preventDefault();
         session.undo?.();
         session.announceDrawingShortcut?.("두 손가락 탭 · 실행 취소");
         return;
       }
-      if (candidate.count === 3) {
-        session.redo?.();
-        session.announceDrawingShortcut?.("세 손가락 탭 · 다시 실행");
+      if (candidate.count === 3 && touchPrefs?.threeFinger === "undo") {
+        event.preventDefault();
+        session.undo?.();
+        session.announceDrawingShortcut?.("세 손가락 탭 · 실행 취소");
         return;
       }
-      session.setCanvasOnlyMode?.((value: boolean) => !value);
-      session.announceDrawingShortcut?.("네 손가락 탭 · 캔버스만 보기 전환");
+      if (candidate.count === 3 && touchPrefs?.threeFinger === "toggle-ui") {
+        event.preventDefault();
+        session.setCanvasOnlyMode?.((value: boolean) => !value);
+        session.announceDrawingShortcut?.("세 손가락 탭 · 캔버스 UI 전환");
+        return;
+      }
+      if (candidate.count === 4) {
+        event.preventDefault();
+        session.setCanvasOnlyMode?.((value: boolean) => !value);
+        session.announceDrawingShortcut?.("네 손가락 탭 · 캔버스만 보기 전환");
+      }
     };
 
     const cancel = () => { gesture = null; };
     root.addEventListener("touchstart", onTouchStart, { passive: true });
     root.addEventListener("touchmove", onTouchMove, { passive: true });
-    root.addEventListener("touchend", onTouchEnd, { passive: true });
+    root.addEventListener("touchend", onTouchEnd, { passive: false });
     root.addEventListener("touchcancel", cancel, { passive: true });
     return () => {
       root.removeEventListener("touchstart", onTouchStart);

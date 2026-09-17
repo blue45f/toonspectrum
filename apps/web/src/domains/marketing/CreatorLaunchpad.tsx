@@ -133,10 +133,10 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
       ? copy.install
       : copy.installHelp;
   const swReady = pwa.serviceWorkerStatus === "active" || pwa.serviceWorkerStatus === "update-waiting";
-  const drawingInstallLabel = locale === "ko" ? "순수 드로잉 앱 설치" : "Install drawing-only app";
+  const drawingInstallLabel = locale === "ko" ? "순수 드로잉 앱 설치" : "Install ToonStudio Draw";
   const drawingInstallBody = locale === "ko"
-    ? "전체 앱과 별도로 설치됩니다. 로그인·협업·AI 없이 브러시·레이어·로컬 저장과 오프라인 드로잉에 집중합니다."
-    : "Installs separately from the full app, focused on brushes, layers, local storage and offline drawing without sign-in, collaboration or AI.";
+    ? "별도 간이 편집기가 아니라 현재 Studio와 동일한 문서·브러시·레이어·저장 엔진을 캔버스 중심 앱 UI로 설치합니다."
+    : "Installs the same Studio document, brush, layer and save engine with canvas-first app chrome — not a separate lightweight editor.";
 
   return (
     <section className="clp" aria-labelledby="creator-continuity-title" data-creator-launchpad="v1">
@@ -253,7 +253,7 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
             <button
               type="button"
               className="clp-install-button"
-              onClick={() => window.location.assign("/offline-draw/install.html?source=site")}
+              onClick={() => window.location.assign("/draw-app/install.html?source=site")}
             >
               <Brush size={17} aria-hidden="true" />{drawingInstallLabel}
             </button>

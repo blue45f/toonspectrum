@@ -43,15 +43,27 @@ export function StudioDrawingAppBar({ session }: { readonly session: StudioCutto
         </span>
         <div className="hidden min-w-0 sm:block">
           <strong className="block truncate text-xs font-black tracking-[-0.02em] text-fg">ToonStudio Draw</strong>
-          <span className="block max-w-48 truncate text-[0.65rem] text-fg-3">{s.title || "Untitled"}</span>
+          <span className="block max-w-48 truncate text-[0.65rem] text-fg-3">{s.name || "Untitled"}</span>
         </div>
       </div>
 
       <div className="hidden min-w-0 flex-1 items-center gap-1.5 md:flex" aria-label="현재 드로잉 설정">
-        <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-line bg-card px-2.5 py-1 text-[0.68rem] font-semibold text-fg-2">
+        <button
+          type="button"
+          className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-line bg-card px-2.5 py-1 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          aria-label={`브러시 라이브러리 열기, 현재 ${brushName}`}
+          title="브러시 라이브러리"
+          onClick={(event) => {
+            if (s.isMobile) {
+              s.setMobileSheet?.("draw");
+              return;
+            }
+            s.studioBrushCatalogHandlers?.toggle?.("desktop-dock", event.currentTarget);
+          }}
+        >
           <Brush size={13} aria-hidden="true" />
           <span className="max-w-32 truncate">{brushName}</span>
-        </span>
+        </button>
         <span className="rounded-full border border-line bg-card px-2.5 py-1 text-[0.68rem] font-semibold tabular-nums text-fg-2">
           {Math.round(Number(s.strokeWidth) || 0)} px
         </span>
