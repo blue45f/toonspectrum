@@ -1231,15 +1231,20 @@ export function recommendCreatorTeamRoles(
     for (const role of allowed) {
       let score = 0;
       const reasons: string[] = [];
-      if (primaryRoles.has(role)) {
+      const hasPrimaryRole = primaryRoles.has(role);
+      const hasSecondaryRole = secondaryRoles.has(role);
+      const hasSpecialtyRole = specialtyRoles.has(role);
+      const hasRoleEvidence = hasPrimaryRole || hasSecondaryRole || hasSpecialtyRole;
+      if (!hasRoleEvidence) continue;
+      if (hasPrimaryRole) {
         score += 70;
         reasons.push("대표 직무와 일치");
       }
-      if (secondaryRoles.has(role)) {
+      if (hasSecondaryRole) {
         score += 35;
         reasons.push("보조 직무와 일치");
       }
-      if (specialtyRoles.has(role)) {
+      if (hasSpecialtyRole) {
         score += 30;
         reasons.push("전문 분야와 일치");
       }
@@ -1264,15 +1269,13 @@ export function recommendCreatorTeamRoles(
         score -= 80;
         reasons.push("현재 협업 불가");
       }
-      if (score > 0) {
-        recommendations.push({
-          userId: candidate.userId,
-          name: candidate.name,
-          productionRole: role,
-          score,
-          reasons,
-        });
-      }
+      recommendations.push({
+        userId: candidate.userId,
+        name: candidate.name,
+        productionRole: role,
+        score,
+        reasons,
+      });
     }
   }
 
