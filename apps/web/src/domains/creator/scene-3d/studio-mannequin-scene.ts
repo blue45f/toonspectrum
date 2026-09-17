@@ -428,11 +428,23 @@ export function createStudioMannequinScene(
     const to = toVec3(primitive.to);
     const segment = new THREE.Vector3().subVectors(to, from);
     const segmentLength = segment.length();
+    const endRadius = primitive.endRadius;
+    const hasAnatomicalTaper = typeof endRadius === "number"
+      && Number.isFinite(endRadius)
+      && endRadius > 0
+      && Math.abs(endRadius - primitive.radius) > 1e-6;
     const middleLength = Math.max(0.001, segmentLength - primitive.radius * 2);
-    const mesh = new THREE.Mesh(
-      new THREE.CapsuleGeometry(primitive.radius, middleLength, 12, 28),
-      bodyMaterial,
-    );
+    const geometry = hasAnatomicalTaper
+      ? new THREE.CylinderGeometry(
+          endRadius,
+          primitive.radius,
+          Math.max(0.001, segmentLength),
+          32,
+          2,
+          false,
+        )
+      : new THREE.CapsuleGeometry(primitive.radius, middleLength, 12, 28);
+    const mesh = new THREE.Mesh(geometry, bodyMaterial);
     mesh.position.copy(from).addScaledVector(segment, 0.5);
     if (segmentLength > 1e-9) {
       mesh.quaternion.setFromUnitVectors(
