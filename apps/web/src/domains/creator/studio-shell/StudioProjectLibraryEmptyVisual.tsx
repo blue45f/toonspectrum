@@ -3,10 +3,10 @@ import { motion, useReducedMotion } from "motion/react";
 
 import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useT } from "@/shared/lib/i18n";
+import { translateParallelBilingualCopy, useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 import "./studio-project-library-empty-visual.css";
-
-type Locale = "ko" | "en";
 
 const COPY = {
   ko: {
@@ -43,8 +43,10 @@ const COPY = {
 
 const HREFS = ["/studio/new", "/studio/import", "/production/projects/sample-project/overview"] as const;
 
-export function StudioProjectLibraryEmptyVisual({ locale }: { readonly locale: Locale }) {
-  const copy = COPY[locale];
+export function StudioProjectLibraryEmptyVisual({ locale }: { readonly locale: string }) {
+  const t = useT();
+  const bt = useBilingual("StudioProjectLibraryEmptyVisual");
+  const copy = translateParallelBilingualCopy(t, "StudioProjectLibraryEmptyVisual", COPY);
   const reducedMotion = useReducedMotion();
   return (
     <section className="studio-project-empty-visual" aria-labelledby="studio-project-empty-title" lang={locale}>
@@ -52,7 +54,7 @@ export function StudioProjectLibraryEmptyVisual({ locale }: { readonly locale: L
         <p className="studio-project-empty-visual__eyebrow"><Sparkles size={14} aria-hidden="true" />{copy.eyebrow}</p>
         <h2 id="studio-project-empty-title">{copy.title}</h2>
         <p className="studio-project-empty-visual__body">{copy.body}</p>
-        <div className="studio-project-empty-visual__badges" aria-label={locale === "ko" ? "작업 보호 기능" : "Work protection features"}>
+        <div className="studio-project-empty-visual__badges" aria-label={bt("작업 보호 기능", "Work protection features")}>
           {copy.badges.map((badge) => <span key={badge}><ShieldCheck size={13} aria-hidden="true" />{badge}</span>)}
         </div>
         <div className="studio-project-empty-visual__actions">
