@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: core-v3-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
@@ -40,6 +41,30 @@ jobs:
             !/artifacts/
             !/docs/
             !/tests/benchmarks/results/
+      - name: Collect changed pull-request files
+        if: github.event_name == 'pull_request'
+        id: changed
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          changed_file_path="$RUNNER_TEMP/core-lint-changed-files.txt"
+          : > "$changed_file_path"
+          page=1
+          while :; do
+            response="$(curl --fail-with-body --silent --show-error --retry 3 \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100&page=$page")"
+            count="$(jq 'length' <<< "$response")"
+            jq -r '.[].filename' <<< "$response" >> "$changed_file_path"
+            (( count < 100 )) && break
+            ((page += 1))
+          done
+          echo "file=$changed_file_path" >> "$GITHUB_OUTPUT"
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -50,17 +75,23 @@ jobs:
         id: eslint-cache
         uses: actions/cache/restore@v4
         with:
-          path: node_modules/.cache/eslint/full
+          path: node_modules/.cache/eslint
           key: core-eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs') }}-${{ github.sha }}
           restore-keys: |
             core-eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs') }}-
-      - name: Strict lint
+      - name: Strict lint changed pull-request files
+        if: github.event_name == 'pull_request'
+        env:
+          LINT_CACHE_LOCATION: node_modules/.cache/eslint/quick/
+        run: node scripts/lint-changed.mjs --files-from="${{ steps.changed.outputs.file }}" --full-on-config
+      - name: Strict lint full repository
+        if: github.event_name != 'pull_request'
         run: pnpm run lint:strict
       - name: Save ESLint result cache on main
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.eslint-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: node_modules/.cache/eslint/full
+          path: node_modules/.cache/eslint
           key: core-eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs') }}-${{ github.sha }}
 
   typecheck:
@@ -93,6 +124,7 @@ jobs:
           scripts/ci-core-gate.test.mjs
           scripts/ci-core-regression-shards.test.mjs
           scripts/ci-executed-gates.test.mjs
+          scripts/lint-changed-policy.test.mjs
           scripts/studio-bundle-temporary-allowance.test.mjs
           scripts/ci-merge-reliability.test.mjs
       - name: Verify deduplicated PR workflow policy

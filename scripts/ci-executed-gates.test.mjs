@@ -47,6 +47,17 @@ test("mandatory lanes start independently and retain fail-closed coverage", () =
   assert.doesNotMatch(job("build"), /pnpm run build(?!:)/);
 });
 
+test("pull-request lint scopes to changed files and escalates configuration changes", () => {
+  const lint = job("lint");
+  assert.ok(source.includes("permissions:\n  contents: read\n  pull-requests: read"));
+  assert.match(lint, /Collect changed pull-request files/);
+  assert.match(lint, /pulls\/\$PR_NUMBER\/files\?per_page=100&page=\$page/);
+  assert.match(lint, /node scripts\/lint-changed\.mjs --files-from=.* --full-on-config/);
+  assert.match(lint, /if: github\.event_name != 'pull_request'/);
+  assert.ok(lint.includes("path: node_modules/.cache/eslint\n"));
+  assert.match(job("typecheck"), /scripts\/lint-changed-policy\.test\.mjs/);
+});
+
 test("PR caches restore without paying cache-save post steps", () => {
   for (const [name, cacheId] of [
     ["lint", "eslint-cache"],
