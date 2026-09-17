@@ -18,6 +18,36 @@ export const TechnologyPage = lazyRetry(
   })),
   "TechnologyPage",
 );
+export const EngineeringStoryPage = lazyRetry(
+  () => import("@/domains/legal/technology/EngineeringStoryPage").then((module) => ({
+    default: module.EngineeringStoryPage,
+  })),
+  "EngineeringStoryPage",
+);
+export const EngineeringGuidesPage = lazyRetry(
+  () => import("@/domains/legal/technology/EngineeringGuidesPage").then((module) => ({
+    default: module.EngineeringGuidesPage,
+  })),
+  "EngineeringGuidesPage",
+);
+export const EngineeringDeckPage = lazyRetry(
+  () => import("@/domains/legal/technology/EngineeringDeckPage").then((module) => ({
+    default: module.EngineeringDeckPage,
+  })),
+  "EngineeringDeckPage",
+);
+export const EngineeringVideosPage = lazyRetry(
+  () => import("@/domains/legal/technology/EngineeringVideosPage").then((module) => ({
+    default: module.EngineeringVideosPage,
+  })),
+  "EngineeringVideosPage",
+);
+export const EngineeringLicensesPage = lazyRetry(
+  () => import("@/domains/legal/technology/EngineeringLicensesPage").then((module) => ({
+    default: module.EngineeringLicensesPage,
+  })),
+  "EngineeringLicensesPage",
+);
 export const ProductPrinciplesPage = lazyRetry(
   () => import("@/domains/legal/ProductPrinciplesPage").then((module) => ({
     default: module.ProductPrinciplesPage,

@@ -78,7 +78,8 @@ export function AboutSectionNav({ className }: AboutSectionNavProps) {
         {ABOUT_ITEMS.map((item) => {
           const Icon = item.icon;
           const copy = item[locale];
-          const active = pathname === item.href;
+          const active = pathname === item.href
+            || (item.href === "/about/technology" && pathname.startsWith("/about/technology/"));
 
           return (
             <Link
