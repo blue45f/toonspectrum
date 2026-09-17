@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Cross-platform local-folder scan, journal, and conflict-safe sync planning for ToonStudio.",
+  "description": "Conflict-safe local folder and Google Drive, Dropbox, OneDrive sync for ToonStudio.",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
   "types": "./src/index.ts",

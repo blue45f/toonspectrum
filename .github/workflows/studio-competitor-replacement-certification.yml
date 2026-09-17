@@ -1,0 +1,76 @@
+name: Studio competitor replacement certification
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: [main]
+    paths:
+      - ".github/workflows/studio-competitor-replacement-certification.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "apps/desktop-sync/**"
+      - "apps/web/src/domains/creator/**"
+      - "apps/api/src/modules/studio-project-graph/**"
+      - "packages/studio-project-model/**"
+      - "packages/studio-format-gateway/**"
+      - "scripts/verify-studio-competitor-replacement*"
+      - "scripts/verify-studio-reference-projects*"
+      - "scripts/verify-studio-professional-validation*"
+      - "docs/benchmarks/studio-competitor-replacement-program.json"
+      - "docs/benchmarks/studio-reference-project-certification.json"
+      - "docs/validation/studio-professional-creator-validation*"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/studio-competitor-replacement-certification.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "apps/desktop-sync/**"
+      - "apps/web/src/domains/creator/**"
+      - "apps/api/src/modules/studio-project-graph/**"
+      - "packages/studio-project-model/**"
+      - "packages/studio-format-gateway/**"
+      - "scripts/verify-studio-competitor-replacement*"
+      - "scripts/verify-studio-reference-projects*"
+      - "scripts/verify-studio-professional-validation*"
+      - "docs/benchmarks/studio-competitor-replacement-program.json"
+      - "docs/benchmarks/studio-reference-project-certification.json"
+      - "docs/validation/studio-professional-creator-validation*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify:
+    name: sync, reference projects, and claim safety
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 trusted first-party action
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Verify workstream evidence, desktop sync, and claim policy
+        run: pnpm run verify:studio-competitor-replacement
+      - name: Execute deterministic reference projects A-D
+        run: pnpm run verify:studio-reference-projects
+      - name: Upload certification receipts
+        if: always()
+        uses: actions/upload-artifact@v4 # NOSONAR S7637 trusted first-party action
+        with:
+          name: studio-competitor-replacement-${{ github.run_id }}
+          path: qa-results/studio-reference-projects
+          if-no-files-found: warn
+          retention-days: 30

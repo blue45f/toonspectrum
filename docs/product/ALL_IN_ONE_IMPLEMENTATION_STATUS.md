@@ -121,11 +121,18 @@
 - 원격 쓰기·삭제는 마지막으로 확인한 version을 compare-and-swap 조건으로 사용해 스캔 뒤 변경된 파일을 덮어쓰지 않는다.
 - upload·download는 임시 파일, digest 재검증과 atomic rename 경계를 사용하고, 성공한 작업만 journal에 반영한다.
 - 로컬 삭제는 `.toonstudio/trash`로 이동하며 감시 모드는 중복 trigger를 병합하고 SIGINT·SIGTERM에서 안전하게 중지한다.
+- Google Drive·Dropbox·OneDrive를 access token으로 직접 연결하는 cloud transport를 제공한다.
+- Google Drive version+ETag, Dropbox revision, OneDrive eTag를 공급자 compare-and-swap 조건으로 사용한다.
+- 공급자에 SHA-256이 없거나 알고리즘이 다른 경우 `.toonstudio-sync-index.json` sidecar를 저장하고 object version과 연결한다.
+- sidecar가 없거나 오래됐으면 원격 파일을 다시 내려받아 SHA-256을 복구하고, conflict 없는 실행 뒤 index를 compare-and-swap으로 갱신한다.
+- `--dry-run`과 충돌 cycle은 원격 폴더나 sidecar index를 생성·수정하지 않는다.
+- Google Drive와 OneDrive는 resumable upload session, Dropbox는 revision-guarded upload session을 사용한다.
+- access token은 환경 변수에서만 읽고 CLI 출력·journal·sidecar에 기록하지 않는다.
 - 경쟁 제품 대체 프로그램 57개 workstream을 실제 저장소 evidence와 연결하는 검증기를 추가했다.
 - 52개 구현, 4개 검증 harness, 1개 외부 전문 창작자 검증 상태를 구분하며 외부 서명 증거 전에는 대체 완료 문구를 차단한다.
 - 전문 창작자 12명 대상 블라인드 제작 과제·성능·PSD·3D·검수·게시 패키지 평가 기준을 명시했다.
 
-이 증분의 완료 범위는 파일시스템·마운트 폴더 transport와 CLI다. 실제 Google Drive·Dropbox·OneDrive OAuth transport, OS 서명 설치 패키지, 네트워크 multipart 재개 전송과 충돌 GUI는 별도 release gate로 유지한다.
+이 증분의 완료 범위는 파일시스템·마운트 폴더와 Google Drive·Dropbox·OneDrive direct access-token transport다. 브라우저 OAuth 로그인·refresh token·OS Keychain, 프로세스 재시작 이후 upload session 재개, OS 서명 설치 패키지와 충돌 GUI는 별도 release gate로 유지한다.
 
 ## 2026-09-17 기준 프로젝트 A–D 자동 인증 증분
 
@@ -185,3 +192,18 @@
 6. 외부 서비스 장애가 ToonStudio 내부 제작을 막아서는 안 된다.
 7. 기능을 추가할 때 대표 화면과 소유 도메인을 하나로 지정한다.
 8. 모든 편집 화면은 저장·복구 상태를 사용자가 이해할 수 있는 문장으로 제공한다.
+
+## 2026-09-17 동기화 transport·외부 검증 실행 패키지 증분
+
+이번 증분에서 완료한 범위는 다음과 같다.
+
+- 데스크톱 동기화 엔진에 실제 파일시스템 remote transport를 추가해 upload, download, delete와 두 번째 cycle의 journal 재사용을 왕복 검증한다.
+- 원격 파일 version을 compare-and-swap 조건으로 사용하고, 스캔 이후 바뀐 원본·임시 파일·최종 커밋의 SHA-256과 크기를 단계별로 확인한다.
+- `.toonstudio`, `.git`, `node_modules`는 canonical path 검사 전에 제외해 내부 journal이 다음 스캔을 깨뜨리지 않도록 수정했다.
+- 로컬과 원격이 동일하거나 서로 중첩된 폴더인 경우 재귀 동기화를 시작하기 전에 중단한다.
+- 심볼릭 링크 부모를 통한 루트 탈출, 원격 동시 변경, 다운로드 중 원격 변경과 손상된 byte를 실패로 처리한다.
+- 전문 창작자 검증 protocol, 12명 역할별 template, evidence 판정기와 receipt checksum을 추가했다.
+- 검증기는 7개 과제×12명, 독립 서명 checksum, 역할 구성, 완료율, 데이터 유실, 게시 사전검사, PSD 손실 보고, SUS, 접근성·보안 임계값을 모두 검사한다.
+- 자동화된 protocol 검사나 합성 단위 테스트는 실제 외부 서명 증거를 대체하지 않으며, evidence가 없으면 `PR-057`과 대체 완료 문구는 계속 차단된다.
+
+운영 Google Drive·Dropbox 계정, Safari 실기기, 장시간 다중 사용자 세션과 실제 전문 창작자 서명은 저장소 내부 자동화로 생성할 수 없는 출시 증거다. 해당 증거는 위 protocol에 따라 수집하고 checksum receipt로 연결한다.

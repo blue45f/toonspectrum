@@ -7,7 +7,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   executeDesktopSyncCli,
@@ -73,6 +73,30 @@ describe("desktop sync CLI", () => {
       "--watch",
       "--interval", "999",
     ])).toThrow(/at least 1000ms/u);
+  });
+
+  it("parses cloud targets without exposing OAuth credentials", () => {
+    const options = parseDesktopSyncCliArguments([
+      "--local", "./local",
+      "--cloud-provider", "dropbox",
+      "--cloud-root", "ToonStudio/Series",
+      "--access-token-env", "CUSTOM_DROPBOX_TOKEN",
+      "--dry-run",
+    ]);
+    expect(options).toMatchObject({
+      remoteRoot: "dropbox:ToonStudio/Series",
+      remoteTarget: {
+        kind: "cloud",
+        provider: "dropbox",
+        rootPath: "ToonStudio/Series",
+        accessTokenEnvironmentVariable: "CUSTOM_DROPBOX_TOKEN",
+      },
+    });
+    expect(() => parseDesktopSyncCliArguments([
+      "--local", "./local",
+      "--remote-folder", "./remote",
+      "--cloud-provider", "dropbox",
+    ])).toThrow(/exactly one/u);
   });
 
   it("runs one filesystem-backed cycle and emits JSON without file content", async () => {
@@ -143,5 +167,74 @@ describe("desktop sync CLI", () => {
     await expect(runDesktopSyncCli(["--help"], collected.io)).resolves.toBe(0);
     expect(collected.stdout.join("")).toContain("toonstudio-sync --local");
     expect(collected.stderr).toEqual([]);
+  });
+});
+
+describe("desktop sync cloud CLI", () => {
+  it("runs a Dropbox dry-run through the cloud remote factory", async () => {
+    const local = await temporaryRoot("toonstudio-cli-cloud-local");
+    const calls: Array<RequestInit | undefined> = [];
+    const fetchImpl = vi.fn<typeof fetch>(async (request, init) => {
+      calls.push(init);
+      const url = typeof request === "string"
+        ? request
+        : request instanceof URL
+          ? request.toString()
+          : request.url;
+      if (url.endsWith("/files/get_metadata")) {
+        return new Response(JSON.stringify({
+          error_summary: "path/not_found/",
+        }), {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (
+        url.endsWith("/files/create_folder_v2")
+        || url.endsWith("/files/upload")
+        || url.endsWith("/files/list_folder")
+      ) {
+        throw new Error("Dropbox dry-run must not mutate or create its root");
+      }
+      throw new Error(`unexpected Dropbox request: ${url}`);
+    });
+    const collected = outputCollector();
+
+    const exitCode = await runDesktopSyncCli([
+      "--local", local,
+      "--cloud-provider", "dropbox",
+      "--cloud-root", "ToonStudio/Series",
+      "--access-token-env", "TEST_DROPBOX_TOKEN",
+      "--dry-run",
+      "--json",
+    ], collected.io, {
+      environment: { TEST_DROPBOX_TOKEN: "test-secret" },
+      fetchImpl,
+    });
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(collected.stdout.join(""))).toMatchObject({
+      status: "ready",
+      remoteRoot: "dropbox:ToonStudio/Series",
+      counts: { upload: 0, download: 0, conflict: 0 },
+      execution: null,
+    });
+    expect(collected.stdout.join("")).not.toContain("test-secret");
+    expect(calls.every((init) => (
+      new Headers(init?.headers).get("Authorization")
+      === "Bearer test-secret"
+    ))).toBe(true);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("requires the configured token environment variable", async () => {
+    const local = await temporaryRoot("toonstudio-cli-cloud-missing-token");
+    const options = parseDesktopSyncCliArguments([
+      "--local", local,
+      "--cloud-provider", "google-drive",
+      "--dry-run",
+    ]);
+    await expect(executeDesktopSyncCli(options, {
+      environment: {},
+    })).rejects.toThrow(/TOONSTUDIO_GOOGLE_DRIVE_ACCESS_TOKEN/u);
   });
 });
