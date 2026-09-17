@@ -84,7 +84,7 @@ const VIEW_DESCRIPTIONS: Readonly<Record<LibraryView, Readonly<Record<Locale, st
 };
 
 function localeFromLanguage(language: string): Locale {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  return language;
 }
 
 function resolveView(value: string | null, initialView?: InitialLibraryView): LibraryView {
@@ -96,9 +96,13 @@ function viewHref(view: LibraryView): string {
   return view === "active" ? "/studio" : `/studio?view=${view}`;
 }
 
-function dateLabel(value: string | null, locale: Locale): string {
+function dateLabel(
+  value: string | null,
+  locale: Locale,
+  bt: (ko: string, en: string) => string,
+): string {
   if (!value || !Number.isFinite(Date.parse(value))) return bt("아직 없음", "Not yet");
-  return new Intl.DateTimeFormat(bt("ko-KR", "en-US"), {
+  return new Intl.DateTimeFormat(locale || "en", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -106,17 +110,22 @@ function dateLabel(value: string | null, locale: Locale): string {
   }).format(new Date(value));
 }
 
-function distributionLabel(profile: StudioSaveProfile, locale: Locale): string {
+function distributionLabel(
+  profile: StudioSaveProfile,
+  bt: (ko: string, en: string) => string,
+): string {
   const labels = {
     none: { ko: "미배포", en: "Not distributed" },
     exported: { ko: "내보냄", en: "Exported" },
     submitted: { ko: "외부 제출", en: "Submitted externally" },
     published: { ko: "게시됨", en: "Published" },
   } as const;
-  return labels[profile.distributionState][locale];
+  const label = labels[profile.distributionState];
+  return bt(label.ko, label.en);
 }
 
-function SaveBadge({ profile, locale }: { readonly profile: StudioSaveProfile; readonly locale: Locale }) {
+function SaveBadge({ profile, locale: _locale }: { readonly profile: StudioSaveProfile; readonly locale: Locale }) {
+  const bt = useBilingual("StudioSaveFirstProjectLibraryPage.badge");
   const summary = studioSaveSafetySummary(profile);
   const Icon = summary.needsBackup ? CloudOff : CheckCircle2;
   return (
@@ -127,7 +136,7 @@ function SaveBadge({ profile, locale }: { readonly profile: StudioSaveProfile; r
         : "border-success/35 bg-success-soft/20 text-success",
     )}>
       <Icon size={13} aria-hidden="true" />
-      {locale === "ko" ? summary.headline : summary.needsBackup ? "Backup needs attention" : "Backup ready"}
+      {bt(summary.headline, summary.needsBackup ? "Backup needs attention" : "Backup ready")}
     </span>
   );
 }
@@ -143,7 +152,7 @@ function personalCloudProviderLabel(provider: PersonalCloudProviderId): string {
   return "OneDrive";
 }
 
-function uploadFailureMessage(error: unknown, locale: Locale): string {
+function uploadFailureMessage(error: unknown, bt: (ko: string, en: string) => string): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message.trim().slice(0, 500);
   }
@@ -187,9 +196,10 @@ export function StudioSaveFirstProjectLibraryPage({
       void reloadCloudConnections();
     } else {
       const reason = searchParams.get("cloudError");
-      setMessage(locale === "ko"
-        ? `${label} 연결을 완료하지 못했습니다.${reason ? ` (${reason})` : ""}`
-        : `${label} connection could not be completed.${reason ? ` (${reason})` : ""}`);
+      setMessage(bt(
+        `${label} 연결을 완료하지 못했습니다.${reason ? ` (${reason})` : ""}`,
+        `${label} connection could not be completed.${reason ? ` (${reason})` : ""}`,
+      ));
     }
     const next = new URLSearchParams(searchParams);
     next.delete("cloud");
@@ -317,7 +327,7 @@ export function StudioSaveFirstProjectLibraryPage({
       });
       setMessage(bt(`“${project.title}”을 ${personalCloudProviderLabel(provider)}에 저장했습니다.`, `Saved “${project.title}” to ${personalCloudProviderLabel(provider)}.`));
     } catch (cause) {
-      const detail = uploadFailureMessage(cause, locale);
+      const detail = uploadFailureMessage(cause, bt);
       const uploadError = cause instanceof PersonalCloudUploadError ? cause : null;
       const unauthorized = uploadError?.code === "unauthorized";
       profiles.updateBindingStatus(project.id, bindingId, {
@@ -386,9 +396,9 @@ export function StudioSaveFirstProjectLibraryPage({
         <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">TOONSTUDIO</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-4xl">{VIEW_LABELS[view][locale]}</h1>
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-4xl">{bt(VIEW_LABELS[view].ko, VIEW_LABELS[view].en)}</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2 sm:text-base">
-              {VIEW_DESCRIPTIONS[view][locale]}
+              {bt(VIEW_DESCRIPTIONS[view].ko, VIEW_DESCRIPTIONS[view].en)}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -475,10 +485,10 @@ export function StudioSaveFirstProjectLibraryPage({
                         <SaveBadge profile={profile} locale={locale} />
                       </div>
                       <h2 className="mt-3 truncate text-lg font-black text-fg">{project.title}</h2>
-                      <p className="mt-1 text-xs text-fg-3">{bt("마지막 작업", "Last opened")} {dateLabel(project.lastOpenedAt, locale)}</p>
+                      <p className="mt-1 text-xs text-fg-3">{bt("마지막 작업", "Last opened")} {dateLabel(project.lastOpenedAt, locale, bt)}</p>
                       <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-panel/60 p-3 text-[0.68rem]">
-                        <div><p className="font-semibold text-fg-3">{bt("마지막 저장", "Last save")}</p><p className="mt-1 font-black text-fg">{dateLabel(profile.lastManualSaveAt, locale)}</p></div>
-                        <div><p className="font-semibold text-fg-3">{bt("배포", "Distribution")}</p><p className="mt-1 font-black text-fg">{distributionLabel(profile, locale)}</p></div>
+                        <div><p className="font-semibold text-fg-3">{bt("마지막 저장", "Last save")}</p><p className="mt-1 font-black text-fg">{dateLabel(profile.lastManualSaveAt, locale, bt)}</p></div>
+                        <div><p className="font-semibold text-fg-3">{bt("배포", "Distribution")}</p><p className="mt-1 font-black text-fg">{distributionLabel(profile, bt)}</p></div>
                       </div>
                       <details className="mt-3 rounded-xl border border-line bg-panel/55">
                         <summary className="cursor-pointer list-none px-3 py-2.5 text-xs font-black text-fg [&::-webkit-details-marker]:hidden">
@@ -495,7 +505,7 @@ export function StudioSaveFirstProjectLibraryPage({
                                     </p>
                                     <p className="mt-1 text-[0.64rem] text-fg-3">
                                       {binding.lastSyncedAt
-                                        ? `${bt("마지막 저장", "Last saved")} ${dateLabel(binding.lastSyncedAt, locale)}`
+                                        ? `${bt("마지막 저장", "Last saved")} ${dateLabel(binding.lastSyncedAt, locale, bt)}`
                                         : binding.connectionRequired
                                           ? bt("계정 연결 필요", "Account connection required")
                                           : bt("작업 사본", "Working copy")}
@@ -575,7 +585,7 @@ export function StudioSaveFirstProjectLibraryPage({
               <div className="mt-5 space-y-3">
                 {filteredProjects.map((project) => (
                   <article key={project.id} className="flex flex-col gap-3 rounded-2xl border border-line bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div><h2 className="font-black text-fg">{project.title}</h2><p className="mt-1 text-xs text-fg-3">{dateLabel(project.updatedAt, locale)}</p></div>
+                    <div><h2 className="font-black text-fg">{project.title}</h2><p className="mt-1 text-xs text-fg-3">{dateLabel(project.updatedAt, locale, bt)}</p></div>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => { if (view === "archived") library.activate(project.id); else library.restore(project.id); }} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}><RotateCcw size={14} aria-hidden="true" />{bt("복원", "Restore")}</button>
                       {view === "trash" ? <button type="button" onClick={() => { if (library.removePermanently(project.id)) profiles.remove(project.id); }} className={buttonClass({ variant: "quiet", size: "sm", className: "text-danger" })}><Trash2 size={14} aria-hidden="true" />{bt("완전 삭제", "Delete")}</button> : null}
@@ -626,7 +636,7 @@ export function StudioSaveFirstProjectLibraryPage({
                               {summary.headline}
                             </p>
                             <p className="mt-1 text-[0.66rem] text-fg-3">
-                              {bt("마지막 수동 저장", "Last manual save")} {dateLabel(profile.lastManualSaveAt, locale)}
+                              {bt("마지막 수동 저장", "Last manual save")} {dateLabel(profile.lastManualSaveAt, locale, bt)}
                             </p>
                           </div>
                           <button
@@ -672,7 +682,7 @@ export function StudioSaveFirstProjectLibraryPage({
         {view === "publications" ? (
           <section className="mt-7 rounded-2xl border border-line bg-card p-5">
             <div className="flex items-start gap-3"><span className="grid size-11 place-items-center rounded-xl bg-panel text-fg-2"><Send size={19} aria-hidden="true" /></span><div><h2 className="text-lg font-black text-fg">{bt("게시는 선택 사항입니다", "Publishing is optional")}</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-fg-2">{bt("저장된 원본과 게시물은 별개입니다. 게시를 중단해도 비공개 원본은 유지됩니다.", "Saved originals and publications are separate. Unpublishing keeps the private original.")}</p></div></div>
-            <div className="mt-5 space-y-3">{activeProjects.map((project) => { const profile = profiles.profileFor(project.id); return <article key={project.id} className="flex flex-col gap-3 rounded-xl border border-line bg-panel/50 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-black text-fg">{project.title}</h3><p className="mt-1 text-xs text-fg-3">{distributionLabel(profile, locale)} · {profile.accessMode === "public" ? "공개" : "나만 보기"}</p></div><Link href={`/studio/p/${encodeURIComponent(project.id)}/export?intent=publish`} className={buttonClass({ variant: "outline", size: "sm" })}>{bt("배포 옵션 열기", "Open distribution options")}</Link></article>; })}</div>
+            <div className="mt-5 space-y-3">{activeProjects.map((project) => { const profile = profiles.profileFor(project.id); return <article key={project.id} className="flex flex-col gap-3 rounded-xl border border-line bg-panel/50 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-black text-fg">{project.title}</h3><p className="mt-1 text-xs text-fg-3">{distributionLabel(profile, bt)} · {profile.accessMode === "public" ? "공개" : "나만 보기"}</p></div><Link href={`/studio/p/${encodeURIComponent(project.id)}/export?intent=publish`} className={buttonClass({ variant: "outline", size: "sm" })}>{bt("배포 옵션 열기", "Open distribution options")}</Link></article>; })}</div>
           </section>
         ) : null}
 
