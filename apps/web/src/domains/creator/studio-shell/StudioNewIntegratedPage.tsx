@@ -12,6 +12,7 @@ import {
   writeStudioTemplateHandoff,
 } from "../studio-template-catalog";
 import { StudioNewIntegratedPage as StudioProjectCreatePage } from "./StudioProjectCreatePage";
+import "./studio-new-visual-first.css";
 
 type Locale = "ko" | "en";
 
