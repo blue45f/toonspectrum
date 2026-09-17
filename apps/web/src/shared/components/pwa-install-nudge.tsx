@@ -10,6 +10,8 @@ import {
 } from "@/shared/lib/pwa-install-store";
 import { useI18n } from "@/shared/lib/i18n";
 
+import "./pwa-install-nudge.css";
+
 const INSTALL_NUDGE_SESSION_KEY = "toonstudio:pwa-install-nudge-dismissed";
 
 function readInstallNudgeDismissal(): boolean {
@@ -31,12 +33,14 @@ export function PwaInstallNudge() {
     getPwaInstallServerSnapshot,
   );
   const [dismissed, setDismissed] = useState(readInstallNudgeDismissal);
-  // Market browsing is content-first; the hero install card competes with discovery chrome.
+  // Market browsing is content-first; the install prompt competes with discovery chrome there.
+  // The creator home keeps the prompt, but CSS moves it above the mobile bottom navigation.
   const hideOnMarket = pathname === "/market" || pathname.startsWith("/market/");
 
   if (hideOnMarket || pwa.status !== "available" || dismissed) return null;
 
   const title = locale === "ko" ? "툰스튜디오를 앱처럼 열어보세요" : "Open ToonStudio like an app";
+  const compactTitle = locale === "ko" ? "툰스튜디오 앱 열기" : "Open ToonStudio";
   const description = locale === "ko"
     ? "홈 화면과 앱 목록에서 더 빠르게 창작을 시작할 수 있습니다."
     : "Launch your creative workspace faster from the home screen or app list.";
@@ -56,32 +60,41 @@ export function PwaInstallNudge() {
     <aside
       role="status"
       aria-label={title}
-      className="fixed right-3 top-[4.85rem] z-40 w-[min(22rem,calc(100vw-1.5rem))] rounded-2xl border border-line-strong bg-panel/95 p-3 shadow-2xl backdrop-blur-2xl motion-safe:animate-fade-up sm:right-5 sm:top-[5.15rem]"
+      aria-describedby="pwa-install-nudge-description"
+      className="pwa-install-nudge"
+      data-pwa-install-nudge="true"
+      data-surface={pathname === "/" ? "home" : "route"}
     >
-      <div className="flex items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent">
-          <Download size={18} aria-hidden="true" />
+      <div className="pwa-install-nudge__body">
+        <span className="pwa-install-nudge__icon" aria-hidden="true">
+          <Download size={18} />
         </span>
-        <div className="min-w-0 flex-1">
-          <strong className="block text-sm text-fg">{title}</strong>
-          <p className="mt-1 text-xs leading-5 text-fg-3">{description}</p>
-          <button
-            type="button"
-            onClick={() => void requestPwaInstall()}
-            className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl bg-fg px-3 py-2 text-xs font-bold text-canvas transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            <Download size={15} aria-hidden="true" />{action}
-          </button>
+        <div className="pwa-install-nudge__copy">
+          <strong className="pwa-install-nudge__title" aria-hidden="true">
+            <span className="pwa-install-nudge__title-full">{title}</span>
+            <span className="pwa-install-nudge__title-compact">{compactTitle}</span>
+          </strong>
+          <p id="pwa-install-nudge-description" className="pwa-install-nudge__description">
+            {description}
+          </p>
         </div>
-        <button
-          type="button"
-          aria-label={close}
-          onClick={dismiss}
-          className="grid size-10 shrink-0 place-items-center rounded-xl text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-        >
-          <X size={17} aria-hidden="true" />
-        </button>
       </div>
+      <button
+        type="button"
+        onClick={() => void requestPwaInstall()}
+        className="pwa-install-nudge__action"
+      >
+        <Download size={15} aria-hidden="true" />
+        {action}
+      </button>
+      <button
+        type="button"
+        aria-label={close}
+        onClick={dismiss}
+        className="pwa-install-nudge__close"
+      >
+        <X size={17} aria-hidden="true" />
+      </button>
     </aside>
   );
 }

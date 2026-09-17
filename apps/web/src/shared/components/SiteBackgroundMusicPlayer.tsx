@@ -305,7 +305,7 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
           type="button"
           onClick={() => void togglePlayback()}
           className={cn(
-            "grid size-10 shrink-0 place-items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+            "grid size-11 shrink-0 place-items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
             playing ? "bg-accent text-on-accent" : "bg-raised text-fg-2 hover:text-fg",
           )}
           aria-label={playing ? (korean ? "배경음악 일시정지" : "Pause background music") : (korean ? "배경음악 재생" : "Play background music")}
@@ -316,7 +316,7 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
         <button
           type="button"
           onClick={toggleExpanded}
-          className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-full px-2 text-left hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-2 text-left hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           aria-expanded={expanded}
         >
           <span className={cn("size-2 shrink-0 rounded-full", playing ? "animate-pulse bg-good" : "bg-fg-3")} aria-hidden="true" />
