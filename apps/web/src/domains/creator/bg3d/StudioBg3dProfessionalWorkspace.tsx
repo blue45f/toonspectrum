@@ -27,11 +27,14 @@ import {
   type StudioBg3dWorkspacePresetId,
 } from "./studio-bg3d-professional-workspace-layout";
 
+import type { StudioBg3dExperienceMode } from "./StudioBackground3DTypes";
+
 interface StudioBg3dProfessionalWorkspaceProps {
   readonly outliner: ReactNode;
   readonly viewport: ReactNode;
   readonly inspector: ReactNode;
   readonly scopeKey?: string | null;
+  readonly experienceMode?: StudioBg3dExperienceMode;
 }
 
 interface ResizeGesture {
@@ -69,6 +72,7 @@ export function StudioBg3dProfessionalWorkspace({
   viewport,
   inspector,
   scopeKey = null,
+  experienceMode = "pro",
 }: StudioBg3dProfessionalWorkspaceProps) {
   const canonicalStorageKey = studioBg3dProfessionalWorkspaceStorageKey(scopeKey);
   const [layout, setLayout] = useState(() =>
@@ -157,6 +161,9 @@ export function StudioBg3dProfessionalWorkspace({
     setLayout((current) => setStudioBg3dWorkspacePanelVisible(current, panel, !visible));
   };
 
+  const simpleMode = experienceMode === "simple";
+  const outlinerVisible = !simpleMode && layout.outlinerVisible;
+  const inspectorVisible = simpleMode || layout.inspectorVisible;
   const reversed = layout.dockOrder === "inspector-viewport-outliner";
   const workspaceStyle = {
     "--studio-bg3d-outliner-width": `${layout.outlinerWidth}px`,
@@ -203,7 +210,7 @@ export function StudioBg3dProfessionalWorkspace({
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div
-        className="hidden min-h-10 shrink-0 items-center gap-1.5 border-b border-line bg-panel/90 px-2 xl:flex"
+        className={simpleMode ? "hidden" : "hidden min-h-10 shrink-0 items-center gap-1.5 border-b border-line bg-panel/90 px-2 xl:flex"}
         role="toolbar"
         aria-label="3D 전문가 작업공간"
       >
@@ -257,21 +264,21 @@ export function StudioBg3dProfessionalWorkspace({
         style={workspaceStyle}
       >
         <aside
-          className={`${layout.outlinerVisible ? "hidden xl:flex" : "hidden"} min-h-0 shrink-0 flex-col overflow-hidden border-r border-line bg-panel/70 xl:w-[var(--studio-bg3d-outliner-width)]`}
+          className={`${outlinerVisible ? "hidden xl:flex" : "hidden"} min-h-0 shrink-0 flex-col overflow-hidden border-r border-line bg-panel/70 xl:w-[var(--studio-bg3d-outliner-width)]`}
           style={{ order: "var(--studio-bg3d-outliner-order)" }}
         >
           {outliner}
         </aside>
-        {layout.outlinerVisible ? renderSeparator("outliner") : null}
+        {outlinerVisible ? renderSeparator("outliner") : null}
         <div
           className="contents xl:flex xl:min-h-0 xl:min-w-0 xl:flex-1"
           style={{ order: "var(--studio-bg3d-viewport-order)" }}
         >
           {viewport}
         </div>
-        {layout.inspectorVisible ? renderSeparator("inspector") : null}
+        {inspectorVisible ? renderSeparator("inspector") : null}
         <div
-          className={`${layout.inspectorVisible ? "contents xl:flex" : "contents xl:hidden"} xl:min-h-0 xl:shrink-0 xl:overflow-hidden xl:w-[var(--studio-bg3d-inspector-width)]`}
+          className={`${inspectorVisible ? "contents xl:flex" : "contents xl:hidden"} xl:min-h-0 xl:shrink-0 xl:overflow-hidden xl:w-[var(--studio-bg3d-inspector-width)]`}
           style={{ order: "var(--studio-bg3d-inspector-order)" }}
         >
           {inspector}

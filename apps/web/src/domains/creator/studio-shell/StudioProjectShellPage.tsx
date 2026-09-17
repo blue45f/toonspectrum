@@ -149,7 +149,7 @@ const SECTION_DEFINITIONS: Readonly<Record<StudioProjectSection, SectionDefiniti
       action(Brush, "드로잉", "Drawing", "브러시·레이어·선택·보정으로 원고를 제작합니다.", "Create with brushes, layers, selections and adjustments.", (id) => workHref(id, "canvas")),
       action(LayoutGrid, "웹툰·컷 편집", "Webtoon & panels", "컷·대사·말풍선과 긴 세로 원고를 편집합니다.", "Edit panels, dialogue, balloons and long vertical canvases.", (id) => workHref(id, "comic")),
       action(Presentation, "애니메이션·모션", "Animation & motion", "애니매틱, 키프레임과 장면 타이밍을 만듭니다.", "Create animatics, keyframes and scene timing.", (id) => workHref(id, "animation")),
-      action(Boxes, "3D 배경·포즈", "3D backgrounds & poses", "카메라·조명·포즈를 원고의 참고와 선화로 연결합니다.", "Connect cameras, lighting and poses to reference and line-art output.", (id) => workHref(id, "bg3d")),
+      action(Boxes, "3D 장면 연출", "3D scene direction", "배경·포즈·구도를 먼저 잡고 원고의 작화 가이드로 적용합니다.", "Block backgrounds, poses and composition, then apply them as drawing guides.", (id) => workHref(id, "bg3d")),
     ],
   },
   assets: {
