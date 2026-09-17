@@ -9,6 +9,7 @@ import * as R from "./studio-bg3d-editor-runtime-bindings";
 import type { StudioBg3dHistoryCommandTimeline } from "./studio-bg3d-history-command-adapter";
 
 import type { StudioBg3dKtx2Renderer } from "./studio-bg3d-ktx2-renderer-runtime";
+import { useStudioBg3dCanonicalDocumentState } from "./useStudioBg3dCanonicalDocumentState";
 
 export function useStudioBg3dEditorState(props) {
   const hostRef = R.useRef<Record<string, any> | null>(null);
@@ -106,7 +107,19 @@ export function useStudioBg3dEditorState(props) {
 
 
 
-  const [primitives, setPrimitives] = useState<BgPrimitive[]>([]);
+  const {
+    primitives,
+    setPrimitives,
+    customModels,
+    setCustomModels,
+    sceneBaseDocument,
+    setSceneBaseDocument,
+    canonicalRevision,
+    liveSceneRef: physicsRuntimeSourceRef,
+    replaceCanonicalDocumentState,
+  } = useStudioBg3dCanonicalDocumentState({
+    initialDocument: canonicalSceneDocument(initialScene) ?? DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+  });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [transformMode, setTransformMode] = useState<TransformModeId>("translate");
   /** Null keeps mode defaults; an explicit transform space is view-only and tool-stable. */
@@ -258,7 +271,6 @@ export function useStudioBg3dEditorState(props) {
   const [layerQuery, setLayerQuery] = useState("");
 
   // 업로드된 커스텀 3D 모델(§bg3d-model-library.ts)의 씬 배치 인스턴스 + 라이브러리 목록/상태.
-  const [customModels, setCustomModels] = useState<BgCustomModelInstance[]>([]);
   const [modelLibrary, setModelLibrary] = useState<Bg3dModelLibraryEntry[]>(
     copyStudioBg3dBundledEnvironmentLibraryEntries,
   );
@@ -346,10 +358,6 @@ export function useStudioBg3dEditorState(props) {
   const [failedCloneIds, setFailedCloneIds] = useState<Set<string>>(() => new Set());
   const [readyCloneIds, setReadyCloneIds] = useState<Set<string>>(() => new Set());
   const [unbatchableModelIds, setUnbatchableModelIds] = useState<Set<string>>(() => new Set());
-  const [sceneBaseDocument, setSceneBaseDocument] = useState<StudioBg3dSceneDocument>(
-    () => canonicalSceneDocument(initialScene) ?? DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT
-  );
-
   const captureRef = useRef<CaptureState>({ adapter: null, camera: null });
   const modalDialogRef = useRef<HTMLDivElement | null>(null);
   const modalRootRef = useRef<HTMLElement | null>(null);
@@ -419,12 +427,6 @@ export function useStudioBg3dEditorState(props) {
   const latestPhysicsSamplesRef = useRef<readonly StudioBg3dPhysicsTransformSample[]>([]);
   const physicsSessionRef = useRef<StudioBg3dPhysicsSession | null>(null);
   const physicsWorkerSessionRef = useRef<StudioBg3dPhysicsTimelineWorkerSession | null>(null);
-  const physicsRuntimeSourceRef = useRef({
-    primitives,
-    customModels,
-    document: sceneBaseDocument,
-  });
-  physicsRuntimeSourceRef.current = { primitives, customModels, document: sceneBaseDocument };
   const physicsStartButtonRef = useRef<HTMLButtonElement | null>(null);
   const physicsTransportActionRef = useRef<HTMLButtonElement | null>(null);
   const shouldTransferPhysicsFocusRef = useRef(false);
@@ -469,6 +471,8 @@ export function useStudioBg3dEditorState(props) {
     sharedCharacterCaptureStatusFenceRef,
     primitives,
     setPrimitives,
+    canonicalRevision,
+    replaceCanonicalDocumentState,
     selectedIds,
     setSelectedIds,
     transformMode,
