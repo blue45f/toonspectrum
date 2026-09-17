@@ -14,7 +14,12 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AboutSectionNav } from "../AboutSectionNav";
-import { ENGINEERING_CHAPTERS, type EngineeringLocale } from "./engineering-story-content";
+import { ENGINEERING_FIELD_NOTES } from "./engineering-field-notes-content";
+import {
+  ENGINEERING_CHAPTERS,
+  type EngineeringLocale,
+  type EngineeringStatus,
+} from "./engineering-story-content";
 import {
   EngineeringPageIntro,
   EngineeringStatusBadge,
@@ -28,8 +33,8 @@ import { cx } from "@/shared/lib/cx";
 
 const AUDIENCES = [
   { id: "investor", ko: "투자자 10장", en: "Investor · 10 slides" },
-  { id: "seminar", ko: "기술 세미나", en: "Engineering seminar" },
-  { id: "study", ko: "스터디 심화", en: "Study deep dive" },
+  { id: "seminar", ko: "기술 세미나 · 20장", en: "Engineering seminar · 20 slides" },
+  { id: "study", ko: "스터디 심화 · 29장", en: "Study deep dive · 29 slides" },
 ] as const;
 
 type Audience = (typeof AUDIENCES)[number]["id"];
@@ -64,7 +69,7 @@ interface DeckSlide {
   readonly body: string;
   readonly points: readonly string[];
   readonly note: string;
-  readonly chapterId?: string;
+  readonly status?: EngineeringStatus;
 }
 
 const chapterById = new Map<string, (typeof ENGINEERING_CHAPTERS)[number]>(
@@ -85,7 +90,25 @@ function chapterSlide(chapterId: string, locale: EngineeringLocale): DeckSlide {
       chapter.userValue[locale],
     ],
     note: chapter.tradeoff[locale],
-    chapterId: chapter.id,
+    status: chapter.status,
+  };
+}
+
+const fieldNoteById = new Map<string, (typeof ENGINEERING_FIELD_NOTES)[number]>(
+  ENGINEERING_FIELD_NOTES.map((note) => [note.id, note]),
+);
+
+function fieldNoteSlide(noteId: string, locale: EngineeringLocale): DeckSlide {
+  const note = fieldNoteById.get(noteId);
+  if (!note) throw new Error(`Unknown engineering field note: ${noteId}`);
+  return {
+    id: `field-${note.id}`,
+    eyebrow: note.eyebrow,
+    title: note.title[locale],
+    body: note.summary[locale],
+    points: [note.problem[locale], note.pattern[locale], note.boundary[locale]],
+    note: note.reuseSteps[0]?.[locale] ?? note.boundary[locale],
+    status: note.status,
   };
 }
 
@@ -147,6 +170,14 @@ function buildSlides(audience: Audience, locale: EngineeringLocale): readonly De
       chapterSlide("quality", locale),
       chapterSlide("infrastructure", locale),
       chapterSlide("ai-routing", locale),
+      fieldNoteSlide("worker-topology", locale),
+      fieldNoteSlide("pwa-offline-lifecycle", locale),
+      fieldNoteSlide("browser-local-ai", locale),
+      fieldNoteSlide("free-first-infrastructure", locale),
+      fieldNoteSlide("blender-mcp-pipeline", locale),
+      fieldNoteSlide("multi-engine-3d", locale),
+      fieldNoteSlide("open-api-provenance", locale),
+      fieldNoteSlide("ai-assisted-engineering", locale),
       chapterSlide("delivery", locale),
     ];
   }
@@ -154,6 +185,7 @@ function buildSlides(audience: Audience, locale: EngineeringLocale): readonly De
   return [
     opening,
     ...ENGINEERING_CHAPTERS.map((chapter) => chapterSlide(chapter.id, locale)),
+    ...ENGINEERING_FIELD_NOTES.map((note) => fieldNoteSlide(note.id, locale)),
     {
       id: "study-close",
       eyebrow: "STUDY QUESTIONS",
@@ -184,8 +216,6 @@ function SlideCanvas({
   readonly locale: EngineeringLocale;
   readonly compact?: boolean;
 }) {
-  const chapter = slide.chapterId ? chapterById.get(slide.chapterId) : undefined;
-
   return (
     <article
       data-deck-slide="true"
@@ -212,8 +242,8 @@ function SlideCanvas({
           <p className="font-display text-[0.62rem] font-black uppercase tracking-[0.2em] text-[#627b63] sm:text-xs">
             {slide.eyebrow}
           </p>
-          {chapter ? (
-            <EngineeringStatusBadge status={chapter.status} locale={locale} className="mt-3 border-[#78916d55] bg-white/55 text-[#36513a]" />
+          {slide.status ? (
+            <EngineeringStatusBadge status={slide.status} locale={locale} className="mt-3 border-[#78916d55] bg-white/55 text-[#36513a]" />
           ) : null}
         </div>
         <div className="text-right">

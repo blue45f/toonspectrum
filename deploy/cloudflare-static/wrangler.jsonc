@@ -18,6 +18,18 @@
       "/market",
       "/market/browse",
       "/market/resource/*",
+      "/ranking",
+      "/play",
+      "/author/*",
+      "/u/*",
+      "/create/*",
+      "/showcase/work/*",
+      "/showcase/series/*",
+      "/community/post/*",
+      "/community/cafes/*",
+      "/community/promote/*",
+      "/pencafe/*",
+      "/collaborate/*",
       "/assets/opencascade.wasm-*.wasm",
       "/assets/studio/cc0-20260906/assets/polyhaven-modular-street-seating/modular_street_seating.glb"
     ]

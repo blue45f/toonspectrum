@@ -15364,20 +15364,19 @@ No text, logo, watermark, or copyrighted character.`;
       settleTrackedStudioAiOperation(operationId, result);
       operationId = null;
       if (!result.ok) throw new Error(result.error);
-      const generated = result.data;
       const generatedName = assetPromptName.trim()
         || prompt.split("\n")[0]?.trim().slice(0, 80)
         || "AI 에셋";
       const saved = await saveStudioAssetMutation({
         name: generatedName,
-        dataUrl: generated.dataUrl,
-        width: generated.width,
-        height: generated.height,
+        dataUrl: result.data.dataUrl,
+        width: result.data.width,
+        height: result.data.height,
         kind: "ai",
       });
       if (!canApplyStudioMutation(mutationTicket)) return;
       const generatedProvenance = finalizeStudioAiGeneratedAssetProvenance(requestProvenance, {
-        model: generated.model,
+        model: result.data.model,
       });
       if (!addRenderedImage(
         saved.dataUrl,

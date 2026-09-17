@@ -125,7 +125,7 @@ export function ShareDialog({ payload, trigger }: ShareDialogProps) {
     setNotice(null);
     try {
       await nativeShare(payload);
-      emitShareEvent("native", "success", payload);
+      emitShareEvent("native", "completed", payload);
       setNotice({ kind: "success", message: t("share.status.shared") });
     } catch (error) {
       if (isShareCancellation(error)) {
@@ -145,7 +145,7 @@ export function ShareDialog({ payload, trigger }: ShareDialogProps) {
     setNotice(null);
     try {
       await shareWithKakao(payload);
-      emitShareEvent("kakao", "success", payload);
+      emitShareEvent("kakao", "opened", payload);
       setNotice({ kind: "success", message: t("share.status.kakaoOpened") });
     } catch {
       emitShareEvent("kakao", "failed", payload);
@@ -158,7 +158,7 @@ export function ShareDialog({ payload, trigger }: ShareDialogProps) {
   async function copyLink() {
     setNotice(null);
     const copied = await copyShareLink(payload);
-    emitShareEvent("copy", copied ? "success" : "failed", payload);
+    emitShareEvent("copy", copied ? "completed" : "failed", payload);
     setNotice({
       kind: copied ? "success" : "error",
       message: t(copied ? "share.status.copied" : "share.status.copyFailed"),
@@ -166,7 +166,7 @@ export function ShareDialog({ payload, trigger }: ShareDialogProps) {
   }
 
   function recordLinkShare(channel: LinkShareChannel) {
-    emitShareEvent(channel, "success", payload);
+    emitShareEvent(channel, "opened", payload);
     setNotice({
       kind: "success",
       message: t(
@@ -194,7 +194,7 @@ export function ShareDialog({ payload, trigger }: ShareDialogProps) {
       });
       setQrDataUrl(dataUrl);
       setQrVisible(true);
-      emitShareEvent("qr", "success", payload);
+      emitShareEvent("qr", "opened", payload);
     } catch {
       emitShareEvent("qr", "failed", payload);
       setNotice({ kind: "error", message: t("share.status.qrFailed") });

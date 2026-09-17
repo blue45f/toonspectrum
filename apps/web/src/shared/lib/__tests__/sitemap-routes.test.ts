@@ -33,6 +33,7 @@ describe("sitemap static routes", () => {
       '"/about/technology"',
       '"/about/technology/story"',
       '"/about/technology/guides"',
+      '"/about/technology/field-notes"',
       '"/about/technology/deck"',
       '"/about/technology/videos"',
       '"/about/technology/licenses"',

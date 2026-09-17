@@ -37,21 +37,28 @@ const OVERVIEW_SCENES: readonly TechnologyScene[] = [
     points: ["WebGPU", "CanvasKit", "OPFS", "Recovery"],
   },
   {
-    kicker: "04 · PROVIDER BOUNDARIES",
+    kicker: "04 · BROWSER EXECUTION",
+    title: "Worker, PWA, 로컬 AI를\n하나의 복구 계약으로.",
+    body: "59개 전용 Worker, 버전 있는 Service Worker, ONNX WebGPU/WASM과 MediaPipe를 요청·취소·메모리·결과 권위 뒤에 둡니다.",
+    label: "EXECUTE",
+    points: ["Workers", "PWA", "ONNX", "MediaPipe"],
+  },
+  {
+    kicker: "05 · PROVIDER BOUNDARIES",
     title: "외부 공급자는\n제품 계약 뒤에 둡니다.",
     body: "OAuth, 개인 클라우드와 AI를 공급자 중립 계약으로 감싸 동의, 예산, 권리와 승인 결과를 보존합니다.",
     label: "CONNECT",
     points: ["OAuth", "Cloud", "AI", "Consent"],
   },
   {
-    kicker: "05 · VERIFIABLE STATUS",
+    kicker: "06 · VERIFIABLE STATUS",
     title: "운영·설정·실험을\n같은 말로 표시하지 않습니다.",
     body: "각 기능 상태를 코드, 테스트, workflow와 문서 근거에 연결해 성공처럼 보이는 미완성 기능을 줄입니다.",
     label: "VERIFY",
     points: ["Vitest", "Playwright", "CI", "Evidence"],
   },
   {
-    kicker: "06 · REUSABLE ENGINEERING",
+    kicker: "07 · REUSABLE ENGINEERING",
     title: "가져갈 것은 패키지가 아니라\n경계와 검증 순서입니다.",
     body: "입력, 출력, 데이터 권위, 실패와 대체 경로를 유지하면 다른 서비스에서도 같은 설계를 재사용할 수 있습니다.",
     label: "REUSE",
@@ -74,7 +81,7 @@ const INVESTOR_SCENES: readonly TechnologyScene[] = [
     points: ["Local-first", "GPU", "Recovery", "Quality"],
   },
   {
-    ...OVERVIEW_SCENES[5],
+    ...OVERVIEW_SCENES[6],
     kicker: "04 · CONTROLLED SCALE",
     title: "무료 우선으로 시작하고\n검증된 병목만 승격합니다.",
     body: "비용, 권리, 공급자와 품질 상태를 함께 추적해 성장 과정에서도 자동 유료 승격과 숨은 의존을 만들지 않습니다.",
@@ -86,8 +93,9 @@ const PORTRAIT_SCENES: readonly TechnologyScene[] = [
   OVERVIEW_SCENES[0],
   OVERVIEW_SCENES[1],
   OVERVIEW_SCENES[2],
-  OVERVIEW_SCENES[4],
+  OVERVIEW_SCENES[3],
   OVERVIEW_SCENES[5],
+  OVERVIEW_SCENES[6],
 ] as const;
 
 type TechnologyFilmVariant = "overview" | "investor" | "portrait";
