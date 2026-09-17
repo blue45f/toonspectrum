@@ -504,6 +504,7 @@ export function StudioCanvasStatusRail({
       {hasAutosave && !followerNotice && (
         <StudioRecoveryNotice
           blockedReason={autosaveRestoreBlockedReason}
+          autoRestore={autosaveDocumentLeadership?.role === "leader"}
           onRestore={onRestoreAutosave}
           onBackup={onDownloadAutosaveBackup}
           onDelete={onClearAutosave}
