@@ -27,7 +27,7 @@ describe("StudioLayerCompsPanel", () => {
       />,
     );
 
-    expect(screen.getByText("저장된 레이어 콤프가 없습니다.")).toBeDefined();
+    expect(screen.getByText("저장한 레이어 보기가 없어요")).toBeDefined();
   });
 
   it("allows capturing a new layer comp", () => {
@@ -41,10 +41,10 @@ describe("StudioLayerCompsPanel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByText("새 콤프"));
-    const input = screen.getByPlaceholderText(/콤프 이름/i);
+    fireEvent.click(screen.getByText("현재 보기 저장"));
+    const input = screen.getByPlaceholderText(/대사 없는 클린본/i);
     fireEvent.change(input, { target: { value: "선화전용" } });
-    fireEvent.click(screen.getByText("저장"));
+    fireEvent.click(screen.getByText("보기 저장"));
 
     expect(onCompsChange).toHaveBeenCalledWith(
       expect.arrayContaining([
@@ -70,7 +70,7 @@ describe("StudioLayerCompsPanel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByText("적용"));
+    fireEvent.click(screen.getByTitle("이 보기 불러오기"));
     expect(onApplyComp).toHaveBeenCalledWith(comp1);
   });
 
@@ -88,7 +88,7 @@ describe("StudioLayerCompsPanel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByText("콤프 일괄 내보내기"));
+    fireEvent.click(screen.getByText("모두 내보내기"));
     expect(onBatchExportPlan).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({
@@ -105,17 +105,17 @@ describe("StudioLayerCompsPanel", () => {
     const groups = [{ id: "folder", hidden: true }];
     const view = render(<StudioLayerCompsPanel layers={layers} groups={groups} comps={[]}
       onApplyComp={vi.fn()} onCompsChange={onCompsChange} />);
-    fireEvent.click(screen.getByText("새 콤프"));
-    fireEvent.change(screen.getByRole("textbox", { name: "새 콤프 이름" }), { target: { value: "그룹 상태" } });
-    fireEvent.click(screen.getByText("저장"));
+    fireEvent.click(screen.getByText("현재 보기 저장"));
+    fireEvent.change(screen.getByRole("textbox", { name: "저장할 보기 이름" }), { target: { value: "그룹 상태" } });
+    fireEvent.click(screen.getByText("보기 저장"));
     const saved = onCompsChange.mock.calls[0][0][0];
     expect(saved.layerStates.ink).toMatchObject({ groupId: "folder", opacity: 0.7, blendMode: "multiply" });
     expect(saved.groupStates.folder).toEqual({ groupId: "folder", visible: false });
     view.rerender(<StudioLayerCompsPanel layers={[{ ...layers[0], blendMode: "source-over" }]}
       groups={[{ id: "folder", hidden: false }]} comps={[saved]}
       onApplyComp={vi.fn()} onCompsChange={onCompsChange} />);
-    expect(screen.getByText("표시 레이어 0 / 1개")).toBeDefined();
-    fireEvent.click(screen.getByTitle("현재 레이어 상태로 업데이트"));
+    expect(screen.getByText("보이는 레이어 0 / 1개")).toBeDefined();
+    fireEvent.click(screen.getByTitle("현재 레이어 상태로 덮어쓰기"));
     const updated = onCompsChange.mock.calls[1][0][0];
     expect(updated.layerStates.ink.blendMode).toBe("source-over");
     expect(updated.groupStates.folder.visible).toBe(true);
@@ -126,12 +126,12 @@ describe("StudioLayerCompsPanel", () => {
     const onApplyComp = vi.fn(() => new Promise<boolean>((resolve) => { finish = resolve; }));
     const comp = captureLayerComp("완성본", sampleLayers, "comp-1");
     render(<StudioLayerCompsPanel layers={sampleLayers} comps={[comp]} onApplyComp={onApplyComp} />);
-    fireEvent.click(screen.getByText("적용"));
-    expect((screen.getByRole("group", { name: "레이어 콤프" }) as HTMLFieldSetElement).disabled).toBe(true);
-    fireEvent.click(screen.getByText("적용"));
+    fireEvent.click(screen.getByTitle("이 보기 불러오기"));
+    expect((screen.getByRole("group", { name: "레이어 보기" }) as HTMLFieldSetElement).disabled).toBe(true);
+    fireEvent.click(screen.getByTitle("이 보기 불러오기"));
     expect(onApplyComp).toHaveBeenCalledTimes(1);
     await act(async () => { finish(true); });
-    expect((screen.getByRole("group", { name: "레이어 콤프" }) as HTMLFieldSetElement).disabled).toBe(false);
+    expect((screen.getByRole("group", { name: "레이어 보기" }) as HTMLFieldSetElement).disabled).toBe(false);
   });
 
   it("cancels creating a comp with Escape without closing the surrounding inspector", () => {
@@ -141,17 +141,17 @@ describe("StudioLayerCompsPanel", () => {
       <StudioLayerCompsPanel layers={sampleLayers} comps={[]}
         onApplyComp={vi.fn()} onCompsChange={onCompsChange} />
     </div>);
-    fireEvent.click(screen.getByRole("button", { name: "새 콤프" }));
-    const input = screen.getByRole("textbox", { name: "새 콤프 이름" });
+    fireEvent.click(screen.getByRole("button", { name: "현재 보기 저장" }));
+    const input = screen.getByRole("textbox", { name: "저장할 보기 이름" });
     fireEvent.change(input, { target: { value: "취소할 초안" } });
     const escape = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
     fireEvent(input, escape);
     expect(escape.defaultPrevented).toBe(true);
     expect(inspectorShortcut).not.toHaveBeenCalled();
-    expect(screen.queryByRole("textbox", { name: "새 콤프 이름" })).toBeNull();
-    expect(screen.getByRole("group", { name: "레이어 콤프" })).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "저장할 보기 이름" })).toBeNull();
+    expect(screen.getByRole("group", { name: "레이어 보기" })).toBeTruthy();
     expect(onCompsChange).not.toHaveBeenCalled();
-    expect(screen.getByText("저장된 레이어 콤프가 없습니다.")).toBeTruthy();
+    expect(screen.getByText("저장한 레이어 보기가 없어요")).toBeTruthy();
   });
 
   it("cancels renaming with Escape and restores the saved name when editing again", () => {
@@ -162,8 +162,8 @@ describe("StudioLayerCompsPanel", () => {
       <StudioLayerCompsPanel layers={sampleLayers} comps={[comp]}
         onApplyComp={vi.fn()} onCompsChange={onCompsChange} />
     </div>);
-    fireEvent.click(screen.getByTitle("이름 수정"));
-    const input = screen.getByRole("textbox", { name: "저장된 이름 이름 수정" });
+    fireEvent.click(screen.getByTitle("보기 이름 바꾸기"));
+    const input = screen.getByRole("textbox", { name: "저장된 이름 보기 이름 바꾸기" });
     fireEvent.change(input, { target: { value: "저장하지 않을 이름" } });
     const escape = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
     fireEvent(input, escape);
@@ -172,7 +172,7 @@ describe("StudioLayerCompsPanel", () => {
     expect(onCompsChange).not.toHaveBeenCalled();
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.getByText("저장된 이름")).toBeTruthy();
-    fireEvent.click(screen.getByTitle("이름 수정"));
+    fireEvent.click(screen.getByTitle("보기 이름 바꾸기"));
     expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("저장된 이름");
   });
 
@@ -180,10 +180,10 @@ describe("StudioLayerCompsPanel", () => {
     const comp = captureLayerComp("완성본", sampleLayers, "comp-1");
     const onApplyComp = vi.fn(async () => true);
     render(<StudioLayerCompsPanel layers={sampleLayers} comps={[comp]} onApplyComp={onApplyComp} />);
-    fireEvent.click(screen.getByRole("button", { name: /^완성본 표시 레이어/u }));
+    fireEvent.click(screen.getByRole("button", { name: /^완성본 보이는 레이어/u }));
     expect(onApplyComp).toHaveBeenCalledExactlyOnceWith(comp);
     await waitFor(() => {
-      expect((screen.getByRole("group", { name: "레이어 콤프" }) as HTMLFieldSetElement).disabled).toBe(false);
+      expect((screen.getByRole("group", { name: "레이어 보기" }) as HTMLFieldSetElement).disabled).toBe(false);
     });
   });
 
@@ -194,13 +194,13 @@ describe("StudioLayerCompsPanel", () => {
       .mockResolvedValueOnce(true);
     const comp = captureLayerComp("완성본", sampleLayers, "comp-1");
     render(<StudioLayerCompsPanel layers={sampleLayers} comps={[comp]} onApplyComp={onApplyComp} />);
-    const panel = screen.getByRole("group", { name: "레이어 콤프" }) as HTMLFieldSetElement;
-    fireEvent.click(screen.getByRole("button", { name: "적용" }));
+    const panel = screen.getByRole("group", { name: "레이어 보기" }) as HTMLFieldSetElement;
+    fireEvent.click(screen.getByTitle("이 보기 불러오기"));
     expect(panel.disabled).toBe(true);
     await act(async () => { reject(new Error("lease request failed")); });
-    expect(screen.getByRole("alert").textContent).toBe("콤프를 적용하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+    expect(screen.getByRole("alert").textContent).toBe("저장한 보기를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.");
     expect(panel.disabled).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "적용" }));
+    fireEvent.click(screen.getByTitle("이 보기 불러오기"));
     expect(onApplyComp).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("alert")).toBeNull();
     await waitFor(() => { expect(panel.disabled).toBe(false); });
@@ -213,16 +213,16 @@ describe("StudioLayerCompsPanel", () => {
     const onApplyComp = vi.fn();
     const view = render(<StudioLayerCompsPanel layers={sampleLayers} comps={comps}
       onApplyComp={onApplyComp} onCompsChange={onCompsChange} />);
-    fireEvent.click(screen.getByRole("button", { name: "새 콤프" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "새 콤프 이름" }), { target: { value: "입력 중인 콤프" } });
+    fireEvent.click(screen.getByRole("button", { name: "현재 보기 저장" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "저장할 보기 이름" }), { target: { value: "입력 중인 콤프" } });
     view.rerender(<StudioLayerCompsPanel layers={sampleLayers}
       comps={[...comps, captureLayerComp("다른 곳에서 저장한 콤프", sampleLayers, "last-comp")]}
       onApplyComp={onApplyComp} onCompsChange={onCompsChange} />);
-    expect((screen.getByRole("button", { name: "새 콤프" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByTitle("페이지마다 콤프를 64개까지 저장할 수 있습니다")).toBeTruthy();
-    fireEvent.keyDown(screen.getByRole("textbox", { name: "새 콤프 이름" }), { key: "Enter" });
+    expect((screen.getByRole("button", { name: "현재 보기 저장" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTitle("페이지마다 레이어 보기를 64개까지 저장할 수 있습니다")).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "저장할 보기 이름" }), { key: "Enter" });
     expect(onCompsChange).not.toHaveBeenCalled();
-    expect(screen.getByRole("textbox", { name: "새 콤프 이름" })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "저장할 보기 이름" })).toBeTruthy();
   });
 
   it("delegates editor capture/update to the live document and retains the name after rejection", () => {
@@ -231,16 +231,16 @@ describe("StudioLayerCompsPanel", () => {
     const comp = captureLayerComp("기존", sampleLayers, "existing");
     render(<StudioLayerCompsPanel layers={[]} comps={[comp]} onApplyComp={vi.fn()}
       onCaptureComp={onCaptureComp} onCompsChange={onCompsChange} />);
-    fireEvent.click(screen.getByRole("button", { name: "새 콤프" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "새 콤프 이름" }), { target: { value: "즉시 캡처" } });
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "현재 보기 저장" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "저장할 보기 이름" }), { target: { value: "즉시 캡처" } });
+    fireEvent.click(screen.getByRole("button", { name: "보기 저장" }));
     expect(onCaptureComp).toHaveBeenCalledWith("즉시 캡처");
-    expect((screen.getByRole("textbox", { name: "새 콤프 이름" }) as HTMLInputElement).value).toBe("즉시 캡처");
+    expect((screen.getByRole("textbox", { name: "저장할 보기 이름" }) as HTMLInputElement).value).toBe("즉시 캡처");
     expect(onCompsChange).not.toHaveBeenCalled();
     onCaptureComp.mockReturnValue(true);
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
-    expect(screen.queryByRole("textbox", { name: "새 콤프 이름" })).toBeNull();
-    fireEvent.click(screen.getByTitle("현재 레이어 상태로 업데이트"));
+    fireEvent.click(screen.getByRole("button", { name: "보기 저장" }));
+    expect(screen.queryByRole("textbox", { name: "저장할 보기 이름" })).toBeNull();
+    fireEvent.click(screen.getByTitle("현재 레이어 상태로 덮어쓰기"));
     expect(onCaptureComp).toHaveBeenLastCalledWith("기존", "existing");
     expect(onCompsChange).not.toHaveBeenCalled();
   });
@@ -249,29 +249,29 @@ describe("StudioLayerCompsPanel", () => {
     const comp = captureLayerComp("기존", sampleLayers, "existing");
     const onCompsChange = vi.fn(() => false);
     render(<StudioLayerCompsPanel layers={sampleLayers} comps={[comp]} onApplyComp={vi.fn()} onCompsChange={onCompsChange} />);
-    fireEvent.click(screen.getByTitle("이름 수정"));
-    fireEvent.change(screen.getByRole("textbox", { name: "기존 이름 수정" }), { target: { value: "유지할 이름" } });
-    fireEvent.click(screen.getByRole("button", { name: "콤프 이름 저장" }));
-    expect((screen.getByRole("textbox", { name: "기존 이름 수정" }) as HTMLInputElement).value).toBe("유지할 이름");
+    fireEvent.click(screen.getByTitle("보기 이름 바꾸기"));
+    fireEvent.change(screen.getByRole("textbox", { name: "기존 보기 이름 바꾸기" }), { target: { value: "유지할 이름" } });
+    fireEvent.click(screen.getByRole("button", { name: "보기 이름 저장" }));
+    expect((screen.getByRole("textbox", { name: "기존 보기 이름 바꾸기" }) as HTMLInputElement).value).toBe("유지할 이름");
     onCompsChange.mockReturnValue(true);
-    fireEvent.click(screen.getByRole("button", { name: "콤프 이름 저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "보기 이름 저장" }));
     expect(screen.queryByRole("textbox")).toBeNull();
   });
 
   it("supports standalone capture, Enter rename, and deletion without a document callback", () => {
     render(<StudioLayerCompsPanel layers={sampleLayers} onApplyComp={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "새 콤프" }));
-    fireEvent.keyDown(screen.getByRole("textbox", { name: "새 콤프 이름" }), { key: "Enter" });
-    expect(screen.getByText("콤프 1")).toBeTruthy();
-    fireEvent.click(screen.getByTitle("이름 수정"));
-    const input = screen.getByRole("textbox", { name: "콤프 1 이름 수정" });
+    fireEvent.click(screen.getByRole("button", { name: "현재 보기 저장" }));
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "저장할 보기 이름" }), { key: "Enter" });
+    expect(screen.getByText("보기 1")).toBeTruthy();
+    fireEvent.click(screen.getByTitle("보기 이름 바꾸기"));
+    const input = screen.getByRole("textbox", { name: "보기 1 보기 이름 바꾸기" });
     fireEvent.change(input, { target: { value: "  키보드로 저장한 이름  " } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.getByText("키보드로 저장한 이름")).toBeTruthy();
-    fireEvent.click(screen.getByTitle("콤프 삭제"));
+    fireEvent.click(screen.getByTitle("저장한 보기 삭제"));
     expect(screen.queryByText("키보드로 저장한 이름")).toBeNull();
-    expect(screen.getByText("저장된 레이어 콤프가 없습니다.")).toBeTruthy();
+    expect(screen.getByText("저장한 레이어 보기가 없어요")).toBeTruthy();
   });
 
   it("keeps a comp and its rename draft when deletion is rejected, then allows a confirmed retry", () => {
@@ -280,19 +280,19 @@ describe("StudioLayerCompsPanel", () => {
     const onApplyComp = vi.fn();
     const view = render(<StudioLayerCompsPanel layers={sampleLayers} comps={[comp]}
       onApplyComp={onApplyComp} onCompsChange={onCompsChange} />);
-    fireEvent.click(screen.getByTitle("이름 수정"));
-    fireEvent.change(screen.getByRole("textbox", { name: "기존 이름 수정" }), { target: { value: "삭제 보류 중인 초안" } });
-    fireEvent.click(screen.getByTitle("콤프 삭제"));
+    fireEvent.click(screen.getByTitle("보기 이름 바꾸기"));
+    fireEvent.change(screen.getByRole("textbox", { name: "기존 보기 이름 바꾸기" }), { target: { value: "삭제 보류 중인 초안" } });
+    fireEvent.click(screen.getByTitle("저장한 보기 삭제"));
     expect(onCompsChange).toHaveBeenCalledExactlyOnceWith([], [comp]);
-    expect((screen.getByRole("textbox", { name: "기존 이름 수정" }) as HTMLInputElement).value).toBe("삭제 보류 중인 초안");
-    expect(screen.queryByText("저장된 레이어 콤프가 없습니다.")).toBeNull();
+    expect((screen.getByRole("textbox", { name: "기존 보기 이름 바꾸기" }) as HTMLInputElement).value).toBe("삭제 보류 중인 초안");
+    expect(screen.queryByText("저장한 레이어 보기가 없어요")).toBeNull();
     onCompsChange.mockReturnValue(true);
-    fireEvent.click(screen.getByTitle("콤프 삭제"));
+    fireEvent.click(screen.getByTitle("저장한 보기 삭제"));
     expect(onCompsChange).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("textbox")).toBeNull();
     view.rerender(<StudioLayerCompsPanel layers={sampleLayers} comps={[]}
       onApplyComp={onApplyComp} onCompsChange={onCompsChange} />);
-    expect(screen.getByText("저장된 레이어 콤프가 없습니다.")).toBeTruthy();
+    expect(screen.getByText("저장한 레이어 보기가 없어요")).toBeTruthy();
   });
 
   it("waits for capture admission, blocks every competing action, and preserves a rejected draft", async () => {
@@ -305,36 +305,36 @@ describe("StudioLayerCompsPanel", () => {
     render(<StudioLayerCompsPanel layers={sampleLayers} comps={[comp]}
       onApplyComp={onApplyComp} onCaptureComp={onCaptureComp}
       onCompsChange={onCompsChange} onBatchExportPlan={onBatchExportPlan} />);
-    fireEvent.click(screen.getByRole("button", { name: "새 콤프" }));
-    const input = screen.getByRole("textbox", { name: "새 콤프 이름" }) as HTMLInputElement;
+    fireEvent.click(screen.getByRole("button", { name: "현재 보기 저장" }));
+    const input = screen.getByRole("textbox", { name: "저장할 보기 이름" }) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "잠금을 기다리는 초안" } });
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
-    const panel = screen.getByRole("group", { name: "레이어 콤프" }) as HTMLFieldSetElement;
+    fireEvent.click(screen.getByRole("button", { name: "보기 저장" }));
+    const panel = screen.getByRole("group", { name: "레이어 보기" }) as HTMLFieldSetElement;
     expect(panel.disabled).toBe(true);
     expect(panel.getAttribute("aria-busy")).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "보기 저장" }));
     fireEvent.keyDown(input, { key: "Enter" });
     fireEvent.keyDown(input, { key: "Escape" });
-    fireEvent.click(screen.getByRole("button", { name: "적용" }));
-    fireEvent.click(screen.getByTitle("현재 레이어 상태로 업데이트"));
-    fireEvent.click(screen.getByTitle("이름 수정"));
-    fireEvent.click(screen.getByTitle("콤프 삭제"));
-    fireEvent.click(screen.getByRole("button", { name: "콤프 일괄 내보내기" }));
+    fireEvent.click(screen.getByTitle("이 보기 불러오기"));
+    fireEvent.click(screen.getByTitle("현재 레이어 상태로 덮어쓰기"));
+    fireEvent.click(screen.getByTitle("보기 이름 바꾸기"));
+    fireEvent.click(screen.getByTitle("저장한 보기 삭제"));
+    fireEvent.click(screen.getByRole("button", { name: "모두 내보내기" }));
     expect(onCaptureComp).toHaveBeenCalledExactlyOnceWith("잠금을 기다리는 초안");
     expect(onCompsChange).not.toHaveBeenCalled();
     expect(onApplyComp).not.toHaveBeenCalled();
     expect(onBatchExportPlan).not.toHaveBeenCalled();
     expect(input.value).toBe("잠금을 기다리는 초안");
-    expect(screen.queryByRole("textbox", { name: "기존 이름 수정" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "기존 보기 이름 바꾸기" })).toBeNull();
 
     await act(async () => { finish(false); });
     expect(panel.disabled).toBe(false);
     expect(input.value).toBe("잠금을 기다리는 초안");
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "보기 저장" }));
     await act(async () => { finish(true); });
-    expect(screen.queryByRole("textbox", { name: "새 콤프 이름" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "새 콤프" }));
-    expect((screen.getByRole("textbox", { name: "새 콤프 이름" }) as HTMLInputElement).value).toBe("");
+    expect(screen.queryByRole("textbox", { name: "저장할 보기 이름" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "현재 보기 저장" }));
+    expect((screen.getByRole("textbox", { name: "저장할 보기 이름" }) as HTMLInputElement).value).toBe("");
   });
 
   it("awaits a metadata capture callback and preserves the name when its promise rejects", async () => {
@@ -344,15 +344,15 @@ describe("StudioLayerCompsPanel", () => {
       .mockResolvedValueOnce(true);
     render(<StudioLayerCompsPanel layers={sampleLayers} comps={[]}
       onApplyComp={vi.fn()} onCompsChange={onCompsChange} />);
-    fireEvent.click(screen.getByRole("button", { name: "새 콤프" }));
-    const input = screen.getByRole("textbox", { name: "새 콤프 이름" }) as HTMLInputElement;
+    fireEvent.click(screen.getByRole("button", { name: "현재 보기 저장" }));
+    const input = screen.getByRole("textbox", { name: "저장할 보기 이름" }) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "다시 시도할 캡처" } });
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "보기 저장" }));
     expect(onCompsChange).toHaveBeenCalledWith([expect.objectContaining({ name: "다시 시도할 캡처" })], []);
     await act(async () => { reject(new Error("lease failed")); });
     expect(input.value).toBe("다시 시도할 캡처");
-    expect(screen.getByRole("alert").textContent).toBe("콤프를 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    expect(screen.getByRole("alert").textContent).toBe("레이어 보기를 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+    fireEvent.click(screen.getByRole("button", { name: "보기 저장" }));
     await waitFor(() => { expect(screen.queryByRole("textbox")).toBeNull(); });
     expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -365,17 +365,17 @@ describe("StudioLayerCompsPanel", () => {
     const onApplyComp = vi.fn();
     const view = render(<StudioLayerCompsPanel layers={sampleLayers} comps={original}
       onApplyComp={onApplyComp} onCompsChange={onCompsChange} />);
-    fireEvent.click(screen.getByTitle("이름 수정"));
-    fireEvent.change(screen.getByRole("textbox", { name: "기존 이름 수정" }), { target: { value: "새 이름" } });
-    fireEvent.click(screen.getByRole("button", { name: "콤프 이름 저장" }));
+    fireEvent.click(screen.getByTitle("보기 이름 바꾸기"));
+    fireEvent.change(screen.getByRole("textbox", { name: "기존 보기 이름 바꾸기" }), { target: { value: "새 이름" } });
+    fireEvent.click(screen.getByRole("button", { name: "보기 이름 저장" }));
     expect(onCompsChange.mock.calls[0]).toEqual([[{ ...comp, name: "새 이름" }], original]);
     const peerComp = captureLayerComp("동료 추가", sampleLayers, "peer");
     const latest = [comp, peerComp];
     view.rerender(<StudioLayerCompsPanel layers={sampleLayers} comps={latest}
       onApplyComp={onApplyComp} onCompsChange={onCompsChange} />);
     await act(async () => { finish(false); });
-    expect((screen.getByRole("textbox", { name: "기존 이름 수정" }) as HTMLInputElement).value).toBe("새 이름");
-    fireEvent.click(screen.getByRole("button", { name: "콤프 이름 저장" }));
+    expect((screen.getByRole("textbox", { name: "기존 보기 이름 바꾸기" }) as HTMLInputElement).value).toBe("새 이름");
+    fireEvent.click(screen.getByRole("button", { name: "보기 이름 저장" }));
     expect(onCompsChange.mock.calls[1]).toEqual([[{ ...comp, name: "새 이름" }, peerComp], latest]);
     await act(async () => { finish(true); });
     expect(screen.queryByRole("textbox")).toBeNull();
@@ -389,16 +389,16 @@ describe("StudioLayerCompsPanel", () => {
     const comp = captureLayerComp("기존", sampleLayers, "existing");
     render(<StudioLayerCompsPanel layers={sampleLayers} comps={[comp]}
       onApplyComp={vi.fn()} onCompsChange={onCompsChange} />);
-    fireEvent.click(screen.getByTitle("이름 수정"));
-    const input = screen.getByRole("textbox", { name: "기존 이름 수정" }) as HTMLInputElement;
+    fireEvent.click(screen.getByTitle("보기 이름 바꾸기"));
+    const input = screen.getByRole("textbox", { name: "기존 보기 이름 바꾸기" }) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "삭제하지 못한 초안" } });
-    fireEvent.click(screen.getByTitle("콤프 삭제"));
+    fireEvent.click(screen.getByTitle("저장한 보기 삭제"));
     expect(onCompsChange).toHaveBeenCalledWith([], [comp]);
     expect(input.value).toBe("삭제하지 못한 초안");
     await act(async () => { reject(new Error("lease denied")); });
     expect(input.value).toBe("삭제하지 못한 초안");
     expect(screen.getByRole("alert").textContent).toBe("콤프를 삭제하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
-    fireEvent.click(screen.getByTitle("콤프 삭제"));
+    fireEvent.click(screen.getByTitle("저장한 보기 삭제"));
     await waitFor(() => { expect(screen.queryByRole("textbox")).toBeNull(); });
   });
 
@@ -411,17 +411,17 @@ describe("StudioLayerCompsPanel", () => {
     const comp = captureLayerComp("기존", sampleLayers, "existing");
     render(<StudioLayerCompsPanel layers={sampleLayers} comps={[comp]}
       onApplyComp={onApplyComp} onCaptureComp={onCaptureComp} />);
-    const panel = screen.getByRole("group", { name: "레이어 콤프" }) as HTMLFieldSetElement;
-    fireEvent.click(screen.getByTitle("현재 레이어 상태로 업데이트"));
-    fireEvent.click(screen.getByTitle("현재 레이어 상태로 업데이트"));
-    fireEvent.click(screen.getByRole("button", { name: "적용" }));
+    const panel = screen.getByRole("group", { name: "레이어 보기" }) as HTMLFieldSetElement;
+    fireEvent.click(screen.getByTitle("현재 레이어 상태로 덮어쓰기"));
+    fireEvent.click(screen.getByTitle("현재 레이어 상태로 덮어쓰기"));
+    fireEvent.click(screen.getByTitle("이 보기 불러오기"));
     expect(onCaptureComp).toHaveBeenCalledExactlyOnceWith("기존", "existing");
     expect(onApplyComp).not.toHaveBeenCalled();
     expect(panel.disabled).toBe(true);
     await act(async () => { reject(new Error("lease failed")); });
     expect(panel.disabled).toBe(false);
     expect(screen.getByRole("alert").textContent).toBe("콤프를 업데이트하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
-    fireEvent.click(screen.getByTitle("현재 레이어 상태로 업데이트"));
+    fireEvent.click(screen.getByTitle("현재 레이어 상태로 덮어쓰기"));
     await waitFor(() => { expect(panel.disabled).toBe(false); });
     expect(onCaptureComp).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("alert")).toBeNull();
@@ -434,16 +434,16 @@ describe("StudioLayerCompsPanel", () => {
     const onApplyComp = vi.fn();
     const view = render(<StudioLayerCompsPanel key="page-a" layers={sampleLayers} comps={[]}
       onApplyComp={onApplyComp} onCaptureComp={onCaptureComp} />);
-    fireEvent.click(screen.getByRole("button", { name: "새 콤프" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "새 콤프 이름" }), { target: { value: "이전 페이지" } });
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "현재 보기 저장" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "저장할 보기 이름" }), { target: { value: "이전 페이지" } });
+    fireEvent.click(screen.getByRole("button", { name: "보기 저장" }));
     view.rerender(<StudioLayerCompsPanel key="page-b" layers={sampleLayers} comps={[]}
       onApplyComp={onApplyComp} onCaptureComp={onCaptureComp} />);
-    fireEvent.click(screen.getByRole("button", { name: "새 콤프" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "새 콤프 이름" }), { target: { value: "새 페이지 초안" } });
+    fireEvent.click(screen.getByRole("button", { name: "현재 보기 저장" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "저장할 보기 이름" }), { target: { value: "새 페이지 초안" } });
     await act(async () => { if (result === "rejected") reject(new Error("old scope")); else finish(result === "accepted"); });
-    expect((screen.getByRole("textbox", { name: "새 콤프 이름" }) as HTMLInputElement).value).toBe("새 페이지 초안");
-    expect((screen.getByRole("group", { name: "레이어 콤프" }) as HTMLFieldSetElement).disabled).toBe(false);
+    expect((screen.getByRole("textbox", { name: "저장할 보기 이름" }) as HTMLInputElement).value).toBe("새 페이지 초안");
+    expect((screen.getByRole("group", { name: "레이어 보기" }) as HTMLFieldSetElement).disabled).toBe(false);
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
