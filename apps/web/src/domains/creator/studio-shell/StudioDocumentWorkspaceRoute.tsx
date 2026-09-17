@@ -10,6 +10,7 @@ import { parseStudioDocumentLocation } from "../studio-document-workspace";
 import { StudioEditorRoute } from "../studio-router/routes/StudioEditorRoute";
 import { resolveStudioRoute } from "../studio-router/studio-route-manifest";
 import { useStudioI18nPriorityLoading } from "../studio-router/useStudioI18nPriorityLoading";
+import { StudioModeExperienceBoundary } from "./StudioModeExperienceBoundary";
 
 function localeFromLanguage(language: string): "ko" | "en" {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
@@ -41,7 +42,16 @@ export function StudioDocumentWorkspaceRoute() {
       if (currentHref !== routeResolution.canonicalHref) {
         return <Navigate replace state={location.state} to={routeResolution.canonicalHref} />;
       }
-      return <StudioEditorRoute resolution={routeResolution} />;
+      return (
+        <StudioModeExperienceBoundary
+          projectId={documentResolution.projectId}
+          documentId={documentResolution.documentId}
+          workspace={documentResolution.workspace}
+          locale={locale}
+        >
+          <StudioEditorRoute resolution={routeResolution} />
+        </StudioModeExperienceBoundary>
+      );
     }
   }
 
