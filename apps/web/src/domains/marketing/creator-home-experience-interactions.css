@@ -67,10 +67,391 @@ html[data-theme="dark"] .creator-experience .ce-flow-switcher button[aria-presse
   padding: 112px 0;
 }
 
+/*
+ * Visual task picker
+ *
+ * The home used to ask people to decode six text links before they could
+ * start. Keep the same six destinations for compatibility, but make each
+ * choice recognisable from an image, icon and one concise outcome sentence.
+ */
+.creator-flagship .cf-intent-visual {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.55fr);
+  gap: clamp(24px, 3.4vw, 48px);
+  align-items: start;
+  border: 1px solid color-mix(in oklch, var(--cf-line) 82%, var(--cf-accent));
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in oklch, var(--cf-accent) 12%, transparent), transparent 34rem),
+    linear-gradient(145deg, color-mix(in oklch, var(--cf-card) 96%, var(--cf-accent)), var(--cf-card));
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.055), 0 30px 80px -65px var(--cf-accent);
+}
+
+.creator-flagship .cf-intent-main,
+.creator-flagship .cf-intent-side {
+  min-width: 0;
+}
+
+.creator-flagship .cf-intent-eyebrow {
+  color: var(--cf-accent);
+  font-family: var(--font-display), sans-serif;
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.creator-flagship .cf-intent-visual h2 {
+  max-width: 760px;
+  margin-top: 9px;
+  color: var(--cf-ink);
+  font-size: clamp(25px, 3vw, 39px);
+  font-weight: 760;
+  line-height: 1.28;
+  letter-spacing: -0.05em;
+  word-break: keep-all;
+}
+
+.creator-flagship .cf-intent-hint {
+  margin-top: 10px;
+  color: var(--cf-muted);
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.creator-flagship .cf-intent-search {
+  display: grid;
+  width: min(100%, 680px);
+  min-height: 52px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  margin: 22px 0 17px;
+  padding: 0 14px;
+  border: 1px solid var(--cf-line);
+  border-radius: 14px;
+  color: var(--cf-muted);
+  background: color-mix(in oklch, var(--cf-paper) 76%, transparent);
+  text-align: left;
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.04);
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.creator-flagship .cf-intent-search:hover {
+  border-color: color-mix(in oklch, var(--cf-accent) 55%, var(--cf-line));
+  background: var(--cf-raised);
+  transform: translateY(-1px);
+}
+
+.creator-flagship .cf-intent-search > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.creator-flagship .cf-intent-search kbd {
+  min-width: 40px;
+  padding: 5px 7px;
+  border: 1px solid var(--cf-line);
+  border-radius: 7px;
+  color: var(--cf-faint);
+  background: var(--cf-card);
+  font-family: var(--font-display), sans-serif;
+  font-size: 9px;
+  text-align: center;
+}
+
+.creator-flagship .cf-intent-visual-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.creator-flagship .cf-intent-motion-card {
+  min-width: 0;
+}
+
+.creator-flagship .cf-intent-motion-card > a {
+  position: relative;
+  display: grid;
+  min-height: 190px;
+  height: 100%;
+  grid-template-rows: 96px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--cf-line);
+  border-radius: 16px;
+  color: var(--cf-ink);
+  background: var(--cf-card);
+  text-decoration: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.creator-flagship .cf-intent-motion-card > a:hover,
+.creator-flagship .cf-intent-motion-card > a:focus-visible {
+  border-color: color-mix(in oklch, var(--cf-accent) 65%, var(--cf-line));
+  background: color-mix(in oklch, var(--cf-raised) 88%, var(--cf-accent));
+  box-shadow: 0 20px 45px -34px var(--cf-accent);
+}
+
+.creator-flagship .cf-intent-card-media {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--cf-raised) 88%, black);
+}
+
+.creator-flagship .cf-intent-card-media::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 44%, oklch(0.13 0.02 285 / 0.58));
+  content: "";
+}
+
+.creator-flagship .cf-intent-card-media img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+  filter: saturate(0.94) contrast(1.03);
+  transform: scale(1.01);
+  transition: transform 560ms cubic-bezier(.16, 1, .3, 1), filter 280ms ease;
+}
+
+.creator-flagship .cf-intent-motion-card > a:hover .cf-intent-card-media img,
+.creator-flagship .cf-intent-motion-card > a:focus-visible .cf-intent-card-media img {
+  filter: saturate(1.08) contrast(1.04);
+  transform: scale(1.065);
+}
+
+.creator-flagship .cf-intent-card-icon {
+  position: absolute;
+  z-index: 2;
+  left: 10px;
+  bottom: 9px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid oklch(1 0 0 / 0.2);
+  border-radius: 10px;
+  color: white;
+  background: oklch(0.16 0.02 282 / 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.creator-flagship .cf-intent-card-copy {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  padding: 13px 34px 14px 13px;
+}
+
+.creator-flagship .cf-intent-card-copy strong {
+  font-size: 13px;
+  font-weight: 730;
+  letter-spacing: -0.025em;
+}
+
+.creator-flagship .cf-intent-card-copy small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--cf-muted);
+  font-size: 10px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.creator-flagship .cf-intent-motion-card > a > svg {
+  position: absolute;
+  right: 12px;
+  bottom: 15px;
+  color: var(--cf-faint);
+  transition: color 180ms ease, transform 180ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.creator-flagship .cf-intent-motion-card > a:hover > svg,
+.creator-flagship .cf-intent-motion-card > a:focus-visible > svg {
+  color: var(--cf-accent);
+  transform: translateX(3px);
+}
+
+.creator-flagship .cf-intent-side {
+  display: grid;
+  gap: 12px;
+}
+
+.creator-flagship .cf-intent-film {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--cf-accent) 42%, var(--cf-line));
+  border-radius: 18px;
+  color: var(--cf-ink);
+  background: linear-gradient(145deg, color-mix(in oklch, var(--cf-card) 93%, var(--cf-accent)), var(--cf-card));
+  text-decoration: none;
+  transition: border-color 180ms ease, transform 220ms cubic-bezier(.16, 1, .3, 1), box-shadow 220ms ease;
+}
+
+.creator-flagship .cf-intent-film:hover,
+.creator-flagship .cf-intent-film:focus-visible {
+  border-color: var(--cf-accent);
+  transform: translateY(-3px);
+  box-shadow: 0 28px 55px -42px var(--cf-accent);
+}
+
+.creator-flagship .cf-intent-film-media {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 16 / 8.6;
+  background: oklch(0.14 0.025 282);
+}
+
+.creator-flagship .cf-intent-film-media::after {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, transparent 45%, oklch(0.13 0.02 282 / 0.75)),
+    linear-gradient(110deg, transparent 30%, oklch(0.82 0.15 292 / 0.12) 52%, transparent 72%);
+  content: "";
+  pointer-events: none;
+}
+
+.creator-flagship .cf-intent-film-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 800ms cubic-bezier(.16, 1, .3, 1), filter 300ms ease;
+}
+
+.creator-flagship .cf-intent-film:hover .cf-intent-film-media img,
+.creator-flagship .cf-intent-film:focus-visible .cf-intent-film-media img {
+  filter: saturate(1.1);
+  transform: scale(1.035);
+}
+
+.creator-flagship .cf-intent-film-play {
+  position: absolute;
+  z-index: 2;
+  inset: 50% auto auto 50%;
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border: 1px solid oklch(1 0 0 / 0.3);
+  border-radius: 50%;
+  color: white;
+  background: oklch(0.15 0.03 282 / 0.68);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 32px oklch(0 0 0 / 0.28);
+  transform: translate(-50%, -50%);
+  transition: transform 220ms cubic-bezier(.16, 1, .3, 1), background 180ms ease;
+}
+
+.creator-flagship .cf-intent-film:hover .cf-intent-film-play,
+.creator-flagship .cf-intent-film:focus-visible .cf-intent-film-play {
+  background: color-mix(in oklch, var(--cf-accent) 82%, black);
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.creator-flagship .cf-intent-film-copy {
+  display: grid;
+  gap: 6px;
+  padding: 15px 42px 17px 16px;
+}
+
+.creator-flagship .cf-intent-film-copy small {
+  color: var(--cf-accent);
+  font-family: var(--font-display), sans-serif;
+  font-size: 9px;
+  font-weight: 760;
+  letter-spacing: 0.14em;
+}
+
+.creator-flagship .cf-intent-film-copy strong {
+  font-size: 16px;
+  letter-spacing: -0.035em;
+}
+
+.creator-flagship .cf-intent-film-copy > span {
+  color: var(--cf-muted);
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.creator-flagship .cf-intent-film > svg {
+  position: absolute;
+  right: 16px;
+  bottom: 19px;
+  color: var(--cf-accent);
+}
+
+.creator-flagship .cf-intent-recent {
+  padding: 15px;
+  border: 1px solid var(--cf-line);
+  border-radius: 16px;
+  background: color-mix(in oklch, var(--cf-paper) 88%, transparent);
+}
+
+.creator-flagship .cf-intent-recent > p {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--cf-muted);
+  font-size: 10px;
+  font-weight: 680;
+}
+
+/* Let the existing hero artwork feel alive without turning the page into a demo reel. */
+.creator-home[data-creator-home="production-first"] .cf-production-preview {
+  animation: cf-preview-float 7.5s ease-in-out infinite alternate;
+  transform-origin: 50% 58%;
+}
+
+.creator-home[data-creator-home="production-first"] .cf-production-preview::after {
+  position: absolute;
+  z-index: 1;
+  inset: -25%;
+  background: linear-gradient(112deg, transparent 38%, oklch(0.94 0.04 292 / 0.12) 48%, transparent 58%);
+  content: "";
+  pointer-events: none;
+  transform: translateX(-62%) rotate(3deg);
+  animation: cf-preview-sheen 8s ease-in-out infinite;
+}
+
+@keyframes cf-preview-float {
+  from { transform: translate3d(0, 0, 0) rotate(-0.15deg); }
+  to { transform: translate3d(0, -7px, 0) rotate(0.2deg); }
+}
+
+@keyframes cf-preview-sheen {
+  0%, 58% { transform: translateX(-62%) rotate(3deg); opacity: 0; }
+  68% { opacity: 1; }
+  82%, 100% { transform: translateX(62%) rotate(3deg); opacity: 0; }
+}
+
+@media (max-width: 1080px) {
+  .creator-flagship .cf-intent-visual {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .creator-flagship .cf-intent-side {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+  }
+}
+
 @media (max-width: 900px) {
   .creator-experience .ce-faq {
     grid-template-columns: 1fr;
     gap: 38px;
+  }
+
+  .creator-flagship .cf-intent-visual-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -89,10 +470,65 @@ html[data-theme="dark"] .creator-experience .ce-flow-switcher button[aria-presse
   .creator-experience .ce-faq {
     padding: 86px 0;
   }
+
+  .creator-flagship .cf-intent-visual {
+    border-radius: 18px;
+  }
+
+  .creator-flagship .cf-intent-visual-nav,
+  .creator-flagship .cf-intent-side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .creator-flagship .cf-intent-motion-card > a {
+    min-height: 170px;
+    grid-template-rows: 86px minmax(0, 1fr);
+  }
+
+  .creator-flagship .cf-intent-hint {
+    font-size: 11px;
+  }
+
+  .creator-flagship .cf-intent-film-media {
+    aspect-ratio: 16 / 8;
+  }
 }
 
 @media (max-width: 430px) {
   .creator-experience .ce-jump-nav > .ch-jump-links {
     grid-template-columns: 1fr;
+  }
+
+  .creator-flagship .cf-intent-visual-nav {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .creator-flagship .cf-intent-motion-card > a {
+    min-height: 154px;
+    grid-template-columns: 118px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .creator-flagship .cf-intent-card-media {
+    height: 100%;
+  }
+
+  .creator-flagship .cf-intent-card-copy {
+    align-content: center;
+    padding: 15px 32px 15px 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .creator-flagship .cf-intent-motion-card > a,
+  .creator-flagship .cf-intent-card-media img,
+  .creator-flagship .cf-intent-film,
+  .creator-flagship .cf-intent-film-media img,
+  .creator-flagship .cf-intent-film-play,
+  .creator-home[data-creator-home="production-first"] .cf-production-preview,
+  .creator-home[data-creator-home="production-first"] .cf-production-preview::after {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
   }
 }
