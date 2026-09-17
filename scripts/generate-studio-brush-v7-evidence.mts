@@ -13,7 +13,7 @@ const PALETTE = [
   ["#7a2e2e", "#1e5f79"], ["#41326b", "#b47625"], ["#224c47", "#b54a34"],
 ] as const;
 const recipes = BRUSH_STUDIO_V6_RECIPES.filter((entry) => entry.id.startsWith("v7-"));
-if (recipes.length !== 24) throw new Error(`expected 24 V7 recipes, got ${recipes.length}`);
+if (recipes.length !== 48) throw new Error(`expected 48 V7 recipes, got ${recipes.length}`);
 await mkdir(OUT, { recursive: true });
 
 function pathPoints(): readonly { x: number; y: number; pressure: number; tilt: number; twist: number }[] {
@@ -84,7 +84,7 @@ h1{font-size:34px;margin:0 0 8px}.hero p{max-width:980px;color:#b9c0ca;margin:0}
 h2{margin:32px 0 14px;font-size:22px}.surface-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.surface-card,.brush-card{border:1px solid #343942;background:#191c22;border-radius:18px;overflow:hidden}
 .surface-card svg{display:block;width:100%;height:104px}.surface-card strong,.surface-card span,.surface-card p{display:block;margin:10px 14px 0}.surface-card span{font-size:11px;color:#93a0ad}.surface-card p{margin-bottom:14px;color:#b9c0ca;font-size:12px}
 .brush-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.brush-card{padding:14px}.brush-card header{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.brush-card code{font-size:10px;color:#7f8b98}.brush-card svg{display:block;width:100%;height:154px;margin:10px 0;border-radius:12px}.brush-card p{min-height:40px;margin:0;color:#b9c0ca;font-size:12px}.brush-card small{display:block;margin-top:9px;color:#7f8b98}
-</style></head><body><main><section class="hero"><h1>ToonSpectrum Brush Studio V7 · Material Matrix</h1>
+</style></head><body><main><section class="hero"><h1>ToonSpectrum Brush Studio V7.1 · Material Matrix</h1>
 <p>실제 material-contact solver가 생성한 마크를 그대로 SVG로 직렬화한 QA 시트. 표면 이미지를 덧씌운 목업이 아니라 동일한 브러시 런타임 출력이다.</p>
 <div class="metric"><b>${BRUSH_STUDIO_V7_ADVANCED_SURFACES.length} advanced surfaces</b><b>${recipes.length} signature brushes</b><b>${totalMarks.toLocaleString()} rendered marks</b><b>${meanRenderMs.toFixed(2)} ms avg stroke solve</b></div></section>
 <h2>Surface microstructure field</h2><section class="surface-grid">${surfaceCards.join("")}</section>
