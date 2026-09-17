@@ -80,7 +80,8 @@ export class BusinessInquiryService {
         .limit(1),
     ]);
 
-    if (duplicate[0]) return { received: true, id: duplicate[0].id } as const;
+    // Public callers only learn that the request was accepted. Internal record IDs stay private.
+    if (duplicate[0]) return { received: true } as const;
     if ((recentCountRow[0]?.count ?? 0) >= MAX_PER_EMAIL_PER_WINDOW) {
       throw new HttpException(
         "문의가 연속으로 접수됐어요. 잠시 후 다시 시도해 주세요.",
@@ -88,9 +89,8 @@ export class BusinessInquiryService {
       );
     }
 
-    const id = randomUUID();
     await db.insert(businessInquiries).values({
-      id,
+      id: randomUUID(),
       type: value.type,
       organization: value.organization,
       contactName: value.contactName,
@@ -105,7 +105,7 @@ export class BusinessInquiryService {
       updatedAt: now,
     });
 
-    return { received: true, id } as const;
+    return { received: true } as const;
   }
 
   async listForAdmin(userId: string, statusValue: unknown, limitValue: unknown) {
