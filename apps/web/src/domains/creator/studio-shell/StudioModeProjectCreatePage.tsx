@@ -48,6 +48,12 @@ import {
 } from "../save-first/studio-project-create-options";
 import { ensureStudioSaveProfile } from "../save-first/studio-save-profile";
 import { StudioModeWorkspacePreview } from "./StudioModeWorkspacePreview";
+import {
+  DisabledReason,
+  StudioTaskFlow,
+  StudioTaskSummary,
+  type StudioTaskFlowStep,
+} from "./StudioTaskFlow";
 
 type Locale = "ko" | "en";
 type Choice<T extends string> = {
@@ -66,6 +72,8 @@ const KIND_ICONS: Readonly<Record<StudioProjectKind, LucideIcon>> = {
   "three-d": Box,
   animation: Images,
 };
+
+const CREATE_DISABLED_REASON_ID = "studio-create-disabled-reason";
 
 function localeFromLanguage(language: string): Locale {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
@@ -156,6 +164,7 @@ export function StudioModeProjectCreatePage() {
 
   const templates = STUDIO_PROJECT_CREATE_TEMPLATES[kind];
   const selectedTemplate = templates.find((template) => template.id === templateId) ?? templates[0]!;
+  const selectedTemplateLabel = locale === "ko" ? selectedTemplate.labelKo : selectedTemplate.labelEn;
   const modePlan = useMemo(
     () => resolveStudioModeCreationPlan(kind, selectedTemplate.id),
     [kind, selectedTemplate.id],
@@ -166,6 +175,36 @@ export function StudioModeProjectCreatePage() {
     () => STUDIO_PROJECT_CREATE_KINDS.filter((option) => option.featured || showMoreKinds),
     [showMoreKinds],
   );
+  const titleReady = title.trim().length > 0;
+  const modeName = studioModeLabel(modePlan.profile, locale);
+  const steps: readonly StudioTaskFlowStep[] = [
+    {
+      id: "kind",
+      label: locale === "ko" ? "만들 작업 선택" : "Choose work type",
+      description: modeName,
+      state: "complete",
+    },
+    {
+      id: "details",
+      label: locale === "ko" ? "이름과 시작 형식" : "Name and format",
+      description: selectedTemplateLabel,
+      state: titleReady ? "complete" : "current",
+    },
+    ...(structuredWebtoon ? [{
+      id: "production-track",
+      label: locale === "ko" ? "제작 트랙 확인" : "Confirm production track",
+      description: locale === "ko" ? onboardingPlan.titleKo : onboardingPlan.titleEn,
+      state: "complete" as const,
+    }] : []),
+    {
+      id: "start",
+      label: locale === "ko" ? "자동 저장하며 시작" : "Start with autosave",
+      description: locale === "ko"
+        ? "이 기기에 복구 저장 후 작업 시작"
+        : "Start after creating device recovery storage",
+      state: titleReady ? "current" : "upcoming",
+    },
+  ];
 
   function chooseKind(option: StudioProjectCreateKindOption) {
     setKind(option.id);
@@ -221,7 +260,6 @@ export function StudioModeProjectCreatePage() {
     }
   }
 
-  const modeName = studioModeLabel(modePlan.profile, locale);
   const startLabel = structuredWebtoon
     ? (locale === "ko" ? "프로젝트와 제작 계획 만들기" : "Create project and production plan")
     : locale === "ko" ? `${modeName} 시작` : `Start ${modeName}`;
@@ -248,6 +286,12 @@ export function StudioModeProjectCreatePage() {
               {locale === "ko" ? "기존 파일 가져오기" : "Import existing files"}
             </Link>
           </header>
+
+          <StudioTaskFlow
+            steps={steps}
+            ariaLabel={locale === "ko" ? "새 프로젝트 시작 단계" : "New project start steps"}
+            className="mt-5"
+          />
 
           <section className="mt-7" aria-labelledby="studio-mode-kind-title">
             <p className="text-xs font-black text-accent">01</p>
@@ -395,14 +439,34 @@ export function StudioModeProjectCreatePage() {
                   ))}
                 </select>
               </label>
-              <div className="mt-4 rounded-xl border border-line bg-panel/60 p-3 text-xs">
-                <p className="flex justify-between gap-3"><b>{locale === "ko" ? "첫 작업공간" : "First workspace"}</b><span>{modePlan.document.workspace}</span></p>
-                <p className="mt-2 flex justify-between gap-3"><b>{locale === "ko" ? "캔버스" : "Canvas"}</b><span>{modePlan.document.width} × {modePlan.document.height}</span></p>
-                <p className="mt-2 flex justify-between gap-3"><b>{locale === "ko" ? "시작 도구" : "Start tool"}</b><span>{modePlan.launch.startTool}</span></p>
-              </div>
+
+              <StudioTaskSummary
+                eyebrow={locale === "ko" ? "선택한 시작 설정" : "Selected setup"}
+                title={title.trim() || (locale === "ko" ? "프로젝트 이름 없음" : "Untitled project")}
+                description={`${modeName} · ${selectedTemplateLabel}`}
+                className="mt-4"
+                meta={(
+                  <>
+                    <span className="rounded-full border border-good/30 bg-good/10 px-2 py-1 text-[0.65rem] font-bold text-fg-2">
+                      {locale === "ko" ? "이 기기에 저장됨" : "Saved on this device"}
+                    </span>
+                    <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] font-bold text-fg-3">
+                      {modePlan.document.workspace} · {modePlan.document.width} × {modePlan.document.height}
+                    </span>
+                  </>
+                )}
+              />
+
+              <DisabledReason id={CREATE_DISABLED_REASON_ID} visible={!titleReady} className="mt-3">
+                {locale === "ko"
+                  ? "프로젝트 이름을 입력하면 자동 저장되는 작업공간을 시작할 수 있습니다."
+                  : "Enter a project name to start an autosaved workspace."}
+              </DisabledReason>
+
               <button
                 type="button"
-                disabled={creating || !title.trim()}
+                disabled={creating || !titleReady}
+                aria-describedby={!titleReady ? CREATE_DISABLED_REASON_ID : undefined}
                 onClick={create}
                 className={buttonClass({ variant: "solid", size: "lg", className: "mt-5 min-h-12 w-full gap-2" })}
               >
