@@ -82,6 +82,16 @@ export function translateBilingualText(
   return t(defineBilingualAutoText(scope, value.ko, value.en));
 }
 
+/** Concise inline bridge for legacy `locale === "ko" ? ko : en` expressions. */
+export function translateBilingual(
+  t: TranslationResolver,
+  scope: string,
+  ko: string,
+  en: string,
+): string {
+  return t(defineBilingualAutoText(scope, ko, en));
+}
+
 function translateParallelNode(
   t: TranslationResolver,
   scope: string,
