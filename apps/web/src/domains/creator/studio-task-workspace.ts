@@ -1,4 +1,5 @@
 import type { StudioDocumentWorkspaceId } from "./studio-document-workspace";
+import { STUDIO_MODE_PROFILES } from "./studio-mode-profiles";
 import type { StudioUiDensityMode } from "./studio-ui-density";
 import {
   STUDIO_DEFAULT_WORKSPACE_IDS,
@@ -8,10 +9,19 @@ import {
 } from "./studio-workspaces";
 
 const TASK_LAYOUTS: Partial<Record<StudioDocumentWorkspaceId, StudioDefaultWorkspaceId>> = {
-  draw: "lineart", comic: "pro-comic", image: "photo-edit", design: "vector-design",
-  slides: "vector-design", storyboard: "storyboard", whiteboard: "vector-design",
-  animation: "animation", motion: "animation", audio: "animation",
-  localization: "lettering", review: "review",
+  draw: STUDIO_MODE_PROFILES.illustration.document.taskWorkspace,
+  comic: STUDIO_MODE_PROFILES.webtoon.document.taskWorkspace,
+  image: STUDIO_MODE_PROFILES.image.document.taskWorkspace,
+  design: STUDIO_MODE_PROFILES.design.document.taskWorkspace,
+  slides: STUDIO_MODE_PROFILES.slides.document.taskWorkspace,
+  storyboard: STUDIO_MODE_PROFILES.storyboard.document.taskWorkspace,
+  whiteboard: "vector-design",
+  "3d": STUDIO_MODE_PROFILES["three-d"].document.taskWorkspace,
+  animation: STUDIO_MODE_PROFILES.animation.document.taskWorkspace,
+  motion: STUDIO_MODE_PROFILES.animation.document.taskWorkspace,
+  audio: STUDIO_MODE_PROFILES.animation.document.taskWorkspace,
+  localization: "lettering",
+  review: "review",
 };
 const DEFAULT_WORKSPACE_IDS = new Set<string>(STUDIO_DEFAULT_WORKSPACE_IDS);
 

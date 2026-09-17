@@ -170,6 +170,36 @@ describe("StudioProjectCreatePage", () => {
       .toBe("illustration-portrait");
   });
 
+  it("creates presentation work in the slides workspace with a selection-first launch", async () => {
+    render(
+      <MemoryRouter initialEntries={["/studio/new?kind=slides&template=slides-pitch"]}>
+        <StudioProjectCreatePage />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText(/선택한 작업공간 미리보기|Selected workspace preview/u).textContent)
+      .toMatch(/슬라이드|Slides/u);
+    fireEvent.change(screen.getByRole("textbox", { name: /프로젝트 이름|Project name/u }), {
+      target: { value: "피치덱" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /발표 자료 시작|Start Presentation/u }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("location").textContent).toMatch(
+        /^\/studio\/p\/[^/]+\/d\/[^?]+\?workspace=slides&uiMode=basic&startTool=select$/u,
+      );
+    });
+    const project = readStudioProjectLibrary(window.localStorage).projects[0]!;
+    const document = readStudioProjectDocuments(window.localStorage, project.id).documents[0]!;
+    expect(document).toMatchObject({
+      kind: "slides",
+      defaultWorkspace: "slides",
+      width: 1920,
+      height: 1080,
+    });
+  });
+
   it("switches project type and prepares the matching template choices", () => {
     render(
       <MemoryRouter>

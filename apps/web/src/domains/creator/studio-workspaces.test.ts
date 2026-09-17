@@ -141,6 +141,7 @@ const WIDTH_TUNED_WORKSPACE_IDS = new Set<string>([
   "mobile-draw",
   "photo-edit",
   "vector-design",
+  "slides-deck",
   "animation",
   "pose-3d",
 ]);
@@ -181,10 +182,10 @@ describe("built-in Studio workspaces", () => {
       "pro-comic",
       ...STUDIO_EXPANDED_WORKSPACE_IDS,
     ]);
-    expect(STUDIO_DEFAULT_WORKSPACE_IDS).toHaveLength(15);
+    expect(STUDIO_DEFAULT_WORKSPACE_IDS).toHaveLength(16);
     expect(new Set(STUDIO_DEFAULT_WORKSPACES.map((workspace) => workspace.name)).size)
-      .toBe(15);
-    expect(new Set(STUDIO_DEFAULT_WORKSPACE_IDS).size).toBe(15);
+      .toBe(16);
+    expect(new Set(STUDIO_DEFAULT_WORKSPACE_IDS).size).toBe(16);
 
     for (const workspace of STUDIO_DEFAULT_WORKSPACES) {
       expect(Object.isFrozen(workspace)).toBe(true);

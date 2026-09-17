@@ -47,6 +47,11 @@ import {
   type StudioProjectCreateKindOption,
 } from "../save-first/studio-project-create-options";
 import { ensureStudioSaveProfile } from "../save-first/studio-save-profile";
+import {
+  buildStudioModeLaunchHref,
+  resolveStudioCreationPlan,
+  studioModeInitialDocumentTitle,
+} from "../studio-mode-creation-plan";
 import { createStudioProjectWithInitialDocument } from "../studio-project-creation";
 import type { StudioProjectKind } from "../studio-project-library-store";
 import {
@@ -56,6 +61,7 @@ import {
   StudioTaskSummary,
   type StudioTaskFlowStep,
 } from "./StudioTaskFlow";
+import { StudioModeWorkspacePreview } from "./StudioModeWorkspacePreview";
 
 type Locale = "ko" | "en";
 
@@ -166,6 +172,10 @@ export function StudioDeferredSaveProjectCreatePage() {
   const selectedTemplateLabel = selectedTemplate
     ? (locale === "ko" ? selectedTemplate.labelKo : selectedTemplate.labelEn)
     : templateId;
+  const creationPlan = useMemo(
+    () => resolveStudioCreationPlan(kind, templateId),
+    [kind, templateId],
+  );
   const visibleKinds = useMemo(
     () => STUDIO_PROJECT_CREATE_KINDS.filter((option) => option.featured || showMoreKinds),
     [showMoreKinds],
@@ -223,6 +233,14 @@ export function StudioDeferredSaveProjectCreatePage() {
         kind,
         templateId,
         primaryLocale: locale === "ko" ? "ko-KR" : "en-US",
+        document: {
+          title: studioModeInitialDocumentTitle(kind, title),
+          kind: creationPlan.document.kind,
+          defaultWorkspace: creationPlan.document.workspace,
+          width: creationPlan.document.width,
+          height: creationPlan.document.height,
+          pageCount: creationPlan.document.pageCount,
+        },
       }, window);
       ensureStudioSaveProfile(window.localStorage, result.project.id, {
         provider: "browser",
@@ -230,7 +248,7 @@ export function StudioDeferredSaveProjectCreatePage() {
         createVersions: true,
         target: window,
       });
-      let destination = `${result.href}&uiMode=basic&startTool=draw`;
+      let destination = buildStudioModeLaunchHref(result.href, creationPlan);
       if (structuredWebtoonFlow) {
         const profile = createStudioWebtoonOnboardingProfile(
           result.project.id,
@@ -334,6 +352,8 @@ export function StudioDeferredSaveProjectCreatePage() {
               </button>
             ) : null}
           </section>
+
+          <StudioModeWorkspacePreview profile={creationPlan.profile} locale={locale} />
 
           <section className="mt-7 min-w-0 rounded-3xl border border-line bg-card p-5 shadow-sm sm:p-7" aria-labelledby="project-settings-title">
             <div className="flex min-w-0 items-start gap-3">
@@ -538,8 +558,8 @@ export function StudioDeferredSaveProjectCreatePage() {
                     ? `${onboardingPlan.titleKo} · ${onboardingPlan.milestoneKo}`
                     : `${onboardingPlan.titleEn} · ${onboardingPlan.milestoneEn}`)
                 : locale === "ko"
-                  ? `${selectedTemplateLabel} 템플릿을 적용하고 드로잉 도구로 시작합니다.`
-                  : `Apply the ${selectedTemplateLabel} template and open the drawing tool.`}
+                  ? `${selectedTemplateLabel} · ${creationPlan.profile.creationPreview.outputKo}`
+                  : `${selectedTemplateLabel} · ${creationPlan.profile.creationPreview.outputEn}`}
               meta={<WorkflowTrustBadge state="device-saved" locale={locale} compact={false} />}
             />
             <div className="flex min-w-0 flex-col gap-3 lg:min-w-72">
