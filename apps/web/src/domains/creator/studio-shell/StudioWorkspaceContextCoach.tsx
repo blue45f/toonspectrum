@@ -90,7 +90,7 @@ export function StudioWorkspaceContextCoach({ surface }: { readonly surface: Coa
           transition={{ duration: .28, ease: [0.16, 1, 0.3, 1] }}
         >
           <div className="studio-context-coach__visual" aria-hidden="true">
-            <img src={surface === "bg3d" ? "/brand/theme-scenes/midnight-studio.svg" : surface === "poser" ? "/brand/theme-scenes/graphite-studio.svg" : "/brand/theme-scenes/blossom-studio.svg"} alt="" />
+            <img src={surface === "bg3d" ? "/brand/production-os-workspace.svg" : surface === "poser" ? "/brand/theme-scenes/graphite-studio.svg" : "/brand/theme-scenes/blossom-studio.svg"} alt="" />
           </div>
           <div className="studio-context-coach__body">
             <p><Sparkles size={13} aria-hidden="true" /> JUST-IN-TIME GUIDE</p>
