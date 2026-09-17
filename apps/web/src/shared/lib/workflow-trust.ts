@@ -1,5 +1,8 @@
 import { defineBilingualText } from "./i18n-bilingual-copy";
 
+/** @deprecated Display copy now follows the global i18n locale. Kept for caller compatibility. */
+export type WorkflowTrustLocale = "ko" | "en";
+
 export type WorkflowTrustState =
   | "resume-ready"
   | "device-saved"
