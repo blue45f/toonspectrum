@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const app = readFileSync(new URL("./App.tsx", import.meta.url), "utf8");
+const compatibilityBridge = readFileSync(new URL("./BrowserCompatibilityBridge.tsx", import.meta.url), "utf8");
 const shell = readFileSync(new URL("./AppShell.tsx", import.meta.url), "utf8");
 const effects = readFileSync(new URL("./RouteScrollRestoration.tsx", import.meta.url), "utf8");
 
@@ -36,11 +37,15 @@ describe("public shell integration", () => {
     expect(effects).toContain('mutation?.disconnect()');
   });
 
-  it("does not read or write optional browser storage without a guard", () => {
-    expect(app).toContain("hasDismissedBrowserCompatibility()");
-    expect(app).toContain("dismissBrowserCompatibility()");
+  it("keeps optional browser diagnostics and guarded storage out of the initial app bundle", () => {
+    expect(app).toContain("const BrowserCompatibilityBridge = lazy(");
+    expect(app).not.toContain('import { checkBrowserCompatibility');
+    expect(compatibilityBridge).toContain("hasDismissedBrowserCompatibility()");
+    expect(compatibilityBridge).toContain("dismissBrowserCompatibility()");
     expect(app).not.toContain("sessionStorage.getItem");
     expect(app).not.toContain("sessionStorage.setItem");
+    expect(compatibilityBridge).not.toContain("sessionStorage.getItem");
+    expect(compatibilityBridge).not.toContain("sessionStorage.setItem");
   });
 
   it("loads global tooltip guidance as an immediate non-blocking chunk", () => {

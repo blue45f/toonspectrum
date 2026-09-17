@@ -3,7 +3,7 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 
 import { allowStudioProgrammaticReload } from "../shared/lib/programmatic-reload";
 import { announceStudioRenderFailure } from "../shared/lib/render-failure-event";
-import { classifyError, type ErrorAnalysis } from "../compat/browser-check";
+import { classifyRuntimeError, type ErrorAnalysis } from "../compat/runtime-error-classification";
 
 import { BrowserCompatModal } from "./browser-compat-modal";
 import { hasAttemptedChunkReload, markChunkReloadAttempted } from "./chunk-reload-guard";
@@ -26,7 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null, analysis: null, showModal: false, autoReloading: false };
 
   static getDerivedStateFromError(error: Error): State {
-    const analysis = classifyError(error);
+    const analysis = classifyRuntimeError(error);
     return {
       error,
       analysis,
@@ -42,6 +42,15 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    if (this.state.analysis?.type === "compatibility") {
+      void import("../compat/browser-check")
+        .then(({ classifyError }) => {
+          if (this.state.error === error) {
+            this.setState({ analysis: classifyError(error), showModal: true });
+          }
+        })
+        .catch(() => {});
+    }
     // DEV 에서만 console.error 를 하던 탓에, 프로덕션 빌드에서 컴포넌트가 무너져도 아무 흔적이
     // 남지 않았다. 브라우저 게이트는 전부 프로덕션 프리뷰를 상대하므로 "에러 0"을 보고했고,
     // 사용자는 같은 순간 빈 화면을 보고 있었다. 알림은 환경과 무관하게 보낸다.

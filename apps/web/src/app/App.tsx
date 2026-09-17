@@ -1,14 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
 
-import { checkBrowserCompatibility, type BrowserCompatibilityResult } from "../compat/browser-check";
-import { BrowserCompatModal } from "../components/browser-compat-modal";
 import { ErrorBoundary } from "../components/error-boundary";
 import { apiPath } from "../infrastructure/api";
 
 import { AppShell } from "./AppShell";
-import { shouldPromptForBrowserCompatibility } from "./browser-compatibility-scope";
-import { dismissBrowserCompatibility, hasDismissedBrowserCompatibility } from "./public-site-storage";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";
 import { StudioRouterDocumentNavigationBoundary } from "./StudioRouterDocumentNavigationBoundary";
@@ -54,6 +50,11 @@ const StudioBg3dRetainedOwnerHost = lazy(() =>
 const TrafficAnalyticsBridge = lazy(() =>
   import("./traffic-analytics/TrafficAnalyticsBridge").then((mod) => ({
     default: mod.TrafficAnalyticsBridge,
+  })),
+);
+const BrowserCompatibilityBridge = lazy(() =>
+  import("./BrowserCompatibilityBridge").then((mod) => ({
+    default: mod.BrowserCompatibilityBridge,
   })),
 );
 
@@ -233,9 +234,6 @@ function SerifWebFontBridge() {
 
 function AppRuntime() {
   const { pathname } = useLocation();
-  const [compatResult, setCompatResult] =
-    useState<BrowserCompatibilityResult | null>(null);
-  const [showCompatModal, setShowCompatModal] = useState(false);
   // Route truth is available during the first render; the Zustand bridge runs later in an effect.
   const studioImmersive = isImmersiveMobileRoute(pathname);
   const adminChrome = isAdminPath(pathname);
@@ -243,22 +241,6 @@ function AppRuntime() {
   const publicExperience = !isStudioRoutePathname(pathname) && !adminChrome;
 
   useKmasEntryMerge(!adminChrome);
-
-  useEffect(() => {
-    setCompatResult(checkBrowserCompatibility());
-  }, []);
-
-  useEffect(() => {
-    if (!compatResult) return;
-    const shouldOpen = shouldPromptForBrowserCompatibility(pathname, compatResult)
-      && !hasDismissedBrowserCompatibility();
-    setShowCompatModal(shouldOpen);
-  }, [compatResult, pathname]);
-
-  const handleCloseCompatModal = () => {
-    setShowCompatModal(false);
-    dismissBrowserCompatibility();
-  };
 
   return (
     <>
@@ -302,12 +284,10 @@ function AppRuntime() {
                 <DeskCloudHost />
               </>
             ) : null}
-            {!adminChrome && compatResult ? (
-              <BrowserCompatModal
-                isOpen={showCompatModal}
-                onClose={handleCloseCompatModal}
-                missingFeatures={compatResult.missingFeatures}
-              />
+            {!adminChrome ? (
+              <Suspense fallback={null}>
+                <BrowserCompatibilityBridge pathname={pathname} />
+              </Suspense>
             ) : null}
           </>
         }
