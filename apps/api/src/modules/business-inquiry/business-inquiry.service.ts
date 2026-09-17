@@ -3,9 +3,10 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
-  TooManyRequestsException,
 } from "@nestjs/common";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 
@@ -15,7 +16,7 @@ import {
   type BusinessInquiryEntry,
   type BusinessInquiryStatus,
   validateBusinessInquiryInput,
-} from "@toonspectrum/core/business-inquiry";
+} from "../../../../../packages/core/src/business-inquiry";
 
 import { businessInquiries, db } from "../../db";
 import { isOfficialUser } from "../../server/feedback";
@@ -51,8 +52,8 @@ function toEntry(row: typeof businessInquiries.$inferSelect): BusinessInquiryEnt
 export class BusinessInquiryService {
   async create(input: unknown) {
     const validated = validateBusinessInquiryInput(input);
-    // Honeypot submissions get the same generic success shape so bot authors do not
-    // learn which field caused rejection. Nothing is persisted.
+    // Honeypot submissions receive the normal success shape so bots cannot learn
+    // which field caused rejection. Nothing is persisted.
     if (validated.spam) return { received: true } as const;
     if (!validated.value) throw new BadRequestException(validated.error ?? "문의 내용을 확인해 주세요.");
 
@@ -81,7 +82,10 @@ export class BusinessInquiryService {
 
     if (duplicate[0]) return { received: true, id: duplicate[0].id } as const;
     if ((recentCountRow[0]?.count ?? 0) >= MAX_PER_EMAIL_PER_WINDOW) {
-      throw new TooManyRequestsException("문의가 연속으로 접수됐어요. 잠시 후 다시 시도해 주세요.");
+      throw new HttpException(
+        "문의가 연속으로 접수됐어요. 잠시 후 다시 시도해 주세요.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
 
     const id = randomUUID();
