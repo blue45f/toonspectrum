@@ -175,7 +175,6 @@ export function createStudioBg3dModelImportActions(
     placementSessionRef,
     sceneBaseDocument,
     sceneRestoreAbortRef,
-    setCustomModels,
     setDeletingModelId,
     setError,
     setGenericModelClassifications,
