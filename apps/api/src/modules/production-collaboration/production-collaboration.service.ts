@@ -1324,8 +1324,30 @@ function applyCommand(
       if (current && current.riskId !== response.riskId) {
         throw new BadRequestException("위험 대응의 연결 대상은 변경할 수 없습니다.");
       }
+      if ((!current && response.revision !== 1) || (current && response.revision !== current.revision + 1)) {
+        throw new ConflictException("위험 대응 revision이 현재 값과 일치하지 않습니다.");
+      }
       if ((!current && response.status !== "proposed") || (current && response.status !== current.status)) {
         throw new BadRequestException("위험 대응 상태 변경은 전용 상태 전이 명령을 사용해야 합니다.");
+      }
+      const lifecycleChanged = current
+        ? response.actualEffect !== current.actualEffect
+          || response.cancellationReason !== current.cancellationReason
+          || response.approvedAt !== current.approvedAt
+          || response.startedAt !== current.startedAt
+          || response.completedAt !== current.completedAt
+          || response.cancelledAt !== current.cancelledAt
+          || response.createdAt !== current.createdAt
+        : Boolean(
+          response.actualEffect
+          || response.cancellationReason
+          || response.approvedAt
+          || response.startedAt
+          || response.completedAt
+          || response.cancelledAt,
+        );
+      if (lifecycleChanged) {
+        throw new BadRequestException("위험 대응 상태·결과·수명주기 시각은 전용 상태 전이 명령으로만 변경할 수 있습니다.");
       }
       if (response.ownerAssignmentId) {
         const owner = aggregate.assignments.find((entry) => entry.id === response.ownerAssignmentId);
@@ -1336,20 +1358,36 @@ function applyCommand(
       if (response.linkedTaskId && !aggregate.tasks.some((task) => task.id === response.linkedTaskId)) {
         throw new BadRequestException("위험 대응에 연결할 작업을 찾을 수 없습니다.");
       }
+      const normalizedResponse = Object.freeze({
+        ...response,
+        status: current?.status ?? "proposed",
+        actualEffect: current?.actualEffect ?? null,
+        cancellationReason: current?.cancellationReason ?? null,
+        approvedAt: current?.approvedAt ?? null,
+        startedAt: current?.startedAt ?? null,
+        completedAt: current?.completedAt ?? null,
+        cancelledAt: current?.cancelledAt ?? null,
+        createdAt: current?.createdAt ?? at,
+        updatedAt: at,
+      });
       return {
         aggregate: {
           ...aggregate,
-          riskResponses: upsertById(aggregate.riskResponses, response),
+          riskResponses: upsertById(aggregate.riskResponses, normalizedResponse),
         },
       };
     }
     case "transition-risk-response": {
       const response = aggregate.riskResponses.find((entry) => entry.id === command.responseId);
       if (!response) throw new BadRequestException("상태를 변경할 위험 대응을 찾을 수 없습니다.");
+      if (response.revision !== command.expectedResponseRevision) {
+        throw new ConflictException("위험 대응이 다른 사용자에 의해 변경되었습니다.");
+      }
       try {
         const next = transitionProductionRiskResponse(response, command.toStatus, {
           at,
           actualEffect: command.actualEffect,
+          reason: command.reason,
         });
         return {
           aggregate: {
@@ -1724,23 +1762,31 @@ export class ProductionCollaborationService {
       const statuses = query.status?.split(",").filter(Boolean) ?? [];
       const severities = query.severity?.split(",").filter(Boolean) ?? [];
       const categories = query.category?.split(",").filter(Boolean) ?? [];
+      const episodeIds = query.episodeId?.split(",").filter(Boolean) ?? [];
+      const ownerAssignmentIds = query.ownerAssignmentId?.split(",").filter(Boolean) ?? [];
+      const ruleKeys = query.ruleKey?.split(",").filter(Boolean) ?? [];
       const search = query.q?.toLocaleLowerCase("ko-KR") ?? "";
       const signalsByRiskId = new Map(
         evaluation.signals
           .filter((signal) => signal.linkedRiskId)
           .map((signal) => [signal.linkedRiskId!, signal]),
       );
-      const items = evaluation.risks.filter((risk) => {
-        const signal = signalsByRiskId.get(risk.id);
-        return (statuses.length === 0 || statuses.includes(risk.status))
+      const items = evaluation.risks.filter((risk) =>
+        (statuses.length === 0 || statuses.includes(risk.status))
           && (severities.length === 0 || severities.includes(risk.severity))
           && (categories.length === 0 || categories.includes(risk.category))
           && (!query.source || risk.source === query.source)
-          && (!query.episodeId || risk.affectedEpisodeIds.includes(query.episodeId))
-          && (!query.ownerAssignmentId || risk.ownerAssignmentId === query.ownerAssignmentId)
-          && (!query.ruleKey || signal?.ruleKey === query.ruleKey)
-          && (!search || `${risk.title} ${risk.description} ${risk.causeCodes.join(" ")}`.toLocaleLowerCase("ko-KR").includes(search));
-      }).slice(0, query.limit).map((risk) => ({
+          && (episodeIds.length === 0 || episodeIds.some((episodeId) =>
+            episodeId === "project"
+              ? risk.affectedEpisodeIds.length === 0
+              : risk.affectedEpisodeIds.includes(episodeId)))
+          && (ownerAssignmentIds.length === 0 || ownerAssignmentIds.some((assignmentId) =>
+            assignmentId === "unassigned"
+              ? !risk.ownerAssignmentId
+              : risk.ownerAssignmentId === assignmentId))
+          && (ruleKeys.length === 0 || risk.causeCodes.some((ruleKey) => ruleKeys.includes(ruleKey)))
+          && (!search || `${risk.title} ${risk.description} ${risk.causeCodes.join(" ")}`.toLocaleLowerCase("ko-KR").includes(search)))
+        .slice(0, query.limit).map((risk) => ({
         risk,
         signal: signalsByRiskId.get(risk.id) ?? null,
         responseCount: record.aggregate.riskResponses.filter((response) => response.riskId === risk.id).length,

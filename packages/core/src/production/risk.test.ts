@@ -73,6 +73,14 @@ describe("production risk management", () => {
     expect(result.signals.some((signal) => signal.ruleKey === "task.forecast-slip")).toBe(true);
     expect(result.signals.some((signal) => signal.ruleKey === "capacity.due-gap")).toBe(true);
     expect(result.risks.some((risk) => risk.status === "open" && risk.source === "automatic")).toBe(true);
+    const deliveryRisks = result.risks.filter((risk) =>
+      risk.affectedTaskIds.includes("task-line-art-12")
+      && risk.causeCodes.some((code) => ["task.forecast-slip", "capacity.due-gap"].includes(code)));
+    expect(deliveryRisks).toHaveLength(1);
+    expect(deliveryRisks[0]?.causeCodes).toEqual(expect.arrayContaining([
+      "task.forecast-slip",
+      "capacity.due-gap",
+    ]));
     expect(result.schedule.byTaskId["task-line-art-12"]?.slackHours).toBeLessThan(0);
   });
 
@@ -91,6 +99,244 @@ describe("production risk management", () => {
     expect(secondSignal?.id).toBe(firstSignal?.id);
     expect(secondSignal?.firstDetectedAt).toBe(firstSignal?.firstDetectedAt);
     expect(second.risks.filter((risk) => risk.causeCodes.includes("task.forecast-slip"))).toHaveLength(1);
+  });
+
+  it("waits for medium-confidence signals to remain stable before opening a risk", () => {
+    const base = aggregate([task({ remainingEstimateHours: null })]);
+    const configured = {
+      ...base,
+      riskPolicy: {
+        ...base.riskPolicy,
+        autoOpenStableHours: 2,
+        autoOpenMinimumConfidence: "medium" as const,
+      },
+    };
+    const first = evaluateProductionRisks(configured, NOW);
+    const forecastSignal = first.signals.find((signal) => signal.ruleKey === "task.forecast-slip");
+
+    expect(forecastSignal?.confidence).toBe("medium");
+    expect(first.risks.some((risk) => risk.causeCodes.includes("task.forecast-slip"))).toBe(false);
+
+    const second = evaluateProductionRisks({
+      ...configured,
+      riskSignals: first.signals,
+      risks: first.risks,
+      riskAssessments: first.assessments,
+    }, new Date("2026-09-16T03:00:00.000Z"));
+
+    expect(second.risks.some((risk) => risk.causeCodes.includes("task.forecast-slip"))).toBe(true);
+  });
+
+  it("reactivates expired suppressions and always surfaces critical signals", () => {
+    const first = evaluateProductionRisks(aggregate(), NOW);
+    const target = first.signals.find((signal) => signal.ruleKey === "task.forecast-slip")!;
+    const suppressed = first.signals.map((signal) => signal.id === target.id
+      ? {
+          ...signal,
+          state: "suppressed" as const,
+          suppression: {
+            reason: "담당자 확인 중",
+            suppressedByAssignmentId: OWNER_ASSIGNMENT_ID,
+            suppressedAt: "2026-09-15T22:00:00.000Z",
+            expiresAt: "2026-09-16T00:30:00.000Z",
+          },
+        }
+      : signal);
+    const expired = evaluateProductionRisks({
+      ...aggregate(),
+      riskSignals: suppressed,
+      risks: first.risks,
+      riskAssessments: first.assessments,
+    }, new Date("2026-09-16T01:00:00.000Z"));
+    const reactivated = expired.signals.find((signal) => signal.id === target.id);
+
+    expect(reactivated?.state).toBe("active");
+    expect(reactivated?.suppression).toBeNull();
+
+    const overdueTask = task({ dueAt: "2026-09-15T09:00:00.000Z" });
+    const overdueFirst = evaluateProductionRisks(aggregate([overdueTask]), NOW);
+    const overdueSignal = overdueFirst.signals.find((signal) => signal.ruleKey === "task.overdue")!;
+    const critical = evaluateProductionRisks({
+      ...aggregate([overdueTask]),
+      riskSignals: overdueFirst.signals.map((signal) => signal.id === overdueSignal.id
+        ? {
+            ...signal,
+            state: "suppressed" as const,
+            suppression: {
+              reason: "임시 숨김",
+              suppressedByAssignmentId: OWNER_ASSIGNMENT_ID,
+              suppressedAt: NOW.toISOString(),
+              expiresAt: null,
+            },
+          }
+        : signal),
+      risks: overdueFirst.risks,
+      riskAssessments: overdueFirst.assessments,
+    }, new Date("2026-09-16T01:00:00.000Z"));
+    const criticalSignal = critical.signals.find((signal) => signal.ruleKey === "task.overdue");
+
+    expect(criticalSignal?.severity).toBe("critical");
+    expect(criticalSignal?.state).toBe("active");
+    expect(criticalSignal?.suppression).toBeNull();
+  });
+
+
+  it("groups forecast and capacity symptoms into one root delivery risk", () => {
+    const result = evaluateProductionRisks(aggregate(), NOW);
+    const deliveryRisks = result.risks.filter((risk) =>
+      risk.source === "automatic" && risk.affectedTaskIds.includes("task-line-art-12"));
+
+    expect(deliveryRisks).toHaveLength(1);
+    expect(deliveryRisks[0]?.causeCodes).toEqual(expect.arrayContaining([
+      "task.forecast-slip",
+      "capacity.due-gap",
+    ]));
+    expect(new Set(deliveryRisks[0]?.signalIds).size).toBe(deliveryRisks[0]?.signalIds.length);
+  });
+
+  it("uses hysteresis to prevent capacity signals from flapping around the warning threshold", () => {
+    const first = evaluateProductionRisks(aggregate(), NOW);
+    const firstCapacity = first.signals.find((signal) => signal.ruleKey === "capacity.due-gap");
+    const available = Number(firstCapacity?.evidence.find((entry) => entry.key === "available-hours")?.value);
+    expect(available).toBeGreaterThan(0);
+
+    const atEightyPercent = task({
+      remainingEstimateHours: available * 0.8,
+      progressPercent: 50,
+    });
+    const retained = evaluateProductionRisks({
+      ...aggregate([atEightyPercent]),
+      riskSignals: first.signals,
+      risks: first.risks,
+      riskAssessments: first.assessments,
+    }, NOW);
+    expect(retained.signals.find((signal) => signal.ruleKey === "capacity.due-gap")?.state).toBe("active");
+
+    const atSeventyPercent = task({
+      remainingEstimateHours: available * 0.7,
+      progressPercent: 60,
+    });
+    const cleared = evaluateProductionRisks({
+      ...aggregate([atSeventyPercent]),
+      riskSignals: retained.signals,
+      risks: retained.risks,
+      riskAssessments: retained.assessments,
+    }, NOW);
+    expect(cleared.signals.find((signal) => signal.ruleKey === "capacity.due-gap")?.state).toBe("cleared");
+  });
+
+  it("removes suppression when the same signal escalates to critical", () => {
+    const blocked = task({
+      processKey: "publication",
+      title: "12화 게시 준비",
+      status: "blocked",
+      statusChangedAt: "2026-09-14T23:00:00.000Z",
+      dueAt: "2026-09-18T09:00:00.000Z",
+      baselineDueAt: "2026-09-18T09:00:00.000Z",
+      remainingEstimateHours: 8,
+      progressPercent: 50,
+    });
+    const downstream = task({
+      id: "task-release-check-12",
+      processKey: "preflight",
+      title: "12화 공개 전 점검",
+      dependencyTaskIds: [blocked.id],
+      dueAt: "2026-09-19T09:00:00.000Z",
+      baselineDueAt: "2026-09-19T09:00:00.000Z",
+      remainingEstimateHours: 2,
+      progressPercent: 80,
+    });
+    const first = evaluateProductionRisks(aggregate([blocked, downstream]), NOW);
+    const blockedSignal = first.signals.find((signal) => signal.ruleKey === "task.blocked-age");
+    expect(blockedSignal?.severity).toBe("warning");
+    const suppressedAt = NOW.toISOString();
+    const suppressed = {
+      ...blockedSignal!,
+      state: "suppressed" as const,
+      suppression: {
+        reason: "담당자 확인 중",
+        suppressedByAssignmentId: OWNER_ASSIGNMENT_ID,
+        suppressedAt,
+        expiresAt: "2026-09-20T00:00:00.000Z",
+      },
+    };
+
+    const escalated = evaluateProductionRisks({
+      ...aggregate([blocked, downstream]),
+      riskSignals: first.signals.map((signal) => signal.id === suppressed.id ? suppressed : signal),
+      risks: first.risks,
+      riskAssessments: first.assessments,
+    }, new Date("2026-09-17T06:00:00.000Z"));
+    const critical = escalated.signals.find((signal) => signal.ruleKey === "task.blocked-age");
+
+    expect(critical?.severity).toBe("critical");
+    expect(critical?.state).toBe("active");
+    expect(critical?.suppression).toBeNull();
+  });
+
+  it("gates medium-confidence auto-open until policy confidence and stability requirements are met", () => {
+    const uncertainTask = task({
+      dueAt: "2026-09-26T09:00:00.000Z",
+      baselineDueAt: "2026-09-26T09:00:00.000Z",
+      progressPercent: null,
+      remainingEstimateHours: 400,
+    });
+    const base = aggregate([uncertainTask]);
+    const strict = {
+      ...base,
+      riskPolicy: {
+        ...base.riskPolicy,
+        autoOpenSeverity: "high" as const,
+        autoOpenMinimumConfidence: "high" as const,
+        autoOpenStableHours: 2,
+      },
+    };
+    const first = evaluateProductionRisks(strict, NOW);
+    expect(first.signals.some((signal) =>
+      signal.ruleKey === "task.forecast-slip" && signal.confidence === "medium")).toBe(true);
+    expect(first.risks.filter((risk) => risk.source === "automatic")).toHaveLength(0);
+
+    const afterThreeHours = new Date(NOW.getTime() + 3 * 60 * 60 * 1_000);
+    const stillStrict = evaluateProductionRisks({
+      ...strict,
+      riskSignals: first.signals,
+      risks: first.risks,
+      riskAssessments: first.assessments,
+    }, afterThreeHours);
+    expect(stillStrict.risks.filter((risk) => risk.source === "automatic")).toHaveLength(0);
+
+    const relaxed = evaluateProductionRisks({
+      ...strict,
+      riskPolicy: {
+        ...strict.riskPolicy,
+        autoOpenMinimumConfidence: "medium" as const,
+      },
+      riskSignals: first.signals,
+      risks: first.risks,
+      riskAssessments: first.assessments,
+    }, afterThreeHours);
+    expect(relaxed.risks.some((risk) =>
+      risk.source === "automatic" && risk.causeCodes.includes("task.forecast-slip"))).toBe(true);
+  });
+
+  it("reopens a resolved automatic risk while its source signal is still active", () => {
+    const first = evaluateProductionRisks(aggregate(), NOW);
+    const automaticRisk = first.risks.find((risk) => risk.causeCodes.includes("task.forecast-slip"))!;
+    const resolved = transitionProductionRisk(automaticRisk, "resolved", {
+      reason: "대응이 끝났다고 확인했습니다.",
+      at: "2026-09-16T01:00:00.000Z",
+    });
+
+    const reevaluated = evaluateProductionRisks({
+      ...aggregate(),
+      riskSignals: first.signals,
+      risks: first.risks.map((risk) => risk.id === resolved.id ? resolved : risk),
+      riskAssessments: first.assessments,
+    }, new Date("2026-09-16T02:00:00.000Z"));
+    const reopened = reevaluated.risks.find((risk) => risk.id === resolved.id);
+
+    expect(reopened?.status).toBe("open");
+    expect(reopened?.resolvedAt).toBeNull();
   });
 
   it("marks an overdue deadline as an occurred risk", () => {
@@ -197,6 +443,7 @@ describe("production risk management", () => {
       id: "risk-response:test",
       projectId: PROJECT_ID,
       riskId: "risk:test",
+      revision: 1,
       strategy: "mitigate",
       actionType: "split-task",
       title: "작업 분할",
@@ -208,14 +455,28 @@ describe("production risk management", () => {
       linkedChangeOrderId: null,
       expectedEffect: "예상 지연 8시간 감소",
       actualEffect: null,
+      cancellationReason: null,
       status: "proposed",
-      createdAt: "2026-09-16T01:00:00.000Z",
+      approvedAt: null,
+      startedAt: null,
       completedAt: null,
+      cancelledAt: null,
+      createdAt: "2026-09-16T01:00:00.000Z",
+      updatedAt: "2026-09-16T01:00:00.000Z",
     };
-    const started = transitionProductionRiskResponse(response, "in-progress", {
+    expect(() => transitionProductionRiskResponse(response, "in-progress", {
+      at: "2026-09-16T01:30:00.000Z",
+    })).toThrow(/Illegal/u);
+    const approved = transitionProductionRiskResponse(response, "approved", {
       at: "2026-09-16T02:00:00.000Z",
     });
+    const started = transitionProductionRiskResponse(approved, "in-progress", {
+      at: "2026-09-16T03:00:00.000Z",
+    });
 
+    expect(approved.approvedAt).toBe("2026-09-16T02:00:00.000Z");
+    expect(started.startedAt).toBe("2026-09-16T03:00:00.000Z");
+    expect(started.revision).toBe(3);
     expect(() => transitionProductionRiskResponse(started, "completed", {
       at: "2026-09-16T05:00:00.000Z",
     })).toThrow(/actual effect/u);
@@ -237,13 +498,14 @@ describe("production risk management", () => {
 
     expect(() => transitionProductionRiskResponse(response, "cancelled", {
       at: "2026-09-16T03:00:00.000Z",
-    })).toThrow(/actual effect/u);
+    })).toThrow(/requires a reason/u);
     const cancelled = transitionProductionRiskResponse(response, "cancelled", {
       at: "2026-09-16T03:00:00.000Z",
-      actualEffect: "일정 재기준화로 대응이 불필요해졌습니다.",
+      reason: "일정 재기준화로 대응이 불필요해졌습니다.",
     });
     expect(cancelled.status).toBe("cancelled");
-    expect(cancelled.actualEffect).toContain("재기준화");
+    expect(cancelled.cancellationReason).toContain("재기준화");
+    expect(cancelled.cancelledAt).toBe("2026-09-16T03:00:00.000Z");
     expect(cancelled.completedAt).toBeNull();
   });
 });

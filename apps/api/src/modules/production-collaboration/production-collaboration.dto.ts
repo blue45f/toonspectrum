@@ -864,34 +864,47 @@ const ProductionRiskPolicySchema = z.object({
   minimumReadyBufferEpisodes: z.number().int().min(0).max(100),
   autoOpenSeverity: z.enum(["warning", "high", "critical"]),
   notificationCooldownHours: z.number().int().min(1).max(8_760),
+  autoOpenStableHours: z.number().int().min(0).max(8_760),
+  thresholdHysteresisPercent: z.number().min(0).max(50),
   autoResolveStableHours: z.number().int().min(1).max(8_760),
+  autoOpenMinimumConfidence: z.enum(["low", "medium", "high"]),
   revision: z.number().int().min(1).max(2_147_483_647),
   updatedAt: IsoDateTimeSchema,
-}).strict().refine((value) => value.blockedWarningHours <= value.blockedCriticalHours, {
-  message: "blocked warning threshold must not exceed critical threshold",
-});
+}).strict()
+  .refine((value) => value.blockedWarningHours <= value.blockedCriticalHours, {
+    message: "blocked warning threshold must not exceed critical threshold",
+  })
+  .refine((value) => value.capacityWarningPercent <= value.capacityCriticalPercent, {
+    message: "capacity warning threshold must not exceed critical threshold",
+  });
 
 const ProductionRiskResponseSchema = z.object({
   id: IdentitySchema,
   projectId: IdentitySchema,
   riskId: IdentitySchema,
+  revision: z.number().int().min(1).max(2_147_483_647),
   strategy: z.enum(["avoid", "mitigate", "transfer", "accept", "escalate"]),
   actionType: z.enum([
     "assign", "split-task", "reschedule", "resolve-dependency", "parallel-review",
     "outsource", "reduce-scope", "reuse-asset", "create-change-request", "manual",
   ]),
   title: z.string().trim().min(1).max(240),
-  description: z.string().trim().max(20_000),
+  description: z.string().trim().min(1).max(20_000),
   ownerAssignmentId: IdentitySchema.nullable(),
   dueAt: NullableIsoDateTimeSchema,
   linkedTaskId: IdentitySchema.nullable(),
   linkedChangeRequestId: IdentitySchema.nullable(),
   linkedChangeOrderId: IdentitySchema.nullable(),
-  expectedEffect: z.string().trim().max(4_000),
+  expectedEffect: z.string().trim().min(1).max(4_000),
   actualEffect: z.string().trim().min(1).max(4_000).nullable(),
+  cancellationReason: z.string().trim().min(1).max(4_000).nullable(),
   status: ProductionRiskResponseStatusSchema,
-  createdAt: IsoDateTimeSchema,
+  approvedAt: NullableIsoDateTimeSchema,
+  startedAt: NullableIsoDateTimeSchema,
   completedAt: NullableIsoDateTimeSchema,
+  cancelledAt: NullableIsoDateTimeSchema,
+  createdAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema,
 }).strict();
 
 const DecisionRecordSchema = z.object({
@@ -1107,9 +1120,9 @@ export const ProductionRiskQuerySchema = z.object({
   severity: z.string().trim().max(200).optional(),
   category: z.string().trim().max(500).optional(),
   source: z.enum(["manual", "automatic"]).optional(),
-  episodeId: IdentitySchema.optional(),
-  ownerAssignmentId: IdentitySchema.optional(),
-  ruleKey: z.string().trim().max(160).optional(),
+  episodeId: z.string().trim().max(2_000).optional(),
+  ownerAssignmentId: z.string().trim().max(2_000).optional(),
+  ruleKey: z.string().trim().max(2_000).optional(),
   q: z.string().trim().max(240).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 }).strict();
@@ -1213,6 +1226,8 @@ const TransitionRiskResponseCommandSchema = z.object({
   responseId: IdentitySchema,
   toStatus: ProductionRiskResponseStatusSchema,
   actualEffect: z.string().trim().min(1).max(4_000).nullable(),
+  reason: z.string().trim().min(1).max(4_000).nullable(),
+  expectedResponseRevision: z.number().int().min(1).max(2_147_483_647),
 }).strict();
 const SuppressRiskSignalCommandSchema = z.object({
   type: z.literal("suppress-risk-signal"),

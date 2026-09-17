@@ -83,7 +83,9 @@ export function ProductionRiskResponseCard({
         type: "transition-risk-response",
         responseId: response.id,
         toStatus,
-        actualEffect: resultNote.trim() || null,
+        actualEffect: toStatus === "completed" ? resultNote.trim() || null : null,
+        reason: toStatus === "cancelled" ? resultNote.trim() || null : null,
+        expectedResponseRevision: response.revision,
       }, `${response.title} 대응을 ${STATUS_LABELS[toStatus]} 상태로 변경했습니다.`);
       if (toStatus === "proposed") setResultNote("");
     } catch (transitionError) {
@@ -118,7 +120,9 @@ export function ProductionRiskResponseCard({
         </div>
         <div className="rounded-lg border border-line bg-card p-2.5">
           <p className="text-[0.625rem] font-bold text-fg-3">실제 결과</p>
-          <p className="mt-1 text-xs leading-5 text-fg-2">{response.actualEffect || "아직 기록되지 않음"}</p>
+          <p className="mt-1 text-xs leading-5 text-fg-2">
+            {response.actualEffect || response.cancellationReason || "아직 기록되지 않음"}
+          </p>
         </div>
       </div>
       {active ? (
@@ -147,7 +151,7 @@ export function ProductionRiskResponseCard({
             <ShieldCheck className="size-4" aria-hidden="true" /> 승인
           </button>
         ) : null}
-        {(response.status === "proposed" || response.status === "approved") && canEdit ? (
+        {response.status === "approved" && canEdit ? (
           <button type="button" className={buttonClass({ size: "sm" })} disabled={busy} onClick={() => void transition("in-progress")}>
             <Play className="size-4" aria-hidden="true" /> 대응 시작
           </button>
@@ -168,9 +172,13 @@ export function ProductionRiskResponseCard({
           </button>
         ) : null}
       </div>
-      {response.completedAt ? (
-        <p className="mt-2 text-[0.6875rem] text-fg-3">완료 {formatDate(response.completedAt)}</p>
-      ) : null}
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.6875rem] text-fg-3">
+        {response.approvedAt ? <span>승인 {formatDate(response.approvedAt)}</span> : null}
+        {response.startedAt ? <span>시작 {formatDate(response.startedAt)}</span> : null}
+        {response.completedAt ? <span>완료 {formatDate(response.completedAt)}</span> : null}
+        {response.cancelledAt ? <span>취소 {formatDate(response.cancelledAt)}</span> : null}
+        <span>r{response.revision}</span>
+      </div>
     </article>
   );
 }

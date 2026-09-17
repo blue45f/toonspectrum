@@ -70,7 +70,10 @@ export function createDefaultProductionRiskPolicy(
     minimumReadyBufferEpisodes: 2,
     autoOpenSeverity: "high",
     notificationCooldownHours: 24,
+    autoOpenStableHours: 2,
+    thresholdHysteresisPercent: 10,
     autoResolveStableHours: 24,
+    autoOpenMinimumConfidence: "medium",
     revision: 1,
     updatedAt: at,
   });
@@ -112,18 +115,24 @@ function riskId(fingerprint: string): string {
 }
 
 function automaticRiskId(signal: ProductionRiskSignal): string {
-  const groupKey = ["task.forecast-slip", "task.overdue"].includes(signal.ruleKey)
-    ? "task.deadline"
+  const groupKey = ["task.forecast-slip", "task.overdue", "capacity.due-gap"].includes(signal.ruleKey)
+    ? "task.delivery-risk"
     : signal.ruleKey;
   if (groupKey === signal.ruleKey) return riskId(signal.fingerprint);
-  const committedDueAt = signal.evidence.find((entry) => entry.key === "committed-due-at")?.value ?? null;
   return riskId(stableProductionFingerprint({
     projectId: signal.projectId,
     groupKey,
     sourceEntityType: signal.sourceEntityType,
     sourceEntityId: signal.sourceEntityId,
-    committedDueAt,
   }));
+}
+
+function confidenceRank(confidence: ProductionRiskConfidence): number {
+  return { low: 0, medium: 1, high: 2 }[confidence];
+}
+
+function isOccurredSignal(signal: ProductionRiskSignal): boolean {
+  return signal.ruleKey.endsWith("overdue") || signal.ruleKey === "preflight.blocker";
 }
 
 interface SignalCandidate {
@@ -207,6 +216,38 @@ function collectTaskCandidates(
     const affectedEpisodeIds = episodeId ? [episodeId] : [];
     const downstreamBoost = Math.min(12, forecast.downstreamTaskIds.length * 3);
     const releaseBoost = task.processKey === "publication" ? 10 : 0;
+    const dueInHours = hoursUntil(task.dueAt, now);
+
+    const dataGaps = [
+      !task.dueAt ? "마감일" : null,
+      !task.estimateHours ? "3점 공수" : null,
+      typeof task.progressPercent !== "number" ? "진행률" : null,
+      typeof task.remainingEstimateHours !== "number" ? "잔여 공수" : null,
+    ].filter((value): value is string => Boolean(value));
+    if (
+      dataGaps.length > 0
+      && ["ready", "in-progress", "blocked", "needs-input", "internal-review", "external-review", "changes-requested"].includes(task.status)
+      && (dueInHours === null || dueInHours <= 7 * 24)
+    ) {
+      candidates.push({
+        ruleKey: "data.low-confidence",
+        scope: task.scope,
+        sourceEntityType: "task",
+        sourceEntityId: task.id,
+        category: "schedule",
+        priorityScore: dueInHours !== null && dueInHours <= policy.dueSoonHours ? 28 : 18,
+        confidence: "high",
+        title: `${task.title} 예측 정보 보완 필요`,
+        summary: `${dataGaps.join(" · ")} 정보가 없어 자동 예측 신뢰도가 낮습니다.`,
+        evidence: [
+          evidence({ key: "missing-forecast-inputs", label: "누락 예측 정보", value: dataGaps.join(", "), threshold: 0, unit: "field", sourceType: "task", sourceId: task.id, observedAt }),
+          evidence({ key: "forecast-confidence", label: "일정 예측 신뢰도", value: forecast.confidence, sourceType: "task", sourceId: task.id, observedAt }),
+        ],
+        affectedTaskIds: [task.id],
+        affectedEpisodeIds,
+        affectedMilestoneIds: [],
+      });
+    }
 
     if (Number.isFinite(dueAtMs) && dueAtMs < nowMs) {
       const overdueHours = Math.round((nowMs - dueAtMs) / HOUR_MS);
@@ -274,33 +315,51 @@ function collectTaskCandidates(
       }
     }
 
-    if ((forecast.capacityGapHours ?? 0) > 0) {
+    if (
+      task.assignmentIds.length > 0
+      && forecast.remainingHours > 0
+      && forecast.availableHoursBeforeDue !== null
+    ) {
       const gap = forecast.capacityGapHours ?? 0;
-      const loadPercent = forecast.availableHoursBeforeDue && forecast.availableHoursBeforeDue > 0
+      const loadPercent = forecast.availableHoursBeforeDue > 0
         ? Math.round((forecast.remainingHours / forecast.availableHoursBeforeDue) * 100)
         : 999;
-      candidates.push({
-        ruleKey: "capacity.due-gap",
-        scope: task.scope,
-        sourceEntityType: "task",
-        sourceEntityId: task.id,
-        category: "capacity",
-        priorityScore: Math.min(100, (loadPercent >= policy.capacityCriticalPercent ? 70 : 52) + Math.min(12, Math.ceil(gap / 4)) + downstreamBoost),
-        confidence: forecast.confidence,
-        title: `${task.title} 가용시간 부족`,
-        summary: `마감 전 가용시간보다 ${Math.round(gap)}시간 부족`,
-        evidence: [
-          evidence({ key: "remaining-hours", label: "남은 예상 공수", value: forecast.remainingHours, unit: "hour", sourceType: "task", sourceId: task.id, observedAt }),
-          evidence({ key: "available-hours", label: "마감 전 가용시간", value: forecast.availableHoursBeforeDue, unit: "hour", sourceType: "task", sourceId: task.id, observedAt }),
-          evidence({ key: "capacity-gap-hours", label: "부족 가용시간", value: gap, threshold: 0, unit: "hour", sourceType: "task", sourceId: task.id, observedAt }),
-        ],
-        affectedTaskIds: [task.id, ...forecast.downstreamTaskIds],
-        affectedEpisodeIds,
-        affectedMilestoneIds: [],
-      });
+      const previousCapacitySignal = aggregate.riskSignals.find((signal) =>
+        signal.ruleKey === "capacity.due-gap"
+        && signal.sourceEntityId === task.id
+        && signal.state !== "cleared");
+      const recoveryFactor = previousCapacitySignal
+        ? Math.max(0.5, 1 - policy.thresholdHysteresisPercent / 100)
+        : 1;
+      const warningThreshold = policy.capacityWarningPercent * recoveryFactor;
+      const criticalThreshold = policy.capacityCriticalPercent * recoveryFactor;
+      if (loadPercent >= warningThreshold) {
+        const critical = loadPercent >= criticalThreshold;
+        candidates.push({
+          ruleKey: "capacity.due-gap",
+          scope: task.scope,
+          sourceEntityType: "task",
+          sourceEntityId: task.id,
+          category: "capacity",
+          priorityScore: Math.min(100, (critical ? 70 : 50) + Math.min(12, Math.ceil(gap / 4)) + downstreamBoost),
+          confidence: forecast.confidence,
+          title: `${task.title} 마감 전 작업량 위험`,
+          summary: gap > 0
+            ? `가용시간 대비 ${loadPercent}% · ${Math.round(gap)}시간 부족`
+            : `가용시간 대비 ${loadPercent}% · 여유가 빠르게 줄고 있습니다.`,
+          evidence: [
+            evidence({ key: "remaining-hours", label: "남은 예상 공수", value: forecast.remainingHours, unit: "hour", sourceType: "task", sourceId: task.id, observedAt }),
+            evidence({ key: "available-hours", label: "마감 전 가용시간", value: forecast.availableHoursBeforeDue, unit: "hour", sourceType: "task", sourceId: task.id, observedAt }),
+            evidence({ key: "capacity-load-percent", label: "마감 전 작업량", value: loadPercent, threshold: critical ? policy.capacityCriticalPercent : policy.capacityWarningPercent, unit: "percent", sourceType: "task", sourceId: task.id, observedAt }),
+            evidence({ key: "capacity-gap-hours", label: "부족 가용시간", value: gap, threshold: 0, unit: "hour", sourceType: "task", sourceId: task.id, observedAt }),
+          ],
+          affectedTaskIds: [task.id, ...forecast.downstreamTaskIds],
+          affectedEpisodeIds,
+          affectedMilestoneIds: [],
+        });
+      }
     }
 
-    const dueInHours = hoursUntil(task.dueAt, now);
     if (task.assignmentIds.length === 0 && dueInHours !== null && dueInHours <= 7 * 24 && dueInHours >= 0) {
       candidates.push({
         ruleKey: "assignment.unowned-due-soon",
@@ -503,9 +562,12 @@ function mergeSignals(
     detected.add(fingerprint);
     const prior = previous.get(fingerprint);
     const severity = productionRiskSeverity(candidate.priorityScore);
-    const suppressionActive = prior?.suppression
-      && (!prior.suppression.expiresAt || Date.parse(prior.suppression.expiresAt) > now.getTime())
-      && severity !== "critical";
+    const suppression = severity === "critical"
+      ? null
+      : prior?.suppression
+        && (!prior.suppression.expiresAt || Date.parse(prior.suppression.expiresAt) > now.getTime())
+        ? prior.suppression
+        : null;
     return Object.freeze({
       id: prior?.id ?? signalId(fingerprint),
       projectId: aggregate.projectId,
@@ -525,11 +587,11 @@ function mergeSignals(
       affectedEpisodeIds: Object.freeze([...new Set(candidate.affectedEpisodeIds)]),
       affectedMilestoneIds: Object.freeze([...new Set(candidate.affectedMilestoneIds)]),
       linkedRiskId: prior?.linkedRiskId ?? null,
-      state: suppressionActive ? "suppressed" : "active",
+      state: suppression ? "suppressed" : "active",
       firstDetectedAt: prior?.firstDetectedAt ?? nowIso,
       lastDetectedAt: nowIso,
       clearedAt: null,
-      suppression: severity === "critical" ? null : prior?.suppression ?? null,
+      suppression,
     });
   });
 
@@ -642,6 +704,71 @@ function riskFromSignal(
   });
 }
 
+function riskFromSignals(
+  aggregate: ProductionProjectAggregate,
+  signals: readonly ProductionRiskSignal[],
+  existing: ProductionRisk | null,
+  now: Date,
+): ProductionRisk {
+  const ordered = signals.slice().sort((left, right) =>
+    Number(isOccurredSignal(right)) - Number(isOccurredSignal(left))
+    || severityRank(right.severity) - severityRank(left.severity)
+    || right.priorityScore - left.priorityScore
+    || confidenceRank(right.confidence) - confidenceRank(left.confidence));
+  const primary = ordered[0];
+  if (!primary) throw new Error("Automatic risk requires at least one active signal.");
+  const base = riskFromSignal(aggregate, primary, existing, now);
+  const previousSignals = new Map(aggregate.riskSignals.map((signal) => [signal.id, signal]));
+  const reappeared = ordered.some((signal) => previousSignals.get(signal.id)?.state === "cleared");
+  const escalated = ordered.some((signal) => {
+    const previous = previousSignals.get(signal.id);
+    return previous ? severityRank(signal.severity) > severityRank(previous.severity) : false;
+  });
+  const occurred = ordered.some(isOccurredSignal);
+  let status = base.status;
+  if (occurred) status = "occurred";
+  else if (existing?.status === "resolved") status = "open";
+  else if (
+    existing
+    && ["dismissed", "closed"].includes(existing.status)
+    && (reappeared || escalated || ordered.some((signal) => signal.severity === "critical"))
+  ) status = "open";
+
+  const probability = Math.max(...ordered.map(signalProbability)) as 1 | 2 | 3 | 4 | 5;
+  const impact = Math.max(...ordered.map(signalImpact)) as 1 | 2 | 3 | 4 | 5;
+  const forecastDueAt = ordered
+    .map((signal) => signal.evidence.find((entry) => entry.key === "forecast-due-at")?.value)
+    .find((value): value is string => typeof value === "string") ?? base.forecastDueAt;
+  const delayHours = ordered.flatMap((signal) => signal.evidence
+    .filter((entry) => entry.key === "slack-hours" && typeof entry.value === "number" && entry.value < 0)
+    .map((entry) => Math.abs(entry.value as number)));
+  const nowIso = now.toISOString();
+  return Object.freeze({
+    ...base,
+    signalIds: Object.freeze([...new Set([...(existing?.signalIds ?? []), ...ordered.map((signal) => signal.id)])]),
+    title: primary.title,
+    description: [...new Set(ordered.map((signal) => signal.summary))].join(" · "),
+    probability,
+    impact,
+    exposureScore: probability * impact,
+    severity: primary.severity,
+    priorityScore: Math.max(...ordered.map((signal) => signal.priorityScore)),
+    causeCodes: Object.freeze([...new Set(ordered.map((signal) => signal.ruleKey))]),
+    earlySignals: Object.freeze([...new Set(ordered.flatMap((signal) => signal.evidence
+      .map((entry) => `${entry.label}: ${String(entry.value ?? "미정")}`)))]),
+    trigger: [...new Set(ordered.map((signal) => signal.summary))].join(" · "),
+    affectedTaskIds: Object.freeze([...new Set(ordered.flatMap((signal) => signal.affectedTaskIds))]),
+    affectedEpisodeIds: Object.freeze([...new Set(ordered.flatMap((signal) => signal.affectedEpisodeIds))]),
+    affectedMilestoneIds: Object.freeze([...new Set(ordered.flatMap((signal) => signal.affectedMilestoneIds))]),
+    forecastDueAt,
+    varianceHours: delayHours.length > 0 ? Math.max(...delayHours) : base.varianceHours,
+    status,
+    occurredAt: existing?.occurredAt ?? (occurred ? nowIso : null),
+    resolvedAt: status === "open" && existing?.status === "resolved" ? null : base.resolvedAt,
+    closedAt: status === "open" && existing?.status === "closed" ? null : base.closedAt,
+  });
+}
+
 function synchronizeAutomaticRisks(
   aggregate: ProductionProjectAggregate,
   signals: readonly ProductionRiskSignal[],
@@ -653,20 +780,52 @@ function synchronizeAutomaticRisks(
     .filter((risk) => risk.source === "automatic")
     .map((risk) => [risk.id, risk]));
   const manual = aggregate.risks.filter((risk) => risk.source !== "automatic");
-  const relevantSignals = signals.filter((signal) =>
-    signal.state !== "cleared" && severityRank(signal.severity) >= threshold);
+  const grouped = new Map<string, ProductionRiskSignal[]>();
+  for (const signal of signals) {
+    if (signal.state === "cleared") continue;
+    const id = automaticRiskId(signal);
+    const values = grouped.get(id) ?? [];
+    values.push(signal);
+    grouped.set(id, values);
+  }
+
   const touchedRiskIds = new Set<string>();
-  const generated = relevantSignals.flatMap((signal): ProductionRisk[] => {
-    const id = signal.linkedRiskId ?? automaticRiskId(signal);
-    const current = automatic.get(id) ?? null;
-    if (signal.state === "suppressed") {
-      if (!current) return [];
-      touchedRiskIds.add(id);
-      return [current];
+  const generated: ProductionRisk[] = [];
+  for (const [rootRiskId, groupSignals] of grouped) {
+    const linkedCurrent = [...automatic.values()].find((risk) =>
+      groupSignals.some((signal) => risk.signalIds.includes(signal.id))) ?? null;
+    const current = automatic.get(rootRiskId) ?? linkedCurrent;
+    const effectiveRiskId = current?.id ?? rootRiskId;
+    const activeSignals = groupSignals.filter((signal) => signal.state === "active");
+    if (activeSignals.length === 0) {
+      if (current) {
+        touchedRiskIds.add(effectiveRiskId);
+        generated.push(current);
+      }
+      continue;
     }
-    touchedRiskIds.add(id);
-    return [riskFromSignal(aggregate, signal, current, now)];
-  });
+    const crossesOpenThreshold = activeSignals.some((signal) =>
+      severityRank(signal.severity) >= threshold);
+    const crossesConfidenceThreshold = activeSignals.some((signal) =>
+      confidenceRank(signal.confidence) >= confidenceRank(policy.autoOpenMinimumConfidence)
+      || signal.severity === "critical"
+      || isOccurredSignal(signal));
+    if (!current && (!crossesOpenThreshold || !crossesConfidenceThreshold)) continue;
+
+    const oldestDetectedAt = Math.min(...activeSignals.map((signal) => {
+      const value = Date.parse(signal.firstDetectedAt);
+      return Number.isFinite(value) ? value : now.getTime();
+    }));
+    const stableForHours = Math.max(0, (now.getTime() - oldestDetectedAt) / HOUR_MS);
+    const canOpenImmediately = activeSignals.some((signal) =>
+      signal.confidence === "high"
+      || signal.severity === "critical"
+      || isOccurredSignal(signal));
+    if (!current && !canOpenImmediately && stableForHours < policy.autoOpenStableHours) continue;
+
+    touchedRiskIds.add(effectiveRiskId);
+    generated.push(riskFromSignals(aggregate, activeSignals, current, now));
+  }
 
   const resolved = [...automatic.values()]
     .filter((risk) => !touchedRiskIds.has(risk.id))
@@ -683,7 +842,6 @@ function synchronizeAutomaticRisks(
       const nowIso = now.toISOString();
       return Object.freeze({
         ...risk,
-        revision: risk.revision,
         status: "resolved",
         resolutionSummary: risk.resolutionSummary ?? "자동 감지 조건이 안정화 기간 동안 다시 나타나지 않았습니다.",
         resolvedAt: nowIso,
@@ -692,7 +850,9 @@ function synchronizeAutomaticRisks(
       });
     });
 
-  return Object.freeze([...manual, ...generated, ...resolved].sort((left, right) =>
+  const byId = new Map<string, ProductionRisk>();
+  for (const risk of [...manual, ...generated, ...resolved]) byId.set(risk.id, risk);
+  return Object.freeze([...byId.values()].sort((left, right) =>
     severityRank(right.severity) - severityRank(left.severity)
     || right.priorityScore - left.priorityScore
     || right.updatedAt.localeCompare(left.updatedAt)));
@@ -701,8 +861,10 @@ function synchronizeAutomaticRisks(
 function buildAssessments(
   projectId: string,
   risks: readonly ProductionRisk[],
+  signals: readonly ProductionRiskSignal[],
   now: Date,
 ): readonly ProductionRiskAssessment[] {
+  const signalsById = new Map(signals.map((signal) => [signal.id, signal]));
   return Object.freeze(risks
     .filter((risk) => ACTIVE_RISK_STATUSES.has(risk.status))
     .map((risk): ProductionRiskAssessment => {
@@ -720,7 +882,12 @@ function buildAssessments(
         impact: risk.impact,
         exposureScore: risk.exposureScore,
         priorityScore: risk.priorityScore,
-        confidence: risk.source === "manual" ? "medium" : "high",
+        confidence: risk.source === "manual"
+          ? "medium"
+          : risk.signalIds
+            .map((signalIdValue) => signalsById.get(signalIdValue))
+            .filter((signal): signal is ProductionRiskSignal => Boolean(signal))
+            .sort((left, right) => right.priorityScore - left.priorityScore)[0]?.confidence ?? "medium",
         rationale: Object.freeze([
           `가능성 ${risk.probability} × 영향도 ${risk.impact}`,
           `운영 우선순위 ${risk.priorityScore}`,
@@ -751,7 +918,7 @@ export function evaluateProductionRisks(
     ...signal,
     linkedRiskId: linkedRiskBySignalId.get(signal.id) ?? signal.linkedRiskId,
   })));
-  const assessments = buildAssessments(aggregate.projectId, risks, now);
+  const assessments = buildAssessments(aggregate.projectId, risks, signals, now);
   const activeSignalIds = new Set(
     signals.filter((signal) => signal.state === "active").map((signal) => signal.id),
   );
@@ -816,7 +983,7 @@ export function transitionProductionRisk(
 }
 
 const RISK_RESPONSE_TRANSITIONS: Readonly<Record<ProductionRiskResponseStatus, readonly ProductionRiskResponseStatus[]>> = Object.freeze({
-  proposed: ["approved", "in-progress", "cancelled"],
+  proposed: ["approved", "cancelled"],
   approved: ["in-progress", "cancelled"],
   "in-progress": ["completed", "cancelled"],
   completed: [],
@@ -826,22 +993,46 @@ const RISK_RESPONSE_TRANSITIONS: Readonly<Record<ProductionRiskResponseStatus, r
 export function transitionProductionRiskResponse(
   response: ProductionRiskResponse,
   target: ProductionRiskResponseStatus,
-  input: { readonly at: string; readonly actualEffect?: string | null },
+  input: {
+    readonly at: string;
+    readonly actualEffect?: string | null;
+    readonly reason?: string | null;
+  },
 ): ProductionRiskResponse {
   if (response.status === target) return response;
   if (!RISK_RESPONSE_TRANSITIONS[response.status].includes(target)) {
     throw new Error(`Illegal production risk response transition: ${response.status} -> ${target}`);
   }
   const actualEffect = input.actualEffect?.trim() || null;
-  if (["completed", "cancelled"].includes(target) && !actualEffect) {
-    throw new Error(`${target === "completed" ? "Completed" : "Cancelled"} production risk response requires an actual effect.`);
+  const reason = input.reason?.trim() || null;
+  if (target === "completed" && !actualEffect) {
+    throw new Error("Completed production risk response requires an actual effect.");
+  }
+  if (target === "cancelled" && !reason) {
+    throw new Error("Cancelled production risk response requires a reason.");
   }
   return Object.freeze({
     ...response,
+    revision: response.revision + 1,
     status: target,
-    actualEffect: target === "completed" || target === "cancelled"
+    actualEffect: target === "completed"
       ? actualEffect
       : target === "proposed" ? null : response.actualEffect,
-    completedAt: target === "completed" ? input.at : target === "proposed" ? null : response.completedAt,
+    cancellationReason: target === "cancelled"
+      ? reason
+      : target === "proposed" ? null : response.cancellationReason,
+    approvedAt: target === "approved"
+      ? response.approvedAt ?? input.at
+      : target === "proposed" ? null : response.approvedAt,
+    startedAt: target === "in-progress"
+      ? response.startedAt ?? input.at
+      : target === "proposed" ? null : response.startedAt,
+    completedAt: target === "completed"
+      ? input.at
+      : target === "proposed" ? null : response.completedAt,
+    cancelledAt: target === "cancelled"
+      ? input.at
+      : target === "proposed" ? null : response.cancelledAt,
+    updatedAt: input.at,
   });
 }

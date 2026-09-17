@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   CircleAlert,
   Clock3,
+  Copy,
   Filter,
   ListChecks,
   Pencil,
@@ -26,6 +27,7 @@ import {
   type ProductionRisk,
   type ProductionRiskCategory,
   type ProductionRiskPolicy,
+  type ProductionRiskResponse,
   type ProductionRiskSeverity,
   type ProductionRiskSignal,
   type ProductionRiskStatus,
@@ -33,12 +35,21 @@ import {
 
 import type { ProductionClientCommand } from "./production-api";
 import { ProductionRiskEditorDialog } from "./ProductionRiskEditorDialog";
+import { ProductionRiskMultiFilter } from "./ProductionRiskMultiFilter";
 import { ProductionRiskResponseCard } from "./ProductionRiskResponseCard";
+import {
+  normalizeProductionRiskSearchParams,
+  parseProductionRiskUrlState,
+  serializeProductionRiskUrlState,
+  type ProductionRiskDetailTab,
+  type ProductionRiskMatrixCell,
+  type ProductionRiskUrlState,
+  type ProductionRiskViewMode,
+} from "./production-risk-url-state";
 import {
   ProductionRiskEpisodeView,
   ProductionRiskMatrixView,
   ProductionRiskViewSwitcher,
-  type ProductionRiskViewMode,
 } from "./ProductionRiskViews";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -54,7 +65,6 @@ interface ProductionRiskWorkspaceProps {
 }
 
 type Tone = "neutral" | "accent" | "success" | "warning" | "danger";
-type DetailTab = "overview" | "evidence" | "impact" | "response" | "history";
 type NumericRiskPolicyKey =
   | "dueSoonHours"
   | "blockedWarningHours"
@@ -64,6 +74,8 @@ type NumericRiskPolicyKey =
   | "defaultReviewSlaHours"
   | "minimumReadyBufferEpisodes"
   | "notificationCooldownHours"
+  | "autoOpenStableHours"
+  | "thresholdHysteresisPercent"
   | "autoResolveStableHours";
 
 const DATE_TIME = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" });
@@ -99,7 +111,45 @@ const SEVERITY_LABELS: Readonly<Record<ProductionRiskSeverity, string>> = Object
   high: "높음",
   critical: "긴급",
 });
+const RULE_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  "task.overdue": "실제 마감 초과",
+  "task.forecast-slip": "예상 마감 초과",
+  "task.blocked-age": "차단 장기화",
+  "capacity.due-gap": "마감 전 작업량",
+  "assignment.unowned-due-soon": "담당자 미배정",
+  "review.sla-breach": "검수 응답 초과",
+  "episode.buffer-low": "연재 버퍼 부족",
+  "asset.not-ready": "에셋 준비 지연",
+  "milestone.overdue": "계약 마일스톤 초과",
+  "preflight.blocker": "게시 사전 검사 차단",
+  "dependency.cycle": "작업 의존성 순환",
+  "data.low-confidence": "예측 정보 부족",
+});
 const ACTIVE_STATUSES = new Set<ProductionRiskStatus>(["open", "monitoring", "mitigating", "occurred"]);
+
+type ResponseDraft = {
+  readonly actionType: ProductionRiskResponse["actionType"];
+  readonly title: string;
+  readonly description: string;
+  readonly ownerAssignmentId: string;
+  readonly dueAt: string;
+  readonly linkedTaskId: string;
+  readonly expectedEffect: string;
+};
+
+function dateTimeLocalValue(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function isoDateTimeValue(value: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
 
 function formatDate(value: string | null): string {
   if (!value) return "미정";
@@ -192,14 +242,6 @@ function Section({
   );
 }
 
-function splitFilter(value: string | null): readonly string[] {
-  return value?.split(",").map((entry) => entry.trim()).filter(Boolean) ?? [];
-}
-
-function riskViewMode(value: string | null): ProductionRiskViewMode {
-  return value === "episode" || value === "matrix" ? value : "priority";
-}
-
 function productionEpisodeLabel(
   aggregate: ProductionProjectAggregate,
   episodeId: string,
@@ -282,6 +324,15 @@ function validateRiskPolicy(policy: ProductionRiskPolicy): string | null {
   if (policy.capacityWarningPercent > policy.capacityCriticalPercent) {
     return "작업량 주의 기준은 작업량 긴급 기준보다 클 수 없습니다.";
   }
+  if (policy.autoOpenStableHours < 0) {
+    return "자동 생성 안정화 시간은 0 이상이어야 합니다.";
+  }
+  if (policy.thresholdHysteresisPercent < 0 || policy.thresholdHysteresisPercent > 50) {
+    return "임계값 복귀 여유는 0%부터 50% 사이여야 합니다.";
+  }
+  if (policy.autoResolveStableHours < 1 || policy.notificationCooldownHours < 1) {
+    return "자동 해결 안정화와 알림 재전송 간격은 1시간 이상이어야 합니다.";
+  }
   if (!/^([01]\d|2[0-3]):[0-5]\d$/u.test(policy.workdayEndLocal)) {
     return "업무 종료 시각은 00:00부터 23:59 사이여야 합니다.";
   }
@@ -309,8 +360,8 @@ function RiskDetail({
   readonly aggregate: ProductionProjectAggregate;
   readonly risk: ProductionRisk;
   readonly signal: ProductionRiskSignal | null;
-  readonly tab: DetailTab;
-  readonly setTab: (tab: DetailTab) => void;
+  readonly tab: ProductionRiskDetailTab;
+  readonly setTab: (tab: ProductionRiskDetailTab) => void;
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly canEdit: boolean;
   readonly canManage: boolean;
@@ -320,7 +371,13 @@ function RiskDetail({
 }) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [responseDraft, setResponseDraft] = useState<ResponseDraft | null>(null);
   const responses = aggregate.riskResponses.filter((response) => response.riskId === risk.id);
+
+  useEffect(() => {
+    setReason("");
+    setResponseDraft(null);
+  }, [risk.id]);
   const projectBase = `/production/projects/${encodeURIComponent(aggregate.projectId)}`;
 
   const trimmedReason = reason.trim();
@@ -345,11 +402,31 @@ function RiskDetail({
     }
   };
 
-  const createResponse = async (
-    actionType: "split-task" | "reschedule" | "outsource" | "resolve-dependency" | "manual",
+  const startResponseDraft = (
+    actionType: ResponseDraft["actionType"],
     title: string,
   ) => {
-    if (!canEdit || busy) return;
+    setResponseDraft({
+      actionType,
+      title,
+      description: `${risk.title}의 영향을 줄이기 위한 운영 대응입니다.`,
+      ownerAssignmentId: actorAssignmentId ?? risk.ownerAssignmentId ?? "",
+      dueAt: dateTimeLocalValue(risk.responseDueAt),
+      linkedTaskId: risk.affectedTaskIds[0] ?? "",
+      expectedEffect: risk.varianceHours
+        ? `예상 초과 ${Math.round(risk.varianceHours)}시간 축소`
+        : "차단 원인 또는 일정 위험 축소",
+    });
+  };
+
+  const responseDraftValid = Boolean(
+    responseDraft?.title.trim()
+    && responseDraft.description.trim()
+    && responseDraft.expectedEffect.trim(),
+  );
+
+  const createResponse = async () => {
+    if (!canEdit || busy || !responseDraft || !responseDraftValid) return;
     setBusy(true);
     try {
       const now = new Date();
@@ -359,25 +436,29 @@ function RiskDetail({
           id: `risk-response:${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
           projectId: aggregate.projectId,
           riskId: risk.id,
-          strategy: actionType === "outsource" ? "transfer" : "mitigate",
-          actionType,
-          title,
-          description: reason.trim() || `${risk.title}의 영향을 줄이기 위한 운영 대응입니다.`,
-          ownerAssignmentId: actorAssignmentId ?? risk.ownerAssignmentId,
-          dueAt: risk.responseDueAt,
-          linkedTaskId: risk.affectedTaskIds[0] ?? null,
+          revision: 1,
+          strategy: responseDraft.actionType === "outsource" ? "transfer" : "mitigate",
+          actionType: responseDraft.actionType,
+          title: responseDraft.title.trim(),
+          description: responseDraft.description.trim(),
+          ownerAssignmentId: responseDraft.ownerAssignmentId || null,
+          dueAt: isoDateTimeValue(responseDraft.dueAt),
+          linkedTaskId: responseDraft.linkedTaskId || null,
           linkedChangeRequestId: null,
           linkedChangeOrderId: null,
-          expectedEffect: risk.varianceHours
-            ? `예상 초과 ${Math.round(risk.varianceHours)}시간 축소`
-            : "차단 원인 또는 일정 위험 축소",
+          expectedEffect: responseDraft.expectedEffect.trim(),
           actualEffect: null,
+          cancellationReason: null,
           status: "proposed",
-          createdAt: now.toISOString(),
+          approvedAt: null,
+          startedAt: null,
           completedAt: null,
+          cancelledAt: null,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
         },
-      }, `${title} 대응안을 등록했습니다.`);
-      setReason("");
+      }, `${responseDraft.title.trim()} 대응안을 등록했습니다.`);
+      setResponseDraft(null);
     } finally {
       setBusy(false);
     }
@@ -400,7 +481,7 @@ function RiskDetail({
     }
   };
 
-  const tabs: readonly { readonly id: DetailTab; readonly label: string }[] = [
+  const tabs: readonly { readonly id: ProductionRiskDetailTab; readonly label: string }[] = [
     { id: "overview", label: "개요" },
     { id: "evidence", label: "근거" },
     { id: "impact", label: "영향 경로" },
@@ -528,13 +609,13 @@ function RiskDetail({
       {tab === "response" ? (
         <div className="mt-4 space-y-4">
           <label className="block">
-            <span className="text-xs font-bold text-fg">판단·대응 사유</span>
+            <span className="text-xs font-bold text-fg">위험 상태 판단 사유</span>
             <textarea
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               rows={3}
               className="mt-2 w-full rounded-xl border border-line bg-panel px-3 py-2 text-sm text-fg outline-none focus:border-accent"
-              placeholder="왜 이 대응을 선택했는지 기록하세요."
+              placeholder="수용·오탐·해결·신호 숨김의 판단 근거를 기록하세요."
               disabled={!canEdit || busy}
             />
           </label>
@@ -542,11 +623,125 @@ function RiskDetail({
             위험 수용·오탐 처리·해결 확인·신호 숨김은 판단 사유를 입력해야 실행할 수 있습니다.
           </p>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void createResponse("split-task", "작업 분할")}>작업 분할</button>
-            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void createResponse("reschedule", "일정 조정")}>일정 조정</button>
-            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void createResponse("resolve-dependency", "차단 해소")}>차단 해소</button>
-            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void createResponse("outsource", "외주 전환 검토")}>외주 전환</button>
+            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} aria-pressed={responseDraft?.actionType === "split-task"} onClick={() => startResponseDraft("split-task", "작업 분할")}>작업 분할</button>
+            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} aria-pressed={responseDraft?.actionType === "reschedule"} onClick={() => startResponseDraft("reschedule", "일정 조정")}>일정 조정</button>
+            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} aria-pressed={responseDraft?.actionType === "resolve-dependency"} onClick={() => startResponseDraft("resolve-dependency", "차단 해소")}>차단 해소</button>
+            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} aria-pressed={responseDraft?.actionType === "outsource"} onClick={() => startResponseDraft("outsource", "외주 전환 검토")}>외주 전환</button>
           </div>
+          {responseDraft ? (
+            <form
+              aria-label="위험 대응안 작성"
+              className="rounded-2xl border border-accent/30 bg-accent-soft/40 p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void createResponse();
+              }}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-xs font-black text-fg">대응안 작성</h3>
+                  <p className="mt-1 text-[0.6875rem] leading-4 text-fg-3">
+                    승인 전에 담당자·기한·예상 효과를 확인합니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={buttonClass({ variant: "ghost", size: "sm" })}
+                  onClick={() => setResponseDraft(null)}
+                  disabled={busy}
+                >
+                  작성 취소
+                </button>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="text-[0.6875rem] font-bold text-fg-3">대응 제목</span>
+                  <input
+                    value={responseDraft.title}
+                    onChange={(event) => setResponseDraft((current) => current ? { ...current, title: event.target.value } : current)}
+                    className="mt-1 min-h-10 w-full rounded-xl border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent"
+                    disabled={busy}
+                    required
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-[0.6875rem] font-bold text-fg-3">담당자</span>
+                  <select
+                    value={responseDraft.ownerAssignmentId}
+                    onChange={(event) => setResponseDraft((current) => current ? { ...current, ownerAssignmentId: event.target.value } : current)}
+                    className="mt-1 min-h-10 w-full rounded-xl border border-line bg-card px-3 py-2 text-sm text-fg"
+                    disabled={busy}
+                  >
+                    <option value="">담당자 미정</option>
+                    {aggregate.assignments
+                      .filter((assignment) => assignment.status === "active")
+                      .map((assignment) => (
+                        <option key={assignment.id} value={assignment.id}>
+                          {assignmentName(aggregate, assignment.id)}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="text-[0.6875rem] font-bold text-fg-3">실행 내용</span>
+                  <textarea
+                    value={responseDraft.description}
+                    onChange={(event) => setResponseDraft((current) => current ? { ...current, description: event.target.value } : current)}
+                    rows={3}
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent"
+                    disabled={busy}
+                    required
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-[0.6875rem] font-bold text-fg-3">완료 목표 시각</span>
+                  <input
+                    type="datetime-local"
+                    value={responseDraft.dueAt}
+                    onChange={(event) => setResponseDraft((current) => current ? { ...current, dueAt: event.target.value } : current)}
+                    className="mt-1 min-h-10 w-full rounded-xl border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent"
+                    disabled={busy}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-[0.6875rem] font-bold text-fg-3">연결 작업</span>
+                  <select
+                    value={responseDraft.linkedTaskId}
+                    onChange={(event) => setResponseDraft((current) => current ? { ...current, linkedTaskId: event.target.value } : current)}
+                    className="mt-1 min-h-10 w-full rounded-xl border border-line bg-card px-3 py-2 text-sm text-fg"
+                    disabled={busy}
+                  >
+                    <option value="">연결하지 않음</option>
+                    {risk.affectedTaskIds.map((taskId) => (
+                      <option key={taskId} value={taskId}>{taskLabel(aggregate, taskId)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="text-[0.6875rem] font-bold text-fg-3">예상 효과</span>
+                  <input
+                    value={responseDraft.expectedEffect}
+                    onChange={(event) => setResponseDraft((current) => current ? { ...current, expectedEffect: event.target.value } : current)}
+                    className="mt-1 min-h-10 w-full rounded-xl border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent"
+                    disabled={busy}
+                    required
+                  />
+                </label>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-accent/20 pt-3">
+                <p className="text-[0.6875rem] text-fg-3">
+                  저장 후 관리자가 승인하고 담당자가 실행을 시작합니다.
+                </p>
+                <button
+                  type="submit"
+                  className={buttonClass({ size: "sm" })}
+                  disabled={busy || !responseDraftValid}
+                >
+                  대응안 제안
+                </button>
+              </div>
+            </form>
+          ) : null}
           <div className="flex flex-wrap gap-2 border-t border-line pt-4">
             {risk.status === "open" || risk.status === "monitoring" ? <button type="button" className={buttonClass({ size: "sm" })} disabled={!canEdit || busy} onClick={() => void transition("mitigating", "대응을 시작합니다.")}>대응 시작</button> : null}
             {risk.status === "mitigating" || risk.status === "occurred" ? <button type="button" className={buttonClass({ size: "sm" })} disabled={!canEdit || busy || !trimmedReason} onClick={() => void transition("resolved", "")}>해결 확인</button> : null}
@@ -650,6 +845,8 @@ function RiskPolicyPanel({
     { key: "defaultReviewSlaHours", label: "기본 검수 응답", suffix: "시간" },
     { key: "minimumReadyBufferEpisodes", label: "최소 준비 버퍼", suffix: "회" },
     { key: "notificationCooldownHours", label: "알림 재전송 간격", suffix: "시간" },
+    { key: "autoOpenStableHours", label: "자동 생성 안정화", suffix: "시간" },
+    { key: "thresholdHysteresisPercent", label: "임계값 복귀 여유", suffix: "%" },
     { key: "autoResolveStableHours", label: "자동 해결 안정화", suffix: "시간" },
   ];
 
@@ -659,7 +856,7 @@ function RiskPolicyPanel({
       description="자동 오픈 기준, 안정화 시간, 알림 주기와 차단·작업량·검수·연재 버퍼 임계값을 조정합니다."
       action={<button type="button" className={buttonClass({ size: "sm" })} disabled={!canManage || saving || Boolean(validationError)} onClick={() => void save()}><SlidersHorizontal className="size-4" aria-hidden="true" /> 정책 저장</button>}
     >
-      <div className="mb-3 grid gap-3 sm:grid-cols-3">
+      <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="rounded-xl border border-line bg-panel p-3">
           <span className="text-xs font-bold text-fg">프로젝트 시간대</span>
           <input
@@ -693,6 +890,22 @@ function RiskPolicyPanel({
             <option value="critical">긴급만</option>
           </select>
         </label>
+        <label className="rounded-xl border border-line bg-panel p-3">
+          <span className="text-xs font-bold text-fg">자동 생성 최소 신뢰도</span>
+          <select
+            value={draft.autoOpenMinimumConfidence}
+            onChange={(event) => setDraft((current) => ({
+              ...current,
+              autoOpenMinimumConfidence: event.target.value as ProductionRiskPolicy["autoOpenMinimumConfidence"],
+            }))}
+            disabled={!canManage}
+            className="mt-2 w-full rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-fg"
+          >
+            <option value="low">낮음 이상</option>
+            <option value="medium">보통 이상</option>
+            <option value="high">높음만</option>
+          </select>
+        </label>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {fields.map((field) => (
@@ -701,7 +914,8 @@ function RiskPolicyPanel({
             <span className="mt-2 flex items-center gap-2">
               <input
                 type="number"
-                min={field.key === "minimumReadyBufferEpisodes" ? 0 : 1}
+                min={["minimumReadyBufferEpisodes", "autoOpenStableHours", "thresholdHysteresisPercent"].includes(field.key) ? 0 : 1}
+                max={field.key === "thresholdHysteresisPercent" ? 50 : undefined}
                 value={String(draft[field.key])}
                 onChange={(event) => setNumber(field.key, event.target.value)}
                 disabled={!canManage}
@@ -734,10 +948,10 @@ export function ProductionRiskWorkspace({
     [aggregate, currentNow],
   );
   const [searchParams, setSearchParams] = useSearchParams();
-  const [detailTab, setDetailTab] = useState<DetailTab>("overview");
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingRisk, setEditingRisk] = useState<ProductionRisk | null>(null);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
   const userId = useApp((state) => state.userId);
   const actorPartyId = aggregate.parties.find((party) => party.accountUserId === userId)?.id ?? null;
   const actorAssignment = aggregate.assignments.find((assignment) =>
@@ -745,16 +959,6 @@ export function ProductionRiskWorkspace({
     ?? (aggregate.projectId === "sample-project"
       ? aggregate.assignments.find((assignment) => assignment.roleType === "producer" && assignment.status === "active")
       : null);
-
-  const severityFilters = splitFilter(searchParams.get("severity")) as readonly ProductionRiskSeverity[];
-  const statusFilters = splitFilter(searchParams.get("status")) as readonly ProductionRiskStatus[];
-  const categoryFilters = splitFilter(searchParams.get("category")) as readonly ProductionRiskCategory[];
-  const sourceFilter = searchParams.get("source");
-  const episodeFilter = searchParams.get("episode");
-  const ownerFilter = searchParams.get("owner");
-  const viewMode = riskViewMode(searchParams.get("view"));
-  const search = searchParams.get("q")?.trim().toLocaleLowerCase("ko-KR") ?? "";
-  const selectedRiskId = searchParams.get("risk");
 
   const episodeOptions = useMemo(() => {
     const ordered = aggregate.episodePlans
@@ -770,49 +974,137 @@ export function ProductionRiskWorkspace({
     .filter((assignment) => assignment.status === "active")
     .slice()
     .sort((left, right) => assignmentName(aggregate, left.id).localeCompare(assignmentName(aggregate, right.id), "ko-KR")), [aggregate]);
+  const episodeFilterOptions = useMemo(() => [
+    { value: "project", label: "프로젝트 공통" },
+    ...episodeOptions.map((episodeId) => ({ value: episodeId, label: productionEpisodeLabel(aggregate, episodeId) })),
+  ], [aggregate, episodeOptions]);
+  const ownerFilterOptions = useMemo(() => [
+    { value: "unassigned", label: "담당자 미정" },
+    ...ownerOptions.map((assignment) => ({ value: assignment.id, label: assignmentName(aggregate, assignment.id) })),
+  ], [aggregate, ownerOptions]);
+  const ruleOptions = useMemo(() => [...new Set(evaluation.signals.map((signal) => signal.ruleKey))]
+    .sort((left, right) => (RULE_LABELS[left] ?? left).localeCompare(RULE_LABELS[right] ?? right, "ko-KR")), [evaluation.signals]);
+  const ruleFilterOptions = useMemo(() => ruleOptions.map((ruleKey) => ({
+    value: ruleKey,
+    label: RULE_LABELS[ruleKey] ?? ruleKey,
+  })), [ruleOptions]);
+  const urlOptions = useMemo(() => ({
+    episodeIds: episodeOptions,
+    ownerAssignmentIds: ownerOptions.map((assignment) => assignment.id),
+    ruleKeys: ruleOptions,
+    riskIds: evaluation.risks.map((risk) => risk.id),
+  }), [episodeOptions, evaluation.risks, ownerOptions, ruleOptions]);
+  const urlState = useMemo(
+    () => parseProductionRiskUrlState(searchParams, urlOptions),
+    [searchParams, urlOptions],
+  );
 
-  const filteredRisks = evaluation.risks.filter((risk) => {
+  useEffect(() => {
+    const normalized = normalizeProductionRiskSearchParams(searchParams, urlOptions);
+    if (normalized.toString() !== searchParams.toString()) {
+      setSearchParams(normalized, { replace: true });
+    }
+  }, [searchParams, setSearchParams, urlOptions]);
+
+  useEffect(() => {
+    if (urlState.selectedRiskId) setMobileDetailOpen(true);
+  }, [urlState.selectedRiskId]);
+
+  const search = urlState.search.toLocaleLowerCase("ko-KR");
+  const baseFilteredRisks = evaluation.risks.filter((risk) => {
     const signal = sourceSignal(evaluation.signals, risk);
-    const statusMatch = statusFilters.length > 0
-      ? statusFilters.includes(risk.status)
+    const statusMatch = urlState.statuses.length > 0
+      ? urlState.statuses.includes(risk.status)
       : ACTIVE_STATUSES.has(risk.status) && signal?.state !== "suppressed";
-    const episodeMatch = !episodeFilter
-      || episodeFilter === "all"
-      || (episodeFilter === "project" ? risk.affectedEpisodeIds.length === 0 : risk.affectedEpisodeIds.includes(episodeFilter));
-    const ownerMatch = !ownerFilter
-      || ownerFilter === "all"
-      || (ownerFilter === "unassigned" ? !risk.ownerAssignmentId : risk.ownerAssignmentId === ownerFilter);
+    const episodeMatch = urlState.episodeIds.length === 0 || urlState.episodeIds.some((episodeId) =>
+      episodeId === "project"
+        ? risk.affectedEpisodeIds.length === 0
+        : risk.affectedEpisodeIds.includes(episodeId));
+    const ownerMatch = urlState.ownerAssignmentIds.length === 0 || urlState.ownerAssignmentIds.some((assignmentId) =>
+      assignmentId === "unassigned"
+        ? !risk.ownerAssignmentId
+        : risk.ownerAssignmentId === assignmentId);
+    const ruleMatch = urlState.ruleKeys.length === 0
+      || risk.causeCodes.some((ruleKey) => urlState.ruleKeys.includes(ruleKey));
     return statusMatch
       && episodeMatch
       && ownerMatch
-      && (severityFilters.length === 0 || severityFilters.includes(risk.severity))
-      && (categoryFilters.length === 0 || categoryFilters.includes(risk.category))
-      && (!sourceFilter || sourceFilter === "all" || sourceFilter === risk.source)
+      && ruleMatch
+      && (urlState.severities.length === 0 || urlState.severities.includes(risk.severity))
+      && (urlState.categories.length === 0 || urlState.categories.includes(risk.category))
+      && (!urlState.source || urlState.source === risk.source)
       && (!search || `${risk.title} ${risk.description} ${risk.causeCodes.join(" ")}`.toLocaleLowerCase("ko-KR").includes(search));
   });
-  const selectedRisk = filteredRisks.find((risk) => risk.id === selectedRiskId)
+  const filteredRisks = urlState.matrixCell
+    ? baseFilteredRisks.filter((risk) =>
+      risk.probability === urlState.matrixCell?.probability
+      && risk.impact === urlState.matrixCell.impact)
+    : baseFilteredRisks;
+  const selectedRisk = filteredRisks.find((risk) => risk.id === urlState.selectedRiskId)
     ?? filteredRisks[0]
     ?? null;
   const selectedSignal = selectedRisk ? sourceSignal(evaluation.signals, selectedRisk) : null;
+  const viewMode = urlState.view;
 
-  const updateParam = (key: string, value: string | null) => {
-    const next = new URLSearchParams(searchParams);
-    const shouldDelete = !value || value === "all" || (key === "view" && value === "priority");
-    if (shouldDelete) next.delete(key);
-    else next.set(key, value);
-    if (key !== "risk") next.delete("risk");
-    setSearchParams(next, { replace: true });
+  const replaceUrlState = (
+    patch: Partial<ProductionRiskUrlState>,
+    options: { readonly clearSelection?: boolean } = {},
+  ) => {
+    const nextState: ProductionRiskUrlState = {
+      ...urlState,
+      ...patch,
+      selectedRiskId: options.clearSelection
+        ? null
+        : "selectedRiskId" in patch ? patch.selectedRiskId ?? null : urlState.selectedRiskId,
+      detailTab: options.clearSelection ? "overview" : patch.detailTab ?? urlState.detailTab,
+    };
+    setSearchParams(serializeProductionRiskUrlState(nextState, searchParams), { replace: true });
   };
 
   const selectView = (nextView: ProductionRiskViewMode) => {
-    updateParam("view", nextView);
+    replaceUrlState({
+      view: nextView,
+      matrixCell: nextView === "matrix" ? urlState.matrixCell : null,
+    });
     setMobileDetailOpen(false);
   };
 
   const selectRisk = (riskId: string) => {
-    updateParam("risk", riskId);
+    replaceUrlState({ selectedRiskId: riskId, detailTab: "overview" });
     setMobileDetailOpen(true);
-    setDetailTab("overview");
+  };
+
+  const selectMatrixCell = (cell: ProductionRiskMatrixCell | null) => {
+    const sameCell = cell
+      && urlState.matrixCell?.probability === cell.probability
+      && urlState.matrixCell.impact === cell.impact;
+    replaceUrlState({ matrixCell: sameCell ? null : cell }, { clearSelection: true });
+    setMobileDetailOpen(false);
+  };
+
+  const resetFilters = () => {
+    replaceUrlState({
+      search: "",
+      severities: [],
+      statuses: [],
+      categories: [],
+      source: null,
+      episodeIds: [],
+      ownerAssignmentIds: [],
+      ruleKeys: [],
+      matrixCell: null,
+    }, { clearSelection: true });
+    setMobileDetailOpen(false);
+  };
+
+  const copyShareUrl = async () => {
+    try {
+      if (!globalThis.navigator?.clipboard) throw new Error("clipboard unavailable");
+      await globalThis.navigator.clipboard.writeText(globalThis.location.href);
+      setShareStatus("현재 필터와 선택 상태가 포함된 주소를 복사했습니다.");
+    } catch {
+      setShareStatus("주소 복사를 지원하지 않는 환경입니다. 브라우저 주소창의 URL을 공유해 주세요.");
+    }
   };
 
   const refresh = async () => {
@@ -890,14 +1182,106 @@ export function ProductionRiskWorkspace({
         description="기본값은 현재 대응이 필요한 위험만 보여 줍니다. 종료된 항목은 상태 필터에서 선택합니다."
         action={<Filter className="size-4 text-fg-3" aria-hidden="true" />}
       >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
-          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">검색</span><input value={searchParams.get("q") ?? ""} onChange={(event) => updateParam("q", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg outline-none focus:border-accent" placeholder="제목·원인 검색" /></label>
-          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">위험도</span><select value={searchParams.get("severity") ?? "all"} onChange={(event) => updateParam("severity", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체</option><option value="critical">긴급</option><option value="high">높음</option><option value="warning">주의</option><option value="watch">관찰</option></select></label>
-          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">상태</span><select value={searchParams.get("status") ?? "all"} onChange={(event) => updateParam("status", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">활성 위험</option>{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">유형</span><select value={searchParams.get("category") ?? "all"} onChange={(event) => updateParam("category", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체</option>{Object.entries(CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">등록 방식</span><select value={searchParams.get("source") ?? "all"} onChange={(event) => updateParam("source", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체</option><option value="automatic">자동 감지</option><option value="manual">직접 등록</option></select></label>
-          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">회차</span><select aria-label="회차 필터" value={episodeFilter ?? "all"} onChange={(event) => updateParam("episode", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체 회차</option><option value="project">프로젝트 공통</option>{episodeOptions.map((episodeId) => <option key={episodeId} value={episodeId}>{productionEpisodeLabel(aggregate, episodeId)}</option>)}</select></label>
-          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">담당자</span><select aria-label="위험 담당자 필터" value={ownerFilter ?? "all"} onChange={(event) => updateParam("owner", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체 담당자</option><option value="unassigned">담당자 미정</option>{ownerOptions.map((assignment) => <option key={assignment.id} value={assignment.id}>{assignmentName(aggregate, assignment.id)}</option>)}</select></label>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <label className="block">
+            <span className="text-[0.6875rem] font-bold text-fg-3">검색</span>
+            <input
+              value={urlState.search}
+              onChange={(event) => replaceUrlState({ search: event.target.value }, { clearSelection: true })}
+              className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg outline-none focus:border-accent"
+              placeholder="제목·원인 검색"
+            />
+          </label>
+          <div>
+            <span className="text-[0.6875rem] font-bold text-fg-3">위험도</span>
+            <ProductionRiskMultiFilter
+              className="mt-1"
+              label="위험도"
+              options={Object.entries(SEVERITY_LABELS).map(([value, label]) => ({ value, label }))}
+              selected={urlState.severities}
+              onChange={(values) => replaceUrlState({ severities: values as readonly ProductionRiskSeverity[] }, { clearSelection: true })}
+            />
+          </div>
+          <div>
+            <span className="text-[0.6875rem] font-bold text-fg-3">상태</span>
+            <ProductionRiskMultiFilter
+              className="mt-1"
+              label="상태"
+              emptyLabel="활성 위험"
+              options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))}
+              selected={urlState.statuses}
+              onChange={(values) => replaceUrlState({ statuses: values as readonly ProductionRiskStatus[] }, { clearSelection: true })}
+            />
+          </div>
+          <div>
+            <span className="text-[0.6875rem] font-bold text-fg-3">유형</span>
+            <ProductionRiskMultiFilter
+              className="mt-1"
+              label="유형"
+              options={Object.entries(CATEGORY_LABELS).map(([value, label]) => ({ value, label }))}
+              selected={urlState.categories}
+              onChange={(values) => replaceUrlState({ categories: values as readonly ProductionRiskCategory[] }, { clearSelection: true })}
+            />
+          </div>
+          <label className="block">
+            <span className="text-[0.6875rem] font-bold text-fg-3">등록 방식</span>
+            <select
+              value={urlState.source ?? "all"}
+              onChange={(event) => replaceUrlState({
+                source: event.target.value === "all" ? null : event.target.value as "manual" | "automatic",
+              }, { clearSelection: true })}
+              className="mt-1 min-h-10 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"
+            >
+              <option value="all">전체</option>
+              <option value="automatic">자동 감지</option>
+              <option value="manual">직접 등록</option>
+            </select>
+          </label>
+          <div>
+            <span className="text-[0.6875rem] font-bold text-fg-3">회차</span>
+            <ProductionRiskMultiFilter
+              className="mt-1"
+              label="회차"
+              options={episodeFilterOptions}
+              selected={urlState.episodeIds}
+              onChange={(values) => replaceUrlState({ episodeIds: values }, { clearSelection: true })}
+            />
+          </div>
+          <div>
+            <span className="text-[0.6875rem] font-bold text-fg-3">담당자</span>
+            <ProductionRiskMultiFilter
+              className="mt-1"
+              label="담당자"
+              options={ownerFilterOptions}
+              selected={urlState.ownerAssignmentIds}
+              onChange={(values) => replaceUrlState({ ownerAssignmentIds: values }, { clearSelection: true })}
+            />
+          </div>
+          <div>
+            <span className="text-[0.6875rem] font-bold text-fg-3">감지 규칙</span>
+            <ProductionRiskMultiFilter
+              className="mt-1"
+              label="감지 규칙"
+              options={ruleFilterOptions}
+              selected={urlState.ruleKeys}
+              onChange={(values) => replaceUrlState({ ruleKeys: values }, { clearSelection: true })}
+            />
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+          <button
+            type="button"
+            className={buttonClass({ variant: "ghost", size: "sm" })}
+            onClick={resetFilters}
+          >
+            필터 초기화
+          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[0.6875rem] text-fg-3" aria-live="polite">{shareStatus}</span>
+            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} onClick={() => void copyShareUrl()}>
+              <Copy className="size-4" aria-hidden="true" /> 보기 주소 복사
+            </button>
+          </div>
         </div>
       </Section>
 
@@ -942,12 +1326,14 @@ export function ProductionRiskWorkspace({
             {viewMode === "matrix" ? (
               <ProductionRiskMatrixView
                 aggregate={aggregate}
-                risks={filteredRisks}
+                risks={baseFilteredRisks}
                 selectedRiskId={selectedRisk?.id ?? null}
                 onSelect={selectRisk}
+                selectedCell={urlState.matrixCell}
+                onSelectCell={selectMatrixCell}
               />
             ) : null}
-            {filteredRisks.length === 0 ? (
+            {baseFilteredRisks.length === 0 ? (
               <div className="rounded-xl border border-dashed border-line p-8 text-center">
                 <CheckCircle2 className="mx-auto size-8 text-good" aria-hidden="true" />
                 <p className="mt-3 text-sm font-black text-fg">조건에 맞는 위험이 없습니다</p>
@@ -963,14 +1349,20 @@ export function ProductionRiskWorkspace({
               aggregate={aggregate}
               risk={selectedRisk}
               signal={selectedSignal}
-              tab={detailTab}
-              setTab={setDetailTab}
+              tab={urlState.detailTab}
+              setTab={(tab) => replaceUrlState({
+                selectedRiskId: selectedRisk.id,
+                detailTab: tab,
+              })}
               execute={execute}
               canEdit={canEdit}
               canManage={canManage}
               actorAssignmentId={actorAssignment?.id ?? null}
               onEditRisk={() => openEditRisk(selectedRisk)}
-              onBack={() => setMobileDetailOpen(false)}
+              onBack={() => {
+                setMobileDetailOpen(false);
+                replaceUrlState({ selectedRiskId: null, detailTab: "overview" });
+              }}
             />
           ) : (
             <div className="rounded-2xl border border-dashed border-line bg-card p-10 text-center">

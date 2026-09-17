@@ -33,6 +33,59 @@ function aggregate(): ProductionProjectAggregate {
   });
 }
 
+
+function manualRisk(
+  id: string,
+  causeCode: string,
+  affectedEpisodeIds: readonly string[],
+  ownerAssignmentId: string | null,
+): ProductionProjectAggregate["risks"][number] {
+  return {
+    id,
+    projectId: "project-1",
+    revision: 1,
+    scope: affectedEpisodeIds[0]
+      ? episodeScope("project-1", affectedEpisodeIds[0])
+      : { kind: "project", id: "project-1", ancestors: [] },
+    category: "schedule",
+    source: "manual",
+    signalIds: [],
+    title: `${causeCode} 위험`,
+    description: `${causeCode} 조건을 확인합니다.`,
+    probability: 3,
+    impact: 4,
+    exposureScore: 12,
+    severity: "warning",
+    priorityScore: 48,
+    ownerAssignmentId,
+    causeCodes: [causeCode],
+    earlySignals: [],
+    mitigation: "일정을 조정합니다.",
+    contingency: "범위를 조정합니다.",
+    trigger: "테스트 조건",
+    affectedTaskIds: [],
+    affectedEpisodeIds,
+    affectedMilestoneIds: [],
+    baselineDueAt: null,
+    forecastDueAt: null,
+    varianceHours: null,
+    status: "open",
+    dueAt: null,
+    responseDueAt: null,
+    nextReviewAt: null,
+    acceptedReason: null,
+    dismissedReason: null,
+    resolutionSummary: null,
+    detectedAt: at,
+    lastEvaluatedAt: at,
+    occurredAt: null,
+    resolvedAt: null,
+    closedAt: null,
+    createdAt: at,
+    updatedAt: at,
+  };
+}
+
 const externalReviewToken = "a".repeat(64);
 
 function aggregateWithExternalReview(): ProductionProjectAggregate {
@@ -1107,6 +1160,117 @@ describe("ProductionCollaborationService", () => {
     )).rejects.toMatchObject({ status: 404 });
   });
 
+
+  it("applies multi-value episode, owner and detection-rule filters to risk queries", async () => {
+    const base = aggregate();
+    const ownerAssignmentId = base.assignments[0]!.id;
+    const current: ProductionProjectAggregate = {
+      ...base,
+      risks: [
+        manualRisk("risk-overdue", "task.overdue", ["episode-1"], ownerAssignmentId),
+        manualRisk("risk-forecast", "task.forecast-slip", [], null),
+      ],
+    };
+    repository.getProject.mockResolvedValue({
+      aggregate: current,
+      access: {
+        view: true,
+        comment: true,
+        edit: true,
+        manage: true,
+        owner: true,
+        role: "owner",
+      },
+    });
+
+    const combined = await service().getRisks("owner-1", "project-1", {
+      status: "open",
+      severity: "warning",
+      category: "schedule",
+      source: "manual",
+      episodeId: "episode-1,project",
+      ownerAssignmentId: `${ownerAssignmentId},unassigned`,
+      ruleKey: "task.overdue,task.forecast-slip",
+      q: "",
+      limit: 50,
+    });
+    expect(combined.items.map((item) => item.risk.id).sort()).toEqual([
+      "risk-forecast",
+      "risk-overdue",
+    ]);
+
+    const overdueOnly = await service().getRisks("owner-1", "project-1", {
+      status: "open",
+      severity: "warning",
+      category: "schedule",
+      source: "manual",
+      episodeId: "episode-1,project",
+      ownerAssignmentId: `${ownerAssignmentId},unassigned`,
+      ruleKey: "task.overdue,missing-rule",
+      q: "",
+      limit: 50,
+    });
+    expect(overdueOnly.items.map((item) => item.risk.id)).toEqual(["risk-overdue"]);
+  });
+
+  it("rejects lifecycle-field tampering through the response upsert command", async () => {
+    const base = aggregate();
+    const ownerAssignmentId = base.assignments[0]!.id;
+    const risk = manualRisk("risk-response-parent", "manual", [], ownerAssignmentId);
+    const response = {
+      id: "risk-response-tamper",
+      projectId: base.projectId,
+      riskId: risk.id,
+      revision: 1,
+      strategy: "mitigate" as const,
+      actionType: "split-task" as const,
+      title: "작업 분할",
+      description: "선화 작업을 나눕니다.",
+      ownerAssignmentId,
+      dueAt: null,
+      linkedTaskId: null,
+      linkedChangeRequestId: null,
+      linkedChangeOrderId: null,
+      expectedEffect: "예상 지연 감소",
+      actualEffect: null,
+      cancellationReason: null,
+      status: "proposed" as const,
+      approvedAt: null,
+      startedAt: null,
+      completedAt: null,
+      cancelledAt: null,
+      createdAt: at,
+      updatedAt: at,
+    };
+    const current: ProductionProjectAggregate = {
+      ...base,
+      risks: [risk],
+      riskResponses: [response],
+    };
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current, {
+      view: true,
+      comment: true,
+      edit: true,
+      manage: true,
+      owner: true,
+      role: "owner",
+    }));
+
+    await expect(service().executeCommand("owner-1", base.projectId, {
+      expectedRevision: 0,
+      mutationId: "15151515-1515-4515-8515-151515151515",
+      command: {
+        type: "upsert-risk-response",
+        response: {
+          ...response,
+          revision: 2,
+          approvedAt: "2026-09-15T13:00:00.000Z",
+          updatedAt: "2026-09-15T13:00:00.000Z",
+        },
+      },
+    })).rejects.toMatchObject({ status: 400 });
+  });
+
   it("audits risk response transitions and requires manage capability for approval", async () => {
     const base = aggregate();
     const ownerAssignmentId = base.assignments[0]!.id;
@@ -1158,6 +1322,7 @@ describe("ProductionCollaborationService", () => {
         id: "risk-response-test",
         projectId: "project-1",
         riskId: "risk-test",
+        revision: 1,
         strategy: "mitigate",
         actionType: "split-task",
         title: "작업 분할",
@@ -1169,9 +1334,14 @@ describe("ProductionCollaborationService", () => {
         linkedChangeOrderId: null,
         expectedEffect: "예상 지연 감소",
         actualEffect: null,
+        cancellationReason: null,
         status: "proposed",
-        createdAt: at,
+        approvedAt: null,
+        startedAt: null,
         completedAt: null,
+        cancelledAt: null,
+        createdAt: at,
+        updatedAt: at,
       }],
     };
     repository.mutateProject.mockImplementation(async (input) => {
@@ -1189,6 +1359,8 @@ describe("ProductionCollaborationService", () => {
         responseId: "risk-response-test",
         toStatus: "approved",
         actualEffect: null,
+        reason: null,
+        expectedResponseRevision: 1,
       },
     });
 
@@ -1198,6 +1370,19 @@ describe("ProductionCollaborationService", () => {
       targetType: "risk-response",
       targetId: "risk-response-test",
     });
+
+    await expect(service().executeCommand("owner-1", "project-1", {
+      expectedRevision: 0,
+      mutationId: "14141414-1414-4414-8414-141414141414",
+      command: {
+        type: "transition-risk-response",
+        responseId: "risk-response-test",
+        toStatus: "approved",
+        actualEffect: null,
+        reason: null,
+        expectedResponseRevision: 99,
+      },
+    })).rejects.toMatchObject({ status: 409 });
   });
 
 });

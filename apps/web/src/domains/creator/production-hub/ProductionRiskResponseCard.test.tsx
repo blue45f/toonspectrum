@@ -15,6 +15,7 @@ function response(status: ProductionRiskResponse["status"]): ProductionRiskRespo
     id: "risk-response:test",
     projectId: "sample-project",
     riskId: "risk:test",
+    revision: 3,
     strategy: "mitigate",
     actionType: "split-task",
     title: "작업 분할",
@@ -26,9 +27,14 @@ function response(status: ProductionRiskResponse["status"]): ProductionRiskRespo
     linkedChangeOrderId: null,
     expectedEffect: "예상 지연 8시간 감소",
     actualEffect: null,
+    cancellationReason: null,
     status,
-    createdAt: "2026-09-17T09:00:00.000Z",
+    approvedAt: null,
+    startedAt: status === "in-progress" ? "2026-09-17T10:00:00.000Z" : null,
     completedAt: null,
+    cancelledAt: null,
+    createdAt: "2026-09-17T09:00:00.000Z",
+    updatedAt: "2026-09-17T10:00:00.000Z",
   };
 }
 
@@ -46,6 +52,7 @@ describe("ProductionRiskResponseCard", () => {
     );
 
     expect(screen.getByRole("button", { name: "승인" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "대응 시작" })).toBeNull();
     const cancel = screen.getByRole("button", { name: "취소" }) as HTMLButtonElement;
     expect(cancel.disabled).toBe(true);
     fireEvent.change(screen.getByPlaceholderText(/완료 효과나 취소 사유/u), {
@@ -58,7 +65,9 @@ describe("ProductionRiskResponseCard", () => {
       expect.objectContaining({
         type: "transition-risk-response",
         toStatus: "cancelled",
-        actualEffect: "일정 재기준화로 별도 대응이 필요하지 않습니다.",
+        actualEffect: null,
+        reason: "일정 재기준화로 별도 대응이 필요하지 않습니다.",
+        expectedResponseRevision: 3,
       }),
       expect.any(String),
     ));
@@ -91,6 +100,8 @@ describe("ProductionRiskResponseCard", () => {
         type: "transition-risk-response",
         toStatus: "completed",
         actualEffect: "실제 지연을 6시간 줄였습니다.",
+        reason: null,
+        expectedResponseRevision: 3,
       }),
       expect.any(String),
     ));

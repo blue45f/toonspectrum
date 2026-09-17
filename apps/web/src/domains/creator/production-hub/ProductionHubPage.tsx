@@ -443,10 +443,11 @@ function reduceDemoCommand(
       return { ...base, riskResponses: replaceById(aggregate.riskResponses, command.response) };
     case "transition-risk-response": {
       const response = aggregate.riskResponses.find((entry) => entry.id === command.responseId);
-      if (!response) return aggregate;
+      if (!response || response.revision !== command.expectedResponseRevision) return aggregate;
       const next = transitionProductionRiskResponse(response, command.toStatus, {
         at: new Date().toISOString(),
         actualEffect: command.actualEffect,
+        reason: command.reason,
       });
       return { ...base, riskResponses: replaceById(aggregate.riskResponses, next) };
     }

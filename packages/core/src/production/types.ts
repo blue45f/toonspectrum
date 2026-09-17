@@ -988,7 +988,10 @@ export interface ProductionRiskPolicy {
   readonly minimumReadyBufferEpisodes: number;
   readonly autoOpenSeverity: "warning" | "high" | "critical";
   readonly notificationCooldownHours: number;
+  readonly autoOpenStableHours: number;
+  readonly thresholdHysteresisPercent: number;
   readonly autoResolveStableHours: number;
+  readonly autoOpenMinimumConfidence: ProductionRiskConfidence;
   readonly revision: number;
   readonly updatedAt: string;
 }
@@ -1047,6 +1050,7 @@ export interface ProductionRiskResponse {
   readonly id: string;
   readonly projectId: string;
   readonly riskId: string;
+  readonly revision: number;
   readonly strategy: "avoid" | "mitigate" | "transfer" | "accept" | "escalate";
   readonly actionType:
     | "assign"
@@ -1068,9 +1072,14 @@ export interface ProductionRiskResponse {
   readonly linkedChangeOrderId: string | null;
   readonly expectedEffect: string;
   readonly actualEffect: string | null;
+  readonly cancellationReason: string | null;
   readonly status: ProductionRiskResponseStatus;
-  readonly createdAt: string;
+  readonly approvedAt: string | null;
+  readonly startedAt: string | null;
   readonly completedAt: string | null;
+  readonly cancelledAt: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
 }
 
 export interface ProductionRiskAssessment {
