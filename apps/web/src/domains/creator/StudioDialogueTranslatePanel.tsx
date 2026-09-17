@@ -40,6 +40,7 @@ import {
   type StudioLocalizationQaDimensionSection,
 } from "./StudioLocalizationQaReport";
 
+import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
 import { cx } from "@/shared/lib/cx";
 
 /**
@@ -460,19 +461,20 @@ export function StudioDialogueTranslatePanel({
             />
           </div>
 
-          {!configured && (
-            <p className="rounded-lg border border-dashed border-line px-2 py-2 text-[0.66rem] leading-relaxed text-fg-4">
-              로그인하면 자동 무료 AI를 먼저 사용합니다. 사용할 수 있는 무료 경로가 없으면 통합 AI 설정에서 개인 무료 키 또는 로컬 AI를 연결하세요.
-            </p>
-          )}
-          {error && (
-            <p
-              role="alert"
-              className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-1.5 text-[0.66rem] leading-relaxed text-bad"
-            >
-              {error}
-            </p>
-          )}
+          {!configured ? (
+            <AiRecoveryNotice
+              code="not_configured"
+              message="번역 초안은 유지됩니다. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요."
+              compact
+            />
+          ) : null}
+          {error ? (
+            <AiRecoveryNotice
+              message={error}
+              onRetry={canGenerate ? onGenerate : undefined}
+              compact
+            />
+          ) : null}
           {busy && progress && (
             <p role="status" className="flex items-center gap-1.5 text-[0.66rem] text-fg-3">
               <Loader2 size={11} className="animate-spin text-accent" aria-hidden />
