@@ -63,13 +63,17 @@ export function resolveStudioInteractiveThreeDSurfaceAdmission({
     });
   }
 
-  // Canvas and non-3D routes retain the legacy modal behavior while a route upgrade is pending.
-  // Character Shaper and the legacy poser share the same VRM runtime, so Shaper remains the
-  // deterministic winner if stale state exists outside a routed 3D surface.
-  return {
-    bg3dOpen,
-    characterShaperOpen,
-    mannequinPoserOpen,
-    poserVrmOpen: poserVrmOpen && !characterShaperOpen,
-  };
+  // Canvas and non-3D routes can briefly observe multiple open flags while a route upgrade is
+  // pending. Admit exactly one renderer even in that transition frame. Mannequin is route-less,
+  // then the two VRM surfaces, then BG3D; a routed owner will take precedence on the next render.
+  if (mannequinPoserOpen) {
+    return { ...CLOSED_INTERACTIVE_3D_SURFACES, mannequinPoserOpen: true };
+  }
+  if (characterShaperOpen) {
+    return { ...CLOSED_INTERACTIVE_3D_SURFACES, characterShaperOpen: true };
+  }
+  if (poserVrmOpen) {
+    return { ...CLOSED_INTERACTIVE_3D_SURFACES, poserVrmOpen: true };
+  }
+  return { ...CLOSED_INTERACTIVE_3D_SURFACES, bg3dOpen };
 }
