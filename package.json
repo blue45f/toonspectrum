@@ -198,7 +198,13 @@
     "update:studio-publish-goldens": "tsx scripts/verify-studio-publish-package-goldens.mts --write",
     "verify:studio-publish-goldens": "tsx scripts/verify-studio-publish-package-goldens.mts && vitest run scripts/verify-studio-publish-package-goldens.test.ts",
     "verify:studio-publishing-lifecycle": "node scripts/verify-studio-publishing-lifecycle.mjs --run --receipt qa-results/studio-publishing-lifecycle/receipt.json && node --test scripts/verify-studio-publishing-lifecycle.test.mjs",
-    "verify:studio-operational-validation": "node scripts/verify-studio-operational-validation.mjs --run --receipt qa-results/studio-operational-validation/receipt.json && node --test scripts/verify-studio-operational-validation.test.mjs"
+    "verify:studio-operational-validation": "node scripts/verify-studio-operational-validation.mjs --run --receipt qa-results/studio-operational-validation/receipt.json && node --test scripts/verify-studio-operational-validation.test.mjs",
+    "mobile:doctor": "cap doctor",
+    "mobile:sync": "cap sync",
+    "mobile:assets": "capacitor-assets generate --android --iconBackgroundColor '#10182d' --iconBackgroundColorDark '#10182d' --splashBackgroundColor '#10182d' --splashBackgroundColorDark '#10182d' && capacitor-assets generate --ios --iconBackgroundColor '#10182d' --iconBackgroundColorDark '#10182d' --splashBackgroundColor '#10182d' --splashBackgroundColorDark '#10182d'",
+    "mobile:android:build": "cap sync android && cd android && ./gradlew assembleDebug",
+    "mobile:android:install": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
+    "mobile:ios:prepare": "cap sync ios"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",
@@ -277,7 +283,15 @@
     "xatlasjs": "0.2.0",
     "yjs": "^13.6.31",
     "zod": "^4.4.3",
-    "zustand": "^5.0.14"
+    "zustand": "^5.0.14",
+    "@capacitor/android": "8.5.2",
+    "@capacitor/app": "8.1.1",
+    "@capacitor/browser": "8.0.4",
+    "@capacitor/core": "8.5.2",
+    "@capacitor/ios": "8.5.2",
+    "@capacitor/keyboard": "8.0.5",
+    "@capacitor/splash-screen": "8.0.2",
+    "@capacitor/status-bar": "8.0.3"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
@@ -327,7 +341,9 @@
     "vitest": "4.1.11",
     "wesl": "^0.7.28",
     "wrangler": "4.116.0",
-    "yaml": "2.9.0"
+    "yaml": "2.9.0",
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.2"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
