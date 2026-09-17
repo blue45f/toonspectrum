@@ -1,6 +1,7 @@
 import { STUDIO_I18N_NAMESPACES } from "@/shared/lib/i18n-asset-manifest";
 import {
   getLang,
+  registerI18nEnglishSourceEntries,
   registerI18nLocaleEntries,
   triggerTranslationBundleUpdate,
 } from "@/shared/lib/i18n-core";
@@ -197,7 +198,11 @@ export async function loadStudioI18nNamespaces(
   }
 
   if (Object.keys(merged).length > 0) {
-    registerI18nLocaleEntries(assetLocale, merged);
+    if (assetLocale === "en") {
+      registerI18nEnglishSourceEntries(merged);
+    } else {
+      registerI18nLocaleEntries(assetLocale, merged);
+    }
     const normalizedRequestedLocale = normalizeLocaleCode(requestedLocale);
     if (
       normalizedRequestedLocale

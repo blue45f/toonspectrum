@@ -1,9 +1,14 @@
 import { ADMIN_I18N_NAMESPACES } from "@/shared/lib/i18n-asset-manifest";
-import { getLocaleCandidates, registerI18nLocaleEntries, useI18n } from "@/shared/lib/i18n";
+import {
+  getLocaleCandidates,
+  registerI18nEnglishSourceEntries,
+  registerI18nLocaleEntries,
+  useI18n,
+} from "@/shared/lib/i18n";
 import { adminI18nBuiltins } from "./admin-i18n-builtins";
 
 registerI18nLocaleEntries("ko", adminI18nBuiltins.ko);
-registerI18nLocaleEntries("en", adminI18nBuiltins.en);
+registerI18nEnglishSourceEntries(adminI18nBuiltins.en);
 
 const pendingLoads = new Map<string, Promise<void>>();
 

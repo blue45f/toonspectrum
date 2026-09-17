@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatMissingTranslationKey,
+  registerI18nEnglishSourceEntries,
   registerI18nLocaleEntries,
   resolveTranslation,
   resolveTranslationForDisplay,
@@ -33,17 +34,27 @@ describe("sitewide i18n integrity", () => {
     expect(protectedSource.restore("Derniers jours · au __TSI18N_1__")).toBeNull();
   });
 
-  it("discovers untranslated keys registered later by lazy Admin/Studio route dictionaries", () => {
+  it("discovers untranslated keys explicitly registered by lazy Admin/Studio route dictionaries", () => {
     const key = "admin.siteAudit.syntheticRouteLabel";
     const english = "Last {days} days";
 
-    registerI18nLocaleEntries("en", { [key]: english });
+    registerI18nEnglishSourceEntries({ [key]: english });
     registerI18nLocaleEntries("ja", { [key]: english });
 
     expect(getRuntimeTranslationPendingKeys("ja")).toContain(key);
 
     registerI18nLocaleEntries("ja", { [key]: "直近 {days} 日" });
     expect(getRuntimeTranslationPendingKeys("ja")).not.toContain(key);
+  });
+
+  it("does not translate English reference data unless its route marks the key as user-visible", () => {
+    const key = "reference.siteAudit.internalOnlyLabel";
+    const english = "Internal reference only";
+
+    registerI18nLocaleEntries("en", { [key]: english });
+    registerI18nLocaleEntries("fr", { [key]: english });
+
+    expect(getRuntimeTranslationPendingKeys("fr")).not.toContain(key);
   });
 
   it("does not auto-translate the English and Korean source/fallback locales", () => {

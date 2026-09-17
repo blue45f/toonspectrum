@@ -5,6 +5,7 @@ import {
 import {
   DICT,
   FALLBACK_LANG,
+  getI18nRuntimeTranslationSourceKeys,
   triggerTranslationBundleUpdate,
 } from "./i18n-core";
 import {
@@ -80,7 +81,7 @@ function shouldAutoTranslateLocale(locale: string): boolean {
   const root = normalized.split("-")[0];
   // Coverage is a key-level property, not a locale-level property. Japanese/Chinese can be highly
   // translated in the app shell while a newly added Admin/Studio namespace is still English. Skip
-  // only the two source/fallback languages and let getKeysNeedingAutomaticTranslation decide each
+  // only the two source/fallback languages and let getRuntimeTranslationPendingKeys decide each
   // individual key so authored translations are never overwritten.
   return root !== FALLBACK_LANG && root !== RUNTIME_TRANSLATION_SOURCE;
 }
@@ -276,9 +277,10 @@ function getAttemptedKeys(locale: string): Set<string> {
 }
 
 /**
- * Returns every currently registered English source key that still needs automatic translation.
- * DICT.en grows as lazy Admin/Studio namespaces load, so this must be computed dynamically rather
- * than frozen to the app-shell dictionary at module evaluation time.
+ * Returns every explicitly registered English source key that still needs automatic translation.
+ * App-shell keys are registered at bootstrap; lazy Admin/Studio loaders opt their English source
+ * dictionaries in when those route surfaces are loaded. DICT can contain test/reference data that
+ * is not user-visible, so translating every DICT.en entry would create unnecessary external calls.
  */
 export function getRuntimeTranslationPendingKeys(locale: string): readonly string[] {
   const normalized = normalizeLocaleCode(locale);
@@ -289,7 +291,7 @@ export function getRuntimeTranslationPendingKeys(locale: string): readonly strin
   const runtimeBundle = runtimeTranslationBundles.get(normalized);
   const attempted = getAttemptedKeys(normalized);
 
-  return Object.keys(sourceDictionary).filter((key) => {
+  return getI18nRuntimeTranslationSourceKeys().filter((key) => {
     const source = sourceDictionary[key];
     if (!source || !/[\p{L}\p{N}]/u.test(source)) return false;
     if (runtimeBundle?.[key] !== undefined || attempted.has(key)) return false;
