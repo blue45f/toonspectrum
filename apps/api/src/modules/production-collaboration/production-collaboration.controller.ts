@@ -20,6 +20,8 @@ import {
   ProductionExternalReviewQueryDto,
   ProductionProjectByWorkParamsDto,
   ProductionProjectParamsDto,
+  ProductionRiskParamsDto,
+  ProductionRiskQueryDto,
   SubmitProductionExternalReviewDto,
 } from "./production-collaboration.dto";
 import { ProductionCollaborationService } from "./production-collaboration.service";
@@ -64,6 +66,28 @@ export class ProductionCollaborationController {
   @Header("Cache-Control", "private, no-store, max-age=0")
   getPersonalInbox(@Headers("x-user-id") userId?: string) {
     return this.service.getPersonalInbox(authenticatedProductionUserId(userId));
+  }
+
+  @Get("/projects/:projectId/risks")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  getRisks(
+    @Param(new ZodValidationPipe(ProductionProjectParamsDto))
+    params: ProductionProjectParamsDto,
+    @Query(new ZodValidationPipe(ProductionRiskQueryDto))
+    query: ProductionRiskQueryDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.getRisks(authenticatedProductionUserId(userId), params.projectId, query);
+  }
+
+  @Get("/projects/:projectId/risks/:riskId")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  getRisk(
+    @Param(new ZodValidationPipe(ProductionRiskParamsDto))
+    params: ProductionRiskParamsDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.getRisk(authenticatedProductionUserId(userId), params.projectId, params.riskId);
   }
 
   @Get("/projects/:projectId")

@@ -781,19 +781,57 @@ export function predictiveSignalToProductionRisk(
   signalEntry: ProductionRiskSignal,
   projectId: string,
 ): ProductionRisk {
-  return {
+  const now = new Date().toISOString();
+  const exposureScore = signalEntry.probability * signalEntry.impactLevel;
+  const forecastDueAt = signalEntry.dueAt && signalEntry.projectedDelayDays
+    ? new Date(Date.parse(signalEntry.dueAt) + signalEntry.projectedDelayDays * DAY_MS).toISOString()
+    : signalEntry.dueAt;
+  const severity = signalEntry.severity === "critical"
+    ? "critical"
+    : signalEntry.severity === "high"
+      ? "high"
+      : signalEntry.severity === "medium" ? "warning" : "watch";
+
+  return Object.freeze({
     id: signalEntry.registrationRiskId,
     projectId,
+    revision: 1,
     scope: signalEntry.scope,
     category: signalEntry.category,
+    source: "manual",
+    signalIds: Object.freeze([]),
     title: `[예측] ${signalEntry.title}`,
     description: `${signalEntry.summary} 예상 영향: ${signalEntry.impact} 근거: ${signalEntry.causes.join(" / ")}`,
     probability: signalEntry.probability,
     impact: signalEntry.impactLevel,
+    exposureScore,
+    severity,
+    priorityScore: Math.max(0, Math.min(100, signalEntry.score)),
     ownerAssignmentId: signalEntry.ownerAssignmentId,
+    causeCodes: Object.freeze([`predictive:${signalEntry.kind}`]),
+    earlySignals: Object.freeze([...signalEntry.causes]),
     mitigation: signalEntry.mitigations.join(" / "),
+    contingency: signalEntry.impact,
     trigger: `예측 점수 ${signalEntry.score}점 · 신뢰도 ${signalEntry.confidence} · ${signalEntry.kind}`,
+    affectedTaskIds: Object.freeze(signalEntry.taskId ? [signalEntry.taskId] : []),
+    affectedEpisodeIds: Object.freeze(signalEntry.episodeId ? [signalEntry.episodeId] : []),
+    affectedMilestoneIds: Object.freeze([]),
+    baselineDueAt: signalEntry.dueAt,
+    forecastDueAt,
+    varianceHours: signalEntry.projectedDelayDays === null ? null : signalEntry.projectedDelayDays * 24,
     status: "open",
     dueAt: signalEntry.dueAt,
-  };
+    responseDueAt: signalEntry.dueAt,
+    nextReviewAt: null,
+    acceptedReason: null,
+    dismissedReason: null,
+    resolutionSummary: null,
+    detectedAt: now,
+    lastEvaluatedAt: now,
+    occurredAt: null,
+    resolvedAt: null,
+    closedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  });
 }

@@ -305,7 +305,15 @@ const ProductionTaskSchema = z.object({
   inputRevisionRefs: z.array(ProductionRevisionRefSchema).max(10_000),
   outputDeliverableIds: z.array(IdentitySchema).max(10_000),
   dependencyTaskIds: z.array(IdentitySchema).max(10_000),
+  plannedStartAt: NullableIsoDateTimeSchema.optional(),
+  baselineDueAt: NullableIsoDateTimeSchema.optional(),
   dueAt: NullableIsoDateTimeSchema,
+  statusChangedAt: IsoDateTimeSchema.optional(),
+  startedAt: NullableIsoDateTimeSchema.optional(),
+  completedAt: NullableIsoDateTimeSchema.optional(),
+  progressPercent: z.number().min(0).max(100).nullable().optional(),
+  remainingEstimateHours: z.number().min(0).max(100_000).nullable().optional(),
+  linkedRiskIds: z.array(IdentitySchema).max(10_000).optional(),
   estimateHours: EstimateHoursSchema.nullable(),
   completionCriteria: z.array(HumanTextSchema).max(1_000),
   sourceAgreementMilestoneId: IdentitySchema.nullable(),
@@ -772,20 +780,101 @@ const AssetRequirementSchema = z.object({
   status: z.enum(["identified", "sourcing", "ready", "blocked", "cancelled"]),
 }).strict();
 
+const ProductionRiskCategorySchema = z.enum([
+  "story", "visual", "schedule", "capacity", "review", "asset", "budget",
+  "rights", "contract", "platform", "health", "security", "communication", "technical",
+]);
+const ProductionRiskSeveritySchema = z.enum(["watch", "warning", "high", "critical"]);
+const ProductionRiskResponseStatusSchema = z.enum(["proposed", "approved", "in-progress", "completed", "cancelled"]);
+const ProductionRiskStatusSchema = z.enum([
+  "open", "monitoring", "mitigating", "occurred", "accepted", "resolved", "dismissed", "closed",
+]);
+
 const ProductionRiskSchema = z.object({
   id: IdentitySchema,
   projectId: IdentitySchema,
+  revision: z.number().int().min(1).max(2_147_483_647),
   scope: ProductionScopeRefSchema,
-  category: z.enum(["story", "visual", "schedule", "capacity", "budget", "rights", "contract", "platform", "health", "security"]),
+  category: ProductionRiskCategorySchema,
+  source: z.enum(["manual", "automatic"]),
+  signalIds: z.array(IdentitySchema).max(10_000),
   title: z.string().trim().min(1).max(240),
   description: HumanTextSchema,
   probability: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
   impact: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
+  exposureScore: z.number().int().min(1).max(25),
+  severity: ProductionRiskSeveritySchema,
+  priorityScore: z.number().min(0).max(100),
   ownerAssignmentId: IdentitySchema.nullable(),
+  causeCodes: z.array(z.string().trim().min(1).max(160)).max(1_000),
+  earlySignals: z.array(HumanTextSchema).max(1_000),
   mitigation: z.string().trim().max(20_000),
+  contingency: z.string().trim().max(20_000),
   trigger: z.string().trim().max(4_000),
-  status: z.enum(["open", "mitigating", "accepted", "resolved", "closed"]),
+  affectedTaskIds: z.array(IdentitySchema).max(100_000),
+  affectedEpisodeIds: z.array(IdentitySchema).max(10_000),
+  affectedMilestoneIds: z.array(IdentitySchema).max(10_000),
+  baselineDueAt: NullableIsoDateTimeSchema,
+  forecastDueAt: NullableIsoDateTimeSchema,
+  varianceHours: z.number().min(0).max(1_000_000).nullable(),
+  status: ProductionRiskStatusSchema,
   dueAt: NullableIsoDateTimeSchema,
+  responseDueAt: NullableIsoDateTimeSchema,
+  nextReviewAt: NullableIsoDateTimeSchema,
+  acceptedReason: z.string().trim().max(4_000).nullable(),
+  dismissedReason: z.string().trim().max(4_000).nullable(),
+  resolutionSummary: z.string().trim().max(20_000).nullable(),
+  detectedAt: IsoDateTimeSchema,
+  lastEvaluatedAt: IsoDateTimeSchema,
+  occurredAt: NullableIsoDateTimeSchema,
+  resolvedAt: NullableIsoDateTimeSchema,
+  closedAt: NullableIsoDateTimeSchema,
+  createdAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema,
+}).strict();
+
+const ProductionRiskPolicySchema = z.object({
+  id: IdentitySchema,
+  projectId: IdentitySchema,
+  timezone: z.string().trim().min(1).max(120),
+  workdayEndLocal: z.string().regex(/^\d{2}:\d{2}$/u),
+  dueSoonHours: z.number().int().min(1).max(8_760),
+  blockedWarningHours: z.number().int().min(1).max(8_760),
+  blockedCriticalHours: z.number().int().min(1).max(8_760),
+  capacityWarningPercent: z.number().min(1).max(500),
+  capacityCriticalPercent: z.number().min(1).max(500),
+  defaultReviewSlaHours: z.number().int().min(1).max(8_760),
+  minimumReadyBufferEpisodes: z.number().int().min(0).max(100),
+  autoOpenSeverity: z.enum(["warning", "high", "critical"]),
+  notificationCooldownHours: z.number().int().min(1).max(8_760),
+  autoResolveStableHours: z.number().int().min(1).max(8_760),
+  revision: z.number().int().min(1).max(2_147_483_647),
+  updatedAt: IsoDateTimeSchema,
+}).strict().refine((value) => value.blockedWarningHours <= value.blockedCriticalHours, {
+  message: "blocked warning threshold must not exceed critical threshold",
+});
+
+const ProductionRiskResponseSchema = z.object({
+  id: IdentitySchema,
+  projectId: IdentitySchema,
+  riskId: IdentitySchema,
+  strategy: z.enum(["avoid", "mitigate", "transfer", "accept", "escalate"]),
+  actionType: z.enum([
+    "assign", "split-task", "reschedule", "resolve-dependency", "parallel-review",
+    "outsource", "reduce-scope", "reuse-asset", "create-change-request", "manual",
+  ]),
+  title: z.string().trim().min(1).max(240),
+  description: z.string().trim().max(20_000),
+  ownerAssignmentId: IdentitySchema.nullable(),
+  dueAt: NullableIsoDateTimeSchema,
+  linkedTaskId: IdentitySchema.nullable(),
+  linkedChangeRequestId: IdentitySchema.nullable(),
+  linkedChangeOrderId: IdentitySchema.nullable(),
+  expectedEffect: z.string().trim().max(4_000),
+  actualEffect: z.string().trim().min(1).max(4_000).nullable(),
+  status: ProductionRiskResponseStatusSchema,
+  createdAt: IsoDateTimeSchema,
+  completedAt: NullableIsoDateTimeSchema,
 }).strict();
 
 const DecisionRecordSchema = z.object({
@@ -991,6 +1080,23 @@ export const ProductionProjectByWorkParamsSchema = z.object({
   workId: IdentitySchema,
 }).strict();
 
+export const ProductionRiskParamsSchema = z.object({
+  projectId: IdentitySchema,
+  riskId: IdentitySchema,
+}).strict();
+
+export const ProductionRiskQuerySchema = z.object({
+  status: z.string().trim().max(500).optional(),
+  severity: z.string().trim().max(200).optional(),
+  category: z.string().trim().max(500).optional(),
+  source: z.enum(["manual", "automatic"]).optional(),
+  episodeId: IdentitySchema.optional(),
+  ownerAssignmentId: IdentitySchema.optional(),
+  ruleKey: z.string().trim().max(160).optional(),
+  q: z.string().trim().max(240).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+}).strict();
+
 const ConfigureCollaborationCommandSchema = z.object({
   type: z.literal("configure-collaboration"),
   parties: z.array(CollaborationPartySchema).min(1).max(500),
@@ -1066,6 +1172,49 @@ const UpsertCreditManifestCommandSchema = z.object({
 const UpsertRightsInterestCommandSchema = z.object({ type: z.literal("upsert-rights-interest"), interest: RightsInterestSchema }).strict();
 const UpsertCompensationPlanCommandSchema = z.object({ type: z.literal("upsert-compensation-plan"), plan: CompensationPlanSchema }).strict();
 
+const UpsertRiskCommandSchema = z.object({
+  type: z.literal("upsert-risk"),
+  risk: ProductionRiskSchema,
+}).strict();
+const TransitionRiskCommandSchema = z.object({
+  type: z.literal("transition-risk"),
+  riskId: IdentitySchema,
+  toStatus: ProductionRiskStatusSchema,
+  reason: z.string().trim().max(20_000),
+  expectedRiskRevision: z.number().int().min(1).max(2_147_483_647),
+}).strict();
+const UpsertRiskResponseCommandSchema = z.object({
+  type: z.literal("upsert-risk-response"),
+  response: ProductionRiskResponseSchema,
+}).strict();
+const TransitionRiskResponseCommandSchema = z.object({
+  type: z.literal("transition-risk-response"),
+  responseId: IdentitySchema,
+  toStatus: ProductionRiskResponseStatusSchema,
+  actualEffect: z.string().trim().min(1).max(4_000).nullable(),
+}).strict();
+const SuppressRiskSignalCommandSchema = z.object({
+  type: z.literal("suppress-risk-signal"),
+  signalId: IdentitySchema,
+  reason: HumanTextSchema,
+  suppressedByAssignmentId: IdentitySchema,
+  expiresAt: NullableIsoDateTimeSchema,
+}).strict();
+const UpdateRiskPolicyCommandSchema = z.object({
+  type: z.literal("update-risk-policy"),
+  policy: ProductionRiskPolicySchema,
+}).strict();
+const EvaluateRisksCommandSchema = z.object({
+  type: z.literal("evaluate-risks"),
+}).strict();
+const RebaselineTaskCommandSchema = z.object({
+  type: z.literal("rebaseline-task"),
+  taskId: IdentitySchema,
+  newDueAt: IsoDateTimeSchema,
+  reason: HumanTextSchema,
+  sourceChangeRequestId: IdentitySchema.nullable(),
+}).strict();
+
 const UpsertPlanningRecordCommandSchema = z.object({
   type: z.literal("upsert-planning-record"),
   record: PlanningRecordSchema,
@@ -1105,6 +1254,14 @@ export const ProductionCommandSchema = z.discriminatedUnion("type", [
   UpsertCreditManifestCommandSchema,
   UpsertRightsInterestCommandSchema,
   UpsertCompensationPlanCommandSchema,
+  UpsertRiskCommandSchema,
+  TransitionRiskCommandSchema,
+  UpsertRiskResponseCommandSchema,
+  TransitionRiskResponseCommandSchema,
+  SuppressRiskSignalCommandSchema,
+  UpdateRiskPolicyCommandSchema,
+  EvaluateRisksCommandSchema,
+  RebaselineTaskCommandSchema,
 ]);
 
 export const ExecuteProductionCommandSchema = z.object({
@@ -1135,6 +1292,8 @@ export const SubmitProductionExternalReviewSchema = z.object({
 export class CreateProductionProjectDto extends createZodDto(CreateProductionProjectSchema) {}
 export class ProductionProjectParamsDto extends createZodDto(ProductionProjectParamsSchema) {}
 export class ProductionProjectByWorkParamsDto extends createZodDto(ProductionProjectByWorkParamsSchema) {}
+export class ProductionRiskParamsDto extends createZodDto(ProductionRiskParamsSchema) {}
+export class ProductionRiskQueryDto extends createZodDto(ProductionRiskQuerySchema) {}
 export class ExecuteProductionCommandDto extends createZodDto(ExecuteProductionCommandSchema) {}
 export class ProductionExternalReviewParamsDto extends createZodDto(ProductionExternalReviewParamsSchema) {}
 export class ProductionExternalReviewQueryDto extends createZodDto(ProductionExternalReviewQuerySchema) {}
@@ -1142,3 +1301,4 @@ export class SubmitProductionExternalReviewDto extends createZodDto(SubmitProduc
 
 export type ProductionCommand = z.infer<typeof ProductionCommandSchema>;
 export type ExecuteProductionCommand = z.infer<typeof ExecuteProductionCommandSchema>;
+export type ProductionRiskQuery = z.infer<typeof ProductionRiskQuerySchema>;

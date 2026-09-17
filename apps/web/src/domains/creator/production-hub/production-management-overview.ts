@@ -5,6 +5,7 @@ import {
   productionDepartment,
   type ProductionDepartmentKey,
   type ProductionProjectAggregate,
+  type ProductionRisk,
   type ProductionTask,
   type ProductionTaskStatus,
   type RoleAssignment,
@@ -501,6 +502,16 @@ function healthFromScore(score: number): { health: ManagementHealth; label: stri
   return { health: "critical", label: "즉시 조치" };
 }
 
+function activeProductionRisk(
+  aggregate: ProductionProjectAggregate,
+  risk: ProductionRisk,
+): boolean {
+  if (!["open", "monitoring", "mitigating", "occurred"].includes(risk.status)) return false;
+  if (risk.source === "manual" || risk.signalIds.length === 0) return true;
+  return risk.signalIds.some((signalId) =>
+    aggregate.riskSignals.some((signal) => signal.id === signalId && signal.state === "active"));
+}
+
 function activeChangeRequest(status: string): boolean {
   return !["implemented", "closed", "rejected", "cancelled"].includes(status);
 }
@@ -666,7 +677,7 @@ function buildActions(input: {
     });
   }
 
-  for (const risk of aggregate.risks.filter((entry) => entry.status === "open" || entry.status === "mitigating")) {
+  for (const risk of aggregate.risks.filter((entry) => activeProductionRisk(aggregate, entry))) {
     const score = risk.probability * risk.impact;
     if (score < 9) continue;
     const episodeId = risk.scope.kind === "episode"
@@ -679,8 +690,8 @@ function buildActions(input: {
       title: risk.title,
       detail: `위험 P${risk.probability} × I${risk.impact} · ${risk.mitigation}`,
       actionLabel: "대응 확인",
-      href: `${projectBase}/planning`,
-      dueAt: risk.dueAt,
+      href: `${projectBase}/risks?risk=${encodeURIComponent(risk.id)}`,
+      dueAt: risk.responseDueAt ?? risk.dueAt,
       sourceId: risk.id,
       episodeId,
       departmentKey: null,
@@ -776,7 +787,7 @@ export function deriveProductionManagementOverview(
   const unassignedTaskCount = openTasks.filter((task) => task.assignmentIds.length === 0).length;
   const blockingQuestionCount = aggregate.clarifications.filter((entry) => entry.blocking && (entry.status === "open" || entry.status === "answered")).length;
   const overloadedAssignmentCount = workload.filter((entry) => entry.health === "overloaded").length;
-  const activeRiskCount = aggregate.risks.filter((entry) => entry.status === "open" || entry.status === "mitigating").length;
+  const activeRiskCount = aggregate.risks.filter((entry) => activeProductionRisk(aggregate, entry)).length;
   const activeChangeRequestCount = aggregate.changeRequests.filter((entry) => activeChangeRequest(entry.status)).length;
 
   const penalties = [
