@@ -12,6 +12,8 @@ on:
       - 'apps/web/src/domains/marketing/**'
       - 'apps/web/src/domains/creator-resources/**'
       - 'apps/web/src/domains/creator/studio-shell/StudioDeferredSaveProjectCreatePage*'
+      - 'apps/web/src/domains/creator/studio-shell/StudioFrontDoorPages*'
+      - 'apps/web/src/domains/creator/studio-shell/StudioTaskFlow*'
       - 'apps/web/src/domains/creator/studio-launch-mode.ts'
       - 'apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioPreferencesRuntime.ts'
       - 'apps/web/src/shared/components/SiteRouteExperienceBoundary*'
@@ -63,6 +65,8 @@ jobs:
           tests/creator-flagship-contracts.test.ts
           apps/web/src/domains/creator-resources/open-creation.test.ts
           apps/web/src/domains/creator/studio-shell/StudioDeferredSaveProjectCreatePage.contract.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioFrontDoorPages.contract.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioTaskFlow.contract.test.ts
           apps/web/src/domains/marketing/CreatorReferenceSearch.test.tsx
           apps/web/src/domains/marketing/CreatorHomeExperience.test.ts
           apps/web/src/domains/marketing/creator-home-navigation.test.ts
