@@ -60,10 +60,10 @@ export const StudioBrushLabPage = lazyRetry(
   "StudioBrushLabPage",
 );
 export const StudioHomePage = lazyRetry(
-  () => import("@/domains/creator/studio-shell/StudioProjectLibraryPage").then((module) => ({
-    default: module.StudioProjectLibraryPage,
+  () => import("@/domains/creator/studio-shell/StudioFrontDoorPages").then((module) => ({
+    default: module.StudioHomePage,
   })),
-  "StudioProjectLibraryPage",
+  "StudioHomePage",
 );
 export const StudioNewPage = lazyRetry(
   () => import("@/domains/creator/studio-shell/StudioNewIntegratedPage").then((module) => ({
