@@ -209,7 +209,7 @@ export const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
     caption: "도움말",
     items: [
       "명령 · 속성 통합 검색",
-      "CSP · Photoshop 용어 찾기",
+      "다른 앱 용어 찾기",
       "현재 도구 도움말",
       "도움말 홈 · 단계별 가이드",
       "단축키 · 기본 조작",
