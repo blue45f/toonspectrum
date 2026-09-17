@@ -43,6 +43,10 @@ export function isCloudflareOversizedAssetPath(pathname: string): boolean {
   return cloudflareLargeAssetDescriptor(pathname) !== null;
 }
 
+export function supportsCloudflareStaticSidecar(pathname: string): boolean {
+  return pathname !== PRODUCT_TOUR_PATH && isCloudflareOversizedAssetPath(pathname);
+}
+
 export function cloudflareLargeAssetKey(pathname: string): string | null {
   return cloudflareLargeAssetDescriptor(pathname)
     ? pathname.replace(/^\/+/, "")
