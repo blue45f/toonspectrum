@@ -15,6 +15,16 @@ function normalizeKeyPart(value: string): string {
     .replace(/^-+|-+$/gu, "");
 }
 
+function stableTextId(ko: string, en: string): string {
+  let hash = 0x811c9dc5;
+  const source = `${ko}\u0000${en}`;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `copy-${hash.toString(36)}`;
+}
+
 /**
  * Registers an existing ko/en UI copy pair with the global i18n runtime and returns the stable key.
  *
@@ -39,6 +49,11 @@ export function defineBilingualText(
   registerI18nLocaleEntries("ko", { [key]: ko });
   registerI18nEnglishSourceEntries({ [key]: en });
   return key;
+}
+
+/** Content-addressed convenience for large legacy surfaces where naming hundreds of keys adds noise. */
+export function defineBilingualAutoText(scope: string, ko: string, en: string): string {
+  return defineBilingualText(scope, stableTextId(ko, en), ko, en);
 }
 
 export function defineBilingualMap<
