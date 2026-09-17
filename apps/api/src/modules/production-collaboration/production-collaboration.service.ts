@@ -10,6 +10,7 @@ import {
 
 import {
   analyzeProductionChangeImpact,
+  applyProductionStudioRevisionLink,
   applySubmissionToDeliverable,
   commitProductionAggregate,
   createImmutableScopePackage,
@@ -21,6 +22,7 @@ import {
   derivePersonalProductionInbox,
   evaluateAutomationRule,
   evaluateHandoffReadiness,
+  evaluateProductionStudioRevisionCoverage,
   evaluateReleaseReadiness,
   evaluateReviewApproval,
   resolveDecisionAuthority,
@@ -55,6 +57,7 @@ import {
   validateSeasonPlan,
   validateSeriesMaster,
   validateSubmission,
+  validateProductionStudioRevisionLink,
   type CompensationPlan,
   type ContributionRecord,
   type CreditManifest,

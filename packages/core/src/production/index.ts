@@ -13,3 +13,4 @@ export * from "./planning";
 export * from "./commercial";
 export * from "./role-workflow";
 export * from "./operations-control";
+export * from "./studio-revision";
