@@ -147,18 +147,37 @@ function HairBack({ style }: { readonly style: AvatarForgeHairStyle }): ReactNod
     case "none":
       return null;
     case "short":
+      return (
+        <>
+          <path d="M45 61C46 34 60 18 81 17c22-1 36 14 37 43-8-9-17-14-29-16-16-3-30 2-44 17Z" />
+          <path d="M48 55c-3 10-2 22 3 31l8-12 5 14 8-17 9 13 8-15 10 12 7-14 9 8c3-9 3-17 1-25-14-2-27-3-38 0-11 2-21 4-30 5Z" opacity="0.94" />
+        </>
+      );
     case "pixie":
       return (
-        <path d="M47 60C48 28 65 16 82 17c23 1 35 18 34 47-8-13-18-19-34-20-14 0-25 5-35 16Z" />
+        <>
+          <path d="M46 60C49 35 61 21 80 18c18-2 31 8 37 28l-13-7 5 12-16-7 2 13-16-9-7 12-7-12-16 12 4-15-12 6c1-4 3-8 5-11Z" />
+          <path d="M48 58c2 9 5 15 10 21l8-12 7 10 7-14 8 10 9-14 8 7 8-12c-3 19-14 30-32 31-17 1-29-8-33-27Z" opacity="0.88" />
+        </>
       );
     case "bob":
       return (
         <path d="M42 61C43 27 60 14 81 15c27 1 39 20 37 54l-5 44-20 7-12-9-12 9-22-8-5-51Z" />
       );
     case "long":
+      return (
+        <>
+          <path d="M40 63C41 27 59 13 81 14c28 1 42 21 40 58l-4 97-22 9-14-19-14 19-24-9-3-106Z" />
+          <path d="M46 77c4 27 5 57 5 84l14 7 16-18 15 18 14-7c2-31 3-58 5-86-11 7-22 10-34 10-13 0-24-3-35-8Z" opacity="0.88" />
+        </>
+      );
     case "hime":
       return (
-        <path d="M41 62C42 26 60 13 81 14c28 1 41 21 39 58l-4 95-23 7-12-18-12 18-24-7-4-105Z" />
+        <>
+          <path d="M40 62C41 27 59 13 81 14c28 1 42 21 40 58l-4 96-22 8-14-18-14 18-24-8-3-106Z" />
+          <path d="M43 66h19v64l-12 8-8-7 1-65Zm57 0h19l1 65-9 7-11-8V66Z" />
+          <path d="M50 68h12v51l-8 5-4-4V68Zm50 0h12v52l-5 4-7-5V68Z" opacity="0.76" />
+        </>
       );
     case "wavy":
       return (
@@ -295,7 +314,7 @@ export function StudioVrmAvatarForgePreview({
   const svgHeightClass = variant === "hero"
     ? "h-44"
     : variant === "compact"
-      ? "h-16"
+      ? "h-[4.6rem]"
       : "h-24";
   const accessibleLabel = label
     ?? `${summary.face}, ${summary.hair}, ${summary.bangs}, ${summary.body} 스타일 미리보기`;
@@ -308,7 +327,7 @@ export function StudioVrmAvatarForgePreview({
       data-hair-style={safe.hair.style}
       data-bang-style={safe.hair.bangStyle}
       role="img"
-      viewBox="0 0 160 200"
+      viewBox={showBody ? "0 0 160 200" : "18 0 124 138"}
     >
       <title>{accessibleLabel}</title>
       <defs>
@@ -344,9 +363,11 @@ export function StudioVrmAvatarForgePreview({
         </g>
       ) : null}
 
-      <g fill={`url(#${hairGradientId})`} stroke={safe.hair.shadowColor ?? safe.hair.baseColor} strokeLinejoin="round" strokeWidth="2.4">
-        <HairBack style={safe.hair.style} />
-      </g>
+      {safe.hair.style !== "none" ? (
+        <g data-hair-layer="back" fill={`url(#${hairGradientId})`} stroke={safe.hair.shadowColor ?? safe.hair.baseColor} strokeLinejoin="round" strokeWidth="2.4">
+          <HairBack style={safe.hair.style} />
+        </g>
+      ) : null}
       <ellipse
         cx={headCx - headWidth * 0.52}
         cy={headCy + 3}
@@ -385,17 +406,22 @@ export function StudioVrmAvatarForgePreview({
       <path d={`M${headCx - 2} ${headCy + 5}q2 3 4 0`} fill="none" stroke="#b77f6b" strokeLinecap="round" strokeWidth="1.4" />
       <path d={`M${headCx - 8} ${headCy + 18}q8 ${4 + safe.face.cheekVolume * 2} 16 0`} fill="none" stroke="#9f4f55" strokeLinecap="round" strokeWidth="1.8" />
       <FaceAccents state={safe} cx={headCx} cy={headCy} width={headWidth} height={headHeight} />
-      <g fill={`url(#${hairGradientId})`} stroke={safe.hair.shadowColor ?? safe.hair.baseColor} strokeLinejoin="round" strokeWidth="2.2">
-        <Bangs style={safe.hair.bangStyle} />
-      </g>
-      <path
-        d="M56 37c13-16 39-19 54-1"
-        fill="none"
-        opacity={0.22 + safe.hair.shine * 0.4}
-        stroke="#fff"
-        strokeLinecap="round"
-        strokeWidth="4"
-      />
+      {safe.hair.style !== "none" ? (
+        <>
+          <g data-hair-layer="bangs" fill={`url(#${hairGradientId})`} stroke={safe.hair.shadowColor ?? safe.hair.baseColor} strokeLinejoin="round" strokeWidth="2.2">
+            <Bangs style={safe.hair.bangStyle} />
+          </g>
+          <path
+            data-hair-layer="shine"
+            d="M56 37c13-16 39-19 54-1"
+            fill="none"
+            opacity={0.18 + safe.hair.shine * 0.34}
+            stroke="#fff"
+            strokeLinecap="round"
+            strokeWidth="3.2"
+          />
+        </>
+      ) : null}
     </svg>
   );
 }

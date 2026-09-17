@@ -3,7 +3,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { createAvatarForgeState } from "./studio-vrm-avatar-forge";
+import { AVATAR_FORGE_HAIR_STYLE_OPTIONS, createAvatarForgeState } from "./studio-vrm-avatar-forge";
 import {
   countStudioVrmAvatarForgeChanges,
   describeStudioVrmAvatarForgeState,
@@ -32,5 +32,36 @@ describe("StudioVrmAvatarForgePreview", () => {
     expect(summary.hair).toBe("보브");
     expect(summary.changedControls).toBe(countStudioVrmAvatarForgeChanges(changed, baseline));
     expect(summary.changedControls).toBeGreaterThanOrEqual(3);
+  });
+});
+
+
+describe("StudioVrmAvatarForgePreview hair catalogue quality", () => {
+  it("renders hair-none without residual bangs or shine", () => {
+    const state = createAvatarForgeState();
+    state.hair = { ...state.hair, style: "none", bangStyle: "full" };
+    const { container } = render(<StudioVrmAvatarForgePreview state={state} showBody={false} />);
+    expect(container.querySelector('[data-hair-layer="back"]')).toBeNull();
+    expect(container.querySelector('[data-hair-layer="bangs"]')).toBeNull();
+    expect(container.querySelector('[data-hair-layer="shine"]')).toBeNull();
+    expect(container.querySelector("svg")?.getAttribute("viewBox")).toBe("18 0 124 138");
+  });
+
+  it("gives every named hair style a distinct silhouette signature", () => {
+    const signatures = new Set<string>();
+    for (const option of AVATAR_FORGE_HAIR_STYLE_OPTIONS) {
+      if (option.id === "none") continue;
+      const state = createAvatarForgeState();
+      state.hair = { ...state.hair, style: option.id, bangStyle: "none" };
+      const { container, unmount } = render(<StudioVrmAvatarForgePreview state={state} showBody={false} />);
+      const back = container.querySelector('[data-hair-layer="back"]');
+      const signature = Array.from(back?.querySelectorAll("path, circle, ellipse") ?? [])
+        .map((node) => `${node.tagName}:${node.getAttribute("d") ?? node.getAttribute("cx") ?? ""}:${node.getAttribute("cy") ?? ""}`)
+        .join("|");
+      expect(signature, option.id).not.toBe("");
+      expect(signatures.has(signature), option.id).toBe(false);
+      signatures.add(signature);
+      unmount();
+    }
   });
 });
