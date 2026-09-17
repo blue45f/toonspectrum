@@ -50,6 +50,13 @@ function formatElapsed(seconds: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
 }
 
+function isPresentationControlTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return target.closest(
+    'a, button, input, select, textarea, [contenteditable="true"], [role="button"], [role="link"]',
+  ) !== null;
+}
+
 interface DeckSlide {
   readonly id: string;
   readonly eyebrow: string;
@@ -292,6 +299,8 @@ export function EngineeringDeckPage() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
+      if (isPresentationControlTarget(event.target)) return;
+
       if (event.key === "ArrowRight" || event.key === "PageDown" || event.key === " ") {
         event.preventDefault();
         setIndex((value) => Math.min(slides.length - 1, value + 1));

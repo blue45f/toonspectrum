@@ -63,7 +63,13 @@ describe("engineering story pages", () => {
 
     const previous = screen.getByRole("button", { name: /이전|Previous/u });
     const next = screen.getByRole("button", { name: /다음|Next/u });
+    const notes = screen.getByRole("button", { name: /발표자 노트|Speaker notes/u });
     expect(previous.hasAttribute("disabled")).toBe(true);
+
+    notes.focus();
+    fireEvent.keyDown(notes, { key: " " });
+    expect(previous.hasAttribute("disabled")).toBe(true);
+
     fireEvent.click(next);
     expect(previous.hasAttribute("disabled")).toBe(false);
     fireEvent.keyDown(document, { key: "Home" });
