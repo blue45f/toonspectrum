@@ -94,7 +94,7 @@ function statusTone(status: string): string {
   return "border-warning/35 bg-warning-soft/15 text-warning";
 }
 
-function labelForStatus(status: string, locale: Locale): string {
+function labelForStatus(status: string, bt: (ko: string, en: string) => string): string {
   const ko: Readonly<Record<string, string>> = {
     ready: "준비됨",
     review: "확인 필요",
@@ -117,13 +117,13 @@ function labelForStatus(status: string, locale: Locale): string {
     warn: "Review",
     fail: "Fix required",
   };
-  return (locale === "ko" ? ko[status] : en[status]) ?? status;
+  return ko[status] && en[status] ? bt(ko[status]!, en[status]!) : status;
 }
 
 function sourceLabel(
   status: StudioPlatformSourceStatus,
   requiresOfficialRecheck: boolean,
-  locale: Locale,
+  bt: (ko: string, en: string) => string,
 ): string {
   if (status === "official") {
     if (requiresOfficialRecheck) {
@@ -189,7 +189,7 @@ function StatusPanel({
           <p className="mt-1 text-xs leading-5 text-fg-3">{description}</p>
         </div>
         <span className={cn("shrink-0 rounded-full border px-2.5 py-1 text-[0.65rem] font-black", statusTone(status))}>
-          {labelForStatus(status, locale)}
+          {labelForStatus(status, bt)}
         </span>
       </div>
     </div>
