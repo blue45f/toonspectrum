@@ -6493,9 +6493,10 @@ export function StudioCuttoonEditor({
   }, [initialWorkspaceLaunchId]);
   /**
    * 라우트 소유 표면(타임라인·스토리보드·3D 배경·포저)의 열림/닫힘 전이를 URL 에 반영한다.
-   * 열림 전이는 canvas 라우트에서만 해당 표면으로 올라가고(다른 표면 위 패널 공존은 URL 을
-   * 다투지 않는다), 닫힘 전이는 URL 이 그 표면을 주장하고 있을 때만 canvas 로 내려온다 —
-   * 반대 방향(라우트→상태)은 위 studioRoute.surface 이펙트가 소유하므로 루프가 없다.
+   * 타임라인·스토리보드 열림은 canvas 에서만 URL 을 올리지만, interactive 3D 표면은 다른
+   * 라우트 위에서 요청돼도 새 3D 표면이 URL 소유권을 넘겨받는다. 닫힘 전이는 URL 이 해당
+   * 표면을 주장하고 있을 때만 canvas 로 내려온다. 반대 방향(라우트→상태)은 위
+   * studioRoute.surface 이펙트가 소유하므로 루프가 없다.
    */
   const upgradeRoutedSurface = useEffectEvent((surface: Studio2dWorkspaceSurface) => {
     const requestsInteractiveThreeD =
@@ -20245,17 +20246,16 @@ No text, logo, watermark, or copyrighted character.`;
       setPoserInitialDataUrl(undefined);
       setPoserInitialElementId(undefined);
       setPoserVrmOpen(true);
-      // Do not rely on an open-edge effect alone: if stale state already says "open", the
-      // asset action still has to make the poser route authoritative.
-      navigateStudio2dSurface("poser");
       return;
     }
     // Fresh insert path (not re-edit of an existing LT plate).
     setBg3dInitialDataUrl(undefined);
     setBg3dInitialScene(undefined);
     setBg3dInitialElementId(undefined);
+    // The routed-surface open edge records ownership before it navigates. Keeping that ordering
+    // is essential: a direct navigation here can make the bg3d route effect treat this seeded
+    // asset as a cold deep link and clear the one-shot template/primitive seed.
     setBg3dOpen(true);
-    navigateStudio2dSurface("bg3d");
   }
 
   function clearStudioObjectInsertSeeds() {
