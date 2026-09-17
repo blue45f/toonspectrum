@@ -77,6 +77,19 @@ describe("CharacterSlotPreview", () => {
     }
   });
 
+  it("keeps the hairless card free of bangs and front-hair decoration", () => {
+    const hairless = markup({
+      kind: "hair",
+      style: "none",
+      bangStyle: "full",
+      baseColor: "#352a28",
+      tipColor: "#6b5148",
+      length: 1,
+      volume: 1,
+    });
+    expect(hairless).not.toContain('data-character-hair-front="true"');
+  });
+
   it("uses spec colours as literal fills and derives lighter/darker companions from them", () => {
     const hair = markup({ kind: "hair", style: "long", bangStyle: "curtain", baseColor: "#9d174d", tipColor: "#fbcfe8", length: 1.3, volume: 1 });
     expect(hair).toContain('stop-color="#9d174d"');

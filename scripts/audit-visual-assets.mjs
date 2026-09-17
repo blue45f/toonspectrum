@@ -89,6 +89,14 @@ const wardrobePanel = readFileSync(join(root, "apps/web/src/domains/creator/vrm/
 if (/\{(?:set|item|p)\.emoji\}/.test(wardrobePanel)) {
   violations.push("StudioVrmPoserPanelBodyB.tsx still renders OS emoji for wardrobe/costume catalogue visuals");
 }
+const expressionPanel = readFileSync(join(root, "apps/web/src/domains/creator/vrm/StudioVrmPoserPanelBodyA.tsx"), "utf8");
+if (/\{preset\.emoji\}/.test(expressionPanel)) {
+  violations.push("StudioVrmPoserPanelBodyA.tsx still renders OS emoji for expression preset visuals");
+}
+const scenePropPanel = readFileSync(join(root, "apps/web/src/domains/creator/vrm/StudioVrmPoserPanelBodyD.tsx"), "utf8");
+if (/\{prop\.emoji\}/.test(scenePropPanel)) {
+  violations.push("StudioVrmPoserPanelBodyD.tsx still renders OS emoji for scene prop visuals");
+}
 
 const extensionCounts = Object.fromEntries(
   [...visualExtensions].map((ext) => [ext, visuals.filter((file) => extname(file).toLowerCase() === ext).length]).filter(([, count]) => count > 0),

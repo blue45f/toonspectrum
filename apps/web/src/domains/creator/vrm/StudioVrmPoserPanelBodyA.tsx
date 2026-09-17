@@ -56,6 +56,9 @@ import {
   StudioVrmAvatarForgePanel,
 } from "./StudioVrmAvatarForgePanel";
 import {
+  StudioVrmExpressionPresetVisual,
+} from "./StudioVrmSemanticVisual";
+import {
   inspectStudioVrmSemanticFaceMorphProfile,
 } from "./studio-vrm-semantic-face-morph";
 import {
@@ -456,7 +459,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                         disabled={!vrm}
                         onClick={() => handleExpressionPresetSelect(preset)}
                       >
-                        <span className="text-base leading-none" aria-hidden>{preset.emoji}</span>
+                        <StudioVrmExpressionPresetVisual preset={preset} className="size-8" />
                         <span className="block w-full truncate text-[0.66rem] font-bold">{preset.label}</span>
                       </button>
                     ))}
