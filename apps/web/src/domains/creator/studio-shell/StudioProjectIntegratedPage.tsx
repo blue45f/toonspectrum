@@ -71,6 +71,11 @@ function StudioWebtoonOnboardingPanelSlot({
   );
 }
 
+const StudioCreatorIntelligencePanel = lazy(async () => {
+  const module = await import("../creator-intelligence/StudioCreatorIntelligencePanel");
+  return { default: module.StudioCreatorIntelligencePanel };
+});
+
 const StudioCompatibilityReportsPanel = lazy(async () => {
   const module = await import("../project-graph/StudioCompatibilityReportsPanel");
   return { default: module.StudioCompatibilityReportsPanel };
@@ -129,6 +134,11 @@ function SectionWorkflow({
         view={view}
         locale={locale}
       />
+      {section === "overview" && view === "intelligence" ? (
+        <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
+          <StudioCreatorIntelligencePanel projectId={projectId} locale={locale} />
+        </Suspense>
+      ) : null}
       {section === "production" ? (
         <StudioProductionCocreatorBridgePanel projectId={projectId} locale={locale} />
       ) : null}
