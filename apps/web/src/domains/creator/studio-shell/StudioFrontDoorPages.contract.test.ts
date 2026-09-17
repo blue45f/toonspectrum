@@ -6,46 +6,48 @@ const source = readFileSync(
   new URL("./StudioFrontDoorPages.tsx", import.meta.url),
   "utf8",
 );
-const routePages = readFileSync(
-  new URL("../../../app/routes/groups/creator-route-pages.ts", import.meta.url),
+const projectHome = readFileSync(
+  new URL("./StudioProjectLibraryManagementPage.tsx", import.meta.url),
+  "utf8",
+);
+const projectStartPanel = readFileSync(
+  new URL("./StudioProjectStartPanel.tsx", import.meta.url),
   "utf8",
 );
 
 describe("Studio front door UX contract", () => {
-  it("is the canonical exact /studio home while projects remain a separate destination", () => {
-    expect(routePages).toContain("@/domains/creator/studio-shell/StudioFrontDoorPages");
-    expect(routePages).toContain("default: module.StudioHomePage");
-    expect(routePages).toContain('"StudioHomePage"');
-    expect(routePages).not.toContain("default: module.StudioProjectLibraryPage");
-    expect(source).toContain('href: "/studio/projects"');
+  it("keeps the existing project library home and integrates the task-first start panel", () => {
+    expect(projectHome).toContain('import { StudioProjectStartPanel } from "./StudioProjectStartPanel"');
+    expect(projectHome).toContain('controller.view === "active" ? <StudioProjectStartPanel locale={controller.locale} /> : null');
+    expect(projectStartPanel).toContain("기존 프로젝트는 아래에서 바로 이어서 작업할 수 있습니다");
   });
 
   it("starts from what the user currently has instead of asking for expertise", () => {
-    expect(source).toContain("지금 무엇을 가지고 있나요?");
-    expect(source).toContain("아이디어만 있어요");
-    expect(source).toContain("대본이나 콘티가 있어요");
-    expect(source).toContain("그리던 파일이 있어요");
-    expect(source).toContain("팀 프로젝트를 시작해요");
-    expect(source).toContain("샘플로 먼저 둘러볼게요");
-    expect(source).not.toContain("초보 모드");
-    expect(source).not.toContain("전문가 모드");
+    expect(projectStartPanel).toContain("지금 무엇을 가지고 있나요?");
+    expect(projectStartPanel).toContain("아이디어만 있어요");
+    expect(projectStartPanel).toContain("대본이나 콘티가 있어요");
+    expect(projectStartPanel).toContain("그리던 파일이 있어요");
+    expect(projectStartPanel).toContain("팀 프로젝트를 시작해요");
+    expect(projectStartPanel).toContain("샘플로 먼저 둘러볼게요");
+    expect(projectStartPanel).not.toContain("초보 모드");
+    expect(projectStartPanel).not.toContain("전문가 모드");
   });
 
   it("connects every starting intent to a real product destination", () => {
-    expect(source).toContain("/studio/new?kind=webtoon&template=webtoon-vertical");
-    expect(source).toContain("/story-lab");
-    expect(source).toContain("/studio/import");
-    expect(source).toContain("/production");
-    expect(source).toContain("/production/projects/sample-project/overview");
+    expect(projectStartPanel).toContain("/studio/new?kind=webtoon&template=webtoon-vertical");
+    expect(projectStartPanel).toContain("/story-lab");
+    expect(projectStartPanel).toContain("/studio/import");
+    expect(projectStartPanel).toContain("/production");
+    expect(projectStartPanel).toContain("/production/projects/sample-project/overview");
   });
 
   it("shows the complete project flow and save-trust language", () => {
-    expect(source).toContain("<StudioTaskFlow");
-    expect(source).toContain("2D·3D 제작");
-    expect(source).toContain("협업");
-    expect(source).toContain("검토");
-    expect(source).toContain("연재");
-    expect(source).toContain("<WorkflowTrustBadge state=\"device-saved\"");
+    expect(projectStartPanel).toContain("<StudioTaskFlow");
+    expect(projectStartPanel).toContain("2D·3D 제작");
+    expect(projectStartPanel).toContain("협업");
+    expect(projectStartPanel).toContain("검토");
+    expect(projectStartPanel).toContain("연재");
+    expect(projectStartPanel).toContain("<WorkflowTrustBadge state=\"device-saved\"");
   });
 
   it("does not silently flatten unsupported imported objects", () => {
@@ -58,6 +60,8 @@ describe("Studio front door UX contract", () => {
     expect(source).toContain("min-w-0");
     expect(source).toContain("break-words");
     expect(source).toContain("w-full min-w-0");
+    expect(projectStartPanel).toContain("min-w-0");
+    expect(projectStartPanel).toContain("break-words");
     expect(source).not.toContain("truncate text-sm");
   });
 
