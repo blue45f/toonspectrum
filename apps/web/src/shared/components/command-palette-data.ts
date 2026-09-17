@@ -87,12 +87,12 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
   {
     id: "cmd-toggle-bgm",
     title: "배경음악(BGM) 토글",
-    subtitle: "웹툰 분위기에 맞춘 생성형 앰비언트 사운드",
+    subtitle: "현재 페이지와 웹툰 테마에 맞춘 사운드스케이프",
     category: "audio",
     icon: Music,
     shortcut: ["⌥", "M"],
     keywords: ["음악", "bgm", "배경음", "노래", "music", "ambient", "ost"],
-    description: "웹툰 감상과 창작 작업에 몰입감을 주는 앰비언트 배경음악을 토글합니다.",
+    description: "페이지별 자동 선곡, 장르 테마, 보컬 OST를 제공하는 사이트 배경음악을 토글합니다.",
     getState: () => {
       const state = getAudioState();
       return {

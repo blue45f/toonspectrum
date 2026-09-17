@@ -25,6 +25,7 @@ import {
   playSfx,
   resumeAudio,
   setBgmEnabled,
+  setBgmVolume,
   setMasterVolume,
   setMuted,
   setSfxEnabled,
@@ -119,6 +120,8 @@ export interface UseAmbientBgm {
   artist: string;
   /** 현재 트랙 크레딧/출처 링크(호스티드 플레이리스트에서만, 없으면 ""). */
   creditUrl: string;
+  /** BGM 전용 볼륨(0~1). */
+  volume: number;
   /** 사용 가능한 무드 프리셋(메타). */
   presets: readonly BgmPreset[];
   /** on↔off 토글(켜졌으면 true 반환). 제스처 핸들러에서 호출하세요. */
@@ -129,6 +132,8 @@ export interface UseAmbientBgm {
   next: () => void;
   /** 특정 무드 id 로 전환. */
   setMood: (moodId: string) => void;
+  /** BGM 전용 볼륨 설정. */
+  setVolume: (value: number) => void;
 }
 
 /**
@@ -141,17 +146,20 @@ export function useAmbientBgm(): UseAmbientBgm {
   const setEnabled = useCallback((value: boolean) => setBgmEnabled(value), []);
   const next = useCallback(() => bgmNext(), []);
   const setMood = useCallback((moodId: string) => bgmSetMood(moodId), []);
+  const setVolume = useCallback((value: number) => setBgmVolume(value), []);
   return {
     enabled: audio.bgmEnabled,
     mood: audio.currentMood,
     moodId: audio.currentMoodId,
     artist: audio.currentTrackArtist,
     creditUrl: audio.currentTrackCreditUrl,
+    volume: audio.bgmVolume,
     presets: BGM_PRESETS,
     toggle,
     setEnabled,
     next,
     setMood,
+    setVolume,
   };
 }
 

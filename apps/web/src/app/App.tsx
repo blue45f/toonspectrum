@@ -41,6 +41,11 @@ const SiteFooter = lazy(() =>
     default: mod.SiteFooter,
   })),
 );
+const SiteBackgroundMusicPlayer = lazy(() =>
+  import("@/shared/components/SiteBackgroundMusicPlayer").then((mod) => ({
+    default: mod.SiteBackgroundMusicPlayer,
+  })),
+);
 const StudioBg3dRetainedOwnerHost = lazy(() =>
   import("../domains/creator/bg3d/StudioBg3dRetainedOwnerHost").then((mod) => ({
     default: mod.StudioBg3dRetainedOwnerHost,
@@ -288,6 +293,9 @@ function AppRuntime() {
                 <StudioBg3dRetainedOwnerHost />
               </Suspense>
             </ErrorBoundary>
+            <Suspense fallback={null}>
+              <SiteBackgroundMusicPlayer suspended={isolatedChrome} />
+            </Suspense>
             {!isolatedChrome ? (
               <>
                 <DeferredBackToTop />
