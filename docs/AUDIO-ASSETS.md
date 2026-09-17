@@ -1,6 +1,6 @@
 # Audio assets
 
-## ToonSpectrum anime vocal opening
+## Licensed anime opening reference
 
 - Web path: `/audio/toonspectrum-anime-vocal-opening.mp3`
 - Source title: `anime`
@@ -43,22 +43,30 @@ fallback.
 
 ## Playlist manifest
 
-The site-wide page soundtrack player reads `public/audio/playlist.json`
-(schema `{ tracks: [{ src, title, artist, license, creditUrl }] }`) only after the listener
-explicitly selects the **Vocal OST** source. The default source is the page-aware procedural
-Web Audio catalog, so no large audio file is downloaded and no audio starts without consent.
+The site-wide player reads `public/audio/playlist.json` with role-aware metadata:
+`id`, `src`, `title`, `artist`, `role`, `origin`, `vocalMode`, `language`, `summary`, `license`, and
+`creditUrl`. New listeners enter the **Original anime OST** source by default, but playback still
+requires an explicit user gesture. The route resolver chooses an opening, creator, story, action,
+romance/character, or ending role and always prefers a reviewed `origin: "original"` track.
+
+The three checked-in tracks documented above are `origin: "licensed-reference"` fallbacks. They
+are intentionally presented as **REFERENCE DEMO**, never as ToonSpectrum-authored songs. Until a
+reviewed original is published for a role, the player may use the matching reference track; users
+can switch to the procedural **Focus instrumental** source at any time.
 
 Manifest entries are restricted to reviewed same-origin `/audio/*` files with HTTPS credit
-links. `/audio/*` response headers are generated from `config/http-response-headers.json`.
-If the manifest or a track fails, the player returns to the procedural route theme. Audio
-creation, animatic, game, message, and live-call routes temporarily suspend the site soundtrack
-without clearing the listener's saved opt-in.
+links. `/audio/*` response headers are generated from `config/http-response-headers.json`. If the
+manifest fails, the player returns to the procedural instrumental engine. Audio creation, animatic,
+game, message, and live-call routes temporarily suspend the site soundtrack without clearing the
+listener's saved opt-in.
 ## Site-wide soundscape runtime
 
 The floating player is lazy-loaded from the global application shell. Music is off by default;
 a listener must press play before the browser audio context is resumed. The player remembers
-its source, page-following preference, expanded state, opt-in, mute state, and a BGM-only volume
-that does not change notification or interface effects.
+its OST/instrumental source, role-following preference, expanded state, opt-in, mute state, and
+an OST-only volume that does not change notification or interface effects. Legacy `page-theme`
+preferences migrate to `focus-instrumental`; legacy `vocal-ost` preferences migrate to the new
+`original-ost` experience.
 
 Public and project pages resolve into route themes such as creator focus, worldbuilding,
 production drive, catalog discovery, city pop, creator café, asset market, study ambience,

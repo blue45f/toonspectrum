@@ -19,6 +19,7 @@ import {
 import { Link, useSearchParams } from "react-router-dom";
 
 import { MusicTrackCard } from "./MusicTrackCard";
+import { ANIME_OST_STARTERS } from "./studio-anime-ost-presets";
 import { generateMusic, getMusicStatus } from "./studio-music-client";
 import { deleteMusicTrack, loadMusicTracks, saveMusicTrack } from "./studio-music-library";
 import {
@@ -46,8 +47,10 @@ import {
   MUSIC_LYRIC_LANGUAGES,
   MUSIC_MOODS,
   MUSIC_PURPOSES,
+  MUSIC_SONG_STRUCTURES,
   MUSIC_TERMS_URL,
   MUSIC_THEME_PACKS,
+  MUSIC_VOCAL_STYLES,
   parseMusicBrief,
   type MusicBrief,
   type MusicStatus,
@@ -67,6 +70,16 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
   const episodeId = readMusicEpisodeId(params.get("episodeId"), workId);
   const [brief, setBrief] = useState<MusicBrief>(() => ({
     ...defaultMusicBrief(),
+    title: "나의 첫 오리지널 OST",
+    purpose: "opening",
+    bpm: 138,
+    instruments: ["guitar", "drums", "synth", "strings"],
+    vocals: true,
+    vocalStyle: "bright-heroine",
+    songStructure: "anime-op",
+    lyricTheme: "작품의 첫 페이지를 함께 열어가는 청춘과 도전",
+    intensity: "cinematic",
+    arc: "build",
     workId,
     episodeId,
   }));
@@ -157,6 +170,37 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
   const applyTheme = (themeId: string) => {
     setBrief((previous) => applyMusicThemePack(previous, themeId));
     setNotice("웹툰 테마의 분위기·악기·템포·감정 곡선을 적용했습니다. 장면에 맞게 세부 값을 조정하세요.");
+    setError("");
+  };
+
+  const chooseCreationMode = (vocals: boolean) => {
+    if (!vocals) lyricsDraft.current = brief.lyrics || lyricsDraft.current;
+    setBrief((previous) => ({
+      ...previous,
+      vocals,
+      lyrics: vocals ? (previous.lyrics || lyricsDraft.current) : "",
+      purpose: vocals
+        ? (["opening", "ending", "ost"].includes(previous.purpose) ? previous.purpose : "opening")
+        : "bgm",
+      rightsConfirmed: false,
+    }));
+    setNotice(vocals
+      ? "보컬 애니 OST 모드입니다. OP·ED·캐릭터 테마 프리셋과 AI 가사를 조합해 한 곡처럼 설계하세요."
+      : "장면 BGM 모드입니다. 대사와 독서를 방해하지 않는 연주 중심으로 생성합니다.");
+    setError("");
+  };
+
+  const applyAnimeOstStarter = (starterId: string) => {
+    const starter = ANIME_OST_STARTERS.find((entry) => entry.id === starterId);
+    if (!starter) return;
+    setBrief((previous) => ({
+      ...previous,
+      ...starter.patch,
+      scene: previous.scene.trim() || MUSIC_MOODS.find((entry) => entry.id === starter.patch.mood)?.scene || previous.scene,
+      lyrics: previous.lyrics || lyricsDraft.current,
+      rightsConfirmed: false,
+    }));
+    setNotice(`${starter.label}의 곡 구조·보컬·악기·템포를 적용했습니다. 장면과 가사를 작품에 맞게 바꿔 주세요.`);
     setError("");
   };
 
@@ -342,18 +386,18 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
           {workId ? "작품으로 돌아가기" : "툰스튜디오로"}
         </Link>
         <p className="relative mb-3 flex items-center gap-2 text-xs font-semibold tracking-widest text-accent">
-          <Headphones size={16} aria-hidden />TOONSTUDIO SOUNDTRACK
+          <Headphones size={16} aria-hidden />TOONSTUDIO ORIGINAL ANIME OST
         </p>
         <h1 className="relative text-3xl font-bold leading-tight sm:text-4xl">
-          장면에 감정을,<br className="sm:hidden" /> 이야기에 음악을.
+          웹툰을 한 편의 애니처럼,<br className="sm:hidden" /> 나만의 보컬 OST로.
         </h1>
         <p className="relative mt-4 max-w-3xl text-sm leading-relaxed text-fg-2 sm:text-base">
-          웹툰 장르 프리셋과 감정 곡선, 회차 장면, AI 가사 초안을 조합해 BGM·OST·주제가를 제작하세요.
+          오프닝·엔딩·캐릭터 송부터 장면 BGM까지. 작품 세계관, 장면 감정, 보컬 캐릭터와 AI 가사를 조합해 기존 곡을 흉내 내지 않는 오리지널 애니풍 OST를 제작하세요.
         </p>
         <div className="relative mt-5 flex flex-wrap gap-2 text-xs text-fg-2">
-          <span className="rounded-full border border-line px-3 py-1.5">12개 웹툰 테마</span>
-          <span className="rounded-full border border-line px-3 py-1.5">18가지 장면 분위기</span>
-          <span className="rounded-full border border-line px-3 py-1.5">AI 가사 초안</span>
+          <span className="rounded-full border border-line px-3 py-1.5">7개 애니 OST 스타터</span>
+          <span className="rounded-full border border-line px-3 py-1.5">OP · ED · 캐릭터 · 배틀 테마</span>
+          <span className="rounded-full border border-line px-3 py-1.5">보컬 스타일 + AI 가사</span>
           <span className="rounded-full border border-line px-3 py-1.5">Eleven Music v2.5</span>
         </div>
       </header>
@@ -383,21 +427,56 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
           ref={formRef}
           onSubmit={(event) => void submit(event)}
           className="min-w-0 space-y-6 rounded-2xl border border-line bg-card p-5 sm:p-6"
-          aria-label="AI 음악 만들기"
+          aria-label="오리지널 애니 OST 만들기"
         >
           <div>
             <h2 className="flex items-center gap-2 text-xl font-semibold">
-              <Sparkles size={20} aria-hidden />AI 음악 만들기
+              <Sparkles size={20} aria-hidden />오리지널 애니 OST 만들기
             </h2>
-            <p className="mt-1 text-sm text-fg-3">테마를 고른 뒤 장면과 감정 흐름을 다듬으세요.</p>
+            <p className="mt-1 text-sm text-fg-3">먼저 보컬 OST인지 장면 BGM인지 정하고, 작품의 감정선과 노래 구조를 다듬으세요.</p>
             <p className="mt-2 break-all text-xs text-fg-3" aria-live="polite">{routeScope}</p>
           </div>
 
           <fieldset disabled={busy} className="space-y-6 disabled:opacity-70">
+            <section aria-labelledby="music-mode-heading">
+              <h3 id="music-mode-heading" className="text-sm font-semibold">1. 무엇을 만들까요?</h3>
+              <p className="mt-1 text-xs leading-5 text-fg-3">사이트용 테마곡처럼 들리게 하려면 보컬 애니 OST를 선택하세요. 장면 BGM은 독서 집중용 연주곡에 맞춥니다.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <button type="button" aria-pressed={brief.vocals} onClick={() => chooseCreationMode(true)} className={cn("rounded-2xl border p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-accent", brief.vocals ? "border-accent bg-accent/10" : "border-line bg-canvas hover:border-accent/40")}>
+                  <span className="text-[0.6875rem] font-black tracking-[0.16em] text-accent">VOCAL ANIME OST</span>
+                  <span className="mt-1 block text-base font-black">오프닝 · 엔딩 · 캐릭터 송</span>
+                  <span className="mt-1 block text-xs leading-5 text-fg-3">보컬, 후렴 훅, 가사와 곡 구조를 중심으로 한 완성형 주제가</span>
+                </button>
+                <button type="button" aria-pressed={!brief.vocals} onClick={() => chooseCreationMode(false)} className={cn("rounded-2xl border p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-accent", !brief.vocals ? "border-accent bg-accent/10" : "border-line bg-canvas hover:border-accent/40")}>
+                  <span className="text-[0.6875rem] font-black tracking-[0.16em] text-fg-3">SCENE SCORE</span>
+                  <span className="mt-1 block text-base font-black">장면 BGM · 루프</span>
+                  <span className="mt-1 block text-xs leading-5 text-fg-3">대사와 스크롤을 방해하지 않는 분위기 중심의 연주 사운드트랙</span>
+                </button>
+              </div>
+            </section>
+
+            {brief.vocals ? (
+              <section aria-labelledby="anime-ost-starter-heading">
+                <div>
+                  <h3 id="anime-ost-starter-heading" className="text-sm font-semibold">2. 애니 OST 스타터</h3>
+                  <p className="mt-1 text-xs text-fg-3">특정 기존 작품이나 가수를 모사하지 않고, 곡의 역할과 감정 구조만 빠르게 설정합니다.</p>
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {ANIME_OST_STARTERS.map((starter) => (
+                    <button key={starter.id} type="button" className="min-h-24 rounded-xl border border-line bg-canvas p-3 text-left transition-colors hover:border-accent/45 hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-accent" onClick={() => applyAnimeOstStarter(starter.id)}>
+                      <span className="text-[0.625rem] font-black tracking-[0.14em] text-accent">{starter.badge}</span>
+                      <span className="mt-1 block text-sm font-bold text-fg">{starter.label}</span>
+                      <span className="mt-1 block text-xs leading-5 text-fg-3">{starter.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
             <section aria-labelledby="music-theme-heading">
               <div className="flex items-end justify-between gap-3">
                 <div>
-                  <h3 id="music-theme-heading" className="text-sm font-semibold">1. 웹툰 테마로 빠르게 시작</h3>
+                  <h3 id="music-theme-heading" className="text-sm font-semibold">{brief.vocals ? "3. 장르·장면 테마 보강" : "2. 웹툰 장면 테마로 빠르게 시작"}</h3>
                   <p className="mt-1 text-xs text-fg-3">테마를 누르면 악기·템포·강도·감정 곡선이 함께 설정됩니다.</p>
                 </div>
               </div>
@@ -417,7 +496,7 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
             </section>
 
             <section className="space-y-5 rounded-2xl border border-line bg-panel/30 p-4" aria-labelledby="music-detail-heading">
-              <h3 id="music-detail-heading" className="text-sm font-semibold">2. 장면과 음악 세부 설정</h3>
+              <h3 id="music-detail-heading" className="text-sm font-semibold">{brief.vocals ? "4. 장면과 곡 세부 설정" : "3. 장면과 음악 세부 설정"}</h3>
               <label className="block space-y-2 text-sm font-medium">
                 음악 제목
                 <input className={inputClass} required maxLength={80} value={brief.title} onChange={(event) => patch({ title: event.target.value })} />
@@ -522,32 +601,49 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
             <section className="space-y-4 rounded-2xl border border-line bg-panel/30 p-4" aria-labelledby="music-lyrics-heading">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 id="music-lyrics-heading" className="text-sm font-semibold">3. 보컬·AI 가사</h3>
+                  <h3 id="music-lyrics-heading" className="text-sm font-semibold">{brief.vocals ? "5. 보컬 캐릭터·AI 가사" : "4. 보컬 옵션"}</h3>
                   <p className="mt-1 text-xs leading-5 text-fg-3">장면을 바탕으로 독창적인 가사 초안을 만들거나 직접 작성할 수 있습니다.</p>
                 </div>
                 <label className="flex min-h-10 items-center gap-3 text-sm">
                   <input
                     type="checkbox"
                     checked={brief.vocals}
-                    onChange={(event) => {
-                      if (!event.target.checked) lyricsDraft.current = brief.lyrics;
-                      patch({
-                        vocals: event.target.checked,
-                        lyrics: event.target.checked ? lyricsDraft.current : "",
-                      });
-                    }}
+                    onChange={(event) => chooseCreationMode(event.target.checked)}
                   />
                   보컬이 있는 주제가 만들기
                 </label>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                <label className="min-w-44 space-y-2 text-sm font-medium">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-2 text-sm font-medium">
+                  보컬 캐릭터
+                  <select className={inputClass} value={brief.vocalStyle} onChange={(event) => patch({ vocalStyle: event.target.value, rightsConfirmed: false })} disabled={!brief.vocals}>
+                    {MUSIC_VOCAL_STYLES.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+                  </select>
+                </label>
+                <label className="space-y-2 text-sm font-medium">
                   가사 언어
-                  <select className={inputClass} value={brief.lyricsLanguage} onChange={(event) => patch({ lyricsLanguage: event.target.value })}>
+                  <select className={inputClass} value={brief.lyricsLanguage} onChange={(event) => patch({ lyricsLanguage: event.target.value, rightsConfirmed: false })}>
                     {MUSIC_LYRIC_LANGUAGES.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
                   </select>
                 </label>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-2 text-sm font-medium">
+                  곡 구조
+                  <select className={inputClass} value={brief.songStructure} onChange={(event) => patch({ songStructure: event.target.value, rightsConfirmed: false })} disabled={!brief.vocals}>
+                    {MUSIC_SONG_STRUCTURES.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}
+                  </select>
+                  <span className="block text-xs font-normal leading-5 text-fg-3">{MUSIC_SONG_STRUCTURES.find((entry) => entry.id === brief.songStructure)?.hint}</span>
+                </label>
+                <label className="space-y-2 text-sm font-medium">
+                  가사 핵심 주제 · 후렴 아이디어
+                  <input className={inputClass} maxLength={180} value={brief.lyricTheme} onChange={(event) => patch({ lyricTheme: event.target.value, rightsConfirmed: false })} disabled={!brief.vocals} placeholder="예: 넘어져도 함께라면 다음 페이지를 열 수 있다" />
+                  <span className="block text-right text-xs font-normal text-fg-3">{brief.lyricTheme.length}/180</span>
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   className={cn(buttonClass, "border-accent/50 text-accent")}
@@ -591,7 +687,7 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
             </section>
 
             <section className="space-y-4 rounded-2xl border border-line bg-panel/30 p-4" aria-labelledby="music-output-heading">
-              <h3 id="music-output-heading" className="text-sm font-semibold">4. 반복·프롬프트·권리 확인</h3>
+              <h3 id="music-output-heading" className="text-sm font-semibold">{brief.vocals ? "6. 출력·프롬프트·권리 확인" : "5. 반복·프롬프트·권리 확인"}</h3>
               <label className="flex min-h-10 items-center gap-3 text-sm">
                 <input type="checkbox" checked={brief.loop} onChange={(event) => patch({ loop: event.target.checked })} />
                 반복 감상에 어울리는 루프 구성 요청
@@ -626,7 +722,7 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
               }
             >
               <Music4 size={18} aria-hidden />
-              {savingTrack ? "음원 저장 중…" : busy ? "음악 생성 중…" : "AI 음악 생성"}
+              {savingTrack ? "OST 저장 중…" : busy ? "OST 생성 중…" : brief.vocals ? "AI 오리지널 OST 생성" : "AI 장면 BGM 생성"}
             </button>
             {busy && !savingTrack ? (
               <button type="button" className={buttonClass} onClick={cancel}>

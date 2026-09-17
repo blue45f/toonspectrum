@@ -1,12 +1,17 @@
-# BGM tracks
+# Site OST assets
 
-Hosted vocal BGM playlist for the shared fx audio engine. The manifest is
-`playlist.json` (`{ tracks: [{ src, title, artist, license, creditUrl }] }`);
-the global page soundtrack player loads it only when the listener selects
-“Vocal OST”. Page-aware procedural Web Audio themes remain the default and the
-fallback when the manifest or a track is unavailable.
+The global player is now designed around a **ToonSpectrum original anime OST** experience:
+opening, ending, creator, story, action, and character-song roles. The default listener source
+is `original-ost`; the procedural Web Audio engine remains available as `focus-instrumental`.
 
-Tracks are used under the Pixabay Content License (free for commercial use,
-no attribution required). Not for standalone redistribution.
+`playlist.json` contains role-aware metadata (`id`, `src`, `title`, `artist`, `role`, `origin`,
+`vocalMode`, `language`, `summary`, `license`, `creditUrl`). Runtime selection always prefers an
+`origin: "original"` track for the current page role before using a licensed reference fallback.
 
-Provenance details per track: see `docs/AUDIO-ASSETS.md`.
+The three audio files currently checked into this directory are **licensed reference demos**, not
+ToonSpectrum-authored songs. The UI labels them `REFERENCE DEMO` and preserves their actual artist,
+license, and source. Do not rename or present them as ToonSpectrum originals.
+
+A generated or commissioned ToonSpectrum song should be published with `origin: "original"` only
+after its creation provenance and commercial-use rights have been reviewed. See
+`docs/AUDIO-ASSETS.md` for provenance and release notes.

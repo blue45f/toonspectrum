@@ -54,11 +54,13 @@ function Harness({ initial = "/music?workId=work-a" }: { initial?: string }) {
   </Routes></MemoryRouter></StrictMode>;
 }
 const consent = () => screen.getByRole("checkbox", { name: /입력한 장면·가사를 사용할 권한/ });
-const submit = () => screen.getByRole("form", { name: "AI 음악 만들기" });
-const generateButton = () => screen.getByRole("button", { name: "AI 음악 생성" });
+const submit = () => screen.getByRole("form", { name: "오리지널 애니 OST 만들기" });
+const generateButton = () => screen.getByRole("button", { name: /AI (?:오리지널 OST|장면 BGM) 생성/u });
 function fillBrief() {
   fireEvent.change(screen.getByLabelText("음악 제목"), { target: { value: "새 음악" } });
   fireEvent.change(screen.getByLabelText("장면 설명"), { target: { value: "조용한 역에서 두 사람이 재회한다." } });
+  const lyrics = screen.queryByLabelText(/직접 작성한 가사 또는 AI 초안/u);
+  if (lyrics) fireEvent.change(lyrics, { target: { value: "[Verse] 다시 만난 밤\n[Chorus] 우리의 페이지를 열어" } });
   fireEvent.click(consent());
 }
 async function ready() {
@@ -266,7 +268,7 @@ describe("music workspace rendered recovery and route regression", () => {
   it("preserves original lyric text when toggling vocals off and on", async () => {
     render(<Harness />); await ready();
     const vocals = screen.getByRole("checkbox", { name: "보컬이 있는 주제가 만들기" });
-    fireEvent.click(vocals);
+    expect(vocals).toHaveProperty("checked", true);
     fireEvent.change(screen.getByLabelText(/직접 작성한 가사/), { target: { value: "우리의 내일을 노래해" } });
     fireEvent.click(vocals); fireEvent.click(vocals);
     expect(screen.getByLabelText(/직접 작성한 가사/)).toHaveProperty("value", "우리의 내일을 노래해");
