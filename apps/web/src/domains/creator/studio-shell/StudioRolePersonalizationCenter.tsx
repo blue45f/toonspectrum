@@ -52,6 +52,7 @@ import {
   creatorRoleChecklist,
   creatorRoleNotificationSettings,
   creatorRoleStudioWorkspace,
+  creatorWorkspaceStudioUiMode,
   normalizeCreatorRoleWorkspacePreference,
   rankCreatorRoleWork,
   recommendCreatorTeamRoles,
@@ -86,18 +87,25 @@ const FEATURED_ONBOARDING_ROLES: readonly CreatorRoleId[] = [
   "assistant",
   "planner",
   "producer",
+  "educator",
   "creator",
 ];
 
 const USAGE_GOAL_LABELS: Readonly<
   Record<CreatorRoleUsageGoal, { readonly ko: string; readonly en: string }>
 > = {
+  learning: { ko: "웹툰 제작 배우기", en: "Learn webtoon production" },
+  "first-project": { ko: "첫 작품 만들기", en: "Create my first project" },
   "personal-project": { ko: "개인 작품 제작", en: "Personal project" },
+  serialization: { ko: "연재 작품 제작", en: "Serialized production" },
+  "drawing-practice": { ko: "그림·작화 연습", en: "Drawing practice" },
+  "story-writing": { ko: "스토리·대본 집필", en: "Story writing" },
+  "character-building": { ko: "캐릭터 제작", en: "Character creation" },
   "team-production": { ko: "팀 프로젝트 참여", en: "Team production" },
-  serialization: { ko: "연재 작품 관리", en: "Serialization" },
-  outsourcing: { ko: "외주 작업", en: "Freelance work" },
   portfolio: { ko: "포트폴리오 제작", en: "Portfolio" },
   "studio-management": { ko: "제작사·스튜디오 운영", en: "Studio management" },
+  education: { ko: "학생 교육·수업", en: "Teaching & education" },
+  outsourcing: { ko: "외주 작업", en: "Freelance work" },
 };
 
 const NOTIFICATION_LABELS: Readonly<
@@ -223,7 +231,7 @@ function studioWorkspaceHref(
     preference.workspacePreset
       ?? creatorRoleStudioWorkspace(preference.activeRole),
   );
-  params.set("uiMode", "standard");
+  params.set("uiMode", creatorWorkspaceStudioUiMode(preference.workspaceMode));
   if (projectKey !== "draft" && projectKey !== GLOBAL_CREATOR_ROLE_WORKSPACE_KEY) {
     params.set("scope", projectKey);
   }
@@ -530,6 +538,15 @@ export function StudioRolePersonalizationCenter({
   ) => {
     await projectWorkspace.save(normalizeCreatorRoleWorkspacePreference({
       ...projectDocument,
+      ...patch,
+    }));
+  };
+
+  const saveGlobalPatch = async (
+    patch: Partial<CreatorRoleWorkspacePreference>,
+  ) => {
+    await globalWorkspace.save(normalizeCreatorRoleWorkspacePreference({
+      ...globalDocument,
       ...patch,
     }));
   };
@@ -1143,6 +1160,50 @@ export function StudioRolePersonalizationCenter({
           </div>
         </Card>
       </div>
+
+      <Card
+        title={localized(locale, "기본 작업환경 개인화", "Default workspace personalization")}
+        description={localized(locale, "활동 목적과 화면 밀도는 기본값으로만 사용되며 프로젝트 역할과 권한을 변경하지 않습니다.", "Goals and workspace density are defaults only and never change project roles or permissions.")}
+        action={<Settings2 className="size-4 text-accent" aria-hidden="true" />}
+      >
+        <div className="grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
+          <label className="text-xs font-bold text-fg-2">
+            {localized(locale, "작업 화면", "Workspace mode")}
+            <select
+              value={globalDocument.workspaceMode}
+              onChange={(event) => void saveGlobalPatch({
+                workspaceMode: event.currentTarget.value as CreatorRoleWorkspacePreference["workspaceMode"],
+              })}
+              className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg"
+            >
+              <option value="guided">Guided · {localized(locale, "안내 중심", "more guidance")}</option>
+              <option value="creator">Creator · {localized(locale, "균형형", "balanced")}</option>
+              <option value="production">Production · {localized(locale, "고밀도", "high density")}</option>
+            </select>
+            <span className="mt-1.5 block text-[0.68rem] font-normal leading-5 text-fg-3">
+              {localized(locale, "Studio를 열 때 Guided/Creator는 단순 화면, Production은 전체 패널 밀도로 연결됩니다.", "Guided and Creator open a simplified Studio layout, while Production opens the full-density layout.")}
+            </span>
+          </label>
+          <div>
+            <p className="text-xs font-bold text-fg-2">{localized(locale, "주요 사용 목적", "Primary goals")}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {CREATOR_ROLE_USAGE_GOALS.map((goal) => (
+                <ToggleChip
+                  key={goal}
+                  selected={globalDocument.usageGoals.includes(goal)}
+                  onClick={() => void saveGlobalPatch({
+                    usageGoals: globalDocument.usageGoals.includes(goal)
+                      ? globalDocument.usageGoals.filter((entry) => entry !== goal)
+                      : [...globalDocument.usageGoals, goal],
+                  })}
+                >
+                  {USAGE_GOAL_LABELS[goal][locale]}
+                </ToggleChip>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <details className="rounded-2xl border border-line bg-card p-4">
         <summary className="cursor-pointer list-none text-sm font-black text-fg">

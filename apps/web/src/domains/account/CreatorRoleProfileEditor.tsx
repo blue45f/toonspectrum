@@ -15,6 +15,8 @@ import {
   CREATOR_ROLE_MAX_SECONDARY,
   CREATOR_ROLE_MAX_SPECIALTIES,
   CREATOR_SPECIALTY_DEFINITIONS,
+  CREATOR_STAGE_IDS,
+  CREATOR_STAGE_LABELS,
   creatorRoleDefinition,
   creatorRoleSelection,
   creatorText,
@@ -27,6 +29,7 @@ import {
   type CreatorRoleLocale,
   type CreatorRoleProfile,
   type CreatorSpecialtyId,
+  type CreatorStage,
 } from "@/shared/lib/creator-role-contract";
 import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
@@ -37,6 +40,7 @@ const FEATURED_ROLES: readonly CreatorRoleId[] = [
   "assistant",
   "planner",
   "producer",
+  "educator",
   "creator",
 ];
 
@@ -138,6 +142,26 @@ export function CreatorRoleProfileEditor({
           </span>
         ) : null}
       </header>
+
+      <label className="block text-xs font-semibold text-fg">
+        {localized(locale, "현재 활동 단계", "Current creator stage")}
+        <select
+          disabled={disabled}
+          value={value.creatorStage ?? ""}
+          onChange={(event) => onChange(withProfilePatch(value, {
+            creatorStage: (event.target.value || null) as CreatorStage | null,
+          }))}
+          className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg outline-none focus:border-accent"
+        >
+          <option value="">{localized(locale, "선택 안 함", "Not specified")}</option>
+          {CREATOR_STAGE_IDS.map((id) => (
+            <option key={id} value={id}>{creatorText(CREATOR_STAGE_LABELS[id], locale)}</option>
+          ))}
+        </select>
+        <span className="mt-1 block text-[0.68rem] font-normal leading-5 text-fg-3">
+          {localized(locale, "학생·아마추어·프로 여부는 능력 평가가 아니라 홈과 도움말의 우선순위를 정하는 데만 사용합니다.", "This is not a skill rating. It only tunes home content and guidance priority.")}
+        </span>
+      </label>
 
       <fieldset disabled={disabled}>
         <legend className="text-xs font-black text-fg">

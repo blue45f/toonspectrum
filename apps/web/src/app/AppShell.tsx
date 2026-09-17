@@ -40,6 +40,11 @@ const AgeGateHost = lazy(() =>
 const StoreSync = lazy(() =>
   import("@/domains/auth/components/store-sync").then((mod) => ({ default: mod.StoreSync })),
 );
+const CreatorAdaptiveOnboardingGate = lazy(() =>
+  import("@/shared/components/CreatorAdaptiveOnboardingGate").then((mod) => ({
+    default: mod.CreatorAdaptiveOnboardingGate,
+  })),
+);
 const ToastHost = lazy(() =>
   import("@/shared/components/toast-host").then((mod) => ({ default: mod.ToastHost })),
 );
@@ -110,6 +115,9 @@ export function AppShell({
     <AuthSessionProvider>
       <Suspense fallback={null}><AccessibleTooltipLayer /></Suspense>
       <Suspense fallback={null}><StoreSync /></Suspense>
+      {showGlobalOverlays ? (
+        <Suspense fallback={null}><CreatorAdaptiveOnboardingGate /></Suspense>
+      ) : null}
       <RouteScrollRestoration />
       <CreatorContinuityTracker />
       <SiteExperienceFrame enabled={enhancedSite}>
