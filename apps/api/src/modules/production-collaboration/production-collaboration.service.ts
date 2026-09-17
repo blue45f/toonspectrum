@@ -1410,6 +1410,7 @@ export class ProductionCollaborationService {
   async submitExternalReview(
     projectId: string,
     reviewId: string,
+    token: string,
     body: SubmitProductionExternalReviewDto,
   ) {
     if (body.decision !== "approve" && !body.note.trim()) {
@@ -1418,7 +1419,7 @@ export class ProductionCollaborationService {
     const result = await this.run(() => this.repository.mutatePublicReview({
       projectId,
       mutate: (current) => {
-        const access = requireExternalReviewAccess(current, reviewId, body.token);
+        const access = requireExternalReviewAccess(current, reviewId, token);
         if (!access.permissions.includes("comment") && body.decision === "comment") {
           throw new ForbiddenException("이 링크에는 댓글 권한이 없습니다.");
         }
