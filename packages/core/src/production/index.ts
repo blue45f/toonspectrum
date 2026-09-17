@@ -16,3 +16,4 @@ export * from "./operations-control";
 export * from "./schedule-forecast";
 export * from "./risk";
 export * from "./migration";
+export * from "./studio-revision";

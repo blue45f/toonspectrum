@@ -35,6 +35,7 @@ import {
 import { Link, Navigate, useParams } from "react-router-dom";
 
 import {
+  applyProductionStudioRevisionLink,
   createPlanningSnapshot,
   evaluateHandoffReadiness,
   evaluateProductionRisks,
@@ -355,6 +356,8 @@ function reduceDemoCommand(
       return { ...base, deliverables: replaceById(aggregate.deliverables, command.deliverable) };
     case "upsert-submission":
       return { ...base, submissions: replaceById(aggregate.submissions, command.submission) };
+    case "upsert-studio-revision-link":
+      return applyProductionStudioRevisionLink(base, command.link);
     case "record-review-decision":
       return { ...base, reviewDecisions: replaceById(aggregate.reviewDecisions, command.decision) };
     case "upsert-episode":

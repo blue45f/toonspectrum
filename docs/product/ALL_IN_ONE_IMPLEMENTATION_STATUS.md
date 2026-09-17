@@ -200,6 +200,20 @@
 
 현재 release commit의 8시간 soak, 물리 GPU·브라우저 process crash·OPFS quota, 실제 네트워크 분할, 실기기 스크린리더·펜 장치와 외부 전문 창작자 서명은 저장소 자동화가 대체하지 않는 release gate다.
 
+## 2026-09-17 Production–Studio revision bridge 증분
+
+이번 증분에서 완료한 범위는 다음과 같다.
+
+- Production 산출물과 Studio 원고를 `ProductionStudioRevisionLink`로 명시적으로 연결한다.
+- 대본·콘티·선화·배경·채색·식자·통합 승인본의 역할과 Studio revision lineage를 검증한다.
+- 승인 연결은 실제 승인된 `Submission`과 `Deliverable.approvedSubmissionId`가 일치할 때만 허용한다.
+- 승인된 대본·작화·통합 revision을 회차의 narrative·visual·integrated 권위에 투영한다.
+- 같은 회차·역할의 이전 연결은 자동으로 `superseded` 처리하되 원본 revision과 감사 이력은 보존한다.
+- 회차별로 필요·승인·검수 대기·미연결 revision 수와 통합 검수 준비 여부를 Production 화면에 표시한다.
+- 사용자는 검수 또는 승인 revision을 명시적으로 연결하며, 권한·역할·제출본 부족 시 이유와 다음 행동을 확인한다.
+- API는 프로젝트·작업·회차·산출물·제출본·역할 배정과 revision digest를 서버에서 다시 검증한다.
+- 이 증분은 Production과 Studio의 revision 권위를 연결하지만 실제 다중 계정 팀 제작, 위치 기반 수정 요청, 승인 잠금과 게시본 E2E는 계속 검증 대상으로 남긴다.
+
 ## 올인원 공개 문구 사용 게이트
 
 다음 기준 프로젝트가 모두 통과하기 전에는 `Clip Studio·Photoshop·SketchUp·Drive를 완전히 대체했다`거나 `모든 전문 기능이 완성됐다`고 표시하지 않는다.

@@ -23,6 +23,7 @@ import {
   evaluateProductionRisks,
   evaluateHandoffReadiness,
   evaluateReleaseReadiness,
+  evaluateProductionStudioRevisionCoverage,
   evaluateReviewApproval,
   resolveDecisionAuthority,
   preflightCreditManifest,
@@ -206,6 +207,7 @@ function eventTarget(command: ProductionCommand): { type: string; id: string } {
 
 function commandCapability(command: ProductionCommand): "comment" | "edit" | "manage" {
   if (command.type === "record-review-decision") return "comment";
+  if (command.type === "upsert-studio-revision-link" && command.link.status === "approved") return "manage";
   if (command.type === "upsert-operations-record") {
     return [
       "resource-calendar",
