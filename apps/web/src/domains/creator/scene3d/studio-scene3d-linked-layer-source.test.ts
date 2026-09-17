@@ -7,22 +7,25 @@ import { resolveStudioScene3dLinkedLayerEditSource } from "./studio-scene3d-link
 function fixture() {
   const page = createStudioLinked3dRenderPageFixture();
   const element = page.elements[0];
+  const bundleId = element?.type === "image" ? element.bg3dLtBundleId : undefined;
+  const linked3dRender = page.linked3dRender;
+  const shared3dStage = page.shared3dStage;
   if (
     !element
     || element.type !== "image"
-    || !element.bg3dLtBundleId
+    || !bundleId
     || !element.bg3dScene
-    || !page.shared3dStage
-    || !page.linked3dRender
+    || !shared3dStage
+    || !linked3dRender
   ) {
     throw new Error("Linked 3D fixture is incomplete.");
   }
   return {
     page,
     element,
-    bundleId: element.bg3dLtBundleId,
-    linked3dRender: page.linked3dRender,
-    shared3dStage: page.shared3dStage,
+    bundleId,
+    linked3dRender,
+    shared3dStage,
   };
 }
 
