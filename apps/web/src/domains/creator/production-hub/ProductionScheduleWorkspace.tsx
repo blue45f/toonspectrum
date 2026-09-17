@@ -20,13 +20,19 @@ import type {
 } from "@toonspectrum/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
+import { deriveProductionOperationsOverview } from "./production-episode-operations";
+import { deriveAssignmentWorkload } from "./production-management-overview";
+import {
+  deriveProductionRiskIntelligence,
+  type ProductionRiskSignal,
+} from "./production-risk-intelligence";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
 type ScheduleView = "timeline" | "workload";
 type ExecuteCommand = (command: ProductionClientCommand, message: string) => Promise<void>;
-type RiskLevel = "normal" | "attention" | "overdue";
+type RiskLevel = "normal" | "attention" | "predicted" | "overdue";
 
 export interface ProductionScheduleWorkspaceProps {
   readonly aggregate: ProductionProjectAggregate;
@@ -93,10 +99,17 @@ function startOfDay(value: Date): Date {
   return new Date(value.getFullYear(), value.getMonth(), value.getDate());
 }
 
-function taskRisk(task: ProductionTask, now: Date): RiskLevel {
+function taskRisk(
+  task: ProductionTask,
+  now: Date,
+  signals: readonly ProductionRiskSignal[] = [],
+): RiskLevel {
   if (["done", "cancelled", "out-of-scope"].includes(task.status)) return "normal";
   const due = parseDate(task.dueAt);
   if (due && startOfDay(due).getTime() < startOfDay(now).getTime()) return "overdue";
+  if (signals.some((signal) =>
+    signal.source === "derived"
+    && (signal.severity === "critical" || signal.severity === "high"))) return "predicted";
   if (task.status === "blocked" || task.status === "changes-requested") return "attention";
   if (due && startOfDay(due).getTime() - startOfDay(now).getTime() <= DAY_MS * 2) return "attention";
   return "normal";
@@ -129,8 +142,16 @@ function scopeLabel(task: ProductionTask): string {
 
 function riskClass(risk: RiskLevel): string {
   if (risk === "overdue") return "border-bad/35 bg-bad/10 text-bad";
+  if (risk === "predicted") return "border-warn/50 bg-warn/15 text-warn";
   if (risk === "attention") return "border-warn/35 bg-warn/10 text-warn";
   return "border-line bg-raised text-fg-2";
+}
+
+function riskLabel(risk: RiskLevel): string {
+  if (risk === "overdue") return "기한 초과";
+  if (risk === "predicted") return "예측 위험";
+  if (risk === "attention") return "주의";
+  return "정상";
 }
 
 function statusClass(status: ProductionTaskStatus): string {
@@ -156,6 +177,24 @@ export function ProductionScheduleWorkspace({
   const [query, setQuery] = useState("");
   const [assignmentFilter, setAssignmentFilter] = useState("all");
   const [riskFilter, setRiskFilter] = useState<"all" | RiskLevel>("all");
+  const riskIntelligence = useMemo(() => {
+    const operations = deriveProductionOperationsOverview(aggregate, now);
+    return deriveProductionRiskIntelligence(aggregate, {
+      now,
+      operations,
+      workload: deriveAssignmentWorkload(aggregate, now),
+    });
+  }, [aggregate, now]);
+  const riskSignalsByTask = useMemo(() => {
+    const byTask = new Map<string, ProductionRiskSignal[]>();
+    for (const signal of riskIntelligence.signals) {
+      if (!signal.taskId) continue;
+      const current = byTask.get(signal.taskId) ?? [];
+      current.push(signal);
+      byTask.set(signal.taskId, current);
+    }
+    return byTask;
+  }, [riskIntelligence.signals]);
 
   const days = useMemo(
     () => Array.from({ length: 14 }, (_, index) => addDays(windowStart, index)),
@@ -169,10 +208,10 @@ export function ProductionScheduleWorkspace({
       || task.processKey.toLocaleLowerCase("ko-KR").includes(normalized)
       || task.scope.id.toLocaleLowerCase("ko-KR").includes(normalized);
     const matchesAssignment = assignmentFilter === "all" || task.assignmentIds.includes(assignmentFilter);
-    const risk = taskRisk(task, now);
+    const risk = taskRisk(task, now, riskSignalsByTask.get(task.id));
     const matchesRisk = riskFilter === "all" || riskFilter === risk;
     return matchesQuery && matchesAssignment && matchesRisk;
-  }), [aggregate.tasks, assignmentFilter, now, query, riskFilter]);
+  }), [aggregate.tasks, assignmentFilter, now, query, riskFilter, riskSignalsByTask]);
 
   const saveTask = (task: ProductionTask, patch: Partial<ProductionTask>, message: string) => {
     if (!canEdit) return;
@@ -211,14 +250,19 @@ export function ProductionScheduleWorkspace({
         name: assignmentLabel(aggregate, assignment.id),
         tasks: assignedTasks,
         hours: assignedTasks.reduce((sum, task) => sum + taskHours(task), 0),
-        attention: assignedTasks.filter((task) => taskRisk(task, now) !== "normal").length,
+        attention: assignedTasks.filter((task) =>
+          taskRisk(task, now, riskSignalsByTask.get(task.id)) !== "normal").length,
       };
     })
     .filter((entry) => entry.tasks.length > 0)
-    .sort((left, right) => right.hours - left.hours), [aggregate, now, tasks]);
+    .sort((left, right) => right.hours - left.hours), [aggregate, now, riskSignalsByTask, tasks]);
 
-  const overdueCount = tasks.filter((task) => taskRisk(task, now) === "overdue").length;
-  const attentionCount = tasks.filter((task) => taskRisk(task, now) === "attention").length;
+  const overdueCount = tasks.filter((task) =>
+    taskRisk(task, now, riskSignalsByTask.get(task.id)) === "overdue").length;
+  const predictedCount = tasks.filter((task) =>
+    taskRisk(task, now, riskSignalsByTask.get(task.id)) === "predicted").length;
+  const attentionCount = tasks.filter((task) =>
+    taskRisk(task, now, riskSignalsByTask.get(task.id)) === "attention").length;
   const scheduledHours = tasks.reduce((sum, task) => sum + taskHours(task), 0);
 
   return (
@@ -239,9 +283,10 @@ export function ProductionScheduleWorkspace({
           </div>
         </div>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
+        <div className="mt-4 grid gap-2 sm:grid-cols-3 xl:grid-cols-7">
           <div className="rounded-xl border border-line bg-card p-3"><p className="text-[0.6875rem] font-bold text-fg-3">표시 작업</p><p className="mt-1 text-xl font-black text-fg">{tasks.length}</p></div>
           <div className={cn("rounded-xl border p-3", overdueCount > 0 ? "border-bad/30 bg-bad/10" : "border-line bg-card")}><p className="text-[0.6875rem] font-bold text-fg-3">기한 초과</p><p className="mt-1 text-xl font-black text-fg">{overdueCount}</p></div>
+          <div className={cn("rounded-xl border p-3", predictedCount > 0 ? "border-warn/40 bg-warn/15" : "border-line bg-card")}><p className="text-[0.6875rem] font-bold text-fg-3">예측 위험</p><p className="mt-1 text-xl font-black text-fg">{predictedCount}</p></div>
           <div className={cn("rounded-xl border p-3", attentionCount > 0 ? "border-warn/30 bg-warn/10" : "border-line bg-card")}><p className="text-[0.6875rem] font-bold text-fg-3">주의 필요</p><p className="mt-1 text-xl font-black text-fg">{attentionCount}</p></div>
           <div className="rounded-xl border border-line bg-card p-3"><p className="text-[0.6875rem] font-bold text-fg-3">예상 공수</p><p className="mt-1 text-xl font-black text-fg">{scheduledHours}h</p></div>
           <div className="rounded-xl border border-line bg-card p-3"><p className="text-[0.6875rem] font-bold text-fg-3">활성 담당</p><p className="mt-1 text-xl font-black text-fg">{workload.length}</p></div>
@@ -254,7 +299,7 @@ export function ProductionScheduleWorkspace({
             <input aria-label="작업 검색" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="작업·공정·범위 검색" className="min-w-0 flex-1 bg-transparent text-fg outline-none" />
           </label>
           <label className="flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-xs text-fg-2"><Users className="size-4 text-fg-3" aria-hidden="true" /><span className="sr-only">담당자 필터</span><select aria-label="담당자 필터" value={assignmentFilter} onChange={(event) => setAssignmentFilter(event.target.value)} className="bg-transparent font-semibold text-fg outline-none"><option value="all">모든 담당자</option>{aggregate.assignments.filter((entry) => entry.status === "active").map((assignment) => <option key={assignment.id} value={assignment.id}>{assignmentLabel(aggregate, assignment.id)}</option>)}</select></label>
-          <label className="flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-xs text-fg-2"><Filter className="size-4 text-fg-3" aria-hidden="true" /><span className="sr-only">위험 필터</span><select aria-label="위험 필터" value={riskFilter} onChange={(event) => setRiskFilter(event.target.value as typeof riskFilter)} className="bg-transparent font-semibold text-fg outline-none"><option value="all">모든 위험</option><option value="overdue">기한 초과</option><option value="attention">주의 필요</option><option value="normal">정상</option></select></label>
+          <label className="flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-xs text-fg-2"><Filter className="size-4 text-fg-3" aria-hidden="true" /><span className="sr-only">위험 필터</span><select aria-label="위험 필터" value={riskFilter} onChange={(event) => setRiskFilter(event.target.value as typeof riskFilter)} className="bg-transparent font-semibold text-fg outline-none"><option value="all">모든 위험</option><option value="overdue">기한 초과</option><option value="predicted">예측 위험</option><option value="attention">주의 필요</option><option value="normal">정상</option></select></label>
         </div>
       </header>
 
@@ -278,16 +323,18 @@ export function ProductionScheduleWorkspace({
               const dueIndex = due ? Math.round((startOfDay(due).getTime() - windowStart.getTime()) / DAY_MS) : -1;
               const durationDays = Math.max(1, Math.ceil(taskHours(task) / 8));
               const startIndex = Math.max(0, dueIndex - durationDays + 1);
-              const risk = taskRisk(task, now);
+              const taskSignals = riskSignalsByTask.get(task.id) ?? [];
+              const risk = taskRisk(task, now, taskSignals);
               return (
                 <div key={task.id} className="grid min-h-24 border-b border-line bg-panel/45" style={{ gridTemplateColumns: "minmax(21rem,1.6fr) repeat(14,minmax(3.3rem,1fr))" }}>
                   <div className="sticky left-0 z-10 border-r border-line bg-card p-3">
-                    <div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><span className={cn("rounded-full border px-2 py-0.5 text-[0.625rem] font-bold", statusClass(task.status))}>{STATUS_LABEL[task.status]}</span><span className={cn("rounded-full border px-2 py-0.5 text-[0.625rem] font-bold", riskClass(risk))}>{risk === "overdue" ? "기한 초과" : risk === "attention" ? "주의" : "정상"}</span></div><h3 className="mt-2 truncate text-sm font-bold text-fg">{task.title}</h3><p className="mt-1 text-[0.6875rem] text-fg-3">{task.processKey} · {scopeLabel(task)}</p></div><span className="text-xs font-black text-fg">{taskHours(task)}h</span></div>
+                    <div className="flex items-start justify-between gap-2"><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><span className={cn("rounded-full border px-2 py-0.5 text-[0.625rem] font-bold", statusClass(task.status))}>{STATUS_LABEL[task.status]}</span><span className={cn("rounded-full border px-2 py-0.5 text-[0.625rem] font-bold", riskClass(risk))}>{riskLabel(risk)}</span></div><h3 className="mt-2 truncate text-sm font-bold text-fg">{task.title}</h3><p className="mt-1 text-[0.6875rem] text-fg-3">{task.processKey} · {scopeLabel(task)}</p></div><span className="text-xs font-black text-fg">{taskHours(task)}h</span></div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <select aria-label={`${task.title} 상태`} value={task.status} disabled={!canEdit} className="min-h-8 rounded-lg border border-line bg-panel px-2 text-[0.6875rem] font-semibold text-fg outline-none disabled:opacity-60" onChange={(event) => saveTask(task, { status: event.target.value as ProductionTaskStatus }, `${task.title} 상태를 변경했습니다.`)}>{STATUS_OPTIONS.map((status) => <option key={status} value={status}>{STATUS_LABEL[status]}</option>)}</select>
                       <input type="date" aria-label={`${task.title} 마감일`} value={due ? dateOnly(due) : ""} disabled={!canEdit} className="min-h-8 rounded-lg border border-line bg-panel px-2 text-[0.6875rem] text-fg outline-none disabled:opacity-60" onChange={(event) => saveTask(task, { dueAt: event.target.value ? new Date(`${event.target.value}T09:00:00`).toISOString() : null }, `${task.title} 마감일을 변경했습니다.`)} />
                       {task.dependencyTaskIds.length > 0 ? <span className="inline-flex items-center gap-1 text-[0.6875rem] text-fg-3"><GitBranch className="size-3" aria-hidden="true" />선행 {task.dependencyTaskIds.length}</span> : null}
                     </div>
+                    {taskSignals[0] ? <p className="mt-2 line-clamp-2 text-[0.6875rem] leading-4 text-warn">{taskSignals[0].summary}</p> : null}
                   </div>
                   {days.map((day, index) => {
                     const withinBar = dueIndex >= 0 && index >= startIndex && index <= dueIndex;
@@ -295,8 +342,8 @@ export function ProductionScheduleWorkspace({
                     const today = dateOnly(day) === dateOnly(now);
                     return (
                       <div key={day.toISOString()} className={cn("relative border-r border-line/70", today && "bg-accent-soft/40")}>
-                        {withinBar ? <div className={cn("absolute inset-y-7", index === startIndex ? "left-2 rounded-l-full" : "left-0", index === dueIndex ? "right-2 rounded-r-full" : "right-0", risk === "overdue" ? "bg-bad/45" : risk === "attention" ? "bg-warn/45" : "bg-accent/35")} /> : null}
-                        {isDue ? <div className={cn("absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card", risk === "overdue" ? "bg-bad" : risk === "attention" ? "bg-warn" : "bg-accent")} title={`${task.title} 마감`} /> : null}
+                        {withinBar ? <div className={cn("absolute inset-y-7", index === startIndex ? "left-2 rounded-l-full" : "left-0", index === dueIndex ? "right-2 rounded-r-full" : "right-0", risk === "overdue" ? "bg-bad/45" : risk === "predicted" ? "bg-warn/55" : risk === "attention" ? "bg-warn/45" : "bg-accent/35")} /> : null}
+                        {isDue ? <div className={cn("absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card", risk === "overdue" ? "bg-bad" : risk === "predicted" || risk === "attention" ? "bg-warn" : "bg-accent")} title={`${task.title} 마감`} /> : null}
                       </div>
                     );
                   })}
@@ -316,7 +363,7 @@ export function ProductionScheduleWorkspace({
                 <header className="flex items-start justify-between gap-3"><div><p className="text-sm font-black text-fg">{name}</p><p className="mt-1 text-xs text-fg-3">{assignment.publicCreditRole ?? assignment.roleType}</p></div><span className={cn("rounded-full border px-2 py-1 text-xs font-bold", ratio > 100 ? "border-bad/30 bg-bad/10 text-bad" : ratio > 80 ? "border-warn/30 bg-warn/10 text-warn" : "border-good/30 bg-good/10 text-good")}>{hours}h / {target}h</span></header>
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-raised"><div className={cn("h-full rounded-full", ratio > 100 ? "bg-bad" : ratio > 80 ? "bg-warn" : "bg-good")} style={{ width: `${Math.min(100, ratio)}%` }} /></div>
                 <div className="mt-3 flex items-center justify-between text-[0.6875rem] text-fg-3"><span>{assignedTasks.length}개 작업</span><span>{attention}개 주의</span></div>
-                <div className="mt-4 space-y-2">{assignedTasks.map((task) => { const risk = taskRisk(task, now); return <div key={task.id} className="rounded-xl border border-line bg-card p-3"><div className="flex items-start justify-between gap-2"><div><p className="text-xs font-semibold text-fg">{task.title}</p><p className="mt-1 text-[0.6875rem] text-fg-3">{task.processKey} · {taskHours(task)}h</p></div>{risk === "normal" ? <CheckCircle2 className="size-4 text-good" aria-label="일정 정상" /> : <AlertTriangle className={cn("size-4", risk === "overdue" ? "text-bad" : "text-warn")} aria-label={risk === "overdue" ? "기한 초과" : "주의 필요"} />}</div><div className="mt-2 flex items-center justify-between text-[0.6875rem]"><span className="text-fg-3">{task.dueAt ? dateOnly(new Date(task.dueAt)) : "마감 미정"}</span><span className={cn("rounded-full border px-1.5 py-0.5 font-bold", statusClass(task.status))}>{STATUS_LABEL[task.status]}</span></div></div>; })}</div>
+                <div className="mt-4 space-y-2">{assignedTasks.map((task) => { const signals = riskSignalsByTask.get(task.id); const risk = taskRisk(task, now, signals); return <div key={task.id} className="rounded-xl border border-line bg-card p-3"><div className="flex items-start justify-between gap-2"><div><p className="text-xs font-semibold text-fg">{task.title}</p><p className="mt-1 text-[0.6875rem] text-fg-3">{task.processKey} · {taskHours(task)}h</p></div>{risk === "normal" ? <CheckCircle2 className="size-4 text-good" aria-label="일정 정상" /> : <AlertTriangle className={cn("size-4", risk === "overdue" ? "text-bad" : "text-warn")} aria-label={riskLabel(risk)} />}</div>{signals?.[0] ? <p className="mt-2 text-[0.6875rem] leading-4 text-warn">{signals[0].summary}</p> : null}<div className="mt-2 flex items-center justify-between text-[0.6875rem]"><span className="text-fg-3">{task.dueAt ? dateOnly(new Date(task.dueAt)) : "마감 미정"}</span><span className={cn("rounded-full border px-1.5 py-0.5 font-bold", statusClass(task.status))}>{STATUS_LABEL[task.status]}</span></div></div>; })}</div>
               </article>
             );
           })}

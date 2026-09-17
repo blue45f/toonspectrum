@@ -15,6 +15,11 @@ import {
   type EpisodeDeadlineHealth,
   type EpisodeOperationsRow,
 } from "./production-episode-operations";
+import {
+  deriveProductionRiskIntelligence,
+  type ProductionRiskIntelligence,
+  type ProductionRiskSignal,
+} from "./production-risk-intelligence";
 
 const DAY_MS = 86_400_000;
 const PLANNING_WINDOW_DAYS = 14;
@@ -124,6 +129,7 @@ export interface ProductionManagementOverview {
   readonly healthLabel: string;
   readonly healthReasons: readonly string[];
   readonly operations: ReturnType<typeof deriveProductionOperationsOverview>;
+  readonly riskIntelligence: ProductionRiskIntelligence;
   readonly actions: readonly ManagementAction[];
   readonly episodeRows: readonly ManagementEpisodeRow[];
   readonly workload: readonly AssignmentWorkload[];
@@ -499,6 +505,20 @@ function activeChangeRequest(status: string): boolean {
   return !["implemented", "closed", "rejected", "cancelled"].includes(status);
 }
 
+function predictiveActionKind(signal: ProductionRiskSignal): ManagementActionKind {
+  if (signal.kind === "deadline-overrun" || signal.kind === "dependency-chain") return "deadline";
+  if (signal.kind === "release-buffer") return "release";
+  if (signal.kind === "review-bottleneck" || signal.kind === "revision-gap") return "review";
+  if (signal.kind === "capacity") return "capacity";
+  return "risk";
+}
+
+function predictiveActionSeverity(signal: ProductionRiskSignal): ManagementSeverity {
+  if (signal.severity === "critical") return "critical";
+  if (signal.severity === "high" || signal.severity === "medium") return "warning";
+  return "info";
+}
+
 function buildActions(input: {
   readonly aggregate: ProductionProjectAggregate;
   readonly lens: ProductionManagementLens;
@@ -506,8 +526,9 @@ function buildActions(input: {
   readonly episodeRows: readonly ManagementEpisodeRow[];
   readonly workload: readonly AssignmentWorkload[];
   readonly assignmentRecommendations: readonly AssignmentRecommendation[];
+  readonly riskIntelligence: ProductionRiskIntelligence;
 }): readonly ManagementAction[] {
-  const { aggregate, lens, now, episodeRows, workload, assignmentRecommendations } = input;
+  const { aggregate, lens, now, episodeRows, workload, assignmentRecommendations, riskIntelligence } = input;
   const nowMs = now.getTime();
   const projectBase = `/production/projects/${encodeURIComponent(aggregate.projectId)}`;
   const actions: ManagementAction[] = [];
@@ -684,6 +705,35 @@ function buildActions(input: {
     });
   }
 
+  for (const signal of riskIntelligence.signals.filter((entry) =>
+    entry.source === "derived"
+    && (entry.severity === "critical" || entry.severity === "high")
+    && entry.kind !== "blocker"
+    && entry.kind !== "capacity")) {
+    const kind = predictiveActionKind(signal);
+    if (signal.taskId && actions.some((action) =>
+      action.sourceId === signal.taskId
+      && (action.kind === kind || (kind === "deadline" && action.kind === "blocker")))) continue;
+    const task = signal.taskId
+      ? aggregate.tasks.find((entry) => entry.id === signal.taskId)
+      : undefined;
+    const departmentKey = task ? actionDepartment(aggregate, task) : null;
+    actions.push({
+      id: `predictive:${signal.id}`,
+      kind,
+      severity: predictiveActionSeverity(signal),
+      title: signal.title,
+      detail: `${signal.summary} · ${signal.impact}`,
+      actionLabel: signal.existingRiskId ? "위험 원장 확인" : "예측 근거 확인",
+      href: signal.existingRiskId ? `${projectBase}/planning` : `${projectBase}/overview#predictive-risk-intelligence`,
+      dueAt: signal.dueAt,
+      sourceId: signal.taskId ?? signal.id,
+      episodeId: signal.episodeId,
+      departmentKey,
+      lensPriority: lensPriority(lens, departmentKey, kind),
+    });
+  }
+
   return actions
     .sort((left, right) => {
       const severity = severityOrder(left.severity) - severityOrder(right.severity);
@@ -710,6 +760,11 @@ export function deriveProductionManagementOverview(
   const episodeRows = deriveManagementEpisodeRows(operations.rows);
   const workload = deriveAssignmentWorkload(aggregate, now);
   const assignmentRecommendations = deriveAssignmentRecommendations(aggregate, now, workload);
+  const riskIntelligence = deriveProductionRiskIntelligence(aggregate, {
+    now,
+    workload,
+    operations,
+  });
   const nowMs = now.getTime();
   const openTasks = aggregate.tasks.filter((task) => !isClosed(task));
   const recommendedTaskIds = new Set(assignmentRecommendations.map((entry) => entry.task.id));
@@ -735,6 +790,8 @@ export function deriveProductionManagementOverview(
     Math.min(12, reviewTaskCount * 2),
     Math.min(18, overloadedAssignmentCount * 6),
     Math.min(12, activeChangeRequestCount * 4),
+    Math.min(18, riskIntelligence.predictedOverrunTaskCount * 4),
+    Math.min(10, riskIntelligence.revisionGapCount * 2),
   ];
   const healthScore = clamp(100 - penalties.reduce((sum, value) => sum + value, 0), 0, 100);
   const health = healthFromScore(healthScore);
@@ -747,6 +804,9 @@ export function deriveProductionManagementOverview(
   if (uncoveredUnassignedTaskCount > 0) healthReasons.push(`배정 가능 인력 없음 ${uncoveredUnassignedTaskCount}개`);
   if (reviewTaskCount > 0) healthReasons.push(`검수·수정 대기 ${reviewTaskCount}개`);
   if (operations.unplannedCount > 0) healthReasons.push(`게시 마감 미설정 ${operations.unplannedCount}개`);
+  if (riskIntelligence.predictedOverrunTaskCount > 0) healthReasons.push(`예측 마감 초과 ${riskIntelligence.predictedOverrunTaskCount}개`);
+  if (riskIntelligence.dependencyBottleneckCount > 0) healthReasons.push(`의존성 병목 ${riskIntelligence.dependencyBottleneckCount}개`);
+  if (riskIntelligence.revisionGapCount > 0) healthReasons.push(`Revision 연결 누락 ${riskIntelligence.revisionGapCount}개`);
   if (healthReasons.length === 0) healthReasons.push("현재 기준으로 차단·지연·과부하가 없습니다.");
 
   return {
@@ -755,6 +815,7 @@ export function deriveProductionManagementOverview(
     healthLabel: health.label,
     healthReasons,
     operations,
+    riskIntelligence,
     actions: buildActions({
       aggregate,
       lens: roleLens,
@@ -762,6 +823,7 @@ export function deriveProductionManagementOverview(
       episodeRows,
       workload,
       assignmentRecommendations,
+      riskIntelligence,
     }),
     episodeRows,
     workload,

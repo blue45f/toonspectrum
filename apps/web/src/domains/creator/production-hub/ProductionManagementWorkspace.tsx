@@ -36,6 +36,7 @@ import {
   type ProductionManagementLens,
 } from "./production-management-overview";
 import type { ProductionClientCommand } from "./production-api";
+import { ProductionRiskIntelligencePanel } from "./ProductionRiskIntelligencePanel";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
@@ -390,9 +391,9 @@ export function ProductionManagementWorkspace({
         <MetricCard
           label="마감 위험"
           value={String(overview.operations.criticalCount + overview.operations.riskCount)}
-          detail={`즉시 ${overview.operations.criticalCount} · 주의 ${overview.operations.riskCount}`}
+          detail={`즉시 ${overview.operations.criticalCount} · 주의 ${overview.operations.riskCount} · 예측 초과 ${overview.riskIntelligence.predictedOverrunTaskCount}`}
           icon={AlertTriangle}
-          tone={overview.operations.criticalCount > 0 ? "danger" : overview.operations.riskCount > 0 ? "warning" : "success"}
+          tone={overview.operations.criticalCount > 0 || overview.riskIntelligence.predictedOverrunTaskCount > 0 ? "danger" : overview.operations.riskCount > 0 ? "warning" : "success"}
         />
         <MetricCard
           label="막힌 질문"
@@ -513,6 +514,13 @@ export function ProductionManagementWorkspace({
           </div>
         </Section>
       </div>
+
+      <ProductionRiskIntelligencePanel
+        intelligence={overview.riskIntelligence}
+        projectId={aggregate.projectId}
+        execute={execute}
+        canEdit={canEdit}
+      />
 
       <Section
         id="assignment-recommendations"
