@@ -7,6 +7,7 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  Inject,
   Param,
   Post,
   Put,
@@ -31,7 +32,10 @@ function authenticatedStudioUserId(userId: string | undefined): string {
 
 @Controller()
 export class StudioProductionController {
-  constructor(private readonly service: StudioProductionService) {}
+  constructor(
+    @Inject(StudioProductionService)
+    private readonly service: StudioProductionService,
+  ) {}
   @Get("/creator/works/:id/production")
   @Header("Cache-Control", "private, no-store, max-age=0")
   getWorkspace(

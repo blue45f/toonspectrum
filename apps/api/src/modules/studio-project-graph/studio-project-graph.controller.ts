@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpException,
   HttpStatus,
+  Inject,
   Param,
   Patch,
   Post,
@@ -97,7 +98,10 @@ export function parseStudioIfMatch(value: string | undefined): string {
 
 @Controller("/studio-project-graph")
 export class StudioProjectGraphController {
-  constructor(private readonly service: StudioProjectGraphService) {}
+  constructor(
+    @Inject(StudioProjectGraphService)
+    private readonly service: StudioProjectGraphService,
+  ) {}
 
   @Post("/projects")
   @HttpCode(HttpStatus.CREATED)
