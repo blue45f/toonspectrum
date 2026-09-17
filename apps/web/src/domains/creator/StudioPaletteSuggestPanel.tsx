@@ -13,6 +13,8 @@ import { useEffect, useRef } from "react";
 
 import type { PaletteSuggestion } from "./studio-palette-suggest";
 
+import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
+
 export function StudioPaletteSuggestPanel({
   configured,
   moodText,
@@ -51,12 +53,13 @@ export function StudioPaletteSuggestPanel({
         AI 색상 팔레트 추천
       </div>
 
-      {!configured && (
-        <p className="rounded-md border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
-          로그인하면 자동 무료 AI를 먼저 사용합니다. 무료 경로를 사용할 수 없으면 <span className="font-semibold text-fg-2">AI 어시스트 설정</span>
-          에서 개인 무료 API 키 또는 로컬 AI를 연결하세요.
-        </p>
-      )}
+      {!configured ? (
+        <AiRecoveryNotice
+          code="not_configured"
+          message="장르와 분위기 문장은 먼저 작성할 수 있어요. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요."
+          compact
+        />
+      ) : null}
 
       <textarea
         value={moodText}
@@ -66,7 +69,7 @@ export function StudioPaletteSuggestPanel({
         }}
         placeholder="예: 스릴러, 어둡고 차가운 느낌 / 청춘로맨스, 파스텔톤"
         rows={2}
-        disabled={!configured || busy}
+        disabled={busy}
         className="h-14 w-full resize-none rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent disabled:opacity-60"
       />
 
@@ -74,14 +77,21 @@ export function StudioPaletteSuggestPanel({
         type="button"
         onClick={onGenerate}
         disabled={!canGenerate}
-        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+        title={!configured ? "로그인하거나 무료 AI 경로를 연결하면 실행할 수 있어요." : undefined}
+        className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {busy ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+        {busy ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" /> : <Sparkles size={14} />}
         {busy ? "배색을 구상하는 중…" : "팔레트 추천받기"}
       </button>
 
       <div ref={feedbackRef}>
-        {error && <p className="text-xs text-bad">{error}</p>}
+        {error ? (
+          <AiRecoveryNotice
+            message={error}
+            onRetry={canGenerate ? onGenerate : undefined}
+            compact
+          />
+        ) : null}
 
         {suggestion && suggestion.colors.length > 0 && (
           <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-card/70 p-2">
@@ -103,7 +113,7 @@ export function StudioPaletteSuggestPanel({
             <button
               type="button"
               onClick={() => onSaveToLibrary(suggestion)}
-              className="inline-flex items-center justify-center gap-1 rounded-md border border-line bg-panel px-2 py-1.5 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+              className="inline-flex min-h-11 items-center justify-center gap-1 rounded-md border border-line bg-panel px-2 py-1.5 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
             >
               <Save size={11} /> 내 팔레트에 저장
             </button>

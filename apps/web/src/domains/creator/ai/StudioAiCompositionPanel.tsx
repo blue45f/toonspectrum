@@ -13,11 +13,14 @@ import { useEffect, useRef, useState } from "react";
 import {
   suggestSceneComposition,
   studioTextAiTransportForOperation,
+  type StudioAiErrorCode,
   type StudioAiResult,
   type StudioAiSettings,
   type StudioTextAiProvenance,
   type StudioTextAiTransport,
 } from "./studio-ai-client";
+
+import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
 
 export interface StudioAiCompositionOperationSettlement {
   operationId: string;
@@ -52,12 +55,15 @@ export function StudioAiCompositionPanel({
   const sceneTextValue = sceneText ?? localSceneText;
   const setSceneTextValue = onSceneTextChange ?? setLocalSceneText;
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{
+    code: StudioAiErrorCode;
+    message: string;
+  } | null>(null);
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   // 팔레트·대사 패널과 동일 — 결과·에러가 팝오버 fold 아래에 생기지 않게 도착 시 nearest 스크롤.
   const feedbackRef = useRef<HTMLDivElement | null>(null);
-  const hasFeedback = Boolean(suggestion || error);
+  const hasFeedback = Boolean(suggestion || failure);
   useEffect(() => {
     if (hasFeedback) feedbackRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
   }, [hasFeedback]);
@@ -66,7 +72,7 @@ export function StudioAiCompositionPanel({
     const prompt = sceneTextValue.trim();
     if (busy || !configured || !prompt) return;
     setBusy(true);
-    setError(null);
+    setFailure(null);
     setCopyState("idle");
     const operationId = onOperationStart?.(prompt);
     const operationTransport = operationId && transport
@@ -83,7 +89,7 @@ export function StudioAiCompositionPanel({
     if (result.ok) {
       setSuggestion(result.data.suggestion);
     } else {
-      setError(result.error);
+      setFailure({ code: result.code, message: result.error });
     }
     setBusy(false);
   };
@@ -105,12 +111,13 @@ export function StudioAiCompositionPanel({
         장면 구성 제안 (콘티→그림 보조)
       </div>
 
-      {!configured && (
-        <p className="rounded-md border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
-          장면 초안은 먼저 작성할 수 있어요. 로그인하면 자동 무료 AI를 먼저 사용합니다. 무료 경로를 사용할 수 없으면{" "}
-          <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 개인 클라우드 API 키와 모델을 연결하세요.
-        </p>
-      )}
+      {!configured ? (
+        <AiRecoveryNotice
+          code="not_configured"
+          message="장면 초안은 먼저 작성할 수 있어요. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요."
+          compact
+        />
+      ) : null}
 
       <textarea
         value={sceneTextValue}
@@ -128,14 +135,22 @@ export function StudioAiCompositionPanel({
         type="button"
         onClick={() => void run()}
         disabled={!configured || busy || !sceneTextValue.trim()}
+        title={!configured ? "로그인하거나 무료 AI 경로를 연결하면 실행할 수 있어요." : undefined}
         className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-sm font-bold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {busy ? <Loader2 size={14} className="animate-spin" /> : <Clapperboard size={14} />}
+        {busy ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" /> : <Clapperboard size={14} />}
         {busy ? "구상하는 중…" : "구도 제안 받기"}
       </button>
 
       <div ref={feedbackRef}>
-        {error && <p className="text-xs text-bad">{error}</p>}
+        {failure ? (
+          <AiRecoveryNotice
+            code={failure.code}
+            message={failure.message}
+            onRetry={() => void run()}
+            compact
+          />
+        ) : null}
 
         {suggestion && (
           <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-card/70 p-2">
