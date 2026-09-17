@@ -6,8 +6,7 @@ import { WorkflowTrustBadge } from "./WorkflowTrustBadge";
 import { supportsRoutePurposeScene } from "./site-experience/site-experience-policy";
 
 import { defineBilingualText } from "@/shared/lib/i18n-bilingual-copy";
-import { useI18n, useT } from "@/shared/lib/i18n";
-import { resolveProductLocale } from "@/shared/lib/product-identity";
+import { useT } from "@/shared/lib/i18n";
 import { resolveSiteRouteExperience } from "@/shared/lib/site-route-experience";
 import { resolveSiteRouteVisual } from "@/shared/lib/site-route-visual";
 
@@ -84,8 +83,6 @@ export function SiteRouteExperienceBoundary({
 }) {
   const t = useT();
   const { pathname, search } = useLocation();
-  const language = useI18n((state) => state.lang);
-  const locale = resolveProductLocale(language);
   const experience = useMemo(
     () => resolveSiteRouteExperience(`${pathname}${search}`),
     [pathname, search],
@@ -167,7 +164,7 @@ export function SiteRouteExperienceBoundary({
         >
           <WifiOff className="mt-0.5 size-5 shrink-0 text-warn" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <WorkflowTrustBadge state="offline-pending" locale={locale} />
+            <WorkflowTrustBadge state="offline-pending" />
             <p className="mt-2 break-words text-xs leading-5 text-fg-2">
               {t(COPY.offlineBody)}
             </p>
