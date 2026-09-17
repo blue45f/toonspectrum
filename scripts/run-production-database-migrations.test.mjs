@@ -41,10 +41,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(66);
+  expect(manifest).toHaveLength(67);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0066_share_analytics_events");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(66);
+  expect(manifest.at(-1).id).toBe("0067_creator_role_workspace_personalization");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(67);
 });
 
 test("applied studio media inference migration remains checksum-immutable", () => {
@@ -125,6 +125,31 @@ test("creator role profile migration is additive, versioned, and structurally gu
     "jsonb_typeof(\"creatorRoleProfile\" -> 'secondaryRoles') = 'array'",
     "jsonb_typeof(\"creatorRoleProfile\" -> 'specialties') = 'array'",
     "jsonb_typeof(\"creatorRoleProfile\" -> 'roleVisibility') = 'boolean'",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA|COLUMN)/iu);
+});
+
+test("creator role workspace migration preserves opt-in privacy and bounded project preferences", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0067_creator_role_workspace_personalization",
+  );
+  expect(migration?.id).toBe("0067_creator_role_workspace_personalization");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'UPDATE public."user"',
+    "'{roleVisibility}'",
+    "'false'::jsonb",
+    'ALTER COLUMN "creatorRoleProfile" SET DEFAULT',
+    'CREATE TABLE IF NOT EXISTS public."creator_role_workspace_preference"',
+    'PRIMARY KEY ("userId", "projectKey")',
+    'creator_role_workspace_preference_document_check',
+    'idx_creator_role_workspace_preference_updated',
+    'idx_user_creator_role_primary_public',
+    'idx_user_creator_role_specialties_gin',
   ]) {
     expect(sql).toContain(requiredFragment);
   }
