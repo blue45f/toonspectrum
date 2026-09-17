@@ -208,7 +208,9 @@
     "desktop:sync:release:verify": "node scripts/verify-desktop-sync-release.mjs",
     "test:desktop-sync-release": "pnpm --filter @toonspectrum/desktop-sync-agent build && node --test scripts/desktop-sync-release.test.mjs",
     "test:studio-2d-legacy-gpt25": "node scripts/studio-2d-legacy-gpt25-replacements.test.mjs",
-    "render:creator-essential-props": "blender --background --python scripts/render-creator-essential-prop-thumbnails.py"
+    "render:creator-essential-props": "blender --background --python scripts/render-creator-essential-prop-thumbnails.py",
+    "check:market-cc0-catalog": "tsx scripts/generate-market-cc0-catalog.mts --check && tsx scripts/generate-market-cc0-starter-records.mts --check",
+    "generate:studio-2d-legacy-gpt25": "node scripts/generate-studio-2d-legacy-gpt25-batch.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",
