@@ -115,10 +115,18 @@ export function evaluateStudioScene3dAssetAdmission(
     blockers.push("실제 렌더 썸네일의 긴 변이 512px 미만입니다.");
   }
 
-  if (requiresLods(asset) && technical.lodCount < 3) {
+  const hasValidLodCount = Number.isSafeInteger(technical.lodCount) && technical.lodCount >= 0;
+  if (!hasValidLodCount) {
+    blockers.push("LOD 단계 수 측정값이 유효하지 않습니다.");
+  }
+  if (requiresLods(asset) && (!hasValidLodCount || technical.lodCount < 3)) {
     blockers.push("근·중·원거리 3단계 LOD가 없습니다.");
   }
-  if (requiresLods(asset) && lodEvidence.validCount < Math.max(3, technical.lodCount)) {
+  if (
+    requiresLods(asset)
+    && hasValidLodCount
+    && lodEvidence.validCount < Math.max(3, technical.lodCount)
+  ) {
     blockers.push("LOD 선언과 실제 삼각형 증거가 일치하지 않습니다.");
   }
   if (requiresLods(asset) && technical.lodCount >= 3 && !lodEvidence.strictlyDecreasing) {
