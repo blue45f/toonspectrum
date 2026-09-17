@@ -29,3 +29,8 @@ export * from "./ir/layer-graph-v3";
 export * from "./ir/sparse-tile-v3";
 export * from "./ir/vector-stroke-v3";
 export * from "./ir/scene-3d-v3";
+export * from "./graph/artifact-revision";
+export * from "./authority/document-authority";
+export * from "./capability/capability-ledger";
+export * from "./interchange/compatibility-report";
+export * from "./assets/asset-lockfile";

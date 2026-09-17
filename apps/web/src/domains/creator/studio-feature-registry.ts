@@ -9,6 +9,7 @@
 import * as archiveManifest from "./studio-archive-manifest";
 import * as assetPassport from "./studio-asset-passport";
 import * as assetProvider from "./studio-asset-provider";
+import * as competitorCapabilityEvidence from "./studio-platform/studio-competitor-capability-evidence";
 import * as fontAudit from "./studio-font-audit";
 import * as marketplaceSubmission from "./studio-marketplace-submission";
 import * as pluginRegistry from "./studio-plugin-registry";
@@ -20,6 +21,7 @@ export const STUDIO_FEATURE_MODULE_REGISTRY = Object.freeze({
   archiveManifest,
   assetPassport,
   assetProvider,
+  competitorCapabilityEvidence,
   fontAudit,
   marketplaceSubmission,
   pluginRegistry,

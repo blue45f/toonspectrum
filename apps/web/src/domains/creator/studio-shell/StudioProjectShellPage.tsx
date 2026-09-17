@@ -38,6 +38,7 @@ import {
   type StudioProjectSection as StudioProjectSectionId,
 } from "../studio-project-views";
 import { resolveStudioProjectViewDestination } from "../studio-project-view-destinations";
+import { StudioCompetitorCapabilityPanel } from "./StudioCompetitorCapabilityPanel";
 import { StudioProjectDiagnosticsBridge } from "./StudioProjectDiagnosticsBridge";
 import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel";
 
@@ -413,6 +414,9 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
         locale={locale}
         compact={section !== "overview"}
       />
+      {section === "overview" ? (
+        <StudioCompetitorCapabilityPanel locale={locale} />
+      ) : null}
 
       <section className="mt-6" aria-labelledby="project-section-actions">
         <div className="flex items-center gap-3">
