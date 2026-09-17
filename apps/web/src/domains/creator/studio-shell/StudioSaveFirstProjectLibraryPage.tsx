@@ -420,7 +420,7 @@ export function StudioSaveFirstProjectLibraryPage({
                     candidate === view ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
                   )}
                 >
-                  {VIEW_LABELS[candidate][locale]}
+                  {bt(VIEW_LABELS[candidate].ko, VIEW_LABELS[candidate].en)}
                 </Link>
               ))}
             </div>
@@ -436,7 +436,7 @@ export function StudioSaveFirstProjectLibraryPage({
                   candidate === view ? "bg-raised text-accent" : "text-fg-3 hover:bg-card hover:text-fg",
                 )}
               >
-                {VIEW_LABELS[candidate][locale]}
+                {bt(VIEW_LABELS[candidate].ko, VIEW_LABELS[candidate].en)}
               </Link>
             ))}
           </nav>
