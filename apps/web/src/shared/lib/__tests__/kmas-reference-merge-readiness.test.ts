@@ -90,9 +90,10 @@ test("reference discovery has one labeled route in the public manifest", () => {
 });
 
 test("reference discovery remains reachable from the public sitemap", () => {
-  const source = readFileSync(resolve(process.cwd(), "apps/web/src/domains/legal/SitemapPage.tsx"), "utf8");
-  const tupleOccurrences = source.split('["/references",').length - 1;
-  const objectOccurrences = source.split('href: "/references"').length - 1;
+  const source = readFileSync(
+    resolve(process.cwd(), "apps/web/src/domains/legal/site-directory-data.ts"),
+    "utf8",
+  );
   const destinationOccurrences = source.split('destination("/references",').length - 1;
-  assert.equal(tupleOccurrences + objectOccurrences + destinationOccurrences, 1);
+  assert.equal(destinationOccurrences, 1);
 });
