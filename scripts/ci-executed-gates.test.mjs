@@ -131,6 +131,16 @@ test("preflight is sparse and independent expensive lanes start in parallel", ()
   for (const name of ["lint", "typecheck", "static", "serial", "build"]) {
     assert.doesNotMatch(job(name), /^ {4}needs:/m, `${name} should start independently`);
   }
+  for (const excludedPath of [
+    "!/apps/web/public/assets/",
+    "!/apps/web/public/vrm/",
+    "!/artifacts/",
+    "!/docs/",
+    "!/tests/benchmarks/results/",
+  ]) {
+    assert.ok(job("typecheck").includes(excludedPath), `typecheck sparse checkout is missing ${excludedPath}`);
+  }
+  assert.ok(job("typecheck").includes("filter: blob:none"));
   assert.doesNotMatch(job("static"), /^\s+if:/m, "mandatory regressions cannot be skipped");
 });
 
@@ -198,9 +208,12 @@ test("ToonStudio session validation shares one setup and delegates full gates to
     .split(/(?=^ {2}[a-z][a-z0-9-]*:\n)/m)
     .filter((entry) => /^ {2}[a-z][a-z0-9-]*:\n/.test(entry));
   assert.equal(sessionJobs.length, 1, "session validation should pay checkout/install cost once");
-  assert.match(session, /pnpm run lint:quick -- --base=/);
+  assert.match(session, /filter: blob:none/);
+  assert.match(session, /!\/apps\/web\/public\/assets\//);
+  assert.match(session, /git diff --name-only -z --diff-filter=ACMR "\$BASE_SHA" HEAD/);
+  assert.match(session, /pnpm exec eslint --max-warnings=0 --no-warn-ignored/);
   assert.match(session, /pnpm exec vitest related/);
-  assert.doesNotMatch(session, /pnpm (?:run )?build(?:\s|$)|pnpm exec tsc/);
+  assert.doesNotMatch(session, /lint:quick|pnpm (?:run )?build(?:\s|$)|pnpm exec tsc/);
 });
 
 test("focused integration checks cannot collide with the protected core status", () => {
