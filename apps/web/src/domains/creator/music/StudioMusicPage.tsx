@@ -460,7 +460,7 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
               <div className="-mt-3 flex items-center justify-between gap-2 text-xs text-fg-3">
                 <button
                   type="button"
-                  className="min-h-8 text-accent underline underline-offset-4"
+                  className="min-h-11 rounded-md px-1 text-accent underline underline-offset-4"
                   onClick={() => patch({ scene: MUSIC_MOODS.find((mood) => mood.id === brief.mood)!.scene })}
                 >
                   선택한 분위기의 예시 넣기

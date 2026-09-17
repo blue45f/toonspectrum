@@ -19,8 +19,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { CreatorHomeNavigation } from "./CreatorHomeNavigation";
-
 import Link from "@/compat/router-link";
 import { ProductIntentStart } from "@/domains/creator-resources/ProductIntentStart";
 import {
@@ -31,11 +29,14 @@ import {
   type ProductStartDestinationId,
 } from "@/shared/lib/product-identity";
 import { useI18n } from "@/shared/lib/i18n";
+import { useTheme } from "@/shared/lib/theme";
 
 import "./creator-home-experience.css";
 import "./creator-prism.css";
 import "./creator-flagship.css";
 import "./creator-all-in-one.css";
+import "./creator-theme-gallery.css";
+import "./creator-home-spacing.css";
 
 interface LocalizedText {
   readonly ko: string;
@@ -220,6 +221,7 @@ function localeText(copy: LocalizedText, locale: ProductLocale) {
 
 export function CreatorHomeExperience() {
   const language = useI18n((state) => state.lang);
+  const resolvedTheme = useTheme((state) => state.resolvedTheme);
   const locale = resolveProductLocale(language);
   const identity = PRODUCT_IDENTITY[locale];
   const copy = COPY[locale];
@@ -229,12 +231,10 @@ export function CreatorHomeExperience() {
       className="creator-home creator-experience creator-flagship"
       data-creator-home="production-first"
       data-creator-experience="all-in-one-studio-v3"
+      data-theme-art={resolvedTheme}
       data-product-direction="planning-to-publishing"
       lang={locale}
     >
-      <CreatorHomeNavigation locale={locale} />
-      <div className="cf-shell"><ProductIntentStart /></div>
-
       <section className="cf-hero cf-shell" aria-labelledby="creator-hero-title">
         <div className="cf-hero-copy">
           <p className="cf-kicker"><span className="cf-signal" aria-hidden="true" />{identity.category}</p>
@@ -259,7 +259,8 @@ export function CreatorHomeExperience() {
         </figure>
       </section>
 
-      <div className="cf-shell">
+      <div className="cf-shell cf-home-wayfinding">
+        <ProductIntentStart />
         <nav className="cf-jump-nav" aria-label={locale === "ko" ? "홈 주요 영역" : "Home sections"}>
           <a href="#creator-start">{copy.jumpStart}</a>
           <a href="#creator-flow">{copy.jumpFlow}</a>

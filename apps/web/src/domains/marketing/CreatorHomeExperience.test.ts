@@ -39,6 +39,9 @@ describe("creator home experience contracts", () => {
     expect(source).toContain('id="creator-process-title"');
     expect(source).toContain('data-creator-home="production-first"');
     expect(source).toContain('data-creator-experience="all-in-one-studio-v3"');
+    expect(source).toContain("data-theme-art={resolvedTheme}");
+    expect(source).toContain("useTheme((state) => state.resolvedTheme)");
+    expect(source).toContain('import "./creator-theme-gallery.css"');
     expect(source).toContain('data-product-direction="planning-to-publishing"');
     expect(source).toContain("<ProductIntentStart />");
     expect(source).toContain('href="/studio/new"');

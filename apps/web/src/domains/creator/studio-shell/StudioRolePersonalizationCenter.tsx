@@ -438,14 +438,14 @@ export function StudioRolePersonalizationCenter({
   const currentAssignmentIds = new Set(currentAssignments.map((assignment) => assignment.id));
   const assignedOpenTasks = productionWorkspace?.tasks.filter((task) => (
     task.status !== "done"
-    && task.assigneeIds.some((id) => currentAssignmentIds.has(id))
+    && (task.assigneeIds ?? []).some((id) => currentAssignmentIds.has(id))
   )).length ?? 0;
   const unassignedTasks = productionWorkspace?.tasks.filter((task) => (
-    task.status !== "done" && task.assigneeIds.length === 0
+    task.status !== "done" && (task.assigneeIds ?? []).length === 0
   )).length ?? 0;
   const requiredRoles = productionWorkspace
     ? [...new Set(productionWorkspace.tasks
-        .filter((task) => task.status !== "done" && task.assigneeIds.length === 0)
+        .filter((task) => task.status !== "done" && (task.assigneeIds ?? []).length === 0)
         .map((task) => task.role)
         .filter((role): role is CreatorProductionRole => role !== null))]
     : [];
@@ -730,7 +730,11 @@ export function StudioRolePersonalizationCenter({
                 ["experienceLevel", "경력 수준", "Experience level"],
                 ["collaborationStatus", "협업 가능 상태", "Collaboration status"],
               ] as const).map(([key, ko, en]) => (
-                <label key={key} className="flex items-start gap-3 rounded-xl border border-line bg-card p-3">
+                <label
+                  key={key}
+                  aria-label={localized(locale, ko, en)}
+                  className="flex items-start gap-3 rounded-xl border border-line bg-card p-3"
+                >
                   <input
                     type="checkbox"
                     checked={onboardingVisibility[key]}
@@ -976,7 +980,11 @@ export function StudioRolePersonalizationCenter({
             {checklist.map((item) => {
               const checked = projectDocument.checklistStates[item.id] === true;
               return (
-                <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-panel p-3">
+                <label
+                  key={item.id}
+                  aria-label={localized(locale, item.labelKo, item.labelEn)}
+                  className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-panel p-3"
+                >
                   <input
                     type="checkbox"
                     checked={checked}

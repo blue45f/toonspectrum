@@ -333,7 +333,7 @@ export function ExplorePage() {
                     }}
                     aria-pressed={active}
                     className={cn(
-                      "inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium",
+                      "inline-flex min-h-11 items-center rounded-full border px-3 py-1.5 text-sm font-medium",
                       "transition-[transform,background-color,border-color,box-shadow] duration-200 ease-out-expo",
                       "hover:-translate-y-px active:scale-[0.96]",
                       active && "ring-1"

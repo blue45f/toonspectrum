@@ -2,10 +2,13 @@ import { MonitorUp, WifiOff } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
+import { RoutePurposeScene } from "./RoutePurposeScene";
 import { WorkflowTrustBadge } from "./WorkflowTrustBadge";
+import { supportsRoutePurposeScene } from "./site-experience/site-experience-policy";
 
 import { resolveProductLocale } from "@/shared/lib/product-identity";
 import { resolveSiteRouteExperience } from "@/shared/lib/site-route-experience";
+import { resolveSiteRouteVisual } from "@/shared/lib/site-route-visual";
 import { useI18n } from "@/shared/lib/i18n";
 
 function useNarrowViewport() {
@@ -40,7 +43,13 @@ function useOnlineState() {
  * for tests and shells, announces the route purpose, and shows only the device/recovery guidance
  * that a page cannot safely communicate by itself.
  */
-export function SiteRouteExperienceBoundary({ children }: { readonly children: ReactNode }) {
+export function SiteRouteExperienceBoundary({
+  children,
+  routeTitle,
+}: {
+  readonly children: ReactNode;
+  readonly routeTitle: string;
+}) {
   const { pathname, search } = useLocation();
   const language = useI18n((state) => state.lang);
   const locale = resolveProductLocale(language);
@@ -48,8 +57,13 @@ export function SiteRouteExperienceBoundary({ children }: { readonly children: R
     () => resolveSiteRouteExperience(`${pathname}${search}`),
     [pathname, search],
   );
+  const visual = useMemo(
+    () => resolveSiteRouteVisual(`${pathname}${search}`),
+    [pathname, search],
+  );
   const narrow = useNarrowViewport();
   const online = useOnlineState();
+  const routePurposeSceneSupported = supportsRoutePurposeScene(pathname);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -58,14 +72,20 @@ export function SiteRouteExperienceBoundary({ children }: { readonly children: R
     root.dataset.routeRecoveryPolicy = experience.recoveryPolicy;
     root.dataset.routeTerminologyScope = experience.terminologyScope;
     root.dataset.routeSaveTrust = experience.saveTrustRequired ? "required" : "optional";
+    root.dataset.routeVisualKind = visual.kind;
+    root.dataset.routeVisualMotion = visual.motion;
+    root.dataset.routePurposeScene = routePurposeSceneSupported ? "true" : "false";
     return () => {
       delete root.dataset.routeContextLevel;
       delete root.dataset.routeMobilePolicy;
       delete root.dataset.routeRecoveryPolicy;
       delete root.dataset.routeTerminologyScope;
       delete root.dataset.routeSaveTrust;
+      delete root.dataset.routeVisualKind;
+      delete root.dataset.routeVisualMotion;
+      delete root.dataset.routePurposeScene;
     };
-  }, [experience]);
+  }, [experience, routePurposeSceneSupported, visual]);
 
   const desktopRequired = narrow && experience.mobilePolicy === "desktop-required";
   const showOfflineGuidance = !online && experience.saveTrustRequired;
@@ -75,6 +95,15 @@ export function SiteRouteExperienceBoundary({ children }: { readonly children: R
       <p className="sr-only" role="status" aria-live="polite" key={experience.canonicalPath}>
         {experience.pagePurpose[locale]}
       </p>
+
+      {routePurposeSceneSupported ? (
+        <RoutePurposeScene
+          title={routeTitle}
+          locale={locale}
+          experience={experience}
+          profile={visual}
+        />
+      ) : null}
 
       {desktopRequired ? (
         <aside

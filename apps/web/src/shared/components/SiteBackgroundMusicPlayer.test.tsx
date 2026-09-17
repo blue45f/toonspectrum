@@ -99,6 +99,12 @@ describe("SiteBackgroundMusicPlayer", () => {
     });
   });
 
+  it("keeps both compact controls at the 44px touch-target minimum", () => {
+    renderAt("/");
+    expect(screen.getByRole("button", { name: "배경음악 재생" }).className).toContain("size-11");
+    expect(screen.getByRole("button", { name: /페이지 테마 연주/u }).className).toContain("min-h-11");
+  });
+
   it("lets the listener override page following, theme and dedicated BGM volume", () => {
     renderAt("/ranking");
     expandPlayer();

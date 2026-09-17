@@ -413,8 +413,8 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
             <h2 className="mt-1 text-lg font-black text-fg">브러시 만들기·전체 편집</h2>
             <p className="mt-1 text-xs leading-relaxed text-fg-3">{BRUSH_STUDIO_V6_RECIPES.length}개 시작 레시피에서 골라 실제 획을 비교하세요. 기본 편집은 결과 중심으로 단순하게, 전문가 설정은 엔진과 물리까지 단계적으로 엽니다.</p>
             <div role="group" aria-label="브러시 편집 깊이" className="mt-3 inline-flex rounded-xl border border-line bg-bg-2/55 p-1">
-              <button type="button" aria-pressed={experience === "guided"} onClick={() => changeExperience("guided")} className={`min-h-9 rounded-lg px-3 text-xs font-black ${experience === "guided" ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised"} ${STUDIO_FOCUS_RING}`}>기본 편집</button>
-              <button type="button" aria-pressed={experience === "expert"} onClick={() => changeExperience("expert")} className={`min-h-9 rounded-lg px-3 text-xs font-black ${experience === "expert" ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised"} ${STUDIO_FOCUS_RING}`}>전문가 설정</button>
+              <button type="button" aria-pressed={experience === "guided"} onClick={() => changeExperience("guided")} className={`min-h-[44px] rounded-lg px-3 text-xs font-black ${experience === "guided" ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised"} ${STUDIO_FOCUS_RING}`}>기본 편집</button>
+              <button type="button" aria-pressed={experience === "expert"} onClick={() => changeExperience("expert")} className={`min-h-[44px] rounded-lg px-3 text-xs font-black ${experience === "expert" ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised"} ${STUDIO_FOCUS_RING}`}>전문가 설정</button>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -439,7 +439,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
       </div>
 
       <nav aria-label="브러시 스튜디오 영역" className="flex gap-2 overflow-x-auto rounded-2xl border border-line bg-card/45 p-2">
-        {tabs.map((item) => <button key={item.id} type="button" aria-pressed={tab === item.id} onClick={() => setTab(item.id)} className={`min-h-10 shrink-0 rounded-xl px-3 text-xs font-black ${tab === item.id ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised"} ${STUDIO_FOCUS_RING}`}>{item.label}</button>)}
+        {tabs.map((item) => <button key={item.id} type="button" aria-pressed={tab === item.id} onClick={() => setTab(item.id)} className={`min-h-[44px] shrink-0 rounded-xl px-3 text-xs font-black ${tab === item.id ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised"} ${STUDIO_FOCUS_RING}`}>{item.label}</button>)}
       </nav>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
