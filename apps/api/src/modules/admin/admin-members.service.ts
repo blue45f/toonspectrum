@@ -10,6 +10,8 @@ import {
 } from "drizzle-orm";
 
 import {
+  accountMerges,
+  accounts,
   db,
   fanPosts,
   ratings,
@@ -133,6 +135,7 @@ export class AdminMembersService {
         email: users.email,
         role: users.role,
         status: users.status,
+        mergedIntoUserId: users.mergedIntoUserId,
         suspendedAt: users.suspendedAt,
         suspensionReason: users.suspensionReason,
         deletedAt: users.deletedAt,
@@ -349,23 +352,50 @@ export class AdminMembersService {
       throw new BadRequestException("해당 회원을 찾을 수 없습니다.");
     }
 
-    const [[reviewsCount, fanPostsCount, ratingsCount], paidRows] =
-      await Promise.all([
-        Promise.all([
-          countFrom(reviews, eq(reviews.userId, targetUserId)),
-          countFrom(fanPosts, eq(fanPosts.userId, targetUserId)),
-          countFrom(ratings, eq(ratings.userId, targetUserId)),
-        ]),
-        db
-          .select({ amount: revenueLedger.amountCents })
-          .from(revenueLedger)
-          .where(
-            and(
-              eq(revenueLedger.payerId, targetUserId),
-              eq(revenueLedger.status, "paid"),
-            ),
+    const [
+      [reviewsCount, fanPostsCount, ratingsCount],
+      paidRows,
+      linkedAccounts,
+      mergeRows,
+    ] = await Promise.all([
+      Promise.all([
+        countFrom(reviews, eq(reviews.userId, targetUserId)),
+        countFrom(fanPosts, eq(fanPosts.userId, targetUserId)),
+        countFrom(ratings, eq(ratings.userId, targetUserId)),
+      ]),
+      db
+        .select({ amount: revenueLedger.amountCents })
+        .from(revenueLedger)
+        .where(
+          and(
+            eq(revenueLedger.payerId, targetUserId),
+            eq(revenueLedger.status, "paid"),
           ),
-      ]);
+        ),
+      db
+        .select({ provider: accounts.provider })
+        .from(accounts)
+        .where(eq(accounts.userId, targetUserId))
+        .orderBy(asc(accounts.provider)),
+      db
+        .select({
+          id: accountMerges.id,
+          sourceUserId: accountMerges.sourceUserId,
+          targetUserId: accountMerges.targetUserId,
+          status: accountMerges.status,
+          createdAt: accountMerges.createdAt,
+          completedAt: accountMerges.completedAt,
+        })
+        .from(accountMerges)
+        .where(
+          or(
+            eq(accountMerges.sourceUserId, targetUserId),
+            eq(accountMerges.targetUserId, targetUserId),
+          ),
+        )
+        .orderBy(desc(accountMerges.createdAt))
+        .limit(20),
+    ]);
 
     const totalPaidCents = paidRows.reduce(
       (sum, row) => sum + Number(row.amount ?? 0),
@@ -386,6 +416,20 @@ export class AdminMembersService {
         createdAt: target.createdAt
           ? new Date(target.createdAt).toISOString()
           : null,
+      },
+      identity: {
+        linkedProviders: [...new Set(linkedAccounts.map((entry) => entry.provider))],
+        mergedIntoUserId: target.mergedIntoUserId ?? null,
+        mergeHistory: mergeRows.map((entry) => ({
+          id: entry.id,
+          sourceUserId: entry.sourceUserId,
+          targetUserId: entry.targetUserId,
+          status: entry.status,
+          createdAt: entry.createdAt ? new Date(entry.createdAt).toISOString() : null,
+          completedAt: entry.completedAt
+            ? new Date(entry.completedAt).toISOString()
+            : null,
+        })),
       },
       activity: {
         reviewsCount: toNumber(reviewsCount),
