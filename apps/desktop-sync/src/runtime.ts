@@ -13,6 +13,7 @@ import type { ScanSyncFolderOptions } from "./scanner.js";
 
 export interface DesktopSyncRemote extends DesktopSyncTransport {
   listRemoteFiles(signal?: AbortSignal): Promise<readonly RemoteFileSnapshot[]>;
+  assertDistinctFrom?(localRoot: string): Promise<void>;
 }
 
 export interface DesktopSyncCycleOptions extends ScanSyncFolderOptions {
@@ -31,6 +32,8 @@ export async function runDesktopSyncCycle(
   remote: DesktopSyncRemote,
   options: DesktopSyncCycleOptions = {},
 ): Promise<DesktopSyncCycleResult> {
+  if (options.signal?.aborted) throw options.signal.reason;
+  await remote.assertDistinctFrom?.(root);
   if (options.signal?.aborted) throw options.signal.reason;
   const [journal, localFiles, remoteFiles] = await Promise.all([
     loadSyncJournal(root),
