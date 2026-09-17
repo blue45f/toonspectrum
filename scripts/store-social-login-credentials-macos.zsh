@@ -101,6 +101,18 @@ import_vault() {
 
 main() {
   require_macos_keychain
+
+  # npm-style invocations may forward a literal separator (`--`) as argv[1].
+  # Accept both `pnpm run <script> --status` and `pnpm run <script> -- --status`
+  # so the documented status check can never be mistaken for a vault path.
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+  if (( $# > 1 )); then
+    usage >&2
+    exit 64
+  fi
+
   case "${1:-}" in
     -h|--help)
       usage
