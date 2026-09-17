@@ -132,6 +132,9 @@ importers:
       '@toonspectrum/studio-engine-vello':
         specifier: workspace:*
         version: link:packages/studio-engine-vello
+      '@toonspectrum/studio-format-gateway':
+        specifier: workspace:*
+        version: link:packages/studio-format-gateway
       '@toonspectrum/studio-project-model':
         specifier: workspace:*
         version: link:packages/studio-project-model
@@ -463,6 +466,12 @@ importers:
       '@toonspectrum/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@toonspectrum/studio-format-gateway':
+        specifier: workspace:*
+        version: link:../../packages/studio-format-gateway
+      '@toonspectrum/studio-project-model':
+        specifier: workspace:*
+        version: link:../../packages/studio-project-model
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@libsql/client@0.17.3)(@types/pg@8.20.0)(pg@8.21.0)
@@ -536,6 +545,18 @@ importers:
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
+
+  apps/desktop-sync-agent:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.3
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@types/node@24.13.2)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
   packages/core:
     dependencies:

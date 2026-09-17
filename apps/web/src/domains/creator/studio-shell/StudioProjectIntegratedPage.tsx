@@ -3,6 +3,9 @@ import { useLocation, useParams } from "react-router-dom";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
 
+import { StudioCompatibilityReportsPanel } from "../project-graph/StudioCompatibilityReportsPanel";
+import { StudioProjectGraphContextBar } from "../project-graph/StudioProjectGraphContextBar";
+import { StudioProjectVersionStackPanel } from "../project-graph/StudioProjectVersionStackPanel";
 import {
   resolveStudioProjectView,
   studioProjectDefaultView,
@@ -75,9 +78,16 @@ function SectionWorkflow({
       {section === "assets" && view === "series" ? (
         <StudioSeriesKitPanel projectId={projectId} locale={locale} />
       ) : null}
+      {section === "review" && view === "versions" ? (
+        <StudioProjectVersionStackPanel projectId={projectId} locale={locale} />
+      ) : null}
       {section === "review" ? (
         <StudioReviewPanel projectId={projectId} locale={locale} />
       ) : null}
+      {(section === "assets" && (view === "missing" || view === "rights"))
+        || (section === "export" && view === "preflight") ? (
+          <StudioCompatibilityReportsPanel projectId={projectId} locale={locale} />
+        ) : null}
       {section === "export" ? (
         <StudioExportPanel projectId={projectId} locale={locale} />
       ) : null}
@@ -121,6 +131,7 @@ export function StudioProjectIntegratedPage({
       <StudioProjectShellPage section={section} />
       {decodedProjectId ? (
         <Container size="wide" className="-mt-3 space-y-5 pb-10 sm:-mt-5 sm:pb-14">
+          <StudioProjectGraphContextBar projectId={decodedProjectId} locale={locale} />
           <SectionWorkflow
             projectId={decodedProjectId}
             section={section}
