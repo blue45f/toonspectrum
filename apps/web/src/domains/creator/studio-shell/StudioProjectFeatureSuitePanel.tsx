@@ -179,7 +179,7 @@ function OverviewSuite({
         <Metric label={bt("완독률", "Completion")} value={`${Math.round((episode?.completionRate ?? 0) * 100)}%`} />
         <Metric label={bt("평균 스크롤", "Average scroll")} value={`${Math.round((episode?.averageMaxScrollDepth ?? 0) * 100)}%`} />
         <Metric label={bt("반응", "Reactions")} value={episode?.reactions ?? 0} />
-        <Metric label={bt("순수익", "Net")} value={new Intl.NumberFormat(bt("ko-KR", "en-US"), {
+        <Metric label={bt("순수익", "Net")} value={new Intl.NumberFormat(locale || "en", {
           style: "currency",
           currency: episode?.currency ?? "KRW",
           maximumFractionDigits: 0,
@@ -341,7 +341,7 @@ function StorySuite({
           </div>
           {continuity?.issues.slice(0, 4).map((issue) => (
             <p key={`${issue.code}:${issue.toSceneId}`} className="mt-2 rounded-xl border border-warning/25 bg-warning-soft/10 px-3 py-2 text-xs leading-5 text-fg-2">
-              {locale === "ko" ? issue.messageKo : issue.messageEn}
+              {bt(issue.messageKo, issue.messageEn)}
             </p>
           ))}
         </FeatureCard>
@@ -465,7 +465,7 @@ function QualityPanel({ projectId, locale }: { readonly projectId: string; reado
             ? "border-danger/30 bg-danger-soft/10 text-danger"
             : "border-warning/25 bg-warning-soft/10 text-fg-2",
         )}>
-          {locale === "ko" ? finding.messageKo : finding.messageEn}
+          {bt(finding.messageKo, finding.messageEn)}
         </p>
       ))}
     </FeatureCard>
@@ -628,7 +628,7 @@ function DesignTemplatePanel({ projectId, locale }: { readonly projectId: string
       </div>
       {[...templatePlan.findings, ...presentation.findings].slice(0, 5).map((finding, index) => (
         <p key={`${"slotId" in finding ? finding.slotId : finding.slideId}:${finding.code}:${index}`} className="mt-2 rounded-xl border border-warning/25 bg-warning-soft/10 px-3 py-2 text-xs text-fg-2">
-          {"messageKo" in finding ? (locale === "ko" ? finding.messageKo : finding.messageEn) : finding.code}
+          {"messageKo" in finding ? bt(finding.messageKo, finding.messageEn) : finding.code}
         </p>
       ))}
     </FeatureCard>
