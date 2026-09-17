@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(
   new URL(
-    "../../db/migrations/0065_creator_role_workspace_personalization.sql",
+    "../../db/migrations/0066_creator_role_workspace_personalization.sql",
     import.meta.url,
   ),
   "utf8",
@@ -24,10 +24,10 @@ describe("creator role workspace production migration", () => {
     expect(migration).toContain('"idx_user_creator_role_specialties_gin"');
   });
 
-  it("is registered after the ProjectGraph v3 migration", () => {
+  it("is registered after the series lifecycle migration", () => {
     expect(manifest).toContain(
-      "apps/api/src/db/migrations/0064_studio_project_graph_v3.sql\n"
-      + "apps/api/src/db/migrations/0065_creator_role_workspace_personalization.sql\n",
+      "apps/api/src/db/migrations/0065_creator_series_lifecycle.sql\n"
+      + "apps/api/src/db/migrations/0066_creator_role_workspace_personalization.sql\n",
     );
   });
 });
