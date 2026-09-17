@@ -22,6 +22,12 @@ on:
       - 'apps/web/src/domains/marketing/CreatorHomeExperience.tsx'
       - 'apps/web/src/domains/creator-resources/CreatorHomePage.tsx'
       - 'apps/web/src/domains/creator/production-hub/**'
+      - 'apps/web/src/domains/creator/studio-exact-resume*'
+      - 'apps/web/src/domains/creator/useStudioExactResumeContext*'
+      - 'apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx'
+      - 'apps/web/src/domains/creator/studio-shell/StudioProjectLibrary*'
+      - 'apps/web/src/domains/creator/studio-shell/StudioSaveFirstProjectLibraryPage.tsx'
+      - 'apps/web/src/domains/creator/studio-shell/useStudioProjectLibraryManagementController.ts'
       - 'apps/web/src/domains/catalog/AuthorPage.tsx'
       - 'apps/web/src/domains/community/PencafePage.tsx'
       - 'apps/web/src/shared/components/public-site-*'
@@ -36,6 +42,7 @@ on:
       - 'e2e/creator-flagship.spec.ts'
       - 'e2e/engineering-story.spec.ts'
       - 'e2e/production-risk-intelligence.spec.ts'
+      - 'e2e/studio-exact-resume.spec.ts'
       - 'e2e/helpers/capture-page-evidence.ts'
       - 'playwright.non-studio.config.ts'
       - '.github/workflows/non-studio-experience-quality.yml'
@@ -95,6 +102,9 @@ jobs:
           apps/web/src/domains/creator/production-hub/ProductionExternalReviewPage.test.tsx
           apps/web/src/domains/creator/production-hub/ProductionManagementWorkspace.test.tsx
           apps/web/src/domains/creator/production-hub/ProductionScheduleWorkspace.test.tsx
+          apps/web/src/domains/creator/studio-exact-resume-context.test.ts
+          apps/web/src/domains/creator/useStudioExactResumeContext.test.tsx
+          apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
       - name: Production bundle
         run: pnpm run build:bundle
       - name: Package bounded offline preview for interactive inspection

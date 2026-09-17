@@ -20,11 +20,12 @@ export function StudioProjectLibraryManagementContent({
     busyProjectId, setSaveTarget, setDeleteRequest,
     visibleProjects, temporaryProjects, savedProjects, archiveProjects,
     trashProjects, restoreProjects, duplicateProject, savePackage,
-    projectOverviewHref, continueProjectHref,
+    projectOverviewHref, projectResumeTarget, continueProjectHref,
   } = controller;
 
   const renderProjectCard = (project: StudioProjectLibraryEntry, temporary: boolean) => {
     const profile = profiles.profileFor(project.id);
+    const resumeTarget = projectResumeTarget(project);
     const checked = selectedIds.has(project.id);
     const localFileSaved = profile.bindings.some((binding) => (
       binding.provider === "local-file" && binding.syncState === "synced"
@@ -41,10 +42,12 @@ export function StudioProjectLibraryManagementContent({
         localFileSaved={localFileSaved}
         busy={busyProjectId !== null}
         continueHref={continueProjectHref(project)}
+        resumeSummary={resumeTarget.summary}
+        resumeExact={resumeTarget.exact}
         overviewHref={projectOverviewHref(project)}
         storageHref={`/studio?view=storage&project=${encodeURIComponent(project.id)}`}
         onToggle={() => setSelection(project.id, !checked)}
-        onTouch={() => { library.touch(project.id, project.lastOpenedDocumentId); }}
+        onTouch={() => { library.touch(project.id, resumeTarget.documentId); }}
         onOpenSave={() => setSaveTarget(project)}
         onSavePackage={() => { void savePackage(project); }}
         onDuplicate={() => duplicateProject(project)}

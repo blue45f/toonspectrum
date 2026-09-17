@@ -16,9 +16,10 @@ import { readStudioSubmissions } from "../save-first/studio-submission-store";
 import {
   ensureInitialStudioProjectDocument,
   readStudioProjectDocuments,
-  studioProjectDocumentHref,
   studioProjectDocumentStorageKey,
 } from "../studio-project-document-store";
+import { removeStudioExactResumeContext } from "../studio-exact-resume-context";
+import { resolveStudioProjectResumeTarget } from "../studio-project-resume-target";
 import {
   activateStudioProjectsBulk,
   archiveStudioProjectsBulk,
@@ -217,6 +218,10 @@ export function useStudioProjectLibraryManagementController() {
     if (result.affectedIds.length > 0) {
       removeStudioSaveProfilesBulk(window.localStorage, result.affectedIds, { target: window });
       for (const projectId of result.affectedIds) {
+        const documents = readStudioProjectDocuments(window.localStorage, projectId).documents;
+        for (const document of documents) {
+          removeStudioExactResumeContext(window.localStorage, projectId, document.id);
+        }
         window.localStorage.removeItem(studioProjectDocumentStorageKey(projectId));
       }
     }
@@ -312,19 +317,20 @@ export function useStudioProjectLibraryManagementController() {
     `/studio/p/${encodeURIComponent(project.id)}/overview`
   );
 
-  const continueProjectHref = (project: StudioProjectLibraryEntry): string => {
-    const fallback = projectOverviewHref(project);
-    if (typeof window === "undefined") return fallback;
-    const documents = readStudioProjectDocuments(window.localStorage, project.id).documents;
-    const document = documents.find((candidate) => candidate.id === project.lastOpenedDocumentId)
-      ?? documents.find((candidate) => candidate.status === "active");
-    if (!document) return fallback;
-    try {
-      return studioProjectDocumentHref(document);
-    } catch {
-      return fallback;
+  const projectResumeTarget = (project: StudioProjectLibraryEntry) => {
+    if (typeof window === "undefined") {
+      return {
+        href: projectOverviewHref(project),
+        documentId: project.lastOpenedDocumentId,
+        summary: null,
+        exact: false,
+      };
     }
+    return resolveStudioProjectResumeTarget(window.localStorage, project, locale);
   };
+  const continueProjectHref = (project: StudioProjectLibraryEntry): string => (
+    projectResumeTarget(project).href
+  );
   return {
     locale,
     authUserId,
@@ -360,6 +366,7 @@ export function useStudioProjectLibraryManagementController() {
     duplicateProject,
     savePackage,
     projectOverviewHref,
+    projectResumeTarget,
     continueProjectHref,
   };
 }
