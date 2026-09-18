@@ -47,7 +47,6 @@ import {
 } from "./studio-immersive-workflows";
 import { SpatialWebtoonReaderLauncher } from "./SpatialWebtoonReaderLauncher";
 import {
-  formatI18nTemplate,
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
