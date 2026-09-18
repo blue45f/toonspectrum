@@ -17,6 +17,11 @@ describe("resolveSeoRoutePolicy", () => {
     expect(resolveSeoRoutePolicy("/author/sample-author").indexable).toBe(true);
     expect(resolveSeoRoutePolicy("/u/user-1").indexable).toBe(true);
     expect(resolveSeoRoutePolicy("/community/post/post-1").indexable).toBe(true);
+    expect(resolveSeoRoutePolicy("/showcase/work/work-1")).toEqual({
+      canonicalPath: "/create/work-1",
+      robots: INDEX_ROBOTS,
+      indexable: true,
+    });
   });
 
   it("canonicalizes historical aliases before deciding indexability", () => {
