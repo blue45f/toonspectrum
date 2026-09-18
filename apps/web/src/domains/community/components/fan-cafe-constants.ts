@@ -16,6 +16,8 @@ export const KIND_ITEMS: { value: FanCafeKindFilter; label: string }[] = [
   { value: "talk", label: KIND_LABEL.talk },
   { value: "theory", label: KIND_LABEL.theory },
   { value: "fanart", label: KIND_LABEL.fanart },
+  { value: "cosplay", label: KIND_LABEL.cosplay },
+  { value: "event", label: KIND_LABEL.event },
   { value: "cheer", label: KIND_LABEL.cheer },
 ];
 

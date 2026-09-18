@@ -38,7 +38,7 @@ export interface ValidatedFanPostInput {
   images: string[];
 }
 
-const POST_KINDS = new Set<FanCafePostKind>(["talk", "theory", "fanart", "cheer"]);
+const POST_KINDS = new Set<FanCafePostKind>(["talk", "theory", "fanart", "cosplay", "event", "cheer"]);
 const POST_SORTS = new Set<"recent" | "popular">(["recent", "popular"]);
 const SCOPES = new Set<FanCafeScope>(["title", "author", "pencafe", "cafe"]);
 const SCOPE_FILTERS = new Set<FanCafeScopeFilter>(["title", "author", "pencafe", "cafe", "all"]);

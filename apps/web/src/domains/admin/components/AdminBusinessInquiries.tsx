@@ -15,6 +15,7 @@ import {
 } from "@toonspectrum/core/business-inquiry";
 
 import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { AdminBusinessVerifications } from "./AdminBusinessVerifications";
 
 function formatDate(value: string): string {
   const timestamp = Date.parse(value);
@@ -135,6 +136,7 @@ export function AdminBusinessInquiries() {
   };
 
   return (
+    <>
     <section className="space-y-5" aria-labelledby="business-inquiries-title">
       <div className="flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-line bg-card p-5">
         <div>
@@ -187,5 +189,9 @@ export function AdminBusinessInquiries() {
         </div>
       )}
     </section>
+    <div className="mt-6">
+      <AdminBusinessVerifications />
+    </div>
+    </>
   );
 }
