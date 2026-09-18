@@ -1,7 +1,9 @@
 import {
   formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { Cloud, FileArchive, Trash2 } from "lucide-react";
 
@@ -10,11 +12,6 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 
 import { StudioProjectLibraryModal } from "./StudioProjectLibraryManagementUi";
 import type { StudioProjectLibraryManagementController } from "./useStudioProjectLibraryManagementController";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioProjectLibraryManagementDialogs", ko, en);

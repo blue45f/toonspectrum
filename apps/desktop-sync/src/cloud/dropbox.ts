@@ -560,6 +560,34 @@ export class DropboxDesktopCloudProvider implements DesktopCloudProvider {
     }
   }
 
+  private async moveFile(
+    fromPath: string,
+    toPath: string,
+    signal?: AbortSignal,
+  ): Promise<DropboxMetadata> {
+    const response = await this.api(
+      "files/move_v2",
+      {
+        from_path: fromPath,
+        to_path: toPath,
+        autorename: false,
+        allow_shared_folder: false,
+        allow_ownership_transfer: false,
+      },
+      { signal },
+    );
+    const body = await jsonObject(response, this.id);
+    const metadata = dropboxMetadata(body.metadata);
+    if (!metadata) {
+      throw new DesktopCloudError(
+        this.id,
+        "invalid-response",
+        "Dropbox move response did not contain file metadata",
+      );
+    }
+    return metadata;
+  }
+
   private trashRelativePath(
     file: DesktopCloudObject,
     expectedVersion: string,
