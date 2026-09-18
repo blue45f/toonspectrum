@@ -1,12 +1,21 @@
+import { parseArtifact, type Artifact } from "./artifact";
 import {
   createStudioArtifact,
   type StudioArtifactRevisionV1,
   type StudioArtifactV1,
 } from "./artifact-revision";
 import {
+  assertSameImmutableRevision,
+  parseRevisionManifest,
+  revisionParentKindIssues,
+  type RevisionManifest,
+} from "./revision";
+import {
   assertStudioScopeRef,
   type StudioScopeRefV1,
 } from "./scope-ref";
+
+import type { ProjectId } from "./ids";
 
 export const STUDIO_PROJECT_NODE_KINDS = [
   "series",
@@ -295,16 +304,6 @@ export function appendStudioRevisionToGraph(
  * append-only revision authority consumed by the engine and legacy-shadow migration. Keeping both
  * contracts here avoids making either caller reinterpret the other's persistence shape.
  */
-import { parseArtifact, type Artifact } from "./artifact";
-import {
-  assertSameImmutableRevision,
-  parseRevisionManifest,
-  revisionParentKindIssues,
-  type RevisionManifest,
-} from "./revision";
-
-import type { ProjectId, RevisionId } from "./ids";
-
 export type ProjectAuthorityVersion = "legacy-v2" | "project-graph-v3";
 
 export interface ProjectGraphLegacyProjection {
@@ -470,8 +469,8 @@ export function appendRevision(
 
   const nextArtifact: Artifact = Object.freeze({
     ...artifact,
-    ...(revision.kind === "release" ? {} : { headRevisionId: revision.id as RevisionId }),
-    ...(revision.kind === "approved" ? { approvedRevisionId: revision.id as RevisionId } : {}),
+    ...(revision.kind === "release" ? {} : { headRevisionId: revision.id }),
+    ...(revision.kind === "approved" ? { approvedRevisionId: revision.id } : {}),
     updatedAt: revision.createdAt,
   });
   const next: ProjectGraphV3 = Object.freeze({
