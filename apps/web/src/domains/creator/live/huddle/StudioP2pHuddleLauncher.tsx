@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { MessageCircle, Mic, MicOff, Video, MonitorUp, PhoneOff, Hand, VolumeX, X } from "lucide-react";
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useStudioLiveCollaboration } from "../studio-live-collaboration-context";
 import { StudioP2pCreativeHuddleController as StudioP2pHuddleController, type CreativeHuddleSnapshot as HuddleSnapshot } from "./studio-p2p-creative-huddle-controller";
 import { HUDDLE_REACTIONS, HUDDLE_TEXT_LIMIT } from "./studio-p2p-huddle-protocol";
