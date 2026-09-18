@@ -206,6 +206,11 @@ describe("StudioProjectCenterSearch", () => {
     });
   });
 
+  it("cleans up observers and animation work without referencing stale teardown state", () => {
+    const view = render(<Fixture />);
+    expect(() => view.unmount()).not.toThrow();
+  });
+
   it("persists recent history before a delegated command closes the center", async () => {
     render(<ClosingFixture />);
     const search = screen.getByRole("searchbox", {
