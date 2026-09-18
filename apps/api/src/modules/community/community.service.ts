@@ -2,8 +2,10 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
+  Optional,
   UnauthorizedException,
 } from "@nestjs/common";
 
@@ -56,6 +58,10 @@ import {
   validateCommunityCafeUpdateInput,
 } from "../../server/community-governance";
 import { getReviewsData } from "../../server/reviews";
+import {
+  MEMBERSHIP_REWARD_SERVICE,
+  type MembershipRewardService,
+} from "../membership-wallet/membership-wallet.tokens";
 
 import type {
   CommunityCafe,
@@ -143,6 +149,30 @@ async function governed<T>(action: () => Promise<T>): Promise<T> {
 
 @Injectable()
 export class CommunityService {
+  constructor(
+    @Optional()
+    @Inject(MEMBERSHIP_REWARD_SERVICE)
+    private readonly membershipWallet?: MembershipRewardService,
+  ) {}
+
+  private async awardActivity(
+    userId: string,
+    activity: "community.post.created" | "community.comment.created",
+    sourceRef: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<void> {
+    if (!this.membershipWallet) return;
+    try {
+      await this.membershipWallet.grantActivityPoints({
+        userId,
+        activity,
+        sourceRef,
+        metadata,
+      });
+    } catch {
+      // Community writes are authoritative; reward accounting is best-effort.
+    }
+  }
   async boards(
     scopeValue: string | null,
     query: string | null,
@@ -214,7 +244,12 @@ export class CommunityService {
       const cafe = await governed(() => assertCommunityPostingAccess(parsed.value!.targetId, userId));
       parsed.value.targetLabel = cafe.name;
     }
-    return createFanPost(userId, parsed.value);
+    const post = await createFanPost(userId, parsed.value);
+    await this.awardActivity(userId, "community.post.created", post.id, {
+      scope: parsed.value.scope,
+      kind: parsed.value.kind,
+    });
+    return post;
   }
 
   async getPost(postId: string, viewerId: string | null): Promise<FanCafePost> {
@@ -260,12 +295,19 @@ export class CommunityService {
       await governed(() => assertCommunityPostingAccess(post.targetId, userId));
     }
     try {
-      return await createFanPostReply({
+      const reply = await createFanPostReply({
         postId,
         userId,
         parentId: parsed.parentId,
         text: parsed.text,
       });
+      await this.awardActivity(
+        userId,
+        "community.comment.created",
+        reply.id,
+        { postId },
+      );
+      return reply;
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : "답글을 저장하지 못했습니다.");
     }
@@ -398,13 +440,20 @@ export class CommunityService {
       throw new BadRequestException(parsed.error ?? "답글의 상위 항목이 유효하지 않습니다.");
     }
     try {
-      return await createReviewReply({
+      const reply = await createReviewReply({
         reviewId,
         parentId: parsed.parentId,
         userId,
         text: parsed.text,
         spoiler: !!body.spoiler,
       });
+      await this.awardActivity(
+        userId,
+        "community.comment.created",
+        reply.id,
+        { reviewId },
+      );
+      return reply;
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : "답글을 저장하지 못했습니다.");
     }

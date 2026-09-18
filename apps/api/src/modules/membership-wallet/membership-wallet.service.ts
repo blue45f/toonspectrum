@@ -10,14 +10,18 @@ import {
 import type { PoolClient } from "pg";
 
 import {
+  ACTIVITY_POINT_POLICIES,
+  type ActivityPointKey,
   CREDIT_COST_POLICIES,
   type CreditFeatureKey,
   highestMembershipPlan,
+  isActivityPointKey,
   isCreditFeatureKey,
   isMembershipPlanId,
   MEMBER_CREATOR_LEVELS,
   MEMBER_SELLER_LEVELS,
   MEMBER_TRUST_LEVELS,
+  MEMBERSHIP_ECONOMY_POLICY,
   MEMBERSHIP_ENTITLEMENT_KEYS,
   MEMBERSHIP_PLAN_POLICIES,
   type MemberCreatorLevel,
@@ -25,19 +29,17 @@ import {
   type MemberTrustLevel,
   type MembershipEntitlementKey,
   type MembershipPlanId,
+  PUBLIC_WALLET_ASSET,
   REWARD_MILESTONES,
   type RewardMilestoneKey,
   type WalletAsset,
-  WALLET_ASSETS,
 } from "../../../../../packages/core/src/membership-wallet";
 import { dbPool } from "../../db";
 import { isAdminUser } from "../../server/app-config";
 import { logAuditAction } from "../admin/admin-types";
 
 const RESERVATION_TTL_MS = 10 * 60 * 1000;
-const REWARD_POINT_TTL_MS = 365 * 24 * 60 * 60 * 1000;
-const CREDIT_REDEMPTION_POINT_COST = 1_000;
-const CREDIT_REDEMPTION_CREDIT_AMOUNT = 50;
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 type WalletAccountRow = {
   id: string;
@@ -102,21 +104,29 @@ function positiveInteger(value: unknown, label: string, max = 1_000_000_000): nu
 function nonNegativeInteger(value: unknown, label: string, max = 1_000_000_000): number {
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > max) {
-    throw new BadRequestException(`${label} 값이 올바르지 않습니다.`);
+    throw new BadRequestException(label + " 값이 올바르지 않습니다.");
+  }
+  return parsed;
+}
+
+function signedNonZeroInteger(
+  value: unknown,
+  label: string,
+  max = 1_000_000_000,
+): number {
+  const parsed = Number(value);
+  if (
+    !Number.isSafeInteger(parsed)
+    || parsed === 0
+    || Math.abs(parsed) > max
+  ) {
+    throw new BadRequestException(label + " 값이 올바르지 않습니다.");
   }
   return parsed;
 }
 
 function boundedText(value: unknown, max: number): string {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
-}
-
-function utcMonthKey(date = new Date()): string {
-  return date.toISOString().slice(0, 7);
-}
-
-function nextUtcMonth(date = new Date()): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1));
 }
 
 function addUtcMonths(date: Date, months: number): Date {
@@ -127,10 +137,26 @@ function addUtcMonths(date: Date, months: number): Date {
 
 function sourcePriority(source: string): number {
   if (source === "promotion" || source === "event" || source === "compensation") return 10;
-  if (source === "membership") return 20;
+  if (source.startsWith("activity:")) return 20;
+  if (source === "membership") return 30;
   if (source === "admin") return 40;
   if (source === "purchase") return 900;
   return 100;
+}
+
+
+
+function kstDayBounds(date = new Date()): {
+  dayKey: string;
+  start: Date;
+  end: Date;
+} {
+  const shifted = new Date(date.getTime() + KST_OFFSET_MS);
+  const dayKey = shifted.toISOString().slice(0, 10);
+  const [year, month, day] = dayKey.split("-").map(Number);
+  const start = new Date(Date.UTC(year!, month! - 1, day!) - KST_OFFSET_MS);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { dayKey, start, end };
 }
 
 function isCreatorLevel(value: unknown): value is MemberCreatorLevel {
@@ -158,22 +184,24 @@ export class MembershipWalletService {
   async getPolicyCatalog() {
     const overrides = await this.loadPolicyOverrides();
     return {
+      economy: MEMBERSHIP_ECONOMY_POLICY,
       plans: await Promise.all(
         Object.keys(MEMBERSHIP_PLAN_POLICIES).map((planId) =>
           this.effectivePlanPolicy(planId as MembershipPlanId, overrides)),
       ),
-      creditCosts: await Promise.all(
-        Object.keys(CREDIT_COST_POLICIES).map((feature) =>
-          this.effectiveCreditCost(feature as CreditFeatureKey, overrides)),
+      activityRewards: await Promise.all(
+        Object.keys(ACTIVITY_POINT_POLICIES).map((activityKey) =>
+          this.effectiveActivityPointPolicy(
+            activityKey as ActivityPointKey,
+            overrides,
+          )),
       ),
       rewardMilestones: REWARD_MILESTONES,
-      pointRedemptionOffers: [
-        {
-          id: "studio-credit-50",
-          pointCost: CREDIT_REDEMPTION_POINT_COST,
-          creditAmount: CREDIT_REDEMPTION_CREDIT_AMOUNT,
-        },
-      ],
+      policyNotes: {
+        paymentsEnabled: false,
+        pointsAreCashEquivalent: false,
+        fairUseLimitsApplyDuringBeta: true,
+      },
     };
   }
 
@@ -181,7 +209,6 @@ export class MembershipWalletService {
     const userId = requireUserId(userIdValue);
     await this.ensureBetaFounderPromotion(userId);
     const planId = await this.resolveMembershipPlan(userId);
-    await this.ensureMonthlyMembershipCredits(userId, planId);
     await this.releaseExpiredReservations(userId);
     await this.expireAvailableLots(userId);
 
@@ -226,11 +253,12 @@ export class MembershipWalletService {
         [userId],
       ),
       dbPool.query(
-        `SELECT id, "entryType", amount, "deltaAvailable",
-                "deltaReserved", reason, "referenceKey", "createdAt"
-         FROM wallet_ledger_entry
-         WHERE "userId" = $1
-         ORDER BY "createdAt" DESC
+        `SELECT entry.id, entry."entryType", entry.amount, entry."deltaAvailable",
+                entry."deltaReserved", entry.reason, entry."referenceKey", entry."createdAt"
+         FROM wallet_ledger_entry AS entry
+         INNER JOIN wallet_account AS account ON account.id = entry."accountId"
+         WHERE entry."userId" = $1 AND account.asset = 'reward_point'
+         ORDER BY entry."createdAt" DESC
          LIMIT 50`,
         [userId],
       ),
@@ -258,9 +286,9 @@ export class MembershipWalletService {
         grants: grants.rows,
       },
 
+      economy: MEMBERSHIP_ECONOMY_POLICY,
       wallet: {
-        studioCredit: balance("studio_credit"),
-        rewardPoint: balance("reward_point"),
+        points: balance(PUBLIC_WALLET_ASSET),
       },
       levels: levels.rows[0] ?? {
         creatorLevel: "new",
@@ -274,11 +302,6 @@ export class MembershipWalletService {
         deltaAvailable: asInt(entry.deltaAvailable),
         deltaReserved: asInt(entry.deltaReserved),
       })),
-      pointRedemptionOffers: [{
-        id: "studio-credit-50",
-        pointCost: CREDIT_REDEMPTION_POINT_COST,
-        creditAmount: CREDIT_REDEMPTION_CREDIT_AMOUNT,
-      }],
     };
   }
 
@@ -311,8 +334,6 @@ export class MembershipWalletService {
     metadata?: Record<string, unknown>;
   }) {
     await this.ensureBetaFounderPromotion(input.userId);
-    const planId = await this.resolveMembershipPlan(input.userId);
-    await this.ensureMonthlyMembershipCredits(input.userId, planId);
     await this.releaseExpiredReservations(input.userId);
     await this.expireAvailableLots(input.userId);
     const estimate = await this.estimateCredits(input.feature, input.units ?? 1);
@@ -496,6 +517,113 @@ export class MembershipWalletService {
         amount: positiveInteger(input.amount, "지급량"),
       }),
     );
+  }
+
+  private async debitAsset(input: {
+    userId: string;
+    asset: WalletAsset;
+    amount: number;
+    idempotencyKey: string;
+    reason: string;
+    referenceKey?: string | null;
+    metadata?: Record<string, unknown>;
+  }) {
+    const amount = positiveInteger(input.amount, "회수량");
+    const idempotencyKey = boundedText(input.idempotencyKey, 200);
+    if (!idempotencyKey) {
+      throw new BadRequestException("회수 요청 식별자가 필요합니다.");
+    }
+
+    return this.transaction(async (client) => {
+      const account = await this.ensureAccount(client, input.userId, input.asset);
+      const existing = await client.query<{ id: string }>(
+        `SELECT id FROM wallet_ledger_entry
+         WHERE "accountId" = $1 AND "idempotencyKey" = $2
+         LIMIT 1`,
+        [account.id, idempotencyKey],
+      );
+      if (existing.rows[0]) {
+        return {
+          adjusted: false,
+          idempotent: true,
+          accountId: account.id,
+          amount: -amount,
+        };
+      }
+      if (asInt(account.availableAmount) < amount) {
+        throw new ConflictException("회수 가능한 포인트 잔액이 부족합니다.");
+      }
+
+      const lots = await client.query<{
+        id: string;
+        remainingAmount: string | number;
+      }>(
+        `SELECT id, "remainingAmount"
+         FROM wallet_lot
+         WHERE "accountId" = $1
+           AND "remainingAmount" > 0
+           AND ("expiresAt" IS NULL OR "expiresAt" > now())
+         ORDER BY "spendPriority" ASC,
+                  "expiresAt" ASC NULLS LAST,
+                  "createdAt" ASC
+         FOR UPDATE`,
+        [account.id],
+      );
+
+      let remaining = amount;
+      for (const lot of lots.rows) {
+        if (remaining <= 0) break;
+        const take = Math.min(remaining, asInt(lot.remainingAmount));
+        if (take <= 0) continue;
+        await client.query(
+          `UPDATE wallet_lot
+           SET "remainingAmount" = "remainingAmount" - $2
+           WHERE id = $1 AND "remainingAmount" >= $2`,
+          [lot.id, take],
+        );
+        remaining -= take;
+      }
+      if (remaining !== 0) {
+        throw new Error("wallet_adjustment_lot_invariant_failed");
+      }
+
+      const updated = await client.query(
+        `UPDATE wallet_account
+         SET "availableAmount" = "availableAmount" - $2,
+             "updatedAt" = now()
+         WHERE id = $1 AND "availableAmount" >= $2
+         RETURNING id`,
+        [account.id, amount],
+      );
+      if (!updated.rows[0]) {
+        throw new Error("wallet_adjustment_balance_invariant_failed");
+      }
+
+      await client.query(
+        `INSERT INTO wallet_ledger_entry (
+           id, "accountId", "userId", "entryType", amount,
+           "deltaAvailable", "deltaReserved", reason, "referenceKey",
+           "idempotencyKey", metadata
+         ) VALUES ($1,$2,$3,'adjustment',$4,$5,0,$6,$7,$8,$9::jsonb)`,
+        [
+          randomUUID(),
+          account.id,
+          input.userId,
+          amount,
+          -amount,
+          boundedText(input.reason, 240),
+          input.referenceKey ?? null,
+          idempotencyKey,
+          JSON.stringify(input.metadata ?? {}),
+        ],
+      );
+
+      return {
+        adjusted: true,
+        accountId: account.id,
+        amount: -amount,
+      };
+    });
   }
 
   private async reserveAsset(input: {
@@ -838,44 +966,6 @@ export class MembershipWalletService {
     return highestMembershipPlan(plans);
   }
 
-  private async ensureMonthlyMembershipCredits(
-    userId: string,
-    planId: MembershipPlanId,
-  ) {
-    const overrides = await this.loadPolicyOverrides();
-
-    const policy = await this.effectivePlanPolicy(planId, overrides);
-    const target = policy.monthlyCredits;
-    if (target <= 0) return;
-
-    const month = utcMonthKey();
-    const granted = await dbPool.query<{ granted: string | number }>(
-      `SELECT COALESCE(SUM("grantedAmount"), 0)::bigint AS granted
-       FROM wallet_lot
-       WHERE "userId" = $1
-         AND asset = 'studio_credit'
-         AND source = 'membership'
-         AND "sourceRef" = $2`,
-      [userId, month],
-    );
-    const alreadyGranted = asInt(granted.rows[0]?.granted ?? 0);
-    const delta = Math.max(0, target - alreadyGranted);
-    if (delta <= 0) return;
-
-    await this.grantAsset({
-      userId,
-      asset: "studio_credit",
-
-      amount: delta,
-      source: "membership",
-      sourceKey: `membership:${month}:${target}`,
-      sourceRef: month,
-      expiresAt: nextUtcMonth(),
-      reason: `${policy.label} 월 제공 크레딧`,
-      metadata: { planId, target, alreadyGranted },
-    });
-  }
-
   private async ensureBetaFounderPromotion(userId: string): Promise<void> {
     if (process.env.BETA_FOUNDER_AUTO_ENROLL !== "true") return;
 
@@ -928,30 +1018,6 @@ export class MembershipWalletService {
     }
   }
 
-  /* Incomplete duplicate left by an interrupted write.
-  private async expireAvailableLots(userId: string): Promise<void> {
-    await this.transaction(async (client) => {
-      const lots = await client.query<{
-        id: string;
-        accountId: string;
-        remainingAmount: string | number;
-        sourceKey: string;
-      }>(
-        `SELECT id, "accountId", "remainingAmount", "sourceKey"
-         FROM wallet_lot
-         WHERE "userId" = $1
-           AND "expiresAt" IS NOT NULL
-           AND "expiresAt" <= now()
-           AND "remainingAmount" > 0
-         ORDER BY "expiresAt" ASC
-         FOR UPDATE`,
-        [userId],
-      );
-
-      for (const lot of lots.rows) {
-        const expiredAmount = asInt(lot.remainingAmount);
-        if (expiredAmount <= 0) continue;
-  */
   private async expireAvailableLots(userId: string): Promise<void> {
     await this.transaction(async (client) => {
       const lots = await client.query<{
@@ -1005,7 +1071,7 @@ export class MembershipWalletService {
             lot.id,
             expiredAmount,
             -expiredAmount,
-            "만료된 크레딧/포인트 정리",
+            "만료된 내부 지갑 항목 정리",
             lot.sourceKey,
             `expire:${lot.id}`,
           ],
@@ -1046,21 +1112,14 @@ export class MembershipWalletService {
         entitlements[key] = value as never;
       } else if (
         typeof expected === "number"
-        && Number.isSafeInteger(Number(value))
+        && Number.isFinite(Number(value))
         && Number(value) >= 0
       ) {
         entitlements[key] = Number(value) as never;
       }
     }
-    const monthly = Number(record.monthlyCredits);
     return {
       ...base,
-      monthlyCredits:
-        Number.isSafeInteger(monthly)
-        && monthly >= 0
-        && monthly <= 1_000_000_000
-          ? monthly
-          : base.monthlyCredits,
       entitlements,
     };
   }
@@ -1095,6 +1154,181 @@ export class MembershipWalletService {
       Math.max(lower, Number(next[numericKeys[0] ?? ""])),
     );
     return next as unknown as typeof base;
+  }
+
+  private effectiveActivityPointPolicy(
+    activityKey: ActivityPointKey,
+    overrides: Map<string, unknown>,
+  ) {
+    const base = ACTIVITY_POINT_POLICIES[activityKey];
+    const raw = overrides.get(`activity:${activityKey}`);
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return base;
+    const record = raw as Record<string, unknown>;
+    const safe = (value: unknown, fallback: number, maximum: number) => {
+      const parsed = Number(value);
+      return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= maximum
+        ? parsed
+        : fallback;
+    };
+    return {
+      ...base,
+      points: safe(record.points, base.points, 100_000),
+      dailyGrantLimit: safe(
+        record.dailyGrantLimit,
+        base.dailyGrantLimit,
+        1_000,
+      ),
+      cooldownSeconds: safe(
+        record.cooldownSeconds,
+        base.cooldownSeconds,
+        86_400,
+      ),
+    };
+  }
+
+  async grantActivityPoints(input: {
+    userId: string | undefined;
+    activity: unknown;
+    sourceRef: unknown;
+    metadata?: Record<string, unknown>;
+    clientClaim?: boolean;
+  }) {
+    const userId = requireUserId(input.userId);
+    if (!isActivityPointKey(input.activity)) {
+      throw new BadRequestException("지원하지 않는 포인트 활동입니다.");
+    }
+    const activityKey = input.activity;
+    const sourceRef = boundedText(input.sourceRef, 180);
+    if (!sourceRef) {
+      throw new BadRequestException("포인트 적립 근거 식별자가 필요합니다.");
+    }
+    const policy = this.effectiveActivityPointPolicy(
+      activityKey,
+      await this.loadPolicyOverrides(),
+    );
+    if (input.clientClaim === true && policy.claimMode !== "client") {
+      throw new ForbiddenException("이 활동은 서버가 확인한 경우에만 포인트를 적립합니다.");
+    }
+    if (policy.points <= 0 || policy.dailyGrantLimit <= 0) {
+      return {
+        granted: false,
+        disabled: true,
+        activity: activityKey,
+        points: 0,
+      };
+    }
+
+    const source = `activity:${activityKey}`;
+    const sourceKey = `${source}:${sourceRef}`;
+    const { dayKey, start, end } = kstDayBounds();
+
+    return this.transaction(async (client) => {
+      await client.query(
+        `SELECT pg_advisory_xact_lock(hashtext($1))`,
+        [`membership-activity:${userId}:${activityKey}`],
+      );
+
+      const account = await this.ensureAccount(
+        client,
+        userId,
+        PUBLIC_WALLET_ASSET,
+      );
+      const duplicate = await client.query<{ id: string }>(
+        `SELECT id
+         FROM wallet_lot
+         WHERE "accountId" = $1 AND "sourceKey" = $2
+         LIMIT 1`,
+        [account.id, boundedText(sourceKey, 240)],
+      );
+      if (duplicate.rows[0]) {
+        return {
+          granted: false,
+          idempotent: true,
+          activity: activityKey,
+          points: 0,
+          dailyGrantLimit: policy.dailyGrantLimit,
+        };
+      }
+
+      const daily = await client.query<{
+        count: string | number;
+        latest: Date | null;
+      }>(
+        `SELECT COUNT(*)::integer AS count, MAX("createdAt") AS latest
+         FROM wallet_lot
+         WHERE "userId" = $1
+           AND asset = 'reward_point'
+           AND source = $2
+           AND "createdAt" >= $3
+           AND "createdAt" < $4`,
+        [userId, source, start, end],
+      );
+      const count = asInt(daily.rows[0]?.count ?? 0);
+      if (count >= policy.dailyGrantLimit) {
+        return {
+          granted: false,
+          capped: true,
+          activity: activityKey,
+          points: 0,
+          dailyGrantLimit: policy.dailyGrantLimit,
+          nextResetAt: end.toISOString(),
+        };
+      }
+
+      const latest = daily.rows[0]?.latest;
+      if (
+        latest
+        && policy.cooldownSeconds > 0
+        && Date.now() - new Date(latest).getTime()
+          < policy.cooldownSeconds * 1000
+      ) {
+        return {
+          granted: false,
+          cooldown: true,
+          activity: activityKey,
+          points: 0,
+          cooldownSeconds: policy.cooldownSeconds,
+        };
+      }
+
+      const grant = await this.grantLotWithClient(client, {
+        userId,
+        asset: PUBLIC_WALLET_ASSET,
+        amount: policy.points,
+        source,
+        sourceKey,
+        sourceRef,
+        expiresAt: null,
+        reason: policy.label,
+        metadata: {
+          ...(input.metadata ?? {}),
+          activity: activityKey,
+          dayKey,
+        },
+      });
+      return {
+        ...grant,
+        activity: activityKey,
+        points: grant.granted ? policy.points : 0,
+        dailyGrantLimit: policy.dailyGrantLimit,
+        remainingDailyGrants: Math.max(
+          0,
+          policy.dailyGrantLimit - count - (grant.granted ? 1 : 0),
+        ),
+      };
+    });
+  }
+
+  async claimClientActivityPoints(input: {
+    userId: string | undefined;
+    activity: unknown;
+    sourceRef: unknown;
+    metadata?: Record<string, unknown>;
+  }) {
+    return this.grantActivityPoints({
+      ...input,
+      clientClaim: true,
+    });
   }
 
   async getEffectiveEntitlements(userIdValue: string | undefined) {
@@ -1140,65 +1374,10 @@ export class MembershipWalletService {
       source: "event",
       sourceKey: `reward:${milestone}:${sourceRef}`,
       sourceRef,
-      expiresAt: new Date(Date.now() + REWARD_POINT_TTL_MS),
+      expiresAt: null,
       reason: policy.label,
       metadata: { milestone },
     });
-  }
-
-  async redeemRewardPoints(input: {
-    userId: string | undefined;
-    offerId: unknown;
-    idempotencyKey: unknown;
-  }) {
-    const userId = requireUserId(input.userId);
-    if (input.offerId !== "studio-credit-50") {
-      throw new BadRequestException("지원하지 않는 포인트 교환 상품입니다.");
-    }
-    const idempotencyKey = boundedText(input.idempotencyKey, 160);
-    if (!idempotencyKey) {
-      throw new BadRequestException("포인트 교환 요청 식별자가 필요합니다.");
-    }
-    await this.expireAvailableLots(userId);
-    const reservation = await this.reserveAsset({
-      userId,
-      asset: "reward_point",
-      amount: CREDIT_REDEMPTION_POINT_COST,
-      idempotencyKey: `point-redeem:${idempotencyKey}`,
-      metadata: { offerId: "studio-credit-50" },
-    });
-    if (reservation.status === "released" || reservation.status === "expired") {
-      throw new ConflictException({
-        code: "reward_point_redemption_expired",
-        message: "만료된 교환 요청입니다. 새 요청으로 다시 시도해 주세요.",
-      });
-    }
-    if (reservation.status === "reserved") {
-      await this.settleReservation(
-        reservation.id,
-        CREDIT_REDEMPTION_POINT_COST,
-        "captured",
-      );
-    }
-    const grant = await this.grantAsset({
-      userId,
-      asset: "studio_credit",
-      amount: CREDIT_REDEMPTION_CREDIT_AMOUNT,
-      source: "event",
-      sourceKey: `point-redemption:${idempotencyKey}`,
-      sourceRef: idempotencyKey,
-      reason: "리워드 포인트 교환 Studio Credit",
-      metadata: {
-        offerId: "studio-credit-50",
-        pointCost: CREDIT_REDEMPTION_POINT_COST,
-      },
-    });
-    return {
-      redeemed: grant.granted,
-      idempotent: !grant.granted,
-      pointCost: CREDIT_REDEMPTION_POINT_COST,
-      creditAmount: CREDIT_REDEMPTION_CREDIT_AMOUNT,
-    };
   }
 
   private async requireAdmin(
@@ -1234,9 +1413,11 @@ export class MembershipWalletService {
     const key = boundedText(input.key, 180);
     const validPlanKey = key.startsWith("plan:")
       && isMembershipPlanId(key.slice("plan:".length));
+    const validActivityKey = key.startsWith("activity:")
+      && isActivityPointKey(key.slice("activity:".length));
     const validCreditKey = key.startsWith("credit:")
       && isCreditFeatureKey(key.slice("credit:".length));
-    if (!validPlanKey && !validCreditKey) {
+    if (!validPlanKey && !validActivityKey && !validCreditKey) {
       throw new BadRequestException("지원하지 않는 정책 키입니다.");
     }
     if (!input.value || typeof input.value !== "object" || Array.isArray(input.value)) {
@@ -1311,7 +1492,7 @@ export class MembershipWalletService {
     adminId: string | undefined;
     targetUserId: unknown;
     asset: unknown;
-    units: unknown;
+    delta: unknown;
     requestKey: unknown;
     reason?: unknown;
   }) {
@@ -1320,40 +1501,44 @@ export class MembershipWalletService {
     if (!targetUserId) {
       throw new BadRequestException("대상 사용자 ID가 필요합니다.");
     }
-    if (
-      typeof input.asset !== "string"
-      || !(WALLET_ASSETS as readonly string[]).includes(input.asset)
-    ) {
-      throw new BadRequestException("지원하지 않는 지갑 자산입니다.");
+    if (input.asset !== PUBLIC_WALLET_ASSET) {
+      throw new BadRequestException("현재 사용자에게 지급할 수 있는 자산은 포인트뿐입니다.");
     }
-    const asset = input.asset as WalletAsset;
-    const units = positiveInteger(input.units, "지급량");
+    const asset: WalletAsset = PUBLIC_WALLET_ASSET;
+    const delta = signedNonZeroInteger(input.delta, "포인트 조정량");
     const requestKey = boundedText(input.requestKey, 160);
     if (!requestKey) {
       throw new BadRequestException("지급 요청 식별자가 필요합니다.");
     }
-    const reason =
-      boundedText(input.reason, 240) || "관리자 수동 지급";
-    const result = await this.grantAsset({
-      userId: targetUserId,
-      asset,
-      amount: units,
-      source: "admin",
-      sourceKey: `admin:${adminId}:${requestKey}`,
-      sourceRef: requestKey,
-      expiresAt:
-        asset === "reward_point"
-          ? new Date(Date.now() + REWARD_POINT_TTL_MS)
-          : null,
-      reason,
-      metadata: { adminId },
-    });
+    const reason = boundedText(input.reason, 240)
+      || (delta > 0 ? "관리자 수동 지급" : "관리자 수동 회수");
+    const result = delta > 0
+      ? await this.grantAsset({
+          userId: targetUserId,
+          asset,
+          amount: delta,
+          source: "admin",
+          sourceKey: ["admin", adminId, requestKey].join(":"),
+          sourceRef: requestKey,
+          expiresAt: null,
+          reason,
+          metadata: { adminId, delta },
+        })
+      : await this.debitAsset({
+          userId: targetUserId,
+          asset,
+          amount: Math.abs(delta),
+          idempotencyKey: ["adjust", adminId, requestKey].join(":"),
+          reason,
+          referenceKey: requestKey,
+          metadata: { adminId, delta },
+        });
     await logAuditAction(
       adminId,
       "membership_wallet.benefit_apply",
       "user",
       targetUserId,
-      { asset, units, requestKey },
+      { asset, delta, requestKey },
     );
     return result;
   }

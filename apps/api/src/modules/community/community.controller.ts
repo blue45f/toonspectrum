@@ -8,6 +8,7 @@ import {
   Headers,
   HttpException,
   HttpStatus,
+  Inject,
   Param,
   Patch,
   Post,
@@ -101,8 +102,11 @@ const CommunityRateLimitStore: Record<string, number[]> = {};
 export class CommunityController {
   private readonly communityService: CommunityService;
 
-  constructor() {
-    this.communityService = new CommunityService();
+  constructor(
+    @Inject(CommunityService)
+    communityService?: CommunityService,
+  ) {
+    this.communityService = communityService ?? new CommunityService();
   }
 
   private checkRateLimit(key: string, limit: number, windowMs: number) {

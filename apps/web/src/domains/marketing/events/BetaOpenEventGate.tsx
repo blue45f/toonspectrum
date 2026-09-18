@@ -176,7 +176,7 @@ export function BetaOpenEventGate({ pathname }: { pathname: string }) {
             {[
               {
                 strong: { ko: "베타 기간", en: "During beta" },
-                body: { ko: "전 서비스 제한 없이 무료", en: "Every service, unlimited and free" },
+                body: { ko: "주요 서비스 이용료 무료 · 공정 사용 한도 적용", en: "Major services free · fair-use limits apply" },
               },
               {
                 strong: { ko: "회원가입", en: "Create an account" },

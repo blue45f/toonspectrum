@@ -3,6 +3,16 @@ export type MembershipPlanId = (typeof MEMBERSHIP_PLAN_IDS)[number];
 
 export const WALLET_ASSETS = ["studio_credit", "reward_point"] as const;
 export type WalletAsset = (typeof WALLET_ASSETS)[number];
+export const PUBLIC_WALLET_ASSET = "reward_point" as const;
+
+export const MEMBERSHIP_ECONOMY_POLICY = Object.freeze({
+  mode: "activity-points" as const,
+  paymentsEnabled: false,
+  creditPurchasesEnabled: false,
+  publicAsset: PUBLIC_WALLET_ASSET,
+  pointExpiryDays: null,
+  fairUseLimitsApplyDuringBeta: true,
+});
 
 export const MEMBER_CREATOR_LEVELS = [
   "new",
@@ -32,8 +42,11 @@ export type MemberSellerLevel = (typeof MEMBER_SELLER_LEVELS)[number];
 
 export const MEMBERSHIP_ENTITLEMENT_KEYS = [
   "storage.bytes",
+  "storage.warningRatio",
   "upload.file.maxBytes",
+  "upload.daily.maxBytes",
   "upload.concurrent",
+  "canvas.maxHeightPx",
   "render.concurrent",
   "retention.versionsDays",
   "retention.trashDays",
@@ -41,9 +54,13 @@ export const MEMBERSHIP_ENTITLEMENT_KEYS = [
   "collaboration.viewers",
   "collaboration.videoPeers",
   "collaboration.canvasPeers",
+  "ai.monthlyTokens",
   "market.sell",
   "market.bulkUpload",
   "export.highResolution",
+  "feature.webgpuExport",
+  "feature.cmykSoftProof",
+  "feature.customPlugins",
 ] as const;
 export type MembershipEntitlementKey =
   (typeof MEMBERSHIP_ENTITLEMENT_KEYS)[number];
@@ -52,97 +69,122 @@ export type MembershipEntitlementValue = number | boolean;
 export interface MembershipPlanPolicy {
   readonly id: MembershipPlanId;
   readonly label: string;
-  readonly monthlyCredits: number;
+  readonly description: string;
   readonly entitlements: Readonly<
     Record<MembershipEntitlementKey, MembershipEntitlementValue>
   >;
 }
 
-const GB = 1_000_000_000;
-const TB = 1_000 * GB;
+const MB = 1_000_000;
+const GB = 1_000 * MB;
 
 export const MEMBERSHIP_PLAN_POLICIES = Object.freeze({
   free: {
     id: "free",
     label: "Free",
-    monthlyCredits: 500,
+    description: "기본 창작·커뮤니티 기능과 개인 작업을 위한 시작 등급",
     entitlements: {
-      "storage.bytes": 10 * GB,
-      "upload.file.maxBytes": 1 * GB,
-      "upload.concurrent": 3,
-      "render.concurrent": 2,
+      "storage.bytes": 5 * GB,
+      "storage.warningRatio": 0.8,
+      "upload.file.maxBytes": 250 * MB,
+      "upload.daily.maxBytes": 2 * GB,
+      "upload.concurrent": 2,
+      "canvas.maxHeightPx": 10_000,
+      "render.concurrent": 1,
       "retention.versionsDays": 30,
-      "retention.trashDays": 30,
-      "collaboration.members": 5,
-      "collaboration.viewers": 50,
-      "collaboration.videoPeers": 6,
-      "collaboration.canvasPeers": 20,
+      "retention.trashDays": 14,
+      "collaboration.members": 3,
+      "collaboration.viewers": 20,
+      "collaboration.videoPeers": 4,
+      "collaboration.canvasPeers": 10,
+      "ai.monthlyTokens": 100,
       "market.sell": false,
       "market.bulkUpload": false,
       "export.highResolution": false,
+      "feature.webgpuExport": false,
+      "feature.cmykSoftProof": false,
+      "feature.customPlugins": false,
     },
   },
-
   creator: {
     id: "creator",
     label: "Creator",
-    monthlyCredits: 2_000,
+    description: "꾸준히 작품을 제작·공개하는 개인 창작자를 위한 운영 등급",
     entitlements: {
-      "storage.bytes": 100 * GB,
-      "upload.file.maxBytes": 2 * GB,
-      "upload.concurrent": 8,
-      "render.concurrent": 4,
+      "storage.bytes": 25 * GB,
+      "storage.warningRatio": 0.8,
+      "upload.file.maxBytes": 1 * GB,
+      "upload.daily.maxBytes": 10 * GB,
+      "upload.concurrent": 5,
+      "canvas.maxHeightPx": 50_000,
+      "render.concurrent": 2,
       "retention.versionsDays": 90,
       "retention.trashDays": 30,
-      "collaboration.members": 10,
-      "collaboration.viewers": 200,
-      "collaboration.videoPeers": 8,
-      "collaboration.canvasPeers": 40,
+      "collaboration.members": 8,
+      "collaboration.viewers": 100,
+      "collaboration.videoPeers": 6,
+      "collaboration.canvasPeers": 25,
+      "ai.monthlyTokens": 2_000,
       "market.sell": true,
       "market.bulkUpload": false,
       "export.highResolution": true,
+      "feature.webgpuExport": true,
+      "feature.cmykSoftProof": true,
+      "feature.customPlugins": true,
     },
   },
-
   pro: {
     id: "pro",
     label: "Pro",
-    monthlyCredits: 5_000,
+    description: "고용량 제작·배포와 고급 협업을 위한 전문 창작자 등급",
     entitlements: {
-      "storage.bytes": 500 * GB,
-      "upload.file.maxBytes": 5 * GB,
-      "upload.concurrent": 16,
-      "render.concurrent": 8,
+      "storage.bytes": 100 * GB,
+      "storage.warningRatio": 0.8,
+      "upload.file.maxBytes": 2 * GB,
+      "upload.daily.maxBytes": 30 * GB,
+      "upload.concurrent": 10,
+      "canvas.maxHeightPx": 200_000,
+      "render.concurrent": 4,
       "retention.versionsDays": 365,
       "retention.trashDays": 30,
       "collaboration.members": 20,
       "collaboration.viewers": 500,
       "collaboration.videoPeers": 10,
       "collaboration.canvasPeers": 50,
+      "ai.monthlyTokens": 10_000,
       "market.sell": true,
       "market.bulkUpload": true,
       "export.highResolution": true,
+      "feature.webgpuExport": true,
+      "feature.cmykSoftProof": true,
+      "feature.customPlugins": true,
     },
   },
-
   team: {
     id: "team",
     label: "Team",
-    monthlyCredits: 12_000,
+    description: "스튜디오·팀 단위 장기 제작과 다인 협업을 위한 최상위 운영 등급",
     entitlements: {
-      "storage.bytes": TB,
-      "upload.file.maxBytes": 10 * GB,
-      "upload.concurrent": 24,
-      "render.concurrent": 12,
+      "storage.bytes": 500 * GB,
+      "storage.warningRatio": 0.8,
+      "upload.file.maxBytes": 5 * GB,
+      "upload.daily.maxBytes": 100 * GB,
+      "upload.concurrent": 20,
+      "canvas.maxHeightPx": 1_000_000,
+      "render.concurrent": 8,
       "retention.versionsDays": 730,
-      "retention.trashDays": 30,
+      "retention.trashDays": 60,
       "collaboration.members": 100,
       "collaboration.viewers": 2_000,
       "collaboration.videoPeers": 12,
       "collaboration.canvasPeers": 100,
+      "ai.monthlyTokens": 50_000,
       "market.sell": true,
       "market.bulkUpload": true,
       "export.highResolution": true,
+      "feature.webgpuExport": true,
+      "feature.cmykSoftProof": true,
+      "feature.customPlugins": true,
     },
   },
 } satisfies Record<MembershipPlanId, MembershipPlanPolicy>);
@@ -165,6 +207,62 @@ export function highestMembershipPlan(
         : best,
     "free",
   );
+}
+
+export const ACTIVITY_POINT_KEYS = [
+  "creator.work.created",
+  "creator.work.published",
+  "community.post.created",
+  "community.comment.created",
+  "fortune.used",
+  "playground.used",
+] as const;
+export type ActivityPointKey = (typeof ACTIVITY_POINT_KEYS)[number];
+
+export interface ActivityPointPolicy {
+  readonly key: ActivityPointKey;
+  readonly label: string;
+  readonly points: number;
+  readonly dailyGrantLimit: number;
+  readonly cooldownSeconds: number;
+  readonly claimMode: "server" | "client";
+}
+
+function activity(
+  key: ActivityPointKey,
+  label: string,
+  points: number,
+  dailyGrantLimit: number,
+  cooldownSeconds: number,
+  claimMode: "server" | "client",
+): ActivityPointPolicy {
+  return { key, label, points, dailyGrantLimit, cooldownSeconds, claimMode };
+}
+
+export const ACTIVITY_POINT_POLICIES = Object.freeze({
+  "creator.work.created": activity(
+    "creator.work.created", "새 작품 만들기", 20, 3, 60, "server",
+  ),
+  "creator.work.published": activity(
+    "creator.work.published", "작품 공개", 100, 2, 300, "server",
+  ),
+  "community.post.created": activity(
+    "community.post.created", "커뮤니티 글 작성", 15, 5, 60, "server",
+  ),
+  "community.comment.created": activity(
+    "community.comment.created", "댓글 작성", 3, 10, 20, "server",
+  ),
+  "fortune.used": activity(
+    "fortune.used", "운세 이용", 2, 3, 60, "server",
+  ),
+  "playground.used": activity(
+    "playground.used", "놀이터 이용", 3, 5, 120, "client",
+  ),
+} satisfies Record<ActivityPointKey, ActivityPointPolicy>);
+
+export function isActivityPointKey(value: unknown): value is ActivityPointKey {
+  return typeof value === "string"
+    && (ACTIVITY_POINT_KEYS as readonly string[]).includes(value);
 }
 
 export const CREDIT_FEATURE_KEYS = [
@@ -199,6 +297,10 @@ function credit(
   return { key, label, baseCredits, minimumCredits, maximumCredits };
 }
 
+/**
+ * Future/internal cost model only. These values are intentionally not exposed as
+ * a purchasable user wallet while MEMBERSHIP_ECONOMY_POLICY.creditPurchasesEnabled is false.
+ */
 export const CREDIT_COST_POLICIES = Object.freeze({
   "ai.text.generate": credit("ai.text.generate", "AI text generation", 1, 1, 20),
   "ai.translation": credit("ai.translation", "AI translation", 2, 2, 40),
@@ -207,7 +309,6 @@ export const CREDIT_COST_POLICIES = Object.freeze({
     "ai.image.removeBackground", "Background removal", 2, 2, 10,
   ),
   "ai.image.upscale": credit("ai.image.upscale", "Image upscale", 4, 4, 40),
-
   "ai.image.generate": credit("ai.image.generate", "Image generation", 8, 5, 80),
   "ai.storyboard.generate": credit(
     "ai.storyboard.generate", "Storyboard generation", 10, 5, 100,
@@ -222,11 +323,13 @@ export function isCreditFeatureKey(value: unknown): value is CreditFeatureKey {
     && (CREDIT_FEATURE_KEYS as readonly string[]).includes(value);
 }
 
-export function estimateCreditCost(feature: CreditFeatureKey, units = 1): number {
+export function estimateCreditCost(
+  feature: CreditFeatureKey,
+  units = 1,
+): number {
   const policy = CREDIT_COST_POLICIES[feature];
   const safeUnits = Number.isFinite(units) ? Math.max(0, units) : 1;
   return Math.min(
-
     policy.maximumCredits,
     Math.max(
       policy.minimumCredits,
@@ -249,10 +352,10 @@ export const BETA_PROMOTIONS = Object.freeze({
 });
 
 export const REWARD_MILESTONES = Object.freeze({
-  "profile-complete": { points: 300, label: "Complete creator profile" },
-  "first-public-work": { points: 1_000, label: "Publish first work" },
-  "beta-feedback-accepted": { points: 1_500, label: "Accepted beta feedback" },
-  "bug-report-accepted": { points: 500, label: "Accepted bug report" },
+  "profile-complete": { points: 100, label: "크리에이터 프로필 완성" },
+  "first-public-work": { points: 300, label: "첫 작품 공개" },
+  "beta-feedback-accepted": { points: 150, label: "채택된 베타 피드백" },
+  "bug-report-accepted": { points: 100, label: "채택된 버그 제보" },
 });
 export type RewardMilestoneKey = keyof typeof REWARD_MILESTONES;
 

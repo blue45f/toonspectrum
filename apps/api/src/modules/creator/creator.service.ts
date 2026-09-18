@@ -8,6 +8,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from "@nestjs/common";
 
@@ -21,6 +22,10 @@ import {
 import { rateLimit } from "../../../../web/src/shared/lib/rate-limit";
 import { StudioLinked3dPassAssetFenceError } from "../../../../web/src/shared/lib/studio-linked-3d-pass-asset-fence";
 import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
+import {
+  MEMBERSHIP_REWARD_SERVICE,
+  type MembershipRewardService,
+} from "../membership-wallet/membership-wallet.tokens";
 import {
   addComment,
   bumpAssetDownloads,
@@ -177,7 +182,58 @@ export class CreatorService {
     @Inject(StudioRealtimeRevocationService)
     private readonly realtimeRevocation: StudioRealtimeRevocationService =
       new StudioRealtimeRevocationService({ enabled: false }),
+    @Optional()
+    @Inject(MEMBERSHIP_REWARD_SERVICE)
+    private readonly membershipWallet?: MembershipRewardService,
   ) {}
+
+  private async awardActivity(
+    userId: string,
+    activity:
+      | "creator.work.created"
+      | "creator.work.published"
+      | "community.comment.created",
+    sourceRef: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<void> {
+    if (!this.membershipWallet) return;
+    try {
+      await this.membershipWallet.grantActivityPoints({
+        userId,
+        activity,
+        sourceRef,
+        metadata,
+      });
+    } catch {
+      // Product writes must succeed even when reward accounting is unavailable.
+    }
+  }
+
+  private async awardFirstPublicWork(userId: string): Promise<void> {
+    if (!this.membershipWallet) return;
+    try {
+      await this.membershipWallet.grantRewardMilestone(
+        userId,
+        "first-public-work",
+        userId,
+      );
+    } catch {
+      // Publication remains authoritative when reward accounting is unavailable.
+    }
+  }
+
+  private async awardFirstPublicWork(userId: string): Promise<void> {
+    if (!this.membershipWallet) return;
+    try {
+      await this.membershipWallet.grantRewardMilestone(
+        userId,
+        "first-public-work",
+        userId,
+      );
+    } catch {
+      // The published work remains authoritative even if the reward ledger is unavailable.
+    }
+  }
 
   async listWorks(q: CreatorWorkListQueryDto, viewerId?: string) {
     if (q.bookmarked && !viewerId) throw new ForbiddenException("북마크 목록은 로그인 후 볼 수 있습니다.");
@@ -207,7 +263,24 @@ export class CreatorService {
   async createWork(userId: string, body: CreateCreatorWorkDto) {
     try {
       // 페이지/문서가 클 수 있으나 다른 모듈과 동일하게 별도 크기 제한은 두지 않는다.
-      return await createWork(userId, body);
+      const work = await createWork(userId, body);
+      await this.awardActivity(
+        userId,
+        "creator.work.created",
+        work.id,
+        { status: body.status ?? "draft" },
+      );
+      if (body.status === "published") {
+        await this.awardActivity(
+          userId,
+          "creator.work.published",
+          work.id,
+          { source: "create" },
+        );
+        await this.awardFirstPublicWork(userId);
+        await this.awardFirstPublicWork(userId);
+      }
+      return work;
     } catch (error) {
       if (error instanceof StudioLinked3dPassAssetFenceError) {
         throw creatorLinked3dPassAssetFenceConflict(error);
@@ -218,7 +291,18 @@ export class CreatorService {
 
   async updateWork(userId: string, id: string, body: UpdateCreatorWorkDto) {
     try {
-      return await updateWork(userId, id, body);
+      const work = await updateWork(userId, id, body);
+      if (body.status === "published") {
+        await this.awardActivity(
+          userId,
+          "creator.work.published",
+          id,
+          { source: "update" },
+        );
+        await this.awardFirstPublicWork(userId);
+        await this.awardFirstPublicWork(userId);
+      }
+      return work;
     } catch (error) {
       if (error instanceof CreatorWorkRevisionConflictError) {
         throw new ConflictException({
@@ -638,7 +722,14 @@ export class CreatorService {
       );
     }
     try {
-      return await addComment(userId, workId, input?.text, parentId);
+      const comment = await addComment(userId, workId, input?.text, parentId);
+      await this.awardActivity(
+        userId,
+        "community.comment.created",
+        comment.id,
+        { workId },
+      );
+      return comment;
     } catch (error) {
       throw new BadRequestException(
         error instanceof Error ? error.message : "댓글을 작성할 수 없습니다.",

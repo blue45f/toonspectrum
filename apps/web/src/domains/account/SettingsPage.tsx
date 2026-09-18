@@ -290,10 +290,23 @@ export function SettingsPage() {
         </p>
       </header>
 
-      <Link to="/settings/ai" className="mb-6 flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
-        <span><strong>통합 AI 설정</strong><span className="mt-1 block text-sm text-fg-2">텍스트·이미지·영상·3D의 사용자 키와 암호화 보관함을 한곳에서 관리</span></span>
-        <ChevronRight size={18} aria-hidden />
-      </Link>
+      <div className="mb-6 grid gap-3">
+        <Link to="/membership" className="flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
+          <span>
+            <strong>{lang.startsWith("ko") ? "멤버십 · 포인트 · 용량 정책" : "Membership, points & storage"}</strong>
+            <span className="mt-1 block text-sm text-fg-2">
+              {lang.startsWith("ko")
+                ? "내 등급의 저장공간·업로드 한도와 활동 포인트 적립 기준 확인"
+                : "Review storage, upload limits and activity-point rules for your tier"}
+            </span>
+          </span>
+          <ChevronRight size={18} aria-hidden />
+        </Link>
+        <Link to="/settings/ai" className="flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
+          <span><strong>통합 AI 설정</strong><span className="mt-1 block text-sm text-fg-2">텍스트·이미지·영상·3D의 사용자 키와 암호화 보관함을 한곳에서 관리</span></span>
+          <ChevronRight size={18} aria-hidden />
+        </Link>
+      </div>
 
       <section id="appearance" className="mb-6 rounded-2xl border border-line bg-panel/40 p-5" aria-labelledby="appearance-heading">
         <h2 id="appearance-heading" className="mb-4 text-base font-semibold">

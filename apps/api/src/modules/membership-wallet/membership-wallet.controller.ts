@@ -6,7 +6,6 @@ import {
   Headers,
   Param,
   Post,
-  Query,
   UseGuards,
 } from "@nestjs/common";
 
@@ -14,9 +13,10 @@ import { AdminMutationGuard } from "../admin/admin-mutation.guard";
 
 import { MembershipWalletService } from "./membership-wallet.service";
 
-type RedeemBody = {
-  offerId?: unknown;
-  idempotencyKey?: unknown;
+type ActivityClaimBody = {
+  activity?: unknown;
+  sourceRef?: unknown;
+  metadata?: Record<string, unknown>;
 };
 
 @Controller()
@@ -34,27 +34,26 @@ export class MembershipWalletController {
     return this.service.getOverview(userId);
   }
 
-  @Get("membership/credits/estimate")
+  @Get("membership/entitlements")
   @Header("Cache-Control", "no-store, max-age=0")
-  estimateCredits(
-    @Query("feature") feature: string | undefined,
-    @Query("units") units: string | undefined,
-  ) {
-    return this.service.estimateCredits(feature, units ?? 1);
+  getEntitlements(@Headers("x-user-id") userId: string | undefined) {
+    return this.service.getEffectiveEntitlements(userId);
   }
 
-  @Post("membership/rewards/redeem")
+  @Post("membership/activity/claim")
   @Header("Cache-Control", "no-store, max-age=0")
-  redeemRewardPoints(
+  claimActivityPoints(
     @Headers("x-user-id") userId: string | undefined,
-    @Body() body: RedeemBody,
+    @Body() body: ActivityClaimBody,
   ) {
-    return this.service.redeemRewardPoints({
+    return this.service.claimClientActivityPoints({
       userId,
-      offerId: body?.offerId,
-      idempotencyKey: body?.idempotencyKey,
+      activity: body?.activity,
+      sourceRef: body?.sourceRef,
+      metadata: body?.metadata,
     });
   }
+
   @Get("admin/membership/policy")
   @Header("Cache-Control", "no-store, max-age=0")
   adminGetPolicy(@Headers("x-user-id") adminId: string | undefined) {
@@ -97,7 +96,7 @@ export class MembershipWalletController {
       adminId,
       targetUserId,
       asset: body.asset,
-      units: body.units,
+      delta: body.delta ?? body.units,
       requestKey: body.requestKey,
       reason: body.reason,
     });

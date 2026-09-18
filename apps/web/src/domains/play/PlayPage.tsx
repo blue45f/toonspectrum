@@ -13,6 +13,7 @@ import { recordVisit, usePlayJournal } from "./lab/play-storage";
 import "./play-lab.css";
 
 import { Container } from "@/shared/components/section";
+import { claimMembershipActivity } from "@/infrastructure/membership-wallet-client";
 import { SharePageButton } from "@/shared/components/share-page-button";
 
 const FILTERS = [["all", "전체"], ["draw", "드로잉"], ["story", "스토리"], ["sense", "색감"], ["arcade", "아케이드"], ["favorites", "즐겨찾기"]] as const;
@@ -21,6 +22,9 @@ export function PlayPage() {
   const cast = comicCast(params.get("cast")).id;
   const changeCast = (id: ComicCastId) => { const next = new URLSearchParams(params); next.set("cast", id); setParams(next, { replace: true }); };
   const activeId = params.get("game") ?? undefined; const active = findGame(activeId);
+  const activeRewardKey = active
+    ? `${active.id}:${safeSeed(params.get("seed"))}:${(params.get("idea") ?? "").slice(0, 30)}`
+    : "";
   const headingRef = useRef<HTMLHeadingElement>(null);
   const { journal, toggleFavorite, warning } = usePlayJournal();
   const [today, setToday] = useState(koreaDay);
@@ -30,6 +34,20 @@ export function PlayPage() {
   useEffect(() => { const id = window.setInterval(() => setToday(koreaDay()), 60000); return () => clearInterval(id); }, []);
   useEffect(() => { document.title = active ? `${active.label} · 놀이터 · ToonStudio` : "창작 놀이터 · ToonStudio"; }, [active]);
   useEffect(() => { headingRef.current?.focus(); if (activeId && findGame(activeId)) recordVisit(activeId); }, [activeId]);
+  useEffect(() => {
+    if (!active || !activeRewardKey) return;
+    const sourceRef = typeof globalThis.crypto?.randomUUID === "function"
+      ? globalThis.crypto.randomUUID()
+      : `play-${active.id}-${Date.now()}`;
+    const timer = window.setTimeout(() => {
+      void claimMembershipActivity(
+        "playground.used",
+        sourceRef,
+        { gameId: active.id },
+      ).catch(() => undefined);
+    }, 20_000);
+    return () => window.clearTimeout(timer);
+  }, [active, activeRewardKey]);
   const changeFilter = (key: string, value: string) => {
     const next = new URLSearchParams(params); if (value) next.set(key, value); else next.delete(key); setParams(next, { replace: true });
   };

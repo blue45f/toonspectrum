@@ -10,6 +10,7 @@ import { parseCreatorRoleProfileInput } from "../../../../web/src/shared/lib/cre
 import { parseRegionSettings } from "../../../../web/src/shared/lib/region-settings";
 import { db, ratings, reviews, reviewLikes, reads, subscriptions } from "../../db";
 import { deleteMyAccount, loadMe, updateProfile, type UpdateProfileInput } from "../../server/me";
+import type { MembershipRewardService } from "../membership-wallet/membership-wallet.tokens";
 
 import { type MeCollectionRepository } from "./me-collection.repository";
 import { type CollectionMutation } from "./me.dto";
@@ -229,7 +230,10 @@ export function normalizeMergePayload(payload: MergePayload): NormalizedMergePay
 
 @Injectable()
 export class MeService {
-  constructor(private readonly collectionRepository: MeCollectionRepository) {}
+  constructor(
+    private readonly collectionRepository: MeCollectionRepository,
+    private readonly membershipWallet?: MembershipRewardService,
+  ) {}
 
   async getMe(uid: string) {
     return loadMe(uid);
@@ -259,6 +263,21 @@ export class MeService {
     }
     const result = await updateProfile(uid, input);
     if ("error" in result) throw new BadRequestException(result.error);
+    if (
+      this.membershipWallet
+      && result.profile.name?.trim()
+      && result.profile.bio?.trim()
+    ) {
+      try {
+        await this.membershipWallet.grantRewardMilestone(
+          uid,
+          "profile-complete",
+          uid,
+        );
+      } catch {
+        // Profile updates remain authoritative when reward accounting is unavailable.
+      }
+    }
     return result;
   }
 
