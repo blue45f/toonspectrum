@@ -10,5 +10,7 @@
   "admin.tabs.reports": "신고 심의",
   "admin.tabs.revenue": "정산",
   "admin.tabs.security": "보안·IP",
-  "admin.tabs.traffic": "실시간 트래픽"
+  "admin.tabs.traffic": "실시간 트래픽",
+  "admin.tabs.supporters": "운영비 후원",
+  "admin.tabs.creatorSupport": "창작자 지원"
 }

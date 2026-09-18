@@ -19,6 +19,8 @@ vi.mock("../components/AdminDashboard", () => ({ AdminDashboard: ({ uid, onNavig
 vi.mock("../components/AdminTraffic", async () => { await traffic.promise; return { AdminTraffic: ({ uid }: { uid: string }) => <p>traffic:{uid}</p> }; });
 vi.mock("../components/AdminPlans", () => ({ AdminPlans: ({ uid }: { uid: string }) => <p>plans:{uid}</p> }));
 vi.mock("../components/AdminRevenue", () => ({ AdminRevenue: ({ uid }: { uid: string }) => <p>revenue:{uid}</p> }));
+vi.mock("../components/AdminSupporterPayments", () => ({ AdminSupporterPayments: ({ uid }: { uid: string }) => <p>supporters:{uid}</p> }));
+vi.mock("../components/AdminCreatorSupport", () => ({ AdminCreatorSupport: ({ uid }: { uid: string }) => <p>creatorSupport:{uid}</p> }));
 vi.mock("../components/AdminPromos", () => ({ AdminPromos: ({ userId }: { userId: string }) => <p>promos:{userId}</p> }));
 vi.mock("../components/AdminAnnouncements", () => ({ AdminAnnouncements: ({ userId }: { userId: string }) => <p>announcements:{userId}</p> }));
 vi.mock("../components/AdminReports", () => ({ AdminReports: ({ userId }: { userId: string }) => <p>reports:{userId}</p> }));

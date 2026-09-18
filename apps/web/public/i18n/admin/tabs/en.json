@@ -10,5 +10,7 @@
   "admin.tabs.reports": "Reports & Moderation",
   "admin.tabs.revenue": "Settlement",
   "admin.tabs.security": "Security & IP",
-  "admin.tabs.traffic": "Live traffic"
+  "admin.tabs.traffic": "Live traffic",
+  "admin.tabs.supporters": "Operating-cost support",
+  "admin.tabs.creatorSupport": "Creator support"
 }

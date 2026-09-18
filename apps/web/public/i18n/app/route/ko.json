@@ -44,5 +44,6 @@
   "route.fortune": "캐릭터 운세",
   "route.play": "놀이터",
   "route.unknown": "페이지",
-  "route.pencafeSuffix": "펜카페"
+  "route.pencafeSuffix": "펜카페",
+  "route.creatorSupport": "창작자 지원"
 }
