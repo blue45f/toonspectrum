@@ -1,3 +1,5 @@
+import { parsePublicSharePath } from "@toonspectrum/core";
+
 import { canonicalSitePath } from "./site-route-authority";
 
 export const INDEX_ROBOTS =
@@ -63,7 +65,6 @@ const INDEXABLE_EXACT_ROUTES = new Set([
   "/discover/works",
   "/explore",
   "/feedback",
-  "/fortune",
   "/guide",
   "/help",
   "/insights",
@@ -100,16 +101,8 @@ const INDEXABLE_PREFIXES = [
 ] as const;
 
 const INDEXABLE_DETAIL_ROUTES = [
-  /^\/author\/[^/]+$/u,
-  /^\/collaborate\/[^/]+$/u,
-  /^\/community\/cafes\/[^/]+$/u,
-  /^\/community\/post\/[^/]+$/u,
-  /^\/community\/promote\/[^/]+$/u,
-  /^\/(?:create|showcase)\/(?:series|work)\/[^/]+$/u,
   /^\/market\/resource\/[^/]+$/u,
-  /^\/pencafe\/[^/]+$/u,
   /^\/title\/[^/]+$/u,
-  /^\/u\/[^/]+$/u,
 ] as const;
 
 function matchesPrefix(pathname: string, prefix: string): boolean {
@@ -118,7 +111,9 @@ function matchesPrefix(pathname: string, prefix: string): boolean {
 
 function isPrivateRoute(pathname: string): boolean {
   if (PRIVATE_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix))) return true;
-  return PRIVATE_SUFFIXES.some((suffix) => pathname.endsWith(suffix));
+  return PRIVATE_SUFFIXES.some(
+    (suffix) => pathname.endsWith(suffix) || pathname.includes(`${suffix}/`),
+  );
 }
 
 function isIndexableRoute(pathname: string): boolean {
@@ -127,15 +122,22 @@ function isIndexableRoute(pathname: string): boolean {
   return INDEXABLE_DETAIL_ROUTES.some((pattern) => pattern.test(pathname));
 }
 
+/**
+ * SEO is intentionally fail-closed: unknown/application routes are noindex until they are
+ * explicitly classified as public content. This prevents new account or editor surfaces from
+ * accidentally entering search indexes while keeping their links crawlable when appropriate.
+ */
 export function resolveSeoRoutePolicy(pathname: string): SeoRoutePolicy {
-  const canonicalPath = canonicalSitePath(pathname);
+  const authorityPath = canonicalSitePath(pathname);
+  const publicShareRoute = parsePublicSharePath(authorityPath);
+  const canonicalPath = publicShareRoute?.canonicalPath ?? authorityPath;
   if (isPrivateRoute(canonicalPath)) {
     return { canonicalPath, robots: NOINDEX_PRIVATE_ROBOTS, indexable: false };
   }
   if (CRAWLABLE_UTILITY_ROUTES.has(canonicalPath)) {
     return { canonicalPath, robots: NOINDEX_FOLLOW_ROBOTS, indexable: false };
   }
-  if (isIndexableRoute(canonicalPath)) {
+  if (publicShareRoute || isIndexableRoute(canonicalPath)) {
     return { canonicalPath, robots: INDEX_ROBOTS, indexable: true };
   }
   return { canonicalPath, robots: NOINDEX_FOLLOW_ROBOTS, indexable: false };
