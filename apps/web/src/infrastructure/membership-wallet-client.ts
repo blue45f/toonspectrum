@@ -75,7 +75,8 @@ export type MembershipOverview = {
     dailyLimit: number;
     spentToday: number;
     remainingToday: number;
-    resetsAt: string;
+    monthlyResetsAt: string;
+    dailyResetsAt: string;
   };
   levels: {
     creatorLevel: string;
