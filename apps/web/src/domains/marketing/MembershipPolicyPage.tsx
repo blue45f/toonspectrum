@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 
 import {
   ACTIVITY_POINT_POLICIES,
+  CREATOR_LEVEL_AUTO_POLICIES,
   MEMBERSHIP_ECONOMY_POLICY,
   MEMBERSHIP_PLAN_POLICIES,
 } from "../../../../../packages/core/src/membership-wallet";
