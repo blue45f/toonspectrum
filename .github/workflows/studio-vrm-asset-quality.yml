@@ -42,22 +42,27 @@ concurrency:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
-    timeout-minutes: 55
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=12288
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 1
           lfs: true
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
-          node-version: 24
+          version: 11.4.0
+          run_install: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.16.0
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
@@ -94,6 +99,8 @@ jobs:
       - name: Lint and validate architecture
         run: |
           set -euo pipefail
+          # Repository-wide typecheck and production build are required once by CI/core.
+          # This lane owns VRM asset admission, focused regressions, lint, and generated drift only.
           pnpm exec eslint --max-warnings=0 --no-warn-ignored \
             apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality.ts \
             apps/web/src/domains/creator/vrm/studio-vrm-thumbnail-quality.test.ts \
@@ -113,15 +120,9 @@ jobs:
             scripts/repair-studio-vrm-models.test.ts
           node scripts/validate-architecture.mjs
 
-      - name: Typecheck and production build
-        run: |
-          set -euo pipefail
-          pnpm exec tsc -p tsconfig.json --noEmit
-          pnpm build
-
       - name: Upload exact asset audit reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: studio-vrm-asset-quality-${{ github.run_id }}
           path: artifacts/studio-vrm-*-quality-report.json

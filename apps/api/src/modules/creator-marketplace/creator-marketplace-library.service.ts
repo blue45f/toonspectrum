@@ -12,6 +12,8 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 
+import { assertMarketplaceAcquisitionAllowed } from "../commerce/commerce-market-policy";
+
 import {
   CREATOR_MARKETPLACE_CLOUD_LIBRARY_CURSOR_MAX_CHARACTERS,
   CreatorMarketplaceAcquisitionTargetSchema,
@@ -331,6 +333,7 @@ export class CreatorMarketplaceLibraryService {
     releaseId: string,
   ): Promise<CreatorMarketplaceAcquireReceipt> {
     try {
+      await assertMarketplaceAcquisitionAllowed(userId, releaseId);
       const result = await this.repository.acquire(userId, releaseId);
       return CreatorMarketplaceAcquireReceiptSchema.parse({
         operation: "acquire",
@@ -352,6 +355,7 @@ export class CreatorMarketplaceLibraryService {
     input: ConfirmCreatorMarketplaceStudioInstallDto,
   ): Promise<CreatorMarketplaceStudioInstallConfirmationReceipt> {
     try {
+      await assertMarketplaceAcquisitionAllowed(userId, releaseId);
       const result = await this.repository.confirmStudioInstall(
         userId,
         releaseId,

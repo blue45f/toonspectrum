@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioCanvasResizer — friendly page size / magic-resize control.
  * PicsArt/Canva-class aspect cards + height slider + reflow strategy.
@@ -78,8 +82,8 @@ function AspectSilhouette({
         width={box - 1}
         height={box - 1}
         rx={6}
-        fill={active ? "oklch(0.98 0.01 85 / 0.12)" : "oklch(0.2 0.01 66 / 0.55)"}
-        stroke={active ? "oklch(0.98 0.01 85 / 0.28)" : "oklch(0.35 0.012 64 / 0.45)"}
+        fill={active ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "en", "oklch(0.98 0.01 85 / 0.12)") : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "en", "oklch(0.2 0.01 66 / 0.55)")}
+        stroke={active ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "en", "oklch(0.98 0.01 85 / 0.28)") : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "en", "oklch(0.35 0.012 64 / 0.45)")}
         strokeWidth={0.8}
       />
       <rect
@@ -88,7 +92,7 @@ function AspectSilhouette({
         width={r.w}
         height={r.h}
         rx={2.5}
-        fill={active ? "currentColor" : "oklch(0.62 0.08 42 / 0.75)"}
+        fill={active ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "en", "oklch(0.62 0.08 42 / 0.75)")}
         opacity={active ? 0.92 : 0.9}
       />
     </svg>
@@ -166,15 +170,15 @@ export function StudioCanvasResizer({
           <AspectSilhouette width={canvasW} height={canvasH} active />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[0.7rem] font-bold text-fg">지금 캔버스</p>
+          <p className="text-[0.7rem] font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "ko", "지금 캔버스")}</p>
           <p className="truncate text-[0.72rem] tabular-nums font-semibold text-fg-2">{summary}</p>
-          <p className="text-[0.58rem] text-fg-3">폭은 웹툰 기준 {canvasW}px 고정 · 높이로 비율을 바꿔요</p>
+          <p className="text-[0.58rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "ko", "폭은 웹툰 기준 ")}{canvasW}{translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "ko", "px 고정 · 높이로 비율을 바꿔요")}</p>
         </div>
         <Maximize2 size={14} className="shrink-0 text-fg-3" aria-hidden />
       </div>
 
       {/* Mode: height-only vs reflow */}
-      <div className="grid grid-cols-2 gap-1" role="group" aria-label="리사이즈 방식">
+      <div className="grid grid-cols-2 gap-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "ko", "리사이즈 방식")}>
         {MODE_META.map(({ id, label, hint, Icon }) => {
           const active = mode === id;
           return (
@@ -208,7 +212,7 @@ export function StudioCanvasResizer({
       </div>
 
       {mode === "reflow" ? (
-        <div className="flex flex-wrap gap-1" role="group" aria-label="내용 맞춤 전략">
+        <div className="flex flex-wrap gap-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "ko", "내용 맞춤 전략")}>
           {MAGIC_RESIZE_STRATEGIES.map((s) => (
             <button
               key={s.id}
@@ -246,7 +250,7 @@ export function StudioCanvasResizer({
       />
 
       <div>
-        <p className="mb-1 text-[0.64rem] font-semibold text-fg-2">빠른 규격</p>
+        <p className="mb-1 text-[0.64rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "ko", "빠른 규격")}</p>
         <div className="grid grid-cols-3 gap-1.5">
           {STUDIO_CANVAS_HEIGHT_PRESETS.map((preset) => {
             const active = nearId === preset.id || Math.abs(preset.height - canvasH) <= 2;
@@ -299,15 +303,15 @@ export function StudioCanvasResizer({
       {/* Fine height control */}
       <div className="rounded-xl border border-line bg-card/80 p-2">
         <div className="mb-1.5 flex items-center justify-between gap-2">
-          <p className="text-[0.64rem] font-semibold text-fg-2">높이 미세 조절</p>
+          <p className="text-[0.64rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "ko", "높이 미세 조절")}</p>
           <span className="text-[0.62rem] tabular-nums text-fg-3">{aspect}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
             disabled={disabled}
-            title={`−${STUDIO_CANVAS_H_STEP}px`}
-            aria-label={`캔버스 높이 ${STUDIO_CANVAS_H_STEP} 줄이기`}
+            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "en", "−{v0}px"), { v0: String(STUDIO_CANVAS_H_STEP) })}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "ko", "캔버스 높이 {v0} 줄이기"), { v0: String(STUDIO_CANVAS_H_STEP) })}
             onClick={() => applyHeight(adjustStudioCanvasHeight(canvasH, -STUDIO_CANVAS_H_STEP))}
             className={cn(
               "grid size-9 place-items-center rounded-lg border border-line bg-canvas text-fg-2 hover:bg-raised",
@@ -326,14 +330,14 @@ export function StudioCanvasResizer({
             disabled={disabled}
             onChange={(e) => applyHeight(Number(e.target.value))}
             className="studio-range min-w-0 flex-1"
-            aria-label="캔버스 높이"
-            aria-valuetext={`${canvasH}픽셀`}
+            aria-label={translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "ko", "캔버스 높이")}
+            aria-valuetext={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "ko", "{v0}픽셀"), { v0: String(canvasH) })}
           />
           <button
             type="button"
             disabled={disabled}
-            title={`+${STUDIO_CANVAS_H_STEP}px`}
-            aria-label={`캔버스 높이 ${STUDIO_CANVAS_H_STEP} 늘리기`}
+            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "en", "+{v0}px"), { v0: String(STUDIO_CANVAS_H_STEP) })}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "ko", "캔버스 높이 {v0} 늘리기"), { v0: String(STUDIO_CANVAS_H_STEP) })}
             onClick={() => applyHeight(adjustStudioCanvasHeight(canvasH, STUDIO_CANVAS_H_STEP))}
             className={cn(
               "grid size-9 place-items-center rounded-lg border border-line bg-canvas text-fg-2 hover:bg-raised",
@@ -344,8 +348,7 @@ export function StudioCanvasResizer({
             <Plus size={14} aria-hidden />
           </button>
           <label className="sr-only" htmlFor="studio-canvas-h-input">
-            캔버스 높이 숫자
-          </label>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "ko", "캔버스 높이 숫자")}</label>
           <input
             id="studio-canvas-h-input"
             type="number"
@@ -361,8 +364,8 @@ export function StudioCanvasResizer({
         <p className="mt-1.5 flex items-start gap-1 text-[0.58rem] leading-snug text-fg-3">
           <Info size={11} className="mt-0.5 shrink-0" aria-hidden />
           {mode === "reflow"
-            ? "빠른 규격은 내용 맞춤(재배치/축소)으로 적용됩니다. 슬라이더는 높이만 바꿉니다."
-            : "높이만 바뀌고 그림 위치는 그대로입니다. 잘리면 스크롤해 확인하세요."}
+            ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "ko", "빠른 규격은 내용 맞춤(재배치/축소)으로 적용됩니다. 슬라이더는 높이만 바꿉니다.")
+            : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasResizer", "ko", "높이만 바뀌고 그림 위치는 그대로입니다. 잘리면 스크롤해 확인하세요.")}
         </p>
       </div>
     </div>

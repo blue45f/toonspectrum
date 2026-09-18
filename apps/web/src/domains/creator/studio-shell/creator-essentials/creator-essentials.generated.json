@@ -500,8 +500,8 @@
       ],
       "url": "/creator-essentials/pose-neutral-2d.svg",
       "preview": "/creator-essentials/pose-neutral-2d.preview.svg",
-      "sha256": "1bb3c56aa378e40459cf37c799b9802dab826e20e8ef208d684c1e01495c0ca8",
-      "bytes": 363848,
+      "sha256": "d85284c9d9982ed6c1796cae779988c07cf77a655455438a997ceb413f1a839a",
+      "bytes": 11278,
       "width": 1440,
       "height": 550
     },
@@ -544,8 +544,8 @@
       ],
       "url": "/creator-essentials/pose-weight-shift-2d.svg",
       "preview": "/creator-essentials/pose-weight-shift-2d.preview.svg",
-      "sha256": "0abbcb114fcf53cecd65ab7deaf39606e63fad0f306e9e106e7b6f0a392ca9a0",
-      "bytes": 364926,
+      "sha256": "d4656575cc981a94ad25130995ac09eac422e459dc4ea116f035dec037100a24",
+      "bytes": 11330,
       "width": 1440,
       "height": 550
     },
@@ -588,8 +588,8 @@
       ],
       "url": "/creator-essentials/pose-walking-2d.svg",
       "preview": "/creator-essentials/pose-walking-2d.preview.svg",
-      "sha256": "fba894888411c65d1ba787d03509291a494e884d47ed64ee11d91fab4088fb62",
-      "bytes": 370825,
+      "sha256": "b97d2fb4f2c4fe183858a2b7eb6c5b175dff3c05026d092164520c91261892ae",
+      "bytes": 11310,
       "width": 1440,
       "height": 550
     },
@@ -632,8 +632,8 @@
       ],
       "url": "/creator-essentials/pose-running-2d.svg",
       "preview": "/creator-essentials/pose-running-2d.preview.svg",
-      "sha256": "ed85291a07d6316e25c0cba4910ce0c18a329dc34e4140f48f81202fb46a8654",
-      "bytes": 370606,
+      "sha256": "e86f8c2c2507391ac4702f2efec4769bff2bfc0f1882625e2d4615b8cb8a9043",
+      "bytes": 11337,
       "width": 1440,
       "height": 550
     },
@@ -676,8 +676,8 @@
       ],
       "url": "/creator-essentials/pose-seated-2d.svg",
       "preview": "/creator-essentials/pose-seated-2d.preview.svg",
-      "sha256": "9f196cfe3c849c134d924fcfe23b70272db861318f4e18f755ac7b9258512a4c",
-      "bytes": 370757,
+      "sha256": "c587cb68d637bd69586ef4a2124edcc8007adaf935266882d93bc95f292694db",
+      "bytes": 11274,
       "width": 1440,
       "height": 550
     },
@@ -720,8 +720,8 @@
       ],
       "url": "/creator-essentials/pose-reaching-2d.svg",
       "preview": "/creator-essentials/pose-reaching-2d.preview.svg",
-      "sha256": "234f5e9ccc234b83dce23f017ad778f96419f1bce364de53223e9a7c4879f8d4",
-      "bytes": 367228,
+      "sha256": "f52f87431214ea649f721d259f9ab12bdda94d4aab8b90b1794f4d79f0a467b2",
+      "bytes": 11264,
       "width": 1440,
       "height": 550
     },
@@ -764,8 +764,8 @@
       ],
       "url": "/creator-essentials/pose-crouching-2d.svg",
       "preview": "/creator-essentials/pose-crouching-2d.preview.svg",
-      "sha256": "77cba5e41634a37224f70761b2b85579d1417202411321935e246f6661401b44",
-      "bytes": 370944,
+      "sha256": "4c0aeba763c8ab86800c6e74895e3e93c6b926c2990ce384a56a394902256082",
+      "bytes": 11331,
       "width": 1440,
       "height": 550
     },
@@ -808,8 +808,8 @@
       ],
       "url": "/creator-essentials/pose-arm-extension-2d.svg",
       "preview": "/creator-essentials/pose-arm-extension-2d.preview.svg",
-      "sha256": "e544fb62b589847fc75d05ac6b84119e2b47d7ed3d5ddc555c9c2f59198456a0",
-      "bytes": 366121,
+      "sha256": "545de9af6ef6d32a81b00d27d1ca1e555d791a6986f96f583bec967459176b51",
+      "bytes": 11336,
       "width": 1440,
       "height": 550
     },
@@ -829,7 +829,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-desk.glb",
-      "preview": "/creator-essentials/prop-desk.preview.svg",
+      "preview": "/creator-essentials/prop-desk.preview.png",
       "sha256": "2a8bc63abcceaeda4d7cbeed31f7d12151106785ec5915acc4293497ad0e27d8",
       "bytes": 3552,
       "width": 480,
@@ -851,7 +851,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-chair.glb",
-      "preview": "/creator-essentials/prop-chair.preview.svg",
+      "preview": "/creator-essentials/prop-chair.preview.png",
       "sha256": "6908f3f94e01d8e4532f8ee4c1e95890e99e71ba2e5ad82c4ccb1a8f3200d6c7",
       "bytes": 4004,
       "width": 480,
@@ -873,7 +873,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-bench.glb",
-      "preview": "/creator-essentials/prop-bench.preview.svg",
+      "preview": "/creator-essentials/prop-bench.preview.png",
       "sha256": "e9414063a8add28c1d182fea20cbf76b174ad88545431a9b6f425eece88d4d9d",
       "bytes": 4004,
       "width": 480,
@@ -895,7 +895,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-bookshelf.glb",
-      "preview": "/creator-essentials/prop-bookshelf.preview.svg",
+      "preview": "/creator-essentials/prop-bookshelf.preview.png",
       "sha256": "de183331d13b9f053cf523f5d8b7bc211e56147bc670f34a122a7e0450f85812",
       "bytes": 5944,
       "width": 480,
@@ -917,7 +917,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-streetlamp.glb",
-      "preview": "/creator-essentials/prop-streetlamp.preview.svg",
+      "preview": "/creator-essentials/prop-streetlamp.preview.png",
       "sha256": "052bf65b6f990f5a15a59e61da23db02280879dd2af932b14c982705ba704f3e",
       "bytes": 5480,
       "width": 480,
@@ -939,7 +939,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-window-wall.glb",
-      "preview": "/creator-essentials/prop-window-wall.preview.svg",
+      "preview": "/creator-essentials/prop-window-wall.preview.png",
       "sha256": "6249dad149d0afa4ea289d3f91cf4089e7993c61bbc4416d761d340222a48f94",
       "bytes": 3948,
       "width": 480,
@@ -961,7 +961,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-doorway.glb",
-      "preview": "/creator-essentials/prop-doorway.preview.svg",
+      "preview": "/creator-essentials/prop-doorway.preview.png",
       "sha256": "51b92c46e58c25505fe6bbf6b7b0b54e6f45c8525ff26c58715d46b0afb97a32",
       "bytes": 3448,
       "width": 480,
@@ -983,7 +983,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-stairs.glb",
-      "preview": "/creator-essentials/prop-stairs.preview.svg",
+      "preview": "/creator-essentials/prop-stairs.preview.png",
       "sha256": "94f674bc3da2b998fa6f894d288cdef9c616d9d3accd3248c92dbad33227af2f",
       "bytes": 2496,
       "width": 480,

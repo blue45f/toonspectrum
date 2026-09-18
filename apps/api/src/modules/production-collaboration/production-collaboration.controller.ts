@@ -5,6 +5,8 @@ import {
   Get,
   Header,
   Headers,
+  Inject,
+  NotFoundException,
   Param,
   Post,
   Query,
@@ -28,9 +30,45 @@ function authenticatedProductionUserId(userId: string | undefined): string {
   return userId;
 }
 
+const EXTERNAL_REVIEW_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,512}$/u;
+const BEARER_SCHEME = "bearer";
+
+function isHttpWhitespace(characterCode: number): boolean {
+  return characterCode === 0x20 || characterCode === 0x09;
+}
+
+function bearerExternalReviewToken(authorization: string | undefined): string | undefined {
+  if (!authorization || authorization.length <= BEARER_SCHEME.length) return undefined;
+  if (authorization.slice(0, BEARER_SCHEME.length).toLowerCase() !== BEARER_SCHEME) {
+    return undefined;
+  }
+  if (!isHttpWhitespace(authorization.charCodeAt(BEARER_SCHEME.length))) return undefined;
+
+  let tokenStart = BEARER_SCHEME.length + 1;
+  while (
+    tokenStart < authorization.length &&
+    isHttpWhitespace(authorization.charCodeAt(tokenStart))
+  ) {
+    tokenStart += 1;
+  }
+  return authorization.slice(tokenStart).trim();
+}
+
+function externalReviewToken(authorization: string | undefined, fallback: string | undefined): string {
+  const bearer = bearerExternalReviewToken(authorization);
+  const token = bearer || fallback?.trim() || "";
+  if (!EXTERNAL_REVIEW_TOKEN_PATTERN.test(token)) {
+    throw new NotFoundException("유효한 외부 검수 링크를 찾을 수 없습니다.");
+  }
+  return token;
+}
+
 @Controller("/production")
 export class ProductionCollaborationController {
-  constructor(private readonly service: ProductionCollaborationService) {}
+  constructor(
+    @Inject(ProductionCollaborationService)
+    private readonly service: ProductionCollaborationService,
+  ) {}
 
   @Post("/projects")
   @Header("Cache-Control", "private, no-store, max-age=0")

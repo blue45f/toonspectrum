@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Fragment, Suspense, type ReactNode, type RefObject } from "react";
 import { Group, Rect, Text } from "react-konva/lib/ReactKonvaCore";
 
@@ -307,7 +308,7 @@ export function renderStudioCanvasSelectionDecorations({
         // verdict `studioGroupUniformResizeMemberCanRotate` reaches for a frame in a selection.
         rotateEnabled={selected?.type !== "frame"}
         naturalRotationEnabled={selected?.type !== "frame"}
-        naturalRatioMode={singleObjectRatioLocked ? "always" : "shift"}
+        naturalRatioMode={singleObjectRatioLocked ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasSelectionDecorations", "en", "always") : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasSelectionDecorations", "en", "shift")}
         flipEnabled={false}
         enabledAnchors={
           singleObjectRatioLocked

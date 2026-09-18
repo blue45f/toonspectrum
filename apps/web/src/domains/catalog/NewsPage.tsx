@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { BookOpen, ExternalLink, Newspaper, Search } from "lucide-react";
 import { useState } from "react";
 
@@ -92,13 +96,10 @@ export function NewsPage() {
     <Container size="prose" className="py-10 sm:py-14">
       <header className="mb-6">
         <p className="eyebrow flex items-center gap-1.5 text-accent">
-          <Newspaper size={14} /> NEWS
-        </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">웹툰·웹소설 소식</h1>
+          <Newspaper size={14} /> {translateCurrentStaticSourceText("domains.catalog.NewsPage", "en", "NEWS")}</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{translateCurrentStaticSourceText("domains.catalog.NewsPage", "ko", "웹툰·웹소설 소식")}</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
-          산업·영상화·공모전·신작 소식을 한곳에 모았습니다. 제목을 누르면 원 기사로 이동하고,
-          관련 작품 칩을 누르면 작품 상세로 이동합니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.catalog.NewsPage", "ko", "산업·영상화·공모전·신작 소식을 한곳에 모았습니다. 제목을 누르면 원 기사로 이동하고, 관련 작품 칩을 누르면 작품 상세로 이동합니다.")}</p>
       </header>
 
       {!loading && !error && items.length > 0 && (
@@ -106,7 +107,7 @@ export function NewsPage() {
           <div
             className="rail -mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0"
             role="group"
-            aria-label="뉴스 카테고리 필터"
+            aria-label={translateCurrentStaticSourceText("domains.catalog.NewsPage", "ko", "뉴스 카테고리 필터")}
           >
             {CATEGORY_TABS.map(({ key, label }) => {
               const count = key === "all" ? items.length : countByCategory[key] ?? 0;
@@ -137,8 +138,8 @@ export function NewsPage() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="헤드라인·매체·작품 검색"
-              aria-label="뉴스 키워드 검색"
+              placeholder={translateCurrentStaticSourceText("domains.catalog.NewsPage", "ko", "헤드라인·매체·작품 검색")}
+              aria-label={translateCurrentStaticSourceText("domains.catalog.NewsPage", "ko", "뉴스 키워드 검색")}
               className="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-fg-3"
             />
           </div>
@@ -152,17 +153,16 @@ export function NewsPage() {
           ))}
         </ul>
       ) : error ? (
-        <ErrorState title="뉴스를 불러오지 못했습니다." message={error} onRetry={reload} />
+        <ErrorState title={translateCurrentStaticSourceText("domains.catalog.NewsPage", "ko", "뉴스를 불러오지 못했습니다.")} message={error} onRetry={reload} />
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line bg-card/40 px-6 py-16 text-center">
           <span className="grid size-12 place-items-center rounded-2xl bg-raised text-fg-3">
             <Newspaper size={22} />
           </span>
           <div>
-            <p className="font-semibold text-fg">표시할 소식이 없어요</p>
+            <p className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.catalog.NewsPage", "ko", "표시할 소식이 없어요")}</p>
             <p className="mt-1 max-w-xs text-sm text-fg-3">
-              새 헤드라인이 모이면 이곳에 표시됩니다. 잠시 후 다시 확인해 주세요.
-            </p>
+              {translateCurrentStaticSourceText("domains.catalog.NewsPage", "ko", "새 헤드라인이 모이면 이곳에 표시됩니다. 잠시 후 다시 확인해 주세요.")}</p>
           </div>
         </div>
       ) : filtered.length === 0 ? (
@@ -171,10 +171,9 @@ export function NewsPage() {
             <Search size={20} />
           </span>
           <div>
-            <p className="font-semibold text-fg">조건에 맞는 소식이 없어요</p>
+            <p className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.catalog.NewsPage", "ko", "조건에 맞는 소식이 없어요")}</p>
             <p className="mt-1 max-w-xs text-sm text-fg-3">
-              다른 카테고리를 고르거나 검색어를 바꿔 보세요.
-            </p>
+              {translateCurrentStaticSourceText("domains.catalog.NewsPage", "ko", "다른 카테고리를 고르거나 검색어를 바꿔 보세요.")}</p>
           </div>
           {filterActive && (
             <button
@@ -185,8 +184,7 @@ export function NewsPage() {
               }}
               className="rounded-full border border-line bg-card px-3.5 py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised"
             >
-              필터 초기화
-            </button>
+              {translateCurrentStaticSourceText("domains.catalog.NewsPage", "ko", "필터 초기화")}</button>
           )}
         </div>
       ) : (
@@ -232,7 +230,7 @@ export function NewsPage() {
                     {related.map((r) => (
                       <Link
                         key={r.slug}
-                        href={`/title/${encodeURIComponent(r.slug)}`}
+                        href={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.NewsPage", "en", "/title/{v0}"), { v0: String(encodeURIComponent(r.slug)) })}
                         className="inline-flex max-w-full items-center gap-1 rounded-full border border-accent/25 bg-accent-soft/40 px-2.5 py-1 text-[0.72rem] font-medium text-accent transition-colors hover:border-accent/50 hover:bg-accent-soft"
                       >
                         <BookOpen size={12} className="shrink-0" />
@@ -248,8 +246,7 @@ export function NewsPage() {
       )}
 
       <p className="mt-6 text-[0.7rem] leading-relaxed text-fg-3">
-        헤드라인·출처·날짜만 표기하며 본문은 각 발행처에 있습니다. 출처: Google News.
-        {generatedAtLabel && <span className="tnum"> · {generatedAtLabel} 갱신</span>}
+        {translateCurrentStaticSourceText("domains.catalog.NewsPage", "ko", "헤드라인·출처·날짜만 표기하며 본문은 각 발행처에 있습니다. 출처: Google News.")}{generatedAtLabel && <span className="tnum"> · {generatedAtLabel} {translateCurrentStaticSourceText("domains.catalog.NewsPage", "ko", "갱신")}</span>}
       </p>
     </Container>
   );

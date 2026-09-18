@@ -1,3 +1,4 @@
+import { translateLocaleBranchForLocale } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect } from "react";
 
 import "./reference-labels";
@@ -45,6 +46,8 @@ export const STATIC_TITLES: Record<string, string> = {
   "/about/technology": "route.about",
   "/about/technology/story": "route.about",
   "/about/technology/guides": "route.about",
+  "/about/technology/references": "route.about",
+  "/about/technology/field-notes": "route.about",
   "/about/technology/deck": "route.about",
   "/about/technology/videos": "route.about",
   "/about/technology/licenses": "route.about",
@@ -58,6 +61,9 @@ export const STATIC_TITLES: Record<string, string> = {
   "/privacy": "route.privacy",
   "/copyright": "route.copyright",
   "/contact": "route.contact",
+  "/business": "route.business",
+  "/support-us": "route.supportUs",
+  "/support-creators": "route.creatorSupport",
   "/support": "route.support",
   "/create": "route.create",
   "/showcase": "route.create",
@@ -91,6 +97,7 @@ export function resolveRouteTitle(pathname: string, t: Translator, productLocale
 }
 
 export function useRouteTitle(pathname: string, search: string): string {
+  useBilingualI18nRevision();
   const t = useT();
   const language = useI18n((state) => state.lang);
   const title = resolveRouteTitle(pathname, t, resolveProductLocale(language));

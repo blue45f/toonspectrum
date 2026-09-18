@@ -1,11 +1,10 @@
 import { z } from "zod";
 
 import { sha256Schema, studioEntityIdSchema } from "../graph/ids";
-
 import { colorIRSchema } from "./color";
 
-import type { ColorIR } from "./color";
 import type { Sha256 } from "../graph/ids";
+import type { ColorIR } from "./color";
 
 export interface VectorPointV3 {
   readonly x: number;
@@ -126,10 +125,6 @@ export const editableVectorStrokeV3Schema = z
     }
   });
 
-export function parseEditableVectorStrokeV3(value: unknown): EditableVectorStrokeV3 {
-  return editableVectorStrokeV3Schema.parse(value) as unknown as EditableVectorStrokeV3;
-}
-
 export function vectorStrokeV3Bounds(stroke: EditableVectorStrokeV3): {
   readonly minX: number;
   readonly minY: number;
@@ -166,7 +161,7 @@ export function rescaleVectorStrokeV3(
     y: point.y * scaleY,
   });
   const widthScale = Math.sqrt(Math.abs(scaleX * scaleY));
-  return parseEditableVectorStrokeV3({
+  return editableVectorStrokeV3Schema.parse({
     ...stroke,
     centerline: stroke.centerline.map((segment) => ({
       p0: mapPoint(segment.p0),
@@ -178,5 +173,5 @@ export function rescaleVectorStrokeV3(
       ...sample,
       width: sample.width * widthScale,
     })),
-  });
+  }) as EditableVectorStrokeV3;
 }

@@ -171,6 +171,9 @@ describe("StudioVrmAvatarForgePanel body creator", () => {
     expect((shortHair as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(shortHair);
     expect(onChange).toHaveBeenCalledOnce();
+    const hairChange = onChange.mock.calls[0]?.[0] as AvatarForgeState;
+    expect(hairChange.hair.style).toBe("short");
+    expect(hairChange.hair.replaceOriginal).toBe(true);
   });
 
   it("blocks every sculpt control while an inconsistent rig requires a reload", () => {

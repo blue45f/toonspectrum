@@ -26,6 +26,7 @@ export interface DesktopCloudProvider {
   uploadFile(input: {
     readonly relativePath: string;
     readonly bytes: Uint8Array;
+    readonly sourceSha256?: string;
     readonly expected: DesktopCloudObject | null;
     readonly signal?: AbortSignal;
   }): Promise<DesktopCloudObject>;

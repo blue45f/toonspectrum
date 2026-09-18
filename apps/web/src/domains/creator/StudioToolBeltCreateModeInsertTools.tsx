@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ImagePlus,
   Library,
@@ -15,6 +16,7 @@ import {
   STUDIO_ICON_STROKE,
   StudioToolbarDivider,
 } from "./studio-chrome-ui";
+import { STUDIO_FLOATING_MENU_LAYOUTS } from "./studio-floating-menu-layouts";
 import { writeStudioInsertDragPayload } from "./studio-insert-drag-writer";
 import { studioToolButtonClass } from "./studio-panel-ui";
 import {
@@ -61,12 +63,12 @@ export const StudioToolBeltCreateModeInsertTools = memo(
 
     return (
       <>
-        <StudioToolbarDivider label="삽입" />
-        <StudioToolbarCluster label="삽입·대사">
+        <StudioToolbarDivider label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "삽입")} />
+        <StudioToolbarCluster label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "삽입·대사")}>
           <StudioToolBeltHintTarget hint={hints.assets}>
             <button
               type="button"
-              aria-label="삽입 허브 열기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "삽입 허브 열기")}
               onClick={() => setMenu(menu === "asset" ? null : "asset")}
               onPointerEnter={preloadStudioAssetToolPopoverBody}
               onPointerDown={preloadStudioAssetToolPopoverBody}
@@ -81,8 +83,7 @@ export const StudioToolBeltCreateModeInsertTools = memo(
                 aria-hidden
                 className={studioToolIconClass({ active: menu === "asset" })}
               />
-              삽입
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "삽입")}</button>
           </StudioToolBeltHintTarget>
           <StudioToolBeltHintTarget hint={hints.text}>
             <button
@@ -105,8 +106,7 @@ export const StudioToolBeltCreateModeInsertTools = memo(
                 aria-hidden
                 className={studioToolIconClass()}
               />{" "}
-              텍스트
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "텍스트")}</button>
           </StudioToolBeltHintTarget>
           <div
             ref={menu === "bubble" ? menuRef : undefined}
@@ -131,17 +131,27 @@ export const StudioToolBeltCreateModeInsertTools = memo(
                     active: menu === "bubble",
                   })}
                 />
-                말풍선
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "말풍선")}</button>
             </StudioToolBeltHintTarget>
             <StudioFloatingToolPopover
               open={menu === "bubble"}
               id="bubble-menu"
               className="fixed inset-x-2 top-[4.5rem] z-[70] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-2xl border border-line/70 bg-panel p-0 shadow-xl lg:inset-x-auto lg:left-3 lg:top-[4.5rem] lg:max-h-[min(42rem,calc(100dvh-7rem))] lg:w-[22rem] lg:max-w-[calc(100vw-1.5rem)]"
+              desktopWindow={{
+                label: "말풍선",
+                surfaceId: "toolbar-bubble",
+                defaultLayout: STUDIO_FLOATING_MENU_LAYOUTS.bubble,
+                onClose: () => setMenu(null),
+                minWidth: 380,
+                minHeight: 320,
+                maxWidth: 760,
+                maxHeight: 900,
+                contentClassName: "overflow-y-auto",
+              }}
             >
               <Suspense
                 fallback={
-                  <StudioPanelLoading label="말풍선 메뉴를 여는 중..." />
+                  <StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "말풍선 메뉴를 여는 중...")} />
                 }
               >
                 <LazyStudioBubbleToolPopoverBody toolBelt={toolBelt} />
@@ -161,8 +171,7 @@ export const StudioToolBeltCreateModeInsertTools = memo(
                 aria-hidden
                 className={studioToolIconClass({ tone: "default" })}
               />
-              이미지
-              <input
+              {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "이미지")}<input
                 type="file"
                 accept={studioCanvasImageAccept}
                 className="sr-only"
@@ -177,7 +186,7 @@ export const StudioToolBeltCreateModeInsertTools = memo(
               aria-hidden
               className={studioToolIconClass({ tone: "default" })}
             />
-            <span className="sr-only sm:not-sr-only sm:inline">색</span>
+            <span className="sr-only sm:not-sr-only sm:inline">{translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "색")}</span>
             <LazyStudioColorPopover
               value={color}
               onChange={(nextColor) => {
@@ -190,7 +199,7 @@ export const StudioToolBeltCreateModeInsertTools = memo(
               onLoadRecentColors={() => {
                 stableEnsureRecentColorsLoaded();
               }}
-              label="브러시·도형 색상"
+              label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "브러시·도형 색상")}
               purpose="brush-shape"
             />
           </span>

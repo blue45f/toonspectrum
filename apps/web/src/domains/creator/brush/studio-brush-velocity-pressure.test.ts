@@ -157,6 +157,75 @@ describe("studio-brush-velocity-pressure", () => {
     expect(result.pressure).toBeCloseTo(legacy!.pressure, 10);
   });
 
+  it("dampens tiny stylus-pressure jitter during slow detail strokes", () => {
+    const settings = { ...base, pressureMinSize: 0 };
+    const first = advanceStudioBrushVelocityPressure(
+      null,
+      { x: 0, y: 0, timeMs: 0, pointerType: "pen", pressure: 0.5 },
+      settings
+    );
+    const jitter = advanceStudioBrushVelocityPressure(
+      first.state,
+      { x: 0.4, y: 0, timeMs: 8, pointerType: "pen", pressure: 0.56 },
+      settings
+    );
+
+    expect(first.pressure).toBe(0.5);
+    expect(jitter.sample.hardwarePressure).toBeCloseTo(0.56, 12);
+    expect(jitter.pressure).toBeGreaterThan(0.5);
+    expect(jitter.pressure).toBeLessThan(0.56);
+    expect(jitter.state.filteredPressure).toBe(jitter.pressure);
+  });
+
+  it("keeps fast stylus strokes transparent to the pressure jitter stabilizer", () => {
+    const settings = { ...base, pressureMinSize: 0 };
+    const first = advanceStudioBrushVelocityPressure(
+      null,
+      { x: 0, y: 0, timeMs: 0, pointerType: "pen", pressure: 0.5 },
+      settings
+    );
+    const fast = advanceStudioBrushVelocityPressure(
+      first.state,
+      { x: 20, y: 0, timeMs: 8, pointerType: "pen", pressure: 0.56 },
+      settings
+    );
+
+    expect(fast.sample.rawVelocity).toBeGreaterThan(1.6);
+    expect(fast.pressure).toBeCloseTo(0.56, 12);
+  });
+
+  it("passes intentional large pressure changes immediately even at low speed", () => {
+    const settings = { ...base, pressureMinSize: 0 };
+    const first = advanceStudioBrushVelocityPressure(
+      null,
+      { x: 0, y: 0, timeMs: 0, pointerType: "pen", pressure: 0.5 },
+      settings
+    );
+    const expressive = advanceStudioBrushVelocityPressure(
+      first.state,
+      { x: 0.4, y: 0, timeMs: 8, pointerType: "pen", pressure: 0.8 },
+      settings
+    );
+
+    expect(expressive.pressure).toBe(0.8);
+  });
+
+  it("leaves raw material-program pressure completely unfiltered", () => {
+    const settings = { ...base, pressureMinSize: 0, rawMaterialPressure: true };
+    const first = advanceStudioBrushVelocityPressure(
+      null,
+      { x: 0, y: 0, timeMs: 0, pointerType: "pen", pressure: 0.5 },
+      settings
+    );
+    const second = advanceStudioBrushVelocityPressure(
+      first.state,
+      { x: 0.4, y: 0, timeMs: 8, pointerType: "pen", pressure: 0.56 },
+      settings
+    );
+
+    expect(second.pressure).toBe(0.56);
+  });
+
   it("retains distinct family response under the same pointer journal", () => {
     const run = (brushId: string) => {
       const settings = { ...base, brushId };

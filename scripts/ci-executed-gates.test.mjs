@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { REQUIRED_CORE_GATES } from "./ci-core-gate.mjs";
+import {
+  loadRequiredTargets,
+  resolveRequiredTargets,
+} from "./run-core-vitest.mjs";
 
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 const source = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
@@ -9,6 +15,7 @@ const requiredTargets = readFileSync(
   new URL("./ci-required-vitest-targets.txt", import.meta.url),
   "utf8",
 ).trim().split(/\r?\n/).filter(Boolean);
+const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const jobs = source.slice(source.indexOf("\njobs:\n") + 7).split(/(?=^ {2}[a-z][a-z0-9-]*:\n)/m);
 
 function job(name) {
@@ -17,85 +24,76 @@ function job(name) {
   return block;
 }
 
-// Lex the limited shell syntax used by explicit CI commands. This is intentionally
-// dependency-free so the contract runs before pnpm install.
-function normalizeShellSource(block) {
-  let result = "";
-  let quote = null;
-  let wordStart = true;
-  for (let index = 0; index < block.length; index += 1) {
-    const char = block[index];
-    const next = block[index + 1];
-    if (quote === null && char === "#" && wordStart) {
-      while (index < block.length && block[index] !== "\n") index += 1;
-      result += "\n";
-      wordStart = true;
-      continue;
-    }
-    if (quote !== "'" && char === "\\" && next !== undefined) {
-      if (next === "\n" || (next === "\r" && block[index + 2] === "\n")) {
-        index += next === "\r" ? 2 : 1;
-        continue;
-      }
-      if (quote === null || /[$`"\\]/.test(next)) {
-        result += char + next;
-        index += 1;
-        wordStart = false;
-        continue;
-      }
-    }
-    if (quote === null && (char === "'" || char === '"')) quote = char;
-    else if (quote === char) quote = null;
-    result += char;
-    wordStart = quote === null && /[\s|&;()<>]/.test(char);
+function targetExists(target) {
+  const absoluteTarget = join(repoRoot, target);
+  if (existsSync(absoluteTarget)) return true;
+
+  const directory = dirname(absoluteTarget);
+  if (!existsSync(directory)) return false;
+  const name = basename(target);
+  if (!name.includes("*")) {
+    return readdirSync(directory).some(
+      (entry) => entry.startsWith(name) && /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(entry),
+    );
   }
-  return result;
+
+  const expression = new RegExp(
+    `^${name
+      .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+      .replaceAll("*", ".*")}$`,
+  );
+  return readdirSync(directory).some((entry) => expression.test(entry));
 }
 
-function executedVitestTargets(block) {
-  return normalizeShellSource(block)
-    .split(/\r?\n/)
-    .filter((line) => /^\s*(?:-\s*)?(?:run:\s*)?pnpm exec vitest run(?:\s|$)/.test(line))
-    .flatMap((line) => line.trim().split(/\s+/))
-    .map((word) => word.replace(/^["']|["']$/g, ""))
-    .filter((word) => /^(?:apps|packages|scripts)\/[\w./*?-]+$/.test(word));
-}
-
-function assertRequiredTargets(block) {
-  const targets = executedVitestTargets(block);
-  const actual = new Set(targets);
-  assert.equal(actual.size, targets.length, "duplicate Vitest target arguments in static CI");
-  for (const path of requiredTargets) {
-    assert.ok(actual.has(path), `missing mandatory Vitest target: ${path}`);
-  }
+function assertRequiredPortfolio(block) {
+  assert.match(block, /mapfile -t targets < scripts\/ci-required-vitest-targets\.txt/);
+  assert.match(block, /test "\$\{#targets\[@\]\}" -gt 0/);
+  assert.match(
+    block,
+    /pnpm exec vitest run "\$\{targets\[@\]\}" --pool=forks --maxWorkers=4/,
+  );
+  assert.equal(
+    [...block.matchAll(/pnpm exec vitest run/g)].length,
+    1,
+    "required regression portfolio must start Vitest exactly once",
+  );
 }
 
 test("core retains every mandatory quality lane without a bypass", () => {
   assert.doesNotMatch(source, /CI_CORE_BYPASS|continue-on-error|if:\s*\$\{\{\s*false/);
-  assert.match(source, /permissions:\n {2}contents: read/);
+  assert.match(source, /permissions:\n {2}contents: read\n {2}pull-requests: read/);
 
-  for (const name of ["lint", "typecheck", "static", "serial", "build"]) {
-    assert.doesNotMatch(job(name), /^ {4}if:/m, `${name} must not be conditionally skipped`);
-    assert.match(job(name), /pnpm install --frozen-lockfile/);
+  for (const name of REQUIRED_CORE_GATES) {
+    const block = job(name);
+    assert.doesNotMatch(block, /^ {4}needs:/m, `${name} must start independently`);
+    if (name !== "core") assert.match(block, /pnpm install --frozen-lockfile/);
   }
+  const lint = job("lint");
+  assert.match(lint, /node scripts\/lint-changed\.mjs --files-from=/);
+  assert.match(lint, /--full-on-config/);
+  assert.match(lint, /pnpm run lint:strict/);
 
-  assert.match(job("lint"), /pnpm run lint:strict/);
   assert.match(job("typecheck"), /pnpm run typecheck\n/);
   assert.match(job("typecheck"), /pnpm run typecheck:cloudflare-realtime/);
   for (const command of [
+    "node --experimental-strip-types --test --test-concurrency=1",
+    "node scripts/run-core-vitest.mjs",
     "pnpm run validate:architecture",
     "pnpm run verify:csp",
     "pnpm run verify:toolchain-coverage",
-    "pnpm exec vitest run",
-    "node --test scripts/verify-studio-p2p-huddle.test.mjs",
-    "node --test scripts/studio-offline-resilience.test.mjs",
-    "node --test scripts/verify-studio-menus-ci.test.mjs",
-    "node --experimental-strip-types --test scripts/api-followup-unit.test.mjs",
-    "node --test scripts/api-followup-ci-policy.test.mjs",
     "pnpm run test:studio-material-brush",
     "scripts/audit-studio-brush-quality-portfolio.mts",
   ]) {
     assert.ok(job("static").includes(command), `missing static gate: ${command}`);
+  }
+  for (const script of [
+    "scripts/api-followup-ci-policy.test.mjs",
+    "scripts/api-followup-unit.test.mjs",
+    "scripts/studio-offline-resilience.test.mjs",
+    "scripts/verify-studio-menus-ci.test.mjs",
+    "scripts/verify-studio-p2p-huddle.test.mjs",
+  ]) {
+    assert.ok(job("static").includes(script), `missing Node regression contract: ${script}`);
   }
   for (const command of [
     "pnpm --filter @webtoon-nest/api build",
@@ -109,7 +107,7 @@ test("core retains every mandatory quality lane without a bypass", () => {
   assert.ok(job("serial").includes("pnpm run test:perf"));
 });
 
-test("protected core aggregates every lane without checking out the repository again", () => {
+test("protected core aggregates every lane without another checkout", () => {
   assert.ok(job("core").includes(`needs: [${REQUIRED_CORE_GATES.join(", ")}]`));
   assert.ok(job("core").includes("if: ${{ always() }}"));
   assert.ok(job("core").includes("CORE_RESULTS: ${{ toJSON(needs) }}"));
@@ -121,19 +119,24 @@ test("protected core aggregates every lane without checking out the repository a
   assert.ok(job("verify").includes('test "$CORE_RESULT" = success'));
 });
 
-test("workflow contracts share the sparse typecheck lane while expensive lanes start independently", () => {
-  assert.doesNotMatch(source, /^ {2}preflight:\n/m, "standalone preflight should not consume a runner");
+test("mandatory lanes start independently and dependency-free contracts run first", () => {
+  assert.doesNotMatch(source, /^ {2}preflight:\n/m);
   for (const name of ["lint", "typecheck", "static", "serial", "build"]) {
     assert.doesNotMatch(job(name), /^ {4}needs:/m, `${name} should start independently`);
   }
-
   const typecheck = job("typecheck");
-  const contractTest = typecheck.indexOf("node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs");
+  const contractTest = typecheck.indexOf("node --test scripts/ci-core-gate.test.mjs");
   const fanoutPolicy = typecheck.indexOf("python3 scripts/verify-pr-workflow-fanout.py");
   const install = typecheck.indexOf("pnpm install --frozen-lockfile");
   assert.ok(contractTest >= 0, "typecheck lane must execute CI contract tests");
   assert.ok(fanoutPolicy > contractTest, "fanout policy should follow the contract suite");
-  assert.ok(install > fanoutPolicy, "dependency installation must follow dependency-free preflight checks");
+  assert.ok(install > fanoutPolicy, "dependency installation must follow dependency-free checks");
+  for (const contract of [
+    "scripts/lint-changed-policy.test.mjs",
+    "scripts/run-core-vitest.test.mjs",
+  ]) {
+    assert.ok(typecheck.includes(contract), `preflight is missing ${contract}`);
+  }
 
   for (const excludedPath of [
     "!/apps/web/public/assets/",
@@ -142,78 +145,90 @@ test("workflow contracts share the sparse typecheck lane while expensive lanes s
     "!/docs/",
     "!/tests/benchmarks/results/",
   ]) {
-    assert.ok(typecheck.includes(excludedPath), `typecheck sparse checkout is missing ${excludedPath}`);
+    assert.match(typecheck, new RegExp(contract.replaceAll(".", "\\.")));
   }
   for (const requiredManifest of [
     "/apps/web/public/assets/3d/environments/refined-v6/manifest.json",
     "/apps/web/public/assets/3d/environments/expansion-v1/manifest.json",
   ]) {
-    assert.ok(typecheck.includes(requiredManifest), `typecheck sparse checkout is missing ${requiredManifest}`);
+    assert.ok(typecheck.includes(requiredManifest), `typecheck checkout is missing ${requiredManifest}`);
   }
-  assert.ok(typecheck.includes("filter: blob:none"));
-
+});
+test("PR lint is scoped while push and merge validation stay repository-wide", () => {
   const lint = job("lint");
-  assert.ok(lint.includes("filter: blob:none"));
-  assert.ok(lint.includes("!/apps/web/public/assets/"));
-  assert.ok(lint.includes("/apps/web/public/assets/reference-rebuild/"));
-  assert.ok(lint.includes("!/apps/web/public/vrm/"));
-  assert.doesNotMatch(job("static"), /^\s+if:/m, "mandatory regressions cannot be skipped");
+  assert.match(lint, /if: github\.event_name == 'pull_request'/);
+  assert.match(lint, /pulls\/\$PR_NUMBER\/files\?per_page=100&page=\$page/);
+  assert.match(lint, /node scripts\/lint-changed\.mjs --files-from=/);
+  assert.match(lint, /--full-on-config/);
+  assert.match(lint, /if: github\.event_name != 'pull_request'/);
+  assert.match(lint, /run: pnpm run lint:strict/);
+  assert.match(lint, /path: node_modules\/\.cache\/eslint\n/);
+  for (const path of [
+    "filter: blob:none",
+    "!/apps/web/public/assets/",
+    "/apps/web/public/assets/reference-rebuild/",
+    "!/apps/web/public/vrm/",
+  ]) {
+    assert.ok(lint.includes(path), `lint sparse checkout is missing ${path}`);
+  }
 });
 
-test("the required Vitest manifest is sorted, unique and fully executed", () => {
+test("PR caches restore without paying cache-save post steps", () => {
+  for (const [name, cacheId] of [
+    ["lint", "eslint-cache"],
+    ["typecheck", "typescript-cache"],
+  ]) {
+    const block = job(name);
+    assert.match(block, new RegExp(`id: ${cacheId}\\n\\s+uses: actions/cache/restore@v4`));
+    assert.match(block, /uses: actions\/cache\/save@v4/);
+    assert.match(block, /if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/);
+    assert.doesNotMatch(block, /uses: actions\/cache@v4/);
+  }
+});
+
+test("the required Vitest manifest is sorted, unique, resolvable and executed once", () => {
   assert.deepEqual(requiredTargets, [...requiredTargets].sort());
   assert.equal(new Set(requiredTargets).size, requiredTargets.length);
   assert.ok(requiredTargets.length >= 160, "unexpected regression coverage shrink");
-  assertRequiredTargets(job("static"));
+  for (const target of requiredTargets) {
+    assert.ok(targetExists(target), `missing mandatory Vitest target: ${target}`);
+  }
+  assertRequiredPortfolio(job("static"));
 });
 
-test("additional Vitest coverage remains allowed", () => {
-  const extra = `${job("static")}\n      - name: Additional regressions\n        run: pnpm exec vitest run apps/web/src/Additional.test.tsx packages/core/src/additional.test.ts\n`;
-  assertRequiredTargets(extra);
+test("the expensive portfolio runs after cheap fail-fast contracts", () => {
+  const block = job("static");
+  const portfolio = block.indexOf("Run required Vitest regression portfolio");
+  for (const command of [
+    "node --test scripts/verify-studio-p2p-huddle.test.mjs",
+    "node --test scripts/studio-offline-resilience.test.mjs",
+    "pnpm run validate:architecture",
+    "node --test scripts/verify-studio-menus-ci.test.mjs",
+    "node --experimental-strip-types --test scripts/api-followup-unit.test.mjs",
+  ]) {
+    assert.ok(block.indexOf(command) < portfolio, `${command} must fail before the full portfolio`);
+  }
+  assert.ok(block.indexOf("pnpm run test:studio-material-brush") > portfolio);
+  assert.ok(block.indexOf("scripts/audit-studio-brush-quality-portfolio.mts") > portfolio);
 });
 
-test("comments, echo output and duplicate arguments cannot fake execution", () => {
-  const path = requiredTargets[0];
-  const missing = job("static").replace(path, "apps/web/src/unrelated-replacement.test.ts");
-  const decoys = `${missing}\n      # pnpm exec vitest run ${path}\n      - run: echo "pnpm exec vitest run ${path}"\n`;
-  assert.throws(() => assertRequiredTargets(decoys), /missing mandatory Vitest target/);
-
-  const duplicated = `${job("static")}\n      - run: pnpm exec vitest run ${path}\n`;
-  assert.throws(() => assertRequiredTargets(duplicated), /duplicate Vitest target/);
-});
-
-test("production visual audit and protected core both use the Vitest policy suite", () => {
+test("production visual audit and protected core share the Vitest policy suite", () => {
   const audit = readFileSync(
     new URL("../.github/workflows/studio-3d-production-visual-audit.yml", import.meta.url),
     "utf8",
   );
   assert.ok(audit.includes("      - name: Verify audit policy\n        run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs\n"));
   assert.doesNotMatch(audit, /node\s+--test\s+scripts\/lib\/studio-3d-production-audit-policy\.test\.mjs/);
-  assert.ok(job("static").includes("run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs"));
+  assert.ok(requiredTargets.includes("scripts/lib/studio-3d-production-audit-policy.test.mjs"));
+  assertRequiredPortfolio(job("static"));
 });
-
 test("manual validation cannot cancel push validation and retries retain evidence", () => {
-  assert.ok(source.includes("group: core-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}"));
+  assert.ok(source.includes(
+    "group: core-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}",
+  ));
   assert.ok(job("serial").includes("name: core-serial-attempt-${{ github.run_attempt }}"));
   assert.ok(job("build").includes("name: core-build-attempt-${{ github.run_attempt }}"));
 });
-
-const shellCommentFixtures = [
-  ["continued comment argument", "pnpm exec vitest run apps/kept.test.ts \\\n  # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
-  ["inline comment", "pnpm exec vitest run apps/kept.test.ts # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
-  ["comment backslash cannot consume the next command", "pnpm exec vitest run apps/first.test.ts # ignored \\\npnpm exec vitest run packages/second.test.ts\n", ["apps/first.test.ts", "packages/second.test.ts"]],
-  ["standalone comment continuation cannot enable a bare path", "pnpm exec vitest run apps/kept.test.ts \\\n  # ignored \\\n  packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
-  ["quoted hashes are not comments", "pnpm exec vitest run --testNamePattern '#literal' \"apps/kept.test.ts\" # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
-  ["escaped hashes are not comments", "pnpm exec vitest run --testNamePattern \\#literal apps/kept.test.ts # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
-  ["valid continued and quoted arguments remain visible", "pnpm exec vitest run \\\n  'apps/kept.test.ts' \\\n  \"packages/kept.test.tsx\"\n", ["apps/kept.test.ts", "packages/kept.test.tsx"]],
-];
-
-test("regression target extraction respects shell comments, quotes and continuations", () => {
-  for (const [name, command, expected] of shellCommentFixtures) {
-    assert.deepEqual(executedVitestTargets(command), expected, name);
-  }
-});
-
 
 test("ToonStudio session validation shares one setup and delegates full gates to protected core", () => {
   const session = readFileSync(
@@ -223,7 +238,7 @@ test("ToonStudio session validation shares one setup and delegates full gates to
   const sessionJobs = session.slice(session.indexOf("\njobs:\n") + 7)
     .split(/(?=^ {2}[a-z][a-z0-9-]*:\n)/m)
     .filter((entry) => /^ {2}[a-z][a-z0-9-]*:\n/.test(entry));
-  assert.equal(sessionJobs.length, 1, "session validation should pay checkout/install cost once");
+  assert.equal(sessionJobs.length, 1, "session validation should pay setup cost once");
   assert.match(session, /filter: blob:none/);
   assert.match(session, /!\/apps\/web\/public\/assets\//);
   assert.match(session, /git diff --name-only -z --diff-filter=ACMR "\$BASE_SHA" HEAD/);
@@ -231,7 +246,6 @@ test("ToonStudio session validation shares one setup and delegates full gates to
   assert.match(session, /pnpm exec vitest related/);
   assert.doesNotMatch(session, /lint:quick|pnpm (?:run )?build(?:\s|$)|pnpm exec tsc/);
 });
-
 test("focused integration checks cannot collide with the protected core status", () => {
   const integration = readFileSync(
     new URL("../.github/workflows/toonstudio-integration.yml", import.meta.url),
@@ -247,6 +261,9 @@ test("focused integration checks cannot collide with the protected core status",
   assert.deepEqual(checks, tracks.map((track) => `ToonStudio integration / ${track}`));
   assert.equal(new Set(checks).size, tracks.length);
   assert.ok(checks.every((name) => name !== "core" && name !== "verify"));
-  assert.match(job("core"), /^ {4}name: core$/m, "preserve the existing protected merge gate");
-  assert.match(validation, /run: bash scripts\/verify-toonstudio-integration\.sh "\$\{\{ matrix\.track \}\}"/);
+  assert.match(job("core"), /^ {4}name: core$/m, "preserve protected merge gate");
+  assert.match(
+    validation,
+    /run: bash scripts\/verify-toonstudio-integration\.sh "\$\{\{ matrix\.track \}\}"/,
+  );
 });

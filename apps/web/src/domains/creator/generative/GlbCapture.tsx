@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef } from "react";
 import { Color, DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, WebGLRenderer } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -28,5 +29,5 @@ export function GlbCapture({ file, onCapture, onError }: { file: File; onCapture
     })().catch(error => { if (!controller.signal.aborted) callbacks.current.onError(String(error)); });
     return () => { controller.abort(); release(); };
   },[file]);
-  return <section><p>드래그로 시점·포즈 구도를 확인하고, 현재 구도를 AI에 전달하세요. 원본 GLB는 변경되지 않습니다.</p><div ref={host} aria-label="3D 캐릭터 시점 미리보기" /><button type="button" onClick={() => { if (capture.current) onCapture(capture.current()); else onError("모델을 불러오는 중이에요."); }}>현재 3D 구도를 2D 변환 입력으로 사용</button></section>;
+  return <section><p>{translateCurrentStaticSourceText("domains.creator.generative.GlbCapture", "ko", "드래그로 시점·포즈 구도를 확인하고, 현재 구도를 AI에 전달하세요. 원본 GLB는 변경되지 않습니다.")}</p><div ref={host} aria-label={translateCurrentStaticSourceText("domains.creator.generative.GlbCapture", "ko", "3D 캐릭터 시점 미리보기")} /><button type="button" onClick={() => { if (capture.current) onCapture(capture.current()); else onError("모델을 불러오는 중이에요."); }}>{translateCurrentStaticSourceText("domains.creator.generative.GlbCapture", "ko", "현재 3D 구도를 2D 변환 입력으로 사용")}</button></section>;
 }

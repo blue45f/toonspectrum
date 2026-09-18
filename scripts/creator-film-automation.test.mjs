@@ -15,8 +15,8 @@ test("n8n export is inactive, manually triggered, and has no credential material
   assert(workflow.nodes.every((entry) => !Object.hasOwn(entry, "credentials")));
   assert(workflow.nodes.every((entry) => !/webhook|executeCommand/i.test(entry.type)));
 });
-test("format validation allows only the four supported renditions", () => {
-  for (const format of ["all", "landscape", "portrait", "square"]) {
+test("format validation allows only the approved renditions", () => {
+  for (const format of ["all", "landscape", "portrait", "square", "header"]) {
     const result = executeCode("Validate render request", { format });
     assert.equal(result[0].json.format, format);
     assert.equal(result[0].json.ref, "main");
@@ -46,6 +46,15 @@ test("every edge targets an existing node and the renderer cannot publish", () =
     assert(names.has(source));
     for (const list of outputs.main) for (const edge of list) assert(names.has(edge.node));
   }
+  const renderer = readFileSync("media/brand-film/render.mjs", "utf8");
+  assert(renderer.includes('filename: "toonstudio-route-header.mp4"'));
+  assert(renderer.includes('width: 1920, height: 768'));
+  assert(renderer.includes('"--crf=18"'));
+  assert(renderer.includes('"--x264-preset=slow"'));
+  assert(renderer.includes('"--muted"'));
+  assert(renderer.includes("routeHeaderPosters"));
+  assert(renderer.includes("[0, 6, 12, 18]"));
+
   const renderWorkflow = readFileSync(".github/workflows/creator-brand-film.yml", "utf8");
   assert(renderWorkflow.includes("contents: read"));
   assert(!/contents: write|git push|secrets\./.test(renderWorkflow));

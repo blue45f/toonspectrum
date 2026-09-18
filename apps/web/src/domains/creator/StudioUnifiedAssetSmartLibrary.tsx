@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { StudioUnifiedAssetSmartFilters } from "./StudioUnifiedAssetSmartFilters";
@@ -176,7 +177,7 @@ export function StudioUnifiedAssetSmartLibrary({
   return (
     <div className="space-y-3" data-studio-smart-asset-library="true">
       <section
-        aria-label="스마트 에셋 라이브러리"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartLibrary", "ko", "스마트 에셋 라이브러리")}
         className="rounded-xl border border-accent/25 bg-accent-soft/20 p-2.5"
       >
         <StudioUnifiedAssetSmartLibraryHeader

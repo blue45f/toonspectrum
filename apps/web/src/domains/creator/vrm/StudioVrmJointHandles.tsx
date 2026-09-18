@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /* eslint-disable react-refresh/only-export-components -- 순수 좌표/종료 헬퍼도 포인터 경계 테스트의 공개 계약이다. */
 
 import { Html } from "@react-three/drei/web/Html.js";
@@ -956,7 +960,7 @@ function RotationHandle({
                 pointerEvents: "none",
               }}
             >
-              {binding.label}{locked ? " · 잠금" : " · 회전"}
+              {binding.label}{locked ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmJointHandles", "ko", " · 잠금") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmJointHandles", "ko", " · 회전")}
             </span>
           ) : null}
         </button>
@@ -1260,15 +1264,15 @@ function Handle({
           type="button"
           aria-label={controlLabel}
           aria-pressed={selected}
-          aria-keyshortcuts={binding.effector ? "ArrowLeft ArrowRight ArrowUp ArrowDown PageUp PageDown" : undefined}
+          aria-keyshortcuts={binding.effector ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmJointHandles", "en", "ArrowLeft ArrowRight ArrowUp ArrowDown PageUp PageDown") : undefined}
           data-bone={binding.bone}
           data-effector={binding.effector || undefined}
           data-ik-control={binding.effector ? control : undefined}
           data-locked={locked || undefined}
           disabled={disabled}
           title={locked
-            ? `${binding.label}: 잠김 · 우클릭 또는 길게 눌러 잠금 해제`
-            : `${binding.label} ${isPole ? "폴" : "목표"}: ${modeLabel} 이동 · ${axisLabel} · 우클릭 또는 길게 눌러 잠금`}
+            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmJointHandles", "ko", "{v0}: 잠김 · 우클릭 또는 길게 눌러 잠금 해제"), { v0: String(binding.label) })
+            : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmJointHandles", "ko", "{v0} {v1}: {v2} 이동 · {v3} · 우클릭 또는 길게 눌러 잠금"), { v0: String(binding.label), v1: String(isPole ? "폴" : "목표"), v2: String(modeLabel), v3: String(axisLabel) })}
           style={buttonStyle}
           onFocus={() => {
             setHovered(true);
@@ -1525,7 +1529,7 @@ export function StudioVrmJointHandles({
         const locked = lockedSet.has(effector);
         return [(
           <Handle
-            key={`${binding.bone}-pole`}
+            key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmJointHandles", "en", "{v0}-pole"), { v0: String(binding.bone) })}
             binding={binding}
             control="pole"
             selected={selectedPole === effector}

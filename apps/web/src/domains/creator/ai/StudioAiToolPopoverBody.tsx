@@ -1,4 +1,7 @@
 import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Clapperboard,
   Images,
   Languages,
@@ -230,7 +233,7 @@ export function StudioAiToolPopoverBody({
         activeId={
           menu === "aiAssist" || menu === "stockImage" || menu === "integrations"
             ? menu
-            : "aiAssist"
+            : translateCurrentStaticSourceText("domains.creator.ai.StudioAiToolPopoverBody", "en", "aiAssist")
         }
         onSelect={(id) => {
           if (id === "scenario") {
@@ -328,7 +331,7 @@ export function StudioAiToolPopoverBody({
                 setMenu(null);
               }}
               scenarioDisabled={masterEditMode}
-              scenarioDisabledReason="마스터 편집 중에는 시나리오 제작을 사용할 수 없어요."
+              scenarioDisabledReason={translateCurrentStaticSourceText("domains.creator.ai.StudioAiToolPopoverBody", "ko", "마스터 편집 중에는 시나리오 제작을 사용할 수 없어요.")}
               onOpenSuperSuite={() => {
                 requestStudioAiSuperSuiteOpen();
               }}
@@ -358,7 +361,7 @@ export function StudioAiToolPopoverBody({
                         aria-label={lt("서버 텍스트 AI 제공자", "studio.aiToolPopover.serverTextAiProviderAria")}
                       >
                         <option value="auto">{lt("자동 전환", "studio.aiToolPopover.serverProviderAuto")}</option>
-                        {(serverAiStatus?.providers.length
+                        {(serverAiStatus?.providers?.length
                           ? serverAiStatus.providers
                           : [
                               { id: "gemini" as const, label: "Gemini 무료", configured: false, model: "" },

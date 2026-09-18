@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { SPATIAL_AUTHORING_PRESETS, spatialAuthoringPresetId, spatialAuthoringMetrics, serializeSpatialStoryboardCsv } from "./studio-spatial-authoring-presets";
 import { SpatialWebtoonReaderLauncher } from "../spatial/SpatialWebtoonReaderLauncher";
 /**
@@ -43,7 +47,7 @@ function PlanMap({ panels, selectedId }: {
   const project = (x: number, z: number) => [160 + x * scale, 180 + z * scale] as const;
   return (
     <svg viewBox="0 0 320 215" role="img" aria-labelledby={titleId} className="w-full rounded-lg border border-line bg-card">
-      <title id={titleId}>공간 콘티 위에서 본 배치도. 강조선과 번호는 선택 컷, 나머지 선은 같은 페이지의 컷입니다. 실제 장면 이미지가 아닙니다.</title>
+      <title id={titleId}>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "공간 콘티 위에서 본 배치도. 강조선과 번호는 선택 컷, 나머지 선은 같은 페이지의 컷입니다. 실제 장면 이미지가 아닙니다.")}</title>
       <path d="M160 20V180" stroke="currentColor" strokeDasharray="3 4" className="text-fg-3" opacity="0.3" />
       {panels.map((panel) => {
         const [x, z] = [panel.position[0], panel.position[2]];
@@ -54,14 +58,14 @@ function PlanMap({ panels, selectedId }: {
         const end = project(x + dx, z + dz);
         const center = project(x, z);
         return (
-          <g key={panel.shotId} className={selectedId === panel.shotId ? "text-accent" : "text-fg-3"}>
+          <g key={panel.shotId} className={selectedId === panel.shotId ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "en", "text-accent") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "en", "text-fg-3")}>
             <line x1={start[0]} y1={start[1]} x2={end[0]} y2={end[1]} stroke="currentColor" strokeWidth={selectedId === panel.shotId ? 5 : 3} />
             {selectedId === panel.shotId ? <text x={center[0]} y={center[1] - 8} textAnchor="middle" fontSize="11" fill="currentColor">{panel.order}</text> : null}
           </g>
         );
       })}
       <circle cx="160" cy="180" r="5" fill="currentColor" className="text-accent" />
-      <text x="160" y="202" textAnchor="middle" fontSize="11" fill="currentColor" className="text-fg-3">관람자 · 정면은 위쪽 (−Z)</text>
+      <text x="160" y="202" textAnchor="middle" fontSize="11" fill="currentColor" className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "관람자 · 정면은 위쪽 (−Z)")}</text>
     </svg>
   );
 }
@@ -132,57 +136,54 @@ export default function StudioBg3dSpatialStoryboardPanel() {
 
   return (
     <div className="space-y-3 pt-3" data-testid="studio-spatial-storyboard">
-      <p className="text-xs leading-relaxed text-fg-3">저장된 3D 샷을 공간에 놓는 <strong className="text-fg">배치 계획</strong>입니다. 컷 이미지를 렌더링하거나 VR·AR 장면에 자동 배치하지 않습니다.</p>
+      <p className="text-xs leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "저장된 3D 샷을 공간에 놓는 ")}<strong className="text-fg">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "배치 계획")}</strong>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "입니다. 컷 이미지를 렌더링하거나 VR·AR 장면에 자동 배치하지 않습니다.")}</p>
       <PlanMap panels={visiblePanels} selectedId={active?.shotId ?? null} />
-      <p className="text-xs text-fg-3">{plan.panels.length}컷 · {plan.pageCount ? page + 1 : 0}/{plan.pageCount}페이지 · 실제 크기의 비율로 표시한 평면도</p>
-      <p className="text-xs leading-relaxed text-fg-3" aria-label="공간 배치 검토 요약">정면 컷 각도: 가로 {metrics.horizontalDegrees}° · 세로 {metrics.verticalDegrees}° · 페이지당 최대 {metrics.maxPanelsPerPage}컷. 헤드셋 시야각이나 글자 가독성 판정이 아닙니다.</p>
-      {plan.pageCount > 1 ? <label className="block space-y-1 text-xs text-fg-2">배치 페이지 바로 이동
-        <select className={FIELD} value={page} disabled={!enabled} onChange={(event) => {
+      <p className="text-xs text-fg-3">{plan.panels.length}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "컷 · ")}{plan.pageCount ? page + 1 : 0}/{plan.pageCount}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "페이지 · 실제 크기의 비율로 표시한 평면도")}</p>
+      <p className="text-xs leading-relaxed text-fg-3" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "공간 배치 검토 요약")}>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "정면 컷 각도: 가로 ")}{metrics.horizontalDegrees}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "° · 세로 ")}{metrics.verticalDegrees}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "° · 페이지당 최대 ")}{metrics.maxPanelsPerPage}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "컷. 헤드셋 시야각이나 글자 가독성 판정이 아닙니다.")}</p>
+      {plan.pageCount > 1 ? <label className="block space-y-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "배치 페이지 바로 이동")}<select className={FIELD} value={page} disabled={!enabled} onChange={(event) => {
           const first = plan.panels.find((panel) => panel.page === Number(event.target.value));
           if (first && enabled) setSelectedId(first.shotId);
-        }}>{Array.from({ length: plan.pageCount }, (_, index) => <option key={index} value={index}>{index + 1} / {plan.pageCount} 페이지</option>)}</select>
+        }}>{Array.from({ length: plan.pageCount }, (_, index) => <option key={index} value={index}>{index + 1} / {plan.pageCount} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "페이지")}</option>)}</select>
       </label> : null}
-      {!plan.panels.length ? <p className="rounded-lg border border-line p-3 text-xs text-fg-2">현재 구도를 컷으로 저장하거나 기존 카메라 도구에서 샷을 추가하세요.</p> : (
+      {!plan.panels.length ? <p className="rounded-lg border border-line p-3 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "현재 구도를 컷으로 저장하거나 기존 카메라 도구에서 샷을 추가하세요.")}</p> : (
         <>
           <div className="grid grid-cols-2 gap-2">
-            <button type="button" className={BUTTON} disabled={!enabled || activeIndex <= 0} onClick={() => setSelectedId(plan.panels[activeIndex - 1]!.shotId)}>이전 컷 선택</button>
-            <button type="button" className={BUTTON} disabled={!enabled || activeIndex >= plan.panels.length - 1} onClick={() => setSelectedId(plan.panels[activeIndex + 1]!.shotId)}>다음 컷 선택</button>
+            <button type="button" className={BUTTON} disabled={!enabled || activeIndex <= 0} onClick={() => setSelectedId(plan.panels[activeIndex - 1]!.shotId)}>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "이전 컷 선택")}</button>
+            <button type="button" className={BUTTON} disabled={!enabled || activeIndex >= plan.panels.length - 1} onClick={() => setSelectedId(plan.panels[activeIndex + 1]!.shotId)}>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "다음 컷 선택")}</button>
           </div>
-          <ol className="max-h-52 space-y-1 overflow-y-auto" aria-label="현재 페이지의 공간 콘티 컷">
+          <ol className="max-h-52 space-y-1 overflow-y-auto" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "현재 페이지의 공간 콘티 컷")}>
             {visiblePanels.map((panel) => (
               <li key={panel.shotId}>
-                <button type="button" className={`${BUTTON} w-full text-left aria-pressed:border-accent aria-pressed:bg-accent-soft`} disabled={!enabled} aria-pressed={panel.shotId === active?.shotId} onClick={() => setSelectedId(panel.shotId)}>
+                <button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "en", "{v0} w-full text-left aria-pressed:border-accent aria-pressed:bg-accent-soft"), { v0: String(BUTTON) })} disabled={!enabled} aria-pressed={panel.shotId === active?.shotId} onClick={() => setSelectedId(panel.shotId)}>
                   <span className="block break-words">{panel.order}. {panel.label}</span>
                 </button>
               </li>
             ))}
           </ol>
-          {active ? <p className="break-words text-xs text-fg-3">선택 컷: X {active.position[0].toFixed(2)} · Y {active.position[1].toFixed(2)} · Z {active.position[2].toFixed(2)}m / 가로 {active.widthMeters.toFixed(2)} × 세로 {active.heightMeters.toFixed(2)}m</p> : null}
+          {active ? <p className="break-words text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "선택 컷: X ")}{active.position[0].toFixed(2)} · Y {active.position[1].toFixed(2)} · Z {active.position[2].toFixed(2)}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "m / 가로 ")}{active.widthMeters.toFixed(2)} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "× 세로 ")}{active.heightMeters.toFixed(2)}m</p> : null}
         </>
       )}
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" className={BUTTON} disabled={!enabled} onClick={() => run(() => runtime?.onCaptureCurrentShot(), "현재 구도 저장 명령을 전달했습니다. 저장된 샷 목록을 확인하세요.")}>현재 구도 컷 저장</button>
+        <button type="button" className={BUTTON} disabled={!enabled} onClick={() => run(() => runtime?.onCaptureCurrentShot(), "현재 구도 저장 명령을 전달했습니다. 저장된 샷 목록을 확인하세요.")}>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "현재 구도 컷 저장")}</button>
         <button type="button" className={BUTTON} disabled={!enabled || !active} onClick={() => {
           if (active && runtime?.productionShots.some((shot) => shot.id === active.shotId)) run(() => runtime.onApplyProductionShot(active.shotId), "선택 컷 적용 명령을 전달했습니다. 기존 편집기의 실행 취소 경로를 사용합니다.");
-        }}>선택 컷을 편집기에 적용</button>
+        }}>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "선택 컷을 편집기에 적용")}</button>
       </div>
-      <p className="text-xs leading-relaxed text-fg-3">컷 선택만으로 카메라가 움직이지 않습니다. 위 적용 버튼은 저장된 샷의 구도와 표시 설정을 바꿉니다. 헤드셋 검토는 아래 기존 AR·VR 미리보기를 사용하세요.</p>
+      <p className="text-xs leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "컷 선택만으로 카메라가 움직이지 않습니다. 위 적용 버튼은 저장된 샷의 구도와 표시 설정을 바꿉니다. 헤드셋 검토는 아래 기존 AR·VR 미리보기를 사용하세요.")}</p>
       <fieldset disabled={!enabled} className="grid grid-cols-2 gap-3 disabled:opacity-50">
-        <legend className="mb-2 text-xs font-bold text-fg">공간 배치 설정</legend>
-        <div className="col-span-2 grid grid-cols-2 gap-2" role="group" aria-label="공간 콘티 시작 설정">
+        <legend className="mb-2 text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "공간 배치 설정")}</legend>
+        <div className="col-span-2 grid grid-cols-2 gap-2" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "공간 콘티 시작 설정")}>
           {SPATIAL_AUTHORING_PRESETS.map((preset) => (
-            <button key={preset.id} type="button" className={`${BUTTON} aria-pressed:border-accent aria-pressed:bg-accent-soft`} disabled={!enabled} aria-pressed={presetId === preset.id} title={preset.hint} onClick={() => edit(preset.settings)}>{preset.label}</button>
+            <button key={preset.id} type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "en", "{v0} aria-pressed:border-accent aria-pressed:bg-accent-soft"), { v0: String(BUTTON) })} disabled={!enabled} aria-pressed={presetId === preset.id} title={preset.hint} onClick={() => edit(preset.settings)}>{preset.label}</button>
           ))}
-          <p className="col-span-2 text-xs leading-relaxed text-fg-3">읽기 방향과 저장된 샷은 유지됩니다. 프리셋은 배치 시작점이며 실제 기기에서 검토해야 합니다.</p>
+          <p className="col-span-2 text-xs leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "읽기 방향과 저장된 샷은 유지됩니다. 프리셋은 배치 시작점이며 실제 기기에서 검토해야 합니다.")}</p>
         </div>
-        <label className="min-w-0 space-y-1 text-xs text-fg-2">배치 방식
-          <select className={FIELD} value={settings.layout} onChange={(event) => edit({ layout: event.target.value as SpatialStoryboardSettings["layout"] })}>
-            <option value="focus">한 컷 집중</option><option value="arc">곡면 배치</option><option value="wall">평면 벽 배치</option>
+        <label className="min-w-0 space-y-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "배치 방식")}<select className={FIELD} value={settings.layout} onChange={(event) => edit({ layout: event.target.value as SpatialStoryboardSettings["layout"] })}>
+            <option value="focus">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "한 컷 집중")}</option><option value="arc">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "곡면 배치")}</option><option value="wall">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "평면 벽 배치")}</option>
           </select>
         </label>
-        <label className="min-w-0 space-y-1 text-xs text-fg-2">읽기 방향
-          <select className={FIELD} value={settings.direction} onChange={(event) => edit({ direction: event.target.value as SpatialStoryboardSettings["direction"] })}>
-            <option value="ltr">왼쪽 → 오른쪽</option><option value="rtl">오른쪽 → 왼쪽</option>
+        <label className="min-w-0 space-y-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "읽기 방향")}<select className={FIELD} value={settings.direction} onChange={(event) => edit({ direction: event.target.value as SpatialStoryboardSettings["direction"] })}>
+            <option value="ltr">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "왼쪽 → 오른쪽")}</option><option value="rtl">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "오른쪽 → 왼쪽")}</option>
           </select>
         </label>
         {DIMENSIONS.map(([key, label, min, max, step]) => (
@@ -190,28 +191,27 @@ export default function StudioBg3dSpatialStoryboardPanel() {
             <input type="range" min={min} max={max} step={step} value={settings[key]} aria-label={label} onChange={(event) => edit({ [key]: Number(event.target.value) })} className="min-h-11 w-full accent-accent" />
           </label>
         ))}
-        <label className="min-w-0 space-y-1 text-xs text-fg-2">컷 가로/세로 비율
-          <input className={FIELD} type="number" min="0.5" max="2.4" step="0.01" value={settings.aspectRatio} onChange={(event) => { if (event.target.value) edit({ aspectRatio: Number(event.target.value) }); }} />
+        <label className="min-w-0 space-y-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "컷 가로/세로 비율")}<input className={FIELD} type="number" min="0.5" max="2.4" step="0.01" value={settings.aspectRatio} onChange={(event) => { if (event.target.value) edit({ aspectRatio: Number(event.target.value) }); }} />
         </label>
       </fieldset>
-      {plan.warnings.length ? <ul className="space-y-1 rounded-lg border border-line p-3 text-xs text-fg-2" aria-label="배치 검토 안내">{plan.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
-      <p className="text-xs leading-relaxed text-fg-3">치수 경고는 편집 참고값이며 기기 호환성·가독성·안전 인증이 아닙니다. 설정은 도구를 닫으면 초기화됩니다. 유지하려면 계획 파일로 내보내세요.</p>
+      {plan.warnings.length ? <ul className="space-y-1 rounded-lg border border-line p-3 text-xs text-fg-2" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "배치 검토 안내")}>{plan.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
+      <p className="text-xs leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "치수 경고는 편집 참고값이며 기기 호환성·가독성·안전 인증이 아닙니다. 설정은 도구를 닫으면 초기화됩니다. 유지하려면 계획 파일로 내보내세요.")}</p>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={BUTTON} disabled={!enabled || !plan.panels.length} onClick={() => download("json")}>계획 JSON 내보내기</button>
-        <button type="button" className={BUTTON} disabled={!enabled || !plan.panels.length} onClick={() => download("csv")}>컷 배치표 CSV 내보내기</button>
-        <button type="button" className={BUTTON} disabled={!enabled} onClick={() => fileInput.current?.click()}>계획 설정 가져오기</button>
-        <button type="button" className={BUTTON} disabled={!enabled} onClick={() => edit(SPATIAL_STORYBOARD_DEFAULTS)}>설정 초기화</button>
-        <input ref={fileInput} type="file" accept=".json,application/json" aria-label="공간 콘티 계획 파일" className="hidden" disabled={!enabled} onChange={(event) => {
+        <button type="button" className={BUTTON} disabled={!enabled || !plan.panels.length} onClick={() => download("json")}>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "계획 JSON 내보내기")}</button>
+        <button type="button" className={BUTTON} disabled={!enabled || !plan.panels.length} onClick={() => download("csv")}>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "컷 배치표 CSV 내보내기")}</button>
+        <button type="button" className={BUTTON} disabled={!enabled} onClick={() => fileInput.current?.click()}>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "계획 설정 가져오기")}</button>
+        <button type="button" className={BUTTON} disabled={!enabled} onClick={() => edit(SPATIAL_STORYBOARD_DEFAULTS)}>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "설정 초기화")}</button>
+        <input ref={fileInput} type="file" accept=".json,application/json" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "공간 콘티 계획 파일")} className="hidden" disabled={!enabled} onChange={(event) => {
           const file = event.target.files?.[0];
           event.target.value = "";
           if (file) void importSettings(file);
         }} />
       </div>
-      {!enabled ? <p role="status" className="text-xs text-fg-3">장면 연결 또는 편집 잠금 해제 후 사용할 수 있습니다.</p> : null}
+      {!enabled ? <p role="status" className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "장면 연결 또는 편집 잠금 해제 후 사용할 수 있습니다.")}</p> : null}
       {message ? <p role="status" className="text-xs text-fg-2">{message}</p> : null}
       {error ? <p role="alert" className="text-xs text-bad">{error}</p> : null}
-      <p className="text-xs text-fg-3">완성된 컷 이미지는 아래 공간 리더에서 직접 열어 AR/VR로 읽을 수 있습니다. 위 3D 샷의 자동 캡처·연동은 아닙니다.</p>
-      <SpatialWebtoonReaderLauncher title="스튜디오 공간 원고 검토" workId="local:studio-spatial" />
+      <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "완성된 컷 이미지는 아래 공간 리더에서 직접 열어 AR/VR로 읽을 수 있습니다. 위 3D 샷의 자동 캡처·연동은 아닙니다.")}</p>
+      <SpatialWebtoonReaderLauncher title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardPanel", "ko", "스튜디오 공간 원고 검토")} workId="local:studio-spatial" />
     </div>
   );
 }

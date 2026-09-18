@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { SITE_URL } from "@toonspectrum/core";
 import {
   ArrowRight,
@@ -300,22 +303,17 @@ export function CharacterShaperLandingPage() {
           className="relative grid gap-8 py-10 sm:py-14 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-center lg:gap-12 lg:py-20"
         >
           <div className="max-w-2xl">
-            <p className="eyebrow text-accent">CHARACTER SHAPER</p>
+            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "en", "CHARACTER SHAPER")}</p>
             <h1 className="mt-3 text-balance [word-break:keep-all] text-[clamp(1.9rem,5vw,3rem)] font-bold leading-[1.12] tracking-tight text-fg">
-              프리셋으로 시작하는 3D 웹툰 캐릭터
-            </h1>
+              {translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "프리셋으로 시작하는 3D 웹툰 캐릭터")}</h1>
             <p className="lede mt-4 max-w-xl text-pretty text-base leading-relaxed text-fg-2 sm:text-lg">
-              프리셋으로 캐릭터를 고르고, 사진·웹캠으로 포즈를 잡고, 모델 위에 직접 그린 뒤 투명 PNG·레이어
-              PSD로 내보내기까지 — 설치 없이 브라우저 안에서 끝납니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "프리셋으로 캐릭터를 고르고, 사진·웹캠으로 포즈를 잡고, 모델 위에 직접 그린 뒤 투명 PNG·레이어 PSD로 내보내기까지 — 설치 없이 브라우저 안에서 끝납니다.")}</p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <Link href={STUDIO_SHAPER_PATH} className={buttonClass({ variant: "solid", size: "lg" })}>
-                스튜디오에서 열기
-                <ArrowRight size={18} aria-hidden="true" />
+                {translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "스튜디오에서 열기")}<ArrowRight size={18} aria-hidden="true" />
               </Link>
               <a href="#how-to" className={buttonClass({ variant: "outline", size: "lg" })}>
-                사용 가이드
-              </a>
+                {translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "사용 가이드")}</a>
             </div>
             <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs text-fg-3">
               {HERO_FACTS.map((fact) => (
@@ -334,7 +332,7 @@ export function CharacterShaperLandingPage() {
 
       {/* 핵심 기능 */}
       <Container size="wide" className="py-12 sm:py-16">
-        <Section eyebrow="FEATURES" title="핵심 기능" desc="고르고, 그리고, 옮기고, 내보내는 데 필요한 네 가지.">
+        <Section eyebrow="FEATURES" title={translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "핵심 기능")} desc={translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "고르고, 그리고, 옮기고, 내보내는 데 필요한 네 가지.")}>
           <div className="grid gap-4 md:grid-cols-2">
             {FEATURES.map((feature, index) => {
               const Art = feature.art;
@@ -374,8 +372,8 @@ export function CharacterShaperLandingPage() {
         <Container size="wide" className="py-12 sm:py-16">
           <Section
             eyebrow="HOW TO"
-            title="다섯 단계로 첫 캐릭터 만들기"
-            desc="위에서 아래로 한 번만 따라가면 컷에 넣을 수 있는 캐릭터가 나옵니다."
+            title={translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "다섯 단계로 첫 캐릭터 만들기")}
+            desc={translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "위에서 아래로 한 번만 따라가면 컷에 넣을 수 있는 캐릭터가 나옵니다.")}
           >
             <ol className="flex flex-col gap-3.5">
               {HOW_TO_STEPS.map((step, index) => (
@@ -390,7 +388,7 @@ export function CharacterShaperLandingPage() {
                     <h3 className="text-base font-bold text-fg sm:text-lg">{step.title}</h3>
                     <p className="mt-1.5 text-sm leading-relaxed text-fg-2">{step.body}</p>
                     <p className="mt-3 flex gap-2 rounded-lg border border-accent/20 bg-accent-soft px-3 py-2 text-[0.8rem] leading-relaxed text-fg-2">
-                      <span className="shrink-0 font-semibold text-accent">팁</span>
+                      <span className="shrink-0 font-semibold text-accent">{translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "팁")}</span>
                       <span>{step.tip}</span>
                     </p>
                   </div>
@@ -403,19 +401,19 @@ export function CharacterShaperLandingPage() {
 
       {/* 단축키 */}
       <Container size="wide" className="py-12 sm:py-16">
-        <Section eyebrow="SHORTCUTS" title="단축키" desc="마우스 없이도 슬롯을 오가고 되돌릴 수 있습니다. ⌘ 표기는 macOS 기준입니다.">
+        <Section eyebrow="SHORTCUTS" title={translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "단축키")} desc={translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "마우스 없이도 슬롯을 오가고 되돌릴 수 있습니다. ⌘ 표기는 macOS 기준입니다.")}>
           <div className="overflow-x-auto rounded-2xl border border-line">
             <table className="w-full min-w-[34rem] text-sm">
               <thead className="bg-card/50 text-left text-xs font-semibold text-fg-3">
                 <tr>
-                  <th scope="col" className="px-4 py-2.5">키</th>
-                  <th scope="col" className="px-4 py-2.5">동작</th>
-                  <th scope="col" className="px-4 py-2.5">비고</th>
+                  <th scope="col" className="px-4 py-2.5">{translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "키")}</th>
+                  <th scope="col" className="px-4 py-2.5">{translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "동작")}</th>
+                  <th scope="col" className="px-4 py-2.5">{translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "비고")}</th>
                 </tr>
               </thead>
               <tbody>
                 {SHORTCUTS.map((row, index) => (
-                  <tr key={row.action} className={index % 2 ? "bg-card/20" : "bg-transparent"}>
+                  <tr key={row.action} className={index % 2 ? translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "en", "bg-card/20") : translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "en", "bg-transparent")}>
                     <td className="whitespace-nowrap px-4 py-2.5">
                       <span className="inline-flex items-center gap-1.5">
                         {row.keys.map((key, keyIndex) => (
@@ -441,7 +439,7 @@ export function CharacterShaperLandingPage() {
       {/* 지원 범위와 한계 */}
       <section className="border-y border-line bg-panel/30">
         <Container size="wide" className="py-12 sm:py-16">
-          <Section eyebrow="SCOPE" title="지원 범위와 한계" desc="되는 것과 모델에 따라 달라지는 것을 미리 적어 둡니다.">
+          <Section eyebrow="SCOPE" title={translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "지원 범위와 한계")} desc={translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "되는 것과 모델에 따라 달라지는 것을 미리 적어 둡니다.")}>
             <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {CAPABILITY_NOTES.map((note) => {
                 const Icon = note.icon;
@@ -462,7 +460,7 @@ export function CharacterShaperLandingPage() {
 
       {/* FAQ */}
       <Container size="wide" className="py-12 sm:py-16">
-        <Section eyebrow="FAQ" title="자주 묻는 질문">
+        <Section eyebrow="FAQ" title={translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "자주 묻는 질문")}>
           <div className="grid gap-2.5 md:grid-cols-2">
             {FAQ.map((item) => (
               <details
@@ -489,22 +487,17 @@ export function CharacterShaperLandingPage() {
         <div className="relative overflow-hidden rounded-3xl border border-line bg-panel/50 px-6 py-10 text-center sm:px-10 sm:py-14">
           <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-40 opacity-80" style={HERO_GLOW_STYLE} />
           <div className="relative">
-            <p className="eyebrow text-accent">START</p>
+            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "en", "START")}</p>
             <h2 className="mt-2 text-balance [word-break:keep-all] text-2xl font-bold tracking-tight text-fg sm:text-3xl">
-              지금 첫 캐릭터를 만들어 보세요
-            </h2>
+              {translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "지금 첫 캐릭터를 만들어 보세요")}</h2>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-fg-2 sm:text-base">
-              내장 샘플 모델로 시작하면 파일을 따로 준비하지 않아도 됩니다. 만든 캐릭터는 투명 PNG로 바로 컷에
-              들어갑니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "내장 샘플 모델로 시작하면 파일을 따로 준비하지 않아도 됩니다. 만든 캐릭터는 투명 PNG로 바로 컷에 들어갑니다.")}</p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <Link href={STUDIO_SHAPER_PATH} className={buttonClass({ variant: "solid", size: "lg" })}>
-                스튜디오에서 열기
-                <ArrowRight size={18} aria-hidden="true" />
+                {translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "스튜디오에서 열기")}<ArrowRight size={18} aria-hidden="true" />
               </Link>
               <Link href="/market/browse?kind=3d-asset" className={buttonClass({ variant: "outline", size: "lg" })}>
-                3D 소재 둘러보기
-              </Link>
+                {translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingPage", "ko", "3D 소재 둘러보기")}</Link>
             </div>
           </div>
         </div>

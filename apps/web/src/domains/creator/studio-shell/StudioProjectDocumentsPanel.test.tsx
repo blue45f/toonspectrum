@@ -4,6 +4,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
+import {
+  studioExactResumeStorageKey,
+  writeStudioExactResumeContext,
+} from "../studio-exact-resume-context";
 import { readStudioProjectDocuments } from "../studio-project-document-store";
 import { StudioProjectDocumentsPanel } from "./StudioProjectDocumentsPanel";
 
@@ -54,5 +58,34 @@ describe("StudioProjectDocumentsPanel", () => {
       expect(after.id).toBe(before.id);
       expect(after.defaultWorkspace).toBe("draw");
     });
+  });
+
+  it("removes exact resume metadata when a trashed document is permanently deleted", async () => {
+    render(
+      <MemoryRouter>
+        <StudioProjectDocumentsPanel projectId="series-alpha" locale="ko" />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "문서 만들기" }));
+    const document = readStudioProjectDocuments(window.localStorage, "series-alpha").documents[0]!;
+    const resumeKey = studioExactResumeStorageKey("series-alpha", document.id);
+    writeStudioExactResumeContext(window.localStorage, {
+      projectId: "series-alpha",
+      documentId: document.id,
+      workspace: document.defaultWorkspace,
+      pageId: "page-1",
+      updatedAt: "2026-09-17T00:00:00.000Z",
+    });
+    expect(window.localStorage.getItem(resumeKey)).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "문서를 휴지통으로" }));
+    fireEvent.click(screen.getByRole("button", { name: /휴지통 1/u }));
+    fireEvent.click(await screen.findByRole("button", { name: "완전히 삭제" }));
+    fireEvent.click(screen.getByRole("button", { name: /^삭제$/u }));
+
+    await waitFor(() => {
+      expect(readStudioProjectDocuments(window.localStorage, "series-alpha").documents).toHaveLength(0);
+    });
+    expect(window.localStorage.getItem(resumeKey)).toBeNull();
   });
 });

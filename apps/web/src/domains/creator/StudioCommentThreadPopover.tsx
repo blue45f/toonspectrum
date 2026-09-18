@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -653,15 +657,13 @@ export function StudioCommentThreadPopover({
         data-studio-comment-thread-popover="true"
         data-studio-shortcut-boundary="true"
         data-placement={position.placement}
-        data-presentation={bottomSheet ? "bottom-sheet" : "anchored-popover"}
+        data-presentation={bottomSheet ? translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "en", "bottom-sheet") : translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "en", "anchored-popover")}
         onFocusCapture={() => {
           suppressDeferredFocusRef.current = false;
         }}
-        className={`fixed z-[94] flex overflow-hidden border border-line-strong bg-panel/98 text-fg backdrop-blur-xl motion-safe:animate-in motion-safe:fade-in motion-reduce:transition-none ${
-          bottomSheet
+        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "en", "fixed z-[94] flex overflow-hidden border border-line-strong bg-panel/98 text-fg backdrop-blur-xl motion-safe:animate-in motion-safe:fade-in motion-reduce:transition-none {v0}"), { v0: String(bottomSheet
             ? "rounded-t-2xl border-b-0 shadow-[0_-18px_58px_oklch(0.06_0.02_70/0.5)] motion-safe:slide-in-from-bottom-3"
-            : "rounded-2xl shadow-[0_24px_74px_oklch(0.06_0.02_70/0.62)] motion-safe:zoom-in-95 [transform-origin:var(--studio-comment-popover-origin)]"
-        }`}
+            : "rounded-2xl shadow-[0_24px_74px_oklch(0.06_0.02_70/0.62)] motion-safe:zoom-in-95 [transform-origin:var(--studio-comment-popover-origin)]") })}
         style={{
           left: position.left,
           top: position.top,
@@ -702,26 +704,23 @@ export function StudioCommentThreadPopover({
                 </time>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-1">
-                <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.62rem] font-semibold ${
-                  thread.resolved
+                <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "en", "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.62rem] font-semibold {v0}"), { v0: String(thread.resolved
                     ? "border-good/35 bg-good/10 text-good"
-                    : "border-warn/35 bg-warn/10 text-warn"
-                }`}>
+                    : "border-warn/35 bg-warn/10 text-warn") })}>
                   {thread.resolved
                     ? <CheckCircle2 size={10} aria-hidden />
                     : <CircleDot size={10} aria-hidden />}
-                  {thread.resolved ? "해결됨" : "검토 중"}
+                  {thread.resolved ? translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "해결됨") : translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "검토 중")}
                 </span>
                 {unread ? (
                   <span className="inline-flex items-center rounded-md bg-accent px-1.5 py-0.5 text-[0.62rem] font-bold text-on-accent">
-                    미확인
-                  </span>
+                    {translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "미확인")}</span>
                 ) : (
-                  <span className="text-[0.62rem] font-semibold text-fg-3">확인함</span>
+                  <span className="text-[0.62rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "확인함")}</span>
                 )}
                 {thread.replies.length > 0 ? (
                   <span className="text-[0.62rem] font-semibold tabular-nums text-fg-3">
-                    답글 {thread.replies.length.toLocaleString("ko-KR")}
+                    {translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "답글 ")}{thread.replies.length.toLocaleString("ko-KR")}
                   </span>
                 ) : null}
               </div>
@@ -729,13 +728,13 @@ export function StudioCommentThreadPopover({
             <button
               type="button"
               disabled={busy}
-              aria-label="전체 댓글 검토함에서 열기"
-              title="작성 중인 답글을 유지하고 전체 댓글 검토함에서 열기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "전체 댓글 검토함에서 열기")}
+              title={translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "작성 중인 답글을 유지하고 전체 댓글 검토함에서 열기")}
               onClick={() => {
                 shouldRestoreFocusRef.current = false;
                 onOpenReview(thread.id);
               }}
-              className={`grid shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-40 motion-reduce:transition-none ${bottomSheet ? "size-11" : "size-10"}`}
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "en", "grid shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-40 motion-reduce:transition-none {v0}"), { v0: String(bottomSheet ? "size-11" : "size-10") })}
             >
               <Inbox size={15} aria-hidden />
             </button>
@@ -744,62 +743,61 @@ export function StudioCommentThreadPopover({
               type="button"
               disabled={busy}
               aria-label={replyBody.trim()
-                ? "답글 초안을 버리고 댓글 대화창 닫기"
-                : "댓글 대화창 닫기"}
-              title={replyBody.trim() ? "초안을 버리고 닫기 (Esc)" : "닫기 (Esc)"}
+                ? translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "답글 초안을 버리고 댓글 대화창 닫기")
+                : translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "댓글 대화창 닫기")}
+              title={replyBody.trim() ? translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "초안을 버리고 닫기 (Esc)") : translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "닫기 (Esc)")}
               onClick={() => {
                 shouldRestoreFocusRef.current = true;
                 onClose("explicit");
               }}
-              className={`grid shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-40 motion-reduce:transition-none ${bottomSheet ? "size-11" : "size-10"}`}
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "en", "grid shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-40 motion-reduce:transition-none {v0}"), { v0: String(bottomSheet ? "size-11" : "size-10") })}
             >
               <X size={15} aria-hidden />
             </button>
           </header>
 
           <p id={descriptionId} className="sr-only">
-            캔버스 위치에 연결된 댓글 대화입니다. 필요하면 전체 대화를 펼치고 빠르게 답글을 남길 수 있습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "캔버스 위치에 연결된 댓글 대화입니다. 필요하면 전체 대화를 펼치고 빠르게 답글을 남길 수 있습니다.")}</p>
 
           <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-width:thin]">
             {clusterCount > 1 && onNavigateCluster ? (
               <nav
-                aria-label="같은 위치의 댓글 이동"
+                aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "같은 위치의 댓글 이동")}
                 className="flex min-h-11 items-center gap-2 border-b border-line bg-raised/45 px-3"
               >
                 <button
                   type="button"
                   disabled={busy || Boolean(replyBody.trim())}
-                  aria-label="이전 위치 댓글"
-                  title={replyBody.trim() ? "작성 중인 답글을 먼저 마무리해 주세요." : "이전 댓글"}
+                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "이전 위치 댓글")}
+                  title={replyBody.trim() ? translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "작성 중인 답글을 먼저 마무리해 주세요.") : translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "이전 댓글")}
                   onClick={() => onNavigateCluster(-1)}
-                  className={`grid shrink-0 place-items-center rounded-lg text-fg-2 transition-colors duration-150 hover:bg-card hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none ${bottomSheet ? "size-11" : "size-9"}`}
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "en", "grid shrink-0 place-items-center rounded-lg text-fg-2 transition-colors duration-150 hover:bg-card hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none {v0}"), { v0: String(bottomSheet ? "size-11" : "size-9") })}
                 >
                   <ChevronLeft size={15} aria-hidden />
                 </button>
                 <p className="min-w-0 flex-1 text-center text-[0.68rem] font-semibold tabular-nums text-fg-2">
-                  같은 위치 {Math.max(1, clusterIndex + 1).toLocaleString("ko-KR")}
+                  {translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "같은 위치 ")}{Math.max(1, clusterIndex + 1).toLocaleString("ko-KR")}
                   <span className="px-1 text-fg-3">/</span>
                   {clusterCount.toLocaleString("ko-KR")}
                   {unreadClusterCount > 0 ? (
                     <span className="ml-1.5 rounded-full bg-accent px-1.5 py-0.5 text-[0.6rem] font-bold text-on-accent">
-                      미확인 {unreadClusterCount.toLocaleString("ko-KR")}
+                      {translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "미확인 ")}{unreadClusterCount.toLocaleString("ko-KR")}
                     </span>
                   ) : null}
                 </p>
                 <button
                   type="button"
                   disabled={busy || Boolean(replyBody.trim())}
-                  aria-label="다음 위치 댓글"
-                  title={replyBody.trim() ? "작성 중인 답글을 먼저 마무리해 주세요." : "다음 댓글"}
+                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "다음 위치 댓글")}
+                  title={replyBody.trim() ? translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "작성 중인 답글을 먼저 마무리해 주세요.") : translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "다음 댓글")}
                   onClick={() => onNavigateCluster(1)}
-                  className={`grid shrink-0 place-items-center rounded-lg text-fg-2 transition-colors duration-150 hover:bg-card hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none ${bottomSheet ? "size-11" : "size-9"}`}
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "en", "grid shrink-0 place-items-center rounded-lg text-fg-2 transition-colors duration-150 hover:bg-card hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none {v0}"), { v0: String(bottomSheet ? "size-11" : "size-9") })}
                 >
                   <ChevronRight size={15} aria-hidden />
                 </button>
               </nav>
             ) : null}
-            <section aria-label={showAllMessages ? "전체 댓글 대화" : "최근 댓글"} className="px-3 py-2.5">
+            <section aria-label={showAllMessages ? translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "전체 댓글 대화") : translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "최근 댓글")} className="px-3 py-2.5">
               {recent.omittedCount > 0 ? (
                 <button
                   type="button"
@@ -809,8 +807,8 @@ export function StudioCommentThreadPopover({
                 >
                   {showAllMessages ? <ChevronUp size={12} aria-hidden /> : <ChevronDown size={12} aria-hidden />}
                   {showAllMessages
-                    ? "최근 메시지만 보기"
-                    : `이전 메시지 ${recent.omittedCount.toLocaleString("ko-KR")}개 보기`}
+                    ? translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "최근 메시지만 보기")
+                    : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "이전 메시지 {v0}개 보기"), { v0: String(recent.omittedCount.toLocaleString("ko-KR")) })}
                 </button>
               ) : null}
               <ol className="divide-y divide-line/70">
@@ -818,11 +816,9 @@ export function StudioCommentThreadPopover({
                   <li key={message.id} className="flex min-w-0 gap-2 py-2 first:pt-0 last:pb-0">
                     <span
                       aria-hidden
-                      className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-[0.65rem] font-bold ${
-                        index === visibleMessages.length - 1
+                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "en", "mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-[0.65rem] font-bold {v0}"), { v0: String(index === visibleMessages.length - 1
                           ? "bg-accent-soft text-accent"
-                          : "bg-raised text-fg-2"
-                      }`}
+                          : "bg-raised text-fg-2") })}
                     >
                       {actorInitial(message.author)}
                     </span>
@@ -839,10 +835,10 @@ export function StudioCommentThreadPopover({
                           {formatDate(message.createdAt)}
                         </time>
                         {message.updatedAt !== message.createdAt ? (
-                          <span className="text-[0.6rem] text-fg-3">수정됨</span>
+                          <span className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "수정됨")}</span>
                         ) : null}
                       </div>
-                      <p className={`mt-0.5 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-5 text-fg-2 ${showAllMessages ? "" : "line-clamp-3"}`}>
+                      <p className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "en", "mt-0.5 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-5 text-fg-2 {v0}"), { v0: String(showAllMessages ? "" : "line-clamp-3") })}>
                         {message.body}
                       </p>
                     </div>
@@ -853,15 +849,12 @@ export function StudioCommentThreadPopover({
 
             <form
               onSubmit={submitReply}
-              className={`sticky bottom-0 z-10 border-t border-line bg-card px-3 py-2.5 ${
-                bottomSheet ? "pb-[max(0.625rem,env(safe-area-inset-bottom))]" : ""
-              }`}
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "en", "sticky bottom-0 z-10 border-t border-line bg-card px-3 py-2.5 {v0}"), { v0: String(bottomSheet ? "pb-[max(0.625rem,env(safe-area-inset-bottom))]" : "") })}
             >
               <div className="flex items-center justify-between gap-2">
                 <label htmlFor={replyId} className="inline-flex items-center gap-1.5 text-[0.7rem] font-bold text-fg-2">
                   <Reply size={12} aria-hidden />
-                  빠른 답글
-                </label>
+                  {translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "빠른 답글")}</label>
                 <span id={countId} className="shrink-0 text-[0.62rem] tabular-nums text-fg-3">
                   {replyBody.length.toLocaleString("ko-KR")}/{STUDIO_COMMENTS_MAX_BODY_LENGTH.toLocaleString("ko-KR")}
                 </span>
@@ -876,7 +869,7 @@ export function StudioCommentThreadPopover({
                 readOnly={submitting || pendingMutation !== null}
                 aria-readonly={submitting || pendingMutation !== null}
                 aria-describedby={`${hintId} ${countId}${replyRestriction ? ` ${restrictionId}` : ""}${error || syncError ? ` ${errorId}` : ""}${notice ? ` ${noticeId}` : ""}`}
-                placeholder={thread.resolved ? "다시 열면 답글을 남길 수 있어요." : "답글을 입력하세요."}
+                placeholder={thread.resolved ? translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "다시 열면 답글을 남길 수 있어요.") : translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "답글을 입력하세요.")}
                 aria-keyshortcuts="Control+Enter Meta+Enter"
                 onChange={(event) => {
                   onReplyBodyChange(
@@ -934,16 +927,14 @@ export function StudioCommentThreadPopover({
                   disabled={!resolveAllowed || busy}
                   aria-pressed={thread.resolved}
                   aria-label={thread.resolved
-                    ? `${thread.author.displayName}의 댓글 다시 열기`
-                    : `${thread.author.displayName}의 댓글 해결 처리`}
+                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "{v0}의 댓글 다시 열기"), { v0: String(thread.author.displayName) })
+                    : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "{v0}의 댓글 해결 처리"), { v0: String(thread.author.displayName) })}
                   aria-describedby={resolveRestrictionDescriptionId}
                   title={!resolveAllowed ? resolveRestriction ?? undefined : undefined}
                   onClick={() => void changeResolution()}
-                  className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none ${
-                    thread.resolved
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "en", "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none {v0}"), { v0: String(thread.resolved
                       ? "text-warn hover:border-warn/45 hover:bg-warn/10"
-                      : "text-good hover:border-good/45 hover:bg-good/10"
-                  }`}
+                      : "text-good hover:border-good/45 hover:bg-good/10") })}
                 >
                   {pendingMutation === "resolve" ? (
                     <LoaderCircle size={13} className="animate-spin motion-reduce:animate-none" aria-hidden />
@@ -953,14 +944,13 @@ export function StudioCommentThreadPopover({
                     <CheckCircle2 size={13} aria-hidden />
                   )}
                   {pendingMutation === "resolve"
-                    ? "변경 중"
+                    ? translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "변경 중")
                     : thread.resolved
-                      ? "다시 열기"
-                      : "해결"}
+                      ? translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "다시 열기")
+                      : translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "해결")}
                 </button>
                 <span id={hintId} className="min-w-0 flex-1 truncate text-[0.62rem] text-fg-3">
-                  ⌘/Ctrl + Enter
-                </span>
+                  {translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "en", "⌘/Ctrl + Enter")}</span>
                 <button
                   type="submit"
                   disabled={!replyAllowed || busy || !replyBody.trim()}
@@ -971,7 +961,7 @@ export function StudioCommentThreadPopover({
                   ) : (
                     <Send size={13} aria-hidden />
                   )}
-                  {pendingMutation === "reply" || submitting ? "등록 중" : "답글"}
+                  {pendingMutation === "reply" || submitting ? translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "등록 중") : translateCurrentStaticSourceText("domains.creator.StudioCommentThreadPopover", "ko", "답글")}
                 </button>
               </footer>
             </form>

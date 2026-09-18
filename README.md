@@ -280,7 +280,9 @@ export STUDIO_LIVE_POSTGRES_URL="$DATABASE_URL"
 
 ```bash
 # .env.local (gitignore됨): 앱 일반 쿼리는 pooler, realtime migration/adapter는 direct endpoint
+# secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- placeholder Neon connection template
 echo 'DATABASE_URL="postgresql://<user>:<pw>@<host>-pooler.<region>.aws.neon.tech/<db>?sslmode=verify-full"' >> .env.local
+# secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- placeholder Neon connection template
 echo 'STUDIO_LIVE_POSTGRES_URL="postgresql://<user>:<pw>@<direct-host>.<region>.aws.neon.tech/<db>?sslmode=verify-full"' >> .env.local
 set -a; source .env.local; set +a
 ```

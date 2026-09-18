@@ -274,6 +274,23 @@ export function planStudioServiceWorkerCacheTrim<Key>(
   return excess > 0 ? keys.slice(0, excess) : [];
 }
 
+/**
+ * Tighten runtime-cache entry caps when the browser reports storage pressure.
+ * This deliberately avoids reading cached response bodies just to count bytes.
+ */
+export function studioServiceWorkerPressureAdjustedLimit(
+  baseLimit: number,
+  usage: number | undefined,
+  quota: number | undefined,
+): number {
+  if (!Number.isFinite(baseLimit) || baseLimit <= 0) return baseLimit;
+  if (!Number.isFinite(usage) || !Number.isFinite(quota) || (quota ?? 0) <= 0) return baseLimit;
+  const ratio = Math.max(0, Number(usage) / Number(quota));
+  if (ratio >= 0.95) return Math.max(1, Math.floor(baseLimit * 0.5));
+  if (ratio >= 0.85) return Math.max(1, Math.floor(baseLimit * 0.75));
+  return baseLimit;
+}
+
 export interface StudioServiceWorkerCachedResponseFacts {
   readonly routeClass: StudioServiceWorkerRouteClass;
   readonly destination?: string;

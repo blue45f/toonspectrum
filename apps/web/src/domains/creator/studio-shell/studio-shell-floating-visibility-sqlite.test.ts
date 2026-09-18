@@ -28,12 +28,12 @@ describe("studio shell floating visibility SQLite preferences", () => {
     await expect(repository.save({
       version: 1,
       hidden: ["collaboration", "document-tools", "collaboration"] as never,
-      autoHideWhileDrawing: true,
+      autoHideDuringStroke: false,
     })).resolves.toEqual({
       state: {
         version: 1,
         hidden: ["document-tools", "collaboration"],
-        autoHideWhileDrawing: true,
+        autoHideDuringStroke: false,
       },
       status: "persisted",
       failure: null,
@@ -42,7 +42,7 @@ describe("studio shell floating visibility SQLite preferences", () => {
       state: {
         version: 1,
         hidden: ["document-tools", "collaboration"],
-        autoHideWhileDrawing: true,
+        autoHideDuringStroke: false,
       },
       persisted: true,
       failure: null,
@@ -50,7 +50,22 @@ describe("studio shell floating visibility SQLite preferences", () => {
     expect(JSON.parse(store.values.get("snapshot")!)).toEqual({
       version: 1,
       hidden: ["document-tools", "collaboration"],
-      autoHideWhileDrawing: true,
+      autoHideDuringStroke: false,
+    });
+  });
+
+  it("enables stroke focus for legacy v1 snapshots without the new preference", async () => {
+    const repository = createStudioShellFloatingVisibilityRepository(memoryStore({
+      snapshot: JSON.stringify({ version: 1, hidden: ["collaboration"] }),
+    }));
+
+    await expect(repository.load()).resolves.toMatchObject({
+      state: {
+        hidden: ["collaboration"],
+        autoHideDuringStroke: true,
+      },
+      persisted: true,
+      failure: null,
     });
   });
 
@@ -66,18 +81,18 @@ describe("studio shell floating visibility SQLite preferences", () => {
       },
     });
 
-    const first = repository.save({ version: 1, hidden: ["collaboration"], autoHideWhileDrawing: false });
-    const second = repository.save({ version: 1, hidden: ["offline-readiness"], autoHideWhileDrawing: true });
+    const first = repository.save({ version: 1, hidden: ["collaboration"], autoHideDuringStroke: true });
+    const second = repository.save({ version: 1, hidden: ["offline-readiness"], autoHideDuringStroke: false });
     await Promise.all([first, second]);
 
     expect(writes).toHaveLength(2);
     expect(JSON.parse(writes.at(-1)!)).toEqual({
       version: 1,
       hidden: ["offline-readiness"],
-      autoHideWhileDrawing: true,
+      autoHideDuringStroke: false,
     });
     await expect(repository.load()).resolves.toMatchObject({
-      state: { hidden: ["offline-readiness"] },
+      state: { hidden: ["offline-readiness"], autoHideDuringStroke: false },
       persisted: true,
     });
   });
@@ -95,12 +110,12 @@ describe("studio shell floating visibility SQLite preferences", () => {
     const pendingSave = repository.save({
       version: 1,
       hidden: ["workspace-switcher"],
-      autoHideWhileDrawing: false,
+      autoHideDuringStroke: true,
     });
     const pendingLoad = repository.load();
 
     await expect(pendingLoad).resolves.toMatchObject({
-      state: { hidden: ["workspace-switcher"] },
+      state: { hidden: ["workspace-switcher"], autoHideDuringStroke: true },
       persisted: true,
       failure: null,
     });
@@ -115,7 +130,7 @@ describe("studio shell floating visibility SQLite preferences", () => {
       snapshot: "{bad-json",
     }));
     await expect(malformed.load()).resolves.toMatchObject({
-      state: { hidden: [] },
+      state: { hidden: [], autoHideDuringStroke: true },
       persisted: false,
       failure: "read-failed",
     });
@@ -125,7 +140,7 @@ describe("studio shell floating visibility SQLite preferences", () => {
       async set() { throw new Error("denied"); },
       async delete() {},
     });
-    await expect(failed.save({ version: 1, hidden: ["collaboration"], autoHideWhileDrawing: false }))
+    await expect(failed.save({ version: 1, hidden: ["collaboration"], autoHideDuringStroke: true }))
       .resolves.toMatchObject({
         status: "memory-only",
         failure: "write-failed",
@@ -136,7 +151,7 @@ describe("studio shell floating visibility SQLite preferences", () => {
       async set() {},
       async delete() {},
     });
-    await expect(ignored.save({ version: 1, hidden: ["collaboration"], autoHideWhileDrawing: false }))
+    await expect(ignored.save({ version: 1, hidden: ["collaboration"], autoHideDuringStroke: true }))
       .resolves.toMatchObject({
         status: "memory-only",
         failure: "verification-failed",

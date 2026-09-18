@@ -6,6 +6,7 @@ import {
   normalizeCreatorRoleProfile,
   type CreatorRoleProfile,
 } from "../../../web/src/shared/lib/creator-role-contract";
+import { parseRegionSettings, type RegionSettings } from "../../../web/src/shared/lib/region-settings";
 import { findCreatorMarketplaceSocialInteractionIds } from "../common/creator-marketplace-social-boundary";
 import {
   db,
@@ -35,6 +36,7 @@ export async function loadMe(uid: string) {
           id: uid,
           status: normalizeUserAccountStatus(me.status),
           creatorRoleProfile: normalizeCreatorRoleProfile(me.creatorRoleProfile),
+          regionSettings: parseRegionSettings(me.regionSettings),
         },
         ratings: {},
         reads: {},
@@ -95,6 +97,7 @@ export async function loadMe(uid: string) {
         bio: me?.bio,
         status: me?.status,
         creatorRoleProfile: normalizeCreatorRoleProfile(me?.creatorRoleProfile),
+        regionSettings: parseRegionSettings(me?.regionSettings),
       },
       ratings: Object.fromEntries(rt.map((row) => [row.titleId, fromDb(row.value)])),
       reads: Object.fromEntries(rd.map((row) => [row.titleId, row.state])),
@@ -143,6 +146,7 @@ export interface UpdateProfileInput {
   bio?: string;
   image?: string | null; // dataURL 또는 빈 문자열/ null(제거)
   creatorRoleProfile?: CreatorRoleProfile;
+  regionSettings?: RegionSettings;
 }
 
 export interface ProfileUpdateError {
@@ -174,6 +178,7 @@ export async function updateProfile(
     email: string | null;
     bio: string | null;
     creatorRoleProfile: CreatorRoleProfile;
+    regionSettings: RegionSettings | null;
   };
 } | ProfileUpdateError> {
   const patch: {
@@ -181,6 +186,7 @@ export async function updateProfile(
     bio?: string | null;
     image?: string | null;
     creatorRoleProfile?: CreatorRoleProfile;
+    regionSettings?: RegionSettings;
   } = {};
 
   if (typeof input.name === "string") {
@@ -203,6 +209,9 @@ export async function updateProfile(
   if (input.creatorRoleProfile !== undefined) {
     patch.creatorRoleProfile = normalizeCreatorRoleProfile(input.creatorRoleProfile);
   }
+  if (input.regionSettings !== undefined) {
+    patch.regionSettings = input.regionSettings;
+  }
 
   if (Object.keys(patch).length === 0) return { error: "변경할 내용이 없어요." };
 
@@ -214,6 +223,7 @@ export async function updateProfile(
     email: users.email,
     bio: users.bio,
     creatorRoleProfile: users.creatorRoleProfile,
+    regionSettings: users.regionSettings,
   });
   if (!row) return { error: "사용자를 찾을 수 없어요." };
   // 프로필 변경 즉시 세션 마이크로캐시 무효화 — 다음 요청부터 새 값을 읽는다.
@@ -222,6 +232,7 @@ export async function updateProfile(
     profile: {
       ...row,
       creatorRoleProfile: normalizeCreatorRoleProfile(row.creatorRoleProfile),
+      regionSettings: parseRegionSettings(row.regionSettings),
     },
   };
 }

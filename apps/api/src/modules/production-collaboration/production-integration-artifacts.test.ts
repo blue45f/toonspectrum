@@ -124,6 +124,7 @@ describe("production integration secret and cost boundaries", () => {
     expect(safeExternalBaseUrl("http://127.0.0.1:3000", {
       allowLoopback: true,
     })).toBe("http://127.0.0.1:3000");
+    // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
     expect(safeExternalBaseUrl("https://user:secret@example.com"))
       .toBeNull();
   });

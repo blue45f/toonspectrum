@@ -1,0 +1,1923 @@
+{
+  "schemaVersion": 1,
+  "targetCapabilityCount": 57,
+  "summary": {
+    "verified": 45,
+    "externalValidationPending": 12,
+    "incomplete": 0,
+    "repositoryImplementationComplete": true,
+    "replacementClaimAllowed": false
+  },
+  "capabilities": [
+    {
+      "id": "project-graph-scope-revision",
+      "sequence": 1,
+      "title": "ProjectGraph, ScopeRef and Artifact Revision",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-platform/studio-project-graph-adapter.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-platform/studio-project-graph-adapter.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-platform/studio-project-graph-adapter.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "transaction-document-authority",
+      "sequence": 2,
+      "title": "StudioTransaction and DocumentAuthority",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "immutable-revision-lifecycle",
+      "sequence": 3,
+      "title": "Working, checkpoint, review, approval and release lifecycle",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-foundation/studio-version-coordinates.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-foundation/studio-version-coordinates.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-foundation/studio-version-coordinates.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "capability-ledger-claim-gate",
+      "sequence": 4,
+      "title": "Capability ledger and marketing claim gate",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "packages/studio-project-model/src/capability/capability-ledger.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "packages/studio-project-model/src/capability/capability-ledger.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "packages/studio-project-model/src/__tests__/platform-integration.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "project-shell-context",
+      "sequence": 5,
+      "title": "Project shell and shared context bar",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.tsx"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/StudioProjectShellPage.integration.test.tsx"
+        }
+      ]
+    },
+    {
+      "id": "workspace-layout",
+      "sequence": 6,
+      "title": "Versioned workspace layout",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workspaces.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workspaces.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workspaces.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "wysiwyg-layout-editor",
+      "sequence": 7,
+      "title": "WYSIWYG workspace layout editor",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/studio-shell-floating-layout.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/studio-shell-floating-layout.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/studio-shell-floating-layout.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "workflow-profiles",
+      "sequence": 8,
+      "title": "Focus, Studio, Lettering and Review profiles",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workspaces.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workspaces.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workspaces-2026.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "cas-blob-store",
+      "sequence": 9,
+      "title": "Content-addressed blob store",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/api/src/modules/creator/studio-work-asset.repository.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/api/src/modules/creator/studio-work-asset.repository.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/api/src/modules/creator/studio-work-asset.repository.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "revision-local-store",
+      "sequence": 10,
+      "title": "Local revision store",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-autosave-sqlite-store.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-autosave-sqlite-store.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-autosave-sqlite-store.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "sync-outbox",
+      "sequence": 11,
+      "title": "Transactional synchronization outbox",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "cloud-revision-api",
+      "sequence": 12,
+      "title": "Cloud revision API",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-production/studio-production-server-revisions.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-production/studio-production-server-revisions.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-production/studio-production-server-revisions.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "collaboration",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-review-workflow.ts"
+        }
+      ]
+    },
+    {
+      "id": "file-space",
+      "sequence": 13,
+      "title": "Project-aware file space",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-project-file.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-project-file.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-project-file.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "version-stack-restore",
+      "sequence": 14,
+      "title": "Version stack, compare and restore",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/StudioRevisionCompareView.tsx"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/StudioRevisionCompareView.tsx"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/StudioRevisionCompareView.test.tsx"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "share-review-link",
+      "sequence": 15,
+      "title": "External share and review link",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-production/studio-review-link-url.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-production/studio-review-link-url.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-production/studio-review-link-url.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "collaboration",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-review-workflow.ts"
+        }
+      ]
+    },
+    {
+      "id": "sparse-tile-authority",
+      "sequence": 16,
+      "title": "Sparse tile document authority",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/render/studio-webgpu-sparse-tile-atlas.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/render/studio-webgpu-sparse-tile-atlas.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/render/studio-webgpu-sparse-tile-atlas.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "pen-input-pipeline",
+      "sequence": 17,
+      "title": "Low-latency pen input pipeline",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/canvas/studio-pointer-input.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/canvas/studio-pointer-input.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/canvas/studio-pointer-input.test.ts"
+        },
+        {
+          "dimension": "browser-evidence",
+          "status": "verified",
+          "reference": "scripts/verify-studio-brush-latency.mts"
+        }
+      ]
+    },
+    {
+      "id": "brush-studio",
+      "sequence": 18,
+      "title": "Brush graph and Brush Studio",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/brush-lab/brush-studio-v6-product-bridge.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/brush-lab/brush-studio-v6-product-bridge.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/brush-lab/brush-studio-v6-product-bridge.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "vector-ink",
+      "sequence": 19,
+      "title": "Editable vector ink",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-vector-ink-geometry.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-vector-ink-geometry.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-vector-ink-geometry.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "unified-layer-graph",
+      "sequence": 20,
+      "title": "Unified non-destructive layer graph",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "selection-transform",
+      "sequence": 21,
+      "title": "Selection and non-destructive transform",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/selection/studio-selection-transform-controller.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/selection/studio-selection-transform-controller.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/selection/studio-selection-transform-controller.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "adjustment-filter-graph",
+      "sequence": 22,
+      "title": "Adjustment and smart filter graph",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "frame-graph",
+      "sequence": 23,
+      "title": "Comic frame graph",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "packages/studio-project-model/src/ir/frame-graph.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "packages/studio-project-model/src/ir/frame-graph.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/render/studio-frame-graph-compositor.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "balloon-text",
+      "sequence": 24,
+      "title": "Balloon and multilingual text engine",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "packages/studio-project-model/src/ir/balloon-text-layout.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "packages/studio-project-model/src/ir/balloon-text-layout.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/comic/studio-comic-production.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "tone-effect-ruler",
+      "sequence": 25,
+      "title": "Tone, effect-line and ruler tools",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/StudioAdvancedRulerPanel.tsx"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/StudioAdvancedRulerPanel.tsx"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/StudioAdvancedRulerPanel.test.tsx"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "episode-page-manager",
+      "sequence": 26,
+      "title": "Episode and page manager",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/production-hub/production-episode-operations.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/production-hub/production-episode-operations.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/production-hub/production-episode-operations.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "platform-export",
+      "sequence": 27,
+      "title": "Platform-aware export and preflight",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/studio-platform-delivery-plan.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/studio-platform-delivery-plan.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/studio-platform-delivery-plan.test.ts"
+        },
+        {
+          "dimension": "interchange",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/studio-platform-delivery-plan.ts"
+        }
+      ]
+    },
+    {
+      "id": "import-center",
+      "sequence": 28,
+      "title": "Import center and compatibility report",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-import-compatibility-report.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-import-compatibility-report.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-import-compatibility.test.ts"
+        },
+        {
+          "dimension": "interchange",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-import-compatibility-report.ts"
+        }
+      ]
+    },
+    {
+      "id": "png-codec",
+      "sequence": 29,
+      "title": "PNG import and export codec",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/bg3d/studio-bg3d-shot-png-worker-client.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/bg3d/studio-bg3d-shot-png-worker-client.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/bg3d/studio-bg3d-shot-png-worker-client.test.ts"
+        },
+        {
+          "dimension": "interchange",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/bg3d/studio-bg3d-shot-png-worker-client.ts"
+        }
+      ]
+    },
+    {
+      "id": "psd-baseline",
+      "sequence": 30,
+      "title": "PSD baseline structure preservation",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-psd-import.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-psd-import.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-psd-import.test.ts"
+        },
+        {
+          "dimension": "interchange",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-psd-import.ts"
+        }
+      ]
+    },
+    {
+      "id": "psd-advanced",
+      "sequence": 31,
+      "title": "PSD advanced object preservation",
+      "state": "external-validation-pending",
+      "externalValidationRequired": true,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/export/studio-psd-export.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/export/studio-psd-export.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts"
+        },
+        {
+          "dimension": "interchange",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/export/studio-psd-export.ts"
+        },
+        {
+          "dimension": "external-validation",
+          "status": "pending",
+          "reference": "docs/evidence/external/psd-advanced.json",
+          "note": "Golden PSD corpus round-trip must be signed by the compatibility lab."
+        }
+      ]
+    },
+    {
+      "id": "psb-large-document",
+      "sequence": 32,
+      "title": "PSB and large document streaming",
+      "state": "external-validation-pending",
+      "externalValidationRequired": true,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/hybrid-dcc/studio-dcc-format-matrix.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/hybrid-dcc/studio-dcc-format-matrix.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-psd-import.test.ts"
+        },
+        {
+          "dimension": "interchange",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/hybrid-dcc/studio-dcc-format-matrix.ts"
+        },
+        {
+          "dimension": "external-validation",
+          "status": "pending",
+          "reference": "docs/evidence/external/psb-large-document.json",
+          "note": "Large PSB corpus and memory-soak evidence is required."
+        }
+      ]
+    },
+    {
+      "id": "clip-migration",
+      "sequence": 33,
+      "title": "Truthful CLIP migration lane",
+      "state": "external-validation-pending",
+      "externalValidationRequired": true,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-import-compatibility.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-import-compatibility.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-import-compatibility.test.ts"
+        },
+        {
+          "dimension": "interchange",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-import-compatibility.ts"
+        },
+        {
+          "dimension": "external-validation",
+          "status": "pending",
+          "reference": "docs/evidence/external/clip-migration.json",
+          "note": "CLIP support remains migration-grade until licensed corpus verification is complete."
+        }
+      ]
+    },
+    {
+      "id": "scene-graph-outliner",
+      "sequence": 34,
+      "title": "3D scene graph and outliner",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/bg3d/StudioBg3dEditorSceneGraph.tsx"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/bg3d/StudioBg3dEditorSceneGraph.tsx"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/scene-3d/studio-3d-scene-dependency-graph.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "inference-modeling",
+      "sequence": 35,
+      "title": "Direct 3D inference and modeling",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/scene-3d/studio-3d-inference-engine.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/scene-3d/studio-3d-inference-engine.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/scene-3d/studio-3d-inference-engine.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "parametric-assets",
+      "sequence": 36,
+      "title": "Parametric webtoon assets",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/scene-3d/studio-3d-dynamic-components.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/scene-3d/studio-3d-dynamic-components.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/scene-3d/studio-3d-dynamic-components.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "camera-scene-variant",
+      "sequence": 37,
+      "title": "Camera and scene variants",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/scene-3d/studio-3d-camera-cinematic-director.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/scene-3d/studio-3d-camera-cinematic-director.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/scene-3d/studio-3d-camera-cinematic-director.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "render-passes",
+      "sequence": 38,
+      "title": "Webtoon 3D render passes",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/bg3d/studio-bg3d-shot-psd.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/bg3d/studio-bg3d-shot-psd.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/bg3d/studio-bg3d-shot-psd.test.ts"
+        },
+        {
+          "dimension": "interchange",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/bg3d/studio-bg3d-shot-psd.ts"
+        }
+      ]
+    },
+    {
+      "id": "3d-live-layer",
+      "sequence": 39,
+      "title": "Revision-pinned 3D live layer",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-linked-3d-pass-cloud-sync.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-linked-3d-pass-cloud-sync.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-linked-3d-pass-cloud-sync.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "unified-asset-library",
+      "sequence": 40,
+      "title": "Unified personal, team and project asset library",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-unified-asset-library-projection.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-unified-asset-library-projection.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-unified-asset-library-projection.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "marketplace-search-preview",
+      "sequence": 41,
+      "title": "Marketplace search and asset preview",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-marketplace-search.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-marketplace-search.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-marketplace-search.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "license-ledger-lockfile",
+      "sequence": 42,
+      "title": "License ledger and asset lockfile",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "packages/studio-project-model/src/assets/asset-lockfile.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "packages/studio-project-model/src/assets/asset-lockfile.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "packages/studio-project-model/src/__tests__/platform-integration.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "seller-center",
+      "sequence": 43,
+      "title": "Marketplace seller center",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/StudioMarketplaceSellerPanel.tsx"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/StudioMarketplaceSellerPanel.tsx"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/StudioMarketplaceSellerPanel.test.tsx"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        }
+      ]
+    },
+    {
+      "id": "realtime-presence",
+      "sequence": 44,
+      "title": "Realtime project presence",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/live/studio-live-socket-transport-presence.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/live/studio-live-socket-transport-presence.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/live/StudioLiveCollaborationProvider.test.tsx"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "collaboration",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-review-workflow.ts"
+        }
+      ]
+    },
+    {
+      "id": "lease-service",
+      "sequence": 45,
+      "title": "Page, object and raster region leases",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/live/createStudioLiveResourceLeaseController.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/live/createStudioLiveResourceLeaseController.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/render/studio-raster-source-lease.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "collaboration",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-review-workflow.ts"
+        }
+      ]
+    },
+    {
+      "id": "semantic-merge-conflict",
+      "sequence": 46,
+      "title": "Semantic merge and conflict center",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workspace-three-way-merge.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workspace-three-way-merge.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workspace-three-way-merge.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "collaboration",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-review-workflow.ts"
+        }
+      ]
+    },
+    {
+      "id": "review-workflow",
+      "sequence": 47,
+      "title": "Pinned review and approval workflow",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-review-workflow.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-review-workflow.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-review-workflow.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "collaboration",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-review-workflow.ts"
+        }
+      ]
+    },
+    {
+      "id": "production-bridge",
+      "sequence": 48,
+      "title": "Production task and artifact bridge",
+      "state": "verified",
+      "externalValidationRequired": false,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/StudioProductionCocreatorBridgePanel.tsx"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-shell/StudioProductionCocreatorBridgePanel.tsx"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-production/studio-production-server-revisions.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "collaboration",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-review-workflow.ts"
+        }
+      ]
+    },
+    {
+      "id": "desktop-sync-agent",
+      "sequence": 49,
+      "title": "Desktop synchronization agent",
+      "state": "external-validation-pending",
+      "externalValidationRequired": true,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "tools/toonbridge/server.mjs"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "tools/toonbridge/server.mjs"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "tools/toonbridge/test/server.test.mjs"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "external-validation",
+          "status": "pending",
+          "reference": "docs/evidence/external/desktop-sync-agent.json",
+          "note": "Signed desktop builds and OS watcher soak evidence are required."
+        }
+      ]
+    },
+    {
+      "id": "local-folder-binding",
+      "sequence": 50,
+      "title": "Local folder binding",
+      "state": "external-validation-pending",
+      "externalValidationRequired": true,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-platform/studio-local-folder-binding.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-platform/studio-local-folder-binding.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-platform/studio-local-folder-binding.test.ts"
+        },
+        {
+          "dimension": "persistence",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "recovery",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts"
+        },
+        {
+          "dimension": "external-validation",
+          "status": "pending",
+          "reference": "docs/evidence/external/local-folder-binding.json",
+          "note": "Browser permission and desktop filesystem matrices require real-device validation."
+        }
+      ]
+    },
+    {
+      "id": "google-drive-adapter",
+      "sequence": 51,
+      "title": "Google Drive adapter",
+      "state": "external-validation-pending",
+      "externalValidationRequired": true,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/api/src/modules/personal-cloud/personal-cloud.provider.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/api/src/modules/personal-cloud/personal-cloud.provider.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/api/src/modules/personal-cloud/personal-cloud.provider.test.ts"
+        },
+        {
+          "dimension": "interchange",
+          "status": "verified",
+          "reference": "apps/api/src/modules/personal-cloud/personal-cloud.provider.ts"
+        },
+        {
+          "dimension": "external-validation",
+          "status": "pending",
+          "reference": "docs/evidence/external/google-drive-adapter.json",
+          "note": "A real Google OAuth tenant and upload/download round trip are required."
+        }
+      ]
+    },
+    {
+      "id": "dropbox-adapter",
+      "sequence": 52,
+      "title": "Dropbox adapter",
+      "state": "external-validation-pending",
+      "externalValidationRequired": true,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/api/src/modules/personal-cloud/personal-cloud.provider.ts"
+        },
+        {
+          "dimension": "product-wiring",
+          "status": "verified",
+          "reference": "apps/api/src/modules/personal-cloud/personal-cloud.provider.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/api/src/modules/personal-cloud/personal-cloud.provider.test.ts"
+        },
+        {
+          "dimension": "interchange",
+          "status": "verified",
+          "reference": "apps/api/src/modules/personal-cloud/personal-cloud.provider.ts"
+        },
+        {
+          "dimension": "external-validation",
+          "status": "pending",
+          "reference": "docs/evidence/external/dropbox-adapter.json",
+          "note": "A real Dropbox OAuth tenant and upload/download round trip are required."
+        }
+      ]
+    },
+    {
+      "id": "performance-lab",
+      "sequence": 53,
+      "title": "Input, render and long-document performance lab",
+      "state": "external-validation-pending",
+      "externalValidationRequired": true,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "scripts/verify-studio-brush-latency.mts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "scripts/verify-studio-brush-latency.test.ts"
+        },
+        {
+          "dimension": "browser-evidence",
+          "status": "verified",
+          "reference": "scripts/verify-studio-five-hour-soak.mts"
+        },
+        {
+          "dimension": "external-validation",
+          "status": "pending",
+          "reference": "docs/evidence/external/performance-lab.json",
+          "note": "Representative pen devices and long-running hardware evidence are required."
+        }
+      ]
+    },
+    {
+      "id": "file-roundtrip-lab",
+      "sequence": 54,
+      "title": "File round-trip golden corpus lab",
+      "state": "external-validation-pending",
+      "externalValidationRequired": true,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-psd-import.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-psd-import.test.ts"
+        },
+        {
+          "dimension": "browser-evidence",
+          "status": "verified",
+          "reference": "scripts/verify-blender-package-roundtrip.mts"
+        },
+        {
+          "dimension": "external-validation",
+          "status": "pending",
+          "reference": "docs/evidence/external/file-roundtrip-lab.json",
+          "note": "Licensed real-world PSD, PSB and CLIP golden corpora are required."
+        }
+      ]
+    },
+    {
+      "id": "collaboration-fault-lab",
+      "sequence": 55,
+      "title": "Collaboration fault-injection lab",
+      "state": "external-validation-pending",
+      "externalValidationRequired": true,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "tests/fault-injection/v12-runtime-fault-harness.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "tests/fault-injection/v12-runtime-fault-matrix.test.ts"
+        },
+        {
+          "dimension": "browser-evidence",
+          "status": "verified",
+          "reference": "scripts/qa-studio-browser-fault-injection.mjs"
+        },
+        {
+          "dimension": "external-validation",
+          "status": "pending",
+          "reference": "docs/evidence/external/collaboration-fault-lab.json",
+          "note": "Multi-user WAN and forced process-loss runs are required."
+        }
+      ]
+    },
+    {
+      "id": "accessibility-security-audit",
+      "sequence": 56,
+      "title": "Accessibility and security audit",
+      "state": "external-validation-pending",
+      "externalValidationRequired": true,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-accessibility-audit.ts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "apps/web/src/domains/creator/studio-accessibility-audit.test.ts"
+        },
+        {
+          "dimension": "browser-evidence",
+          "status": "verified",
+          "reference": "scripts/verify-security-advisory-exceptions.mjs"
+        },
+        {
+          "dimension": "external-validation",
+          "status": "pending",
+          "reference": "docs/evidence/external/accessibility-security-audit.json",
+          "note": "Independent accessibility and security audits are required."
+        }
+      ]
+    },
+    {
+      "id": "professional-creator-validation",
+      "sequence": 57,
+      "title": "Professional creator end-to-end validation",
+      "state": "external-validation-pending",
+      "externalValidationRequired": true,
+      "evidence": [
+        {
+          "dimension": "contract",
+          "status": "verified",
+          "reference": "scripts/verify-studio-lifecycle.mts"
+        },
+        {
+          "dimension": "automated-test",
+          "status": "verified",
+          "reference": "scripts/studio-lifecycle-verifier-policy.test.ts"
+        },
+        {
+          "dimension": "browser-evidence",
+          "status": "verified",
+          "reference": "scripts/verify-studio-lifecycle.mts"
+        },
+        {
+          "dimension": "external-validation",
+          "status": "pending",
+          "reference": "docs/evidence/external/professional-creator-validation.json",
+          "note": "A professional creator must complete and sign off an end-to-end production episode."
+        }
+      ]
+    }
+  ]
+}

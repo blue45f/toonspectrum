@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Character Shaper — deterministic SVG previews for every slot card.
  *
@@ -262,7 +266,7 @@ function EyesArt({
         <path d={`M${n(-hw * 1.05)} ${n(-eh * 2.1)} Q0 ${n(-eh * 2.75)} ${n(hw * 1.1)} ${n(-eh * 1.95)}`} fill="none" stroke={INK} strokeLinecap="round" strokeWidth={1.7} />
         <path d={shape.outline} fill={lid === "half-moon" ? INK : CANVAS} fillOpacity={lid === "half-moon" ? 0.85 : 1} stroke={INK} strokeOpacity={0.65} strokeWidth={0.8} />
         {lid === "half-moon" ? null : (
-          <g clipPath={`url(#${clipId})`}>
+          <g clipPath={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.character.shaper.preview", "en", "url(#{v0})"), { v0: String(clipId) })}>
             <circle cx={hw * 0.05} cy={0} r={irisR} fill={INK} fillOpacity={0.82} />
             <circle cx={hw * 0.05} cy={0} r={irisR * 0.45} fill={INK} />
             <circle cx={hw * 0.05 - irisR * 0.38} cy={-irisR * 0.38} r={irisR * 0.26} fill={PAPER} />
@@ -340,7 +344,7 @@ function IrisesArt({
       {Math.abs(delta) > 0.02 ? (
         <circle cx={cx} cy={cy} r={11.5} fill="none" stroke={LINE_STRONG} strokeDasharray="2 2.2" strokeWidth={1} />
       ) : null}
-      <g clipPath={`url(#${clipId})`}>
+      <g clipPath={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.character.shaper.preview", "en", "url(#{v0})"), { v0: String(clipId) })}>
         <circle cx={cx} cy={cy} r={r} fill={base} stroke={ring} strokeWidth={1.3} />
         <circle cx={cx} cy={cy} r={r * 0.68} fill={core} fillOpacity={0.85} />
         {pupil === "vertical" ? (
@@ -671,15 +675,17 @@ function HairArt({
         <ellipse cx={47.5} cy={50} rx={2} ry={2.6} />
       </g>
       <path d="M36.5 60 q3.5 2.4 7 0" fill="none" stroke={INK} strokeLinecap="round" strokeWidth={1.2} />
-      <g fill={hairFill} stroke={outline} strokeLinejoin="round" strokeWidth={1.1}>
-        {bangs.map((d) => <path key={d} d={d} />)}
-        {style === "hime" ? (
-          <>
-            <path d="M18 42 L26 40 L26 74 L18 74 Z" />
-            <path d="M54 40 L62 42 L62 74 L54 74 Z" />
-          </>
-        ) : null}
-      </g>
+      {style !== "none" ? (
+        <g data-character-hair-front="true" fill={hairFill} stroke={outline} strokeLinejoin="round" strokeWidth={1.1}>
+          {bangs.map((d) => <path key={d} d={d} />)}
+          {style === "hime" ? (
+            <>
+              <path d="M18 42 L26 40 L26 74 L18 74 Z" />
+              <path d="M54 40 L62 42 L62 74 L54 74 Z" />
+            </>
+          ) : null}
+        </g>
+      ) : null}
       {style !== "none" ? (
         <path d="M30 24 C34 20 46 19 51 22" fill="none" opacity={0.35} stroke={selected ? ACCENT : PAPER} strokeLinecap="round" strokeWidth={2.4} />
       ) : null}
@@ -708,8 +714,7 @@ function HairOriginalArt({ selected }: { readonly selected: boolean }) {
       <path d="M36.5 60 q3.5 2.4 7 0" fill="none" stroke={INK} strokeLinecap="round" strokeWidth={1.2} />
       <rect fill={RAISED} height={11} rx={5.5} stroke={LINE} width={30} x={25} y={85.5} />
       <text fill={SOFT_TEXT} fontSize={7} fontWeight={600} textAnchor="middle" x={40} y={93.5}>
-        원본
-      </text>
+        {translateCurrentStaticSourceText("domains.creator.character.shaper.character.shaper.preview", "ko", "원본")}</text>
     </>
   );
 }
@@ -1819,7 +1824,7 @@ export function CharacterSlotPreview({ spec, size = 80, selected = false, classN
       aria-label={label}
       className={cn("block shrink-0 select-none overflow-hidden", className)}
       data-character-preview={spec.kind}
-      data-character-preview-selected={selected ? "true" : undefined}
+      data-character-preview-selected={selected ? translateCurrentStaticSourceText("domains.creator.character.shaper.character.shaper.preview", "en", "true") : undefined}
       focusable="false"
       height={width * 1.25}
       role="img"

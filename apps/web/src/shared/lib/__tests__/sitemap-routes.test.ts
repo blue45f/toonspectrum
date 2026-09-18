@@ -9,6 +9,10 @@ describe("sitemap static routes", () => {
   const script = readFileSync(join(process.cwd(), "scripts/build-static-catalog.ts"), "utf8");
   const staticRoutes = script.match(/const STATIC_ROUTES = \[([\s\S]*?)\];/)?.[1] ?? "";
 
+  it("keeps the Remotion brand film in the sitemap static routes", () => {
+    expect(staticRoutes).toContain('"/brand-film"');
+  });
+
   it("keeps the creator board (/create) in the sitemap static routes", () => {
     expect(staticRoutes).toContain('"/create"');
   });
@@ -29,6 +33,8 @@ describe("sitemap static routes", () => {
       '"/about/technology"',
       '"/about/technology/story"',
       '"/about/technology/guides"',
+      '"/about/technology/references"',
+      '"/about/technology/field-notes"',
       '"/about/technology/deck"',
       '"/about/technology/videos"',
       '"/about/technology/licenses"',

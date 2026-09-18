@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   Captions,
   Check,
@@ -559,10 +563,10 @@ export function StudioAnimaticTimelinePanel({
 
   return (
     <section
-      aria-label="웹툰 애니매틱 타임라인"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "웹툰 애니매틱 타임라인")}
       data-studio-animatic="local-only"
       data-studio-animatic-authority={
-        persistenceTarget ? "sqlite" : storageTarget ? "sync-adapter" : "memory"
+        persistenceTarget ? translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "en", "sqlite") : storageTarget ? translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "en", "sync-adapter") : translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "en", "memory")
       }
       aria-busy={importBusy || persistenceBusy || workspaceStatus?.busy}
       className={cx(
@@ -574,17 +578,15 @@ export function StudioAnimaticTimelinePanel({
         <div className="min-w-0">
           <h2 className="flex items-center gap-1.5 text-sm font-bold text-fg">
             <Play size={15} className="text-accent" aria-hidden />
-            웹툰 애니매틱
-          </h2>
+            {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "웹툰 애니매틱")}</h2>
           <p className="mt-0.5 text-[0.63rem] leading-relaxed text-fg-3">
-            페이지·컷의 타이밍과 카메라 동선을 브라우저에서 검수합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "페이지·컷의 타이밍과 카메라 동선을 브라우저에서 검수합니다.")}</p>
         </div>
         {onClose ? (
           <button
             type="button"
             onClick={onClose}
-            aria-label="웹툰 애니매틱 닫기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "웹툰 애니매틱 닫기")}
             className="grid size-11 shrink-0 place-items-center rounded-xl border border-line text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             <X size={15} aria-hidden />
@@ -596,7 +598,7 @@ export function StudioAnimaticTimelinePanel({
         {workspaceControls}
         {workspaceStatus ? (
           <p role="status" className="text-[0.7rem] text-fg-3">
-            {workspaceStatus.error ?? (workspaceStatus.busy ? "스토리보드와 미디어를 준비하고 저장하는 중…" : "스토리보드와 미디어를 이 기기에 저장했습니다.")}
+            {workspaceStatus.error ?? (workspaceStatus.busy ? translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "스토리보드와 미디어를 준비하고 저장하는 중…") : translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "스토리보드와 미디어를 이 기기에 저장했습니다."))}
           </p>
         ) : (
         <div
@@ -612,15 +614,13 @@ export function StudioAnimaticTimelinePanel({
           <p className="flex items-center gap-1 font-semibold">
             <VolumeX size={12} aria-hidden />
             {storageUnavailable
-              ? "현재 탭의 무음 미리보기"
+              ? translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "현재 탭의 무음 미리보기")
               : persistenceTarget
-                ? "로컬 SQL 무음 미리보기"
-                : "브라우저 로컬 무음 미리보기"}
+                ? translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "로컬 SQL 무음 미리보기")
+                : translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "브라우저 로컬 무음 미리보기")}
           </p>
           <p className="mt-0.5">
-            음성통화·서버 스트리밍·AI 요청 없이 타이밍 메타데이터만
-            처리합니다. 서버·팀원·다른 기기에는 자동 동기화하지 않습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "음성통화·서버 스트리밍·AI 요청 없이 타이밍 메타데이터만 처리합니다. 서버·팀원·다른 기기에는 자동 동기화하지 않습니다.")}</p>
           {panelState.storageError ? (
             <p className="mt-1">{panelState.storageError}</p>
           ) : null}
@@ -633,9 +633,7 @@ export function StudioAnimaticTimelinePanel({
             className="flex items-start gap-1.5 rounded-xl border border-warn/35 bg-warn/10 px-2.5 py-2 text-[0.65rem] leading-relaxed text-warn"
           >
             <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden />
-            시스템의 동작 줄이기 설정을 따라 자동 재생·전환·카메라 보간을
-            끕니다. 타임라인을 직접 스크럽해 컷별 정지 화면을 확인하세요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "시스템의 동작 줄이기 설정을 따라 자동 재생·전환·카메라 보간을 끕니다. 타임라인을 직접 스크럽해 컷별 정지 화면을 확인하세요.")}</p>
         ) : null}
 
         {panelState.documentError ? (
@@ -650,10 +648,10 @@ export function StudioAnimaticTimelinePanel({
         {animatic && plan ? (
           <>
             <section
-              aria-label="애니매틱 미리보기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "애니매틱 미리보기")}
               data-studio-animatic-preview={animatic.previewMode}
               data-reduced-motion={
-                effectiveReducedMotion ? "true" : "false"
+                effectiveReducedMotion ? translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "en", "false")
               }
               className="overflow-hidden rounded-2xl border border-line bg-canvas"
             >
@@ -677,8 +675,8 @@ export function StudioAnimaticTimelinePanel({
                           </p>
                           <p className="mt-1 text-[0.65rem] text-fg-3">
                             {activeSegment.cutId
-                              ? `컷 ${activeSegment.cutId}`
-                              : "페이지 전체"}
+                              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "컷 {v0}"), { v0: String(activeSegment.cutId) })
+                              : translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "페이지 전체")}
                           </p>
                         </div>
                       </div>
@@ -686,23 +684,22 @@ export function StudioAnimaticTimelinePanel({
                   </div>
                 ) : (
                   <div className="grid h-full place-items-center text-xs text-fg-3">
-                    미리 볼 페이지·컷이 없습니다.
-                  </div>
+                    {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "미리 볼 페이지·컷이 없습니다.")}</div>
                 )}
                 {sample ? (
                   <div className="pointer-events-none absolute inset-x-2 bottom-2 flex flex-wrap items-center justify-between gap-1 rounded-lg bg-panel/85 px-2 py-1 text-[0.6rem] tabular-nums text-fg-2 backdrop-blur">
                     <span>
-                      {sample.transitionKind} · 줌{" "}
+                      {sample.transitionKind} {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "· 줌")}{" "}
                       {sample.camera.zoom.toFixed(2)}×
                     </span>
-                    <span>스크롤 Y {Math.round(sample.scrollY)}px</span>
+                    <span>{translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "스크롤 Y ")}{Math.round(sample.scrollY)}px</span>
                   </div>
                 ) : null}
               </div>
             </section>
 
             <section
-              aria-label="애니매틱 재생 제어"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "애니매틱 재생 제어")}
               className="space-y-2 rounded-xl border border-line bg-card/45 p-2.5"
             >
               <div className="grid grid-cols-[2.75rem_2.75rem_1fr] items-center gap-1.5">
@@ -712,7 +709,7 @@ export function StudioAnimaticTimelinePanel({
                   disabled={
                     effectiveReducedMotion || plan.totalDurationMs <= 0
                   }
-                  aria-label={playing ? "애니매틱 일시 정지" : "애니매틱 재생"}
+                  aria-label={playing ? translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "애니매틱 일시 정지") : translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "애니매틱 재생")}
                   className="grid size-11 place-items-center rounded-xl bg-accent text-on-accent transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   {playing ? (
@@ -732,7 +729,7 @@ export function StudioAnimaticTimelinePanel({
                         : "반복 재생을 켰습니다."
                     )
                   }
-                  aria-label="애니매틱 반복 재생"
+                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "애니매틱 반복 재생")}
                   aria-pressed={animatic.loop}
                   className={cx(
                     "grid size-11 place-items-center rounded-xl border transition-colors",
@@ -751,7 +748,7 @@ export function StudioAnimaticTimelinePanel({
                     step={Math.max(1, Math.round(1_000 / plan.fps))}
                     value={safePlayheadMs}
                     onChange={(event) => scrub(Number(event.target.value))}
-                    aria-label="애니매틱 재생헤드"
+                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "애니매틱 재생헤드")}
                     className="h-11 w-full cursor-ew-resize accent-accent"
                   />
                 </div>
@@ -762,20 +759,18 @@ export function StudioAnimaticTimelinePanel({
                   {formatDuration(plan.totalDurationMs)}
                 </span>
                 <span>
-                  {plan.frameCount.toLocaleString("ko-KR")}프레임 ·{" "}
+                  {plan.frameCount.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "프레임 ·")}{" "}
                   {plan.fps}fps
                 </span>
               </div>
             </section>
 
-            <section aria-label="모바일 가로 스크롤 애니매틱 타임라인">
+            <section aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "모바일 가로 스크롤 애니매틱 타임라인")}>
               <div className="mb-1.5 flex items-center justify-between gap-2">
                 <p className="text-[0.68rem] font-semibold text-fg">
-                  페이지·컷 타임라인
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "페이지·컷 타임라인")}</p>
                 <span className="text-[0.6rem] text-fg-4">
-                  좌우로 밀어 탐색
-                </span>
+                  {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "좌우로 밀어 탐색")}</span>
               </div>
               <div
                 data-studio-animatic-horizontal-timeline="true"
@@ -794,7 +789,7 @@ export function StudioAnimaticTimelinePanel({
                         type="button"
                         onClick={() => selectAndScrub(segment.id)}
                         aria-pressed={selected}
-                        aria-label={`${segment.label} 선택하고 스크럽`}
+                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "{v0} 선택하고 스크럽"), { v0: String(segment.label) })}
                         className={cx(
                           "relative min-h-[5.5rem] shrink-0 snap-start overflow-hidden rounded-xl border p-2 text-left transition-colors",
                           selected
@@ -814,10 +809,10 @@ export function StudioAnimaticTimelinePanel({
                           {segment.transition.kind}
                         </span>
                         <span className="mt-1 block text-[0.58rem] text-fg-4">
-                          cue {segment.cues.length}개 ·{" "}
+                          {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "en", "cue ")}{segment.cues.length}{translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "개 ·")}{" "}
                           {segmentPlan
                             ? `${segmentPlan.startFrame + 1}–${segmentPlan.endFrame + 1}f`
-                            : "예산 초과"}
+                            : translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "예산 초과")}
                         </span>
                         {segment.cues.map((cue) => (
                           <span
@@ -846,12 +841,11 @@ export function StudioAnimaticTimelinePanel({
             {timelineExtras}
 
             <section
-              aria-label="애니매틱 전체 설정"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "애니매틱 전체 설정")}
               className="grid gap-2 rounded-xl border border-line bg-card/45 p-2.5 sm:grid-cols-2"
             >
               <label className="space-y-1 text-[0.66rem] font-medium text-fg-3">
-                미리보기 FPS
-                <select
+                {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "미리보기 FPS")}<select
                   value={animatic.fps}
                   onChange={(event) =>
                     updateDocument(
@@ -878,8 +872,7 @@ export function StudioAnimaticTimelinePanel({
                 </select>
               </label>
               <label className="space-y-1 text-[0.66rem] font-medium text-fg-3">
-                미리보기 방식
-                <select
+                {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "미리보기 방식")}<select
                   value={animatic.previewMode}
                   onChange={(event) =>
                     updateDocument(
@@ -893,25 +886,22 @@ export function StudioAnimaticTimelinePanel({
                   }
                   className={fieldClass}
                 >
-                  <option value="cuts">컷 전환</option>
-                  <option value="vertical-scroll">세로 스크롤</option>
+                  <option value="cuts">{translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "컷 전환")}</option>
+                  <option value="vertical-scroll">{translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "세로 스크롤")}</option>
                 </select>
               </label>
               <div className="rounded-xl border border-line bg-panel px-2.5 py-2 text-[0.63rem] leading-relaxed text-fg-3 sm:col-span-2">
                 <p className="flex items-center gap-1 font-semibold text-fg-2">
                   <Gauge size={12} aria-hidden />
-                  예산
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "예산")}</p>
                 <p className="mt-0.5">
-                  남은 길이 {formatDuration(plan.remainingDurationMs)} · 남은
-                  프레임 {plan.remainingFrames.toLocaleString("ko-KR")}개
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "남은 길이 ")}{formatDuration(plan.remainingDurationMs)} {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "· 남은 프레임")}{plan.remainingFrames.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "개")}</p>
               </div>
             </section>
 
             {selectedSegment ? (
               <section
-                aria-label="선택한 애니매틱 컷 설정"
+                aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "선택한 애니매틱 컷 설정")}
                 className="space-y-3 rounded-xl border border-line bg-card/45 p-2.5"
               >
                 <div>
@@ -922,20 +912,19 @@ export function StudioAnimaticTimelinePanel({
                     {selectedSegment.pageId}
                     {selectedSegment.cutId
                       ? ` · ${selectedSegment.cutId}`
-                      : " · 페이지 전체"}
+                      : translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", " · 페이지 전체")}
                   </p>
                 </div>
 
                 <div className="grid gap-2 sm:grid-cols-3">
                   <label className="space-y-1 text-[0.66rem] font-medium text-fg-3">
-                    Hold (ms)
-                    <input
+                    {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "en", "Hold (ms)")}<input
                       type="number"
                       min={250}
                       max={30_000}
                       step={50}
                       value={selectedSegment.holdMs}
-                      aria-label="선택 컷 hold 밀리초"
+                      aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "선택 컷 hold 밀리초")}
                       onChange={(event) =>
                         updateDocument(
                           (current) =>
@@ -951,10 +940,9 @@ export function StudioAnimaticTimelinePanel({
                     />
                   </label>
                   <label className="space-y-1 text-[0.66rem] font-medium text-fg-3">
-                    전환
-                    <select
+                    {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "전환")}<select
                       value={selectedSegment.transition.kind}
-                      aria-label="선택 컷 전환"
+                      aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "선택 컷 전환")}
                       onChange={(event) =>
                         updateDocument(
                           (current) =>
@@ -979,15 +967,14 @@ export function StudioAnimaticTimelinePanel({
                     </select>
                   </label>
                   <label className="space-y-1 text-[0.66rem] font-medium text-fg-3">
-                    전환 길이 (ms)
-                    <input
+                    {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "전환 길이 (ms)")}<input
                       type="number"
                       min={100}
                       max={5_000}
                       step={50}
                       value={selectedSegment.transition.durationMs}
                       disabled={selectedSegment.transition.kind === "cut"}
-                      aria-label="선택 컷 전환 밀리초"
+                      aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "선택 컷 전환 밀리초")}
                       onChange={(event) =>
                         updateDocument(
                           (current) =>
@@ -1011,8 +998,7 @@ export function StudioAnimaticTimelinePanel({
                 <div className="space-y-2 border-t border-line/60 pt-3">
                   <p className="flex items-center gap-1 text-[0.68rem] font-semibold text-fg">
                     <ZoomIn size={12} aria-hidden />
-                    카메라 시작·끝 키프레임
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "카메라 시작·끝 키프레임")}</p>
                   {(["start", "end"] as const).map((endpoint) => {
                     const keyframe =
                       endpoint === "start"
@@ -1025,7 +1011,7 @@ export function StudioAnimaticTimelinePanel({
                         className="grid gap-2 rounded-xl border border-line bg-panel/65 p-2 sm:grid-cols-3"
                       >
                         <legend className="px-1 text-[0.62rem] font-semibold text-fg-3">
-                          {endpoint === "start" ? "시작" : "끝"}
+                          {endpoint === "start" ? translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "시작") : translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "끝")}
                         </legend>
                         {(
                           [
@@ -1045,7 +1031,7 @@ export function StudioAnimaticTimelinePanel({
                               max={max}
                               step={step}
                               value={keyframe[field]}
-                              aria-label={`${endpoint === "start" ? "시작" : "끝"} 카메라 ${label}`}
+                              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "{v0} 카메라 {v1}"), { v0: String(endpoint === "start" ? "시작" : "끝"), v1: String(label) })}
                               onChange={(event) =>
                                 updateDocument(
                                   (current) =>
@@ -1073,7 +1059,7 @@ export function StudioAnimaticTimelinePanel({
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="flex items-center gap-1 text-[0.68rem] font-semibold text-fg">
                       <Captions size={12} aria-hidden />
-                      대사·효과음 cue ({selectedSegment.cues.length}/
+                      {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "대사·효과음 cue (")}{selectedSegment.cues.length}/
                       {STUDIO_ANIMATIC_MAX_CUES_PER_SEGMENT})
                     </p>
                     <div className="flex gap-1.5">
@@ -1115,8 +1101,7 @@ export function StudioAnimaticTimelinePanel({
                   </div>
                   {selectedSegment.cues.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-line px-2.5 py-3 text-center text-[0.64rem] text-fg-4">
-                      cue는 소리를 재생하지 않고 타이밍 메타데이터만 표시합니다.
-                    </p>
+                      {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "cue는 소리를 재생하지 않고 타이밍 메타데이터만 표시합니다.")}</p>
                   ) : (
                     <ul className="space-y-2">
                       {selectedSegment.cues.map((cue) => (
@@ -1126,7 +1111,7 @@ export function StudioAnimaticTimelinePanel({
                         >
                           <select
                             value={cue.kind}
-                            aria-label={`${cue.id} cue 종류`}
+                            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "{v0} cue 종류"), { v0: String(cue.id) })}
                             onChange={(event) =>
                               updateDocument(
                                 (current) =>
@@ -1144,8 +1129,8 @@ export function StudioAnimaticTimelinePanel({
                             }
                             className={fieldClass}
                           >
-                            <option value="dialogue">대사</option>
-                            <option value="sfx">효과음</option>
+                            <option value="dialogue">{translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "대사")}</option>
+                            <option value="sfx">{translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "효과음")}</option>
                           </select>
                           <input
                             type="number"
@@ -1156,7 +1141,7 @@ export function StudioAnimaticTimelinePanel({
                             }
                             step={50}
                             value={cue.offsetMs}
-                            aria-label={`${cue.id} cue 밀리초`}
+                            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "{v0} cue 밀리초"), { v0: String(cue.id) })}
                             onChange={(event) =>
                               updateDocument(
                                 (current) =>
@@ -1174,7 +1159,7 @@ export function StudioAnimaticTimelinePanel({
                           <input
                             type="text"
                             value={cue.text}
-                            aria-label={`${cue.id} cue 내용`}
+                            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "{v0} cue 내용"), { v0: String(cue.id) })}
                             onChange={(event) =>
                               updateDocument(
                                 (current) =>
@@ -1202,7 +1187,7 @@ export function StudioAnimaticTimelinePanel({
                                 "cue를 삭제했습니다."
                               )
                             }
-                            aria-label={`${cue.id} cue 삭제`}
+                            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "{v0} cue 삭제"), { v0: String(cue.id) })}
                             className="grid size-11 place-items-center rounded-xl border border-bad/30 bg-bad/5 text-bad transition-colors hover:bg-bad/10"
                           >
                             <Trash2 size={13} aria-hidden />
@@ -1211,8 +1196,8 @@ export function StudioAnimaticTimelinePanel({
                             <input
                               type="text"
                               value={cue.speaker ?? ""}
-                              placeholder="화자 (선택)"
-                              aria-label={`${cue.id} cue 화자`}
+                              placeholder={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "화자 (선택)")}
+                              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "{v0} cue 화자"), { v0: String(cue.id) })}
                               onChange={(event) =>
                                 updateDocument(
                                   (current) =>
@@ -1240,7 +1225,7 @@ export function StudioAnimaticTimelinePanel({
 
         {notice ? (
           <p
-            role={notice.tone === "bad" ? "alert" : "status"}
+            role={notice.tone === "bad" ? translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "en", "status")}
             className={cx(
               "rounded-xl border px-2.5 py-2 text-[0.65rem] leading-relaxed",
               notice.tone === "good"
@@ -1263,8 +1248,7 @@ export function StudioAnimaticTimelinePanel({
             className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-line bg-panel px-2.5 text-[0.66rem] font-medium text-fg-2 transition-colors hover:bg-raised"
           >
             <RefreshCcw size={12} aria-hidden />
-            페이지·컷 다시 불러오기
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "페이지·컷 다시 불러오기")}</button>
           <div className="flex flex-wrap gap-1.5">
             <input
               id={importInputId}
@@ -1286,7 +1270,7 @@ export function StudioAnimaticTimelinePanel({
               )}
             >
               <FileUp size={12} aria-hidden />
-              {importBusy ? "가져오는 중…" : "JSON 가져오기"}
+              {importBusy ? translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "가져오는 중…") : translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "JSON 가져오기")}
             </label>
             <button
               type="button"
@@ -1295,14 +1279,12 @@ export function StudioAnimaticTimelinePanel({
               className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-line bg-panel px-2.5 text-[0.66rem] font-medium text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Download size={12} aria-hidden />
-              JSON 내보내기
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "JSON 내보내기")}</button>
           </div>
         </div>
         <p className="mt-1.5 flex items-center gap-1 text-[0.58rem] leading-relaxed text-fg-4">
           <Check size={10} aria-hidden />
-          편집 결정과 cue만 저장하며 이미지·음성·영상 데이터는 복제하지 않습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelinePanel", "ko", "편집 결정과 cue만 저장하며 이미지·음성·영상 데이터는 복제하지 않습니다.")}</p>
       </footer>
     </section>
   );

@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   LoaderCircle,
   MessageSquare,
   ShieldCheck,
@@ -26,12 +30,11 @@ export function MarketSocialProofBar({
     return (
       <div
         role="status"
-        aria-label="평점과 댓글 요약 불러오는 중"
+        aria-label={translateCurrentStaticSourceText("domains.market.components.MarketSocialProofBar", "ko", "평점과 댓글 요약 불러오는 중")}
         className="mt-4 inline-flex min-h-9 items-center gap-2 rounded-lg border border-line/70 bg-card/70 px-3 text-xs text-fg-3"
       >
         <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
-        활용 평가와 질문 동기화 중
-      </div>
+        {translateCurrentStaticSourceText("domains.market.components.MarketSocialProofBar", "ko", "활용 평가와 질문 동기화 중")}</div>
     );
   }
 
@@ -40,7 +43,7 @@ export function MarketSocialProofBar({
   const hasReviews = data.stats.totalCount > 0;
   return (
     <nav
-      aria-label="이 리소스의 평가와 질문 요약"
+      aria-label={translateCurrentStaticSourceText("domains.market.components.MarketSocialProofBar", "ko", "이 리소스의 평가와 질문 요약")}
       className="mt-4 flex flex-wrap items-center gap-1.5"
     >
       {/*
@@ -51,8 +54,8 @@ export function MarketSocialProofBar({
       <a
         href="#market-reviews-heading"
         aria-label={hasReviews
-          ? `평점 ${data.stats.average.toFixed(1)} · 리뷰 ${data.stats.totalCount}개`
-          : `평가 전 · 리뷰 ${data.stats.totalCount}개`}
+          ? formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketSocialProofBar", "ko", "평점 {v0} · 리뷰 {v1}개"), { v0: String(data.stats.average.toFixed(1)), v1: String(data.stats.totalCount) })
+          : formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketSocialProofBar", "ko", "평가 전 · 리뷰 {v0}개"), { v0: String(data.stats.totalCount) })}
         className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-card/80 px-3 text-xs font-semibold text-fg transition-colors hover:border-accent/50 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
       >
         <Star
@@ -65,35 +68,33 @@ export function MarketSocialProofBar({
           aria-hidden="true"
         />
         <span className="numeral tnum">
-          {hasReviews ? data.stats.average.toFixed(1) : "평가 전"}
+          {hasReviews ? data.stats.average.toFixed(1) : translateCurrentStaticSourceText("domains.market.components.MarketSocialProofBar", "ko", "평가 전")}
         </span>
         <span className="font-normal text-fg-3">
-          {data.stats.totalCount}개
-        </span>
+          {data.stats.totalCount}{translateCurrentStaticSourceText("domains.market.components.MarketSocialProofBar", "ko", "개")}</span>
       </a>
       <a
         href="#market-reviews-heading"
-        aria-label={`추천 ${data.stats.recommendPercentage}%`}
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketSocialProofBar", "ko", "추천 {v0}%"), { v0: String(data.stats.recommendPercentage) })}
         className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-card/80 px-3 text-xs font-semibold text-fg transition-colors hover:border-accent/50 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
       >
         <ThumbsUp className="size-3.5 text-good" aria-hidden="true" />
         <span className="numeral tnum">{data.stats.recommendPercentage}%</span>
-        <span className="font-normal text-fg-3">추천</span>
+        <span className="font-normal text-fg-3">{translateCurrentStaticSourceText("domains.market.components.MarketSocialProofBar", "ko", "추천")}</span>
       </a>
       <a
         href="#market-comments-heading"
-        aria-label={`질문·답글 ${data.totalCommentCount}개`}
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketSocialProofBar", "ko", "질문·답글 {v0}개"), { v0: String(data.totalCommentCount) })}
         className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-card/80 px-3 text-xs font-semibold text-fg transition-colors hover:border-accent/50 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
       >
         <MessageSquare className="size-3.5 text-accent" aria-hidden="true" />
         <span className="numeral tnum">{data.totalCommentCount}</span>
-        <span className="font-normal text-fg-3">질문·답글</span>
+        <span className="font-normal text-fg-3">{translateCurrentStaticSourceText("domains.market.components.MarketSocialProofBar", "ko", "질문·답글")}</span>
       </a>
       {data.viewer.studioInstallVerified ? (
         <span className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-good/30 bg-good/10 px-3 text-xs font-semibold text-good">
           <ShieldCheck className="size-3.5" aria-hidden="true" />
-          내 계정 Studio 사용 인증
-        </span>
+          {translateCurrentStaticSourceText("domains.market.components.MarketSocialProofBar", "ko", "내 계정 Studio 사용 인증")}</span>
       ) : null}
     </nav>
   );

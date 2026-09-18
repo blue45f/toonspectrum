@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 // AI 자동 채색 패널 — 선택 선화 이미지를 텍스트 지시로 채색.
 // Presentation only; colorize + notice gate owned by parent.
 import { Loader2, Wand2 } from "lucide-react";
@@ -33,8 +36,7 @@ export function StudioAiColorizePanel({
     >
       <div className="flex items-center gap-1.5 text-sm font-bold text-fg">
         <Wand2 size={14} className="text-accent" aria-hidden />
-        AI 자동 채색
-      </div>
+        {translateCurrentStaticSourceText("domains.creator.ai.StudioAiColorizePanel", "ko", "AI 자동 채색")}</div>
 
       {!configured ? (
         <AiRecoveryNotice
@@ -70,7 +72,7 @@ export function StudioAiColorizePanel({
         onKeyDown={(e) => {
           if (e.key === "Enter" && canRun) onColorize();
         }}
-        placeholder="예: 파스텔톤 웹툰 셀 채색, 부드러운 그림자"
+        placeholder={translateCurrentStaticSourceText("domains.creator.ai.StudioAiColorizePanel", "ko", "예: 파스텔톤 웹툰 셀 채색, 부드러운 그림자")}
         disabled={!configured || busy}
         className="w-full rounded-lg border border-line bg-panel px-2.5 py-2 text-[0.68rem] text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent disabled:opacity-60"
       />
@@ -86,7 +88,7 @@ export function StudioAiColorizePanel({
         )}
       >
         {busy ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Wand2 size={14} aria-hidden />}
-        {busy ? "채색하는 중…" : "선택 이미지 채색"}
+        {busy ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiColorizePanel", "ko", "채색하는 중…") : translateCurrentStaticSourceText("domains.creator.ai.StudioAiColorizePanel", "ko", "선택 이미지 채색")}
       </button>
 
       {error ? (
