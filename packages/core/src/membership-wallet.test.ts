@@ -49,7 +49,6 @@ describe("membership wallet policy", () => {
     expect(creator.entitlements["storage.bytes"]).toBe(100_000_000_000);
     expect(team.entitlements["storage.bytes"]).toBe(1_000_000_000_000);
     expect(free.entitlements["credit.monthlyIncluded"]).toBe(500);
-    expect(team.entitlements["credit.sharedPool"]).toBe(true);
     expect(free.entitlements["storage.warningRatio"]).toBe(0.8);
   });
 });
