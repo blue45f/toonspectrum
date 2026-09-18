@@ -21,6 +21,8 @@ export interface HuddleSnapshot extends HuddleState {
   availablePeers: number; error: string | null; closed: boolean;
   cameraFacing: HuddleCameraFacingMode;
 }
+type HuddleSignalPacket = Extract<HuddlePacket, { kind: "description" | "ice" }>;
+
 interface Link {
   pc: RTCPeerConnection; audio: RTCRtpSender; video: RTCRtpSender;
   makingOffer: boolean; ignoreOffer: boolean; settingAnswer: boolean;
@@ -42,6 +44,7 @@ export class StudioP2pHuddleController {
   private readonly epoch: string;
   private readonly peers = new Map<string, HuddlePeer>();
   private readonly links = new Map<string, Link>();
+  private readonly deferredSignals = new Map<string, HuddleSignalPacket[]>();
   private mediaPeerScope: Set<string> | null = null;
   private readonly blocked = new Set<string>();
   private readonly seen = new Set<string>();
@@ -132,7 +135,10 @@ export class StudioP2pHuddleController {
     if (!peer || peer.epoch !== packet.epoch) return;
     if (packet.kind === "left") { this.removePeer(id); this.emit(); return; }
     if (packet.kind === "description" || packet.kind === "ice") {
-      if (packet.toEpoch === this.epoch) this.enqueueSignal(id, packet);
+      if (packet.toEpoch === this.epoch) {
+        if (this.isMediaPeerAllowed(id)) this.enqueueSignal(id, packet);
+        else this.deferSignal(id, packet);
+      }
       return;
     }
     if (packet.kind === "ack") {
@@ -203,10 +209,11 @@ export class StudioP2pHuddleController {
       if (!this.isMediaPeerAllowed(id)) this.closeLink(id);
     }
     for (const [id, peer] of this.peers) {
-      if (this.isMediaPeerAllowed(id)
-        && (!peer.muted || peer.camera || peer.sharing || this.audioTrack || this.videoTrack)) {
+      if (!this.isMediaPeerAllowed(id)) continue;
+      if (!peer.muted || peer.camera || peer.sharing || this.audioTrack || this.videoTrack) {
         this.ensureLink(id);
       }
+      this.flushDeferredSignals(id);
     }
     this.emit();
   }
@@ -318,7 +325,20 @@ export class StudioP2pHuddleController {
       }
     }
   }
-  private enqueueSignal(id: string, packet: HuddlePacket & { kind: "description" | "ice" }): void {
+  private deferSignal(id: string, packet: HuddleSignalPacket): void {
+    const queue = this.deferredSignals.get(id) ?? [];
+    if (queue.length >= 96) queue.shift();
+    queue.push(packet);
+    this.deferredSignals.set(id, queue);
+  }
+  private flushDeferredSignals(id: string): void {
+    if (!this.isMediaPeerAllowed(id)) return;
+    const queue = this.deferredSignals.get(id);
+    if (!queue?.length) return;
+    this.deferredSignals.delete(id);
+    for (const packet of queue) this.enqueueSignal(id, packet);
+  }
+  private enqueueSignal(id: string, packet: HuddleSignalPacket): void {
     const link = this.ensureLink(id);
     if (!link || link.pendingSignals >= 96) return;
     link.pendingSignals += 1;
@@ -438,6 +458,7 @@ export class StudioP2pHuddleController {
   }
   private removePeer(id: string): void {
     this.closeLink(id);
+    this.deferredSignals.delete(id);
     this.peers.delete(id); this.inboundChat.delete(id);
   }
   close(): void {
@@ -449,6 +470,7 @@ export class StudioP2pHuddleController {
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null; this.unsubscribe?.(); this.unsubscribe = null;
     for (const id of [...this.peers.keys()]) this.removePeer(id);
+    this.deferredSignals.clear();
     this.messages.length = 0; this.seen.clear(); this.blocked.clear();
     this.emit(); this.listeners.clear();
   }

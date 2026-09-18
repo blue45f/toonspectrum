@@ -237,6 +237,56 @@ describe("P2P huddle consent and delivery", () => {
     expect(controller.snapshot().error).toContain("복구");
   });
 
+  it("replays a deferred offer when a proximity peer becomes media-eligible", async () => {
+    let inbound: ((sender: StudioLiveParticipant, raw: string) => void) | null = null;
+    const replaceTrack = vi.fn(async () => undefined);
+    const setRemoteDescription = vi.fn(async () => undefined);
+    const peer = {
+      connectionState: "new",
+      signalingState: "stable",
+      localDescription: null,
+      remoteDescription: null,
+      addTransceiver: vi.fn(() => ({ sender: { replaceTrack } })),
+      setLocalDescription: vi.fn(async () => undefined),
+      setRemoteDescription,
+      addIceCandidate: vi.fn(async () => undefined),
+      close: vi.fn(),
+      onicecandidate: null,
+      ontrack: null,
+      onnegotiationneeded: null,
+      onconnectionstatechange: null,
+    } as unknown as RTCPeerConnection;
+    const createPeerConnection = vi.fn(() => peer);
+    const port: StudioLiveDirectPort = {
+      getPeers: () => [B],
+      subscribe: (listener) => { inbound = listener; return () => { inbound = null; }; },
+      send: () => true,
+    };
+    const controller = new StudioP2pHuddleController(A, port, {
+      createPeerConnection,
+      id: () => "epoch-a",
+    });
+    sessions.push(controller);
+    controller.start();
+    controller.setMediaPeerScope([]);
+    inbound?.(B, JSON.stringify({
+      kind: "state", epoch: "epoch-b", muted: true, camera: true, sharing: false, hand: false,
+    }));
+    inbound?.(B, JSON.stringify({
+      kind: "description", epoch: "epoch-b", toEpoch: "epoch-a", type: "offer", sdp: "offer-sdp",
+    }));
+
+    expect(createPeerConnection).not.toHaveBeenCalled();
+    expect(setRemoteDescription).not.toHaveBeenCalled();
+
+    controller.setMediaPeerScope(["b"]);
+
+    await vi.waitFor(() => {
+      expect(createPeerConnection).toHaveBeenCalledOnce();
+      expect(setRemoteDescription).toHaveBeenCalledWith({ type: "offer", sdp: "offer-sdp" });
+    });
+  });
+
   it("creates media peer connections only for the current proximity scope", () => {
     const inboundRef: { current: ((sender: StudioLiveParticipant, raw: string) => void) | null } = { current: null };
     const close = vi.fn();

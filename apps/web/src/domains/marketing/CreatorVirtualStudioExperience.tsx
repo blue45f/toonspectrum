@@ -66,7 +66,7 @@ const ROOMS = [
     en: "Creator Lounge",
     subEn: "Lounge · casual conversation",
     href: "/community",
-    image: "/assets/studio/backgrounds/webtoon_cafe.jpg",
+    image: "/assets/3d/environments/refined-v6/thumbnails/stylized_cafe_interior.png",
     icon: MessageCircle,
   },
   {
@@ -76,7 +76,7 @@ const ROOMS = [
     en: "Writers Room",
     subEn: "Story · synopsis and scripts",
     href: "/story-lab",
-    image: "/assets/studio/backgrounds/webtoon_classroom.jpg",
+    image: "/assets/3d/environments/expansion-v1/thumbnails/library_reading_room.png",
     icon: BookOpenText,
   },
   {
@@ -86,7 +86,7 @@ const ROOMS = [
     en: "Storyboard Wall",
     subEn: "Boards · scenes and panel flow",
     href: "/studio/new",
-    image: "/assets/studio/backgrounds/webtoon_creator_room.png",
+    image: "/assets/3d/environments/refined-v6/thumbnails/classroom_art_studio.png",
     icon: GalleryHorizontalEnd,
   },
   {
@@ -96,7 +96,7 @@ const ROOMS = [
     en: "Asset Library",
     subEn: "Production-ready assets",
     href: "/studio/assets",
-    image: "/brand/atelier-materials-640.webp",
+    image: "/assets/3d/environments/refined-v6/thumbnails/fantasy_alchemist_workshop_library.png",
     icon: Boxes,
   },
   {
@@ -106,7 +106,7 @@ const ROOMS = [
     en: "Drawing Studio",
     subEn: "Drawing · live collaboration",
     href: "/studio",
-    image: "/assets/studio/backgrounds/webtoon_creator_room.png",
+    image: "/assets/3d/environments/refined-v6/thumbnails/classroom_art_studio.png",
     icon: Brush,
   },
   {
@@ -126,10 +126,93 @@ const ROOMS = [
     en: "Assistant Desk",
     subEn: "Assistants · staffing and handoff",
     href: "/collaborate",
-    image: "/brand/atelier-process-640.webp",
+    image: "/assets/3d/environments/expansion-v1/thumbnails/science_research_laboratory.png",
     icon: Handshake,
   },
 ] as const;
+
+type VirtualRoomProp = {
+  readonly src: string;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly rotate?: number;
+  readonly flip?: boolean;
+};
+
+const ROOM_PROPS: Readonly<Record<string, readonly VirtualRoomProp[]>> = {
+  lounge: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-lounge-design-sofa.png", x: 8, y: 4, width: 44, rotate: -2 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-table-coffee.png", x: 48, y: 2, width: 27 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-plant-small2.png", x: 75, y: 10, width: 20 },
+  ],
+  writers: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-desk.png", x: 15, y: 2, width: 46 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-chair-desk.png", x: 52, y: 0, width: 28, flip: true },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-bookcase-open.png", x: 72, y: 14, width: 23 },
+  ],
+  storyboard: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-cabinet-television.png", x: 9, y: 4, width: 43 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-table-cross.png", x: 49, y: 0, width: 28 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-chair-modern-cushion.png", x: 72, y: 1, width: 22, flip: true },
+  ],
+  assets: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-bookcase-open.png", x: 5, y: 9, width: 38 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-cardboard-box-open.png", x: 47, y: 1, width: 30 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-survival-box-large.png", x: 70, y: 0, width: 27 },
+  ],
+  drawing: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-desk-corner.png", x: 5, y: 0, width: 48 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-computer-screen.png", x: 43, y: 12, width: 27 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-lamp-square-floor.png", x: 73, y: 6, width: 22 },
+  ],
+  review: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-television-modern.png", x: 8, y: 12, width: 31 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-lounge-sofa-long.png", x: 34, y: 0, width: 45 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-table-coffee-glass.png", x: 70, y: 0, width: 23 },
+  ],
+  assistant: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-desk.png", x: 7, y: 1, width: 42 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-chair-rounded.png", x: 47, y: 0, width: 25, flip: true },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-cardboard-box-closed.png", x: 73, y: 1, width: 22 },
+  ],
+};
+
+type VirtualSceneCharacter = {
+  readonly src: string;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly flip?: boolean;
+  readonly status?: "online" | "focused" | "reviewing";
+};
+
+const ROOM_CHARACTERS: Readonly<Record<string, readonly VirtualSceneCharacter[]>> = {
+  lounge: [
+    { src: "/assets/3d/characters/thumbnails/avatar-a.png", x: 28, y: 3, width: 22, status: "online" },
+    { src: "/assets/3d/characters/thumbnails/avatar-c.png", x: 68, y: 4, width: 20, flip: true, status: "online" },
+  ],
+  writers: [
+    { src: "/assets/3d/characters/thumbnails/avatar-b.png", x: 57, y: 1, width: 22, status: "focused" },
+  ],
+  storyboard: [
+    { src: "/assets/3d/characters/thumbnails/avatar-c.png", x: 60, y: 0, width: 21, flip: true, status: "reviewing" },
+  ],
+  assets: [
+    { src: "/assets/3d/characters/thumbnails/mushroom-fairy.png", x: 62, y: 0, width: 24, status: "online" },
+  ],
+  drawing: [
+    { src: "/assets/3d/characters/thumbnails/avatar-a.png", x: 30, y: 0, width: 23, status: "focused" },
+    { src: "/assets/3d/characters/thumbnails/avatar-b.png", x: 70, y: 0, width: 21, flip: true, status: "online" },
+  ],
+  review: [
+    { src: "/assets/3d/characters/thumbnails/avatar-c.png", x: 55, y: 0, width: 21, status: "reviewing" },
+  ],
+  assistant: [
+    { src: "/assets/3d/characters/thumbnails/mushroom-fairy.png", x: 36, y: 0, width: 24, status: "online" },
+    { src: "/assets/3d/characters/thumbnails/avatar-b.png", x: 72, y: 0, width: 20, flip: true, status: "focused" },
+  ],
+};
 
 const FEATURE_CARDS = [
   { href: "/studio", ko: "실시간 드로잉 협업", en: "Live drawing", captionKo: "같은 캔버스에서 함께 그려요", captionEn: "Create together on the same canvas", icon: Brush, kind: "draw" },
@@ -174,6 +257,9 @@ export function CreatorVirtualStudioExperience() {
           <span>EP 38</span>
           <span className="vs-online-dot" aria-hidden="true" />
           <span>{t("협업 스튜디오", "Collaboration studio")}</span>
+          <Link href="/events/beta-open" className="vs-beta-chip">
+            <Sparkles size={11} aria-hidden="true" /> BETA FREE
+          </Link>
         </div>
         <div className="vs-top-actions">
           <div className="vs-presence-stack" aria-label={t("캐릭터 미리보기", "Character preview")}>
@@ -226,12 +312,57 @@ export function CreatorVirtualStudioExperience() {
               aria-label={t(ko + " 열기", "Open " + en)}
             >
               <span className="vs-room-shade" aria-hidden="true" />
+              <span className="vs-room-props" aria-hidden="true">
+                {(ROOM_PROPS[id] ?? []).map((prop, propIndex) => (
+                  <img
+                    key={prop.src}
+                    src={prop.src}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    style={{
+                      "--vs-prop-x": `${prop.x}%`,
+                      "--vs-prop-y": `${prop.y}%`,
+                      "--vs-prop-width": `${prop.width}%`,
+                      "--vs-prop-rotate": `${prop.rotate ?? 0}deg`,
+                      "--vs-prop-flip": prop.flip ? -1 : 1,
+                      "--vs-prop-delay": `${propIndex * 45}ms`,
+                    } as CSSProperties}
+                  />
+                ))}
+              </span>
+              <span className="vs-room-characters" aria-hidden="true">
+                {(ROOM_CHARACTERS[id] ?? []).map((character, characterIndex) => (
+                  <span
+                    key={character.src + characterIndex}
+                    className="vs-scene-character"
+                    data-status={character.status ?? "online"}
+                    style={{
+                      "--vs-character-x": `${character.x}%`,
+                      "--vs-character-y": `${character.y}%`,
+                      "--vs-character-width": `${character.width}%`,
+                      "--vs-character-flip": character.flip ? -1 : 1,
+                      "--vs-character-delay": `${characterIndex * 110}ms`,
+                    } as CSSProperties}
+                  >
+                    <img src={character.src} alt="" loading="lazy" decoding="async" />
+                    <i />
+                  </span>
+                ))}
+              </span>
               <span className="vs-room-title"><Icon size={15} /><strong>{t(ko, en)}</strong><small>{t(subKo, subEn)}</small></span>
               <span className="vs-room-open">{t("입장", "Enter")}<ChevronRight size={14} /></span>
               <span className="vs-room-avatar"><CharacterAvatar index={index + 1} small /></span>
             </Link>
           ))}
           <div className="vs-plaza" aria-label={t("중앙 크리에이터 플라자", "Central creator plaza")}>
+            <img className="vs-plaza-prop vs-plaza-prop--left" src="/assets/studio/cc0-20260906/previews/kenney-furniture-plant-small1.png" alt="" aria-hidden="true" />
+            <img className="vs-plaza-prop vs-plaza-prop--right" src="/assets/studio/cc0-20260906/previews/kenney-furniture-plant-small3.png" alt="" aria-hidden="true" />
+            <span className="vs-plaza-crew" aria-hidden="true">
+              <img className="vs-plaza-person vs-plaza-person--a" src="/assets/3d/characters/thumbnails/avatar-a.png" alt="" />
+              <img className="vs-plaza-person vs-plaza-person--b" src="/assets/3d/characters/thumbnails/avatar-b.png" alt="" />
+              <img className="vs-plaza-person vs-plaza-person--c" src="/assets/3d/characters/thumbnails/mushroom-fairy.png" alt="" />
+            </span>
             <span className="vs-plaza-orb"><Sparkles size={25} aria-hidden="true" /></span>
             <strong>ToonSpectrum</strong><small>VIRTUAL STUDIO</small>
             <span>{t("Together, creators make brighter stories.", "Together, creators make brighter stories.")}</span>

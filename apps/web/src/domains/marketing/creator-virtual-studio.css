@@ -23,3 +23,162 @@
 @media(max-width:580px){.vs-brand small{display:none}.vs-top-actions [data-creator-experience-switch=true] button{padding-inline:9px}.vs-world-heading{display:block}.vs-world-heading>span{display:block;margin-top:6px;text-align:left}.vs-room-map{grid-template-columns:1fr;grid-template-rows:none;padding:8px}.vs-room--lounge,.vs-room--writers,.vs-room--storyboard,.vs-room--assets,.vs-room--drawing,.vs-room--review,.vs-room--assistant{grid-column:1;grid-row:auto;min-height:138px}.vs-plaza{display:none}.vs-social,.vs-feature-strip{grid-template-columns:1fr}.vs-members-preview{grid-column:auto}}
 @media(prefers-reduced-motion:reduce){.vs-home *,.vs-home *::before,.vs-home *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.vs-room:hover{transform:none}}
 @media(forced-colors:active){.vs-home{forced-color-adjust:auto;background:Canvas;color:CanvasText}.vs-room{background-image:none!important}}
+
+/* Immersive diorama pass: layer real studio props over each functional room. */
+.vs-room-map{perspective:1200px;background:radial-gradient(ellipse at 50% 48%,#8d72ff26 0 9%,transparent 31%),radial-gradient(ellipse at 18% 14%,#ffb27313,transparent 28%),linear-gradient(145deg,#302a31,#171a20 48%,#211c21)}
+.vs-room-map::after{content:"";position:absolute;inset:10% 8%;z-index:-1;border-radius:45%;background:radial-gradient(ellipse,#9f87ff14,transparent 67%);box-shadow:0 0 80px #7e67ff1c;pointer-events:none}
+.vs-room{isolation:isolate;transform-style:preserve-3d;background-image:linear-gradient(180deg,#0a081018 0%,#0a08092e 35%,#09080ad4 100%),var(--vs-room-image);box-shadow:inset 0 1px 0 #ffffff26,inset 0 -30px 60px #0a080a55,0 14px 32px #0005}
+.vs-room::after{content:"";position:absolute;left:-8%;right:-8%;bottom:-32%;height:70%;z-index:0;background:linear-gradient(90deg,#ffffff08 1px,transparent 1px),linear-gradient(#ffffff07 1px,transparent 1px),linear-gradient(145deg,#6e625747,#2a2525b8);background-size:24px 24px,24px 24px,auto;transform:perspective(260px) rotateX(62deg);transform-origin:bottom center;pointer-events:none}
+.vs-room-shade{z-index:1;background:linear-gradient(180deg,#09080a1c 5%,transparent 38%),linear-gradient(0deg,#09080bc4 0 12%,transparent 53%),radial-gradient(circle at 55% 64%,#ffd5a20f,transparent 45%)}
+.vs-room-props{position:absolute;inset:22% 3% 11%;z-index:2;pointer-events:none}
+.vs-room-props img{position:absolute;left:var(--vs-prop-x);bottom:var(--vs-prop-y);width:var(--vs-prop-width);max-height:88%;object-fit:contain;object-position:bottom center;transform:translateZ(18px) rotate(var(--vs-prop-rotate)) scaleX(var(--vs-prop-flip));transform-origin:bottom center;filter:drop-shadow(0 10px 8px #0008) saturate(.92) brightness(.96);transition:transform .28s cubic-bezier(.16,1,.3,1) var(--vs-prop-delay),filter .25s}
+.vs-room:hover .vs-room-props img,.vs-room:focus-visible .vs-room-props img{transform:translateZ(24px) translateY(-4px) rotate(var(--vs-prop-rotate)) scaleX(var(--vs-prop-flip)) scale(1.045);filter:drop-shadow(0 14px 10px #0009) saturate(1.08) brightness(1.05)}
+.vs-room-title{z-index:5;padding:5px 7px;border:1px solid #ffffff1a;border-radius:9px;background:#0c1018a6;backdrop-filter:blur(8px)}
+.vs-room-open{z-index:6;background:#0c1018d9;backdrop-filter:blur(8px)}
+.vs-room-avatar{z-index:6;filter:drop-shadow(0 4px 8px #0009)}
+.vs-plaza{overflow:visible;border-color:#b7a7ff72;background:radial-gradient(circle,#c5b9ff 0 2%,#917aff78 3% 8%,#4b406b 9% 23%,#27212f 24% 48%,#15151b 49% 100%);box-shadow:0 0 75px #765cff45,inset 0 2px 0 #ffffff1d}
+.vs-plaza::before{content:"";position:absolute;inset:18%;border:1px dashed #b7a7ff42;border-radius:50%;animation:vs-plaza-ring 18s linear infinite}
+.vs-plaza-prop{position:absolute;bottom:-6%;width:32%;z-index:5;filter:drop-shadow(0 12px 10px #0009);pointer-events:none}
+.vs-plaza-prop--left{left:-13%;transform:rotate(-7deg)}
+.vs-plaza-prop--right{right:-13%;transform:scaleX(-1) rotate(-7deg)}
+.vs-plaza-orb{position:relative;z-index:6}
+.vs-plaza strong,.vs-plaza small,.vs-plaza>span:last-child{position:relative;z-index:6}
+@keyframes vs-plaza-ring{to{transform:rotate(360deg)}}
+@media(max-width:900px){.vs-room-props img{max-height:78%}.vs-plaza-prop{display:none}}
+@media(max-width:580px){.vs-room-props{inset:24% 5% 10%}.vs-room-props img:nth-child(3){display:none}}
+@media(prefers-reduced-motion:reduce){.vs-plaza::before{animation:none}.vs-room-props img{transition:none}}
+
+/* Concept-match pass: turn the dashboard grid into a populated production-studio diorama. */
+.vs-home{
+  height:100dvh;
+  min-height:0;
+  grid-template-columns:192px minmax(0,1fr) 318px;
+  grid-template-rows:66px minmax(0,1fr) 94px;
+  background:
+    radial-gradient(ellipse at 46% 28%,#6854b42e 0 18%,transparent 46%),
+    radial-gradient(ellipse at 63% 70%,#d47e4920 0 12%,transparent 38%),
+    linear-gradient(145deg,#090d15,#0d121c 46%,#121018);
+}
+.vs-topbar{background:linear-gradient(90deg,#101722f5,#151728ee 55%,#101722f5)}
+.vs-project-chip{gap:7px}
+.vs-beta-chip{
+  display:inline-flex!important;align-items:center;gap:4px;
+  border:1px solid #ffd28a4d!important;
+  background:linear-gradient(135deg,#6c4d26cc,#3f2b24cc)!important;
+  color:#ffe0a9!important;font-weight:850;letter-spacing:.06em;
+  box-shadow:inset 0 1px #ffffff16,0 5px 16px #0003;
+}
+.vs-world{padding:12px 14px 10px}
+.vs-world-heading{margin-bottom:8px}
+.vs-world-heading h1{font-size:clamp(17px,1.55vw,23px)}
+.vs-room-map{
+  min-height:0;height:calc(100% - 55px);
+  grid-template-rows:minmax(150px,1fr) minmax(130px,.88fr) minmax(190px,1.25fr);
+  gap:9px;padding:11px;
+  border-color:#5b5064;
+  border-radius:24px;
+  overflow:hidden;
+  box-shadow:0 30px 80px #0009,inset 0 1px #ffffff16,inset 0 -40px 80px #08080b4f;
+}
+.vs-room-map::before{
+  background:
+    linear-gradient(30deg,transparent 49.25%,#ffffff08 49.6%,#ffffff08 50.4%,transparent 50.75%),
+    linear-gradient(-30deg,transparent 49.25%,#ffffff06 49.6%,#ffffff06 50.4%,transparent 50.75%);
+  background-size:48px 48px;
+}
+.vs-room{
+  border-radius:18px;
+  border-color:#ffffff2b;
+  background-position:center 48%;
+  overflow:hidden;
+}
+.vs-room::before{
+  content:"";
+  position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:
+    linear-gradient(90deg,#ffffff12 1px,transparent 1px),
+    linear-gradient(#ffffff0e 1px,transparent 1px);
+  background-size:32px 32px;
+  mask-image:linear-gradient(to top,#000 0 33%,transparent 70%);
+  opacity:.38;
+}
+.vs-room[data-room-highlight="true"]{border-color:#c2b4ff8c}
+.vs-room-props{inset:28% 2% 7%;z-index:3}
+.vs-room-props img{filter:drop-shadow(0 12px 8px #000b) saturate(1.02) brightness(1.02)}
+.vs-room-characters{position:absolute;inset:24% 2% 5%;z-index:4;pointer-events:none}
+.vs-scene-character{
+  position:absolute;
+  left:var(--vs-character-x);bottom:var(--vs-character-y);
+  width:var(--vs-character-width);
+  transform:translateX(-50%) scaleX(var(--vs-character-flip));
+  transform-origin:bottom center;
+  filter:drop-shadow(0 12px 8px #000a);
+  transition:transform .28s cubic-bezier(.16,1,.3,1) var(--vs-character-delay),filter .2s;
+}
+.vs-scene-character::after{
+  content:"";position:absolute;left:50%;bottom:-3px;width:58%;height:9%;
+  transform:translateX(-50%);border-radius:50%;
+  background:#05060a75;filter:blur(4px);z-index:-1;
+}
+.vs-scene-character img{display:block;width:100%;height:auto;object-fit:contain}
+.vs-scene-character i{
+  position:absolute;right:8%;top:8%;width:9px;height:9px;border-radius:50%;
+  border:2px solid #151a24;background:#63e29a;box-shadow:0 0 0 3px #63e29a1b,0 0 12px #63e29a70;
+}
+.vs-scene-character[data-status="focused"] i{background:#f7c56b;box-shadow:0 0 0 3px #f7c56b1b,0 0 12px #f7c56b65}
+.vs-scene-character[data-status="reviewing"] i{background:#8abaff;box-shadow:0 0 0 3px #8abaff1b,0 0 12px #8abaff65}
+.vs-room:hover .vs-scene-character,.vs-room:focus-visible .vs-scene-character{
+  transform:translateX(-50%) translateY(-5px) scaleX(var(--vs-character-flip)) scale(1.055);
+  filter:drop-shadow(0 18px 10px #000b) brightness(1.04);
+}
+.vs-room-avatar{display:none}
+.vs-room-title{
+  left:9px;top:8px;padding:6px 8px;
+  border-color:#ffffff24;background:linear-gradient(135deg,#0a1019db,#161421bd);
+  box-shadow:0 5px 18px #0005;
+}
+.vs-room-open{right:8px;bottom:7px;padding:5px 8px;font-size:8px;border-color:#ffffff27}
+.vs-room--lounge{grid-column:1/5}
+.vs-room--writers{grid-column:5/9}
+.vs-room--storyboard{grid-column:9/13}
+.vs-room--assets{grid-column:1/4}
+.vs-room--drawing{grid-column:10/13}
+.vs-room--review{grid-column:1/5}
+.vs-room--assistant{grid-column:9/13}
+.vs-plaza{
+  width:min(265px,84%);
+  background:
+    radial-gradient(circle at 50% 46%,#fff 0 1%,#c9bcff 2% 5%,#8d74ff8a 6% 11%,transparent 12%),
+    radial-gradient(circle,#5a4c7a 0 25%,#2b2534 26% 52%,#17161d 53% 100%);
+  box-shadow:0 0 90px #765cff55,inset 0 2px #ffffff20,0 22px 32px #0007;
+}
+.vs-plaza::after{
+  content:"";position:absolute;inset:8%;border-radius:50%;pointer-events:none;
+  box-shadow:inset 0 0 0 1px #ffffff0c,0 0 0 10px #8c75ff08;
+}
+.vs-plaza-orb{width:58px;height:58px;box-shadow:0 0 22px #e2d8ffcc,0 0 52px #8d72ff9b}
+.vs-social{padding:9px;background:linear-gradient(180deg,#101722f4,#0c121bf5)}
+.vs-panel{border-color:#303d52;background:linear-gradient(155deg,#1a2432,#101722 72%);box-shadow:inset 0 1px #ffffff08,0 10px 26px #0002}
+.vs-huddle-preview{border-color:#635c8f}
+.vs-video-grid figure{box-shadow:inset 0 0 0 1px #ffffff12,0 5px 14px #0004}
+.vs-video-grid img{filter:saturate(.92) contrast(1.03)}
+.vs-feature-strip{padding:8px 10px 10px;background:linear-gradient(180deg,#0c121b,#090f17)}
+.vs-feature-card{min-height:74px;border-color:#273448;background:linear-gradient(145deg,#172131,#0f1621)}
+.vs-feature-icon{box-shadow:inset 0 1px #ffffff12}
+@media(min-width:901px){
+  .vs-room--drawing,.vs-room--assets{transform:translateY(3px)}
+  .vs-room--review,.vs-room--assistant{transform:translateY(2px)}
+}
+@media(max-width:1180px){
+  .vs-home{grid-template-columns:72px minmax(0,1fr) 280px}
+}
+@media(max-width:900px){
+  .vs-home{height:auto;min-height:100dvh}
+  .vs-room-map{height:auto}
+  .vs-room-avatar{display:block}
+  .vs-room-characters{inset:25% 4% 4%}
+  .vs-scene-character{width:min(var(--vs-character-width),22%)}
+}
+@media(max-width:580px){
+  .vs-room-characters{display:none}
+}
