@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import type { DesktopCloudProviderId } from "./cloud/types.js";
 import type { DesktopCredentialVault } from "./credential-vault.js";
 
@@ -43,19 +41,34 @@ export interface DesktopUploadSessionStore {
   ): Promise<boolean>;
 }
 
+const FNV_64_OFFSET = 0xcbf29ce484222325n;
+const FNV_64_PRIME = 0x100000001b3n;
+const FNV_64_MASK = 0xffffffffffffffffn;
+const FNV_64_SECOND_SEED = FNV_64_OFFSET ^ 0x9e3779b97f4a7c15n;
+
+function fnv1a64(value: string, seed: bigint): string {
+  let hash = seed;
+  for (const byte of Buffer.from(value, "utf8")) {
+    hash ^= BigInt(byte);
+    hash = (hash * FNV_64_PRIME) & FNV_64_MASK;
+  }
+  return hash.toString(16).padStart(16, "0");
+}
+
 function accountFor(identity: Pick<
   DesktopUploadSessionIdentity,
   "provider" | "remoteRoot" | "credentialProfile" | "relativePath"
 >): string {
-  const digest = createHash("sha256")
-    .update(JSON.stringify([
-      identity.provider,
-      identity.remoteRoot,
-      identity.credentialProfile,
-      identity.relativePath,
-    ]))
-    .digest("hex");
-  return `upload:${identity.provider}:${digest}`;
+  // This is a bounded credential-vault lookup index, not an authentication hash.
+  // Exact session identity is verified again with sameIdentity after lookup.
+  const serialized = JSON.stringify([
+    identity.provider,
+    identity.remoteRoot,
+    identity.credentialProfile,
+    identity.relativePath,
+  ]);
+  const fingerprint = `${fnv1a64(serialized, FNV_64_OFFSET)}${fnv1a64(serialized, FNV_64_SECOND_SEED)}`;
+  return `upload:${identity.provider}:${fingerprint}`;
 }
 
 function validSha256(value: unknown): value is string {
