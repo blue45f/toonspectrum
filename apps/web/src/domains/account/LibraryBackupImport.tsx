@@ -10,7 +10,6 @@ import { MAX_LIBRARY_BACKUP_BYTES, parseLibraryBackup } from "./library-backup";
 
 import type { HydratePayload } from "@/shared/lib/store-types";
 import {
-  formatI18nTemplate,
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
