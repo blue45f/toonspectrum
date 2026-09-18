@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Box,
   ChevronDown,
   Clock3,
@@ -410,10 +414,10 @@ export function StudioUnifiedAssetWorkspace({
 
   return (
     <section
-      aria-label="통합 에셋 작업 공간"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "통합 에셋 작업 공간")}
       data-studio-unified-asset-workspace="true"
       data-studio-asset-workspace-layout="responsive-three-pane"
-      className="w-[min(74rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] min-w-0"
+      className="w-full max-w-full min-w-0"
     >
       <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-line bg-card p-1">
         <div className="grid flex-1 grid-cols-2 gap-1">
@@ -429,8 +433,7 @@ export function StudioUnifiedAssetWorkspace({
                 : "text-fg-3 hover:bg-raised",
             )}
           >
-            통합 탐색
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "통합 탐색")}</button>
           <button
             type="button"
             onClick={() => setView("library")}
@@ -443,11 +446,10 @@ export function StudioUnifiedAssetWorkspace({
                 : "text-fg-3 hover:bg-raised",
             )}
           >
-            보관함 · 마켓
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "보관함 · 마켓")}</button>
         </div>
         <span className="hidden rounded-full border border-good/30 bg-good/10 px-2.5 py-1 text-[0.68rem] font-bold text-good sm:inline-flex">
-          시각 미리보기 {previewAudit.coveragePercent}%
+          {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "시각 미리보기 ")}{previewAudit.coveragePercent}%
         </span>
       </div>
 
@@ -465,15 +467,14 @@ export function StudioUnifiedAssetWorkspace({
                     <Library size={18} aria-hidden />
                   </span>
                   <div>
-                    <h3 className="text-sm font-black text-fg">에셋 워크스페이스</h3>
+                    <h3 className="text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "에셋 워크스페이스")}</h3>
                     <p className="mt-0.5 text-xs leading-relaxed text-fg-3">
-                      2D 배경 {facetCounts.background}개 · 3D {previewAudit.interactive3d}개 · 장면 레시피 {previewAudit.templates}개
-                    </p>
+                      {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "2D 배경 ")}{facetCounts.background}{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "개 · 3D ")}{previewAudit.interactive3d}{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "개 · 장면 레시피 ")}{previewAudit.templates}{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "개")}</p>
                   </div>
                 </div>
               </div>
               <div className="relative min-w-0 flex-1 sm:max-w-xl">
-                <label htmlFor={searchId} className="sr-only">에셋 통합 검색</label>
+                <label htmlFor={searchId} className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "에셋 통합 검색")}</label>
                 <Search
                   size={16}
                   className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
@@ -488,7 +489,7 @@ export function StudioUnifiedAssetWorkspace({
                     setQuery(event.target.value.slice(0, 120));
                     setStatus(null);
                   }}
-                  placeholder="비 오는 밤 골목, 학교 대화 장면, 3D 책상…  / 로 검색"
+                  placeholder={translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "비 오는 밤 골목, 학교 대화 장면, 3D 책상…  / 로 검색")}
                   className={cn(
                     "min-h-12 w-full rounded-xl border border-line bg-card pl-10 pr-12 text-sm text-fg shadow-sm placeholder:text-fg-3",
                     FOCUS,
@@ -501,7 +502,7 @@ export function StudioUnifiedAssetWorkspace({
                       setQuery("");
                       setStatus(null);
                     }}
-                    aria-label="통합 에셋 검색어 지우기"
+                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "통합 에셋 검색어 지우기")}
                     className={cn(
                       "absolute right-1 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-lg text-fg-3 hover:bg-raised",
                       FOCUS,
@@ -514,7 +515,7 @@ export function StudioUnifiedAssetWorkspace({
             </div>
 
             {quickActions.length > 0 ? (
-              <div className="mt-3 flex gap-2 overflow-x-auto pb-1" aria-label="빠른 삽입">
+              <div className="mt-3 flex gap-2 overflow-x-auto pb-1" aria-label={translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "빠른 삽입")}>
                 {quickActions.map((action) => {
                   const Icon = quickActionIcon(action.actionId);
                   return (
@@ -563,7 +564,7 @@ export function StudioUnifiedAssetWorkspace({
           </header>
 
           {!query ? (
-            <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="빠른 에셋 검색">
+            <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label={translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "빠른 에셋 검색")}>
               {QUICK_QUERIES.map((value) => (
                 <button
                   key={value}
@@ -580,9 +581,9 @@ export function StudioUnifiedAssetWorkspace({
             </div>
           ) : null}
 
-          <div className="grid min-h-0 gap-3 lg:grid-cols-[11rem_minmax(22rem,1fr)_20rem]">
-            <aside className="min-w-0 rounded-xl border border-line bg-panel p-2 lg:max-h-[min(68dvh,46rem)] lg:overflow-y-auto">
-              <div className="flex gap-1 overflow-x-auto lg:block lg:space-y-1" aria-label="에셋 분류">
+          <div data-studio-asset-workspace-grid="true" className="grid min-h-0 gap-3">
+            <aside data-studio-asset-sidebar="true" className="min-w-0 rounded-xl border border-line bg-panel p-2">
+              <div data-studio-asset-facet-list="true" className="flex gap-1 overflow-x-auto" aria-label={translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "에셋 분류")}>
                 {BROWSE_FACETS.map((option) => (
                   <button
                     key={option.id}
@@ -593,7 +594,7 @@ export function StudioUnifiedAssetWorkspace({
                     }}
                     aria-pressed={facet === option.id}
                     className={cn(
-                      "flex min-h-10 shrink-0 items-center justify-between gap-2 rounded-lg px-3 text-left text-xs font-semibold transition-colors lg:w-full",
+                      "flex min-h-10 shrink-0 items-center justify-between gap-2 rounded-lg px-3 text-left text-xs font-semibold transition-colors",
                       FOCUS,
                       facet === option.id
                         ? "bg-accent-soft text-accent"
@@ -609,10 +610,9 @@ export function StudioUnifiedAssetWorkspace({
               </div>
 
               <div className="mt-2 border-t border-line pt-2">
-                <p className="mb-1 hidden px-3 text-[0.68rem] font-bold uppercase tracking-wide text-fg-3 lg:block">
-                  내 작업
-                </p>
-                <div className="flex gap-1 overflow-x-auto lg:block lg:space-y-1">
+                <p data-studio-asset-sidebar-label="true" className="mb-1 hidden px-3 text-[0.68rem] font-bold uppercase tracking-wide text-fg-3">
+                  {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "내 작업")}</p>
+                <div data-studio-asset-collection-list="true" className="flex gap-1 overflow-x-auto">
                   {COLLECTIONS.map((option) => {
                     const Icon = option === "favorites"
                       ? Heart
@@ -629,7 +629,7 @@ export function StudioUnifiedAssetWorkspace({
                         }}
                         aria-pressed={collection === option}
                         className={cn(
-                          "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-xs font-semibold transition-colors lg:w-full",
+                          "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-xs font-semibold transition-colors",
                           FOCUS,
                           collection === option
                             ? "bg-raised text-fg"
@@ -653,13 +653,13 @@ export function StudioUnifiedAssetWorkspace({
                   FOCUS,
                 )}
               >
-                <span className="inline-flex items-center gap-2"><Filter size={14} aria-hidden />필터·보기</span>
+                <span className="inline-flex items-center gap-2"><Filter size={14} aria-hidden />{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "필터·보기")}</span>
                 <ChevronDown size={14} className={cn("transition-transform", filtersOpen && "rotate-180")} aria-hidden />
               </button>
 
               {filtersOpen ? (
                 <div className="mt-2 space-y-2 rounded-lg bg-card p-2">
-                  <p className="text-[0.68rem] font-bold text-fg-3">카드 밀도</p>
+                  <p className="text-[0.68rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "카드 밀도")}</p>
                   <div className="grid grid-cols-2 gap-1">
                     <button
                       type="button"
@@ -670,7 +670,7 @@ export function StudioUnifiedAssetWorkspace({
                         FOCUS,
                         density === "visual" ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-3",
                       )}
-                    ><LayoutGrid size={15} aria-hidden /><span className="sr-only">큰 그리드</span></button>
+                    ><LayoutGrid size={15} aria-hidden /><span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "큰 그리드")}</span></button>
                     <button
                       type="button"
                       onClick={() => setDensity("compact")}
@@ -680,7 +680,7 @@ export function StudioUnifiedAssetWorkspace({
                         FOCUS,
                         density === "compact" ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-3",
                       )}
-                    ><LayoutList size={15} aria-hidden /><span className="sr-only">작은 그리드</span></button>
+                    ><LayoutList size={15} aria-hidden /><span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "작은 그리드")}</span></button>
                   </div>
                 </div>
               ) : null}
@@ -690,8 +690,8 @@ export function StudioUnifiedAssetWorkspace({
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p role="status" aria-live="polite" className="text-xs text-fg-3">
                   {query.trim()
-                    ? `검색 결과 ${results.length}개`
-                    : `${activeFacet.label} ${results.length}개`}
+                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "검색 결과 {v0}개"), { v0: String(results.length) })
+                    : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "{v0} {v1}개"), { v0: String(activeFacet.label), v1: String(results.length) })}
                 </p>
                 {(query || facet !== "all" || collection !== "all") ? (
                   <button
@@ -699,19 +699,15 @@ export function StudioUnifiedAssetWorkspace({
                     onClick={resetDiscovery}
                     className={cn("min-h-9 px-2 text-xs font-semibold text-fg-3 underline", FOCUS)}
                   >
-                    초기화
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "초기화")}</button>
                 ) : null}
               </div>
 
               {results.length > 0 ? (
                 <div
-                  className={cn(
-                    "grid max-h-[min(64dvh,43rem)] gap-2 overflow-y-auto pr-1",
-                    density === "visual"
-                      ? "grid-cols-2 2xl:grid-cols-3"
-                      : "grid-cols-2 sm:grid-cols-3 2xl:grid-cols-4",
-                  )}
+                  data-studio-asset-results-grid="true"
+                  data-density={density}
+                  className="grid max-h-[min(64dvh,43rem)] gap-2 overflow-y-auto pr-1"
                 >
                   {results.map((entry) => {
                     const item = entry.item;
@@ -749,7 +745,7 @@ export function StudioUnifiedAssetWorkspace({
                               void handleUseItem(item);
                             }
                           }}
-                          aria-label={`${item.title} 상세 미리보기`}
+                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "{v0} 상세 미리보기"), { v0: String(item.title) })}
                           className={cn("block w-full text-left", FOCUS)}
                         >
                           <div className={cn(
@@ -762,8 +758,7 @@ export function StudioUnifiedAssetWorkspace({
                             </span>
                             {item.discoverability === "caution" ? (
                               <span className="absolute bottom-2 left-2 rounded-full border border-warn/35 bg-panel/90 px-2 py-1 text-[0.65rem] font-bold text-warn backdrop-blur">
-                                권리 확인
-                              </span>
+                                {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "권리 확인")}</span>
                             ) : null}
                           </div>
                           <div className="p-2.5">
@@ -778,7 +773,7 @@ export function StudioUnifiedAssetWorkspace({
                           <button
                             type="button"
                             onClick={() => commitPreferences(toggleStudioInsertFavorite(preferences, item.id))}
-                            aria-label={favorite ? `${item.title} 즐겨찾기 해제` : `${item.title} 즐겨찾기 추가`}
+                            aria-label={favorite ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "{v0} 즐겨찾기 해제"), { v0: String(item.title) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "{v0} 즐겨찾기 추가"), { v0: String(item.title) })}
                             aria-pressed={favorite}
                             className={cn(
                               "grid size-10 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-accent",
@@ -786,15 +781,15 @@ export function StudioUnifiedAssetWorkspace({
                               favorite && "text-accent",
                             )}
                           >
-                            <Heart size={15} fill={favorite ? "currentColor" : "none"} aria-hidden />
+                            <Heart size={15} fill={favorite ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "en", "none")} aria-hidden />
                           </button>
                           <button
                             type="button"
                             data-studio-insert-drag-handle="true"
                             draggable={draggable}
                             onClick={() => setSelectedId(item.id)}
-                            aria-label={`${item.title} 캔버스로 끌어 놓기`}
-                            title={draggable ? "캔버스의 원하는 위치로 끌어 놓기" : "상세 미리보기 선택"}
+                            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "{v0} 캔버스로 끌어 놓기"), { v0: String(item.title) })}
+                            title={draggable ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "캔버스의 원하는 위치로 끌어 놓기") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "상세 미리보기 선택")}
                             className={cn(
                               "grid size-10 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised",
                               FOCUS,
@@ -814,7 +809,7 @@ export function StudioUnifiedAssetWorkspace({
                             )}
                           >
                             {item.useMode === "open" ? <Box size={14} aria-hidden /> : <Plus size={14} aria-hidden />}
-                            <span className="truncate">{pendingId === item.id ? "처리 중…" : item.useLabel}</span>
+                            <span className="truncate">{pendingId === item.id ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "처리 중…") : item.useLabel}</span>
                           </button>
                         </div>
                       </article>
@@ -825,37 +820,35 @@ export function StudioUnifiedAssetWorkspace({
                 <div className="grid min-h-72 place-items-center rounded-xl border border-dashed border-line bg-card p-6 text-center">
                   <div>
                     <ImageIcon size={30} className="mx-auto text-fg-3" aria-hidden />
-                    <h4 className="mt-3 text-sm font-black text-fg">조건에 맞는 에셋이 없습니다.</h4>
-                    <p className="mt-1 text-xs leading-relaxed text-fg-3">검색어 또는 분류를 넓히거나 새 장면을 만들어 보세요.</p>
+                    <h4 className="mt-3 text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "조건에 맞는 에셋이 없습니다.")}</h4>
+                    <p className="mt-1 text-xs leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "검색어 또는 분류를 넓히거나 새 장면을 만들어 보세요.")}</p>
                     <div className="mt-4 flex flex-wrap justify-center gap-2">
                       <button
                         type="button"
                         onClick={resetDiscovery}
                         className={cn("min-h-10 rounded-lg border border-line bg-panel px-3 text-xs font-bold text-fg-2", FOCUS)}
                       >
-                        조건 넓히기
-                      </button>
+                        {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "조건 넓히기")}</button>
                       <button
                         type="button"
                         onClick={() => onOpenAi(query.trim())}
-                        aria-label="AI 도구에서 만들기"
+                        aria-label={translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "AI 도구에서 만들기")}
                         className={cn("inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent", FOCUS)}
                       >
-                        <Sparkles size={14} aria-hidden />AI 도구에서 만들기
-                      </button>
+                        <Sparkles size={14} aria-hidden />{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "AI 도구에서 만들기")}</button>
                     </div>
                   </div>
                 </div>
               )}
             </div>
 
-            <aside className="min-w-0 rounded-xl border border-line bg-panel p-3 lg:max-h-[min(68dvh,46rem)] lg:overflow-y-auto">
+            <aside data-studio-asset-detail-pane="true" className="min-w-0 rounded-xl border border-line bg-panel p-3">
               {selected && selectedPreview ? (
                 <div data-studio-asset-detail={selected.id}>
                   <div className="aspect-[4/3] overflow-hidden rounded-xl border border-line bg-card">
                     <StudioUnifiedAssetPreviewSurface
                       preview={selectedPreview}
-                      mode={selectedPreview.kind === "three" ? "interactive" : "thumbnail"}
+                      mode={selectedPreview.kind === "three" ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "en", "interactive") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "en", "thumbnail")}
                     />
                   </div>
                   <div className="mt-3">
@@ -867,13 +860,13 @@ export function StudioUnifiedAssetWorkspace({
                       <button
                         type="button"
                         onClick={() => commitPreferences(toggleStudioInsertFavorite(preferences, selected.id))}
-                        aria-label={preferences.favoriteIds.includes(selected.id) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+                        aria-label={preferences.favoriteIds.includes(selected.id) ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "즐겨찾기 해제") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "즐겨찾기 추가")}
                         aria-pressed={preferences.favoriteIds.includes(selected.id)}
                         className={cn("grid size-10 shrink-0 place-items-center rounded-lg border border-line text-fg-3 hover:bg-raised hover:text-accent", FOCUS)}
                       >
                         <Heart
                           size={16}
-                          fill={preferences.favoriteIds.includes(selected.id) ? "currentColor" : "none"}
+                          fill={preferences.favoriteIds.includes(selected.id) ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "en", "none")}
                           aria-hidden
                         />
                       </button>
@@ -891,7 +884,7 @@ export function StudioUnifiedAssetWorkspace({
 
                   {isPlacementCapable(selected) ? (
                     <fieldset className="mt-3 rounded-xl border border-line bg-card p-2.5">
-                      <legend className="px-1 text-xs font-bold text-fg-2">삽입 위치</legend>
+                      <legend className="px-1 text-xs font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "삽입 위치")}</legend>
                       <div className="grid grid-cols-3 gap-1">
                         {(["auto", "page", "selection"] as const).map((mode) => (
                           <button
@@ -924,14 +917,12 @@ export function StudioUnifiedAssetWorkspace({
                         className="mt-0.5 size-4 accent-current"
                       />
                       <span>
-                        <strong className="block text-warn">권리·출처 확인 필요</strong>
-                        이 에셋의 사용 조건을 확인했으며 현재 작품에서 사용할 책임이 있음을 이해했습니다.
-                      </span>
+                        <strong className="block text-warn">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "권리·출처 확인 필요")}</strong>
+                        {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "이 에셋의 사용 조건을 확인했으며 현재 작품에서 사용할 책임이 있음을 이해했습니다.")}</span>
                     </label>
                   ) : (
                     <p className="mt-3 rounded-xl border border-good/30 bg-good/10 p-2.5 text-xs font-semibold text-good">
-                      Studio 내장 또는 확인된 에셋 · 별도 검토 없이 바로 사용할 수 있습니다.
-                    </p>
+                      {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "Studio 내장 또는 확인된 에셋 · 별도 검토 없이 바로 사용할 수 있습니다.")}</p>
                   )}
 
                   <button
@@ -944,18 +935,17 @@ export function StudioUnifiedAssetWorkspace({
                     )}
                   >
                     {selected.useMode === "open" ? <Box size={16} aria-hidden /> : <Plus size={16} aria-hidden />}
-                    {pendingId === selected.id ? "처리 중…" : selected.useLabel}
+                    {pendingId === selected.id ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "처리 중…") : selected.useLabel}
                   </button>
                   {selectedEntry && canDragStudioInsertHubEntry(selectedEntry) ? (
-                    <p className="mt-2 text-center text-[0.68rem] text-fg-3">카드의 드래그 핸들로 캔버스 위치에 바로 놓을 수 있습니다.</p>
+                    <p className="mt-2 text-center text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "카드의 드래그 핸들로 캔버스 위치에 바로 놓을 수 있습니다.")}</p>
                   ) : null}
                 </div>
               ) : (
                 <div className="grid min-h-72 place-items-center text-center text-xs text-fg-3">
                   <div>
                     <Search size={24} className="mx-auto mb-2" aria-hidden />
-                    에셋을 선택하면 실제 미리보기와 적용 옵션이 표시됩니다.
-                  </div>
+                    {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "ko", "에셋을 선택하면 실제 미리보기와 적용 옵션이 표시됩니다.")}</div>
                 </div>
               )}
             </aside>
@@ -963,7 +953,7 @@ export function StudioUnifiedAssetWorkspace({
 
           {status ? (
             <p
-              role={status.tone === "error" ? "alert" : "status"}
+              role={status.tone === "error" ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetWorkspace", "en", "status")}
               aria-live="polite"
               className={cn(
                 "rounded-xl border px-3 py-2.5 text-xs leading-relaxed",

@@ -11,6 +11,7 @@ import {
   AVATAR_FORGE_PRESETS,
   AVATAR_FORGE_VERSION,
   applyAvatarForgeBodyPreset,
+  applyAvatarForgeHairStyleRecipe,
   avatarForgeBraidSegmentCount,
   buildAvatarForgeHairParts,
   buildAvatarForgeBodyAdjustmentPlan,
@@ -192,6 +193,26 @@ describe("studio-vrm-avatar-forge state", () => {
     const state = createAvatarForgeState();
     state.hair.style = "none";
     expect(buildAvatarForgeHairParts(state)).toEqual([]);
+  });
+
+  it("switches hairstyle cards through curated shape recipes without destroying the palette", () => {
+    const state = createAvatarForgeState("wave-diva");
+    state.hair.baseColor = "#123456";
+    state.hair.tipColor = "#abcdef";
+    state.hair.shadowColor = "#081018";
+    state.hair.shine = 0.81;
+    state.hair.replaceOriginal = true;
+
+    const pixie = applyAvatarForgeHairStyleRecipe(state, "pixie");
+    expect(pixie.hair.style).toBe("pixie");
+    expect(pixie.hair.length).toBeLessThan(0.7);
+    expect(pixie.hair.volume).toBeLessThan(1);
+    expect(pixie.hair.wave).toBe(0);
+    expect(pixie.hair.baseColor).toBe("#123456");
+    expect(pixie.hair.tipColor).toBe("#abcdef");
+    expect(pixie.hair.shadowColor).toBe("#081018");
+    expect(pixie.hair.shine).toBe(0.81);
+    expect(pixie.hair.replaceOriginal).toBe(true);
   });
 
   it("scales long-hair plans from normalized controls", () => {

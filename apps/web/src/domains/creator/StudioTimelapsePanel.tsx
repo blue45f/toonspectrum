@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { AlertTriangle, Loader2, Play, Square, Video, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -172,14 +176,13 @@ export function StudioTimelapsePanel({
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-4 py-3">
           <div className="min-w-0">
             <p className="eyebrow flex items-center gap-1.5 text-accent">
-              <Video size={14} aria-hidden /> 타임랩스
-            </p>
-            <h2 className="mt-1 text-lg font-bold tracking-tight text-fg">그리기 과정 타임랩스</h2>
+              <Video size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "타임랩스")}</p>
+            <h2 className="mt-1 text-lg font-bold tracking-tight text-fg">{translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "그리기 과정 타임랩스")}</h2>
           </div>
           <button
             type="button"
-            aria-label="닫기"
-            title="닫기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "닫기")}
+            title={translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "닫기")}
             disabled={exporting}
             className={ICON_BUTTON}
             onClick={onClose}
@@ -190,26 +193,20 @@ export function StudioTimelapsePanel({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <p className="mb-3 rounded-lg border border-line bg-card/60 px-2.5 py-2 text-[0.7rem] leading-relaxed text-fg-3">
-            이 페이지를 그린 과정을 빠르게 재생하는 영상(WebM)으로 저장해요. 지금 이 브라우저 탭에서
-            작업한 기록만 담겨요 — 새로고침하거나 다른 기기에서 이어작업했다면 그 이전 기록은
-            포함되지 않아요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "이 페이지를 그린 과정을 빠르게 재생하는 영상(WebM)으로 저장해요. 지금 이 브라우저 탭에서 작업한 기록만 담겨요 — 새로고침하거나 다른 기기에서 이어작업했다면 그 이전 기록은 포함되지 않아요.")}</p>
 
           {masterEditMode && (
             <p className="mb-3 flex items-start gap-2 rounded-lg border border-line bg-card/70 px-2.5 py-2 text-xs text-fg-3">
               <AlertTriangle className="mt-0.5 shrink-0 text-accent" size={14} aria-hidden />
-              마스터 편집 중에는 타임랩스를 만들 수 없어요. 마스터 편집을 종료한 뒤 다시 시도해주세요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "마스터 편집 중에는 타임랩스를 만들 수 없어요. 마스터 편집을 종료한 뒤 다시 시도해주세요.")}</p>
           )}
           {!masterEditMode && !hasContent && (
             <p className="mb-3 rounded-lg border border-line bg-card/70 px-2.5 py-2 text-xs text-fg-3">
-              아직 그린 내용이 없어요. 먼저 그림을 그려보세요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "아직 그린 내용이 없어요. 먼저 그림을 그려보세요.")}</p>
           )}
 
           <label className="mb-3 flex flex-col gap-1 text-xs text-fg-2">
-            해상도
-            <select
+            {translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "해상도")}<select
               value={resolutionId}
               onChange={(e) => setResolutionId(e.target.value)}
               disabled={exporting}
@@ -224,8 +221,7 @@ export function StudioTimelapsePanel({
           </label>
 
           <label className="mb-3 flex flex-col gap-1 text-xs text-fg-2">
-            영상 길이
-            <select
+            {translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "영상 길이")}<select
               value={durationId}
               onChange={(e) => setDurationId(e.target.value)}
               disabled={exporting}
@@ -240,7 +236,7 @@ export function StudioTimelapsePanel({
           </label>
 
           <p className="mb-3 text-[0.7rem] text-fg-3">
-            {hasContent ? `${steps.length}단계 · 약 ${formatSeconds(plan.durationSec)}` : "단계 없음"}
+            {hasContent ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "{v0}단계 · 약 {v1}"), { v0: String(steps.length), v1: String(formatSeconds(plan.durationSec)) }) : translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "단계 없음")}
           </p>
 
           {exporting && (
@@ -251,7 +247,7 @@ export function StudioTimelapsePanel({
               </div>
               <div
                 role="progressbar"
-                aria-label="타임랩스 녹화 진행률"
+                aria-label={translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "타임랩스 녹화 진행률")}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={progressPct}
@@ -263,16 +259,13 @@ export function StudioTimelapsePanel({
                 />
               </div>
               <p className="mt-1.5 text-[0.68rem] text-fg-3">
-                녹화 중에는 캔버스를 편집할 수 없어요. 완료될 때까지 잠시만 기다려주세요.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "녹화 중에는 캔버스를 편집할 수 없어요. 완료될 때까지 잠시만 기다려주세요.")}</p>
             </div>
           )}
 
           {!supported && (
             <p className="mt-3 text-xs text-bad">
-              이 브라우저는 영상 녹화(MediaRecorder/WebM)를 지원하지 않아요. 크롬·엣지·파이어폭스에서
-              시도해주세요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "이 브라우저는 영상 녹화(MediaRecorder/WebM)를 지원하지 않아요. 크롬·엣지·파이어폭스에서 시도해주세요.")}</p>
           )}
           {error && <p className="mt-3 text-xs text-bad">{error}</p>}
           {doneMsg && !error && <p className="mt-3 text-xs text-good">{doneMsg}</p>}
@@ -286,8 +279,7 @@ export function StudioTimelapsePanel({
               disabled={preparing}
               className={cx(CONTROL_BUTTON, "border-line bg-card text-fg-2 hover:bg-raised")}
             >
-              <Square size={13} /> 취소
-            </button>
+              <Square size={13} /> {translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "취소")}</button>
           )}
           <button
             type="button"
@@ -295,8 +287,7 @@ export function StudioTimelapsePanel({
             disabled={exporting}
             className={cx(CONTROL_BUTTON, "border-line bg-card text-fg-2 hover:bg-raised")}
           >
-            닫기
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "닫기")}</button>
           <StudioToolHintTarget
             disabled={Boolean(recordDisabledReason)}
             unavailableReason={recordDisabledReason}
@@ -316,8 +307,7 @@ export function StudioTimelapsePanel({
               className={cx(CONTROL_BUTTON, "border-accent/60 bg-accent text-on-accent hover:bg-accent/90")}
             >
               {preparing ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-              타임랩스 영상 만들기
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioTimelapsePanel", "ko", "타임랩스 영상 만들기")}</button>
           </StudioToolHintTarget>
         </footer>
       </div>

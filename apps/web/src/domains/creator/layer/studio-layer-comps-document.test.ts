@@ -175,7 +175,7 @@ describe("layer comp transactions respect the aggregate page wire budget", () =>
     expect(options.prepare).toHaveBeenCalledOnce();
     expect(options.validatePage).toHaveBeenCalledOnce();
     expect(options.commit).not.toHaveBeenCalled();
-    expect(options.reportError).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("콤프 저장 용량"));
+    expect(options.reportError).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("레이어 보기 저장 용량"));
     expect(current).toEqual(before);
   });
 
@@ -278,7 +278,7 @@ describe("page-owned layer comp document", () => {
     Array.from({ length: STUDIO_LAYER_COMPS_MAX_COUNT + 1 }, (_, index) => ({ ...comp, id: `comp-${index}` })),
   ].map((value) => ({ value })))("rejects malformed or over-budget comp metadata %#", ({ value }) => {
     expect(parseStudioLayerComps(value)).toBeNull();
-    expect(() => parseStudioProjectFile({ version: 2, pagesList: [{ ...page, layerComps: value }] })).toThrow(/레이어 콤프/u);
+    expect(() => parseStudioProjectFile({ version: 2, pagesList: [{ ...page, layerComps: value }] })).toThrow(/레이어 보기/u);
   });
 
   it.each(["duplicate", "mirror"])("remaps saved state to the %s page's own layer IDs", (kind) => {

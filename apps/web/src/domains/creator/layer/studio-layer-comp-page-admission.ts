@@ -15,6 +15,6 @@ export function studioLayerCompPageAdmissionError(
     studioPageToCrdtPage(next);
     return null;
   } catch {
-    return "페이지의 콤프 저장 용량을 넘어 변경하지 않았어요. 콤프 개수나 캡처할 레이어를 줄이거나 페이지 메모를 정리해 주세요.";
+    return "페이지의 레이어 보기 저장 용량을 넘어 변경하지 않았어요. 저장한 보기 수나 포함할 레이어를 줄이거나 페이지 메모를 정리해 주세요.";
   }
 }

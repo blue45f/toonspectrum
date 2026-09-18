@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "id": "gpt25-bg-horror-fog-cabin-vertical-depth",
+  "model": "gpt-image-2.5-sunburst",
+  "quality": "max",
+  "size": "1152x2048",
+  "promptSha256": "db74a309036c0d9f3f15a71150f8a7044db1b0d79b005543e046bf1275582719",
+  "prompt": "premium 2D webtoon background illustration, hand-painted environment concept art, clean controlled linework, cel-shaded forms with painterly light, production-ready details, coherent perspective and architecture, material-specific textures, crisp edges near focal plane, subtle atmospheric depth, no photorealistic people. Scene: isolated cabin in heavy fog. Composition: 세로 웹툰 컷에 맞는 깊은 원근, 아래에서 위로 시선이 흐르는 S자 동선 (28mm lens, slightly low camera, strong vertical leading lines); distinct foreground silhouette for depth but no people. Lighting and atmosphere: golden-hour sunset with long shadows, clear air. Palette: natural material colors with realistic bounce light. Environment must be empty and immediately usable behind webtoon characters. Preserve believable scale, orthogonal lines, floor contact, material continuity, and several crop-safe regions. Output one complete background only. No characters, no silhouettes, no crowds, no readable text, no letters, no signs with glyphs, no logos, no watermark, no speech balloons, no UI, no frame border, no split panels, no duplicated furniture, no floating objects, no melted geometry, no impossible stairs, no fisheye distortion, no extreme blur, no low-resolution texture, no photographic collage.",
+  "negativePrompt": "No characters, no silhouettes, no crowds, no readable text, no letters, no signs with glyphs, no logos, no watermark, no speech balloons, no UI, no frame border, no split panels, no duplicated furniture, no floating objects, no melted geometry, no impossible stairs, no fisheye distortion, no extreme blur, no low-resolution texture, no photographic collage.",
+  "generatedAt": "2026-09-18T00:15:49.022886Z",
+  "outputSha256": "d6a7417a52fe49997a8717a44ff4ff970e986aa5292fb94321223e35d03d6dbd",
+  "outputBytes": 4192557,
+  "reviewRequired": false,
+  "operatorFunded": false,
+  "generationChannel": "ChatGPT image generation"
+}

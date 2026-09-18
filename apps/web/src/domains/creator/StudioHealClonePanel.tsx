@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Heal/Clone Panel
  * 복구 브러시(Healing brush) / 도장(Clone stamp) 컨트롤 — 켜면 메인 캔버스에서 Alt(Option)+클릭이
@@ -76,8 +80,7 @@ export function StudioHealClonePanel({
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
           <Stamp size={12} aria-hidden />
-          복구 브러시 / 도장
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioHealClonePanel", "ko", "복구 브러시 / 도장")}</p>
         {busy && <Loader2 size={13} className="animate-spin text-accent" aria-hidden />}
       </div>
 
@@ -90,7 +93,7 @@ export function StudioHealClonePanel({
               active={mode === m.id}
               disabled={busy}
               onClick={() => onPickMode(m.id)}
-              title={busy ? "현재 스트로크를 반영한 뒤 모드를 바꿀 수 있습니다." : m.tip}
+              title={busy ? translateCurrentStaticSourceText("domains.creator.StudioHealClonePanel", "ko", "현재 스트로크를 반영한 뒤 모드를 바꿀 수 있습니다.") : m.tip}
             >
               <span className="inline-flex items-center gap-1">
                 <Icon className="size-3" aria-hidden />
@@ -102,18 +105,18 @@ export function StudioHealClonePanel({
       </div>
 
       <StudioSliderRow
-        label="반경"
+        label={translateCurrentStaticSourceText("domains.creator.StudioHealClonePanel", "ko", "반경")}
         min={HEAL_CLONE_RADIUS_RANGE.min}
         max={HEAL_CLONE_RADIUS_RANGE.max}
         step={HEAL_CLONE_RADIUS_RANGE.step}
         value={radiusPx}
         disabled={busy}
         onChange={onRadiusChange}
-        readout={`${radiusPx}px`}
+        readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHealClonePanel", "en", "{v0}px"), { v0: String(radiusPx) })}
       />
 
       <StudioSliderRow
-        label="경도"
+        label={translateCurrentStaticSourceText("domains.creator.StudioHealClonePanel", "ko", "경도")}
         min={HEAL_CLONE_HARDNESS_RANGE.min}
         max={HEAL_CLONE_HARDNESS_RANGE.max}
         step={HEAL_CLONE_HARDNESS_RANGE.step}
@@ -124,7 +127,7 @@ export function StudioHealClonePanel({
       />
 
       <StudioSliderRow
-        label="불투명도"
+        label={translateCurrentStaticSourceText("domains.creator.StudioHealClonePanel", "ko", "불투명도")}
         min={HEAL_CLONE_OPACITY_RANGE.min}
         max={HEAL_CLONE_OPACITY_RANGE.max}
         step={HEAL_CLONE_OPACITY_RANGE.step}
@@ -139,23 +142,21 @@ export function StudioHealClonePanel({
         disabled={busy}
         onClick={() => onAlignedChange(!aligned)}
         title={busy
-          ? "현재 스트로크를 반영한 뒤 정렬 방식을 바꿀 수 있습니다."
-          : "켜면 소스 오프셋이 스트로크가 끝나도 유지됩니다(새 Alt+클릭 전까지). 끄면 매 스트로크마다 소스 앵커 지점부터 다시 복제합니다."}
+          ? translateCurrentStaticSourceText("domains.creator.StudioHealClonePanel", "ko", "현재 스트로크를 반영한 뒤 정렬 방식을 바꿀 수 있습니다.")
+          : translateCurrentStaticSourceText("domains.creator.StudioHealClonePanel", "ko", "켜면 소스 오프셋이 스트로크가 끝나도 유지됩니다(새 Alt+클릭 전까지). 끄면 매 스트로크마다 소스 앵커 지점부터 다시 복제합니다.")}
       >
-        정렬(Aligned)
-      </StudioToggleChip>
+        {translateCurrentStaticSourceText("domains.creator.StudioHealClonePanel", "ko", "정렬(Aligned)")}</StudioToggleChip>
 
       {hasSource && (
         <button
           type="button"
           onClick={onClearSource}
           disabled={busy}
-          title={busy ? "현재 스트로크를 반영한 뒤 소스를 해제할 수 있습니다." : "지정한 소스 앵커를 해제합니다."}
+          title={busy ? translateCurrentStaticSourceText("domains.creator.StudioHealClonePanel", "ko", "현재 스트로크를 반영한 뒤 소스를 해제할 수 있습니다.") : translateCurrentStaticSourceText("domains.creator.StudioHealClonePanel", "ko", "지정한 소스 앵커를 해제합니다.")}
           className={cn(PANEL_CHIP_CLASS, "flex w-full items-center justify-center gap-1")}
         >
           <Crosshair className="size-3" aria-hidden />
-          소스 해제
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioHealClonePanel", "ko", "소스 해제")}</button>
       )}
 
       <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">

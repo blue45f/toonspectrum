@@ -179,6 +179,7 @@ export interface StudioShortcutHandlerContext {
   readonly nodeEditTool: NodeEditTool | null;
   readonly nudgeSelected: (dx: number, dy: number) => void;
   readonly openPixelSelectionTransform: () => void;
+  readonly openStudioQuickActionsAtCanvasPointer: () => void;
   readonly openSelectedLayerCrop: () => void;
   readonly openStudioFilter: (kind: StudioFilterKind) => Promise<void>;
   readonly panelSplitActive: boolean;
@@ -377,6 +378,7 @@ export function buildStudioShortcutHandler(
     nodeEditTool,
     nudgeSelected,
     openPixelSelectionTransform,
+    openStudioQuickActionsAtCanvasPointer,
     openSelectedLayerCrop,
     openStudioFilter,
     panelSplitActive,
@@ -983,6 +985,9 @@ export function buildStudioShortcutHandler(
           }
           applyBrushSlot(slot);
           announceDrawingShortcut(`슬롯 ${drawingShortcut.index + 1}`);
+        } else if (drawingShortcut.type === "open-quick-hud") {
+          openStudioQuickActionsAtCanvasPointer();
+          announceDrawingShortcut("퀵 HUD");
         } else if (drawingShortcut.type === "toggle-chrome") {
           // Browser-safe canvas-first toggle; Tab remains native focus navigation.
           if (canvasOnlyMode) {

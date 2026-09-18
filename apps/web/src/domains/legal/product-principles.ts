@@ -1,4 +1,4 @@
-export type ProductPrinciplesLocale = "ko" | "en";
+export type ProductPrinciplesLocale = string;
 
 export interface ProductPrincipleCopy {
   readonly title: string;

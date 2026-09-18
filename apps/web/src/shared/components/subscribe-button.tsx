@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Bell, BellRing } from "lucide-react";
 import { useState } from "react";
 
@@ -45,8 +49,8 @@ export function SubscribeButton({
         className
       )}
     >
-      {on ? <BellRing key={ringKey} size={16} className={ringKey > 0 ? "pf-bell-ring" : undefined} /> : <Bell size={16} />}
-      {on ? `연재 알림 켜짐${days?.length ? ` · ${days.join("·")}` : ""}` : "연재 알림 받기"}
+      {on ? <BellRing key={ringKey} size={16} className={ringKey > 0 ? translateCurrentStaticSourceText("shared.components.subscribe.button", "en", "pf-bell-ring") : undefined} /> : <Bell size={16} />}
+      {on ? formatI18nTemplate(translateCurrentStaticSourceText("shared.components.subscribe.button", "ko", "연재 알림 켜짐{v0}"), { v0: String(days?.length ? ` · ${days.join("·")}` : "") }) : translateCurrentStaticSourceText("shared.components.subscribe.button", "ko", "연재 알림 받기")}
     </button>
   );
 }

@@ -1,4 +1,5 @@
 import { LEARNING_GOALS, LEARNING_LEVELS, type LearningGoal, type LearningLevel } from "./learning-paths";
+import { LEARNING_ROLES, type LearningRole } from "./learning-resources";
 
 export const LEARNING_PROFILE_STORAGE_KEY = "toonstudio:learning-profile:v1";
 export const SESSION_MINUTES = [15, 30, 45] as const;
@@ -7,6 +8,7 @@ export type SessionMinutes = (typeof SESSION_MINUTES)[number];
 export interface LearningProfile {
   version: 1;
   goal: LearningGoal;
+  role: LearningRole;
   level: LearningLevel;
   sessionMinutes: SessionMinutes;
 }
@@ -14,6 +16,7 @@ export interface LearningProfile {
 export const DEFAULT_LEARNING_PROFILE: LearningProfile = {
   version: 1,
   goal: "first-episode",
+  role: "artist",
   level: "starter",
   sessionMinutes: 30,
 };
@@ -24,6 +27,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isGoal(value: unknown): value is LearningGoal {
   return typeof value === "string" && LEARNING_GOALS.includes(value as LearningGoal);
+}
+
+function isRole(value: unknown): value is LearningRole {
+  return typeof value === "string" && LEARNING_ROLES.includes(value as LearningRole);
 }
 
 function isLevel(value: unknown): value is LearningLevel {
@@ -46,6 +53,7 @@ export function parseLearningProfile(raw: string | null): LearningProfile {
   return {
     version: 1,
     goal: isGoal(value.goal) ? value.goal : DEFAULT_LEARNING_PROFILE.goal,
+    role: isRole(value.role) ? value.role : DEFAULT_LEARNING_PROFILE.role,
     level: isLevel(value.level) ? value.level : DEFAULT_LEARNING_PROFILE.level,
     sessionMinutes: isSessionMinutes(value.sessionMinutes) ? value.sessionMinutes : DEFAULT_LEARNING_PROFILE.sessionMinutes,
   };

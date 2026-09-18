@@ -93,16 +93,22 @@ const HISTORICAL_BASELINE_RELATIONS = Object.freeze([
   "verificationToken",
 ]);
 export const POST_BASELINE_RELATIONS = Object.freeze([
+  "account_merge",
   "admin_announcements",
   "admin_audit_logs",
   "admin_banned_words",
   "admin_content_reports",
   "admin_promos",
   "admin_security_policies",
+  "business_inquiry",
   "community_cafe_ban",
   "community_cafe_invite",
   "community_cafe_join_request",
   "community_cafe_moderation_log",
+  "commerce_entitlement",
+  "commerce_order",
+  "commerce_payment_event",
+  "commerce_product_price",
   "creator_asset_artifact",
   "creator_asset_artifact_set",
   "creator_asset_license_snapshot",
@@ -137,6 +143,7 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "creator_promotion_comment_like",
   "creator_promotion_post",
   "creator_promotion_report",
+  "creator_role_workspace_preference",
   "creator_work_asset_storage_reference",
   "creator_work_bookmark",
   "creator_work_comment_like",
@@ -163,12 +170,34 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "production_project_event",
   "production_project_mutation_receipt",
   "production_push_subscription",
+  "studio_artifact",
+  "studio_blob",
+  "studio_capability_ledger",
+  "studio_compatibility_report",
+  "studio_external_file_binding",
+  "studio_mutation_receipt",
+  "studio_operation",
+  "studio_project_graph",
+  "studio_review",
+  "studio_review_comment",
+  "studio_review_comment_assignee",
+  "studio_review_reviewer",
+  "studio_revision",
+  "studio_revision_blob",
+  "studio_revision_parent",
+  "traffic_page_view",
+  "traffic_session",
+  "traffic_share_event",
   "studio_ai_comic_director_approval",
   "studio_ai_comic_director_artifact",
   "studio_ai_comic_director_job",
   "studio_ai_comic_director_job_event",
   "studio_ai_comic_director_session",
   "studio_ai_visual_bible_revision",
+  "creator_support_application",
+  "creator_support_offer",
+  "supporter_funding_setting",
+  "supporter_payment",
 ]);
 
 const MODE_CONFIRMATIONS = Object.freeze({
@@ -223,26 +252,243 @@ export function buildAuthRuntimeAclSql(runtimeDatabaseRole) {
   return `
 REVOKE ALL ON TABLE
   public."user",
-  public.account
+  public.account,
+  public.account_merge
 FROM PUBLIC;
 
 REVOKE ALL ON TABLE
   public."user",
-  public.account
+  public.account,
+  public.account_merge
 FROM ${quotedRole};
 
 GRANT SELECT, INSERT, UPDATE, DELETE
   ON TABLE public."user", public.account
   TO ${quotedRole};
+
+GRANT SELECT, INSERT
+  ON TABLE public.account_merge
+  TO ${quotedRole};
+GRANT UPDATE ("targetUserId", status, "completedAt", summary)
+  ON TABLE public.account_merge
+  TO ${quotedRole};
+`;
+}
+
+export function buildTrafficAnalyticsRuntimeAclSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  return `
+REVOKE ALL ON TABLE
+  public.traffic_page_view,
+  public.traffic_session,
+  public.traffic_share_event
+FROM PUBLIC;
+
+REVOKE ALL ON TABLE
+  public.traffic_page_view,
+  public.traffic_session,
+  public.traffic_share_event
+FROM ${quotedRole};
+
+GRANT SELECT, INSERT, DELETE
+  ON TABLE public.traffic_page_view, public.traffic_share_event
+  TO ${quotedRole};
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON TABLE public.traffic_session
+  TO ${quotedRole};
 `;
 }
 
 /**
- * A true result means the runtime role is missing one of the authentication
- * lifecycle DML capabilities or has gained a privilege outside that contract.
- * Keep this condition beside the GRANT builder so migration normalization and
- * the production verifier cannot drift apart.
+ * Keep analytics collection private while allowing ingestion, admin reads, and
+ * retention cleanup. Page/share events are append-only from the application.
  */
+export function buildTrafficAnalyticsRuntimeAclViolationSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const roleLiteral = sqlLiteral(role);
+  return `(
+    NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.traffic_page_view',
+      'SELECT, INSERT, DELETE'
+    )
+    OR pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.traffic_page_view',
+      'UPDATE'
+    )
+    OR NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.traffic_share_event',
+      'SELECT, INSERT, DELETE'
+    )
+    OR pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.traffic_share_event',
+      'UPDATE'
+    )
+    OR NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.traffic_session',
+      'SELECT, INSERT, UPDATE, DELETE'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'public.traffic_page_view',
+        'public.traffic_session',
+        'public.traffic_share_event'
+      ]::text[]) AS relation_name
+      CROSS JOIN unnest(ARRAY[
+        'TRUNCATE', 'REFERENCES', 'TRIGGER'
+      ]::text[]) AS elevated_privilege
+      WHERE pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        relation_name,
+        elevated_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'public.traffic_page_view',
+        'public.traffic_session',
+        'public.traffic_share_event'
+      ]::text[]) AS relation_name
+      CROSS JOIN unnest(ARRAY[
+        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
+      ]::text[]) AS public_privilege
+      WHERE pg_catalog.has_table_privilege(0::oid, relation_name, public_privilege)
+    )
+  )`;
+}
+
+/**
+ * Role workspace identity is user-scoped. The runtime may create and read rows,
+ * then advance only the optimistic revision, normalized document, and timestamp.
+ */
+export function buildCreatorRoleWorkspaceRuntimeAclSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  return `
+DO $creator_role_workspace_acl$
+DECLARE
+  column_list text;
+BEGIN
+  SELECT string_agg(format('%I', attribute.attname), ', ' ORDER BY attribute.attnum)
+  INTO column_list
+  FROM pg_catalog.pg_attribute AS attribute
+  WHERE attribute.attrelid = 'public.creator_role_workspace_preference'::regclass
+    AND attribute.attnum > 0
+    AND NOT attribute.attisdropped;
+
+  EXECUTE format(
+    'REVOKE ALL PRIVILEGES (%s) ON TABLE public.creator_role_workspace_preference FROM %I',
+    column_list,
+    ${sqlLiteral(role)}
+  );
+  EXECUTE format(
+    'REVOKE ALL PRIVILEGES (%s) ON TABLE public.creator_role_workspace_preference FROM PUBLIC',
+    column_list
+  );
+END
+$creator_role_workspace_acl$;
+
+REVOKE ALL ON TABLE public.creator_role_workspace_preference FROM PUBLIC;
+REVOKE ALL ON TABLE public.creator_role_workspace_preference FROM ${quotedRole};
+GRANT SELECT, INSERT
+  ON TABLE public.creator_role_workspace_preference
+  TO ${quotedRole};
+GRANT UPDATE ("revision", "document", "updatedAt")
+  ON TABLE public.creator_role_workspace_preference
+  TO ${quotedRole};
+`;
+}
+
+export function buildCreatorRoleWorkspaceRuntimeAclViolationSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const roleLiteral = sqlLiteral(role);
+  return `(
+    NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.creator_role_workspace_preference',
+      'SELECT, INSERT'
+    )
+    OR pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.creator_role_workspace_preference',
+      'UPDATE'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
+      ]::text[]) AS unexpected_privilege
+      WHERE pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        'public.creator_role_workspace_preference',
+        unexpected_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM pg_catalog.pg_attribute AS attribute
+      WHERE attribute.attrelid = 'public.creator_role_workspace_preference'::regclass
+        AND attribute.attnum > 0
+        AND NOT attribute.attisdropped
+        AND pg_catalog.has_column_privilege(
+          ${roleLiteral},
+          'public.creator_role_workspace_preference',
+          attribute.attname,
+          'UPDATE'
+        ) <> (attribute.attname = ANY(ARRAY[
+          'revision', 'document', 'updatedAt'
+        ]::text[]))
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM pg_catalog.pg_attribute AS attribute
+      WHERE attribute.attrelid = 'public.creator_role_workspace_preference'::regclass
+        AND attribute.attnum > 0
+        AND NOT attribute.attisdropped
+        AND pg_catalog.has_column_privilege(
+          ${roleLiteral},
+          'public.creator_role_workspace_preference',
+          attribute.attname,
+          'UPDATE WITH GRANT OPTION'
+        )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
+      ]::text[]) AS public_privilege
+      WHERE pg_catalog.has_table_privilege(
+        0::oid,
+        'public.creator_role_workspace_preference',
+        public_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM pg_catalog.pg_attribute AS attribute
+      CROSS JOIN unnest(ARRAY[
+        'SELECT', 'INSERT', 'UPDATE', 'REFERENCES'
+      ]::text[]) AS public_column_privilege
+      WHERE attribute.attrelid = 'public.creator_role_workspace_preference'::regclass
+        AND attribute.attnum > 0
+        AND NOT attribute.attisdropped
+        AND pg_catalog.has_column_privilege(
+          0::oid,
+          'public.creator_role_workspace_preference',
+          attribute.attname,
+          public_column_privilege
+        )
+    )
+  )`;
+}
+
 export function buildPersonalCloudRuntimeAclSql(runtimeDatabaseRole) {
   const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
   const quotedRole = `"${role}"`;
@@ -418,34 +664,90 @@ export function buildMessagingRuntimeAclViolationSql(runtimeDatabaseRole) {
 
 export function buildAuthRuntimeAclViolationSql(runtimeDatabaseRole) {
   const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const roleLiteral = sqlLiteral(role);
   return `(
     NOT pg_catalog.has_table_privilege(
-      ${sqlLiteral(role)},
+      ${roleLiteral},
       'public."user"',
       'SELECT, INSERT, UPDATE, DELETE'
     )
     OR NOT pg_catalog.has_table_privilege(
-      ${sqlLiteral(role)},
+      ${roleLiteral},
       'public.account',
       'SELECT, INSERT, UPDATE, DELETE'
+    )
+    OR NOT pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.account_merge',
+      'SELECT, INSERT'
+    )
+    OR pg_catalog.has_table_privilege(
+      ${roleLiteral},
+      'public.account_merge',
+      'UPDATE, DELETE'
     )
     OR EXISTS (
       SELECT 1
       FROM unnest(ARRAY[
+        'targetUserId', 'status', 'completedAt', 'summary'
+      ]::text[]) AS mutable_column
+      WHERE NOT pg_catalog.has_column_privilege(
+        ${roleLiteral},
+        'public.account_merge',
+        mutable_column,
+        'UPDATE'
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'id', 'sourceUserId', 'tokenHash', 'expiresAt', 'createdAt'
+      ]::text[]) AS immutable_column
+      WHERE pg_catalog.has_column_privilege(
+        ${roleLiteral},
+        'public.account_merge',
+        immutable_column,
+        'UPDATE'
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'public."user"',
+        'public.account',
+        'public.account_merge'
+      ]::text[]) AS relation_name
+      CROSS JOIN unnest(ARRAY[
         'TRUNCATE',
         'REFERENCES',
         'TRIGGER'
       ]::text[]) AS elevated_privilege
       WHERE pg_catalog.has_table_privilege(
-        ${sqlLiteral(role)},
+        ${roleLiteral},
+        relation_name,
+        elevated_privilege
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
         'public."user"',
-        elevated_privilege
-      )
-      OR pg_catalog.has_table_privilege(
-        ${sqlLiteral(role)},
         'public.account',
-        elevated_privilege
+        'public.account_merge'
+      ]::text[]) AS relation_name
+      CROSS JOIN unnest(ARRAY[
+        'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
+      ]::text[]) AS public_privilege
+      WHERE pg_catalog.has_table_privilege(
+        0::oid,
+        relation_name,
+        public_privilege
       )
+    )
+    OR pg_catalog.has_any_column_privilege(
+      0::oid,
+      'public.account_merge',
+      'UPDATE'
     )
   )`;
 }
@@ -549,6 +851,260 @@ export function buildRuntimeCutoverLedgerAclViolationSql(
         0::oid,
         'public.toonspectrum_schema_migration',
         public_table_privilege
+      )
+    )
+  )`;
+}
+
+
+const STUDIO_PROJECT_GRAPH_RUNTIME_ACL = Object.freeze([
+  { relation: "studio_project_graph", insert: true, delete: false, mutableColumns: [] },
+  {
+    relation: "studio_artifact",
+    insert: true,
+    delete: false,
+    mutableColumns: ["headRevisionId", "approvedRevisionId", "updatedAt"],
+  },
+  { relation: "studio_revision", insert: true, delete: false, mutableColumns: [] },
+  { relation: "studio_revision_parent", insert: true, delete: false, mutableColumns: [] },
+  { relation: "studio_blob", insert: true, delete: false, mutableColumns: [] },
+  { relation: "studio_revision_blob", insert: true, delete: false, mutableColumns: [] },
+  { relation: "studio_operation", insert: true, delete: false, mutableColumns: [] },
+  { relation: "studio_mutation_receipt", insert: true, delete: false, mutableColumns: [] },
+  {
+    relation: "studio_compatibility_report",
+    insert: true,
+    delete: false,
+    mutableColumns: ["approvedBy", "approvedAt"],
+  },
+  {
+    relation: "studio_external_file_binding",
+    insert: true,
+    delete: true,
+    mutableColumns: [
+      "displayPath",
+      "syncMode",
+      "remoteVersion",
+      "remoteEtag",
+      "contentHash",
+      "lastSyncedRevisionId",
+      "lastSyncedAt",
+      "updatedAt",
+    ],
+  },
+  {
+    relation: "studio_review",
+    insert: true,
+    delete: false,
+    mutableColumns: ["status", "decidedAt", "decidedBy", "updatedAt"],
+  },
+  {
+    relation: "studio_review_reviewer",
+    insert: true,
+    delete: false,
+    mutableColumns: [],
+  },
+  {
+    relation: "studio_review_comment",
+    insert: true,
+    delete: false,
+    mutableColumns: ["status", "resolutionRevisionId", "updatedAt"],
+  },
+  {
+    relation: "studio_review_comment_assignee",
+    insert: true,
+    delete: true,
+    mutableColumns: [],
+  },
+  { relation: "studio_capability_ledger", insert: false, delete: false, mutableColumns: [] },
+]);
+
+function studioProjectGraphRelationSqlList() {
+  return STUDIO_PROJECT_GRAPH_RUNTIME_ACL
+    .map(({ relation }) => `public.${relation}`)
+    .join(",\n  ");
+}
+
+/**
+ * The ProjectGraph API writes immutable revisions/operations and only mutates explicit pointer,
+ * approval, review and external-binding columns. The deployment role owns schema changes; the
+ * runtime role receives the least privilege needed by the repository.
+ */
+export function buildStudioProjectGraphRuntimeAclSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  const relations = studioProjectGraphRelationSqlList();
+  const inserts = STUDIO_PROJECT_GRAPH_RUNTIME_ACL
+    .filter(({ insert }) => insert)
+    .map(({ relation }) => `public.${relation}`)
+    .join(",\n    ");
+  const deletes = STUDIO_PROJECT_GRAPH_RUNTIME_ACL
+    .filter(({ delete: allowed }) => allowed)
+    .map(({ relation }) => `public.${relation}`)
+    .join(",\n    ");
+  const updateGrants = STUDIO_PROJECT_GRAPH_RUNTIME_ACL
+    .filter(({ mutableColumns }) => mutableColumns.length > 0)
+    .map(({ relation, mutableColumns }) => `GRANT UPDATE (${mutableColumns.map((column) => `"${column}"`).join(", ")})\n  ON TABLE public.${relation}\n  TO ${quotedRole};`)
+    .join("\n");
+  return `
+DO $studio_project_graph_acl$
+DECLARE
+  relation_name text;
+  column_list text;
+BEGIN
+  FOREACH relation_name IN ARRAY ARRAY[
+    ${STUDIO_PROJECT_GRAPH_RUNTIME_ACL.map(({ relation }) => sqlLiteral(relation)).join(",\n    ")}
+  ]::text[] LOOP
+    SELECT string_agg(format('%I', attribute.attname), ', ' ORDER BY attribute.attnum)
+    INTO column_list
+    FROM pg_catalog.pg_attribute AS attribute
+    WHERE attribute.attrelid = format('public.%I', relation_name)::regclass
+      AND attribute.attnum > 0
+      AND NOT attribute.attisdropped;
+
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES (%s) ON TABLE public.%I FROM %I',
+      column_list,
+      relation_name,
+      ${sqlLiteral(role)}
+    );
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES (%s) ON TABLE public.%I FROM PUBLIC',
+      column_list,
+      relation_name
+    );
+  END LOOP;
+END
+$studio_project_graph_acl$;
+
+REVOKE ALL ON TABLE
+  ${relations}
+FROM PUBLIC;
+
+REVOKE ALL ON TABLE
+  ${relations}
+FROM ${quotedRole};
+
+GRANT SELECT ON TABLE
+  ${relations}
+TO ${quotedRole};
+
+GRANT INSERT ON TABLE
+    ${inserts}
+  TO ${quotedRole};
+
+GRANT DELETE ON TABLE
+    ${deletes}
+  TO ${quotedRole};
+
+${updateGrants}
+`;
+}
+
+export function buildStudioProjectGraphRuntimeAclViolationSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const roleLiteral = sqlLiteral(role);
+  const rows = STUDIO_PROJECT_GRAPH_RUNTIME_ACL.map(({ relation, insert, delete: allowedDelete, mutableColumns }) => `(
+          ${sqlLiteral(relation)}::text,
+          ${insert ? "true" : "false"}::boolean,
+          ${allowedDelete ? "true" : "false"}::boolean,
+          ARRAY[${mutableColumns.map((column) => sqlLiteral(column)).join(", ")}]::text[]
+        )`).join(",\n        ");
+  return `(
+    EXISTS (
+      SELECT 1
+      FROM (VALUES
+        ${rows}
+      ) AS graph_contract(relation_name, allow_insert, allow_delete, mutable_columns)
+      WHERE NOT pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        format('public.%I', graph_contract.relation_name),
+        'SELECT'
+      )
+      OR pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        format('public.%I', graph_contract.relation_name),
+        'INSERT'
+      ) <> graph_contract.allow_insert
+      OR pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        format('public.%I', graph_contract.relation_name),
+        'DELETE'
+      ) <> graph_contract.allow_delete
+      OR pg_catalog.has_table_privilege(
+        ${roleLiteral},
+        format('public.%I', graph_contract.relation_name),
+        'UPDATE'
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM unnest(ARRAY['TRUNCATE', 'REFERENCES', 'TRIGGER']::text[]) AS unexpected_privilege
+        WHERE pg_catalog.has_table_privilege(
+          ${roleLiteral},
+          format('public.%I', graph_contract.relation_name),
+          unexpected_privilege
+        )
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_attribute AS attribute
+        WHERE attribute.attrelid = format('public.%I', graph_contract.relation_name)::regclass
+          AND attribute.attnum > 0
+          AND NOT attribute.attisdropped
+          AND pg_catalog.has_column_privilege(
+            ${roleLiteral},
+            format('public.%I', graph_contract.relation_name),
+            attribute.attname,
+            'UPDATE'
+          ) <> (attribute.attname = ANY(graph_contract.mutable_columns))
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM unnest(ARRAY[
+          'SELECT WITH GRANT OPTION',
+          'INSERT WITH GRANT OPTION',
+          'UPDATE WITH GRANT OPTION',
+          'DELETE WITH GRANT OPTION',
+          'TRUNCATE WITH GRANT OPTION',
+          'REFERENCES WITH GRANT OPTION',
+          'TRIGGER WITH GRANT OPTION'
+        ]::text[]) AS delegable_privilege
+        WHERE pg_catalog.has_table_privilege(
+          ${roleLiteral},
+          format('public.%I', graph_contract.relation_name),
+          delegable_privilege
+        )
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        ${STUDIO_PROJECT_GRAPH_RUNTIME_ACL.map(({ relation }) => sqlLiteral(relation)).join(",\n        ")}
+      ]::text[]) AS relation_name
+      WHERE EXISTS (
+        SELECT 1
+        FROM unnest(ARRAY[
+          'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
+        ]::text[]) AS public_privilege
+        WHERE pg_catalog.has_table_privilege(
+          0::oid,
+          format('public.%I', relation_name),
+          public_privilege
+        )
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_attribute AS attribute
+        CROSS JOIN unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'REFERENCES']::text[]) AS public_column_privilege
+        WHERE attribute.attrelid = format('public.%I', relation_name)::regclass
+          AND attribute.attnum > 0
+          AND NOT attribute.attisdropped
+          AND pg_catalog.has_column_privilege(
+            0::oid,
+            format('public.%I', relation_name),
+            attribute.attname,
+            public_column_privilege
+          )
       )
     )
   )`;
@@ -2844,6 +3400,8 @@ export function runProductionDatabaseMigrations({ // NOSONAR javascript:S3776
     // Normalize dynamic-role ACLs on every run. This also repairs providers that do not preserve
     // ALTER DEFAULT PRIVILEGES across independently owned migration and application roles.
     psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildTrafficAnalyticsRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildCreatorRoleWorkspaceRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildPersonalCloudRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildCommunityCommentRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildMessagingRuntimeAclSql(runtimeDatabaseRole));
@@ -2855,6 +3413,7 @@ export function runProductionDatabaseMigrations({ // NOSONAR javascript:S3776
     psql(databaseUrl, buildCommunityCafeCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildRuntimeCutoverLedgerAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildStudioProductionRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildStudioProjectGraphRuntimeAclSql(runtimeDatabaseRole));
     psql(
       databaseUrl,
       buildCreatorMarketplaceRuntimeAclSql(runtimeDatabaseRole),

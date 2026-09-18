@@ -1,4 +1,7 @@
 import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ChevronDown,
   ChevronUp,
   ChevronsDown,
@@ -78,15 +81,12 @@ export function StudioPageOrganizerToolbar({
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line px-3 py-3 sm:px-4">
         <div className="min-w-0">
           <h2 id="studio-page-organizer-title" className="text-sm font-bold text-fg sm:text-base">
-            페이지 오거나이저
-          </h2>
+            {translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "페이지 오거나이저")}</h2>
           <p className="text-[0.68rem] text-fg-3 sm:text-xs">
-            검색·범위 선택·검토·일괄 정리를 한 화면에서 처리합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "검색·범위 선택·검토·일괄 정리를 한 화면에서 처리합니다.")}</p>
         </div>
         <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.68rem] tabular-nums text-fg-2">
-          {filteredCount}/{pageCount}페이지
-        </span>
+          {filteredCount}/{pageCount}{translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "페이지")}</span>
         <div className="ml-auto flex items-center gap-1.5">
           <button
             type="button"
@@ -94,13 +94,12 @@ export function StudioPageOrganizerToolbar({
             className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <FilePlus2 size={14} aria-hidden />
-            새 페이지
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "새 페이지")}</button>
           <button
             type="button"
             onClick={onClose}
-            aria-label="페이지 오거나이저 닫기"
-            title="닫기 (Esc)"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "페이지 오거나이저 닫기")}
+            title={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "닫기 (Esc)")}
             className="grid size-11 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <X size={16} aria-hidden />
@@ -120,15 +119,15 @@ export function StudioPageOrganizerToolbar({
             type="search"
             value={query}
             onChange={(event: ChangeEvent<HTMLInputElement>) => onQueryChange(event.currentTarget.value)}
-            placeholder="번호·이름·메모·샷·담당자·대사 검색"
-            aria-label="페이지 검색"
+            placeholder={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "번호·이름·메모·샷·담당자·대사 검색")}
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "페이지 검색")}
             className="min-h-11 w-full rounded-xl border border-line bg-card pl-9 pr-10 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-2 focus:ring-accent/20"
           />
           {query ? (
             <button
               type="button"
               onClick={() => onQueryChange("")}
-              aria-label="페이지 검색 지우기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "페이지 검색 지우기")}
               className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg"
             >
               <X size={14} aria-hidden />
@@ -137,13 +136,13 @@ export function StudioPageOrganizerToolbar({
         </label>
         <label className="relative flex min-h-11 items-center gap-2 rounded-xl border border-line bg-card px-3 text-xs text-fg-2">
           <Filter size={14} aria-hidden className="text-fg-3" />
-          <span className="sr-only">페이지 필터</span>
+          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "페이지 필터")}</span>
           <select
             value={filter}
             onChange={(event: ChangeEvent<HTMLSelectElement>) =>
               onFilterChange(event.currentTarget.value as StudioPageOrganizerFilter)
             }
-            aria-label="페이지 필터"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "페이지 필터")}
             className="min-h-9 bg-transparent pr-7 font-semibold text-fg outline-none"
           >
             {FILTER_OPTIONS.map((option) => (
@@ -159,8 +158,7 @@ export function StudioPageOrganizerToolbar({
           disabled={visibleCount === 0}
           className="min-h-11 rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
         >
-          결과 전체 선택
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "결과 전체 선택")}</button>
       </div>
 
       {currentPageHidden ? (
@@ -169,29 +167,27 @@ export function StudioPageOrganizerToolbar({
           onClick={onRevealCurrent}
           className="mx-3 mt-3 rounded-xl border border-warning/50 bg-warning/10 px-3 py-2 text-left text-xs text-fg-2 transition-colors hover:bg-warning/15 sm:mx-4"
         >
-          현재 편집 페이지가 결과에서 숨겨졌습니다. 필터를 초기화하고 현재 페이지로 이동
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "현재 편집 페이지가 결과에서 숨겨졌습니다. 필터를 초기화하고 현재 페이지로 이동")}</button>
       ) : null}
 
       {selectedCount > 0 ? (
         <div
           role="toolbar"
-          aria-label="선택한 페이지 일괄 작업"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "선택한 페이지 일괄 작업")}
           className="mx-3 mt-3 flex min-h-12 shrink-0 items-center gap-1 overflow-x-auto rounded-xl border border-accent/40 bg-accent-soft/30 px-2 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-4"
         >
           <strong className="shrink-0 px-1 text-xs tabular-nums text-accent">
-            {selectedCount}개 선택
-          </strong>
-          <button type="button" onClick={() => onMove(-pageCount)} aria-label="선택 페이지 맨 위로" title="맨 위로" className="grid size-10 shrink-0 place-items-center rounded-lg text-fg-2 hover:bg-raised hover:text-fg">
+            {selectedCount}{translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "개 선택")}</strong>
+          <button type="button" onClick={() => onMove(-pageCount)} aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "선택 페이지 맨 위로")} title={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "맨 위로")} className="grid size-10 shrink-0 place-items-center rounded-lg text-fg-2 hover:bg-raised hover:text-fg">
             <ChevronsUp size={15} aria-hidden />
           </button>
-          <button type="button" onClick={() => onMove(-1)} aria-label="선택 페이지 한 칸 위로" title="한 칸 위로" className="grid size-10 shrink-0 place-items-center rounded-lg text-fg-2 hover:bg-raised hover:text-fg">
+          <button type="button" onClick={() => onMove(-1)} aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "선택 페이지 한 칸 위로")} title={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "한 칸 위로")} className="grid size-10 shrink-0 place-items-center rounded-lg text-fg-2 hover:bg-raised hover:text-fg">
             <ChevronUp size={15} aria-hidden />
           </button>
-          <button type="button" onClick={() => onMove(1)} aria-label="선택 페이지 한 칸 아래로" title="한 칸 아래로" className="grid size-10 shrink-0 place-items-center rounded-lg text-fg-2 hover:bg-raised hover:text-fg">
+          <button type="button" onClick={() => onMove(1)} aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "선택 페이지 한 칸 아래로")} title={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "한 칸 아래로")} className="grid size-10 shrink-0 place-items-center rounded-lg text-fg-2 hover:bg-raised hover:text-fg">
             <ChevronDown size={15} aria-hidden />
           </button>
-          <button type="button" onClick={() => onMove(pageCount)} aria-label="선택 페이지 맨 아래로" title="맨 아래로" className="grid size-10 shrink-0 place-items-center rounded-lg text-fg-2 hover:bg-raised hover:text-fg">
+          <button type="button" onClick={() => onMove(pageCount)} aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "선택 페이지 맨 아래로")} title={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "맨 아래로")} className="grid size-10 shrink-0 place-items-center rounded-lg text-fg-2 hover:bg-raised hover:text-fg">
             <ChevronsDown size={15} aria-hidden />
           </button>
           <button
@@ -201,11 +197,10 @@ export function StudioPageOrganizerToolbar({
             className="ml-1 inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg disabled:cursor-progress disabled:opacity-50"
           >
             <Copy size={14} aria-hidden />
-            {bulkAction === "duplicate" ? "복제 중" : "일괄 복제"}
+            {bulkAction === "duplicate" ? translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "복제 중") : translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "일괄 복제")}
           </button>
           <button type="button" onClick={onClearSelection} className="min-h-10 shrink-0 rounded-lg px-3 text-xs font-semibold text-fg-3 hover:bg-raised hover:text-fg">
-            선택 해제
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "선택 해제")}</button>
           <button
             type="button"
             onClick={onDelete}
@@ -213,14 +208,13 @@ export function StudioPageOrganizerToolbar({
             className="ml-auto inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold text-bad hover:bg-bad-soft/20 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Trash2 size={14} aria-hidden />
-            {bulkAction === "delete" ? "확인 중" : "일괄 삭제"}
+            {bulkAction === "delete" ? translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "확인 중") : translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "일괄 삭제")}
           </button>
         </div>
       ) : null}
 
       <span className="sr-only" role="status" aria-live="polite">
-        {filteredCount}개 페이지 표시, {selectedCount}개 선택
-      </span>
+        {filteredCount}{translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "개 페이지 표시, ")}{selectedCount}{translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "개 선택")}</span>
     </>
   );
 }
@@ -228,11 +222,11 @@ export function StudioPageOrganizerToolbar({
 export function StudioPageOrganizerFooter(): ReactElement {
   return (
     <footer className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-t border-line bg-card/50 px-3 py-2 text-[0.65rem] text-fg-3 sm:px-4">
-      <span>클릭: 단일 선택</span>
-      <span>Shift: 연속 범위</span>
-      <span>⌘/Ctrl: 개별 추가</span>
-      <span>방향키·Home·End·Page Up/Down: 탐색</span>
-      <span className="ml-auto">드래그 정렬은 기존 페이지 목록에서 계속 사용할 수 있습니다.</span>
+      <span>{translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "클릭: 단일 선택")}</span>
+      <span>{translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "Shift: 연속 범위")}</span>
+      <span>{translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "⌘/Ctrl: 개별 추가")}</span>
+      <span>{translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "방향키·Home·End·Page Up/Down: 탐색")}</span>
+      <span className="ml-auto">{translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerToolbar", "ko", "드래그 정렬은 기존 페이지 목록에서 계속 사용할 수 있습니다.")}</span>
     </footer>
   );
 }

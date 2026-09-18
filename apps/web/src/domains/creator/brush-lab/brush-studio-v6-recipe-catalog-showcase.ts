@@ -41,11 +41,11 @@ export const BRUSH_STUDIO_V6_SHOWCASE_RECIPE_SEEDS: readonly BrushStudioV6Recipe
     "libmypaint 다브와 Krita 듀얼 촉을 결합해 매트한 불투명 면 안에 미세한 섬유 결을 남김",
     { slots: {
       motion: "motion-adaptive-ema", carrier: "carrier-libmypaint-dabs", tip: "tip-krita-dual",
-      surface: "surface-kent", deposition: "deposit-marker", pickup: "pickup-krita-smudge",
-      pigment: "pigment-spectral", physics: ["physics-porous-paper"], pattern: "pattern-none",
+      surface: "surface-kent", deposition: "deposit-dry", pickup: "pickup-krita-smudge",
+      pigment: "pigment-spectral", physics: ["physics-dry-contact"], pattern: "pattern-none",
       finish: ["finish-grain"], output: "output-contact-canvas-svg",
-    }, tuning: { size: 24, opacity: 0.94, flow: 0.86, spacing: 0.065, absorbency: 0.26,
-      pickup: 0.18, granulation: 0.34, surfaceTooth: 0.42 } },
+    }, tuning: { size: 24, opacity: 0.94, flow: 0.8, spacing: 0.07, friction: 0.62,
+      pickup: 0.18, granulation: 0.42, surfaceTooth: 0.62 } },
   ),
   defineBrushStudioV6RecipeSeed(
     "pigment-spray-glaze", "입자 에어 글레이즈", "분사·에어",

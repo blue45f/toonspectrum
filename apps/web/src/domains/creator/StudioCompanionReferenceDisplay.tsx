@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ImageIcon,
   Maximize2,
   Minus,
@@ -1178,15 +1182,12 @@ export function StudioCompanionReferenceDisplay({
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0">
           <h2 id={titleId} className="truncate text-sm font-semibold text-fg">
-            분리 레퍼런스 캔버스
-          </h2>
+            {translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "분리 레퍼런스 캔버스")}</h2>
           <p id={helpId} className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
             <span className="[@media(pointer:coarse)]:hidden">
-              휠 확대 · 더블 클릭 맞춤/100% · Space+드래그 이동 · I 스포이드
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "휠 확대 · 더블 클릭 맞춤/100% · Space+드래그 이동 · I 스포이드")}</span>
             <span className="hidden [@media(pointer:coarse)]:inline">
-              두 손가락 확대 · 한 손가락 이동 · I 스포이드
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "두 손가락 확대 · 한 손가락 이동 · I 스포이드")}</span>
           </p>
         </div>
         <span
@@ -1212,23 +1213,23 @@ export function StudioCompanionReferenceDisplay({
 
       <div
         role="toolbar"
-        aria-label="레퍼런스 보기 도구"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "레퍼런스 보기 도구")}
         className="grid min-w-0 grid-cols-5 gap-1.5 rounded-xl border border-line/80 bg-card p-1.5"
       >
         <button
           type="button"
-          aria-label="화면에 맞춤"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "화면에 맞춤")}
           aria-keyshortcuts="0"
           disabled={!visiblePreview}
           onClick={resetFit}
           className={cn(toolButtonClass, "bg-raised text-fg-2 hover:border-line-strong hover:text-fg")}
         >
           <Maximize2 className="size-4" aria-hidden />
-          <span className="sr-only min-[390px]:not-sr-only">맞춤</span>
+          <span className="sr-only min-[390px]:not-sr-only">{translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "맞춤")}</span>
         </button>
         <button
           type="button"
-          aria-label="축소"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "축소")}
           aria-keyshortcuts="-"
           disabled={!visiblePreview || zoom <= MIN_ZOOM}
           onClick={() => adjustZoom(-1)}
@@ -1238,7 +1239,7 @@ export function StudioCompanionReferenceDisplay({
         </button>
         <button
           type="button"
-          aria-label="원본 100% 크기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "원본 100% 크기")}
           disabled={!visiblePreview}
           onClick={setActualSize}
           className={cn(
@@ -1253,7 +1254,7 @@ export function StudioCompanionReferenceDisplay({
         </button>
         <button
           type="button"
-          aria-label="확대"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "확대")}
           aria-keyshortcuts="+"
           disabled={!visiblePreview || zoom >= MAX_ZOOM}
           onClick={() => adjustZoom(1)}
@@ -1263,7 +1264,7 @@ export function StudioCompanionReferenceDisplay({
         </button>
         <button
           type="button"
-          aria-label="스포이드"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "스포이드")}
           aria-keyshortcuts="I"
           aria-pressed={pickerActive}
           disabled={!pickerReady}
@@ -1282,7 +1283,7 @@ export function StudioCompanionReferenceDisplay({
       <button
         type="button"
         ref={viewportRef}
-        aria-label="합성된 레퍼런스 캔버스"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "합성된 레퍼런스 캔버스")}
         aria-describedby={`${helpId} ${statusId}`}
         aria-keyshortcuts="0 + - I Escape Enter Space"
         onClick={handleClick}
@@ -1321,7 +1322,7 @@ export function StudioCompanionReferenceDisplay({
         {visiblePreview ? (
           <img
             src={visiblePreview.url}
-            alt="합성된 레퍼런스 캔버스 미리보기"
+            alt={translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "합성된 레퍼런스 캔버스 미리보기")}
             draggable={false}
             className={cn(
               "pointer-events-none absolute inset-0 size-full select-none object-contain",
@@ -1384,14 +1385,14 @@ export function StudioCompanionReferenceDisplay({
                 : feedback}`
             : displayState === "ready"
               ? colorResult
-                ? `선택한 색 ${colorResult.color.toUpperCase()}`
+                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "선택한 색 {v0}"), { v0: String(colorResult.color.toUpperCase()) })
                 : feedback
               : copy.title}
         </p>
 
         {colorResult ? (
           <output
-            aria-label={`최근 선택 색상 ${colorResult.color.toUpperCase()}`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "최근 선택 색상 {v0}"), { v0: String(colorResult.color.toUpperCase()) })}
             className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-line bg-card px-2 text-[0.65rem] font-semibold text-fg-2"
           >
             <span
@@ -1404,7 +1405,7 @@ export function StudioCompanionReferenceDisplay({
         ) : (
           <span className="inline-flex min-h-11 shrink-0 items-center gap-1.5 px-1 text-[0.65rem] text-fg-3">
             <Move className="size-3.5" aria-hidden />
-            <span className="max-[359px]:sr-only">보기 전용</span>
+            <span className="max-[359px]:sr-only">{translateCurrentStaticSourceText("domains.creator.StudioCompanionReferenceDisplay", "ko", "보기 전용")}</span>
           </span>
         )}
       </div>

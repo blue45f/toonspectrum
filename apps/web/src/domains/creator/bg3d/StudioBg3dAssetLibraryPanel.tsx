@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   ChevronDown,
   Download,
@@ -228,17 +232,15 @@ export function StudioBg3dAssetLibraryPanel({
       <div className="mb-2 flex items-center justify-between gap-3">
         <h3 id="bg3d-asset-library-title" className="flex items-center gap-1.5 text-sm font-bold text-fg">
           <PackageOpen size={15} className="text-accent" aria-hidden />
-          3D 모델
-        </h3>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "3D 모델")}</h3>
         <span className="text-right text-[0.68rem] text-fg-3" aria-live="polite">
-          표시 {visibleEntries.length}/{filteredEntries.length}개 · {deviceProfileLabel} 기준
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "표시 ")}{visibleEntries.length}/{filteredEntries.length}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "개 · ")}{deviceProfileLabel} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "기준")}</span>
       </div>
 
       <input
         ref={fileInputRef}
         accept={MODEL_FILE_ACCEPT}
-        aria-label="3D 모델 및 연결 파일 선택"
+        aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "3D 모델 및 연결 파일 선택")}
         className="sr-only"
         multiple
         type="file"
@@ -256,14 +258,14 @@ export function StudioBg3dAssetLibraryPanel({
         {isUploading ? <X size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
         {isUploading
           ? importProgress?.totalModels
-            ? `가져오기 취소 · ${importProgress.completedModels}/${importProgress.totalModels}`
-            : "가져오기 취소"
-          : "3D 모델 및 연결 파일 가져오기"}
+            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "가져오기 취소 · {v0}/{v1}"), { v0: String(importProgress.completedModels), v1: String(importProgress.totalModels) })
+            : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "가져오기 취소")
+          : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "3D 모델 및 연결 파일 가져오기")}
       </button>
       <details className="group mt-2 rounded-xl border border-line bg-card/60 open:bg-card">
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-bold text-fg marker:content-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9">
           <ShieldCheck size={14} className="shrink-0 text-accent" aria-hidden />
-          <span className="min-w-0 flex-1 truncate">이용 권리 기록</span>
+          <span className="min-w-0 flex-1 truncate">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "이용 권리 기록")}</span>
           <span className="shrink-0 text-[0.65rem] font-semibold text-fg-3">
             {RIGHTS_PRESETS.find((preset) => preset.id === rightsStatus)?.label}
           </span>
@@ -276,9 +278,8 @@ export function StudioBg3dAssetLibraryPanel({
 
         <div className="border-t border-line px-3 pb-3 pt-2.5">
           <p className="text-[0.68rem] leading-relaxed text-fg-3">
-            모델 파일은 외부로 전송하지 않습니다. 출처의 원본 라이선스를 확인하고, 작업에 함께 보관할 권리 정보를 선택하세요.
-          </p>
-          <div className="mt-2 grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="가져올 3D 모델 이용 권리">
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "모델 파일은 외부로 전송하지 않습니다. 출처의 원본 라이선스를 확인하고, 작업에 함께 보관할 권리 정보를 선택하세요.")}</p>
+          <div className="mt-2 grid grid-cols-2 gap-1.5" role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "가져올 3D 모델 이용 권리")}>
             {RIGHTS_PRESETS.map((preset) => (
               <button
                 key={preset.id}
@@ -304,12 +305,12 @@ export function StudioBg3dAssetLibraryPanel({
 
           {rightsStatus === "licensed" ? (
             <label className="mt-2 block text-[0.68rem] font-bold text-fg-2">
-              라이선스·구매처 이름 <span className="text-accent">필수</span>
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "라이선스·구매처 이름 ")}<span className="text-accent">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "필수")}</span>
               <input
                 type="text"
                 value={licenseName}
                 maxLength={160}
-                placeholder="예: ACON3D 구매 라이선스"
+                placeholder={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "예: ACON3D 구매 라이선스")}
                 aria-invalid={!trimmedLicenseName || undefined}
                 className="mt-1 min-h-11 w-full rounded-lg border border-line bg-panel px-2.5 text-xs font-medium text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
                 onChange={(event) => setLicenseName(event.target.value)}
@@ -325,8 +326,7 @@ export function StudioBg3dAssetLibraryPanel({
               className="size-4 accent-[var(--color-accent)]"
               onChange={(event) => setCommercialUse(event.target.checked)}
             />
-            상업 작품에 사용할 수 있음
-          </label>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "상업 작품에 사용할 수 있음")}</label>
           <label className="mt-1.5 flex min-h-11 items-center gap-2 rounded-lg border border-line bg-panel px-2.5 text-[0.68rem] font-semibold text-fg-2 sm:min-h-9">
             <input
               type="checkbox"
@@ -334,16 +334,15 @@ export function StudioBg3dAssetLibraryPanel({
               className="size-4 accent-[var(--color-accent)]"
               onChange={(event) => setAttributionRequired(event.target.checked)}
             />
-            작품에 출처 표기가 필요함
-          </label>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "작품에 출처 표기가 필요함")}</label>
           {attributionRequired ? (
             <label className="mt-2 block text-[0.68rem] font-bold text-fg-2">
-              출처 표기 문구 <span className="text-accent">필수</span>
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "출처 표기 문구 ")}<span className="text-accent">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "필수")}</span>
               <input
                 type="text"
                 value={attribution}
                 maxLength={160}
-                placeholder="예: 모델 제작자 · 라이선스명"
+                placeholder={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "예: 모델 제작자 · 라이선스명")}
                 aria-invalid={!trimmedAttribution || undefined}
                 className="mt-1 min-h-11 w-full rounded-lg border border-line bg-panel px-2.5 text-xs font-medium text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
                 onChange={(event) => setAttribution(event.target.value)}
@@ -352,20 +351,12 @@ export function StudioBg3dAssetLibraryPanel({
           ) : null}
           {!rightsAreComplete ? (
             <p className="mt-2 text-[0.66rem] font-semibold leading-relaxed text-accent" role="alert">
-              필수 권리 정보를 입력하면 파일을 선택할 수 있습니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "필수 권리 정보를 입력하면 파일을 선택할 수 있습니다.")}</p>
           ) : null}
         </div>
       </details>
       <p className="mt-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-xs leading-relaxed text-fg-3">
-        SketchUp에서 내보낸 DAE·OBJ를 포함해 GLB·glTF·FBX·STL·PLY·3DS를 지원합니다. glTF의 BIN/텍스처나 OBJ의 MTL/텍스처도 함께 선택하세요.
-        외부 네트워크 참조 없이 자체 포함 GLB로 변환하고, Worker에서 SHA-256·파일 구조와 기기별
-        삼각형/텍스처 예산을 검사한 뒤 로컬 라이브러리에 저장합니다. Meshopt 압축은 별도 WASM
-        Worker에서 풀며 디코딩 후 메모리도 같은 기기 예산으로 제한합니다. KTX2/Basis 텍스처는
-        전체 mip 선행 검사 뒤 현재 3D 렌더러에 맞는 형식으로 변환합니다.
-        카드의 GLB 저장은 원본 FBX·OBJ를 확장자만 바꾸는 기능이 아니라, 로컬에서 검증·정규화한
-        자체 포함 GLB를 저장 직전에 다시 검사해 내려받는 기능입니다.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "SketchUp에서 내보낸 DAE·OBJ를 포함해 GLB·glTF·FBX·STL·PLY·3DS를 지원합니다. glTF의 BIN/텍스처나 OBJ의 MTL/텍스처도 함께 선택하세요. 외부 네트워크 참조 없이 자체 포함 GLB로 변환하고, Worker에서 SHA-256·파일 구조와 기기별 삼각형/텍스처 예산을 검사한 뒤 로컬 라이브러리에 저장합니다. Meshopt 압축은 별도 WASM Worker에서 풀며 디코딩 후 메모리도 같은 기기 예산으로 제한합니다. KTX2/Basis 텍스처는 전체 mip 선행 검사 뒤 현재 3D 렌더러에 맞는 형식으로 변환합니다. 카드의 GLB 저장은 원본 FBX·OBJ를 확장자만 바꾸는 기능이 아니라, 로컬에서 검증·정규화한 자체 포함 GLB를 저장 직전에 다시 검사해 내려받는 기능입니다.")}</p>
 
       {downloadFeedback ? (
         <p
@@ -377,8 +368,8 @@ export function StudioBg3dAssetLibraryPanel({
                 ? "border-good/35 bg-good/10 text-good"
                 : "border-line bg-card text-fg-2",
           )}
-          role={downloadFeedback.tone === "error" ? "alert" : "status"}
-          aria-live={downloadFeedback.tone === "error" ? "assertive" : "polite"}
+          role={downloadFeedback.tone === "error" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "en", "status")}
+          aria-live={downloadFeedback.tone === "error" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "en", "assertive") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "en", "polite")}
         >
           {downloadFeedback.tone === "error" ? (
             <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden />
@@ -394,15 +385,13 @@ export function StudioBg3dAssetLibraryPanel({
       {libraryStatus === "error" ? (
         <p className="mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3" role="alert">
           <AlertTriangle className="mr-1 inline align-[-2px] text-accent" size={14} aria-hidden />
-          저장된 3D 모델 목록을 불러오지 못했습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "저장된 3D 모델 목록을 불러오지 못했습니다.")}</p>
       ) : null}
 
       {libraryStatus === "degraded" ? (
         <p className="mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3" role="status">
           <AlertTriangle className="mr-1 inline align-[-2px] text-accent" size={14} aria-hidden />
-          번들 환경은 계속 사용할 수 있습니다. 로컬 3D 모델 저장소만 현재 사용할 수 없습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "번들 환경은 계속 사용할 수 있습니다. 로컬 3D 모델 저장소만 현재 사용할 수 없습니다.")}</p>
       ) : null}
 
       <div className="relative mt-3">
@@ -410,9 +399,9 @@ export function StudioBg3dAssetLibraryPanel({
         <input
           type="search"
           value={query}
-          aria-label="3D 모델 라이브러리 검색"
+          aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "3D 모델 라이브러리 검색")}
           aria-controls={MODEL_RESULTS_ID}
-          placeholder="모델 이름·형식 검색…"
+          placeholder={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "모델 이름·형식 검색…")}
           spellCheck={false}
           className="min-h-11 w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-2 text-xs text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
           onChange={(event) => {
@@ -422,7 +411,7 @@ export function StudioBg3dAssetLibraryPanel({
         />
       </div>
 
-      <div className="mt-2 grid grid-cols-3 gap-1.5" role="group" aria-label="3D 모델 상태 필터">
+      <div className="mt-2 grid grid-cols-3 gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "3D 모델 상태 필터")}>
         {ASSET_FILTERS.map((option) => (
           <button
             key={option.id}
@@ -445,7 +434,7 @@ export function StudioBg3dAssetLibraryPanel({
         ))}
       </div>
 
-      <div className="mt-2 grid grid-cols-5 gap-1.5" role="group" aria-label="3D 모델 종류 필터">
+      <div className="mt-2 grid grid-cols-5 gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "3D 모델 종류 필터")}>
         {ASSET_CLASSIFICATION_FILTERS.map((option) => (
           <button
             key={option.id}
@@ -471,14 +460,12 @@ export function StudioBg3dAssetLibraryPanel({
       <div id={MODEL_RESULTS_ID} className="mt-3 grid grid-cols-2 gap-2">
         {libraryStatus === "loading" ? (
           <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">
-            저장된 3D 모델을 불러오는 중입니다.
-          </div>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "저장된 3D 모델을 불러오는 중입니다.")}</div>
         ) : null}
 
         {libraryStatus === "ready" && entries.length === 0 ? (
           <div className="col-span-2 rounded-xl border border-dashed border-line bg-card/45 px-3 py-4 text-center text-xs leading-relaxed text-fg-3">
-            가져온 3D 모델이 아직 없습니다. GLB를 선택하거나 모델과 연결 리소스를 함께 선택해 보세요.
-          </div>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "가져온 3D 모델이 아직 없습니다. GLB를 선택하거나 모델과 연결 리소스를 함께 선택해 보세요.")}</div>
         ) : null}
 
         {entries.length > 0 && filteredEntries.length === 0 ? (
@@ -486,8 +473,7 @@ export function StudioBg3dAssetLibraryPanel({
             className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3"
             role="status"
           >
-            검색·상태·종류 필터와 일치하는 3D 모델이 없습니다.
-          </div>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "검색·상태·종류 필터와 일치하는 3D 모델이 없습니다.")}</div>
         ) : null}
 
         {visibleEntries.map((entry) => {
@@ -506,8 +492,8 @@ export function StudioBg3dAssetLibraryPanel({
             >
               <button
                 type="button"
-                aria-label={`${entry.name} 장면에 추가`}
-                aria-describedby={`bg3d-model-status-${entry.id}`}
+                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "{v0} 장면에 추가"), { v0: String(entry.name) })}
+                aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "en", "bg3d-model-status-{v0}"), { v0: String(entry.id) })}
                 className="grid min-h-[7.75rem] w-full grid-rows-[3rem_auto] gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-55"
                 disabled={!entry.canUse || isDeleting || isExporting || isUploading || isRestoringScene}
                 onClick={() => onAdd(entry.id)}
@@ -527,8 +513,7 @@ export function StudioBg3dAssetLibraryPanel({
                     </span>
                     {bundledEnvironment ? (
                       <span className="inline-flex rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.64rem] font-bold text-accent">
-                        환경 · CC0
-                      </span>
+                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "환경 · CC0")}</span>
                     ) : null}
                     <span
                       className={cx(
@@ -538,10 +523,10 @@ export function StudioBg3dAssetLibraryPanel({
                           : "bg-raised text-fg-3",
                       )}
                     >
-                      {entry.commercialUse ? "상업 이용 가능" : "상업 이용 확인 필요"}
+                      {entry.commercialUse ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "상업 이용 가능") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "상업 이용 확인 필요")}
                     </span>
                   </span>
-                  <span id={`bg3d-model-status-${entry.id}`} className="mt-1 line-clamp-2 block text-[0.64rem] leading-snug text-fg-3">
+                  <span id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "en", "bg3d-model-status-{v0}"), { v0: String(entry.id) })} className="mt-1 line-clamp-2 block text-[0.64rem] leading-snug text-fg-3">
                     {bundledEnvironment?.description ?? entry.statusMessage}
                   </span>
                 </span>
@@ -552,9 +537,9 @@ export function StudioBg3dAssetLibraryPanel({
                   <button
                     type="button"
                     aria-label={isExporting
-                      ? `${entry.name} 정규화 GLB 저장 취소`
-                      : `${entry.name} 정규화 GLB 저장`}
-                    aria-describedby={`bg3d-model-status-${entry.id}`}
+                      ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "{v0} 정규화 GLB 저장 취소"), { v0: String(entry.name) })
+                      : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "{v0} 정규화 GLB 저장"), { v0: String(entry.name) })}
+                    aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "en", "bg3d-model-status-{v0}"), { v0: String(entry.id) })}
                     className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-1.5 text-[0.64rem] font-bold text-fg-2 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-8"
                     disabled={
                       !canDownloadCanonicalGlb ||
@@ -571,12 +556,12 @@ export function StudioBg3dAssetLibraryPanel({
                     ) : (
                       <Download className="shrink-0" size={13} aria-hidden />
                     )}
-                    <span className="truncate">{isExporting ? "취소" : "GLB 저장"}</span>
+                    <span className="truncate">{isExporting ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "취소") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "GLB 저장")}</span>
                   </button>
                   <button
                     type="button"
-                    aria-label={`${entry.name} 삭제`}
-                    title={isRestoringScene ? "장면 원본 복원이 끝난 뒤 삭제할 수 있습니다." : undefined}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "{v0} 삭제"), { v0: String(entry.name) })}
+                    title={isRestoringScene ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "장면 원본 복원이 끝난 뒤 삭제할 수 있습니다.") : undefined}
                     className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-1.5 text-[0.64rem] font-bold text-fg-3 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-8"
                     disabled={isDeleting || isExporting || isRestoringScene}
                     onClick={(event) => {
@@ -589,7 +574,7 @@ export function StudioBg3dAssetLibraryPanel({
                     ) : (
                       <Trash2 className="shrink-0" size={13} aria-hidden />
                     )}
-                    <span className="truncate">{isDeleting ? "삭제 중" : "삭제"}</span>
+                    <span className="truncate">{isDeleting ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "삭제 중") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "삭제")}</span>
                   </button>
                 </div>
               ) : null}
@@ -604,8 +589,7 @@ export function StudioBg3dAssetLibraryPanel({
           className={cx(CONTROL_BUTTON, "mt-3 w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
           onClick={() => setVisibleCount((count) => count + ASSET_BATCH_SIZE)}
         >
-          모델 {Math.min(ASSET_BATCH_SIZE, hiddenEntryCount)}개 더 보기
-          <span className="text-fg-3">· {hiddenEntryCount}개 남음</span>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "모델 ")}{Math.min(ASSET_BATCH_SIZE, hiddenEntryCount)}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "개 더 보기")}<span className="text-fg-3">· {hiddenEntryCount}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "개 남음")}</span>
         </button>
       ) : filteredEntries.length > ASSET_BATCH_SIZE ? (
         <button
@@ -613,8 +597,7 @@ export function StudioBg3dAssetLibraryPanel({
           className={cx(CONTROL_BUTTON, "mt-3 w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
           onClick={() => setVisibleCount(ASSET_BATCH_SIZE)}
         >
-          처음 {ASSET_BATCH_SIZE}개만 보기
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "처음 ")}{ASSET_BATCH_SIZE}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "개만 보기")}</button>
       ) : null}
     </section>
   );

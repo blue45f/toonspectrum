@@ -426,6 +426,8 @@ export function applyStudioShellFloatingPreset(
   preset: StudioShellFloatingPresetId,
   autoHideDuringStroke = DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY.autoHideDuringStroke,
 ): StudioShellFloatingVisibilityState {
+  const autoHideDuringStroke = normalizeStudioShellFloatingVisibility(state)
+    .autoHideDuringStroke;
   switch (preset) {
     case "canvas-focus":
       return freezeVisibility([

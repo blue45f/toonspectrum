@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useRef } from "react";
 
 import {
@@ -93,7 +97,7 @@ export function StudioDualColorWell({
       data-studio-secondary-color={secondary?.toLowerCase()}
       className={cn("flex shrink-0 items-center gap-1.5", className)}
       role="group"
-      aria-label="색상"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioDualColorWell", "ko", "색상")}
     >
       {recent.slice(0, 5).map((swatch, index) => {
         const isCurrentPrimary = primary.toLowerCase() === swatch.toLowerCase();
@@ -102,11 +106,11 @@ export function StudioDualColorWell({
             key={`${swatch}-${index}`}
             type="button"
             data-studio-recent-color="true"
-            data-studio-recent-color-current={isCurrentPrimary ? "true" : undefined}
+            data-studio-recent-color-current={isCurrentPrimary ? translateCurrentStaticSourceText("domains.creator.StudioDualColorWell", "en", "true") : undefined}
             aria-label={
               isCurrentPrimary
-                ? `최근 색 ${index + 1} ${swatch} · 현재 주 색`
-                : `최근 색 ${index + 1} ${swatch} · 주 색으로 적용`
+                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDualColorWell", "ko", "최근 색 {v0} {v1} · 현재 주 색"), { v0: String(index + 1), v1: String(swatch) })
+                : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDualColorWell", "ko", "최근 색 {v0} {v1} · 주 색으로 적용"), { v0: String(index + 1), v1: String(swatch) })
             }
             aria-pressed={isCurrentPrimary}
             onClick={() => onPrimaryChange(swatch)}
@@ -133,14 +137,14 @@ export function StudioDualColorWell({
               className="block size-full cursor-pointer overflow-hidden rounded-md border border-white/20 shadow-[0_2px_4px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-transform hover:scale-105 active:scale-95"
               style={{ background: secondary }}
             >
-              <span className="sr-only">보조 색 선택 · 현재 {secondary}</span>
+              <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioDualColorWell", "ko", "보조 색 선택 · 현재 ")}{secondary}</span>
               <input
                 type="color"
                 value={secondary}
                 onInput={(event) => dispatchColor("secondary", event.currentTarget.value)}
                 onChange={(event) => dispatchColor("secondary", event.currentTarget.value)}
                 className="absolute inset-0 size-full cursor-pointer opacity-0"
-                aria-label={`보조 색 선택 · 현재 ${secondary}`}
+                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDualColorWell", "ko", "보조 색 선택 · 현재 {v0}"), { v0: String(secondary) })}
               />
             </label>
           </StudioToolHintTarget>
@@ -154,14 +158,14 @@ export function StudioDualColorWell({
             className="block size-full cursor-pointer overflow-hidden rounded-lg border border-white/20 shadow-[0_2px_6px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-black/10 transition-transform hover:scale-105 active:scale-95"
             style={{ background: primary }}
           >
-            <span className="sr-only">주 색 선택 · 현재 {primary}</span>
+            <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioDualColorWell", "ko", "주 색 선택 · 현재 ")}{primary}</span>
             <input
               type="color"
               value={primary}
               onInput={(event) => dispatchColor("primary", event.currentTarget.value)}
               onChange={(event) => dispatchColor("primary", event.currentTarget.value)}
               className="absolute inset-0 size-full cursor-pointer opacity-0"
-              aria-label={`주 색 선택 · 현재 ${primary}`}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDualColorWell", "ko", "주 색 선택 · 현재 {v0}"), { v0: String(primary) })}
             />
           </label>
         </StudioToolHintTarget>
@@ -172,7 +176,7 @@ export function StudioDualColorWell({
           <button
             type="button"
             onClick={onTransparentToggle}
-            aria-label="투명색 선택 (단축키 Shift+C)"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioDualColorWell", "ko", "투명색 선택 (단축키 Shift+C)")}
             aria-pressed={isTransparent}
             aria-keyshortcuts="Shift+C"
             data-studio-transparent-color-well="true"
@@ -200,7 +204,7 @@ export function StudioDualColorWell({
           <button
             type="button"
             onClick={onSwap}
-            aria-label="주 색과 보조 색 교체"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioDualColorWell", "ko", "주 색과 보조 색 교체")}
             aria-keyshortcuts="X"
             data-studio-color-swap="true"
             className={cn(

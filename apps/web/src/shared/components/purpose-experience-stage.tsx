@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
   CheckCircle2,
@@ -64,12 +65,10 @@ export function PurposeExperienceStage({
       <div className="relative flex h-full min-h-56 flex-col justify-between">
         <div className="flex items-center justify-between gap-3">
           <span className="font-display text-[0.62rem] font-bold tracking-[0.16em] text-fg-3">
-            LIVE WORKFLOW
-          </span>
+            {translateCurrentStaticSourceText("shared.components.purpose.experience.stage", "en", "LIVE WORKFLOW")}</span>
           <span className="flex items-center gap-1.5 rounded-full border border-line bg-panel/70 px-2.5 py-1 text-[0.64rem] font-semibold text-fg-2">
             <span className="size-1.5 rounded-full bg-good motion-safe:animate-pulse" />
-            interactive
-          </span>
+            {translateCurrentStaticSourceText("shared.components.purpose.experience.stage", "en", "interactive")}</span>
         </div>
 
         <div className="my-5 grid grid-cols-3 items-center gap-2">

@@ -1,0 +1,125 @@
+{
+  "artifactOrder": [
+    "episode-image",
+    "episode-image",
+    "thumbnail:episode",
+    "review-pdf",
+    "credits",
+    "ai-disclosure",
+    "validation-report",
+    "manifest"
+  ],
+  "canExport": true,
+  "destination": "webtoon",
+  "errorCodes": [],
+  "generatedAt": "2026-09-17T00:00:00.000Z",
+  "manifest": {
+    "ai": {
+      "disclosure": "색상 아이디어에 AI 보조를 사용하고 창작자가 최종 검수했습니다.",
+      "usage": "assisted"
+    },
+    "artifacts": [
+      {
+        "byteSize": 900000,
+        "fileName": "episode-007-webtoon-001.jpeg",
+        "height": 1280,
+        "mimeType": "image/jpeg",
+        "role": "episode-image",
+        "sha256": "821d0d66f4f5759420242716489482de1d06fae1a7ea71e7280b22f447018090",
+        "state": "ready",
+        "width": 800
+      },
+      {
+        "byteSize": 1000000,
+        "fileName": "episode-007-webtoon-002.jpeg",
+        "height": 960,
+        "mimeType": "image/jpeg",
+        "role": "episode-image",
+        "sha256": "81a831747ba2b02cfd90b0598c360660700f8f1ea4d5cb024eeb43fcdef144de",
+        "state": "ready",
+        "width": 800
+      },
+      {
+        "byteSize": 120000,
+        "fileName": "episode007thumbnail.jpeg",
+        "height": 142,
+        "mimeType": "image/jpeg",
+        "role": "thumbnail",
+        "sha256": "a73cf68828f7b60e7f9214c0db3cfff871ecf7a3ad2181d86575822cae70d34b",
+        "slot": "episode",
+        "state": "ready",
+        "width": 202
+      },
+      {
+        "byteSize": 2003,
+        "fileName": "review.pdf",
+        "mimeType": "application/pdf",
+        "role": "review-pdf",
+        "sha256": "95b6adca07fbf47cae613137d5de3c25c444fa302bc688eece487ffac229a0b4",
+        "state": "ready"
+      },
+      {
+        "byteSize": 2004,
+        "fileName": "credits.txt",
+        "mimeType": "text/plain",
+        "role": "credits",
+        "sha256": "e0fcc5621aa0a9fc82caaded82280b6451ba8c15cc18ed3424d41a86dcbf32f9",
+        "state": "ready"
+      },
+      {
+        "byteSize": 2005,
+        "fileName": "ai-disclosure.json",
+        "mimeType": "application/json",
+        "role": "ai-disclosure",
+        "sha256": "d9f37b792bc4ced0cac3959c655c6a6e8677f5096c26547dbc2a679189ed0016",
+        "state": "ready"
+      },
+      {
+        "byteSize": 2006,
+        "fileName": "validation-report.json",
+        "mimeType": "application/json",
+        "role": "validation-report",
+        "sha256": "10ddc62bc83238ac451e6e9ae0b0ad1aed9f7394207d9b23fe15e3a8c89724d0",
+        "state": "ready"
+      },
+      {
+        "fileName": "manifest.json",
+        "mimeType": "application/json",
+        "role": "manifest",
+        "state": "planned"
+      }
+    ],
+    "creditsIncluded": true,
+    "destination": "webtoon",
+    "generatedAt": "2026-09-17T00:00:00.000Z",
+    "preset": {
+      "id": "webtoon",
+      "policySnapshotDate": "2026-07-10",
+      "requiresCurrentPolicyReview": true,
+      "revision": "webtoon-canvas-2026-03"
+    },
+    "publication": {
+      "episodeNumber": 7,
+      "episodeTitle": "첫 번째 단서",
+      "seriesTitle": "별빛 탐정단"
+    },
+    "schema": "toonspectrum.publish-package",
+    "totals": {
+      "episodeImageCount": 2,
+      "knownEpisodeBytes": 1900000,
+      "thumbnailCount": 1
+    },
+    "validation": {
+      "canExport": true,
+      "errorCount": 0,
+      "warningCount": 0
+    },
+    "version": 1
+  },
+  "manifestSha256": "5b7679473f03a413c4f94deacbd00bed1d7f085538d4ed8f8f345aae7665fe85",
+  "policySnapshotDate": "2026-07-10",
+  "presetRevision": "webtoon-canvas-2026-03",
+  "privacyMarkersAbsent": true,
+  "schemaVersion": 1,
+  "warningCodes": []
+}

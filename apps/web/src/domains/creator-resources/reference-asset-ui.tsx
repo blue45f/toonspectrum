@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Images } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
@@ -101,9 +105,9 @@ export function AssetImage({
   const [failed, setFailed] = useState(false);
   if (!item.imageUrl || failed) {
     return (
-      <div className={`${className} grid place-items-center bg-raised text-fg-3`}>
+      <div className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.reference.asset.ui", "en", "{v0} grid place-items-center bg-raised text-fg-3"), { v0: String(className) })}>
         <Images size={28} aria-hidden="true" />
-        <span className="sr-only">미리보기를 불러오지 못했습니다.</span>
+        <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.resources.reference.asset.ui", "ko", "미리보기를 불러오지 못했습니다.")}</span>
       </div>
     );
   }
@@ -111,11 +115,11 @@ export function AssetImage({
     <img
       src={item.imageUrl}
       alt=""
-      loading={eager ? "eager" : "lazy"}
+      loading={eager ? translateCurrentStaticSourceText("domains.creator.resources.reference.asset.ui", "en", "eager") : translateCurrentStaticSourceText("domains.creator.resources.reference.asset.ui", "en", "lazy")}
       decoding="async"
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
-      className={`${className} bg-raised object-contain`}
+      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.reference.asset.ui", "en", "{v0} bg-raised object-contain"), { v0: String(className) })}
     />
   );
 }

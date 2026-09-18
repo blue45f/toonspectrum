@@ -1,6 +1,952 @@
 {
   "version": 1,
-  "description": "GPT Image 2.5 BYOK generated Studio backgrounds. Generation installs records here; full-frame review is required before recommendation.",
+  "description": "Reviewed OpenAI image-generation Studio backgrounds replacing legacy small-panel-only assets.",
   "model": "gpt-image-2.5-sunburst",
-  "assets": []
+  "updatedAt": "2026-09-18T00:15:49.022886Z",
+  "assets": [
+    {
+      "id": "webtoon-action-highway-chase",
+      "label": "야간 고속도로 · 세로 원근",
+      "title": "야간 고속도로 · 세로 원근",
+      "genre": "action",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/action/gpt25-bg-action-highway-chase-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 3790952,
+      "sha256": "28483ea1fee0bf16d3bd103be1a20b816c8545edf47487e1e202c3bff7f007de",
+      "tags": [
+        "고속도로",
+        "야간",
+        "세로 원근",
+        "낮",
+        "흐림",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "dc2ed344b1e3dd446fd4793060faa8e020d6ebf32e094ac896ed1f1572f37d72",
+        "recipeId": "gpt25-bg-action-highway-chase-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/action/gpt25-bg-action-highway-chase-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-action-jungle-temple",
+      "label": "정글 속 고대 유적 · 세로 원근",
+      "title": "정글 속 고대 유적 · 세로 원근",
+      "genre": "action",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/action/gpt25-bg-action-jungle-temple-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 4818318,
+      "sha256": "cf1224b6f69156d211df464599a2d207bf040b20959e5710930b83937ed44394",
+      "tags": [
+        "정글",
+        "유적",
+        "세로 원근",
+        "노을",
+        "비",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실외",
+      "timeOfDay": "노을",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "29cc974be1d3812ef9951a14eb63c1cc98de5cc2f807361a4e4f67d7e59c64a5",
+        "recipeId": "gpt25-bg-action-jungle-temple-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/action/gpt25-bg-action-jungle-temple-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-action-ruined-city",
+      "label": "붕괴한 도심 · 세로 원근",
+      "title": "붕괴한 도심 · 세로 원근",
+      "genre": "action",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/action/gpt25-bg-action-ruined-city-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 3919129,
+      "sha256": "9bafc0aad76726aa32f25fdb85a6af5bede5b277a1823f652955f018441fd9e3",
+      "tags": [
+        "폐허",
+        "도시",
+        "세로 원근",
+        "새벽",
+        "안개",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "1dd073f8c1b7b12a93c9399d7b3bc3eafad1bc900aca7dcabc23edae0d337dc3",
+        "recipeId": "gpt25-bg-action-ruined-city-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/action/gpt25-bg-action-ruined-city-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-bedroom",
+      "label": "도시 야경이 보이는 침실 · 세로 원근",
+      "title": "도시 야경이 보이는 침실 · 세로 원근",
+      "genre": "daily",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/daily/gpt25-bg-daily-bedroom-night-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 3058505,
+      "sha256": "5d8ad23c9c078bc24e46defc2ec89ead6c6b00ac56fcffb95cf6bcc9d24a4b41",
+      "tags": [
+        "침실",
+        "방",
+        "아파트",
+        "야경",
+        "도시",
+        "실내",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실내",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "5b4f44c237f7f620df94212f83c534cd120ff95f369992f65c76af9c5e1ec552",
+        "recipeId": "gpt25-bg-daily-bedroom-night-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/daily/gpt25-bg-daily-bedroom-night-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-convenience",
+      "label": "밤 편의점 · 세로 원근",
+      "title": "밤 편의점 · 세로 원근",
+      "genre": "daily",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/daily/gpt25-bg-daily-convenience-store-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 4140075,
+      "sha256": "07dac5b1f6d332217d6be94bec249f274c9e35a0b32f4d69f9f6c06eec81f59f",
+      "tags": [
+        "편의점",
+        "야간",
+        "상점",
+        "세로 원근",
+        "노을",
+        "흐림",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실내",
+      "timeOfDay": "노을",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "47d6b3cade7e3dbbbfde02b043191379056eec0bd0bc657a03b3af93330a956c",
+        "recipeId": "gpt25-bg-daily-convenience-store-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/daily/gpt25-bg-daily-convenience-store-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-drama-boardroom",
+      "label": "대기업 회의실 · 세로 원근",
+      "title": "대기업 회의실 · 세로 원근",
+      "genre": "drama",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/drama/gpt25-bg-drama-boardroom-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 3085531,
+      "sha256": "93df1f0a653b8f66189b7e39c00bda55e8be95ddd0986b0684c61eb63d5be432",
+      "tags": [
+        "회의실",
+        "기업",
+        "세로 원근",
+        "새벽",
+        "눈",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "8c04f9e250004153103290d753662366efe01c27ad095647225a6b3f66305289",
+        "recipeId": "gpt25-bg-drama-boardroom-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/drama/gpt25-bg-drama-boardroom-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-drama-courtroom",
+      "label": "현대 법정 · 세로 원근",
+      "title": "현대 법정 · 세로 원근",
+      "genre": "drama",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/drama/gpt25-bg-drama-courtroom-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 3129520,
+      "sha256": "84849ec1d7d3a5932d7f1c8f283b59f0fc2f195019243a648acb89c602820855",
+      "tags": [
+        "법정",
+        "재판",
+        "세로 원근",
+        "밤",
+        "비",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실내",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "310d584bcb06695aa861c08c83f6afaf168fb5f5cc4e1a923cf583e2c9c45f23",
+        "recipeId": "gpt25-bg-drama-courtroom-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/drama/gpt25-bg-drama-courtroom-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-drama-hospital-corridor",
+      "label": "병원 복도 · 세로 원근",
+      "title": "병원 복도 · 세로 원근",
+      "genre": "drama",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/drama/gpt25-bg-drama-hospital-corridor-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 2718906,
+      "sha256": "61096210e4f02bc9b083a15398e4e53cdd824323ab49ad51a2bf6669805f9a29",
+      "tags": [
+        "병원",
+        "복도",
+        "세로 원근",
+        "밤",
+        "흐림",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실내",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "f2fb1a25bf6db0bd3022ab47a7ae0ebc096541d02b872097962a65de46782772",
+        "recipeId": "gpt25-bg-drama-hospital-corridor-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/drama/gpt25-bg-drama-hospital-corridor-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-fantasy-dragon-peak",
+      "label": "용이 깃든 절벽 · 세로 원근",
+      "title": "용이 깃든 절벽 · 세로 원근",
+      "genre": "fantasy",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/fantasy/gpt25-bg-fantasy-dragon-cliff-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 3978501,
+      "sha256": "324a046259ffe39a7af784fb641e22c5ed67589be49868c7a93365c954afa4a6",
+      "tags": [
+        "용",
+        "절벽",
+        "세로 원근",
+        "밤",
+        "흐림",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실외",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "2aff99a55ffd787a16bbff9648f00a0d445c8e6a95978e794401d4048fd8094d",
+        "recipeId": "gpt25-bg-fantasy-dragon-cliff-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/fantasy/gpt25-bg-fantasy-dragon-cliff-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-horror-abandoned-hospital",
+      "label": "폐병원 병동 · 세로 원근",
+      "title": "폐병원 병동 · 세로 원근",
+      "genre": "horror",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/horror/gpt25-bg-horror-abandoned-hospital-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 3793166,
+      "sha256": "05ba261d4eb6dea91b39fa745a2c353de4abbf3e7c0dff318e3d59a3be3992e9",
+      "tags": [
+        "폐병원",
+        "병동",
+        "세로 원근",
+        "낮",
+        "눈",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "dec401442ac61b449104242d358a7a33cf4b182feaa2eb14ead06d479b3f48d9",
+        "recipeId": "gpt25-bg-horror-abandoned-hospital-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/horror/gpt25-bg-horror-abandoned-hospital-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-horror-dark-tunnel",
+      "label": "끝이 보이지 않는 터널 · 세로 원근",
+      "title": "끝이 보이지 않는 터널 · 세로 원근",
+      "genre": "horror",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/horror/gpt25-bg-horror-dark-tunnel-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 4001333,
+      "sha256": "a649c91a38483b6b171692385e552a283c9d9ed900ea6befe78f7e8e498f0fc6",
+      "tags": [
+        "터널",
+        "어둠",
+        "세로 원근",
+        "밤",
+        "안개",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실내",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "e35cf01d1c065a7b574b984ee13633b14553bef1480d437409f21cacb51c9e50",
+        "recipeId": "gpt25-bg-horror-dark-tunnel-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/horror/gpt25-bg-horror-dark-tunnel-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-horror-foggy-cabin",
+      "label": "안개 속 오두막 · 세로 원근",
+      "title": "안개 속 오두막 · 세로 원근",
+      "genre": "horror",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/horror/gpt25-bg-horror-fog-cabin-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 4192557,
+      "sha256": "d6a7417a52fe49997a8717a44ff4ff970e986aa5292fb94321223e35d03d6dbd",
+      "tags": [
+        "오두막",
+        "안개",
+        "세로 원근",
+        "노을",
+        "맑음",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실외",
+      "timeOfDay": "노을",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "db74a309036c0d9f3f15a71150f8a7044db1b0d79b005543e046bf1275582719",
+        "recipeId": "gpt25-bg-horror-fog-cabin-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/horror/gpt25-bg-horror-fog-cabin-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-romance-carnival",
+      "label": "밤의 대관람차 광장 · 세로 원근",
+      "title": "밤의 대관람차 광장 · 세로 원근",
+      "genre": "romance",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/romance/gpt25-bg-romance-ferris-wheel-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 4057602,
+      "sha256": "6476cabf99075a2c9b2a6e321ce38fb9485f7491f2853bdbc7d1a00131227a9f",
+      "tags": [
+        "놀이공원",
+        "대관람차",
+        "야경",
+        "세로 원근",
+        "노을",
+        "눈",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실외",
+      "timeOfDay": "노을",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "ae50e56e850d43dcfbdb8d31a4a9b8c68a207197a2e3d3e3324208eb7291283d",
+        "recipeId": "gpt25-bg-romance-ferris-wheel-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/romance/gpt25-bg-romance-ferris-wheel-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-romance-cherry-blossom",
+      "label": "벚꽃 산책길 · 세로 원근",
+      "title": "벚꽃 산책길 · 세로 원근",
+      "genre": "romance",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/romance/gpt25-bg-romance-cherry-path-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 4525489,
+      "sha256": "bfe7e27cc4c35643ae9d0deaf04a317cf1f6831fcd3190a520f5f42d8ceec975",
+      "tags": [
+        "벚꽃",
+        "산책로",
+        "세로 원근",
+        "밤",
+        "안개",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실외",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "fd654259f94c6c595c0092f3ad7d49405cd3a8d603cf6bb13491033610e1eb56",
+        "recipeId": "gpt25-bg-romance-cherry-path-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/romance/gpt25-bg-romance-cherry-path-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-sf-cyberpunk-street",
+      "label": "비 내리는 사이버 골목 · 세로 원근",
+      "title": "비 내리는 사이버 골목 · 세로 원근",
+      "genre": "sf",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/sf/gpt25-bg-sf-cyber-alley-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 4419627,
+      "sha256": "3ed82eb947473c5c882a6a038d6cee65d5a81e1bd7dff45ec8ed07c4a9be7e9e",
+      "tags": [
+        "사이버펑크",
+        "골목",
+        "비",
+        "세로 원근",
+        "밤",
+        "안개",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실외",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "1cd658ba904b1a25ad9e63eb8e7e84bcf0f5d5fc1624fe8edfcf692d22e0ff14",
+        "recipeId": "gpt25-bg-sf-cyber-alley-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/sf/gpt25-bg-sf-cyber-alley-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-sf-research-lab",
+      "label": "미래 연구실 · 세로 원근",
+      "title": "미래 연구실 · 세로 원근",
+      "genre": "sf",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/sf/gpt25-bg-sf-research-lab-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 3656129,
+      "sha256": "1e2d73de7f67cb29379a1592f901f6dbd9ab5fa96e1084682159f387cf085913",
+      "tags": [
+        "연구실",
+        "미래",
+        "세로 원근",
+        "새벽",
+        "흐림",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "a2e8216a7a33a077f303e5d813bb0a1ce84bea0affb767c6ae836975668f7c27",
+        "recipeId": "gpt25-bg-sf-research-lab-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/sf/gpt25-bg-sf-research-lab-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-sf-space-station",
+      "label": "우주 정거장 전망실 · 세로 원근",
+      "title": "우주 정거장 전망실 · 세로 원근",
+      "genre": "sf",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/sf/gpt25-bg-sf-space-station-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 3799088,
+      "sha256": "1056f0ea0aa129e63a846e929f201f82c63347dacb389393cb56a214fe634190",
+      "tags": [
+        "우주정거장",
+        "전망실",
+        "세로 원근",
+        "노을",
+        "맑음",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실내",
+      "timeOfDay": "노을",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "4fdc80f67d0c026036449b1d3a379c7ab8b148a6d6852d85000a9f000b45b547",
+        "recipeId": "gpt25-bg-sf-space-station-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/sf/gpt25-bg-sf-space-station-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-wuxia-cliff-duel",
+      "label": "절벽 산길 · 세로 원근",
+      "title": "절벽 산길 · 세로 원근",
+      "genre": "wuxia",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/wuxia/gpt25-bg-wuxia-cliff-path-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 4301488,
+      "sha256": "f00057a8da5165f12c9fef4762ccfecaeb5bc751e991fc921f9b839bdb159fba",
+      "tags": [
+        "절벽",
+        "산길",
+        "세로 원근",
+        "새벽",
+        "눈",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "9967fdb7b2692396230225da815e4a970b54c78ce0ba8f22dc1a04bce20ecec1",
+        "recipeId": "gpt25-bg-wuxia-cliff-path-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/wuxia/gpt25-bg-wuxia-cliff-path-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-wuxia-market-street",
+      "label": "조선시대 저잣거리 · 세로 원근",
+      "title": "조선시대 저잣거리 · 세로 원근",
+      "genre": "wuxia",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/wuxia/gpt25-bg-wuxia-traditional-market-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 4413323,
+      "sha256": "83f61a56c6c6e472e7636a46c214eecd46eb38a47ff191587784b3803bd3fdac",
+      "tags": [
+        "저잣거리",
+        "사극",
+        "세로 원근",
+        "노을",
+        "비",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실외",
+      "timeOfDay": "노을",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "80b7bb390661ef4d45b06887dcea851bb657c5f2aff676e8e4406cd48d75b57b",
+        "recipeId": "gpt25-bg-wuxia-traditional-market-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/wuxia/gpt25-bg-wuxia-traditional-market-vertical-depth/SOURCE.json"
+    },
+    {
+      "id": "webtoon-wuxia-palace-courtyard",
+      "label": "궁궐 안뜰 · 세로 원근",
+      "title": "궁궐 안뜰 · 세로 원근",
+      "genre": "wuxia",
+      "src": "/assets/studio/generated-backgrounds/gpt25-v1/wuxia/gpt25-bg-wuxia-palace-courtyard-vertical-depth/background.png",
+      "width": 1152,
+      "height": 2048,
+      "bytes": 4239728,
+      "sha256": "dfd403c926d985ebaf318dc70acee2bcd36f2e90591bbfe0acb12ed43843aeca",
+      "tags": [
+        "궁궐",
+        "안뜰",
+        "세로 원근",
+        "낮",
+        "흐림",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "recommended": true,
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-18",
+        "notes": [
+          "전체 프레임과 20종 contact sheet를 검수했습니다.",
+          "인물과 읽을 수 있는 텍스트 없이 세로 웹툰 배경으로 사용 가능합니다."
+        ]
+      },
+      "provenance": {
+        "kind": "gpt-image-2.5",
+        "licenseStatus": "first-party-generated",
+        "provider": "OpenAI ChatGPT image generation",
+        "model": "gpt-image-2.5-sunburst",
+        "promptHash": "2ba067d09ff97bdc20034d4f7caca7d2e900dfb6a37ff981aa630a7e3de64991",
+        "recipeId": "gpt25-bg-wuxia-palace-courtyard-vertical-depth",
+        "generatedAt": "2026-09-18T00:15:49.022886Z"
+      },
+      "mediaType": "image/png",
+      "style": "webtoon-illustration",
+      "legacySrc": null,
+      "sourceManifest": "/assets/studio/generated-backgrounds/gpt25-v1/wuxia/gpt25-bg-wuxia-palace-courtyard-vertical-depth/SOURCE.json"
+    }
+  ]
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 
 import { appRoutes } from "../../../app/routes/route-manifest";
-import { SITEMAP_EXTENDED_DESTINATION_GROUPS } from "../../../domains/legal/site-directory-data";
+import { SITEMAP_DIRECTORY_ENTRIES } from "../../../domains/legal/site-directory-data";
 import {
   mutateReferenceNotes, parseReferenceBackup, parseReferenceNotes, previewReferenceImport,
   REFERENCE_STORAGE_KEY,
@@ -88,8 +88,8 @@ test("reference discovery has one labeled route in the public manifest", () => {
 });
 
 test("reference discovery remains reachable from the public sitemap", () => {
-  const occurrences = SITEMAP_EXTENDED_DESTINATION_GROUPS
-    .flatMap((group) => group.items)
-    .filter((entry) => entry.href === "/references");
-  assert.equal(occurrences.length, 1);
+  assert.equal(
+    SITEMAP_DIRECTORY_ENTRIES.filter((entry) => entry.href === "/references").length,
+    1,
+  );
 });

@@ -64,6 +64,13 @@ describe("StudioQuickStartPanel", () => {
     expect(card.className).toContain("pointer-events-auto");
   });
 
+  it("caps the phone coach card so the canvas remains the dominant surface", () => {
+    render(<StudioQuickStartPanel {...createHandlers()} />);
+    const card = quickStartCard();
+    expect(card.className).toContain("max-h-[min(20rem,40dvh)]");
+    expect(card.className).toContain("sm:max-h-[min(66dvh,calc(100svh-2rem))]");
+  });
+
   it("never steals focus when it mounts", () => {
     const outside = document.createElement("button");
     document.body.append(outside);
@@ -232,7 +239,7 @@ describe("StudioQuickStartPanel", () => {
       ["브러시 골라 그리기", handlers.onBrushKit],
       ["컷 나누기", handlers.onOpenTemplate],
       ["캐릭터·포즈", handlers.onOpenCharacter],
-      ["3D 배경 열기", handlers.onOpenBackground3d],
+      ["3D로 장면 잡기", handlers.onOpenBackground3d],
       ["캔버스 넓게 보기", handlers.onCollabFocus],
     ] as const;
 
@@ -254,7 +261,7 @@ describe("StudioQuickStartPanel", () => {
     const card = quickStartCard();
     const scrollArea = card.querySelector<HTMLElement>("[data-studio-quickstart-scroll]");
 
-    expect(card.className).toContain("max-h-[min(60dvh,calc(100svh-5rem))]");
+    expect(card.className).toContain("max-h-[min(20rem,40dvh)]");
     expect(card.className).toContain("rounded-lg");
     expect(card.className).not.toContain("rounded-2xl");
     expect(scrollArea?.className).toContain("overflow-y-auto");

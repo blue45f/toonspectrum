@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useState } from "react";
 
 import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
@@ -30,8 +31,7 @@ export function StudioBg3dProSuitePanel(props: StudioBg3dProSuitePanelProps) {
     <Suspense
       fallback={
         <p className="min-h-11 p-3 text-sm text-fg-3" role="status" aria-live="polite">
-          3D 전문 도구를 불러오는 중입니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanel", "ko", "3D 전문 도구를 불러오는 중입니다.")}</p>
       }
     >
       <LazyProSuiteContent

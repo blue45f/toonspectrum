@@ -1,4 +1,7 @@
 import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Droplets,
   Feather,
   Grid3X3,
@@ -85,15 +88,12 @@ export function StudioBrushGoalStart({
             id="studio-brush-goal-start-title"
             className="text-xs font-bold text-fg"
           >
-            어떤 결과를 만들고 싶나요?
-          </h3>
+            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushGoalStart", "ko", "어떤 결과를 만들고 싶나요?")}</h3>
           <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3">
-            결과를 고르면 검증된 시작 프리셋과 가장 관련 있는 세부 설정을 함께 엽니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushGoalStart", "ko", "결과를 고르면 검증된 시작 프리셋과 가장 관련 있는 세부 설정을 함께 엽니다.")}</p>
         </div>
         <span className="hidden shrink-0 text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-accent sm:inline">
-          Goal start
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushGoalStart", "en", "Goal start")}</span>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin] sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0">

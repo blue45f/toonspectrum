@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
 
@@ -14,6 +15,7 @@ import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route"
 import { AppearanceBridge } from "@/shared/components/appearance/AppearanceBridge";
 import { SiteHeader } from "@/shared/components/site-header";
 import { withCsrfProtection } from "@/shared/lib/csrf";
+import { useI18n } from "@/shared/lib/i18n";
 import { useUi } from "@/shared/lib/ui-store";
 
 // Optional public-page settings must not join the Studio startup bundle.
@@ -185,7 +187,7 @@ function WebFloatingControls() {
         placement="bottom-right"
         showSound={false}
         showBgm={false}
-        className={hideOnMobile ? "max-md:hidden" : undefined}
+        className={hideOnMobile ? translateCurrentStaticSourceText("app.App", "en", "max-md:hidden") : undefined}
       />
     </Suspense>
   );
@@ -234,6 +236,9 @@ function SerifWebFontBridge() {
 
 function AppRuntime() {
   const { pathname } = useLocation();
+  // Legacy bilingual bridges register translation sources during render. Subscribe at the app
+  // runtime boundary so completed machine-translation batches refresh every route, not only useT().
+  useI18n((state) => state.translationBundleRevision);
   // Route truth is available during the first render; the Zustand bridge runs later in an effect.
   const studioImmersive = isImmersiveMobileRoute(pathname);
   const adminChrome = isAdminPath(pathname);
@@ -263,10 +268,10 @@ function AppRuntime() {
         showGlobalOverlays={!adminChrome}
         mainClassName={
           studioImmersive
-            ? "min-h-0 h-[100dvh] overflow-hidden outline-none pb-0"
+            ? translateCurrentStaticSourceText("app.App", "en", "min-h-0 h-[100dvh] overflow-hidden outline-none pb-0")
             : adminChrome
-              ? "min-h-[100dvh] outline-none"
-              : "min-h-screen pb-20 outline-none md:pb-0"
+              ? translateCurrentStaticSourceText("app.App", "en", "min-h-[100dvh] outline-none")
+              : translateCurrentStaticSourceText("app.App", "en", "min-h-screen pb-20 outline-none md:pb-0")
         }
         chromeOverlay={
           <>

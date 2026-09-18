@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
+  SITEMAP_CORE_DESTINATION_GROUPS,
   SITEMAP_DIRECTORY_ENTRIES,
   SITEMAP_EXTENDED_DESTINATION_GROUPS,
 } from "./site-directory-data";
@@ -23,6 +24,7 @@ const PUBLIC_ROUTE_SOURCE_FILES = [
   "apps/web/src/app/routes/groups/experience.routes.tsx",
   "apps/web/src/app/routes/groups/legal.routes.tsx",
   "apps/web/src/app/routes/groups/market.routes.tsx",
+  "apps/web/src/app/routes/groups/marketing.routes.tsx",
   "apps/web/src/app/routes/groups/production.routes.tsx",
   "apps/web/src/app/routes/groups/reference.routes.tsx",
 ] as const;
@@ -92,6 +94,11 @@ const sitemapSource = readFileSync(SITEMAP_SOURCE, "utf8");
 const directoryPaths = new Set(
   SITEMAP_DIRECTORY_ENTRIES.map((entry) => canonicalSitePath(entry.href)),
 );
+const coreDestinationPaths = new Set(
+  SITEMAP_CORE_DESTINATION_GROUPS
+    .flatMap((group) => group.items)
+    .map((item) => canonicalSitePath(item.href)),
+);
 const extendedDestinationHrefs = SITEMAP_EXTENDED_DESTINATION_GROUPS
   .flatMap((group) => group.items)
   .map((item) => item.href);
@@ -136,6 +143,39 @@ describe("site directory experience contracts", () => {
     for (const href of expectedDestinations) {
       expect(directoryPaths, `missing public directory destination: ${href}`).toContain(href);
     }
+  });
+
+  it("keeps the first directory layer creator-first without losing discovery paths", () => {
+    for (const href of [
+      "/production",
+      "/studio",
+      "/studio/new",
+      "/studio/assets",
+      "/studio/publish",
+      "/learn",
+      "/research",
+      "/discover",
+      "/community",
+    ]) {
+      expect(coreDestinationPaths, `missing primary sitemap destination: ${href}`).toContain(href);
+    }
+
+    expect(SITEMAP_CORE_DESTINATION_GROUPS.map((group) => group.id)).toEqual([
+      "start-create",
+      "learn-prepare",
+      "discover-inspire",
+      "connect-manage",
+    ]);
+  });
+
+  it("keeps creator entry points and the brand film visible before the long directory", () => {
+    expect(sitemapSource).toContain('href="/studio/new"');
+    expect(sitemapSource).toContain('href="/studio/projects"');
+    expect(sitemapSource).toContain('href="/brand-film"');
+    expect(sitemapSource.indexOf('href="/brand-film"')).toBeLessThan(
+      sitemapSource.indexOf("SITEMAP_EXTENDED_DESTINATION_GROUPS.map"),
+    );
+    expect(directoryPaths).toContain("/brand-film");
   });
 
   it("keeps canonical directory links equivalent to compatible legacy pages", () => {

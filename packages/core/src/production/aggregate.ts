@@ -1,3 +1,4 @@
+import { createDefaultProductionRiskPolicy } from "./risk";
 import { projectScope } from "./scope";
 
 import type {
@@ -20,7 +21,7 @@ export function createProductionProjectAggregate(input: {
   if (!input.title.trim()) throw new Error("Production project title is required.");
   const scope = projectScope(input.projectId);
   return Object.freeze({
-    modelVersion: 1,
+    modelVersion: 2,
     projectId: input.projectId,
     workId: input.workId,
     organizationId: input.organizationId ?? null,
@@ -79,7 +80,11 @@ export function createProductionProjectAggregate(input: {
     cutPlans: Object.freeze([]),
     planningSnapshots: Object.freeze([]),
     assetRequirements: Object.freeze([]),
+    riskPolicy: createDefaultProductionRiskPolicy(input.projectId, input.at),
+    riskSignals: Object.freeze([]),
     risks: Object.freeze([]),
+    riskResponses: Object.freeze([]),
+    riskAssessments: Object.freeze([]),
     decisions: Object.freeze([]),
     proposals: Object.freeze([]),
     agreements: Object.freeze([]),
@@ -89,6 +94,14 @@ export function createProductionProjectAggregate(input: {
     invoices: Object.freeze([]),
     paymentRecords: Object.freeze([]),
     disputes: Object.freeze([]),
+    resourceCalendars: Object.freeze([]),
+    scheduleBaselines: Object.freeze([]),
+    releasePlans: Object.freeze([]),
+    externalReviewAccesses: Object.freeze([]),
+    automationRules: Object.freeze([]),
+    notificationPolicies: Object.freeze([]),
+    notifications: Object.freeze([]),
+    savedViews: Object.freeze([]),
     auditEvents: Object.freeze([]),
     createdAt: input.at,
     updatedAt: input.at,
@@ -134,7 +147,7 @@ export function commitProductionAggregate(
   });
   return Object.freeze({
     ...mutated,
-    modelVersion: 1,
+    modelVersion: 2,
     projectId: aggregate.projectId,
     workId: aggregate.workId,
     revision,

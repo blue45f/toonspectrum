@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { creatorWorkflowIndex } from "./creator-home-navigation";
 
 import type { CreatorHomeCopy } from "./creator-home-content";
@@ -9,7 +10,7 @@ export function CreatorWorkflowPicker({ copy, stage, onChange, placement = "prev
   placement?: "preview" | "process";
 }) {
   return (
-    <div className={placement === "preview" ? "ch-preview-options" : "ch-process-options"} role="group" aria-label={copy.tools}>
+    <div className={placement === "preview" ? translateCurrentStaticSourceText("domains.marketing.CreatorWorkflowPicker", "en", "ch-preview-options") : translateCurrentStaticSourceText("domains.marketing.CreatorWorkflowPicker", "en", "ch-process-options")} role="group" aria-label={copy.tools}>
       {copy.stages.map((item, index) => (
         <button
           key={item.id}
