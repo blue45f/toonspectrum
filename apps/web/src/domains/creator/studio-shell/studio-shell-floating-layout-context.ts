@@ -9,7 +9,6 @@ import {
   type StudioShellFloatingVisibilityState,
 } from "./studio-shell-floating-layout";
 
-import type { StudioShellStrokeFocusPhase } from "./studio-shell-stroke-focus";
 import type {
   StudioShellFloatingVisibilityPersistenceFailure,
 } from "./studio-shell-floating-visibility-sqlite";
@@ -30,9 +29,6 @@ export interface StudioShellFloatingLayoutRuntime {
     | StudioShellFloatingVisibilityPersistenceFailure
     | "storage-unavailable"
     | null;
-  readonly strokeFocusPhase: StudioShellStrokeFocusPhase;
-  readonly autoHideDuringStroke: boolean;
-  readonly setAutoHideDuringStroke: (enabled: boolean) => void;
   readonly resetRevisions: Readonly<Record<StudioShellFloatingSurfaceId, number>>;
   readonly isVisible: (id: StudioShellFloatingVisibilityId) => boolean;
   readonly isConfiguredVisible: (id: StudioShellFloatingVisibilityId) => boolean;
@@ -40,7 +36,9 @@ export interface StudioShellFloatingLayoutRuntime {
   readonly setSurfaceMounted: (id: StudioShellFloatingSurfaceId, mounted: boolean) => void;
   readonly setVisible: (id: StudioShellFloatingVisibilityId, visible: boolean) => void;
   readonly toggleVisible: (id: StudioShellFloatingVisibilityId) => void;
-  readonly setAutoHideDuringStroke: (enabled: boolean) => void;
+  readonly setAutoHideWhileDrawing: (enabled: boolean) => void;
+  readonly enterFocusMode: () => void;
+  readonly exitFocusMode: () => void;
   readonly applyPreset: (preset: StudioShellFloatingPresetId) => void;
   readonly showAll: () => void;
   readonly hideAll: () => void;
@@ -63,9 +61,6 @@ const FALLBACK_RUNTIME: StudioShellFloatingLayoutRuntime = Object.freeze({
   mountedSurfaceIds: Object.freeze([]),
   authority: "session-only" as const,
   failure: null,
-  strokeFocusPhase: "idle" as const,
-  autoHideDuringStroke: true,
-  setAutoHideDuringStroke: () => undefined,
   resetRevisions: Object.freeze(createStudioShellFloatingResetRevisions()),
   isVisible: () => true,
   isConfiguredVisible: () => true,
@@ -73,7 +68,9 @@ const FALLBACK_RUNTIME: StudioShellFloatingLayoutRuntime = Object.freeze({
   setSurfaceMounted: () => undefined,
   setVisible: () => undefined,
   toggleVisible: () => undefined,
-  setAutoHideDuringStroke: () => undefined,
+  setAutoHideWhileDrawing: () => undefined,
+  enterFocusMode: () => undefined,
+  exitFocusMode: () => undefined,
   applyPreset: () => undefined,
   showAll: () => undefined,
   hideAll: () => undefined,
