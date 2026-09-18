@@ -1182,7 +1182,7 @@ export function StudioRolePersonalizationCenter({
         description={localized(locale, "활동 목적과 화면 밀도는 기본값으로만 사용되며 프로젝트 역할과 권한을 변경하지 않습니다.", "Goals and workspace density are defaults only and never change project roles or permissions.")}
         action={<Settings2 className="size-4 text-accent" aria-hidden="true" />}
       >
-        <div className="grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
+        <div className="grid gap-4 xl:grid-cols-[18rem_18rem_minmax(0,1fr)]">
           <label className="text-xs font-bold text-fg-2">
             {localized(locale, "작업 화면", "Workspace mode")}
             <select
@@ -1198,6 +1198,22 @@ export function StudioRolePersonalizationCenter({
             </select>
             <span className="mt-1.5 block text-[0.68rem] font-normal leading-5 text-fg-3">
               {localized(locale, "Studio를 열 때 Guided/Creator는 단순 화면, Production은 전체 패널 밀도로 연결됩니다.", "Guided and Creator open a simplified Studio layout, while Production opens the full-density layout.")}
+            </span>
+          </label>
+          <label className="text-xs font-bold text-fg-2">
+            {localized(locale, "기본 작업 방식", "Default collaboration")}
+            <select
+              value={globalDocument.collaborationMode}
+              onChange={(event) => void saveGlobalPatch({
+                collaborationMode: event.currentTarget.value as CreatorRoleWorkspacePreference["collaborationMode"],
+              })}
+              className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg"
+            >
+              <option value="solo">{localized(locale, "Solo · 혼자 작업 중심", "Solo · personal-first")}</option>
+              <option value="team">{localized(locale, "Team · 협업 동선 우선", "Team · collaboration-first")}</option>
+            </select>
+            <span className="mt-1.5 block text-[0.68rem] font-normal leading-5 text-fg-3">
+              {localized(locale, "계정 종류를 바꾸지 않습니다. 실제 팀 프로젝트에서는 필요한 협업 UI가 항상 다시 표시됩니다.", "This does not change your account type. Actual team projects always restore the collaboration UI they require.")}
             </span>
           </label>
           <div>
