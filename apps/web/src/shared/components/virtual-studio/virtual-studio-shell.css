@@ -121,3 +121,16 @@
 .vs2-live-chat>header strong{font-size:10px}.vs2-live-chat>header svg{color:#9b8bff}
 .vs2-live-chat-body{display:grid;gap:7px;padding:9px}.vs2-live-chat-body>div{display:flex;align-items:center;gap:7px;min-width:0}.vs2-live-chat-body>div>span{display:grid;min-width:0;flex:1}.vs2-live-chat-body strong{font-size:8.5px}.vs2-live-chat-body small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#73839a;font-size:7px}.vs2-live-chat-body i{color:#51da8b;font-size:7px;font-style:normal}.vs2-live-chat-body>p{margin:0;padding:6px;color:#7f8da0;font-size:8px;line-height:1.5}
 .vs2-live-chat-button{margin:0 8px 8px;width:calc(100% - 16px);min-height:34px;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid #4a3c81;border-radius:8px;background:#272044;color:#cfc3ff;font-size:8px;font-weight:800}.vs2-live-chat-button:disabled{opacity:.42;cursor:not-allowed}
+
+/* Approved concept-art crops for shell fidelity. */
+.vs2-reference-avatar-img{
+  width:118%;height:118%;display:block;object-fit:contain;object-position:50% 62%;
+  transform:translateY(9%);filter:drop-shadow(0 3px 4px rgb(0 0 0/.2));
+}
+.vs2-reference-mascot-img{width:125%;height:125%;display:block;object-fit:contain;object-position:50% 65%;transform:translateY(8%)}
+.vs2-reference-promo-img{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover;object-position:center}
+.vs2-huddle-tile .vs2-reference-huddle-img{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover}
+.vs2-reference-feature-img{width:100%;height:100%;display:block;object-fit:cover;object-position:center}
+.vs2-feature:hover .vs2-reference-feature-img{transform:scale(1.018);filter:saturate(1.035) brightness(1.015)}
+.vs2-reference-feature-img{transition:transform .22s cubic-bezier(.16,1,.3,1),filter .22s}
+@media(prefers-reduced-motion:reduce){.vs2-reference-feature-img{transition:none}.vs2-feature:hover .vs2-reference-feature-img{transform:none}}

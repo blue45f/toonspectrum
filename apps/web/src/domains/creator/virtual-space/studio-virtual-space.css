@@ -137,13 +137,20 @@
   object-fit:contain;
   object-position:bottom center;
   transform-origin:50% 85%;
-  filter:hue-rotate(var(--studio-reference-hue,0deg)) saturate(1.02);
+  filter:saturate(1.02);
   user-select:none;
   pointer-events:none;
 }
-.studio-vspace-reference-player[data-direction=left] img{transform:scaleX(-1)}
-.studio-vspace-reference-player[data-direction=right] img{transform:scaleX(1)}
-.studio-vspace-reference-player[data-direction=up] img{filter:hue-rotate(var(--studio-reference-hue,0deg)) saturate(.96) brightness(.92)}
+.studio-vspace-reference-player[data-direction=up] img{filter:saturate(.98) brightness(.97)}
+.studio-vspace-reference-compact-player{
+  width:112%;
+  height:112%;
+  display:block;
+  object-fit:contain;
+  object-position:50% 58%;
+  filter:saturate(1.03);
+  transform:translateY(8%);
+}
 .studio-vspace-reference-player[data-motion=walk]{animation:studio-reference-player-walk .34s ease-in-out infinite}
 .studio-vspace-reference-player[data-motion=talk]{animation:studio-reference-player-talk .7s ease-in-out infinite}
 .studio-vspace-reference-player[data-motion=draw]{animation:studio-reference-player-draw .46s ease-in-out infinite}
@@ -174,8 +181,17 @@
 }
 .studio-vspace-reference-online.is-away{background:#8a96a5;box-shadow:none}
 @keyframes studio-reference-player-walk{
-  0%,100%{transform:translateY(0) rotate(-.7deg)}
-  50%{transform:translateY(-5px) rotate(.7deg)}
+  0%,100%{transform:translateY(0) rotate(-.8deg) scaleY(1)}
+  25%{transform:translateY(-3px) rotate(.35deg) scaleY(1.012)}
+  50%{transform:translateY(-6px) rotate(.8deg) scaleY(.995)}
+  75%{transform:translateY(-2px) rotate(-.25deg) scaleY(1.008)}
+}
+.studio-vspace-reference-player[data-motion=walk]::after{
+  animation:studio-reference-shadow-walk .34s ease-in-out infinite;
+}
+@keyframes studio-reference-shadow-walk{
+  0%,100%{transform:scaleX(1);opacity:.82}
+  50%{transform:scaleX(.78);opacity:.52}
 }
 @keyframes studio-reference-player-talk{
   0%,100%{transform:translateY(0)}
