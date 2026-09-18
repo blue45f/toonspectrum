@@ -723,6 +723,7 @@ export class MembershipWalletService {
     amount: number;
     featureKey?: CreditFeatureKey | null;
     idempotencyKey: string;
+    dailyLimit?: number;
     metadata?: Record<string, unknown>;
   }) {
     const amountToReserve = positiveInteger(input.amount, "예약량");
