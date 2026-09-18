@@ -78,12 +78,10 @@ function securityHeaders(contentType: string): Record<string, string> {
   };
 }
 
-function safeErrorMessage(error: unknown): string {
-  if (error instanceof DesktopSyncConflictResolutionError) {
-    return `${error.code}: ${error.message}`;
-  }
+function safeErrorCode(error: unknown): string {
+  if (error instanceof DesktopSyncConflictResolutionError) return error.code;
   if (error instanceof DesktopConflictServerError) return error.code;
-  return "conflict resolution failed";
+  return "conflict-resolution-failed";
 }
 
 function jsonResponse(
@@ -381,13 +379,13 @@ export async function startDesktopSyncConflictServer(
                 && error.code === "stale-report"
                 ? 409
                 : 422;
-          jsonResponse(response, status, { message: safeErrorMessage(error) });
+          jsonResponse(response, status, { message: safeErrorCode(error) });
         }
         return;
       }
       textResponse(response, 404, "not found");
     } catch (error) {
-      jsonResponse(response, 500, { message: safeErrorMessage(error) });
+      jsonResponse(response, 500, { message: safeErrorCode(error) });
     }
   });
 
