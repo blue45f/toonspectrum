@@ -104,6 +104,9 @@ function translateParallelNode(
   path: readonly string[],
 ): StringTree {
   if (typeof ko === "string" && typeof en === "string") {
+    // Identical branches are locale-invariant tokens (URLs, ids, numbers, brand terms, etc.).
+    // Preserve them verbatim instead of registering them as machine-translation sources.
+    if (ko === en) return ko;
     const keyScope = path.length > 0 ? `${scope}.${path.join(".")}` : scope;
     return t(defineBilingualAutoText(keyScope, ko, en));
   }
