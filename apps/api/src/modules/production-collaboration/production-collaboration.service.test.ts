@@ -1009,6 +1009,131 @@ describe("ProductionCollaborationService", () => {
     expect(result.counts.inProgress).toBe(1);
   });
 
+  it("rejects a guarded task batch when a task changed after the recovery preview", async () => {
+    const base = aggregate();
+    const task = {
+      id: "task-guarded",
+      projectId: base.projectId,
+      scope: { kind: "project" as const, id: base.projectId, ancestors: [] },
+      processKey: "line-art",
+      title: "선화",
+      status: "in-progress" as const,
+      assignmentIds: [],
+      reviewerAssignmentIds: [],
+      inputRevisionRefs: [],
+      outputDeliverableIds: [],
+      dependencyTaskIds: [],
+      dueAt: "2026-09-20T00:00:00.000Z",
+      estimateHours: { optimistic: 4, likely: 6, pessimistic: 8 },
+      completionCriteria: ["완료"],
+      sourceAgreementMilestoneId: null,
+    };
+    const current: ProductionProjectAggregate = { ...base, tasks: [task] };
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current, {
+      view: true,
+      comment: true,
+      edit: true,
+      manage: true,
+      owner: true,
+      role: "owner",
+    }));
+
+    await expect(service().executeCommand("owner-1", base.projectId, {
+      expectedRevision: 0,
+      mutationId: "13131313-1313-4313-8313-131313131313",
+      command: {
+        type: "upsert-task-batch",
+        tasks: [{ ...task, dueAt: "2026-09-22T00:00:00.000Z" }],
+        expectedTasks: [{ ...task, status: "ready" }],
+      },
+    })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it("persists automation tasks, notifications and rule state in one aggregate revision", async () => {
+    const current = aggregate();
+    const assignmentId = current.assignments[0]!.id;
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current, {
+      view: true,
+      comment: true,
+      edit: true,
+      manage: true,
+      owner: true,
+      role: "owner",
+    }));
+    const task = {
+      id: "automation-task:atomic",
+      projectId: current.projectId,
+      scope: { kind: "project" as const, id: current.projectId, ancestors: [] },
+      processKey: "producer-follow-up",
+      title: "지연 원인 확인",
+      status: "ready" as const,
+      assignmentIds: [assignmentId],
+      reviewerAssignmentIds: [],
+      inputRevisionRefs: [],
+      outputDeliverableIds: [],
+      dependencyTaskIds: [],
+      dueAt: "2026-09-17T13:00:00.000Z",
+      estimateHours: { optimistic: 1, likely: 2, pessimistic: 4 },
+      completionCriteria: ["원인 확인"],
+      sourceAgreementMilestoneId: null,
+    };
+    const notification = {
+      id: "automation-notification:atomic",
+      projectId: current.projectId,
+      assignmentId,
+      type: "automation" as const,
+      title: "지연 조치",
+      body: "마감이 지났습니다.",
+      href: `/production/projects/${current.projectId}/control`,
+      urgency: "critical" as const,
+      sourceType: "automation:rule:task",
+      sourceId: task.id,
+      status: "unread" as const,
+      createdAt: at,
+      readAt: null,
+    };
+    const rule = {
+      id: "automation-rule-atomic",
+      projectId: current.projectId,
+      name: "지연 조치",
+      trigger: "due-passed" as const,
+      conditions: [],
+      actions: [{
+        type: "notify" as const,
+        assignmentIds: [assignmentId],
+        urgency: "critical" as const,
+        message: "마감이 지났습니다.",
+      }],
+      failurePolicy: "require-review" as const,
+      enabled: true,
+      revision: 2,
+      lastEvaluatedAt: at,
+      createdByAssignmentId: assignmentId,
+      updatedAt: at,
+    };
+
+    const result = await service().executeCommand("owner-1", current.projectId, {
+      expectedRevision: 0,
+      mutationId: "14141414-1414-4414-8414-141414141414",
+      command: {
+        type: "apply-automation-execution",
+        tasks: [task],
+        notifications: [notification],
+        evaluatedRules: [rule],
+      },
+    });
+
+    expect(result.aggregate).toMatchObject({ revision: 1 });
+    expect(result.aggregate.tasks).toEqual([task]);
+    expect(result.aggregate.notifications).toEqual([notification]);
+    expect(result.aggregate.automationRules).toEqual([rule]);
+    expect(result.derived).toEqual({
+      taskCount: 1,
+      notificationCount: 1,
+      evaluatedRuleCount: 1,
+    });
+  });
+
   it("projects only token-scoped immutable submissions to an external reviewer", async () => {
     const current = aggregateWithExternalReview();
     repository.getPublicProject.mockResolvedValue(current);
@@ -1030,6 +1155,10 @@ describe("ProductionCollaborationService", () => {
         id: "submission-final",
         deliverable: { type: "integrated-webtoon" },
       }],
+    });
+    expect(result.submissions[0]).toMatchObject({
+      evidenceRefs: [],
+      protectedEvidenceCount: 1,
     });
     expect(result).not.toHaveProperty("assignments");
     expect(result).not.toHaveProperty("externalReviewAccesses");
@@ -1094,6 +1223,55 @@ describe("ProductionCollaborationService", () => {
     );
 
     expect(result.review.responses).toEqual([existing]);
+  });
+
+  it("rejects an active token that does not include view permission", async () => {
+    const base = aggregateWithExternalReview();
+    const current: ProductionProjectAggregate = {
+      ...base,
+      externalReviewAccesses: base.externalReviewAccesses.map((access) => ({
+        ...access,
+        permissions: ["comment"],
+      })),
+    };
+    repository.getPublicProject.mockResolvedValue(current);
+
+    await expect(service().getExternalReview(
+      current.projectId,
+      "external-review-1",
+      externalReviewToken,
+    )).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("rate limits response floods while preserving append-only review history", async () => {
+    const base = aggregateWithExternalReview();
+    const now = Date.now();
+    const current: ProductionProjectAggregate = {
+      ...base,
+      externalReviewAccesses: base.externalReviewAccesses.map((access) => ({
+        ...access,
+        responses: Array.from({ length: 60 }, (_, index) => ({
+          id: `response-flood-${index}`,
+          reviewerName: "외부 검수자",
+          decision: "comment" as const,
+          note: `응답 ${index}`,
+          createdAt: new Date(now - index * 1_000).toISOString(),
+        })),
+      })),
+    };
+    repository.mutatePublicReview.mockImplementation(async (input) => input.mutate(current));
+
+    await expect(service().submitExternalReview(
+      current.projectId,
+      "external-review-1",
+      externalReviewToken,
+      {
+        responseId: "15151515-1515-4515-8515-151515151515",
+        reviewerName: "외부 검수자",
+        decision: "comment",
+        note: "추가 응답",
+      },
+    )).rejects.toMatchObject({ status: 429 });
   });
 
   it("rejects invalid or expired public review tokens without revealing link existence", async () => {

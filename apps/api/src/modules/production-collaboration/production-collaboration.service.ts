@@ -4,7 +4,8 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
-  Inject,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -123,6 +124,55 @@ function assertProjectIdentity(
   }
 }
 
+function duplicateIds(values: readonly { readonly id: string }[]): readonly string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value.id)) duplicates.add(value.id);
+    seen.add(value.id);
+  }
+  return Object.freeze([...duplicates]);
+}
+
+function assertTaskBatchPreconditions(
+  aggregate: ProductionProjectAggregate,
+  tasks: ProductionProjectAggregate["tasks"],
+  expectedTasks: ProductionProjectAggregate["tasks"],
+): void {
+  const taskDuplicates = duplicateIds(tasks);
+  const expectedDuplicates = duplicateIds(expectedTasks);
+  if (taskDuplicates.length > 0 || expectedDuplicates.length > 0) {
+    throw new BadRequestException({
+      message: "작업 묶음에 중복 식별자가 있습니다.",
+      taskDuplicates,
+      expectedDuplicates,
+    });
+  }
+  if (expectedTasks.length === 0) return;
+  const updateIds = new Set(tasks.map((task) => task.id));
+  const unrelated = expectedTasks.filter((task) => !updateIds.has(task.id)).map((task) => task.id);
+  if (unrelated.length > 0) {
+    throw new BadRequestException({
+      message: "비교할 작업은 같은 작업 묶음에 포함되어야 합니다.",
+      taskIds: unrelated,
+    });
+  }
+  const conflicts: string[] = [];
+  for (const expected of expectedTasks) {
+    assertProjectIdentity(aggregate, expected);
+    const current = aggregate.tasks.find((task) => task.id === expected.id);
+    if (!current || stableProductionFingerprint(current) !== stableProductionFingerprint(expected)) {
+      conflicts.push(expected.id);
+    }
+  }
+  if (conflicts.length > 0) {
+    throw new ConflictException({
+      message: "다른 변경이 감지되어 작업 묶음을 안전하게 적용하지 않았습니다.",
+      taskIds: conflicts,
+    });
+  }
+}
+
 function assertAssignmentCanAct(
   aggregate: ProductionProjectAggregate,
   actorUserId: string,
@@ -173,6 +223,11 @@ function eventTarget(command: ProductionCommand): { type: string; id: string } {
       return { type: "episode-operations", id: command.episodeId };
     case "upsert-operations-record":
       return { type: `operations-${command.record.kind}`, id: command.record.value.id };
+    case "apply-automation-execution":
+      return {
+        type: "automation-execution",
+        id: command.evaluatedRules[0]?.id ?? command.notifications[0]?.id ?? command.tasks[0]?.id ?? "automation-execution",
+      };
     case "apply-schedule-scenario":
       return { type: "schedule-scenario", id: command.baseline.id };
     case "upsert-change-request":
@@ -210,6 +265,7 @@ function eventTarget(command: ProductionCommand): { type: string; id: string } {
 
 function commandCapability(command: ProductionCommand): "comment" | "edit" | "manage" {
   if (command.type === "record-review-decision") return "comment";
+  if (command.type === "apply-automation-execution") return "manage";
   if (command.type === "upsert-operations-record") {
     return [
       "resource-calendar",
@@ -1011,6 +1067,7 @@ function applyCommand(
       return { aggregate: { ...aggregate, tasks } };
     }
     case "upsert-task-batch": {
+      assertTaskBatchPreconditions(aggregate, command.tasks, command.expectedTasks);
       let tasks = aggregate.tasks;
       for (const task of command.tasks) {
         assertProjectIdentity(aggregate, task);
@@ -1155,6 +1212,71 @@ function applyCommand(
           };
       }
       return { aggregate };
+    }
+    case "apply-automation-execution": {
+      if (
+        command.tasks.length === 0
+        && command.notifications.length === 0
+        && command.evaluatedRules.length === 0
+      ) {
+        throw new BadRequestException("자동화 실행 결과가 비어 있습니다.");
+      }
+      assertTaskBatchPreconditions(aggregate, command.tasks, []);
+      const notificationDuplicates = duplicateIds(command.notifications);
+      const ruleDuplicates = duplicateIds(command.evaluatedRules);
+      if (notificationDuplicates.length > 0 || ruleDuplicates.length > 0) {
+        throw new BadRequestException({
+          message: "자동화 실행 결과에 중복 식별자가 있습니다.",
+          notificationDuplicates,
+          ruleDuplicates,
+        });
+      }
+      let tasks = aggregate.tasks;
+      for (const task of command.tasks) {
+        assertProjectIdentity(aggregate, task);
+        tasks = upsertById(tasks, task);
+      }
+      const cycles = detectTaskDependencyCycles(tasks);
+      if (cycles.length > 0) {
+        throw new BadRequestException({ message: "자동화 업무 의존성에 순환이 있습니다.", cycles });
+      }
+      let next: ProductionProjectAggregate = { ...aggregate, tasks };
+      for (const notification of command.notifications) {
+        const record: ProductionOperationsRecord = { kind: "notification", value: notification };
+        const issues = validateProductionOperationsRecord(next, record);
+        if (issues.length > 0) {
+          throw new BadRequestException({
+            message: "자동화 알림을 저장할 수 없습니다.",
+            issues,
+          });
+        }
+        next = {
+          ...next,
+          notifications: upsertById(next.notifications ?? [], notification),
+        };
+      }
+      for (const rule of command.evaluatedRules) {
+        const record: ProductionOperationsRecord = { kind: "automation-rule", value: rule };
+        const issues = validateProductionOperationsRecord(next, record);
+        if (issues.length > 0) {
+          throw new BadRequestException({
+            message: "자동화 실행 상태를 저장할 수 없습니다.",
+            issues,
+          });
+        }
+        next = {
+          ...next,
+          automationRules: upsertById(next.automationRules ?? [], rule),
+        };
+      }
+      return {
+        aggregate: next,
+        derived: {
+          taskCount: command.tasks.length,
+          notificationCount: command.notifications.length,
+          evaluatedRuleCount: command.evaluatedRules.length,
+        },
+      };
     }
     case "apply-schedule-scenario": {
       const baselineRecord: ProductionOperationsRecord = {
@@ -1516,6 +1638,10 @@ function externalReviewProjection(
   });
 }
 
+const MAX_EXTERNAL_REVIEW_RESPONSES = 1_000;
+const EXTERNAL_REVIEW_RESPONSE_WINDOW_MS = 10 * 60 * 1_000;
+const MAX_EXTERNAL_REVIEW_RESPONSES_PER_WINDOW = 60;
+
 function externalReviewTokenDigest(token: string): string {
   return `sha256:${createHash("sha256").update(token, "utf8").digest("hex")}`;
 }
@@ -1535,6 +1661,7 @@ function requireExternalReviewAccess(
   if (
     !access
     || access.status !== "active"
+    || !access.permissions.includes("view")
     || Date.parse(access.expiresAt) <= Date.now()
     || !externalReviewTokenMatches(access.tokenDigest, token)
   ) {
@@ -1556,7 +1683,8 @@ function externalReviewProjection(
       status: submission.status,
       submittedAt: submission.submittedAt,
       revisionRef: submission.revisionRef,
-      evidenceRefs: submission.evidenceRefs,
+      evidenceRefs: access.permissions.includes("download") ? submission.evidenceRefs : [],
+      protectedEvidenceCount: access.permissions.includes("download") ? 0 : submission.evidenceRefs.length,
       deliverable: deliverable ? {
         id: deliverable.id,
         type: deliverable.type,
@@ -1764,6 +1892,21 @@ export class ProductionCollaborationService {
             throw new ConflictException("같은 외부 검수 응답 식별자가 다른 내용에 이미 사용되었습니다.");
           }
           return { aggregate: current, derived: externalReviewProjection(current, access) };
+        }
+        if (access.responses.length >= MAX_EXTERNAL_REVIEW_RESPONSES) {
+          throw new HttpException("외부 검수 응답 한도에 도달했습니다.", HttpStatus.TOO_MANY_REQUESTS);
+        }
+        const responseTime = Date.parse(response.createdAt);
+        const recentResponseCount = access.responses.filter((entry) => {
+          const createdAt = Date.parse(entry.createdAt);
+          return Number.isFinite(createdAt)
+            && createdAt >= responseTime - EXTERNAL_REVIEW_RESPONSE_WINDOW_MS;
+        }).length;
+        if (recentResponseCount >= MAX_EXTERNAL_REVIEW_RESPONSES_PER_WINDOW) {
+          throw new HttpException(
+            "짧은 시간에 너무 많은 검수 응답이 제출되었습니다.",
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
         }
         const updatedAccess: ExternalReviewAccess = {
           ...access,

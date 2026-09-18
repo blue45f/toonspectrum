@@ -94,15 +94,84 @@
 
 이번 증분에서 완료한 범위는 다음과 같다.
 
-- Production 산출물과 Studio 원고를 `ProductionStudioRevisionLink`로 명시적으로 연결한다.
-- 대본·콘티·선화·배경·채색·식자·통합 승인본의 역할과 Studio revision lineage를 검증한다.
-- 승인 연결은 실제 승인된 `Submission`과 `Deliverable.approvedSubmissionId`가 일치할 때만 허용한다.
-- 승인된 대본·작화·통합 revision을 회차의 narrative·visual·integrated 권위에 투영한다.
-- 같은 회차·역할의 이전 연결은 자동으로 `superseded` 처리하되 원본 revision과 감사 이력은 보존한다.
-- 회차별로 필요·승인·검수 대기·미연결 revision 수와 통합 검수 준비 여부를 Production 화면에 표시한다.
-- 사용자는 검수 또는 승인 revision을 명시적으로 연결하며, 권한·역할·제출본 부족 시 이유와 다음 행동을 확인한다.
-- API는 프로젝트·작업·회차·산출물·제출본·역할 배정과 revision digest를 서버에서 다시 검증한다.
-- 이 증분은 Production과 Studio의 revision 권위를 연결하지만 실제 다중 계정 팀 제작, 위치 기반 수정 요청, 승인 잠금과 게시본 E2E는 계속 검증 대상으로 남긴다.
+- 작품을 단일 문서가 아니라 story·storyboard·2D canvas·3D scene·asset·audio·localization·review·deliverable·release artifact graph로 저장한다.
+- artifact head, approved revision, immutable parent graph와 append-only operation journal을 서버 권위로 제공한다.
+- 2D layer graph, sparse raster tile, vector stroke, 3D scene/live layer의 정규화된 v3 IR과 검증 계약을 추가했다.
+- 원본 blob, revision blob, 외부 파일 binding, 호환성 보고서와 provenance 연결을 PostgreSQL migration으로 영속화했다.
+- Google Drive·Dropbox·OneDrive·로컬 파일을 import-only, export-only, bidirectional, backup-mirror 모드로 revision에 연결한다.
+- 브라우저 로컬 cache와 서버 ProjectGraph를 함께 사용하고, stale response가 최신 project state를 덮지 않도록 방어한다.
+- Studio 프로젝트 화면에서 정본 상태, 버전 stack, 복원, 호환성·손실 보고와 승인 상태를 확인한다.
+- Production 작업의 입력 revision을 실제 Studio artifact ID·SHA-256 digest·lineage와 대조한다.
+- 공정과 episode scope에 맞는 승인 revision을 우선 추천하고, 명시적 사용자 행동으로 작업 입력에 고정한다.
+- 이미 제출된 revision의 digest가 다르면 자동 교체하지 않고 새 제출을 요구해 기존 검수 증거를 보존한다.
+- 기능 미리보기 데이터에서는 서버 정본을 변경하지 않으며 실제 프로젝트에서만 연결 명령을 제공한다.
+
+남은 검증은 대용량 업로드 재개, 실제 외부 계정, 다중 사용자 충돌, Safari OPFS·GPU 조합과 기준 프로젝트 A–D의 전체 E2E다.
+
+## 2026-09-17 데스크톱 폴더 동기화·대체 증거 게이트 증분
+
+이번 증분에서 완료한 범위는 다음과 같다.
+
+- Windows·macOS·Linux 호스트가 사용할 수 있는 provider-neutral 로컬 폴더 동기화 엔진과 실행 가능한 `toonstudio-sync` CLI를 별도 workspace로 제공한다.
+- `--dry-run`, `--once`, `--watch`, JSON 출력, 파일 크기 제한과 알려지지 않은 확장자 opt-in을 지원한다.
+- 파일을 SHA-256, 크기, 수정 시각과 정규화된 상대 경로로 스캔하고 `.toonstudio`, `.git`, `node_modules`와 루트 밖 경로를 제외한다.
+- 심볼릭 링크와 `..` 경로를 통한 로컬·원격 폴더 탈출을 차단하고 로컬과 원격이 같은 실제 디렉터리인 경우 시작하지 않는다.
+- 마지막 동기화 journal과 현재 로컬·원격 snapshot을 비교해 upload, download, delete-local, delete-remote, no-op, conflict 계획을 결정한다.
+- 양쪽이 동시에 바뀐 파일은 자동 덮어쓰지 않고 conflict 종료 코드 2로 중단한다.
+- 원격 쓰기·삭제는 마지막으로 확인한 version을 compare-and-swap 조건으로 사용해 스캔 뒤 변경된 파일을 덮어쓰지 않는다.
+- upload·download는 임시 파일, digest 재검증과 atomic rename 경계를 사용하고, 성공한 작업만 journal에 반영한다.
+- 로컬 삭제는 `.toonstudio/trash`로 이동하며 감시 모드는 중복 trigger를 병합하고 SIGINT·SIGTERM에서 안전하게 중지한다.
+- Google Drive·Dropbox·OneDrive를 access token으로 직접 연결하는 cloud transport를 제공한다.
+- Google Drive version+ETag, Dropbox revision, OneDrive eTag를 공급자 compare-and-swap 조건으로 사용한다.
+- 공급자에 SHA-256이 없거나 알고리즘이 다른 경우 `.toonstudio-sync-index.json` sidecar를 저장하고 object version과 연결한다.
+- sidecar가 없거나 오래됐으면 원격 파일을 다시 내려받아 SHA-256을 복구하고, conflict 없는 실행 뒤 index를 compare-and-swap으로 갱신한다.
+- `--dry-run`과 충돌 cycle은 원격 폴더나 sidecar index를 생성·수정하지 않는다.
+- Google Drive와 OneDrive는 resumable upload session, Dropbox는 revision-guarded upload session을 사용한다.
+- access token은 환경 변수에서만 읽고 CLI 출력·journal·sidecar에 기록하지 않는다.
+- 경쟁 제품 대체 프로그램 57개 workstream을 실제 저장소 evidence와 연결하는 검증기를 추가했다.
+- 52개 구현, 4개 검증 harness, 1개 외부 전문 창작자 검증 상태를 구분하며 외부 서명 증거 전에는 대체 완료 문구를 차단한다.
+- 전문 창작자 12명 대상 블라인드 제작 과제·성능·PSD·3D·검수·게시 패키지 평가 기준을 명시했다.
+
+이 증분의 완료 범위는 파일시스템·마운트 폴더와 Google Drive·Dropbox·OneDrive direct access-token transport다. 브라우저 OAuth 로그인·refresh token·OS Keychain, 프로세스 재시작 이후 upload session 재개, OS 서명 설치 패키지와 충돌 GUI는 별도 release gate로 유지한다.
+
+## 2026-09-17 기준 프로젝트 A–D 자동 인증 증분
+
+이번 증분에서 완료한 범위는 다음과 같다.
+
+- 기준 프로젝트 A(1인 세로 웹툰), B(팀 제작·검수), C(PSD·CLIP 왕복), D(재편집 가능한 3D 제작)를 실행 가능한 인증 manifest로 고정했다.
+- 18개 완료 기준을 실제 20개 테스트 파일에 연결하고 evidence 파일의 SHA-256과 크기를 receipt에 기록한다.
+- 기준 프로젝트 A: 생성·자동 저장·프로젝트 archive·말풍선·게시 package 87개 테스트를 통과했다.
+- 기준 프로젝트 B: 역할 게이트·Production↔Studio revision digest·검수·댓글 재앵커 33개 테스트를 통과했다.
+- 기준 프로젝트 C: PSD import·텍스트·조정 그래프·CLIP 선택·workspace interchange 110개 테스트를 통과했다.
+- 기준 프로젝트 D: 3D scene document·camera·multi-pass·linked archive·VRM scene 109개 테스트를 통과했다.
+- 네 기준 프로젝트 전체는 20 files / 339 tests를 통과하며 root CI의 필수 게이트로 실행된다.
+- 자동 인증 receipt가 통과해도 전문 창작자 대체 완료 문구는 열리지 않도록 claim policy를 별도로 차단한다.
+
+자동 인증은 코드·저장·복구·왕복 계약의 결정론적 근거다. 실제 장시간 창작 경험, 펜·GPU·파일 편차와 도구 대체 평가는 12명 외부 전문 창작자 서명 검증을 통과해야 한다.
+
+## 2026-09-17 예측형 제작 리스크 증분
+
+이번 증분에서 완료한 범위는 다음과 같다.
+
+- 완료된 뒤에만 드러나는 `기한 초과` 표시와 별도로, 남은 공수·현재 단계·담당자 가용량·선행 작업을 이용해 예상 완료 시점과 마감 여유를 계산한다.
+- 차단·입력 대기, 선행 작업 병목, 담당자 미배정·과부하, 공수 편차, 검수 병목, 연재 버퍼 부족을 서로 다른 원인으로 분리한다.
+- 실제 Studio `inputRevisionRefs`와 `outputDeliverableIds`가 빠진 업무를 추적 불가능한 인계 위험으로 표시한다.
+- 각 신호는 위험 점수만 보여주지 않고 `왜 위험한가`, `예상 영향`, `권장 대응`, 계산 신뢰도를 함께 제공한다.
+- 예측 결과가 담당자·일정·상태를 자동 변경하지 않도록 하고, 사용자가 확인한 신호만 기존 `ProductionRisk` 원장에 정식 등록한다.
+- 동일 신호의 위험 레코드 ID를 결정론적으로 생성해 중복 등록을 막는다.
+- 프로젝트 운영 조종석의 건강 점수·오늘의 운영 판단과 일정 작업실의 필터·타임라인이 같은 예측 모델을 사용한다.
+- 일정 화면에서 이미 늦은 작업, 예측 위험, 단순 주의와 정상 상태를 텍스트와 시각 표현으로 함께 구분한다.
+- 마감 2일 재조정, 적합한 지원 인력 추가, 차단 입력 해소, 병목 선행 작업 우선 완료, 작업 범위 20% 분리 시나리오를 원본을 바꾸지 않고 비교한다.
+- 각 복구안은 위험 점수·예상 지연·프로젝트 고위험 건수·예측 초과 작업 수의 전후 값을 함께 보여준다.
+- 마감·지원 배정처럼 되돌릴 수 있는 변경만 사용자 클릭 후 원자적 배치로 적용하며, 근거 없는 차단 해소·완료 처리·범위 축소는 미리보기 전용으로 제한한다.
+- 복구안 적용과 되돌리기에는 미리 본 작업 상태를 함께 보내며, 그 사이 다른 참여자가 같은 작업을 변경했다면 `409`로 중단해 최신 변경을 덮어쓰지 않는다.
+- 동시성 충돌 시 최신 프로젝트를 자동 재조회하고, 적용 뒤 같은 업무가 다시 바뀐 경우 되돌리기 버튼을 잠가 후속 작업을 보호한다.
+- 저장 실패는 복구 UI까지 전파해 성공·되돌리기 상태를 거짓으로 표시하지 않고, 실패 이유를 같은 화면에서 설명한다.
+- 같은 자동화 조건을 다시 실행해도 결정적 실행 키로 동일 업무·알림을 복제하지 않으며, 시간 기반 경고는 날짜뿐 아니라 원인 작업 상태가 달라진 경우 새 발생으로 처리한다.
+- 자동화 규칙의 조건·행동이 수정되면 의미 지문이 바뀌어 이전 결과와 구분하며, 생성 업무·알림·규칙 실행 시각을 단일 프로젝트 리비전으로 원자 저장한다.
+- 외부 검수 비밀 값은 URL 쿼리와 요청 본문에 남기지 않고 프래그먼트에서 한 번 회수한 뒤 주소창을 정리하며, API에는 Authorization 헤더로만 전달한다.
+- 외부 검수는 `view` 권한을 서버에서 필수 확인하고, `download` 권한이 없으면 원본 증빙 URL 자체를 응답에서 제거하며, 링크별 누적 응답과 단시간 응답 폭주를 제한해 공개 엔드포인트의 정보·저장·응답 증폭을 막는다.
+- 규칙 기반 예측 모델, 위험 등록 권한, 복구 시나리오 동시성, 자동화 원자성·멱등성, 외부 검수 비밀·권한·응답 제한을 API·단위·컴포넌트·모바일 브라우저 테스트로 회귀 방지한다.
 
 ## 올인원 공개 문구 사용 게이트
 

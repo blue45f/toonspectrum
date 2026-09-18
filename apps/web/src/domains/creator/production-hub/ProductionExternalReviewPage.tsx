@@ -200,7 +200,13 @@ export function ProductionExternalReviewPage() {
                   <div className="mt-4 rounded-xl border border-line bg-panel p-4"><p className="text-xs font-black">검수 기준</p><ul className="mt-2 space-y-1.5 text-xs leading-5 text-fg-2">{submission.deliverable.completionCriteria.map((criterion) => <li key={criterion} className="flex gap-2"><CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-good" aria-hidden="true" /><span>{criterion}</span></li>)}</ul></div>
                 ) : null}
                 {submission.evidenceRefs.length ? (
-                  <div className="mt-4"><p className="text-xs font-black">검수 자료</p><div className="mt-2 flex flex-wrap gap-2">{submission.evidenceRefs.map((reference) => isWebUrl(reference) ? <a key={reference} href={reference} target="_blank" rel="noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>자료 열기 <ExternalLink className="size-3.5" aria-hidden="true" /></a> : <span key={reference} className="rounded-lg border border-line bg-panel px-3 py-2 font-mono text-[0.6875rem] text-fg-2">{reference}</span>)}</div></div>
+                  <div className="mt-4"><p className="text-xs font-black">검수 자료</p><div className="mt-2 flex flex-wrap gap-2">{submission.evidenceRefs.map((reference) => isWebUrl(reference) ? <a key={reference} href={reference} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>자료 열기 <ExternalLink className="size-3.5" aria-hidden="true" /></a> : <span key={reference} className="rounded-lg border border-line bg-panel px-3 py-2 font-mono text-[0.6875rem] text-fg-2">{reference}</span>)}</div></div>
+                ) : null}
+                {submission.protectedEvidenceCount > 0 ? (
+                  <div className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-panel p-3 text-xs leading-5 text-fg-2">
+                    <ShieldCheck className="mt-0.5 size-4 shrink-0 text-good" aria-hidden="true" />
+                    <p>원본 검수 자료 {submission.protectedEvidenceCount}개는 다운로드 권한이 없어 링크를 제공하지 않습니다. 승인 여부는 표시된 제출본 정보와 검수 기준을 기준으로 판단해 주세요.</p>
+                  </div>
                 ) : null}
                 <p className="mt-4 break-all font-mono text-[0.625rem] text-fg-3">{submission.revisionRef.digest}</p>
               </div>
