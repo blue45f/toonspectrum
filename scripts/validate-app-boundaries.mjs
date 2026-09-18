@@ -4,7 +4,18 @@ import path from "node:path";
 const ROOT = process.cwd();
 const CONFIG_PATH = path.join(ROOT, "config/architecture-boundary-ratchet.json");
 const SOURCE_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".mts", ".ts", ".tsx"]);
-const APP_ROOTS = ["apps/web/src", "apps/admin/src", "apps/api/src"];
+const SOURCE_ROOTS = ["apps/web/src", "apps/admin/src", "apps/api/src", "packages/contracts/src"];
+const CONTRACT_FORBIDDEN_IMPORT_PREFIXES = [
+  "react",
+  "react-dom",
+  "@nestjs/",
+  "drizzle-orm",
+  "pg",
+  "ky",
+  "express",
+  "socket.io",
+  "node:",
+];
 
 function walk(relativeRoot) {
   const absoluteRoot = path.join(ROOT, relativeRoot);
@@ -56,6 +67,8 @@ const counts = {
   adminCrossDomainDeepImport: 0,
   webSharedToDomain: 0,
   webCrossDomainDeepImport: 0,
+  contractsToApps: 0,
+  contractsForbiddenImport: 0,
 };
 const examples = new Map(Object.keys(counts).map((key) => [key, []]));
 
@@ -65,11 +78,24 @@ function record(key, file, target) {
   if (bucket.length < 5) bucket.push(`${file} -> ${target}`);
 }
 
-for (const file of APP_ROOTS.flatMap(walk)) {
+for (const file of SOURCE_ROOTS.flatMap(walk)) {
   const source = fs.readFileSync(path.join(ROOT, file), "utf8");
   for (const specifier of importsFrom(source)) {
+    if (
+      file.startsWith("packages/contracts/src/")
+      && CONTRACT_FORBIDDEN_IMPORT_PREFIXES.some(
+        (prefix) => specifier === prefix || specifier.startsWith(prefix),
+      )
+    ) {
+      record("contractsForbiddenImport", file, specifier);
+    }
+
     const target = normalizeTarget(file, specifier);
     if (!target) continue;
+
+    if (file.startsWith("packages/contracts/src/") && target.startsWith("apps/")) {
+      record("contractsToApps", file, target);
+    }
 
     if (file.startsWith("apps/web/src/") && target.startsWith("apps/admin/")) record("webToAdmin", file, target);
     if (file.startsWith("apps/admin/src/") && target.startsWith("apps/web/")) record("adminToWeb", file, target);

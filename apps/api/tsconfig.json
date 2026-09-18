@@ -29,6 +29,12 @@
       ],
       "@toonspectrum/studio-format-gateway/*": [
         "../../packages/studio-format-gateway/src/*"
+      ],
+      "@toonspectrum/contracts": [
+        "../../packages/contracts/src/index.ts"
+      ],
+      "@toonspectrum/contracts/*": [
+        "../../packages/contracts/src/*"
       ]
     },
     "outDir": "dist",

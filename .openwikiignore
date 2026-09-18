@@ -1,0 +1,25 @@
+# Dependencies and build outputs
+node_modules/
+dist/
+dist-admin/
+coverage/
+.turbo/
+.tstrace/
+
+# Generated QA, benchmark and deployment artifacts
+artifacts/
+.qa/
+marketplace-benchmark/
+media/
+data/
+
+# Large runtime/catalog payloads that are not architecture sources
+apps/api/data/
+apps/web/public/assets/
+apps/web/public/generated/
+third_party/
+
+# Local worktrees and caches
+worktrees/
+.worktrees/
+.chatgpt-worktrees/

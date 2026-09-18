@@ -18,6 +18,7 @@
     "@nestjs/platform-socket.io": "^11.1.28",
     "@nestjs/websockets": "^11.1.28",
     "@socket.io/postgres-adapter": "^0.5.0",
+    "@toonspectrum/contracts": "workspace:*",
     "@toonspectrum/core": "workspace:*",
     "@toonspectrum/studio-format-gateway": "workspace:*",
     "@toonspectrum/studio-project-model": "workspace:*",
