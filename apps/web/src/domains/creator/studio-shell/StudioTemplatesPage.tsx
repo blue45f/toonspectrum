@@ -3,6 +3,9 @@ import {
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
   translateLocaleBranchForLocale,
+  useBilingual,
+  useBilingualLocalizer,
+  type BilingualText,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
@@ -14,11 +17,11 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
+
 import { cn } from "@/shared/lib/utils";
 
 import {
