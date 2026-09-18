@@ -77,6 +77,9 @@ import {
   type StudioVirtualSpaceSnapshot,
 } from "./studio-virtual-space-presence";
 import {
+  readStudioVirtualSpaceGamepadInput,
+} from "./studio-virtual-space-gamepad";
+import {
   STUDIO_VIRTUAL_SPACE_INTERACTIONS,
   selectNearestStudioVirtualSpaceInteraction,
   type StudioVirtualSpaceInteraction,
@@ -715,12 +718,14 @@ function VirtualSpaceExperience({
   const [activity, setActivity] = useState<StudioVirtualSpaceActivity>("available");
   const [avatarIndex, setAvatarIndex] = useState(initialAvatarIndex);
   const [moving, setMoving] = useState(false);
+  const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
   const selfRef = useRef(snapshot.self);
   const peersRef = useRef(snapshot.peers);
   const followingPeerIdRef = useRef<string | null>(null);
   const lastFollowPathAtRef = useRef(0);
   const localReactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gamepadInteractHeldRef = useRef(false);
   const pressedKeysRef = useRef(new Set<string>());
   const joystickRef = useRef<StudioVirtualSpacePoint>({ x: 0, y: 0 });
   const clickPathRef = useRef<readonly StudioVirtualSpacePoint[]>([]);
@@ -750,6 +755,22 @@ function VirtualSpaceExperience({
   }, [projectId, snapshot.self.x, snapshot.self.y]);
 
   useEffect(() => startStudioConnectivityRuntime(), []);
+
+  useEffect(() => {
+    const syncGamepad = () => {
+      const pads = typeof navigator !== "undefined" && typeof navigator.getGamepads === "function"
+        ? Array.from(navigator.getGamepads())
+        : [];
+      setGamepadConnected(pads.some((pad) => Boolean(pad?.connected)));
+    };
+    syncGamepad();
+    globalThis.addEventListener("gamepadconnected", syncGamepad);
+    globalThis.addEventListener("gamepaddisconnected", syncGamepad);
+    return () => {
+      globalThis.removeEventListener("gamepadconnected", syncGamepad);
+      globalThis.removeEventListener("gamepaddisconnected", syncGamepad);
+    };
+  }, []);
 
   useEffect(() => () => {
     if (localReactionTimerRef.current !== null) {
@@ -890,6 +911,18 @@ function VirtualSpaceExperience({
       if (keys.has("arrowup") || keys.has("w")) vertical -= 1;
       if (keys.has("arrowdown") || keys.has("s")) vertical += 1;
 
+      const gamepads = typeof navigator !== "undefined" && typeof navigator.getGamepads === "function"
+        ? Array.from(navigator.getGamepads())
+        : [];
+      const gamepad = gamepads.find((candidate) => Boolean(candidate?.connected)) ?? null;
+      const gamepadInput = readStudioVirtualSpaceGamepadInput(gamepad);
+      horizontal += gamepadInput.x;
+      vertical += gamepadInput.y;
+      if (gamepadInput.interact && !gamepadInteractHeldRef.current) {
+        activateCurrentZone();
+      }
+      gamepadInteractHeldRef.current = gamepadInput.interact;
+
       const current = selfRef.current;
       let next: StudioVirtualSpacePoint = current;
       let facing = current.facing;
@@ -899,7 +932,7 @@ function VirtualSpaceExperience({
         if (followingPeerIdRef.current) setFollowingPeer(null);
         clickPathRef.current = [];
         const direction = normalizeStudioVirtualSpaceVector(horizontal, vertical);
-        const sprint = keys.has("shift") ? 1.35 : 1;
+        const sprint = keys.has("shift") || gamepadInput.sprint ? 1.35 : 1;
         next = resolveStudioVirtualSpaceMovement(current, {
           x: direction.x * STUDIO_VIRTUAL_SPACE_WALK_SPEED * sprint * elapsedSeconds,
           y: direction.y * STUDIO_VIRTUAL_SPACE_WALK_SPEED * sprint * elapsedSeconds,
@@ -960,7 +993,7 @@ function VirtualSpaceExperience({
       globalThis.cancelAnimationFrame(frame);
       setMovingState(false);
     };
-  }, [activity, projectId, setFollowingPeer, updatePosition]);
+  }, [activateCurrentZone, activity, projectId, setFollowingPeer, updatePosition]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1349,7 +1382,9 @@ function VirtualSpaceExperience({
                 <div className="absolute bottom-3 left-3 z-40 hidden max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-2xl border border-line bg-panel/90 p-2 shadow-lg backdrop-blur lg:flex">
                   <span className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-card px-3 text-[0.7rem] font-bold text-fg-2">
                     <Gamepad2 size={14} aria-hidden />
-                    WASD / ↑↓←→ · Shift
+                    {gamepadConnected
+                      ? bt("게임패드 · 왼쪽 스틱 / D-pad · A / Cross", "Gamepad · left stick / D-pad · A / Cross")
+                      : "WASD / ↑↓←→ · Shift"}
                   </span>
                   <span className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-card px-3 text-[0.7rem] font-bold text-fg-2">
                     <MousePointer2 size={14} aria-hidden />
