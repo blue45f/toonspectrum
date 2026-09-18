@@ -126,6 +126,7 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
       point,
       state.facing as StudioVirtualSpaceFacing,
       state.activity as StudioVirtualSpaceActivity,
+      typeof state.moving === "boolean" ? state.moving : false,
     ),
   };
 }
@@ -214,15 +215,17 @@ export class StudioVirtualSpacePresenceController {
     point: StudioVirtualSpacePoint,
     facing: StudioVirtualSpaceFacing = this.self.facing,
     activity: StudioVirtualSpaceActivity = this.self.activity,
+    moving: boolean = this.self.moving,
   ): void {
     if (this.closed) return;
-    const next = studioVirtualSpaceState(point, facing, activity);
+    const next = studioVirtualSpaceState(point, facing, activity, moving);
     if (
       next.x === this.self.x
       && next.y === this.self.y
       && next.zoneId === this.self.zoneId
       && next.facing === this.self.facing
       && next.activity === this.self.activity
+      && next.moving === this.self.moving
     ) {
       return;
     }
@@ -232,7 +235,11 @@ export class StudioVirtualSpacePresenceController {
   }
 
   setActivity(activity: StudioVirtualSpaceActivity): void {
-    this.update(this.self, this.self.facing, activity);
+    this.update(this.self, this.self.facing, activity, this.self.moving);
+  }
+
+  setMoving(moving: boolean): void {
+    this.update(this.self, this.self.facing, this.self.activity, moving);
   }
 
   refresh(): void {

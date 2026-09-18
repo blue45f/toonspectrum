@@ -14,6 +14,13 @@ import {
   StudioVirtualSpacePresenceController,
   parseStudioVirtualSpacePacket,
 } from "./studio-virtual-space-presence";
+import {
+  findStudioVirtualSpacePath,
+  normalizeStudioVirtualSpaceVector,
+  resolveStudioVirtualSpaceMovement,
+  studioVirtualSpaceCanOccupy,
+  studioVirtualSpaceStepToward,
+} from "./studio-virtual-space-navigation";
 
 const A: StudioLiveParticipant = {
   sessionId: "creator-a",
@@ -79,10 +86,11 @@ describe("Studio virtual space model", () => {
     ]);
   });
 
-  it("keeps generated starting points inside the stage", () => {
+  it("keeps generated starting points inside a walkable part of the stage", () => {
     const point = studioVirtualSpaceInitialPoint("creator-a");
     expect(point.x).toBeGreaterThan(0);
     expect(point.y).toBeGreaterThan(0);
+    expect(studioVirtualSpaceCanOccupy(point)).toBe(true);
   });
 });
 
@@ -101,7 +109,9 @@ describe("Studio virtual space P2P presence", () => {
         activity: "available",
       },
     });
-    expect(parseStudioVirtualSpacePacket(packet)?.kind).toBe("presence");
+    const parsed = parseStudioVirtualSpacePacket(packet);
+    expect(parsed?.kind).toBe("presence");
+    if (parsed?.kind === "presence") expect(parsed.state.moving).toBe(false);
     expect(parseStudioVirtualSpacePacket('{"wire":"other"}')).toBeNull();
     expect(parseStudioVirtualSpacePacket("not-json")).toBeNull();
   });
@@ -125,12 +135,66 @@ describe("Studio virtual space P2P presence", () => {
     expect(a.snapshot().nearbyPeers).toHaveLength(1);
 
     a.update({ x: 900, y: 600 }, "right", "focused");
+    a.setMoving(true);
     a.refresh();
     expect(b.snapshot().peers[0]?.state.activity).toBe("focused");
+    expect(b.snapshot().peers[0]?.state.moving).toBe(true);
     expect(b.snapshot().nearbyPeers).toHaveLength(0);
+
+    a.setMoving(false);
+    a.refresh();
+    expect(b.snapshot().peers[0]?.state.moving).toBe(false);
 
     a.close();
     expect(b.snapshot().peers).toHaveLength(0);
     b.close();
+  });
+});
+
+
+describe("Studio virtual space RPG navigation", () => {
+  it("normalizes diagonal input so movement speed stays consistent", () => {
+    const vector = normalizeStudioVirtualSpaceVector(1, 1);
+    expect(Math.hypot(vector.x, vector.y)).toBeCloseTo(1, 6);
+  });
+
+  it("blocks room walls while allowing doorway traversal", () => {
+    expect(studioVirtualSpaceCanOccupy({ x: 50, y: 40 })).toBe(false);
+    expect(studioVirtualSpaceCanOccupy({ x: 163, y: 232 })).toBe(true);
+  });
+
+  it("slides along colliders instead of teleporting through them", () => {
+    const start = { x: 340, y: 360 };
+    const next = resolveStudioVirtualSpaceMovement(start, { x: 40, y: 30 });
+    expect(next.x).toBeGreaterThan(start.x);
+    expect(next.y).toBe(start.y);
+  });
+
+  it("walks toward click targets in bounded increments", () => {
+    const start = { x: 535, y: 355 };
+    const next = studioVirtualSpaceStepToward(start, { x: 620, y: 330 }, 20);
+    expect(Math.hypot(next.x - start.x, next.y - start.y)).toBeLessThanOrEqual(20.01);
+  });
+});
+
+
+describe("Studio virtual space pathfinding", () => {
+  it("finds a browser-local route through room doors", () => {
+    const path = findStudioVirtualSpacePath(
+      { x: 535, y: 305 },
+      { x: 430, y: 95 },
+    );
+    expect(path.length).toBeGreaterThan(2);
+    expect(path.every((point) => studioVirtualSpaceCanOccupy(point))).toBe(true);
+    expect(path.at(-1)?.y).toBeLessThan(150);
+  });
+
+  it("returns a nearby walkable endpoint when a click lands on furniture", () => {
+    const path = findStudioVirtualSpacePath(
+      { x: 535, y: 305 },
+      { x: 380, y: 380 },
+    );
+    expect(path.length).toBeGreaterThan(0);
+    expect(path.every((point) => studioVirtualSpaceCanOccupy(point))).toBe(true);
   });
 });

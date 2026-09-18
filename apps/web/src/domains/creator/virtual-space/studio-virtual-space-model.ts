@@ -41,6 +41,7 @@ export interface StudioVirtualSpacePresenceState extends StudioVirtualSpacePoint
   readonly zoneId: StudioVirtualSpaceZoneId;
   readonly facing: StudioVirtualSpaceFacing;
   readonly activity: StudioVirtualSpaceActivity;
+  readonly moving: boolean;
 }
 
 export interface StudioVirtualSpacePeer {
@@ -168,8 +169,10 @@ export function studioVirtualAvatarProfile(identity: string): StudioVirtualAvata
 
 export function studioVirtualSpaceInitialPoint(identity: string): StudioVirtualSpacePoint {
   const hash = stableHash(identity || "local");
-  const spreadX = 465 + (hash % 150);
-  const spreadY = 330 + ((hash >>> 8) % 80);
+  // Spawn in the open upper half of Drawing Studio so the RPG collider never traps a fresh session
+  // inside desks, room walls or the central production props.
+  const spreadX = 455 + (hash % 170);
+  const spreadY = 292 + ((hash >>> 8) % 30);
   return Object.freeze({ x: spreadX, y: spreadY });
 }
 
@@ -193,6 +196,7 @@ export function studioVirtualSpaceState(
   point: StudioVirtualSpacePoint = DEFAULT_POINT,
   facing: StudioVirtualSpaceFacing = "down",
   activity: StudioVirtualSpaceActivity = "available",
+  moving = false,
 ): StudioVirtualSpacePresenceState {
   const bounded = clampStudioVirtualSpacePoint(point);
   return Object.freeze({
@@ -200,6 +204,7 @@ export function studioVirtualSpaceState(
     zoneId: studioVirtualSpaceZoneAt(bounded),
     facing,
     activity,
+    moving,
   });
 }
 
