@@ -244,7 +244,7 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   {
     id: "kage",
     name: "카게 (다크)",
-    thumbnailUrl: "/assets/3d/characters/thumbnails/refined-v2/kage.png",
+    thumbnailUrl: "/assets/3d/characters/thumbnails/kage.png",
     url: "/vrm/Darkness_Shibu.vrm",
     limitations: ["heavy-payload"],
   },

@@ -320,11 +320,12 @@ export type BilingualLocalizer = <TKo, TEn>(ko: TKo, en: TEn) => TKo;
  */
 export function useBilingualLocalizer(scope: string): BilingualLocalizer {
   useBilingualI18nRevision();
-  return useCallback(
-    ((ko: unknown, en: unknown) =>
-      translateBilingualValueForActiveLocale(scope, ko, en)) as BilingualLocalizer,
+  const localize = useCallback(
+    (ko: unknown, en: unknown) =>
+      translateBilingualValueForActiveLocale(scope, ko, en),
     [scope],
   );
+  return localize as BilingualLocalizer;
 }
 
 function translateParallelNode(

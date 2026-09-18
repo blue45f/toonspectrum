@@ -15,7 +15,7 @@ import {
 
 import type { Dict } from "./i18n-core";
 
-const RUNTIME_TRANSLATION_CACHE_VERSION = 2;
+const RUNTIME_TRANSLATION_CACHE_VERSION = 3;
 const I18N_TRANSLATION_ENDPOINT = "https://api.mymemory.translated.net/get";
 const I18N_TRANSLATION_CONCURRENCY = 8;
 const RUNTIME_TRANSLATION_TIMEOUT_MS = 8_000;
@@ -82,6 +82,7 @@ function shouldAutoTranslateLocale(locale: string): boolean {
   // translated into English; source/target root equality is filtered per key below.
   return normalized.split("-")[0] !== FALLBACK_LANG;
 }
+
 
 function parseMymemoryResponse(data: unknown): string | null {
   if (typeof data !== "object" || data === null) return null;
@@ -283,7 +284,7 @@ function getAttemptedKeys(locale: string): Set<string> {
 /**
  * Returns registered runtime source keys that still need automatic translation. Each source keeps
  * its authored locale so lazy Studio surfaces can translate Korean-authored static copy without
- * mislabeling that text as English.
+ * mislabeling that text as English or sending user-generated DOM text to the translator.
  */
 type RuntimeTranslationPendingEntry = {
   readonly key: string;
@@ -330,24 +331,22 @@ export async function loadRuntimeTranslationBundle(locale: string): Promise<void
   if (!normalized) return;
 
   await loadAppI18nLocale(normalized);
-  if (!shouldAutoTranslateLocale(normalized)) return;
 
   if (!runtimeTranslationBundles.has(normalized)) {
     const cached = readCachedRuntimeTranslation(normalized);
     if (cached) {
       runtimeTranslationBundles.set(normalized, cached);
       if (Object.keys(cached).length > 0) triggerTranslationBundleUpdate();
-      // Keep the established fast-start contract for a complete persisted cache. If a lazy route
-      // later registers additional English source keys, its translationBundleRevision change makes
-      // useT() invoke this loader again and the new keys are then discovered dynamically.
-      return;
+      // A persisted cache can predate lazy UI sources registered later in the same session. Only
+      // stop here when the current source registry has no additional keys to translate.
+      if (getRuntimeTranslationPendingKeys(normalized).length === 0) return;
     }
   }
 
   const inFlight = runtimeTranslationLoads.get(normalized);
   if (inFlight) {
     await inFlight;
-    return;
+    if (getRuntimeTranslationPendingKeys(normalized).length === 0) return;
   }
 
   const pendingEntries = [...getRuntimeTranslationPendingEntries(normalized)];
