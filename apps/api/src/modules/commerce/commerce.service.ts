@@ -19,6 +19,7 @@ import {
 import {
   isCommerceOrderStatus,
   type CommerceOrderPublicEntry,
+  type CommerceOrderStatus,
 } from "../../../../../packages/core/src/commerce";
 import {
   commerceEntitlements,
@@ -584,7 +585,7 @@ export class CommerceService {
   private assertPaymentMatchesOrder(
     row: CommerceOrderRow,
     payment: SupporterTossPayment,
-  ): void {
+  ): CommerceOrderStatus {
     if (
       payment.orderId !== row.orderId
       || payment.totalAmount !== row.amount
@@ -603,6 +604,7 @@ export class CommerceService {
         message: "지원하지 않는 결제 상태가 반환되었습니다.",
       });
     }
+    return payment.status;
   }
 
   private async applyVerifiedPayment(
@@ -610,8 +612,7 @@ export class CommerceService {
     payment: SupporterTossPayment,
     webhookVerified: boolean,
   ): Promise<CommerceOrderRow> {
-    this.assertPaymentMatchesOrder(row, payment);
-    const status = payment.status;
+    const status = this.assertPaymentMatchesOrder(row, payment);
     const balanceAmount = Math.max(
       0,
       Math.min(

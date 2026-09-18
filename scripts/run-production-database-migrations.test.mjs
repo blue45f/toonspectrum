@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 import { expect, test } from "vitest";
 
@@ -48,6 +48,16 @@ test("manifest lists every numbered SQL migration exactly once in order", () => 
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
   expect(manifest.at(-1).id).toBe("0073_commerce_payments");
   expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(73);
+});
+
+test("migration directory matches the managed manifest without duplicate sequence numbers", () => {
+  const files = readdirSync(new URL("../apps/api/src/db/migrations/", import.meta.url))
+    .filter((name) => /^\d{4}_.+\.sql$/u.test(name))
+    .sort();
+  const manifestFiles = loadMigrationManifest().map(({ id }) => id + ".sql");
+  expect(files).toEqual(manifestFiles);
+  const sequences = files.map((name) => name.slice(0, 4));
+  expect(new Set(sequences).size).toBe(sequences.length);
 });
 
 test("applied studio media inference migration remains checksum-immutable", () => {
