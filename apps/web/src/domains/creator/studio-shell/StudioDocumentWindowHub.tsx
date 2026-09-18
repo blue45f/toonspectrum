@@ -1,7 +1,9 @@
 import {
   formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   AppWindow,
@@ -38,11 +40,7 @@ import {
   STUDIO_DOCUMENT_WINDOW_PRESETS,
   studioRecommendedCompanionWorkspaces,
 } from "./studio-document-window-presets";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
+
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioDocumentWindowHub", ko, en);
