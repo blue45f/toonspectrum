@@ -122,6 +122,7 @@ import type {
 } from "./studio-brush-library";
 
 
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
 type BrushStudioCategory =
@@ -264,20 +265,7 @@ function ToggleRow({ label, description, checked, onChange }: ToggleRowProps) {
         <span className="block text-xs font-semibold text-fg-2">{label}</span>
         <span className="block text-[0.65rem] leading-relaxed text-fg-3">{description}</span>
       </span>
-      <span
-        aria-hidden="true"
-        className={cn(
-          "flex h-6 w-11 shrink-0 items-center rounded-full border px-0.5 transition-colors duration-150",
-          checked ? "border-accent bg-accent" : "border-line-strong bg-raised"
-        )}
-      >
-        <span
-          className={cn(
-            "size-4 rounded-full bg-on-accent shadow-sm transition-transform duration-150",
-            checked ? "translate-x-5 bg-on-accent" : "bg-fg"
-          )}
-        />
-      </span>
+      <SwitchIndicator checked={checked} />
     </button>
   );
 }

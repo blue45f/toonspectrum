@@ -2,12 +2,15 @@
   "admin.tabs.announcements": "공지·배너",
   "admin.tabs.audit": "감사 로그",
   "admin.tabs.campaigns": "캠페인",
+  "admin.tabs.creatorSupport": "창작자 지원",
   "admin.tabs.dashboard": "대시보드",
+  "admin.tabs.inquiries": "비즈니스 문의",
   "admin.tabs.ops": "운영",
   "admin.tabs.plans": "플랜",
   "admin.tabs.promos": "프로모션",
   "admin.tabs.reports": "신고 심의",
   "admin.tabs.revenue": "정산",
   "admin.tabs.security": "보안·IP",
+  "admin.tabs.supporters": "운영비 후원",
   "admin.tabs.traffic": "실시간 트래픽"
 }

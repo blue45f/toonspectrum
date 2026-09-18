@@ -1,5 +1,4 @@
 import {
-  AlertTriangle,
   ChevronRight,
   Clapperboard,
   ImagePlus,
@@ -64,6 +63,7 @@ import type { StudioAiImageReferenceDocument } from "./studio-ai-image-reference
 import type { StudioAiSettings, StudioTextAiProvenance } from "./studio-ai-client";
 import type { ScenarioImageCandidate, ScenarioPreviewItem } from "../studio-scenario-layout";
 
+import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
 import { createSecureRandomUuid } from "@/shared/lib/secure-random-id";
 import { cn } from "@/shared/lib/utils";
 
@@ -827,7 +827,28 @@ export function StudioAiComicDirectorPanel({
           </div>
         </div>
 
-        <footer className="flex min-h-14 flex-wrap items-center gap-2 border-t border-line bg-panel px-3 py-2 text-[0.65rem] text-fg-3"><span className="font-semibold text-fg-2">Activity</span>{busy ? <span role="status" aria-live="polite" className="inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin motion-reduce:animate-none" aria-hidden />{stageLabel ?? "작업 중"}{progress ? ` (${progress.done}/${progress.total})` : ""}</span> : <span>{localJobs.length ? `${localJobs.length}개 durable 작업 기록` : "대기 중"}</span>}{error ? <span role="alert" className="text-bad"><AlertTriangle size={12} className="mr-1 inline" aria-hidden />{error}</span> : null}<button type="button" onClick={onDiscard} disabled={busy} className="ml-auto min-h-11 rounded-lg border border-line bg-card px-3 text-xs font-semibold hover:bg-raised disabled:opacity-45">초안 버리기</button>{stage !== "finish" ? <button type="button" onClick={() => setStage(STAGES[Math.min(STAGES.length - 1, STAGES.findIndex((item) => item.id === stage) + 1)]!.id)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line bg-card px-3 text-xs font-semibold hover:bg-raised">다음 단계<ChevronRight size={13} aria-hidden /></button> : null}</footer>
+        {error ? (
+          <div className="border-t border-line bg-panel px-3 py-2">
+            <AiRecoveryNotice
+              message={error}
+              onRetry={!busy && storyText.trim() ? onGenerate : undefined}
+              compact
+            />
+          </div>
+        ) : null}
+        <footer className="flex min-h-14 flex-wrap items-center gap-2 border-t border-line bg-panel px-3 py-2 text-[0.65rem] text-fg-3">
+          <span className="font-semibold text-fg-2">Activity</span>
+          {busy ? (
+            <span role="status" aria-live="polite" className="inline-flex items-center gap-1.5">
+              <Loader2 size={12} className="animate-spin motion-reduce:animate-none" aria-hidden />
+              {stageLabel ?? "작업 중"}{progress ? ` (${progress.done}/${progress.total})` : ""}
+            </span>
+          ) : (
+            <span>{localJobs.length ? `${localJobs.length}개 durable 작업 기록` : "대기 중"}</span>
+          )}
+          <button type="button" onClick={onDiscard} disabled={busy} className="ml-auto min-h-11 rounded-lg border border-line bg-card px-3 text-xs font-semibold hover:bg-raised disabled:opacity-45">초안 버리기</button>
+          {stage !== "finish" ? <button type="button" onClick={() => setStage(STAGES[Math.min(STAGES.length - 1, STAGES.findIndex((item) => item.id === stage) + 1)]!.id)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line bg-card px-3 text-xs font-semibold hover:bg-raised">다음 단계<ChevronRight size={13} aria-hidden /></button> : null}
+        </footer>
       </div>
     </div>
   );

@@ -149,7 +149,10 @@ export function StudioAiAssistHub({
 
   return (
     <div
-      className={cn("flex min-h-0 flex-1 flex-col gap-2", className)}
+      className={cn(
+        "pointer-events-auto relative z-[1] isolate flex min-h-0 flex-1 flex-col gap-2",
+        className,
+      )}
       data-studio-ai-assist-hub="true"
     >
       {/* Connection strip — always visible */}
@@ -372,7 +375,7 @@ export function StudioAiAssistHub({
       </details>
 
       {/* Scrollable body: presets + recent + active tool form */}
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-0.5">
+      <div className="pointer-events-auto relative z-[1] flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-0.5">
         {presets.length > 0 ? (
           <div className="shrink-0">
             <p className="mb-1 text-[0.62rem] font-semibold text-fg-2">빠른 예시</p>

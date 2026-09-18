@@ -14,7 +14,7 @@ import {
 describe("Studio project section views", () => {
   it("keeps every planned project view in one registry", () => {
     expect(STUDIO_PROJECT_SECTION_VIEWS).toEqual({
-      overview: ["summary", "activity", "readiness"],
+      overview: ["summary", "activity", "readiness", "intelligence"],
       story: [
         "overview",
         "episodes",

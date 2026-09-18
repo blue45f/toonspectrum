@@ -10,6 +10,7 @@ describe("TrafficAnalyticsController", () => {
   const service = {
     recordPageView: vi.fn().mockResolvedValue({ accepted: true }),
     recordHeartbeat: vi.fn().mockResolvedValue({ accepted: true }),
+    recordShareEvent: vi.fn().mockResolvedValue({ accepted: true }),
   } as unknown as TrafficAnalyticsService;
   const controller = new TrafficAnalyticsController(service);
   const request = {
@@ -68,6 +69,27 @@ describe("TrafficAnalyticsController", () => {
     expect(service.recordHeartbeat).toHaveBeenCalledWith(
       {},
       expect.objectContaining({ host: "www.toonstudio.cloud" }),
+    );
+  });
+
+  it("forwards bounded share interaction fields through the same browser proof", async () => {
+    const body = {
+      visitorId: "visitor_1234567890",
+      sessionId: "session_1234567890",
+      path: "/create/work-1?private=value",
+      channel: "kakao",
+      outcome: "opened",
+    };
+    await expect(
+      controller.recordShareEvent(request, "1", body),
+    ).resolves.toEqual({ accepted: true });
+    expect(service.recordShareEvent).toHaveBeenCalledWith(
+      body,
+      expect.objectContaining({
+        host: "www.toonstudio.cloud",
+        countryCode: "KR",
+        privacyOptOut: false,
+      }),
     );
   });
 });

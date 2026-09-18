@@ -1,15 +1,6 @@
 /**
- * StudioShadingAssistPanel.tsx
- *
- * CLIP STUDIO PAINT Ver.2.0 Parity:
- * - Shading Assist (자동 음영 어시스트):
- *   - Allows artists to position a virtual 2D directional or point light source around webtoon lineart.
- *   - 8-direction virtual light compass (↖, ↑, ↗, ←, ☼, →, ↙, ↓, ↘) + custom angle slider.
- *   - Ambient lighting temperature presets (Warm Dawn, Neutral Day, Cool Moon, Sunset Golden).
- *   - Light intensity (0..100%) and shadow softness (0% hard cel to 100% soft gradient).
- *   - Rim light toggle.
- *   - Interactive visual 2-step cel shadow preview indicator.
- *   - Direct generation of a non-destructive Multiply cel-shade shadow layer.
+ * Guided lighting and shading controls for ToonStudio.
+ * The UI favors task language and Studio design tokens over benchmark-product terminology.
  */
 
 import {
@@ -113,35 +104,31 @@ export function StudioShadingAssistPanel({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 p-3 text-xs bg-slate-900/90 text-slate-100 rounded-lg border border-slate-800 shadow-xl",
+        "flex flex-col gap-3 rounded-xl border border-line bg-card p-3 text-xs text-fg shadow-sm",
         className,
       )}
       data-testid="studio-shading-assist-panel"
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-        <div className="flex items-center gap-1.5 font-semibold text-slate-200">
-          <Sun size={15} className="text-amber-400" />
-          <span>자동 음영 어시스트 (Shading Assist)</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium">
-            CSP 2.0
-          </span>
+      <div className="flex items-center justify-between border-b border-line/60 pb-2">
+        <div className="flex items-center gap-1.5 font-semibold text-fg-2">
+          <Sun size={15} className="text-accent" aria-hidden />
+          <span>자동 명암</span>
         </div>
       </div>
 
-      <p className="text-[11px] text-slate-400 leading-relaxed">
-        선화와 채색 레이어 위에 광원 각도와 환경광을 지정하여 웹툰 셀 명암 레이어를
-        자동으로 생성합니다.
+      <p className="text-[11px] leading-relaxed text-fg-3">
+        빛의 방향과 분위기를 고르면 원본을 유지한 채 명암 레이어를 만들어 줍니다.
       </p>
 
       {/* 8-Direction Compass Buttons */}
       <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between text-[11px] text-slate-400">
+        <div className="flex items-center justify-between text-[11px] text-fg-3">
           <span className="flex items-center gap-1">
-            <Compass size={13} className="text-amber-400" />
-            <span>광원 방향 (Light Source)</span>
+            <Compass size={13} className="text-accent" aria-hidden />
+            <span>빛 방향</span>
           </span>
-          <span className="font-semibold text-slate-200">
+          <span className="font-semibold tabular-nums text-fg-2">
             {LIGHT_DIRECTION_ANGLES_DEG[direction]}°
           </span>
         </div>
@@ -159,8 +146,8 @@ export function StudioShadingAssistPanel({
                   className: cn(
                     "h-7 text-[10px] px-1 transition-all",
                     isSelected
-                      ? "bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-md shadow-amber-500/20"
-                      : "border-slate-700 text-slate-300 hover:bg-slate-800",
+                      ? "border-accent bg-accent text-on-accent"
+                      : "border-line text-fg-2 hover:bg-raised hover:text-fg",
                   ),
                 })}
               >
@@ -174,7 +161,7 @@ export function StudioShadingAssistPanel({
 
       {/* Ambient Temperature Modes */}
       <div className="flex flex-col gap-1.5 pt-1">
-        <span className="text-[11px] text-slate-400">분위기 환경광 (Ambient Mood)</span>
+        <span className="text-[11px] text-fg-3">빛 분위기</span>
         <div className="grid grid-cols-2 gap-1.5">
           {AMBIENT_TEMPERATURES.map((temp) => {
             const isSelected = temperature === temp.id;
@@ -187,15 +174,15 @@ export function StudioShadingAssistPanel({
                 className={cn(
                   "flex flex-col items-start p-1.5 rounded border text-left transition-colors",
                   isSelected
-                    ? "bg-amber-950/40 border-amber-500/60 text-slate-100"
-                    : "bg-slate-950/40 border-slate-800 text-slate-400 hover:text-slate-200",
+                    ? "border-accent/55 bg-accent-soft/35 text-fg"
+                    : "border-line/70 bg-panel/45 text-fg-3 hover:bg-raised hover:text-fg",
                 )}
               >
-                <div className="flex items-center gap-1 font-semibold text-[11px] text-slate-200">
-                  <Icon size={12} className="text-amber-400" />
+                <div className="flex items-center gap-1 text-[11px] font-semibold text-fg-2">
+                  <Icon size={12} className="text-accent" aria-hidden />
                   <span>{temp.label}</span>
                 </div>
-                <span className="text-[9px] text-slate-500 mt-0.5">{temp.desc}</span>
+                <span className="mt-0.5 text-[9px] text-fg-3">{temp.desc}</span>
               </button>
             );
           })}
@@ -203,10 +190,10 @@ export function StudioShadingAssistPanel({
       </div>
 
       {/* Sliders: Intensity & Softness */}
-      <div className="flex flex-col gap-2 pt-1 border-t border-slate-800">
+      <div className="flex flex-col gap-2 border-t border-line/60 pt-2">
         <div className="flex flex-col gap-1">
           <div className="flex justify-between text-[11px]">
-            <span className="text-slate-400">명암 농도 (Intensity)</span>
+            <span className="text-fg-3">명암 강도</span>
             <span className="font-semibold text-slate-200">{intensity}%</span>
           </div>
           <input
@@ -214,16 +201,17 @@ export function StudioShadingAssistPanel({
             min={10}
             max={100}
             value={intensity}
+            aria-label="명암 강도"
             onChange={(e) => setIntensity(Number(e.target.value))}
-            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
+            className="h-6 w-full cursor-pointer accent-accent"
           />
         </div>
 
         <div className="flex flex-col gap-1">
           <div className="flex justify-between text-[11px]">
-            <span className="text-slate-400">그라데이션 부드러움 (Softness)</span>
+            <span className="text-fg-3">그림자 부드러움</span>
             <span className="font-semibold text-slate-200">
-              {softness === 0 ? "하드 셀(Hard)" : `${softness}%`}
+              {softness === 0 ? "선명" : `${softness}%`}
             </span>
           </div>
           <input
@@ -231,6 +219,7 @@ export function StudioShadingAssistPanel({
             min={0}
             max={100}
             value={softness}
+            aria-label="그림자 부드러움"
             onChange={(e) => setSoftness(Number(e.target.value))}
             className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
           />
@@ -238,19 +227,19 @@ export function StudioShadingAssistPanel({
       </div>
 
       {/* Rim Light Checkbox & Preview Colors */}
-      <div className="flex items-center justify-between pt-1 border-t border-slate-800 text-[11px]">
-        <label className="flex items-center gap-1.5 cursor-pointer text-slate-300">
+      <div className="flex items-center justify-between border-t border-line/60 pt-2 text-[11px]">
+        <label className="flex cursor-pointer items-center gap-1.5 text-fg-2">
           <input
             type="checkbox"
             checked={enableRimLight}
             onChange={(e) => setEnableRimLight(e.target.checked)}
-            className="rounded accent-amber-400"
+            className="rounded accent-accent"
           />
-          <span>외곽 림 라이트 (Rim Light) 포함</span>
+          <span>가장자리 빛 포함</span>
         </label>
         <div className="flex items-center gap-1.5">
           <div
-            className="size-3.5 rounded-full border border-white/20 shadow-sm"
+            className="size-3.5 rounded-full border border-line/70 shadow-sm"
             style={{ backgroundColor: computed.shadow1ColorHex }}
             title={`그림자 1단계: ${computed.shadow1ColorHex}`}
           />
@@ -277,18 +266,18 @@ export function StudioShadingAssistPanel({
           size: "sm",
           variant: "solid",
           className:
-            "w-full h-8 mt-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold gap-1.5 transition-all shadow-md shadow-amber-500/20",
+            "mt-1 h-8 w-full gap-1.5 bg-accent font-bold text-on-accent transition-colors hover:bg-accent-2",
         })}
       >
         {appliedNotice ? (
           <>
             <Check size={14} />
-            <span>음영 생성 완료!</span>
+            <span>명암 레이어를 만들었어요</span>
           </>
         ) : (
           <>
             <Layers size={14} />
-            <span>음영 어시스트 레이어 생성 (CSP 2.0)</span>
+            <span>명암 레이어 만들기</span>
           </>
         )}
       </button>

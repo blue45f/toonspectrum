@@ -273,6 +273,7 @@ export default defineConfig(
       'apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx',
       'apps/web/src/domains/creator/brush-lab/StudioBrushV5QualityWorkbench.tsx',
       'apps/web/src/domains/creator/brush-lab/StudioBrushV6Workbench.tsx',
+      'apps/web/src/domains/creator/studio-shell/StudioRolePersonalizationCenter.tsx',
     ],
     rules: { 'jsx-a11y/label-has-associated-control': 'off' },
   },

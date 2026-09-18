@@ -12,6 +12,13 @@ import {
   SITE_ROUTE_PREFERENCES_EVENT,
   type RecentSiteRoute,
 } from "@/shared/lib/site-route-history";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("SiteDirectoryPersonalized", ko, en);
 
 interface PersonalizedState {
   readonly favorites: readonly string[];
@@ -26,6 +33,7 @@ export function SiteDirectoryPersonalized({ entries, locale }: {
   readonly entries: readonly SiteDirectoryEntry[];
   readonly locale: SiteNavigationLocale;
 }) {
+  useBilingualI18nRevision();
   const [state, setState] = useState<PersonalizedState>({ favorites: [], recent: [] });
   const byPath = useMemo(() => new Map(entries.map((entry) => [siteDirectoryEntryMetadata(entry).canonicalPath, entry])), [entries]);
   const favorites = state.favorites.flatMap((path) => byPath.get(path) ?? []).slice(0, 6);
@@ -33,7 +41,7 @@ export function SiteDirectoryPersonalized({ entries, locale }: {
     .filter(({ path }) => path !== "/sitemap" && !state.favorites.includes(path))
     .flatMap(({ path }) => byPath.get(path) ?? [])
     .slice(0, 6);
-  const korean = locale === "ko";
+
 
   useEffect(() => {
     const sync = () => setState(readState());
@@ -67,7 +75,7 @@ export function SiteDirectoryPersonalized({ entries, locale }: {
             </Link>
             {favoriteSection ? <button
               type="button"
-              aria-label={`${siteNavigationText(entry.label, locale)} · ${korean ? "즐겨찾기에서 제거" : "Remove from favorites"}`}
+              aria-label={`${siteNavigationText(entry.label, locale)} · ${bi("즐겨찾기에서 제거", "Remove from favorites")}`}
               onClick={() => setFavoriteSiteRoute(metadata.canonicalPath, false)}
             ><Heart size={16} fill="currentColor" aria-hidden="true" /></button> : null}
           </li>;
@@ -81,13 +89,13 @@ export function SiteDirectoryPersonalized({ entries, locale }: {
       <div className="directory-personalized__heading">
         <Star size={18} aria-hidden="true" />
         <div>
-          <h2 id="directory-personalized-title">{korean ? "내가 자주 쓰는 공간" : "Your quick destinations"}</h2>
-          <p>{korean ? "즐겨찾기와 최근 방문을 이 기기에만 저장합니다." : "Favorites and recent visits stay on this device."}</p>
+          <h2 id="directory-personalized-title">{bi("내가 자주 쓰는 공간", "Your quick destinations")}</h2>
+          <p>{bi("즐겨찾기와 최근 방문을 이 기기에만 저장합니다.", "Favorites and recent visits stay on this device.")}</p>
         </div>
       </div>
       <div className="directory-personalized__grid">
-        {renderSection("directory-favorites-title", korean ? "즐겨찾기" : "Favorites", Heart, favorites, true)}
-        {renderSection("directory-recent-title", korean ? "최근 방문" : "Recently visited", Clock3, recent, false)}
+        {renderSection("directory-favorites-title", bi("즐겨찾기", "Favorites"), Heart, favorites, true)}
+        {renderSection("directory-recent-title", bi("최근 방문", "Recently visited"), Clock3, recent, false)}
       </div>
     </section>
   );

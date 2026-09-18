@@ -27,6 +27,13 @@ const StudioOfflinePanel = lazy(
   () => import("../../offline/StudioOfflinePanel").then((module) => ({ default: module.StudioOfflinePanel })),
 );
 
+const StudioWorkspaceContextCoach = lazyRetry(
+  () => import("../../studio-shell/StudioWorkspaceContextCoach").then((module) => ({
+    default: module.StudioWorkspaceContextCoach,
+  })),
+  "StudioWorkspaceContextCoach",
+);
+
 export function StudioEditorRoute({ resolution }: {
   readonly resolution: StudioEditorRouteResolution;
 }) {
@@ -79,6 +86,11 @@ export function StudioEditorRoute({ resolution }: {
         draftSessionEpoch={draftScope.epoch}
         studioRoute={route}
       >
+        {route.surface === "bg3d" || route.surface === "poser" || route.surface === "character" ? (
+          <Suspense fallback={null}>
+            <StudioWorkspaceContextCoach surface={route.surface} />
+          </Suspense>
+        ) : null}
         <StudioOfflinePanelBoundary>
           <Suspense fallback={null}><StudioOfflinePanel /></Suspense>
         </StudioOfflinePanelBoundary>

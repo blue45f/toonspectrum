@@ -12,6 +12,13 @@ import {
   type StudioProjectWorkspaceState,
   type StudioProjectWorkspaceUpdater,
 } from "../studio-project-workspace-store";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("useStudioProjectWorkspace", ko, en);
 
 export interface StudioProjectWorkspaceController {
   readonly state: StudioProjectWorkspaceState | null;
@@ -20,10 +27,8 @@ export interface StudioProjectWorkspaceController {
   readonly reload: () => void;
 }
 
-function humanStorageError(locale: "ko" | "en"): string {
-  return locale === "ko"
-    ? "이 기기에서 프로젝트 상태를 불러오거나 저장하지 못했습니다. 변경 내용이 저장되지 않을 수 있으니 브라우저 저장 공간과 권한을 확인해 주세요."
-    : "Project state could not be loaded or saved on this device. Changes may not be stored; check browser storage space and permissions.";
+function humanStorageError(_locale): string {
+  return bi("이 기기에서 프로젝트 상태를 불러오거나 저장하지 못했습니다. 변경 내용이 저장되지 않을 수 있으니 브라우저 저장 공간과 권한을 확인해 주세요.", "Project state could not be loaded or saved on this device. Changes may not be stored; check browser storage space and permissions.");
 }
 
 /**
@@ -34,6 +39,7 @@ export function useStudioProjectWorkspace(
   projectId: string,
   locale: "ko" | "en",
 ): StudioProjectWorkspaceController {
+  useBilingualI18nRevision();
   const [state, setState] = useState<StudioProjectWorkspaceState | null>(null);
   const [error, setError] = useState<string | null>(null);
 

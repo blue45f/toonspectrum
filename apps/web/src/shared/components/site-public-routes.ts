@@ -5,11 +5,11 @@ export const DISCOVER_PURPOSE_PREFIXES = [
 ] as const;
 
 const PUBLIC_PAGES = new Set([
-  "/", "/references", "/about", "/about/workflow", "/about/technology", "/about/technology/story", "/about/technology/guides", "/about/technology/deck", "/about/technology/videos", "/about/technology/licenses", "/about/principles", "/about/data", "/about/crawler", "/contact", "/support", "/help", "/sitemap",
+  "/", "/brand-film", "/product-tour", "/references", "/about", "/about/workflow", "/about/technology", "/about/technology/story", "/about/technology/guides", "/about/technology/references", "/about/technology/field-notes", "/about/technology/deck", "/about/technology/videos", "/about/technology/licenses", "/about/principles", "/about/data", "/about/crawler", "/contact", "/business", "/support-us", "/support-creators", "/support", "/help", "/sitemap",
   "/discover", "/discover/works", "/search", "/explore", "/ranking", "/recommend",
   "/calendar", "/compare", "/random", "/tags", "/authors", "/insights", "/insights/resources", "/news", "/guide",
   "/research", "/research/assets", "/research/books", "/research/3d-assets", "/references", "/now", "/opportunities", "/story-lab",
-  "/learn", "/learn/recipes", "/learn/glossary", "/learn/studio", "/learn/process", "/learn/careers", "/learn/education",
+  "/learn", "/learn/recipes", "/learn/glossary", "/learn/studio", "/learn/process", "/learn/careers", "/learn/education", "/learn/resources", "/learn/classroom",
   "/market", "/market/browse", "/market/fit", "/market/compare",
   "/showcase", "/showcase/challenges", "/showcase/promo", "/create", "/create/challenges", "/create/promo",
   "/community", "/community/cafes", "/community/title", "/community/author", "/community/pencafe", "/reviews",

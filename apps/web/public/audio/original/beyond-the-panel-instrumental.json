@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 2,
+  "trackId": "beyond-the-panel",
+  "variant": "instrumental",
+  "provider": "ace-step",
+  "model": "acestep-v15-turbo",
+  "generatedAt": "2026-09-17T22:20:13.082600Z",
+  "durationMs": 195000,
+  "bpm": 148,
+  "seed": 851480385,
+  "sha256": "fb8902c37dd6d437081ec8f663aee96b5818d1f267b2eb498df21bf1d7a08e3e",
+  "sourceFlacSha256": "67a4f2dcac848a096931f0174af9b3425e277ce7d1bf8c342df2a4f627e2dfbe",
+  "configSha256": "f0654f7eb3a166f3beb768ecc803275e9a2430995b8e34235d0a192835a51102",
+  "generator": {
+    "project": "ACE-Step 1.5",
+    "sourceRevision": "ca1e85fe9430179831e6bc6be790c332190a3866",
+    "license": "MIT",
+    "sourceUrl": "https://github.com/ace-step/ACE-Step-1.5",
+    "ditSha256": "3f6e0797fad420a39bd33979eb6e840e30989e34a3794e843d23b60ec6e422d7",
+    "vaeSha256": "da17edb604c40deaf09e9b24974e590d1ca83a374070e5d0884cfa4bed9a99b0",
+    "embeddingSha256": "0437e45c94563b09e13cb7a64478fc406947a93cb34a7e05870fc8dcd48e23fd"
+  },
+  "mastering": {
+    "sourceFormat": "flac",
+    "deliveryFormat": "mp3_48000_192",
+    "targetIntegratedLufs": -14,
+    "targetTruePeakDbfs": -1,
+    "ffmpegFilter": "loudnorm=I=-14:TP=-1:LRA=7"
+  },
+  "quality": {
+    "codec": "mp3",
+    "sampleRate": 48000,
+    "channels": 2,
+    "channelLayout": "stereo",
+    "durationSeconds": 195.0,
+    "bitRate": 192057,
+    "integratedLufs": -13.1,
+    "truePeakDbfs": -1.1,
+    "loudnessRangeLu": 6.0,
+    "fileBytes": 4681408,
+    "automatedQcPassed": true
+  },
+  "review": {
+    "ownerReleaseRequested": true,
+    "creativeDirectionRecorded": true,
+    "rightsPromptNonImitation": true,
+    "subjectiveListeningReview": "not-performed-by-assistant",
+    "approvedForSite": true
+  }
+}

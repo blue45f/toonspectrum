@@ -340,12 +340,16 @@ describe("PostgresHealthReadinessRepository", () => {
         "creator_marketplace_package_moderation_decision",
         "creator_marketplace_resource_report",
         "creator_marketplace_resource_report_gate",
+        "creator_role_workspace_preference",
+        "traffic_page_view",
+        "traffic_session",
+        "traffic_share_event",
         "socket_io_attachments",
       ]),
     );
   });
 
-  it("tracks every relation declared across Drizzle and the asset platform migration", () => {
+  it("tracks every relation declared across Drizzle and raw-SQL product migrations", () => {
     // db/schema.ts 는 db/schema/ 도메인 모듈들의 배럴이다 — pgTable 선언은 그 디렉터리에 있다.
     const schemaDir = new URL("../../db/schema/", import.meta.url);
     const schemaFiles = [
@@ -369,16 +373,33 @@ describe("PostgresHealthReadinessRepository", () => {
         ),
       ])
       .map((match) => match[1]!);
+    const quotedMigrationRelations = [
+      "../../db/migrations/0039_creator_asset_platform_foundation.sql",
+      "../../db/migrations/0067_creator_role_workspace_personalization.sql",
+    ].flatMap((path) => [
+      ...readFileSync(new URL(path, import.meta.url), "utf8").matchAll(
+        /\bCREATE TABLE(?: IF NOT EXISTS)? public\."([^"]+)"/gu,
+      ),
+    ]).map((match) => match[1]!);
+    const unquotedMigrationRelations = [
+      "../../db/migrations/0036_traffic_analytics_relations.sql",
+      "../../db/migrations/0066_share_analytics_events.sql",
+    ].flatMap((path) => [
+      ...readFileSync(new URL(path, import.meta.url), "utf8").matchAll(
+        /\bCREATE TABLE(?: IF NOT EXISTS)? public\.([a-z_]+)/gu,
+      ),
+    ]).map((match) => match[1]!);
     const migrationRelations = [
-      ...readFileSync(
-        new URL(
-          "../../db/migrations/0039_creator_asset_platform_foundation.sql",
-          import.meta.url,
-        ),
-        "utf8",
-      ).matchAll(/\bCREATE TABLE public\."([^"]+)"/gu),
-    ].map((match) => match[1]!);
-    expect(migrationRelations.toSorted()).toEqual(ASSET_PLATFORM_RELATIONS);
+      ...quotedMigrationRelations,
+      ...unquotedMigrationRelations,
+    ];
+    expect(migrationRelations.toSorted()).toEqual([
+      ...ASSET_PLATFORM_RELATIONS,
+      "creator_role_workspace_preference",
+      "traffic_page_view",
+      "traffic_session",
+      "traffic_share_event",
+    ].toSorted());
     const declaredRelations = [
       ...new Set([...schemaRelations, ...migrationRelations]),
     ].sort();

@@ -4,6 +4,13 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 const SIZE = 768;
 const BACKGROUND = "#596773";
+type DynamicThumbnailSource = Readonly<{
+  id: string;
+  url: string;
+  crop?: number;
+  fitWings?: boolean;
+}>;
+
 const MODELS = {
   "mega-angel": { url: "/vrm/MegaAngel.vrm", crop: 0.20, fitWings: true },
   alicia: { url: "/vrm/AliciaSolid.vrm", crop: 0.38, fitWings: false },
@@ -41,9 +48,14 @@ const loader = new GLTFLoader();
 loader.register((parser) => new VRMLoaderPlugin(parser));
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
-async function renderAvatar(id: keyof typeof MODELS) {
-  const profile = MODELS[id];
-  if (!profile) throw new Error(`Unknown thumbnail source ${id}`);
+async function renderAvatar(source: keyof typeof MODELS | DynamicThumbnailSource) {
+  const id = typeof source === "string" ? source : source.id;
+  const profile = typeof source === "string"
+    ? MODELS[source]
+    : { url: source.url, crop: source.crop ?? 0.12, fitWings: source.fitWings ?? true };
+  if (!profile?.url || !profile.url.startsWith("/vrm/") || !profile.url.endsWith(".vrm")) {
+    throw new Error(`Unknown thumbnail source ${id}`);
+  }
   const gltf = await loader.loadAsync(profile.url);
   const vrm = gltf.userData.vrm as VRM | undefined;
   if (!vrm) throw new Error(`${id}: source is not a VRM`);

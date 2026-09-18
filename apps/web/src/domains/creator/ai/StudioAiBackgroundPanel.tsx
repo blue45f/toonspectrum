@@ -6,6 +6,7 @@ import { STUDIO_EASE, STUDIO_FOCUS_RING } from "../studio-panel-ui";
 
 import { STUDIO_AI_IMAGE_SIZES, type StudioAiImageSize } from "./studio-ai-client";
 
+import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
 import { cn } from "@/shared/lib/utils";
 
 const BACKGROUND_PROMPT_MAX = 4_000;
@@ -41,12 +42,13 @@ export function StudioAiBackgroundPanel({
         AI 배경 생성
       </div>
 
-      {!configured && (
-        <p className="rounded-lg border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
-          프롬프트와 크기는 먼저 준비할 수 있어요. 실행하려면 위{" "}
-          <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 이미지 API를 연결하세요.
-        </p>
-      )}
+      {!configured ? (
+        <AiRecoveryNotice
+          code="not_configured"
+          message="프롬프트와 크기는 먼저 준비할 수 있어요. 이미지 생성은 통합 AI 설정에서 개인 이미지 API 키와 모델을 연결한 뒤 실행됩니다."
+          compact
+        />
+      ) : null}
 
       <div className="grid gap-1">
         <div className="flex items-center justify-between gap-2 text-[0.62rem] font-semibold text-fg-2">
@@ -115,7 +117,11 @@ export function StudioAiBackgroundPanel({
       </button>
 
       {error ? (
-        <p className="rounded-lg border border-bad/35 bg-bad/10 px-2 py-1.5 text-xs text-bad">{error}</p>
+        <AiRecoveryNotice
+          message={error}
+          onRetry={canGenerate ? onGenerate : undefined}
+          compact
+        />
       ) : (
         <p className="text-[0.62rem] leading-relaxed text-fg-3">
           선택한 칸이 있으면 그 칸에, 여러 칸이면 전부에, 없으면 캔버스 배경으로 들어가요.

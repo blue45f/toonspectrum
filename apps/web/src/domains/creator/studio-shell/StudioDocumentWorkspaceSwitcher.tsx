@@ -5,13 +5,20 @@ import {
   studioDocumentHref,
   type StudioDocumentWorkspaceId,
 } from "../studio-document-workspace";
+import {
+  useStudioDrawingPresentation,
+  withStudioDrawingPresentation,
+} from "../studio-drawing-presentation";
 import { readStudioLaunchDensity } from "../studio-launch-mode";
 import { StudioDocumentWindowHub } from "./StudioDocumentWindowHub";
 
 import { useI18n } from "@/shared/lib/i18n";
+import { getActiveI18nLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
-function localeFromLanguage(language: string): "ko" | "en" {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+
+
+function localeFromLanguage(_language): "ko" | "en" {
+  return getActiveI18nLocale();
 }
 
 /**
@@ -20,10 +27,12 @@ function localeFromLanguage(language: string): "ko" | "en" {
  * remain on the canonical URL while each tab or window chooses its own workspace projection.
  */
 export function StudioDocumentWorkspaceSwitcher() {
+  useBilingualI18nRevision();
   const location = useLocation();
   const navigate = useNavigate();
   const language = useI18n((state) => state.lang);
   const locale = localeFromLanguage(language);
+  const drawingPresentation = useStudioDrawingPresentation();
   const resolution = parseStudioDocumentLocation({
     pathname: location.pathname,
     search: location.search,
@@ -31,8 +40,10 @@ export function StudioDocumentWorkspaceSwitcher() {
 
   if (resolution.kind !== "document") return null;
 
+  // "빠른 드로잉" and the installed drawing app are deliberately the same presentation.
+  // Only the chrome changes; the document/runtime identity stays on the canonical route.
   const quickMode = resolution.workspace === "draw"
-    && readStudioLaunchDensity(location.search) === "focus";
+    && (readStudioLaunchDensity(location.search) === "focus" || drawingPresentation === "app");
   const navigateWorkspace = (
     workspace: StudioDocumentWorkspaceId,
     search: string | URLSearchParams,
@@ -53,7 +64,10 @@ export function StudioDocumentWorkspaceSwitcher() {
     navigateWorkspace(workspace, location.search);
   };
   const toggleQuickMode = (): void => {
-    const search = new URLSearchParams(location.search);
+    const search = withStudioDrawingPresentation(
+      location.search,
+      quickMode ? "integrated" : "app",
+    );
     search.set("uiMode", quickMode ? "basic" : "focus");
     search.set("startTool", quickMode ? "select" : "draw");
     navigateWorkspace(resolution.workspace, search);

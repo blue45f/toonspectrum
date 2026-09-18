@@ -269,8 +269,8 @@ function writeSitemap(): void {
   const STATIC_ROUTES = [
     "/", "/search", "/ranking", "/recommend", "/explore", "/calendar",
     "/reviews", "/community", "/community/cafes", "/insights", "/authors", "/tags", "/compare",
-    "/about", "/about/technology", "/about/technology/story", "/about/technology/guides",
-    "/about/technology/deck", "/about/technology/videos", "/about/technology/licenses",
+    "/about", "/brand-film", "/about/technology", "/about/technology/story", "/about/technology/guides",
+    "/about/technology/references", "/about/technology/field-notes", "/about/technology/deck", "/about/technology/videos", "/about/technology/licenses",
     "/guide", "/news", "/create", "/shaper", "/market", "/market/browse", "/contact",
   ];
   // thin-content 방지를 위해 '평점이 있는' 작품만 색인(빈 페이지 제외) — 조회수 상위 15000편.

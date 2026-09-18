@@ -2,6 +2,12 @@ import {
   diagnoseStudioInAppBrowser,
   type StudioInAppBrowserDiagnosis,
 } from "@/compat/in-app-browser";
+import {
+  translateBilingualValueForActiveLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("studio-immersive-capabilities", ko, en);
 
 export type StudioImmersiveSupport = "supported" | "unsupported" | "unknown";
 export type StudioImmersiveReadiness = "ready" | "fallback";
@@ -169,9 +175,9 @@ export async function inspectStudioImmersiveCapabilities(
 
 export function studioImmersiveSupportLabel(
   state: StudioImmersiveSupport,
-  locale: "ko" | "en",
+  _locale,
 ): string {
-  if (state === "supported") return locale === "ko" ? "사용 가능" : "Available";
-  if (state === "unsupported") return locale === "ko" ? "미지원" : "Unavailable";
-  return locale === "ko" ? "확인 필요" : "Check required";
+  if (state === "supported") return bi("사용 가능", "Available");
+  if (state === "unsupported") return bi("미지원", "Unavailable");
+  return bi("확인 필요", "Check required");
 }

@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from "motion/react";
 
+import { TarotMotif } from "./TarotMotif";
 import { getTarotVisual, tarotAccent, tarotFaceGradient } from "./tarot-visuals";
 
 import { Card3D } from "@/shared/components/ui/card-3d";
@@ -63,14 +64,14 @@ export function TarotCardFace({ card, className }: TarotCardFaceProps) {
 
       {/* 중앙: 모티프 글리프 (은은한 떠오름 + 글로우) */}
       <div className="relative z-10 flex flex-1 items-center justify-center">
-        <motion.span
-          className="text-[3.25rem] leading-none sm:text-6xl"
+        <motion.div
+          className="grid place-items-center"
           style={{ transform: reversed ? "rotate(180deg)" : undefined, filter: `drop-shadow(0 3px 14px ${accent})` }}
           animate={reducedMotion ? { y: 0, scale: 1 } : { y: [0, -5, 0], scale: [1, 1.06, 1] }}
           transition={{ duration: 3.4, ease: "easeInOut", repeat: 0 }}
         >
-          {visual.glyph}
-        </motion.span>
+          <TarotMotif id={visual.motif} size={64} />
+        </motion.div>
       </div>
 
       {/* 하단: 한글명 + 정/역 배지 + 키워드 */}

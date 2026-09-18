@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { AuthorAvatar, SeriesForm } from "./creator-community-ui";
-import { SERIES_STATUS_LABEL } from "./creator-community-utils";
+import { SERIES_STATUS_CLASS, SERIES_STATUS_LABEL } from "./creator-community-utils";
 import { buildStudioHref } from "./creator-studio-links";
 import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
 import { studioDeleteSeriesRequest } from "./studio-destructive-command-catalog";
@@ -235,9 +235,7 @@ export function CreateSeriesPage() {
               <span
                 className={cn(
                   "inline-flex items-center rounded-md border px-1.5 py-0.5 text-[0.7rem] font-medium leading-none",
-                  series.status === "completed"
-                    ? "border-line bg-raised text-fg-2"
-                    : "border-[color:oklch(0.8_0.15_150/0.3)] bg-[oklch(0.8_0.15_150/0.12)] text-good"
+                  SERIES_STATUS_CLASS[series.status]
                 )}
               >
                 {SERIES_STATUS_LABEL[series.status]}

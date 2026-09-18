@@ -24,9 +24,16 @@ describe("original creator essentials inventory", () => {
     const bytes = readFileSync(new URL(asset.url.slice(1), publicRoot));
     expect(bytes.length).toBe(asset.bytes);
     expect(createHash("sha256").update(bytes).digest("hex")).toBe(asset.sha256);
-    const preview = readFileSync(new URL(asset.preview.slice(1), publicRoot), "utf8");
-    expect(preview).toContain("<svg");
-    expect(preview).not.toMatch(/<script|<foreignObject|(?:href|src)\s*=\s*["'](?:https?:|data:|javascript:)/iu);
+    const previewBytes = readFileSync(new URL(asset.preview.slice(1), publicRoot));
+    if (asset.preview.endsWith(".png")) {
+      expect(previewBytes.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+      expect(previewBytes.readUInt32BE(16)).toBeGreaterThanOrEqual(768);
+      expect(previewBytes.readUInt32BE(20)).toBeGreaterThanOrEqual(768);
+    } else {
+      const preview = previewBytes.toString("utf8");
+      expect(preview).toContain("<svg");
+      expect(preview).not.toMatch(/<script|<foreignObject|(?:href|src)\s*=\s*["'](?:https?:|data:|javascript:)/iu);
+    }
   });
   it.each(CREATOR_ESSENTIALS.filter((asset) => asset.kind.endsWith("3d")))("$id is a valid self-contained glTF 2 model", async (asset) => {
     const bytes = new Uint8Array(readFileSync(new URL(asset.url.slice(1), publicRoot)));

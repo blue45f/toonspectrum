@@ -17,6 +17,8 @@ import {
   useSyncExternalStore,
 } from "react";
 
+import { SwitchIndicator } from "@/shared/components/ui/switch";
+
 import {
   closeStudioViewInspectionPanel,
   getStudioViewInspectionSnapshot,
@@ -202,18 +204,7 @@ function ViewToggle({
           {description}
         </span>
       </span>
-      <span
-        className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors ${
-          pressed ? "border-accent bg-accent" : "border-line bg-panel"
-        }`}
-        aria-hidden
-      >
-        <span
-          className={`absolute top-0.5 size-3.5 rounded-full bg-white shadow-sm transition-transform ${
-            pressed ? "translate-x-[1.05rem]" : "translate-x-0.5"
-          }`}
-        />
-      </span>
+      <SwitchIndicator checked={pressed} />
     </button>
   );
 }

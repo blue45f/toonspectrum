@@ -43,7 +43,9 @@ import {
 } from "./user-ai-types";
 
 const INPUT = "min-h-11 w-full rounded-lg border border-line bg-panel p-2 text-sm text-fg focus-visible:outline-2 focus-visible:outline-accent";
-const BUTTON = "min-h-11 rounded-lg border border-line px-3 py-2 text-sm font-semibold hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40";
+const BUTTON = "min-h-11 min-w-11 rounded-lg border border-line px-3 py-2 text-sm font-semibold hover:bg-raised focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40";
+const ORDER_BUTTON = `${BUTTON} shrink-0 px-0`;
+const ORDER_BUTTON_STYLE = { flex: "0 0 48px", minWidth: 48, width: 48 } as const;
 const LABELS: Record<UserAiCapability, string> = {
   text: "텍스트·번역·기획",
   image: "이미지·배경·캐릭터·채색",
@@ -442,13 +444,13 @@ function AiSettingsEditor({
               const status = poolStatus?.providers.find((item) => item.id === id);
               return (
                 <div key={id} className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2">
-                  <span className="text-sm">
+                  <span className="min-w-0 break-words text-sm">
                     {index + 1}. {status?.label ?? SERVER_PROVIDER_LABELS[id]}
                     {status && !status.configured ? " · 비활성" : ""}
                   </span>
-                  <span className="flex gap-1">
-                    <button type="button" className={BUTTON} disabled={index === 0} onClick={() => moveServerProvider(id, -1)} aria-label={`${id} 위로`}>↑</button>
-                    <button type="button" className={BUTTON} disabled={index === routing.serverProviderOrder.length - 1} onClick={() => moveServerProvider(id, 1)} aria-label={`${id} 아래로`}>↓</button>
+                  <span className="flex shrink-0 gap-1">
+                    <button type="button" className={ORDER_BUTTON} style={ORDER_BUTTON_STYLE} disabled={index === 0} onClick={() => moveServerProvider(id, -1)} aria-label={`${id} 위로`}>↑</button>
+                    <button type="button" className={ORDER_BUTTON} style={ORDER_BUTTON_STYLE} disabled={index === routing.serverProviderOrder.length - 1} onClick={() => moveServerProvider(id, 1)} aria-label={`${id} 아래로`}>↓</button>
                   </span>
                 </div>
               );

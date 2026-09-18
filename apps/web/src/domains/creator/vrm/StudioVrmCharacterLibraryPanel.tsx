@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ExternalLink,
+  Lightbulb,
   Loader2,
   Paintbrush,
   Search,
@@ -293,7 +294,7 @@ export function StudioVrmCharacterLibraryPanel({
         </p>
 
         <div className="mt-2.5 space-y-1.5 rounded-lg border border-line bg-panel p-2 text-[0.68rem] text-fg-3">
-          <div className="font-bold text-fg">💡 툰스펙트럼 적용 가이드:</div>
+          <div className="flex items-center gap-1 font-bold text-fg"><Lightbulb size={13} className="text-accent" aria-hidden />툰스펙트럼 적용 가이드:</div>
           <ul className="list-decimal space-y-1 pl-3.5">
             <li>PC/Mac 버전 VRoid Studio를 다운로드하여 설치합니다.</li>
             <li>원하는 슬롯(얼굴, 체형, 헤어, 옷 등)의 프리셋을 골라 취향대로 커스텀합니다.</li>
