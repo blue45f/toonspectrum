@@ -42,6 +42,17 @@ const AVATARS = [
   "/images/characters/leona.jpg",
 ] as const;
 
+const P2P_ZONE_PROP: Record<StudioP2pSpaceZoneId, string> = {
+  lobby: "/assets/studio/cc0-20260906/previews/kenney-furniture-plant-small1.png",
+  writers: "/assets/studio/cc0-20260906/previews/kenney-furniture-desk.png",
+  storyboard: "/assets/studio/cc0-20260906/previews/kenney-furniture-cabinet-television.png",
+  lounge: "/assets/studio/cc0-20260906/previews/kenney-furniture-lounge-design-sofa.png",
+  assets: "/assets/studio/cc0-20260906/previews/kenney-furniture-bookcase-open.png",
+  drawing: "/assets/studio/cc0-20260906/previews/kenney-furniture-desk-corner.png",
+  review: "/assets/studio/cc0-20260906/previews/kenney-furniture-lounge-sofa-long.png",
+  assistant: "/assets/studio/cc0-20260906/previews/kenney-furniture-desk.png",
+};
+
 const ZONE_META: Record<StudioP2pSpaceZoneId, { icon: LucideIcon; image: string; href: string; ko: string }> = {
   lobby: { icon: Sparkles, image: "/brand/studio-scene.svg", href: "/studio/home", ko: "프로젝트의 현재 상황과 다음 작업을 확인합니다." },
   writers: { icon: BookOpenText, image: "/assets/studio/backgrounds/webtoon_classroom.jpg", href: "/story-lab", ko: "시놉시스·대본·설정을 함께 다듬습니다." },
@@ -196,6 +207,7 @@ export function StudioP2pVirtualStudio({
               )}
             >
               <span className="p2p-vs-zone-overlay" />
+              <img className="p2p-vs-zone-prop" src={P2P_ZONE_PROP[zone.id]} alt="" loading="lazy" decoding="async" aria-hidden="true" />
               <span className="p2p-vs-zone-name"><Icon size={12} /><strong>{zone.label}</strong></span>
             </button>
           );

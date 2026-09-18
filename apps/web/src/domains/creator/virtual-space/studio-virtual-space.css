@@ -1,0 +1,31 @@
+.studio-vspace-zone{isolation:isolate;transform-style:preserve-3d;box-shadow:inset 0 1px 0 rgb(255 255 255/.16),inset 0 -34px 55px rgb(0 0 0/.18),0 16px 35px rgb(0 0 0/.13)}
+.studio-vspace-zone-floor{position:absolute;z-index:1;left:-10%;right:-10%;bottom:-34%;height:72%;pointer-events:none;background:linear-gradient(90deg,rgb(255 255 255/.08) 1px,transparent 1px),linear-gradient(rgb(255 255 255/.06) 1px,transparent 1px),linear-gradient(145deg,rgb(133 112 93/.18),rgb(22 22 28/.52));background-size:26px 26px,26px 26px,auto;transform:perspective(280px) rotateX(62deg);transform-origin:bottom center}
+.studio-vspace-zone-props{position:absolute;z-index:2;inset:27% 4% 12%;pointer-events:none}
+.studio-vspace-zone-props img{position:absolute;left:var(--studio-vspace-prop-x);bottom:var(--studio-vspace-prop-y);width:var(--studio-vspace-prop-width);max-height:82%;object-fit:contain;object-position:bottom center;transform:translateZ(18px) scaleX(var(--studio-vspace-prop-flip));transform-origin:bottom center;filter:drop-shadow(0 10px 8px rgb(0 0 0/.55)) saturate(.94) brightness(.98);transition:transform .25s cubic-bezier(.16,1,.3,1),filter .25s}
+.studio-vspace-zone:hover .studio-vspace-zone-props img,.studio-vspace-zone:focus-visible .studio-vspace-zone-props img{transform:translateZ(24px) translateY(-4px) scaleX(var(--studio-vspace-prop-flip)) scale(1.04);filter:drop-shadow(0 14px 10px rgb(0 0 0/.62)) saturate(1.08) brightness(1.05)}
+@media(max-width:1279px){.studio-vspace-zone-props img:nth-child(3){display:none}.studio-vspace-zone-props{inset:30% 5% 10%}}
+@media(prefers-reduced-motion:reduce){.studio-vspace-zone-props img{transition:none}}
+
+/* Concept-match lighting shared with the Virtual Studio home. */
+.studio-vspace-zone{--studio-zone-accent:#a98cff;border-color:color-mix(in srgb,var(--studio-zone-accent) 18%,var(--color-line));background-color:color-mix(in srgb,var(--color-card) 92%,var(--studio-zone-accent) 8%)}
+.studio-vspace-zone[data-zone="lounge"]{--studio-zone-accent:#ffb36f}
+.studio-vspace-zone[data-zone="writers"]{--studio-zone-accent:#a98cff}
+.studio-vspace-zone[data-zone="storyboard"]{--studio-zone-accent:#78b9ff}
+.studio-vspace-zone[data-zone="drawing"]{--studio-zone-accent:#ff8eaa}
+.studio-vspace-zone[data-zone="review"]{--studio-zone-accent:#72dfad}
+.studio-vspace-zone[data-zone="assets"]{--studio-zone-accent:#f4c56e}
+.studio-vspace-zone[data-zone="assistant"]{--studio-zone-accent:#d48cff}
+.studio-vspace-zone[data-zone="live"]{--studio-zone-accent:#6edee8}
+.studio-vspace-zone::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;border-radius:inherit;box-shadow:inset 0 2px 0 color-mix(in srgb,var(--studio-zone-accent) 45%,transparent),inset 0 0 38px color-mix(in srgb,var(--studio-zone-accent) 7%,transparent)}
+.studio-vspace-zone:hover,.studio-vspace-zone:focus-visible{border-color:color-mix(in srgb,var(--studio-zone-accent) 62%,white 8%);box-shadow:inset 0 1px 0 rgb(255 255 255/.18),0 18px 38px rgb(0 0 0/.2),0 0 30px color-mix(in srgb,var(--studio-zone-accent) 13%,transparent)}
+.studio-vspace-zone-props{z-index:3}
+.studio-vspace-zone-floor{background:linear-gradient(90deg,rgb(255 255 255/.09) 1px,transparent 1px),linear-gradient(rgb(255 255 255/.07) 1px,transparent 1px),linear-gradient(145deg,color-mix(in srgb,var(--studio-zone-accent) 8%,rgb(133 112 93/.20)),rgb(18 19 25/.58))}
+
+.studio-vspace-plaza{background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--color-accent) 26%,var(--color-panel)),var(--color-panel) 68%);box-shadow:0 0 55px color-mix(in srgb,var(--color-accent) 28%,transparent),inset 0 1px rgb(255 255 255/.16)}
+.studio-vspace-plaza-ring{position:absolute;inset:-12px;border:1px dashed color-mix(in srgb,var(--color-accent) 35%,transparent);border-radius:50%;animation:studio-vspace-plaza-spin 20s linear infinite}
+.studio-vspace-plaza-mascot{position:absolute;z-index:5;right:-31px;bottom:-20px;width:66px;height:86px;object-fit:contain;object-position:bottom;filter:drop-shadow(0 10px 8px rgb(0 0 0/.55))}
+@keyframes studio-vspace-plaza-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.studio-vspace-plaza-ring{animation:none}}
+
+.studio-vspace-stage{background:radial-gradient(ellipse at 50% 44%,color-mix(in srgb,var(--color-accent) 22%,transparent) 0 12%,transparent 35%),radial-gradient(ellipse at 18% 16%,rgb(255 181 112/.10),transparent 28%),radial-gradient(ellipse at 84% 72%,rgb(103 213 201/.08),transparent 31%),linear-gradient(145deg,color-mix(in srgb,var(--color-panel) 88%,#30283b),color-mix(in srgb,var(--color-card) 92%,#1e2736));box-shadow:0 28px 75px rgb(0 0 0/.28),inset 0 1px rgb(255 255 255/.12),inset 0 -45px 80px rgb(0 0 0/.16)}
+.studio-vspace-stage::after{content:"";position:absolute;inset:7%;z-index:0;pointer-events:none;border-radius:42%;background:radial-gradient(ellipse,color-mix(in srgb,var(--color-accent) 8%,transparent),transparent 68%);box-shadow:0 0 70px color-mix(in srgb,var(--color-accent) 10%,transparent)}

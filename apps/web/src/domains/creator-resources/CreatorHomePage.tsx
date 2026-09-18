@@ -13,12 +13,7 @@ export function CreatorHomePage() {
   const mode = useCreatorExperienceMode((state) => state.mode);
 
   if (mode === "virtual-studio") {
-    return (
-      <>
-        <BetaOpenEventBanner />
-        <CreatorVirtualStudioExperience />
-      </>
-    );
+    return <CreatorVirtualStudioExperience />;
   }
 
   return (

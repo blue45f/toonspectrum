@@ -30,7 +30,6 @@ import {
   useSyncExternalStore,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
-  type ReactNode,
 } from "react";
 import { useParams } from "react-router-dom";
 
@@ -61,7 +60,6 @@ import {
   studioVirtualSpaceDestination,
   studioVirtualSpaceInitialPoint,
   studioVirtualSpaceState,
-  type StudioVirtualAvatarProfile,
   type StudioVirtualSpaceActivity,
   type StudioVirtualSpaceFacing,
   type StudioVirtualSpacePoint,
@@ -73,21 +71,41 @@ import {
   type StudioVirtualSpaceSnapshot,
 } from "./studio-virtual-space-presence";
 
+import "./studio-virtual-space.css";
+
 const MOVE_STEP = 28;
 const VIRTUAL_AVATAR_ART = [
-  "/images/characters/ara.jpg",
-  "/images/characters/danwoo.jpg",
-  "/images/characters/gaon.jpg",
-  "/images/characters/leona.jpg",
+  "/assets/3d/characters/thumbnails/refined-v2/fumi.png",
+  "/assets/3d/characters/thumbnails/refined-v2/mio.png",
+  "/assets/3d/characters/thumbnails/refined-v2/anna.png",
+  "/assets/3d/characters/thumbnails/refined-v2/moon-girl.png",
+  "/assets/3d/characters/thumbnails/refined-v2/megan-the-fox.png",
+  "/assets/3d/characters/thumbnails/refined-v2/teddy.png",
+  "/assets/3d/characters/thumbnails/refined-v2/bot-bunny.png",
+  "/assets/3d/characters/thumbnails/refined-v2/strawberry-princess.png",
+  "/assets/3d/characters/thumbnails/refined-v2/lady-koi.png",
+  "/assets/3d/characters/thumbnails/refined-v2/blue-pixie.png",
+  "/assets/3d/characters/thumbnails/refined-v2/cute-saurus.png",
+  "/assets/3d/characters/thumbnails/refined-v2/cosmic-bot.png",
 ] as const;
 
-function virtualAvatarArt(identity: string): string {
+const VIRTUAL_SCENE_AVATAR_ART = VIRTUAL_AVATAR_ART;
+
+function virtualAvatarIndex(identity: string): number {
   let hash = 2166136261;
   for (let index = 0; index < identity.length; index += 1) {
     hash ^= identity.charCodeAt(index);
     hash = Math.imul(hash, 16777619);
   }
-  return VIRTUAL_AVATAR_ART[(hash >>> 0) % VIRTUAL_AVATAR_ART.length] ?? VIRTUAL_AVATAR_ART[0];
+  return (hash >>> 0) % VIRTUAL_AVATAR_ART.length;
+}
+
+function virtualAvatarArt(identity: string): string {
+  return VIRTUAL_AVATAR_ART[virtualAvatarIndex(identity)] ?? VIRTUAL_AVATAR_ART[0];
+}
+
+function virtualSceneAvatarArt(identity: string): string {
+  return VIRTUAL_SCENE_AVATAR_ART[virtualAvatarIndex(identity)] ?? VIRTUAL_SCENE_AVATAR_ART[0];
 }
 
 const ZONE_ICONS: Readonly<Record<StudioVirtualSpaceZoneId, typeof Coffee>> = {
@@ -113,14 +131,65 @@ const ZONE_TONES: Readonly<Record<StudioVirtualSpaceZoneId, string>> = {
 };
 
 const ZONE_ART: Readonly<Record<StudioVirtualSpaceZoneId, string>> = {
-  lounge: "/assets/studio/backgrounds/webtoon_cafe.jpg",
-  writers: "/assets/studio/backgrounds/webtoon_classroom.jpg",
-  storyboard: "/assets/studio/backgrounds/webtoon_creator_room.png",
-  drawing: "/assets/studio/backgrounds/webtoon_creator_room.png",
+  lounge: "/assets/3d/environments/refined-v6/thumbnails/stylized_cafe_interior.png",
+  writers: "/assets/3d/environments/expansion-v1/thumbnails/library_reading_room.png",
+  storyboard: "/assets/3d/environments/refined-v6/thumbnails/classroom_art_studio.png",
+  drawing: "/assets/3d/environments/refined-v6/thumbnails/classroom_art_studio.png",
   review: "/assets/studio/backgrounds/webtoon_drama_boardroom.jpg",
-  assets: "/brand/atelier-materials-640.webp",
-  assistant: "/brand/atelier-process-640.webp",
-  live: "/assets/studio/backgrounds/webtoon_rooftop_sunset.png",
+  assets: "/assets/3d/environments/refined-v6/thumbnails/fantasy_alchemist_workshop_library.png",
+  assistant: "/assets/3d/environments/expansion-v1/thumbnails/science_research_laboratory.png",
+  live: "/assets/3d/environments/refined-v6/thumbnails/korean_school_rooftop.png",
+};
+
+type StudioVirtualRoomProp = Readonly<{
+  src: string;
+  x: number;
+  y: number;
+  width: number;
+  flip?: boolean;
+}>;
+
+const ZONE_PROPS: Readonly<Record<StudioVirtualSpaceZoneId, readonly StudioVirtualRoomProp[]>> = {
+  lounge: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-lounge-design-sofa.png", x: 8, y: 3, width: 46 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-table-coffee.png", x: 55, y: 1, width: 26 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-plant-small2.png", x: 78, y: 8, width: 18 },
+  ],
+  writers: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-desk.png", x: 8, y: 0, width: 48 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-chair-desk.png", x: 55, y: 0, width: 26, flip: true },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-bookcase-open.png", x: 76, y: 9, width: 20 },
+  ],
+  storyboard: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-cabinet-television.png", x: 7, y: 2, width: 43 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-table-cross.png", x: 50, y: 0, width: 28 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-chair-modern-cushion.png", x: 74, y: 0, width: 20, flip: true },
+  ],
+  drawing: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-desk-corner.png", x: 6, y: 0, width: 48 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-computer-screen.png", x: 48, y: 9, width: 24 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-lamp-square-floor.png", x: 75, y: 5, width: 19 },
+  ],
+  review: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-television-modern.png", x: 7, y: 10, width: 28 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-lounge-sofa-long.png", x: 34, y: 0, width: 46 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-table-coffee-glass.png", x: 74, y: 0, width: 20 },
+  ],
+  assets: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-bookcase-open.png", x: 6, y: 8, width: 36 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-cardboard-box-open.png", x: 46, y: 0, width: 28 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-survival-box-large.png", x: 72, y: 0, width: 24 },
+  ],
+  assistant: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-desk.png", x: 7, y: 0, width: 44 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-chair-rounded.png", x: 50, y: 0, width: 24, flip: true },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-cardboard-box-closed.png", x: 75, y: 0, width: 20 },
+  ],
+  live: [
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-television-modern.png", x: 9, y: 10, width: 30 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-lounge-chair.png", x: 48, y: 0, width: 24 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-lamp-round-floor.png", x: 76, y: 4, width: 18 },
+  ],
 };
 
 function decodeProjectId(projectId: string): string {
@@ -153,36 +222,6 @@ function stagePosition(point: StudioVirtualSpacePoint): CSSProperties {
   };
 }
 
-function accessoryNode(profile: StudioVirtualAvatarProfile): ReactNode {
-  const shared = "absolute z-30 drop-shadow-sm";
-  switch (profile.accessory) {
-    case "beret":
-      return <span className={cn(shared, "-top-1 left-2 h-3 w-10 -rotate-6 rounded-[70%_70%_45%_45%]")} style={{ backgroundColor: profile.accent }} />;
-    case "bow":
-      return (
-        <span className={cn(shared, "-right-1 top-1 grid grid-cols-2 gap-0.5")}>
-          <span className="h-3 w-3 -rotate-12 rounded-[70%_30%_70%_30%]" style={{ backgroundColor: profile.accent }} />
-          <span className="h-3 w-3 rotate-12 rounded-[30%_70%_30%_70%]" style={{ backgroundColor: profile.accent }} />
-        </span>
-      );
-    case "cat":
-      return (
-        <>
-          <span className={cn(shared, "-top-1 left-1 h-4 w-4 -rotate-12 rounded-sm")} style={{ backgroundColor: profile.hair }} />
-          <span className={cn(shared, "-top-1 right-1 h-4 w-4 rotate-12 rounded-sm")} style={{ backgroundColor: profile.hair }} />
-        </>
-      );
-    case "headphones":
-      return <span className={cn(shared, "left-0 top-2 h-8 w-full rounded-t-full border-[4px] border-b-0")} style={{ borderColor: profile.accent }} />;
-    case "leaf":
-      return <span className={cn(shared, "-top-2 right-1 h-3 w-6 rotate-[28deg] rounded-[100%_0_100%_0]")} style={{ backgroundColor: "oklch(0.72 0.17 145)" }} />;
-    case "star":
-      return <Sparkles className={cn(shared, "-right-2 -top-2")} size={18} style={{ color: profile.accent }} aria-hidden />;
-    case "none":
-      return null;
-  }
-}
-
 function ChibiAvatar({
   identity,
   name,
@@ -198,6 +237,7 @@ function ChibiAvatar({
 }) {
   const profile = useMemo(() => studioVirtualAvatarProfile(identity), [identity]);
   const art = useMemo(() => virtualAvatarArt(identity), [identity]);
+  const sceneArt = useMemo(() => virtualSceneAvatarArt(identity), [identity]);
   const activityTone = activity === "away"
     ? "bg-fg-3"
     : activity === "focused"
@@ -215,7 +255,7 @@ function ChibiAvatar({
         )}
         aria-hidden
       >
-        <img src={art} alt="" className="size-full object-cover" loading="lazy" decoding="async" />
+        <img src={art} alt="" className="size-full bg-[radial-gradient(circle_at_50%_34%,oklch(0.35_0.05_300),oklch(0.18_0.02_260)_72%)] object-contain" loading="lazy" decoding="async" />
         <span className={cn("absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-panel", activityTone)} />
       </span>
     );
@@ -224,26 +264,34 @@ function ChibiAvatar({
   return (
     <div
       className={cn(
-        "pointer-events-none relative flex h-[6.5rem] w-[5.2rem] -translate-x-1/2 -translate-y-[82%] flex-col items-center",
-        self && "drop-shadow-[0_0_16px_oklch(0.7_0.18_300/0.5)]",
+        "pointer-events-none relative flex h-[7.2rem] w-[5.8rem] -translate-x-1/2 -translate-y-[86%] flex-col items-center",
+        self && "drop-shadow-[0_0_18px_oklch(0.7_0.18_300/0.55)]",
       )}
       aria-label={name}
     >
-      <span
-        className="absolute bottom-1 size-[4.8rem] overflow-hidden rounded-[46%_46%_44%_44%] border-[3px] bg-panel shadow-[0_12px_28px_oklch(0.08_0_0/0.38)]"
-        style={{ borderColor: self ? profile.accent : profile.hairHighlight }}
-      >
-        <img src={art} alt="" className="size-full object-cover" loading="lazy" decoding="async" />
-        <span className="absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-black/38 to-transparent" />
+      <span className="absolute inset-x-1 bottom-0 top-0 flex items-end justify-center">
+        <span
+          className="absolute bottom-1 left-1/2 h-3 w-[72%] -translate-x-1/2 rounded-full bg-black/35 blur-[4px]"
+          aria-hidden
+        />
+        <img
+          src={sceneArt}
+          alt=""
+          className="relative z-10 h-full w-full object-contain object-bottom drop-shadow-[0_10px_7px_rgba(0,0,0,0.5)]"
+          loading="lazy"
+          decoding="async"
+        />
       </span>
-      {accessoryNode(profile)}
-      <span className={cn("absolute bottom-1 right-0 z-30 size-3 rounded-full border-2 border-panel", activityTone)} />
-      <span className="absolute -bottom-4 left-1/2 z-40 flex max-w-32 -translate-x-1/2 items-center gap-1 truncate rounded-full border border-line bg-panel/95 px-2 py-0.5 text-[0.58rem] font-black text-fg shadow-sm">
+      <span className={cn("absolute bottom-2 right-0 z-30 size-3 rounded-full border-2 border-panel", activityTone)} />
+      <span className="absolute -bottom-4 left-1/2 z-40 flex max-w-32 -translate-x-1/2 items-center gap-1 truncate rounded-full border border-line bg-panel/95 px-2 py-0.5 text-[0.58rem] font-black text-fg shadow-sm backdrop-blur">
         {self ? <Sparkles size={9} className="shrink-0 text-accent" aria-hidden /> : null}
         <span className="truncate">{name}</span>
       </span>
       {self ? (
-        <span className="absolute -top-1 right-0 z-30 rounded-full bg-accent px-1.5 py-0.5 text-[0.45rem] font-black uppercase tracking-wide text-on-accent">
+        <span
+          className="absolute -right-1 top-0 z-30 rounded-full px-1.5 py-0.5 text-[0.45rem] font-black uppercase tracking-wide text-on-accent shadow-sm"
+          style={{ backgroundColor: profile.accent }}
+        >
           ME
         </span>
       ) : null}
@@ -317,13 +365,31 @@ function ZoneSurface({
   const body = (
     <>
       <span
-        className="absolute inset-0 bg-cover bg-center opacity-45 saturate-[0.88]"
+        className="absolute inset-0 bg-cover bg-center opacity-60 saturate-[1.04]"
         style={{ backgroundImage: `url("${ZONE_ART[zone.id]}")` }}
         aria-hidden
       />
-      <span className="absolute inset-0 bg-gradient-to-t from-panel/95 via-panel/45 to-black/5" aria-hidden />
+      <span className="absolute inset-0 bg-gradient-to-t from-panel/90 via-panel/28 to-white/[0.03]" aria-hidden />
+      <span className="studio-vspace-zone-floor" aria-hidden />
       <span className="absolute inset-2 rounded-[1.25rem] border border-white/15 bg-gradient-to-br from-white/10 via-transparent to-black/10" aria-hidden />
-      <span className="relative flex items-start justify-between gap-2">
+      <span className="studio-vspace-zone-props" aria-hidden>
+        {ZONE_PROPS[zone.id].map((prop) => (
+          <img
+            key={prop.src}
+            src={prop.src}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            style={{
+              "--studio-vspace-prop-x": `${prop.x}%`,
+              "--studio-vspace-prop-y": `${prop.y}%`,
+              "--studio-vspace-prop-width": `${prop.width}%`,
+              "--studio-vspace-prop-flip": prop.flip ? -1 : 1,
+            } as CSSProperties}
+          />
+        ))}
+      </span>
+      <span className="relative z-[3] flex items-start justify-between gap-2">
         <span>
           <span className="flex items-center gap-2 text-[0.62rem] font-black uppercase tracking-[0.12em] text-fg-3">
             <Icon size={13} aria-hidden />
@@ -337,13 +403,13 @@ function ZoneSurface({
           <ExternalLink size={14} className="text-fg-3" aria-hidden />
         ) : null}
       </span>
-      <span className="relative mt-auto hidden max-w-[24rem] text-[0.68rem] leading-5 text-fg-3 xl:block">
+      <span className="relative z-[3] mt-auto hidden max-w-[24rem] text-[0.68rem] leading-5 text-fg-3 xl:block">
         {bt(zone.descriptionKo, zone.descriptionEn)}
       </span>
     </>
   );
   const className = cn(
-    "absolute flex flex-col overflow-hidden rounded-[1.45rem] border bg-gradient-to-br p-4 text-left shadow-[0_10px_30px_oklch(0_0_0/0.08)] transition-all duration-200",
+    "studio-vspace-zone absolute flex flex-col overflow-hidden rounded-[1.45rem] border bg-gradient-to-br p-4 text-left shadow-[0_10px_30px_oklch(0_0_0/0.08)] transition-all duration-200",
     ZONE_TONES[zone.id],
     active ? "z-[2] border-accent/70 ring-2 ring-accent/20" : "border-line/70",
     (destination || zone.destination === "assistant") && "hover:-translate-y-0.5 hover:border-accent/45 hover:shadow-xl",
@@ -355,6 +421,7 @@ function ZoneSurface({
         style={style}
         className={className}
         data-space-interactive="true"
+        data-zone={zone.id}
         onClick={onAssistant}
       >
         {body}
@@ -368,13 +435,14 @@ function ZoneSurface({
         style={style}
         className={className}
         data-space-interactive="true"
+        data-zone={zone.id}
       >
         {body}
       </Link>
     );
   }
   return (
-    <div style={style} className={className} data-space-interactive="true">
+    <div style={style} className={className} data-space-interactive="true" data-zone={zone.id}>
       {body}
     </div>
   );
@@ -656,7 +724,7 @@ function VirtualSpaceExperience({
                 role="application"
                 aria-label={bt("가상 스튜디오 공간", "Virtual studio space")}
                 onPointerDown={handleStagePointer}
-                className="relative aspect-[59/36] min-h-[34rem] w-full cursor-crosshair overflow-hidden rounded-[2rem] border border-line bg-[radial-gradient(circle_at_50%_44%,oklch(0.78_0.13_300/0.16),transparent_17%),linear-gradient(145deg,var(--color-panel),var(--color-card))] shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                className="studio-vspace-stage relative aspect-[59/36] min-h-[34rem] w-full cursor-crosshair overflow-hidden rounded-[2rem] border border-line shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 data-studio-virtual-space="true"
               >
                 <div aria-hidden className="absolute inset-0 opacity-40 [background-image:linear-gradient(to_right,currentColor_1px,transparent_1px),linear-gradient(to_bottom,currentColor_1px,transparent_1px)] [background-size:40px_40px] text-line" />
@@ -672,10 +740,12 @@ function VirtualSpaceExperience({
 
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute left-1/2 top-[45%] z-[3] size-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-accent/30 bg-panel/80 shadow-[0_0_45px_oklch(0.7_0.18_300/0.2)]"
+                  className="studio-vspace-plaza pointer-events-none absolute left-1/2 top-[45%] z-[3] size-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-accent/30 bg-panel/80 shadow-[0_0_45px_oklch(0.7_0.18_300/0.2)]"
                 >
-                  <div className="absolute inset-3 grid place-items-center rounded-full bg-accent-soft text-accent">
-                    <Sparkles size={28} />
+                  <span className="studio-vspace-plaza-ring" />
+                  <img src="/assets/3d/characters/thumbnails/refined-v2/cosmic-bot.png" alt="" className="studio-vspace-plaza-mascot" />
+                  <div className="absolute inset-[1.05rem] grid place-items-center rounded-full bg-accent-soft text-accent">
+                    <Sparkles size={26} />
                   </div>
                 </div>
 
