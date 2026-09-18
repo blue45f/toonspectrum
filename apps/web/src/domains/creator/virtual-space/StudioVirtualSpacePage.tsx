@@ -15,7 +15,6 @@ import {
   Gamepad2,
   GalleryHorizontalEnd,
   Headphones,
-  Heart,
   Home,
   LayoutGrid,
   Map,
@@ -159,18 +158,10 @@ function writeVirtualSpaceSessionPoint(projectId: string, point: StudioVirtualSp
   }
 }
 const VIRTUAL_AVATARS = [
-  { labelKo: "하늘", labelEn: "Haneul" },
-  { labelKo: "시나", labelEn: "Sina" },
-  { labelKo: "지훈", labelEn: "Jihun" },
-  { labelKo: "나비", labelEn: "Nabi" },
-  { labelKo: "리호", labelEn: "Riho" },
-  { labelKo: "민준", labelEn: "Minjun" },
-  { labelKo: "트리", labelEn: "Tree" },
-  { labelKo: "유리", labelEn: "Yuri" },
-  { labelKo: "루나", labelEn: "Luna" },
-  { labelKo: "제이", labelEn: "Jay" },
-  { labelKo: "버니", labelEn: "Bunny" },
-  { labelKo: "코스믹", labelEn: "Cosmic" },
+  { labelKo: "하늘", labelEn: "Haneul", skin: "pink" },
+  { labelKo: "시나", labelEn: "Sina", skin: "silver" },
+  { labelKo: "지훈", labelEn: "Jihun", skin: "dark" },
+  { labelKo: "리호", labelEn: "Riho", skin: "purple" },
 ] as const;
 
 function virtualAvatarIndex(identity: string): number {
@@ -338,6 +329,8 @@ function VirtualSpaceMiniMap({
   );
 }
 
+const REFERENCE_PLAYER_SKINS = ["pink", "silver", "dark", "purple"] as const;
+
 function ChibiAvatar({
   identity,
   name,
@@ -362,6 +355,7 @@ function ChibiAvatar({
   readonly avatarIndex?: number;
 }) {
   const variant = resolveVirtualAvatarIndex(identity, avatarIndex);
+  const skin = REFERENCE_PLAYER_SKINS[variant % REFERENCE_PLAYER_SKINS.length] ?? "pink";
   const reactionEmoji = virtualSpaceReactionEmoji(reaction);
   const motion = moving
     ? "walk"
@@ -369,7 +363,9 @@ function ChibiAvatar({
       ? "review"
       : activity === "focused"
         ? "draw"
-        : "idle";
+        : nearby
+          ? "talk"
+          : "idle";
 
   if (compact) {
     return (
@@ -380,7 +376,12 @@ function ChibiAvatar({
         )}
         aria-hidden
       >
-        <StudioChibiSprite variant={variant} size={49} motion={motion} direction={facing} />
+        <img
+          src={`/assets/virtual-studio/reference/player-${skin}-direction-down.png`}
+          alt=""
+          draggable={false}
+          className="studio-vspace-reference-compact-player"
+        />
       </span>
     );
   }
@@ -401,11 +402,19 @@ function ChibiAvatar({
         className="studio-vspace-reference-player"
         data-motion={motion}
         data-direction={facing}
-        style={{ "--studio-reference-hue": `${variant * 27}deg` } as CSSProperties}
+        data-skin={skin}
         aria-hidden="true"
       >
         <img
-          src="/assets/virtual-studio/reference/player-pink.png"
+          src={
+            skin === "pink" && motion === "draw"
+              ? "/assets/virtual-studio/reference/player-pink-state-draw.png"
+              : skin === "pink" && motion === "review"
+                ? "/assets/virtual-studio/reference/player-pink-state-review.png"
+                : skin === "pink" && motion === "talk"
+                  ? "/assets/virtual-studio/reference/player-pink-state-talk.png"
+                  : `/assets/virtual-studio/reference/player-${skin}-direction-${facing}.png`
+          }
           alt=""
           draggable={false}
         />
@@ -696,10 +705,8 @@ function LiveStudioSidebar({
           </Link>
         ))}
       </nav>
-      <Link href="/showcase" className="vs2-promo">
-        <span className="vs2-promo-art"><StudioChibiSprite variant={4} size={104} motion="idle" /></span>
-        <span><strong>{bt("함께 만드는", "Together we make")}</strong><b>{bt("더 큰 이야기", "bigger stories")}</b></span>
-        <Heart size={19} fill="currentColor" />
+      <Link href="/showcase" className="vs2-promo" aria-label={bt("함께 만드는 더 큰 이야기", "Together we make bigger stories")}>
+        <img src="/assets/virtual-studio/reference/ui/sidebar-promo.jpg" alt="" className="vs2-reference-promo-img" />
       </Link>
       <div className="vs2-self">
         <span className="vs2-tiny-avatar">
@@ -731,27 +738,27 @@ function LiveStudioBottom({
     <section className="vs2-bottom vs2-live-bottom" aria-label={bt("스튜디오 기능", "Studio features")}>
       <Link href={`/studio/work/${encodeURIComponent(projectId)}/canvas?live=1`} className="vs2-feature">
         <header><strong>{bt("실시간 드로잉 협업", "Live drawing collaboration")}</strong><small>{bt("같은 캔버스에서 함께 그려요", "Draw together on one canvas")}</small></header>
-        <div className="vs2-feature-body vs2-live-feature-illustration"><Brush size={42} /><StudioChibiSprite variant={0} size={72} motion="draw" /></div>
+        <div className="vs2-feature-body"><img src="/assets/virtual-studio/reference/ui/feature-drawing.jpg" alt="" className="vs2-reference-feature-img" /></div>
       </Link>
       <Link href={reviewHref} className="vs2-feature">
         <header><strong>{bt("리뷰 & 코멘트", "Review & comments")}</strong><small>{bt("정확한 위치에 피드백을 남겨요", "Pin feedback precisely")}</small></header>
-        <div className="vs2-feature-body vs2-live-feature-review"><span className="eye">◉</span><span className="mark">○</span><span>{bt("눈을 조금 더 크게!", "Make the eyes bigger!")}</span></div>
+        <div className="vs2-feature-body"><img src="/assets/virtual-studio/reference/ui/feature-review.jpg" alt="" className="vs2-reference-feature-img" /></div>
       </Link>
       <Link href="/production" className="vs2-feature">
         <header><strong>{bt("작업 보드 & 진행 상황", "Production board")}</strong><small>{bt("누가, 무엇을, 언제까지", "Who, what, by when")}</small></header>
-        <div className="vs2-feature-body vs2-live-feature-board"><b>To Do</b><b>In Progress</b><b>Review</b><span>38화 콘티</span><span>선화 작업</span><span>승인 대기</span></div>
+        <div className="vs2-feature-body"><img src="/assets/virtual-studio/reference/ui/feature-board.jpg" alt="" className="vs2-reference-feature-img" /></div>
       </Link>
       <button type="button" className="vs2-feature text-left" onClick={openAssistant}>
         <header><strong>{bt("AI 프로듀서", "AI Producer")}</strong><small>{bt("항상 함께하는 든든한 PD", "Your always-on production partner")}</small></header>
-        <div className="vs2-feature-body vs2-ai-card"><span className="orb"><Bot size={42} /></span><span className="bubble">{bt("제가 프로젝트를 도와드릴게요!", "I’ll help with the project!")}</span></div>
+        <div className="vs2-feature-body"><img src="/assets/virtual-studio/reference/ui/feature-ai.jpg" alt="" className="vs2-reference-feature-img" /></div>
       </button>
       <Link href={`/studio/work/${encodeURIComponent(projectId)}/canvas?live=1`} className="vs2-feature">
         <header><strong>{bt("라이브 드로잉 이벤트", "Live drawing events")}</strong><small>{bt("작가와 함께하는 특별한 시간", "Create live together")}</small></header>
-        <div className="vs2-feature-body vs2-live-card"><span className="live-pill">LIVE ●</span><StudioChibiSprite variant={7} size={112} motion="draw" /></div>
+        <div className="vs2-feature-body"><img src="/assets/virtual-studio/reference/ui/feature-live.jpg" alt="" className="vs2-reference-feature-img" /></div>
       </Link>
       <Link href="/community" className="vs2-feature">
         <header><strong>{bt("크리에이터 커뮤니티", "Creator community")}</strong><small>{bt("새로운 사람들과 더 많은 기회", "More creators, more opportunities")}</small></header>
-        <div className="vs2-feature-body vs2-community-card"><span className="sign">ToonSpectrum<br /><small>CREATOR PLAZA</small></span><div className="crew">{[0,1,3,5].map((variant)=><StudioChibiSprite key={variant} variant={variant} size={55} motion="idle" />)}</div></div>
+        <div className="vs2-feature-body"><img src="/assets/virtual-studio/reference/ui/feature-community.jpg" alt="" className="vs2-reference-feature-img" /></div>
       </Link>
     </section>
   );
@@ -1736,10 +1743,14 @@ function VirtualSpaceExperience({
                       aria-label={bt(`${avatar.labelKo} 캐릭터 선택`, `Select ${avatar.labelEn} character`)}
                       onClick={() => selectAvatar(index)}
                     >
-                      <StudioChibiSprite
-                        variant={index}
-                        size={58}
-                        motion={avatarIndex === index ? "talk" : "idle"}
+                      <img
+                        src={`/assets/virtual-studio/reference/player-${avatar.skin}-direction-down.png`}
+                        alt=""
+                        draggable={false}
+                        className={cn(
+                          "h-[92%] w-[92%] object-contain object-bottom transition-transform duration-200",
+                          avatarIndex === index ? "scale-105" : "group-hover:scale-105",
+                        )}
                       />
                       {avatarIndex === index ? (
                         <span className="absolute bottom-1 right-1 grid size-4 place-items-center rounded-full bg-accent text-[0.5rem] font-black text-on-accent shadow">
