@@ -40,6 +40,18 @@ describe("2D scene quality and discovery", () => {
     expect(BG_SCENE_COMPATIBILITY_LIBRARY.every((item) => !activeIds.has(item.id))).toBe(true);
     expect(ALL_BG_SCENES).toHaveLength(BG_SCENES.length + BG_SCENE_COMPATIBILITY_LIBRARY.length);
     expect(anyScene("webtoon-bedroom")).toBeTruthy();
+
+    const compatibilityIds = new Set([
+      "webtoon-cafe",
+      "webtoon-classroom",
+      "webtoon-corridor",
+      "webtoon-street",
+    ]);
+    const compatibilityMetadata = STUDIO_2D_ASSET_METADATA
+      .filter((asset) => compatibilityIds.has(asset.id));
+    expect(compatibilityMetadata).toHaveLength(4);
+    expect(compatibilityMetadata.every((asset) => asset.recommended === false)).toBe(true);
+    expect(compatibilityMetadata.every((asset) => asset.provenance.licenseStatus === "unverified")).toBe(true);
   });
   it("retains every active ID exactly once after recommendation regrouping", () => {
     const sections = bgSceneSections(BG_SCENES);

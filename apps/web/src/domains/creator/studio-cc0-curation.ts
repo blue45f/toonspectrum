@@ -35,6 +35,17 @@ export const STUDIO_CC0_QUARANTINED_IDS: readonly string[] = Object.freeze([
   "kenney-food-glass-wine",
 ]);
 
+/**
+ * Reviewed source assets retained for Studio compatibility, but collapsed in Marketplace because
+ * their visual signatures are effectively indistinguishable from a canonical sibling.
+ */
+export const STUDIO_CC0_MARKETPLACE_PERCEPTUAL_DUPLICATE_IDS: readonly string[] = Object.freeze([
+  "kenney-particles-star-02",
+  "kenney-particles-trace-02",
+  "kenney-particles-trace-02-rotated",
+  "kenney-particles-trace-03",
+]);
+
 /** Assembly components are useful, but are not finished backgrounds/props. */
 export function isStudioCc0AssemblyComponent(asset: Pick<StudioCc0Asset, "id" | "role">): boolean {
   if (asset.role === "assembly-component") return true;
@@ -96,7 +107,7 @@ export function studioCc0StyleLabel(asset: Pick<StudioCc0Asset, "kind" | "provid
  * The market should surface finished, visually reviewed assets with enough source
  * resolution, while 3D listings additionally require a successful Studio runtime pass.
  */
-export function isStudioCc0MarketplaceReady(asset: StudioCc0Asset): boolean {
+export function isStudioCc0MarketplaceCandidate(asset: StudioCc0Asset): boolean {
   if (
     getStudioCc0ReviewStatus(asset) !== "contact-sheet-reviewed"
     || isStudioCc0AssemblyComponent(asset)
@@ -120,6 +131,11 @@ export function isStudioCc0MarketplaceReady(asset: StudioCc0Asset): boolean {
     case "effect-mask":
       return Math.min(width, height) >= 512;
   }
+}
+
+export function isStudioCc0MarketplaceReady(asset: StudioCc0Asset): boolean {
+  return isStudioCc0MarketplaceCandidate(asset)
+    && !STUDIO_CC0_MARKETPLACE_PERCEPTUAL_DUPLICATE_IDS.includes(asset.id);
 }
 
 /** Apply after the ordinary text/kind filter; default selection hides parts.

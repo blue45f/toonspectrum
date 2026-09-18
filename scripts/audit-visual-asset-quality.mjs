@@ -66,6 +66,43 @@ function dimensions(buffer, kind) {
   return null;
 }
 
+const BRAND_ALIAS_PATH = /^(?:apps\/web\/public\/(?:brand\/spectrum-ribbon-v2\/)?(?:apple-touch-icon\.png|favicon-(?:32|96)\.png|favicon\.svg|icon-(?:192|512)\.png|icon-maskable-(?:192|512)\.png|icon-maskable\.svg|safari-pinned-tab\.svg)|mobile-shell\/icon-192\.png)$/u;
+const LEGACY_BACKGROUND_ALIAS = /^apps\/web\/public\/assets\/studio\/backgrounds\/(webtoon_[a-z0-9_]+)\.(?:jpg|png)$/u;
+const KNOWN_ASSEMBLY_PREVIEW_COLLISION = new Set([
+  "apps/web/public/assets/studio/cc0-20260906/previews/kenney-nature-cliff-block-cave-rock.png",
+  "apps/web/public/assets/studio/cc0-20260906/previews/kenney-nature-cliff-block-rock.png",
+]);
+
+function intentionalDuplicateReason(group) {
+  const paths = group.map((asset) => asset.path).toSorted();
+  if (paths.every((value) => /^android\/app\/src\/main\/res\/drawable[^/]*\/splash\.png$/u.test(value))) {
+    return "android-density-theme-splash-contract";
+  }
+  if (paths.every((value) => value.startsWith("ios/App/App/Assets.xcassets/Splash.imageset/"))) {
+    return "ios-splash-appearance-scale-contract";
+  }
+  if (paths.every((value) => BRAND_ALIAS_PATH.test(value))) {
+    return "brand-and-install-surface-alias-contract";
+  }
+  const legacyMatches = paths.map((value) => value.match(LEGACY_BACKGROUND_ALIAS));
+  if (
+    paths.length === 2
+    && legacyMatches.every(Boolean)
+    && legacyMatches[0][1] === legacyMatches[1][1]
+    && paths.some((value) => value.endsWith(".jpg"))
+    && paths.some((value) => value.endsWith(".png"))
+  ) {
+    return "legacy-background-url-compatibility";
+  }
+  if (
+    paths.length === KNOWN_ASSEMBLY_PREVIEW_COLLISION.size
+    && paths.every((value) => KNOWN_ASSEMBLY_PREVIEW_COLLISION.has(value))
+  ) {
+    return "reviewed-assembly-model-preview-collision";
+  }
+  return null;
+}
+
 const assets = [];
 const byHash = new Map();
 for (const relativePath of tracked) {
@@ -93,6 +130,12 @@ for (const relativePath of tracked) {
 }
 
 const duplicates = [...byHash.values()].filter((group) => group.length > 1);
+const duplicateClassifications = duplicates.map((group) => ({
+  reason: intentionalDuplicateReason(group),
+  files: group.map((asset) => asset.path).toSorted(),
+}));
+const intentionalDuplicateGroups = duplicateClassifications.filter((group) => group.reason !== null);
+const unexpectedDuplicateGroups = duplicateClassifications.filter((group) => group.reason === null);
 const mismatches = assets.filter((asset) => asset.expectedKind !== asset.actualKind);
 const lowResolution = assets.filter((asset) => asset.width && asset.height && (asset.width < 256 || asset.height < 256));
 const legacyAliasMismatches = mismatches.filter((asset) => {
@@ -108,6 +151,8 @@ const report = {
     assets: assets.length,
     duplicateGroups: duplicates.length,
     duplicateFiles: duplicates.reduce((sum, group) => sum + group.length, 0),
+    intentionalDuplicateGroups: intentionalDuplicateGroups.length,
+    unexpectedDuplicateGroups: unexpectedDuplicateGroups.length,
     lowResolution: lowResolution.length,
     extensionMismatches: mismatches.length,
     legacyAliasMismatches: legacyAliasMismatches.length,
@@ -116,8 +161,14 @@ const report = {
   unexpectedMismatches,
   legacyAliasMismatches,
   lowResolution,
-  duplicateGroups: duplicates.map((group) => group.map((asset) => asset.path)),
+  duplicateGroups: duplicateClassifications,
+  unexpectedDuplicateGroups,
 };
 
 console.log(JSON.stringify(report, null, 2));
-if (process.argv.includes("--strict") && unexpectedMismatches.length > 0) process.exitCode = 1;
+if (
+  process.argv.includes("--strict")
+  && (unexpectedMismatches.length > 0 || unexpectedDuplicateGroups.length > 0)
+) {
+  process.exitCode = 1;
+}

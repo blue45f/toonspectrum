@@ -140,6 +140,21 @@ describe("visually reviewed CC0 selection", () => {
     expect(isStudioCc0MarketplaceReady(effect)).toBe(true);
     expect(isStudioCc0MarketplaceReady({...effect, width: 511})).toBe(false);
   });
+  it.each([
+    "kenney-particles-star-02",
+    "kenney-particles-trace-02",
+    "kenney-particles-trace-02-rotated",
+    "kenney-particles-trace-03",
+  ])("keeps perceptual duplicate %s usable in Studio but out of Marketplace", id => {
+    const duplicate = {
+      ...asset(id, "Kenney", "effect-mask"),
+      role: "finished-asset",
+      width: 512,
+      height: 512,
+    };
+    expect(curateStudioCc0Selection([duplicate])).toEqual([duplicate]);
+    expect(isStudioCc0MarketplaceReady(duplicate)).toBe(false);
+  });
   it("retains explicit enlargement, contrast, focus and success-only dismissal contracts", () => {
     const source = readFileSync(new URL("./StudioCc0AssetLibraryPanel.tsx", import.meta.url), "utf8");
     expect(source).toContain("useStudioModalSheet");

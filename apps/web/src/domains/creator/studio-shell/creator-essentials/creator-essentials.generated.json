@@ -499,7 +499,7 @@
         "3면도"
       ],
       "url": "/creator-essentials/pose-neutral-2d.svg",
-      "preview": "/creator-essentials/pose-neutral-2d.preview.svg",
+      "preview": "/creator-essentials/pose-neutral-3d.preview.svg",
       "sha256": "d85284c9d9982ed6c1796cae779988c07cf77a655455438a997ceb413f1a839a",
       "bytes": 11278,
       "width": 1440,
@@ -543,7 +543,7 @@
         "3면도"
       ],
       "url": "/creator-essentials/pose-weight-shift-2d.svg",
-      "preview": "/creator-essentials/pose-weight-shift-2d.preview.svg",
+      "preview": "/creator-essentials/pose-weight-shift-3d.preview.svg",
       "sha256": "d4656575cc981a94ad25130995ac09eac422e459dc4ea116f035dec037100a24",
       "bytes": 11330,
       "width": 1440,
@@ -587,7 +587,7 @@
         "3면도"
       ],
       "url": "/creator-essentials/pose-walking-2d.svg",
-      "preview": "/creator-essentials/pose-walking-2d.preview.svg",
+      "preview": "/creator-essentials/pose-walking-3d.preview.svg",
       "sha256": "b97d2fb4f2c4fe183858a2b7eb6c5b175dff3c05026d092164520c91261892ae",
       "bytes": 11310,
       "width": 1440,
@@ -631,7 +631,7 @@
         "3면도"
       ],
       "url": "/creator-essentials/pose-running-2d.svg",
-      "preview": "/creator-essentials/pose-running-2d.preview.svg",
+      "preview": "/creator-essentials/pose-running-3d.preview.svg",
       "sha256": "e86f8c2c2507391ac4702f2efec4769bff2bfc0f1882625e2d4615b8cb8a9043",
       "bytes": 11337,
       "width": 1440,
@@ -675,7 +675,7 @@
         "3면도"
       ],
       "url": "/creator-essentials/pose-seated-2d.svg",
-      "preview": "/creator-essentials/pose-seated-2d.preview.svg",
+      "preview": "/creator-essentials/pose-seated-3d.preview.svg",
       "sha256": "c587cb68d637bd69586ef4a2124edcc8007adaf935266882d93bc95f292694db",
       "bytes": 11274,
       "width": 1440,
@@ -719,7 +719,7 @@
         "3면도"
       ],
       "url": "/creator-essentials/pose-reaching-2d.svg",
-      "preview": "/creator-essentials/pose-reaching-2d.preview.svg",
+      "preview": "/creator-essentials/pose-reaching-3d.preview.svg",
       "sha256": "f52f87431214ea649f721d259f9ab12bdda94d4aab8b90b1794f4d79f0a467b2",
       "bytes": 11264,
       "width": 1440,
@@ -763,7 +763,7 @@
         "3면도"
       ],
       "url": "/creator-essentials/pose-crouching-2d.svg",
-      "preview": "/creator-essentials/pose-crouching-2d.preview.svg",
+      "preview": "/creator-essentials/pose-crouching-3d.preview.svg",
       "sha256": "4c0aeba763c8ab86800c6e74895e3e93c6b926c2990ce384a56a394902256082",
       "bytes": 11331,
       "width": 1440,
@@ -807,7 +807,7 @@
         "3면도"
       ],
       "url": "/creator-essentials/pose-arm-extension-2d.svg",
-      "preview": "/creator-essentials/pose-arm-extension-2d.preview.svg",
+      "preview": "/creator-essentials/pose-arm-extension-3d.preview.svg",
       "sha256": "545de9af6ef6d32a81b00d27d1ca1e555d791a6986f96f583bec967459176b51",
       "bytes": 11336,
       "width": 1440,

@@ -14,7 +14,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe("pinned marketplace CC0 delivery", () => {
   it("pins the curated reviewed assets to the current catalog and real file hashes", () => {
     const catalog = parseStudioCc0Catalog(JSON.parse(readFileSync(new URL("manifest.json", root), "utf8")));
-    expect(STUDIO_MARKETPLACE_CC0_ASSETS).toHaveLength(338);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS).toHaveLength(334);
     for (const asset of STUDIO_MARKETPLACE_CC0_ASSETS) {
       expect(asset).toEqual(catalog.find((candidate) => candidate.id === asset.id));
       const bytes = readFileSync(new URL(asset.path, root));
