@@ -1,7 +1,8 @@
 import {
-  translateBilingualValueForLocale,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowLeft,
@@ -23,36 +24,35 @@ import { useSession } from "@/compat/auth-session-store";
 import { getMyProfile, updateMyProfile, type MeProfile } from "@/infrastructure/me-client";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
+  CREATOR_EXPERIENCE_LEVELS,
   CREATOR_ROLE_DEFINITIONS,
   CREATOR_ROLE_MAX_SECONDARY,
-  CREATOR_STAGE_IDS,
-  CREATOR_STAGE_LABELS,
   creatorRoleDefinition,
   creatorRoleSelection,
   creatorText,
   normalizeCreatorRoleProfile,
+  type CreatorExperienceLevel,
   type CreatorRoleId,
   type CreatorRoleLocale,
-  type CreatorStage,
 } from "@/shared/lib/creator-role-contract";
 import { creatorRoleExperience } from "@/shared/lib/creator-role-experience";
 import {
+  CREATOR_ACCOUNT_CONTEXTS,
   CREATOR_ROLE_USAGE_GOALS,
   GLOBAL_CREATOR_ROLE_WORKSPACE_KEY,
+  creatorAccountContextFromLegacyStage,
   creatorDetailedRoleLens,
+  creatorExperienceLevelFromLegacyStage,
   creatorRoleStudioWorkspace,
   normalizeCreatorRoleWorkspacePreference,
+  recommendCreatorWorkspaceMode,
+  type CreatorAccountContext,
   type CreatorRoleUsageGoal,
   type CreatorWorkspaceMode,
 } from "@/shared/lib/creator-role-workspace-contract";
 import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
 
 import { cn } from "@/shared/lib/utils";
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("CreatorAdaptiveOnboardingGate", ko, en);
@@ -70,6 +70,58 @@ const GOAL_LABELS: Readonly<Record<CreatorRoleUsageGoal, { ko: string; en: strin
   "studio-management": { ko: "제작팀 관리", en: "Studio management" },
   education: { ko: "학생 교육·수업", en: "Teaching & education" },
   outsourcing: { ko: "외주 작업", en: "Freelance work" },
+};
+
+const ACCOUNT_CONTEXT_COPY: Readonly<Record<CreatorAccountContext, {
+  ko: string;
+  en: string;
+  descriptionKo: string;
+  descriptionEn: string;
+}>> = {
+  individual: {
+    ko: "개인 창작",
+    en: "Individual",
+    descriptionKo: "혼자 만들거나 개인 프로젝트 중심으로 작업합니다.",
+    descriptionEn: "Create solo or focus on personal projects.",
+  },
+  education: {
+    ko: "교육",
+    en: "Education",
+    descriptionKo: "학생·수강생·강사처럼 학습과 수업 흐름을 함께 사용합니다.",
+    descriptionEn: "Use learning and teaching workflows for students or educators.",
+  },
+  studio: {
+    ko: "팀 · 스튜디오",
+    en: "Team · Studio",
+    descriptionKo: "여러 역할이 함께 제작하고 일정·검수·인계를 관리합니다.",
+    descriptionEn: "Coordinate roles, schedules, reviews and handoffs across a team.",
+  },
+};
+
+const EXPERIENCE_COPY: Readonly<Record<CreatorExperienceLevel, {
+  ko: string;
+  en: string;
+  descriptionKo: string;
+  descriptionEn: string;
+}>> = {
+  beginner: {
+    ko: "처음 · 입문",
+    en: "Beginner",
+    descriptionKo: "제작 흐름과 도구 안내가 도움이 됩니다.",
+    descriptionEn: "More guidance around workflow and tools is useful.",
+  },
+  experienced: {
+    ko: "경험 있음",
+    en: "Experienced",
+    descriptionKo: "기본 제작 흐름을 알고 직접 선택하며 작업합니다.",
+    descriptionEn: "You know the core workflow and prefer choosing tools directly.",
+  },
+  professional: {
+    ko: "현업 · 전문",
+    en: "Professional",
+    descriptionKo: "연재·외주·납품처럼 빠른 제작 동선이 중요합니다.",
+    descriptionEn: "Fast paths matter for serialization, client work and delivery.",
+  },
 };
 
 const MODE_COPY: Readonly<Record<CreatorWorkspaceMode, {
@@ -99,14 +151,14 @@ const MODE_COPY: Readonly<Record<CreatorWorkspaceMode, {
 };
 
 const STEP_LABELS = [
-  { ko: "활동 단계", en: "Stage" },
+  { ko: "환경 · 경험", en: "Context" },
   { ko: "역할", en: "Roles" },
   { ko: "목적", en: "Goals" },
   { ko: "화면", en: "Workspace" },
   { ko: "미리보기", en: "Preview" },
 ] as const;
 
-function localized(_locale, ko: string, en: string): string {
+function localized(_locale: CreatorRoleLocale, ko: string, en: string): string {
   return bi(ko, en);
 }
 
@@ -132,11 +184,13 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
   const [initializedFor, setInitializedFor] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [step, setStep] = useState(0);
-  const [stage, setStage] = useState<CreatorStage | null>(null);
+  const [accountContext, setAccountContext] = useState<CreatorAccountContext>("individual");
+  const [experienceLevel, setExperienceLevel] = useState<CreatorExperienceLevel | null>(null);
   const [roles, setRoles] = useState<readonly CreatorRoleId[]>([]);
   const [primaryRole, setPrimaryRole] = useState<CreatorRoleId | null>(null);
   const [goals, setGoals] = useState<readonly CreatorRoleUsageGoal[]>([]);
   const [workspaceMode, setWorkspaceMode] = useState<CreatorWorkspaceMode>("creator");
+  const [modeTouched, setModeTouched] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const workspace = useCreatorRoleWorkspace(
@@ -179,11 +233,22 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
     if (!profile || initializedFor === profile.id) return;
     if (workspace.status === "idle" || workspace.status === "loading") return;
     const selected = creatorRoleSelection(profile.creatorRoleProfile);
-    setStage(profile.creatorRoleProfile.creatorStage);
+    const legacyStage = profile.creatorRoleProfile.creatorStage;
+    const completed = workspace.snapshot.document.onboardingComplete;
+    setAccountContext(
+      completed
+        ? workspace.snapshot.document.accountContext
+        : creatorAccountContextFromLegacyStage(legacyStage),
+    );
+    setExperienceLevel(
+      profile.creatorRoleProfile.experienceLevel
+      ?? creatorExperienceLevelFromLegacyStage(legacyStage),
+    );
     setRoles(selected);
     setPrimaryRole(profile.creatorRoleProfile.primaryRole ?? selected[0] ?? null);
     setGoals(workspace.snapshot.document.usageGoals);
     setWorkspaceMode(workspace.snapshot.document.workspaceMode);
+    setModeTouched(completed);
     setInitializedFor(profile.id);
   }, [initializedFor, profile, workspace.snapshot.document, workspace.status]);
 
@@ -191,7 +256,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
     profile
     && initializedFor === profile.id
     && (
-      !profile.creatorRoleProfile.creatorStage
+      (!profile.creatorRoleProfile.experienceLevel && !profile.creatorRoleProfile.creatorStage)
       || !profile.creatorRoleProfile.primaryRole
       || !workspace.snapshot.document.onboardingComplete
     )
@@ -222,8 +287,18 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
     () => creatorRoleExperience(primaryRole),
     [primaryRole],
   );
+  const recommendedWorkspaceMode = useMemo(
+    () => recommendCreatorWorkspaceMode({ accountContext, experienceLevel, usageGoals: goals }),
+    [accountContext, experienceLevel, goals],
+  );
+
+  useEffect(() => {
+    if (!visible || modeTouched) return;
+    setWorkspaceMode(recommendedWorkspaceMode);
+  }, [modeTouched, recommendedWorkspaceMode, visible]);
+
   const canContinue = step === 0
-    ? stage !== null
+    ? experienceLevel !== null
     : step === 1
       ? roles.length > 0 && primaryRole !== null
       : true;
@@ -236,13 +311,13 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
   };
 
   const complete = async () => {
-    if (!profile || !stage || !primaryRole || roles.length === 0 || saving) return;
+    if (!profile || !experienceLevel || !primaryRole || roles.length === 0 || saving) return;
     setSaving(true);
     setProfileError(null);
     try {
       const roleProfile = normalizeCreatorRoleProfile({
         ...profile.creatorRoleProfile,
-        creatorStage: stage,
+        experienceLevel,
         primaryRole,
         secondaryRoles: roles.filter((role) => role !== primaryRole),
         activeRole: primaryRole,
@@ -255,6 +330,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
         detailedLens: creatorDetailedRoleLens(primaryRole),
         workspacePreset: creatorRoleStudioWorkspace(primaryRole),
         usageGoals: goals,
+        accountContext,
         workspaceMode,
         onboardingComplete: true,
       }));
@@ -323,29 +399,68 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
           {step === 0 ? (
-            <section aria-labelledby="creator-stage-title">
-              <h2 id="creator-stage-title" className="text-lg font-black text-fg">
-                {localized(locale, "지금 나와 가장 가까운 상태는 무엇인가요?", "Which stage best describes you right now?")}
+            <section aria-labelledby="creator-context-title">
+              <h2 id="creator-context-title" className="text-lg font-black text-fg">
+                {localized(locale, "어떤 환경에서 창작하나요?", "What kind of environment do you create in?")}
               </h2>
               <p className="mt-1 text-sm text-fg-2">
-                {localized(locale, "실력 등급이 아니라 안내 수준과 추천 콘텐츠를 조정하는 기준입니다.", "This is not a skill score. It only tunes guidance and recommendations.")}
+                {localized(locale, "계정 환경과 제작 경험을 분리해 설정합니다. 어떤 선택도 도구 접근 권한을 줄이지 않습니다.", "Set account context and creation experience separately. No choice removes tool access.")}
               </p>
-              <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {CREATOR_STAGE_IDS.map((id) => {
-                  const selected = stage === id;
+              <div className="mt-5 grid gap-2 md:grid-cols-3">
+                {CREATOR_ACCOUNT_CONTEXTS.map((id) => {
+                  const selected = accountContext === id;
+                  const copy = ACCOUNT_CONTEXT_COPY[id];
                   return (
                     <button
                       key={id}
                       type="button"
                       aria-pressed={selected}
-                      onClick={() => setStage(id)}
+                      onClick={() => setAccountContext(id)}
                       className={cn(
-                        "flex min-h-20 items-center justify-between gap-3 rounded-2xl border p-4 text-left transition-colors",
-                        selected ? "border-accent bg-accent-soft text-accent" : "border-line bg-panel text-fg hover:border-accent/35",
+                        "min-h-28 rounded-2xl border p-4 text-left transition-colors",
+                        selected ? "border-accent bg-accent-soft" : "border-line bg-panel hover:border-accent/35",
                       )}
                     >
-                      <span className="text-sm font-black">{creatorText(CREATOR_STAGE_LABELS[id], locale)}</span>
-                      {selected ? <Check size={16} aria-hidden="true" /> : null}
+                      <span className={cn("flex items-center justify-between gap-2 text-sm font-black", selected ? "text-accent" : "text-fg")}>
+                        {localized(locale, copy.ko, copy.en)}
+                        {selected ? <Check size={16} aria-hidden="true" /> : null}
+                      </span>
+                      <span className="mt-2 block text-[0.72rem] leading-5 text-fg-2">
+                        {localized(locale, copy.descriptionKo, copy.descriptionEn)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <h3 className="mt-7 text-sm font-black text-fg">
+                {localized(locale, "제작 경험은 어느 정도인가요?", "How much creation experience do you have?")}
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-fg-2">
+                {localized(locale, "학생·아마추어·프로 같은 신분이 아니라 필요한 안내 수준을 판단하기 위한 값입니다.", "This measures desired guidance, not whether you are a student, amateur or professional by identity.")}
+              </p>
+              <div className="mt-3 grid gap-2 md:grid-cols-3">
+                {CREATOR_EXPERIENCE_LEVELS.map((id) => {
+                  const selected = experienceLevel === id;
+                  const copy = EXPERIENCE_COPY[id];
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setExperienceLevel(id)}
+                      className={cn(
+                        "min-h-24 rounded-2xl border p-4 text-left transition-colors",
+                        selected ? "border-accent bg-accent-soft" : "border-line bg-panel hover:border-accent/35",
+                      )}
+                    >
+                      <span className={cn("flex items-center justify-between gap-2 text-sm font-black", selected ? "text-accent" : "text-fg")}>
+                        {localized(locale, copy.ko, copy.en)}
+                        {selected ? <Check size={16} aria-hidden="true" /> : null}
+                      </span>
+                      <span className="mt-2 block text-[0.72rem] leading-5 text-fg-2">
+                        {localized(locale, copy.descriptionKo, copy.descriptionEn)}
+                      </span>
                     </button>
                   );
                 })}
@@ -439,18 +554,29 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
                 {(["guided", "creator", "production"] as const).map((mode) => {
                   const selected = workspaceMode === mode;
                   const copy = MODE_COPY[mode];
+                  const recommended = recommendedWorkspaceMode === mode;
                   return (
                     <button
                       key={mode}
                       type="button"
                       aria-pressed={selected}
-                      onClick={() => setWorkspaceMode(mode)}
+                      onClick={() => {
+                        setModeTouched(true);
+                        setWorkspaceMode(mode);
+                      }}
                       className={cn(
                         "min-h-40 rounded-2xl border p-5 text-left transition-colors",
                         selected ? "border-accent bg-accent-soft" : "border-line bg-panel hover:border-accent/35",
                       )}
                     >
-                      <LayoutDashboard size={20} className={selected ? translateCurrentStaticSourceText("shared.components.CreatorAdaptiveOnboardingGate", "en", "text-accent") : translateCurrentStaticSourceText("shared.components.CreatorAdaptiveOnboardingGate", "en", "text-fg-3")} aria-hidden="true" />
+                      <div className="flex items-center justify-between gap-2">
+                        <LayoutDashboard size={20} className={selected ? translateCurrentStaticSourceText("shared.components.CreatorAdaptiveOnboardingGate", "en", "text-accent") : translateCurrentStaticSourceText("shared.components.CreatorAdaptiveOnboardingGate", "en", "text-fg-3")} aria-hidden="true" />
+                        {recommended ? (
+                          <span className="rounded-full border border-accent/30 bg-card px-2 py-1 text-[0.62rem] font-black text-accent">
+                            {localized(locale, "추천", "Recommended")}
+                          </span>
+                        ) : null}
+                      </div>
                       <span className={cn("mt-4 block text-base font-black", selected ? "text-accent" : "text-fg")}>{localized(locale, copy.ko, copy.en)}</span>
                       <span className="mt-2 block text-xs leading-5 text-fg-2">{localized(locale, copy.descriptionKo, copy.descriptionEn)}</span>
                     </button>
@@ -471,7 +597,8 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
               <div className="mt-5 overflow-hidden rounded-3xl border border-accent/30 bg-panel">
                 <div className="border-b border-line bg-accent-soft/40 p-5 sm:p-6">
                   <div className="flex flex-wrap gap-2 text-[0.7rem] font-bold">
-                    {stage ? <span className="rounded-full bg-card px-3 py-1 text-fg-2">{creatorText(CREATOR_STAGE_LABELS[stage], locale)}</span> : null}
+                    <span className="rounded-full bg-card px-3 py-1 text-fg-2">{localized(locale, ACCOUNT_CONTEXT_COPY[accountContext].ko, ACCOUNT_CONTEXT_COPY[accountContext].en)}</span>
+                    {experienceLevel ? <span className="rounded-full bg-card px-3 py-1 text-fg-2">{localized(locale, EXPERIENCE_COPY[experienceLevel].ko, EXPERIENCE_COPY[experienceLevel].en)}</span> : null}
                     {primaryDefinition ? <span className="rounded-full bg-accent px-3 py-1 text-on-accent">{creatorText(primaryDefinition.label, locale)}</span> : null}
                     <span className="rounded-full bg-card px-3 py-1 text-fg-2">{bi((MODE_COPY[workspaceMode]).ko, (MODE_COPY[workspaceMode]).en)}</span>
                   </div>
@@ -544,7 +671,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
             ) : (
               <button
                 type="button"
-                disabled={!stage || !primaryRole || saving}
+                disabled={!experienceLevel || !primaryRole || saving}
                 onClick={() => void complete()}
                 className={buttonClass({ size: "sm", className: "gap-1.5" })}
               >

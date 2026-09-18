@@ -19,6 +19,7 @@ const validDocument = {
     "deadline-risk": false,
   },
   usageGoals: ["team-production" as const],
+  accountContext: "studio" as const,
   workspaceMode: "creator" as const,
   capacity: {
     weeklyCapacityHours: 20,
@@ -44,6 +45,8 @@ describe("creator role workspace DTO", () => {
     expect(CreatorRoleWorkspaceDocumentSchema.parse(validDocument)).toEqual(
       validDocument,
     );
+    const { accountContext: _accountContext, ...legacyDocument } = validDocument;
+    expect(CreatorRoleWorkspaceDocumentSchema.parse(legacyDocument).accountContext).toBe("individual");
     expect(UpdateCreatorRoleWorkspaceSchema.parse({
       baseRevision: 2,
       document: validDocument,
