@@ -1082,6 +1082,30 @@ export class MembershipWalletService {
     );
   }
 
+  private async creatorLevelSignals(userId: string) {
+    const signals = await dbPool.query<{
+      verifiedCreator: boolean;
+      publishedWorks: string | number;
+      activityPoints: string | number;
+    }>(
+      `SELECT
+         EXISTS(SELECT 1 FROM creator_profile
+           WHERE "userId" = $1 AND "isVerifiedCreator" = true) AS "verifiedCreator",
+         (SELECT COUNT(*)::bigint FROM creator_work
+           WHERE "userId" = $1 AND status = 'published' AND hidden = false) AS "publishedWorks",
+         (SELECT COALESCE(SUM("grantedAmount"), 0)::bigint FROM wallet_lot
+           WHERE "userId" = $1 AND asset = 'reward_point'
+             AND source LIKE 'activity:%') AS "activityPoints"`,
+      [userId],
+    );
+    const metrics = {
+      verifiedCreator: signals.rows[0]?.verifiedCreator === true,
+      publishedWorks: asInt(signals.rows[0]?.publishedWorks ?? 0),
+      activityPoints: asInt(signals.rows[0]?.activityPoints ?? 0),
+    };
+    return { metrics, automaticLevel: automaticCreatorLevel(metrics) };
+  }
+
   private async resolveMembershipPlan(userId: string): Promise<MembershipPlanId> {
     const result = await dbPool.query<{ planId: string }>(
       `SELECT "planId"
