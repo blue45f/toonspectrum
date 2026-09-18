@@ -1,3 +1,5 @@
+import { useCallback } from "react";
+
 import {
   registerI18nEnglishSourceEntries,
   registerI18nLocaleEntries,
@@ -103,7 +105,10 @@ export function translateBilingualText(
  */
 export function useBilingualLocalizer(scope: string): (ko: string, en: string) => string {
   const t = useT();
-  return (ko, en) => translateBilingualText(t, scope, { ko, en });
+  return useCallback(
+    (ko: string, en: string) => translateBilingualText(t, scope, { ko, en }),
+    [scope, t],
+  );
 }
 
 function translateParallelNode(
