@@ -96,6 +96,7 @@ export type MembershipOverview = {
     manuallyManaged: boolean;
   };
   recentLedger: Array<{
+    asset: "reward_point" | "studio_credit";
     id: string;
     entryType: string;
     amount: number;
