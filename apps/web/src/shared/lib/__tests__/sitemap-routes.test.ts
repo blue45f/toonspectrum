@@ -3,11 +3,11 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-// 창작 표면(/create·/studio) 노출 불변식 — 차별화 표면이 사이트맵 색인이나
-// 홈 랜딩 동선에서 다시 빠지는 회귀를 막는다.
+const script = readFileSync(join(process.cwd(), "scripts/build-static-catalog.ts"), "utf8");
+const staticRoutes = script.match(/const STATIC_ROUTES = \[([\s\S]*?)\];/)?.[1] ?? "";
+
+// canonical 공개 표면이 사이트맵 색인에서 다시 빠지거나 utility URL이 섞이는 회귀를 막는다.
 describe("sitemap static routes", () => {
-  const script = readFileSync(join(process.cwd(), "scripts/build-static-catalog.ts"), "utf8");
-  const staticRoutes = script.match(/const STATIC_ROUTES = \[([\s\S]*?)\];/)?.[1] ?? "";
 
   it("keeps the Remotion brand film in the sitemap static routes", () => {
     expect(staticRoutes).toContain('"/brand-film"');
