@@ -14,7 +14,6 @@ import {
   automaticCreatorLevel,
   type ActivityPointKey,
   CREDIT_COST_POLICIES,
-  CREATOR_LEVEL_AUTO_POLICIES,
   type CreditFeatureKey,
   highestMembershipPlan,
   isActivityPointKey,
