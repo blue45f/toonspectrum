@@ -13,8 +13,8 @@ const projectGraph = vi.hoisted(() => ({
 }));
 
 vi.mock("../project-graph/studio-project-graph-client", () => ({
-  loadStudioProjectGraphByWork: projectGraph.loadByWork,
-  listStudioProjectRevisions: projectGraph.listRevisions,
+  getStudioProjectByWork: projectGraph.loadByWork,
+  listStudioArtifactRevisions: projectGraph.listRevisions,
 }));
 
 const NOW = "2026-09-17T00:00:00.000Z";

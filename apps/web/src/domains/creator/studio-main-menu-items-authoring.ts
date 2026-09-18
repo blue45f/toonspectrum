@@ -38,15 +38,12 @@ import type { StudioWebtoonCanvasPresetId } from "./studio-webtoon-canvas-preset
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
 import type { StudioMainMenuItem } from "./studio-main-menu-model";
 import { openStudioViewInspectionPanel } from "./studio-view-inspection-store";
-import { requestStudioShellFloatingLayoutManagerOpen } from "./studio-shell/studio-shell-floating-layout-events";
+import {
+  STUDIO_SHELL_FLOATING_LAYOUT_OPEN_EVENT,
+  requestStudioShellFloatingLayoutManagerOpen,
+} from "./studio-shell/studio-shell-floating-layout-events";
 
-export const STUDIO_SHELL_FLOATING_LAYOUT_OPEN_EVENT =
-  "toonspectrum:studio-shell-floating-layout-open";
-
-function requestStudioShellFloatingLayoutManagerOpen(): void {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(STUDIO_SHELL_FLOATING_LAYOUT_OPEN_EVENT));
-}
+export { STUDIO_SHELL_FLOATING_LAYOUT_OPEN_EVENT };
 
 const STUDIO_PLATFORM_CANVAS_MENU_ITEMS = [
   { id: "apply-webtoon-vertical", commandId: "canvas.apply-webtoon-vertical", presetId: "webtoon-vertical" },
