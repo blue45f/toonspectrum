@@ -1,8 +1,9 @@
 import {
   formatI18nTemplate,
-  resolveUiLocale,
-  translateBilingualValueForLocale,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
   translateCurrentStaticSourceText,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { useUserAi, userAiLegacySettings } from "@/shared/ai/user-ai-store";
 import { applyStudioTaskWorkspace, studioTaskWorkspaceId } from "./studio-task-workspace";
@@ -17,7 +18,6 @@ import { useStudioAdjustmentLayerCommands } from "./useStudioAdjustmentLayerComm
 import { StudioColorProofProvider } from "./color/StudioColorProofContext";
 import { createStudio2dCanvasImage } from "./studio-2d-source-size";
 import { useStudioSmartShapeEditing } from "./useStudioSmartShapeEditing";
-import { useStudioResumeCheckpoint } from "./useStudioResumeCheckpoint";
 import { useStudioRecentColors } from "./useStudioRecentColors";
 import { copyStudioSmartShapeSnapshot } from "./studio-smart-shape-copy";
 /** Editor host extracted from the /studio page entry.
@@ -1266,7 +1266,6 @@ import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-
 import { resolveStudioWorkspacePanelLayoutVisibility } from "./studio-workspace-presentation-layout";
 import {
   studio2dSurfaceNavigationHref,
-  studioWorkspaceDocumentIdentity,
   type Studio2dWorkspaceSurface,
   type StudioWorkspaceRoute,
 } from "./studio-workspace-route";
@@ -1456,12 +1455,6 @@ import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/compat/auth-session-store";
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
-
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("StudioCuttoonEditorHost", ko, en);
 
@@ -15435,9 +15428,6 @@ const puppetWarpArmed =
 
 ${qualityDirection}
 No text, logo, watermark, or copyrighted character.`;
-    const generatedName = assetPromptName.trim()
-      || prompt.split("\n")[0]?.trim().slice(0, 80)
-      || "AI 에셋";
     setAssetGenerating(true);
     setError(null);
     let operationId: string | null = null;
@@ -26098,14 +26088,14 @@ function clearSelectionForEdit() {
       openPixelSelectionTransform();
     }
   }
-  function openStudioQuickActionsAt(anchor: { x: number; y: number }): void {
+  const openStudioQuickActionsAt = useCallback((anchor: { x: number; y: number }): void => {
     setQuickActionsAnchor(anchor);
     setMobileSheet(null);
     setMenu(null);
     setColorWheelOpen(false);
     setQuickAccessPaletteOpen(false);
     setQuickActionsOpen(true);
-  }
+  }, []);
 
   function openStudioQuickActionsAtCanvasPointer(): void {
     const stage = stageRef.current;
