@@ -8,7 +8,7 @@ import {
 } from "./feedback-database-contract.mjs";
 
 const migration = readFileSync(
-  new URL("../apps/api/src/db/migrations/0069_supporter_payments.sql", import.meta.url),
+  new URL("../apps/api/src/db/migrations/0071_supporter_payments.sql", import.meta.url),
   "utf8",
 );
 const manifest = readFileSync(
@@ -35,9 +35,9 @@ test("supporter payment migration is private, bounded, and forward-only", () => 
 
 test("supporter migration remains managed exactly once", () => {
   expect(
-    manifest.filter((entry) => entry.endsWith("0069_supporter_payments.sql")),
+    manifest.filter((entry) => entry.endsWith("0071_supporter_payments.sql")),
   ).toHaveLength(1);
-  expect(manifest.indexOf("apps/api/src/db/migrations/0069_supporter_payments.sql"))
+  expect(manifest.indexOf("apps/api/src/db/migrations/0071_supporter_payments.sql"))
     .toBeLessThan(manifest.indexOf("apps/api/src/db/migrations/0070_commerce_payments.sql"));
 });
 

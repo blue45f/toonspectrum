@@ -70,7 +70,7 @@ describe("AdminRouter access and real route transitions", () => {
     ["/admin/overview", "overview:actor-a"], ["/admin/analytics/traffic", "traffic:actor-a"],
     ["/admin/users/members", "members:actor-a:admin"], ["/admin/trust/cases", "reports:actor-a"],
     ["/admin/trust/community", "community:actor-a:admin"], ["/admin/monetization/plans", "plans:actor-a"],
-    ["/admin/monetization/revenue", "revenue:actor-a"], ["/admin/monetization/funding", "campaigns:actor-a"],
+    ["/admin/monetization/revenue", "revenue:actor-a"], ["/admin/monetization/supporters", "supporters:actor-a"], ["/admin/monetization/creator-support", "creatorSupport:actor-a"], ["/admin/monetization/funding", "campaigns:actor-a"],
     ["/admin/growth/promotions", "promos:actor-a"], ["/admin/engagement/announcements", "announcements:actor-a"],
     ["/admin/platform/operations", "ops:actor-a"], ["/admin/security/access", "security:actor-a"],
     ["/admin/security/audit", "audit:actor-a"],

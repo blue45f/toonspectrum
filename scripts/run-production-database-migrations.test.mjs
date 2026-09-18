@@ -44,10 +44,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(69);
+  expect(manifest).toHaveLength(72);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0069_account_consolidation");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(69);
+  expect(manifest.at(-1).id).toBe("0072_creator_support_program");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(72);
 });
 
 test("applied studio media inference migration remains checksum-immutable", () => {

@@ -42,7 +42,7 @@ The monthly operating-cost progress is aggregate data only. Administrators can c
 
 ## Database and runtime permissions
 
-Migration `0069_supporter_payments.sql` creates:
+Migration `0071_supporter_payments.sql` creates:
 
 - `supporter_payment` — payment lifecycle, privacy choices, receipt URL, and idempotency metadata;
 - `supporter_funding_setting` — monthly goal and public-wall switch.
