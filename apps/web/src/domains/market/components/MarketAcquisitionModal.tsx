@@ -10,6 +10,9 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import type { MarketplaceCommerceQuote } from "@toonspectrum/core/commerce";
+
+import { getMarketplaceCommerceQuote } from "../commerce-api";
 import { useMarketLibrary } from "../hooks/use-market-library";
 import {
   resolveCurrentMarketAcquisitionRecord,
@@ -57,6 +60,8 @@ export function MarketAcquisitionModal({
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [versionNotice, setVersionNotice] = useState<string | null>(null);
+  const [quote, setQuote] = useState<MarketplaceCommerceQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [acquisition, setAcquisition] =
     useState<ResolvedMarketAcquisitionRecord | null>(null);
 
@@ -68,6 +73,8 @@ export function MarketAcquisitionModal({
     setCompleted(false);
     setError(null);
     setVersionNotice(null);
+    setQuote(null);
+    setQuoteLoading(false);
     setAcquisition(null);
 
     return () => {
@@ -75,6 +82,24 @@ export function MarketAcquisitionModal({
       acquisitionAbortRef.current = null;
     };
   }, [open, record.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    const resourceId = acquisition?.record.id ?? record.id;
+    setQuoteLoading(true);
+    void getMarketplaceCommerceQuote(resourceId, controller.signal)
+      .then((next) => {
+        if (!controller.signal.aborted) setQuote(next);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setQuote(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setQuoteLoading(false);
+      });
+    return () => controller.abort();
+  }, [acquisition?.record.id, open, record.id]);
 
   if (!open) return null;
 
@@ -125,6 +150,22 @@ export function MarketAcquisitionModal({
         setVersionNotice(
           `현재 공개 버전 v${resolved.record.resourceVersion}으로 설치 대상이 변경되었습니다. 최신 라이선스와 출처 조건을 확인한 뒤 다시 동의해 주세요.`,
         );
+        return;
+      }
+
+      const currentQuote = await getMarketplaceCommerceQuote(
+        resolved.record.id,
+        controller.signal,
+      );
+      setQuote(currentQuote);
+      if (currentQuote.checkoutRequired) {
+        if (!currentQuote.checkoutEnabled) {
+          setError("현재 유료 운영 중이지만 결제 공급자 설정이 아직 준비되지 않았습니다.");
+          return;
+        }
+        acquisitionAbortRef.current = null;
+        onClose();
+        navigate("/market/checkout/" + encodeURIComponent(resolved.record.id));
         return;
       }
 
@@ -276,10 +317,16 @@ export function MarketAcquisitionModal({
             <div className="space-y-2 rounded-xl border border-good/40 bg-good/10 p-3.5">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-semibold text-fg">이용 비용</span>
-                <span className="text-sm font-extrabold text-good">무료</span>
+                <span className="text-sm font-extrabold text-good">
+                  {quoteLoading
+                    ? "확인 중…"
+                    : quote?.checkoutRequired
+                      ? new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW", maximumFractionDigits: 0 }).format(quote.amount)
+                      : "무료"}
+                </span>
               </div>
               <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                비용은 없지만 사용권 조건은 적용됩니다. 상업 이용·수정·출처 표기 범위를 아래에서 확인하세요.
+                {quote?.policyNotice ?? "운영 정책과 사용권 조건을 함께 확인해 주세요. 상업 이용·수정·출처 표기 범위는 리소스별 라이선스를 따릅니다."}
               </p>
               <div className="border-t border-good/20 pt-2 text-xs text-fg-2">
                 <p className="flex items-center gap-1.5 font-semibold text-good">
@@ -332,7 +379,12 @@ export function MarketAcquisitionModal({
               <button
                 type="button"
                 onClick={() => void handleAcquire()}
-                disabled={!agreed || submitting}
+                disabled={
+                  !agreed
+                  || submitting
+                  || quoteLoading
+                  || Boolean(quote?.checkoutRequired && !quote.checkoutEnabled)
+                }
                 aria-busy={submitting || undefined}
                 title={!agreed ? "라이선스와 출처 조건을 확인하면 추가할 수 있습니다." : undefined}
                 className={buttonClass({
@@ -346,7 +398,9 @@ export function MarketAcquisitionModal({
                   ? "현재 버전 확인 중…"
                   : versionNotice
                     ? `현재 v${activeRecord.resourceVersion} 조건 확인 후 추가`
-                    : "내 에셋에 추가"}</span>
+                    : quote?.checkoutRequired
+                      ? "결제하고 내 에셋에 추가"
+                      : "내 에셋에 추가"}</span>
               </button>
             </div>
           </div>

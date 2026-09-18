@@ -96,7 +96,11 @@ Product copy uses **operating-cost support / 후원** as the primary term.
 It does not describe this flow as a tax-deductible statutory donation and does not promise donation receipts.
 Any tax, accounting, cash-receipt, or business-registration obligations for real receipts still depend on the actual operator/merchant setup and should be reviewed before live activation.
 
-## Deliberately excluded
+The admin ledger supports full cancellation for payment states that Toss can cancel without collecting additional sensitive data. Cancellation requests include an idempotency key.
+
+An already-deposited virtual-account payment is intentionally not auto-refunded from ToonSpectrum because Toss requires refund-account handling. Operators are directed to the Toss payment manager for that case, so the application does not collect or store bank refund credentials.
+
+## Tax and terminology boundary
 
 - recurring billing or supporter subscriptions;
 - feature-gated supporter tiers;
