@@ -2,7 +2,7 @@ import {
   TOONSPECTRUM_CSRF_HEADER,
   TOONSPECTRUM_CSRF_HEADER_VALUE,
   isCsrfProtectedMethod,
-} from "../../web/src/shared/lib/csrf";
+} from "@toonspectrum/contracts/security/csrf";
 
 import { allowedCorsOrigins } from "./config/cors";
 import { getSessionAuthenticationSource } from "./session-middleware";

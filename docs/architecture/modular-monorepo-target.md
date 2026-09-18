@@ -38,6 +38,12 @@ api   ─┘
 
 Applications must never import another application's source. `shared` must not depend on `domains`. Cross-domain deep imports are migration debt and should converge toward explicit public or integration boundaries.
 
+## Focused shared contracts
+
+packages/contracts is the narrow exception to application-local ownership. It contains only runtime-neutral contracts that have real cross-application consumers. The first migrated slice is security/csrf: constants and pure method classification are shared, while browser Headers/RequestInit helpers remain in Web.
+
+Do not use this package as a dumping ground or create packages/domains. A candidate must have at least two real deployable consumers and remain free of React, DOM, NestJS, database, storage, and transport implementation dependencies.
+
 ## Ratchet strategy
 
 `scripts/validate-app-boundaries.mjs` records boundary counts against `config/architecture-boundary-ratchet.json`. New cross-application dependencies and all new Admin boundary violations start with zero tolerance. Existing Web shared/domain and cross-domain debt is observed first; after a migration slice stabilizes, run the validator with `--write-baseline` and ratchet those budgets downward rather than performing a high-risk mass move.
