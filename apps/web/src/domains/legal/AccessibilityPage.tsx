@@ -1,8 +1,4 @@
-import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { Eye, Keyboard, MousePointer2, Move, Smartphone, Sparkles } from "lucide-react";
 
 import { AccessibilityLab } from "./AccessibilityLab";
@@ -11,7 +7,6 @@ import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("AccessibilityPage", ko, en);

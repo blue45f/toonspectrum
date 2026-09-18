@@ -1,9 +1,4 @@
-import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, ChevronDown, PenTool } from "lucide-react";
 import { useId } from "react";
 import { useLocation } from "react-router-dom";
@@ -12,7 +7,6 @@ import { siteArtDirection } from "./site-art-direction";
 import { SiteArtwork } from "./SiteArtwork";
 import Link from "@/compat/router-link";
 
-import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("SiteCreationCompass", ko, en);

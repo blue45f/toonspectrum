@@ -1,8 +1,4 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText, getActiveI18nLocale, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import {
   BriefcaseBusiness,
   Check,
@@ -38,11 +34,6 @@ import {
 } from "@/shared/lib/creator-role-contract";
 
 import { cn } from "@/shared/lib/utils";
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("CreatorRoleProfileEditor", ko, en);
@@ -64,7 +55,7 @@ const ROLE_GROUP_LABELS: Readonly<Record<CreatorRoleGroup, { ko: string; en: str
   production: { ko: "편집·운영", en: "Editorial & operations" },
 };
 
-function localized(_locale, ko: string, en: string): string {
+function localized(_locale: string, ko: string, en: string): string {
   return bi(ko, en);
 }
 

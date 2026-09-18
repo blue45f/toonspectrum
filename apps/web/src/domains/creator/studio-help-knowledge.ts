@@ -1,6 +1,4 @@
-import {
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale } from "@/shared/lib/i18n-bilingual-copy";
 import {
   normalizeStudioSearchText,
   studioSearchTextMatches,
@@ -8,9 +6,6 @@ import {
 } from "./studio-search-text";
 
 import type { StudioHelpCenterSection } from "./studio-help-center-channel";
-import {
-  translateBilingualValueForActiveLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("studio-help-knowledge", ko, en);
@@ -455,7 +450,7 @@ export const STUDIO_HELP_UPDATES: readonly StudioHelpUpdate[] = Object.freeze([
   },
 ]);
 
-export function studioHelpText(value: StudioHelpLocalizedText, _locale): string {
+export function studioHelpText(value: StudioHelpLocalizedText, _locale: string): string {
   return bi((value).ko, (value).en);
 }
 

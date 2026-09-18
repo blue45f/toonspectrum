@@ -1,10 +1,4 @@
-import {
-  formatI18nTemplate,
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Accessibility,
   ArrowRight,
@@ -20,22 +14,13 @@ import {
 } from "lucide-react";
 
 import { AboutSectionNav } from "./AboutSectionNav";
-import {
-  PRODUCT_DECISION_CHECKS,
-  PRODUCT_PRINCIPLE_GROUPS,
-  type ProductPrinciplesLocale,
-} from "./product-principles";
+import { PRODUCT_DECISION_CHECKS, PRODUCT_PRINCIPLE_GROUPS } from "./product-principles";
 
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
 import { Container } from "@/shared/components/section";
 
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("ProductPrinciplesPage", ko, en);

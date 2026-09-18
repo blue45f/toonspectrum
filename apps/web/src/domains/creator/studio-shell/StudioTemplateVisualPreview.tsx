@@ -13,10 +13,11 @@ import type {
   StudioTemplateLayoutKind,
 } from "../studio-template-system";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
-type Locale = string;
 
 export interface StudioTemplateVisualPreviewProps {
   readonly template: StudioTemplateCatalogItem;

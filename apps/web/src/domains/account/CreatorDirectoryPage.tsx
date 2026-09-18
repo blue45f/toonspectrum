@@ -25,7 +25,7 @@ import {
   type CreatorRoleId,
   type CreatorSpecialtyId,
 } from "@/shared/lib/creator-role-contract";
-import { cn } from "@/shared/lib/utils";
+
 
 const PAGE_SIZE = 24;
 

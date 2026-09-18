@@ -1,6 +1,4 @@
-import {
-  translateBilingualValueForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { Clock3, Heart, Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -15,10 +13,6 @@ import {
   SITE_ROUTE_PREFERENCES_EVENT,
   type RecentSiteRoute,
 } from "@/shared/lib/site-route-history";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("SiteDirectoryPersonalized", ko, en);

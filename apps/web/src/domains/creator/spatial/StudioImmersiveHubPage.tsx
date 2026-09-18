@@ -1,3 +1,4 @@
+import { useI18n } from "@/shared/lib/i18n";
 import {
   formatI18nTemplate,
   translateCurrentStaticSourceText,

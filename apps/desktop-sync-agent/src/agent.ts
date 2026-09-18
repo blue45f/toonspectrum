@@ -1,6 +1,7 @@
 import { DesktopSyncJournal } from "./journal.js";
 import { resolveBoundPath } from "./path-safety.js";
 import { scanDesktopBinding } from "./scanner.js";
+
 import type {
   DesktopFileSnapshot,
   DesktopSyncBinding,

@@ -1,14 +1,8 @@
-import {
-  translateBilingualValueForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, ClipboardCheck, Handshake, Scale, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioProductionCocreatorBridgePanel", ko, en);

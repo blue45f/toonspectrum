@@ -1,8 +1,4 @@
-import {
-  formatI18nTemplate,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, PenTool, Sparkles } from "lucide-react";
 
 import {
@@ -21,10 +17,6 @@ import { isPublicCreativeRoute } from "./site-public-routes";
 import "./public-site-shell.css";
 import { spectrumGradient } from "@/shared/lib/genre-color";
 import { useI18n, useT } from "@/shared/lib/i18n";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("site-footer", ko, en);

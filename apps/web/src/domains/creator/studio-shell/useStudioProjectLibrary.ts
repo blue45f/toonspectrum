@@ -1,8 +1,6 @@
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useT } from "@/shared/lib/i18n";
-import { defineBilingualText } from "@/shared/lib/i18n-bilingual-copy";
 
 import {
   STUDIO_PROJECT_LIBRARY_STORAGE_KEY,
@@ -21,7 +19,8 @@ import {
   type StudioProjectStatus,
 } from "../studio-project-library-store";
 
-type Locale = string;
+
+const STORAGE_ERROR = "이 기기에서 프로젝트 목록을 저장하지 못했습니다. 브라우저 저장 공간과 개인정보 보호 설정을 확인해 주세요.";
 
 export interface StudioProjectLibraryController {
   readonly state: StudioProjectLibraryState | null;
@@ -38,9 +37,6 @@ export interface StudioProjectLibraryController {
   readonly touch: (projectId: string, documentId?: string | null) => StudioProjectLibraryEntry | null;
 }
 
-function storageError(locale: Locale): string {
-  return bt("이 기기에서 프로젝트 목록을 저장하지 못했습니다. 브라우저 저장 공간과 개인정보 보호 설정을 확인해 주세요.", "The project list could not be stored on this device. Check browser storage and privacy settings.");
-}
 
 function eventState(value: unknown): StudioProjectLibraryState | null {
   if (!value || typeof value !== "object") return null;
@@ -79,7 +75,6 @@ export function useStudioProjectLibrary(
     };
     const handleStorage = (event: StorageEvent) => {
       if (event.storageArea === window.localStorage && event.key === STUDIO_PROJECT_LIBRARY_STORAGE_KEY) {
-  const bt = useBilingual("useStudioProjectLibrary");
         reload();
       }
     };

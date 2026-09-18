@@ -1,16 +1,10 @@
-import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { useState, type ReactNode, type Ref } from "react";
 
 import { SiteArtwork } from "./site-experience/SiteArtwork";
 import { ART_VIEW_LABELS, type ArtworkView } from "./site-experience/site-art-direction";
 
 import "./public-story-hero.css";
-import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("public-story-hero", ko, en);

@@ -1,7 +1,4 @@
-import {
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText, defineBilingualText, translateBilingualValueForActiveLocale, translateParallelBilingualCopy, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { SITE_URL } from "@toonspectrum/core";
 import {
   ArrowLeft,
@@ -24,12 +21,6 @@ import {
   useMetaDescription,
   usePageSocialMeta,
 } from "@/hooks/use-document-title";
-import {
-  defineBilingualText,
-  translateBilingualValueForActiveLocale,
-  translateParallelBilingualCopy,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { normalizeLocaleCode, useI18n, useT } from "@/shared/lib/i18n";
 
 import "./creator-home.css";

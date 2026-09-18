@@ -1,8 +1,4 @@
-import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
   CalendarDays,
@@ -25,7 +21,6 @@ import {
 } from "@/shared/components/purpose-experience-stage";
 
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("DiscoverHubPage", ko, en);

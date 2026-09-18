@@ -1,7 +1,4 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { AlertTriangle, CheckCircle2, FileUp, ShieldCheck } from "lucide-react";
 import { useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -21,10 +18,6 @@ import {
   studioImportHandoffHref,
   studioImportHandoffTargetForFormat,
 } from "../studio-import-handoff";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioImportIntake", ko, en);
@@ -42,7 +35,7 @@ function statusClasses(status: StudioImportPlanItem["status"]): string {
   return "border-danger/35 bg-danger/10 text-danger";
 }
 
-function statusLabel(status: StudioImportPlanItem["status"], _locale): string {
+function statusLabel(status: StudioImportPlanItem["status"], _locale: string): string {
   if (status === "accepted") return bi("바로 가져올 수 있음", "Ready to import");
   if (status === "review") return bi("변환 내용 확인 필요", "Review conversion");
   return bi("가져오기 차단", "Import blocked");

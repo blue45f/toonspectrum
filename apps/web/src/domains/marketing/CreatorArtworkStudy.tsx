@@ -1,16 +1,8 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowLeftRight, Brush, Grid2X2, Move3D, Pause, Play } from "lucide-react";
 import { useId, useState, type CSSProperties } from "react";
 
 import { CREATOR_ART_ASSETS, type CreatorArtAsset } from "./creator-theme-art";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("CreatorArtworkStudy", ko, en);

@@ -5,7 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
 import {
   createStudioTemplateHandoff,
@@ -15,11 +15,6 @@ import {
 import { StudioNewIntegratedPage as StudioProjectCreatePage } from "./StudioProjectCreatePage";
 import "./studio-new-visual-first.css";
 import "./studio-new-visual-gallery.css";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 
 /** Preserve template intent while the existing new-project flow creates the document identity. */

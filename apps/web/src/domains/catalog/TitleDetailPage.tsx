@@ -241,10 +241,10 @@ export function TitleDetailPage() {
           <div>
             <div className="flex flex-wrap items-center gap-1.5">
               <Badge tone="accent">{TYPE_LABEL[title.type]}</Badge>
-              <Badge tone={title.status === "completed" ? translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "en", "good") : title.status === "hiatus" ? translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "en", "warn") : translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "en", "neutral")}>
+              <Badge tone={title.status === "completed" ? "good" : title.status === "hiatus" ? "warn" : "neutral"}>
                 {STATUS_LABEL[title.status]}
               </Badge>
-              <Badge tone={title.ageRating === "19" ? translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "en", "bad") : translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "en", "neutral")}>{AGE_LABEL[title.ageRating]}</Badge>
+              <Badge tone={title.ageRating === "19" ? "bad" : "neutral"}>{AGE_LABEL[title.ageRating]}</Badge>
               {title.updateDays && title.updateDays.length > 0 && (
                 <Badge tone="cool">{title.updateDays.join("·")} {translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "연재")}</Badge>
               )}

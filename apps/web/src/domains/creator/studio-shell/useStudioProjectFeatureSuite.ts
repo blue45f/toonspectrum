@@ -1,6 +1,4 @@
-import {
-  translateBilingualValueForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -12,10 +10,6 @@ import {
   type StudioProjectFeatureSuiteUpdater,
 } from "../studio-project-feature-suite-store";
 import { matchesStudioProjectStorageEvent } from "../studio-project-storage-event";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("useStudioProjectFeatureSuite", ko, en);
@@ -27,7 +21,7 @@ export interface StudioProjectFeatureSuiteController {
   readonly reload: () => void;
 }
 
-function storageError(_locale): string {
+function storageError(_locale: string): string {
   return bi("이 기기에서 프로젝트 기능 변경 내용을 저장하지 못했습니다. 브라우저 저장 공간과 권한을 확인해 주세요.", "Project feature changes could not be stored on this device. Check browser storage space and permissions.");
 }
 

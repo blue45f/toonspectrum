@@ -1,5 +1,6 @@
-import type { StudioScopeRefV1 } from "./scope-ref";
 import { assertStudioScopeRef } from "./scope-ref";
+
+import type { StudioScopeRefV1 } from "./scope-ref";
 
 export const STUDIO_ARTIFACT_KINDS = [
   "story",

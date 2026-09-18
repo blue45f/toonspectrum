@@ -2,13 +2,8 @@ import { CloudUpload, Link2, Loader2 } from "lucide-react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useT } from "@/shared/lib/i18n";
-import {
-  defineBilingualText,
-  formatI18nTemplate,
-  translateBilingualMap,
-  type BilingualText,
-} from "@/shared/lib/i18n-bilingual-copy";
+
+
 
 import type {
   PersonalCloudConnectionStatus,
@@ -16,7 +11,6 @@ import type {
 } from "../save-first/personal-cloud-client";
 import type { PersonalCloudUploadProgress } from "../save-first/personal-cloud-upload";
 
-type Locale = string;
 
 interface ActiveUpload extends PersonalCloudUploadProgress {
   readonly provider: PersonalCloudProviderId;

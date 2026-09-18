@@ -1,6 +1,4 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, ArrowUpRight, BookOpen, Compass, Images, Store } from "lucide-react";
 import { useId } from "react";
 import { useLocation } from "react-router-dom";
@@ -10,10 +8,6 @@ import Link from "@/compat/router-link";
 import { nextPublicDestinations } from "./public-site-destinations";
 
 import "./public-site-experience.css";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("public-site-wayfinder", ko, en);

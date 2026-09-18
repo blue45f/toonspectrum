@@ -1,5 +1,6 @@
-import type { StudioScopeRefV1 } from "../graph/scope-ref";
 import { assertStudioScopeRef } from "../graph/scope-ref";
+
+import type { StudioScopeRefV1 } from "../graph/scope-ref";
 
 export interface StudioAssetLockEntryV1 {
   readonly version: 1;

@@ -1067,4 +1067,4 @@ export const ENGINEERING_VIDEO_FORMATS = [
   },
 ] as const;
 
-export const localize = <T extends LocalizedText>(copy: T, _locale): string => bi((copy).ko, (copy).en);
+export const localize = <T extends LocalizedText>(copy: T, _locale: string): string => bi((copy).ko, (copy).en);

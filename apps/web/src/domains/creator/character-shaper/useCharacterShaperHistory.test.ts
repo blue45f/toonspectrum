@@ -1,16 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  CHARACTER_SHAPER_HISTORY_LIMIT,
-  CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES,
-  characterShaperHistoryState,
-  estimateCharacterShaperHistoryEntryBytes,
-  createCharacterShaperHistory,
-  pushCharacterShaperHistory,
-  redoCharacterShaperHistory,
-  trimCharacterShaperHistoryEntries,
-  undoCharacterShaperHistory,
-} from "./useCharacterShaperHistory";
+import { CHARACTER_SHAPER_HISTORY_LIMIT, CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES, characterShaperHistoryState, estimateCharacterShaperHistoryEntryBytes, createCharacterShaperHistory, pushCharacterShaperHistory, redoCharacterShaperHistory, undoCharacterShaperHistory } from "./useCharacterShaperHistory";
 
 import type { CharacterShaperHistoryStack } from "./useCharacterShaperHistory";
 

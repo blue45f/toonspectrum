@@ -1,12 +1,7 @@
-import {
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale } from "@/shared/lib/i18n-bilingual-copy";
 import { normalizeLocaleCode } from "@/shared/lib/i18n-intl-utils";
 
 import type { VrmLibraryEntry } from "./vrm-library";
-import {
-  translateBilingualValueForActiveLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("studio-vrm-display-name", ko, en);

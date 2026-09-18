@@ -1,8 +1,4 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ChevronLeft,
   ChevronRight,
@@ -35,7 +31,6 @@ import { useEngineeringLocale } from "./use-engineering-locale";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
 import { cx } from "@/shared/lib/cx";
-import { translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringDeckPage", ko, en);
@@ -85,7 +80,7 @@ const chapterById = new Map<string, (typeof ENGINEERING_CHAPTERS)[number]>(
   ENGINEERING_CHAPTERS.map((chapter) => [chapter.id, chapter]),
 );
 
-function chapterSlide(chapterId: string, _locale): DeckSlide {
+function chapterSlide(chapterId: string, _locale: string): DeckSlide {
   const chapter = chapterById.get(chapterId);
   if (!chapter) throw new Error(`Unknown engineering chapter: ${chapterId}`);
   return {
@@ -107,7 +102,7 @@ const fieldNoteById = new Map<string, (typeof ENGINEERING_FIELD_NOTES)[number]>(
   ENGINEERING_FIELD_NOTES.map((note) => [note.id, note]),
 );
 
-function fieldNoteSlide(noteId: string, _locale): DeckSlide {
+function fieldNoteSlide(noteId: string, _locale: string): DeckSlide {
   const note = fieldNoteById.get(noteId);
   if (!note) throw new Error(`Unknown engineering field note: ${noteId}`);
   return {

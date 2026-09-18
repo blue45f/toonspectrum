@@ -1,16 +1,9 @@
-import {
-  translateBilingualValueForLocale,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, translateBilingualValueForActiveLocale } from "@/shared/lib/i18n-bilingual-copy";
 import type {
   CreatorContinuityLocale,
   CreatorDestinationId,
   CreatorRecentDestination,
 } from "./creator-continuity-model";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("creator-continuity-destinations", ko, en);

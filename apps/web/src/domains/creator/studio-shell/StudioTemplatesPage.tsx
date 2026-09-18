@@ -12,7 +12,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
+import { type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -31,7 +31,6 @@ import {
 import { planStudioTemplateApplication } from "../studio-template-system";
 import { StudioTemplateVisualPreview } from "./StudioTemplateVisualPreview";
 
-type Locale = string;
 
 const CATEGORY_LABELS: Readonly<
   Record<StudioTemplateCategory, BilingualText>
@@ -119,7 +118,7 @@ function TemplatePreview({
 
       <StudioTemplateVisualPreview
         template={template}
-        locale={legacyLocale}
+        locale={locale}
         showNavigation
         className="mt-4"
       />
@@ -228,7 +227,6 @@ function TemplatePreview({
 export function StudioTemplatesPage() {
   const bt = useBilingual("StudioTemplatesPage");
   const language = useI18n((state) => state.lang);
-  const locale = language;
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<StudioTemplateCategory>("all");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -352,7 +350,7 @@ export function StudioTemplatesPage() {
                       >
                         <StudioTemplateVisualPreview
                           template={template}
-                          locale={legacyLocale}
+                          locale={language}
                           compact
                         />
                       </button>
