@@ -9,6 +9,7 @@ import {
   studio2dResolutionLabel,
 } from "./studio-2d-asset-quality";
 import { studio2dImageSource } from "./studio-2d-image-source";
+import { StudioSurfaceState } from "./StudioSurfaceState";
 import { useStudio2dImageReadiness } from "./useStudio2dImageReadiness";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
@@ -70,12 +71,26 @@ export function Studio2dScenePreview({ scene, disabled, onPick, onClose }: {
               />
           </div>
           <div className="mt-3 space-y-2 text-xs leading-relaxed">
-            {status === "loading" && <p role="status">원본 이미지를 불러오는 중…</p>}
-            {status === "error" && <div role="alert" className="rounded-lg border border-bad/40 bg-bad/10 p-3 text-bad">
-              {state.reason === "timeout" ? "연결 또는 이미지 처리 시간이 초과되어 삽입할 수 없습니다." : "원본을 불러오지 못해 삽입할 수 없습니다."}
-              <button type="button" className="ml-2 underline" onClick={retryImage}>다시 불러오기</button>
-            </div>}
-            {mismatch && <p role="alert" className="text-bad">실제 이미지 크기({actualSize})가 검수 기록과 다릅니다. 이 파일은 재검수 전 삽입할 수 없습니다. <button type="button" className="ml-2 underline" onClick={retryImage}>다시 불러오기</button></p>}
+            {status === "loading" ? <StudioSurfaceState
+              state="loading" compact
+              visual={{ src: "/brand/theme-scenes/starlight-studio.svg", objectPosition: "center 45%" }}
+              title="원본 이미지를 확인하고 있어요"
+              description="픽셀 크기와 검수 기록을 맞춰 본 뒤 삽입할 수 있게 준비합니다."
+            /> : null}
+            {status === "error" ? <StudioSurfaceState
+              state="error" compact
+              visual={{ src: "/brand/theme-scenes/graphite-studio.svg", objectPosition: "center 48%" }}
+              title={state.reason === "timeout" ? "이미지 연결이 오래 걸리고 있어요" : "원본을 불러오지 못했어요"}
+              description={state.reason === "timeout" ? "연결 상태를 확인한 뒤 원본을 다시 불러와 주세요." : "원본을 다시 불러오면 현재 미리보기 설정은 그대로 유지됩니다."}
+              action={<button type="button" className="rounded-lg border border-current/25 bg-card/80 px-3 py-1.5 text-xs font-semibold text-fg hover:bg-raised" onClick={retryImage}>원본 다시 불러오기</button>}
+            /> : null}
+            {mismatch ? <StudioSurfaceState
+              state="blocked" announce="assertive" compact
+              visual={{ src: "/brand/theme-scenes/contrast-studio.svg", objectPosition: "center 46%" }}
+              title="원본 정보가 검수 기록과 달라요"
+              description={`실제 이미지 크기(${actualSize})가 검수 기록과 다릅니다. 이 파일은 재검수 전 삽입할 수 없습니다.`}
+              action={<button type="button" className="rounded-lg border border-current/25 bg-card/80 px-3 py-1.5 text-xs font-semibold text-fg hover:bg-raised" onClick={retryImage}>원본 다시 확인하기</button>}
+            /> : null}
             {metadata && <p className="text-fg-3">{metadata.environment} · {metadata.timeOfDay} · {metadata.containsPeople ? "인물 포함" : "인물 없는 배경"} · {isLargeStudio2dAsset(metadata) ? "큰 원본" : "소형 컷용 원본"}</p>}
             {metadata?.review.notes.map((note) => <p key={note} className="rounded-lg border border-line bg-raised p-2">{note}</p>)}
             {metadata?.provenance.licenseStatus === "cc0-verified" ? <p className="rounded-lg border border-line bg-raised p-2 text-fg-3">CC0 1.0 · {metadata.provenance.provider ?? "출처 확인 완료"} · 상업 이용과 수정이 가능한 출처 확인 소재입니다.</p>
