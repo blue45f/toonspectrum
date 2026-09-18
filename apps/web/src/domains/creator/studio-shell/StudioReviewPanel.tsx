@@ -30,6 +30,11 @@ import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bil
 import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const CURRENT_REVIEWER_ID = "project-owner";
 
@@ -62,6 +67,7 @@ function ReviewStat({
   readonly label: string;
   readonly value: string | number;
 }) {
+  useBilingualI18nRevision();
   return (
     <div className="rounded-xl border border-line bg-panel p-3">
       <p className="text-[0.65rem] text-fg-3">{label}</p>
@@ -72,7 +78,7 @@ function ReviewStat({
 
 function ReviewThreadCard({
   thread,
-  locale,
+  locale: _locale,
   canResolve,
   onResolve,
 }: {

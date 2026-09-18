@@ -32,6 +32,11 @@ import {
 import Link from "@/compat/router-link";
 import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const DESTINATION_LABELS: Readonly<
   Record<StudioAssetDestination, BilingualText>
@@ -136,6 +141,7 @@ function CheckOption({
   readonly description: string;
   readonly onChange: (checked: boolean) => void;
 }) {
+  useBilingualI18nRevision();
   const inputId = useId();
   const descriptionId = `${inputId}-description`;
 

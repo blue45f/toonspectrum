@@ -39,6 +39,11 @@ import {
   type StudioImmersiveStage,
 } from "./studio-immersive-workflows";
 import { SpatialWebtoonReaderLauncher } from "./SpatialWebtoonReaderLauncher";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 type Icon = ComponentType<{ size?: number; className?: string; "aria-hidden"?: boolean }>;
 
@@ -76,6 +81,7 @@ function supportTone(state: StudioImmersiveSupport): string {
 }
 
 function SupportGlyph({ state }: { readonly state: StudioImmersiveSupport }) {
+  useBilingualI18nRevision();
   return state === "supported"
     ? <CheckCircle2 size={16} aria-hidden />
     : <CircleAlert size={16} aria-hidden />;

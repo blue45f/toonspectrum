@@ -24,6 +24,11 @@ import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const EXPORT_TARGET_VISUALS: Readonly<Record<StudioExportTargetId, string>> = {
   "webtoon-platform": "/brand/theme-scenes/ink-studio.svg",

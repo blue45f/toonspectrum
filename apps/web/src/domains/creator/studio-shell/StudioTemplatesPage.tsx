@@ -29,6 +29,11 @@ import {
 } from "../studio-template-catalog";
 import { planStudioTemplateApplication } from "../studio-template-system";
 import { StudioTemplateVisualPreview } from "./StudioTemplateVisualPreview";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const CATEGORY_LABELS: Readonly<
   Record<StudioTemplateCategory, BilingualText>

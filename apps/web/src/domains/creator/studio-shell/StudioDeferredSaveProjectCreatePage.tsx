@@ -57,6 +57,12 @@ import {
   StudioTaskSummary,
   type StudioTaskFlowStep,
 } from "./StudioTaskFlow";
+import {
+  formatI18nTemplate,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const KIND_ICONS: Readonly<Record<StudioProjectKind, LucideIcon>> = {
   webtoon: PanelsTopLeft,

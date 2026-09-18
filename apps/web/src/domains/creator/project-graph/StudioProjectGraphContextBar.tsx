@@ -20,6 +20,12 @@ import {
   useStudioProjectGraph,
   type StudioProjectGraphStatus,
 } from "./useStudioProjectGraph";
+import {
+  formatI18nTemplate,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const STATUS_LABELS: Readonly<Record<StudioProjectGraphStatus, BilingualText>> = {
   loading: { ko: "작품 연결 확인 중", en: "Checking project connection" },
@@ -31,6 +37,7 @@ const STATUS_LABELS: Readonly<Record<StudioProjectGraphStatus, BilingualText>> =
 };
 
 function StatusGlyph({ status }: { readonly status: StudioProjectGraphStatus }) {
+  useBilingualI18nRevision();
   const className = status === "loading" ? "animate-spin" : undefined;
   if (status === "synced" || status === "cached") {
     return <Cloud size={15} aria-hidden="true" className={className} />;

@@ -12,6 +12,11 @@ import {
 import { readStudioProjectDocuments } from "../studio-project-document-reader";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-reader";
 import type { ThumbElement, ThumbPageLike } from "../studio-page-thumbs";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const MAX_PREVIEW_DOCUMENTS = 6;
 
@@ -151,6 +156,7 @@ function useNearViewport(): {
   readonly nearViewport: boolean;
   readonly rootRef: RefObject<HTMLDivElement | null>;
 } {
+  useBilingualI18nRevision();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [nearViewport, setNearViewport] = useState(
     () => typeof globalThis.IntersectionObserver !== "function",

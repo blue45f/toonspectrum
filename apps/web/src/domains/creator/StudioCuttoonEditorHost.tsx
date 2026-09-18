@@ -1439,12 +1439,20 @@ import { scheduleIdle } from "@/domains/auth/components/schedule-idle";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { useResizable } from "@/hooks/use-resizable";
 import { loadChunkWithReloadRecovery } from "@/shared/lib/chunk-load-recovery";
-import { useI18n, useT } from "@/shared/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-asset-contract";
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/compat/auth-session-store";
+import {
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioCuttoonEditorHost", ko, en);
 
 const StudioAiSuperSuiteModal = lazyRetry(studioAiSuperSuiteModalLoader.load, "StudioAiSuperSuiteModal");
 export function StudioCuttoonEditor({
@@ -1454,11 +1462,12 @@ export function StudioCuttoonEditor({
   readonly remixId: string | null;
   readonly studioRoute: StudioWorkspaceRoute;
 }) {
+  useBilingualI18nRevision();
   const navigate = useNavigate();
   const location = useLocation();
   const t = useT();
-  const studioLanguage = useI18n((state) => state.lang);
-  const studioSaveLocale = studioLanguage.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+
+  const studioSaveLocale = getActiveI18nLocale();
   const [params] = useSearchParams();
   const ecosystemSampleImportRef = useRef<string | null>(null);
   // Live-session identity (`?room=`, per-tab instant id) is owned by StudioDocumentLayout, one level
@@ -6510,6 +6519,7 @@ export function StudioCuttoonEditor({
     surface: "animation" | "bg3d" | "character" | "comic" | "poser",
     open: boolean,
   ): void {
+    useBilingualI18nRevision();
     useEffect(() => {
       const was = routedSurfacePanelSyncRef.current[surface];
       routedSurfacePanelSyncRef.current[surface] = open;
@@ -24181,9 +24191,7 @@ No text, logo, watermark, or copyrighted character.`;
   function openLocalStudioFormalSave(): boolean {
     const context = localStudioProjectForSave();
     if (!context) {
-      setError(studioSaveLocale === "ko"
-        ? "이 원고가 속한 프로젝트를 찾지 못했습니다. 내 작업에서 다시 열어 주세요."
-        : "The project for this document could not be found. Reopen it from My work.");
+      setError(bi("이 원고가 속한 프로젝트를 찾지 못했습니다. 내 작업에서 다시 열어 주세요.", "The project for this document could not be found. Reopen it from My work."));
       return false;
     }
     const profile = studioSaveProfileForProject(window.localStorage, context.project.id);
@@ -24198,9 +24206,7 @@ No text, logo, watermark, or copyrighted character.`;
     if (formalSaveInFlightRef.current || typeof window === "undefined") return;
     const context = localStudioProjectForSave();
     if (!context) {
-      setFormalSaveError(studioSaveLocale === "ko"
-        ? "프로젝트 정보를 읽지 못했습니다. 내 작업에서 다시 열어 주세요."
-        : "Project information could not be read. Reopen it from My work.");
+      setFormalSaveError(bi("프로젝트 정보를 읽지 못했습니다. 내 작업에서 다시 열어 주세요.", "Project information could not be read. Reopen it from My work."));
       return;
     }
     formalSaveInFlightRef.current = true;
@@ -24265,20 +24271,14 @@ No text, logo, watermark, or copyrighted character.`;
       setFormalSaveFirstSave(false);
       setFormalSaveOpen(false);
       announceDrawingShortcut(method === "file-picker"
-        ? studioSaveLocale === "ko"
-          ? "편집 가능한 프로젝트 원본을 저장했습니다."
-          : "Saved the editable project original."
-        : studioSaveLocale === "ko"
-          ? "편집 가능한 프로젝트 원본을 다운로드했습니다."
-          : "Downloaded the editable project original.");
+        ? bi("편집 가능한 프로젝트 원본을 저장했습니다.", "Saved the editable project original.")
+        : bi("편집 가능한 프로젝트 원본을 다운로드했습니다.", "Downloaded the editable project original."));
     } catch (cause) {
       if (!(cause instanceof DOMException && cause.name === "AbortError")) {
         formalSaveTargetRef.current = null;
         setFormalSaveError(cause instanceof Error && cause.message.trim()
           ? cause.message.trim().slice(0, 500)
-          : studioSaveLocale === "ko"
-            ? "프로젝트 원본을 저장하지 못했습니다. 임시 자동저장본은 유지됩니다."
-            : "The project original could not be saved. The temporary autosave remains available.");
+          : bi("프로젝트 원본을 저장하지 못했습니다. 임시 자동저장본은 유지됩니다.", "The project original could not be saved. The temporary autosave remains available."));
         setFormalSaveOpen(true);
       }
     } finally {
@@ -29730,7 +29730,7 @@ function clearSelectionForEdit() {
         <StudioFormalSaveDialog
           open={formalSaveOpen}
           locale={studioSaveLocale}
-          projectTitle={formalSaveProjectTitle || title || (studioSaveLocale === "ko" ? "제목 없는 프로젝트" : "Untitled project")}
+          projectTitle={formalSaveProjectTitle || title || (bi("제목 없는 프로젝트", "Untitled project"))}
           firstSave={formalSaveFirstSave}
           busy={formalSaveBusy}
           error={formalSaveError}

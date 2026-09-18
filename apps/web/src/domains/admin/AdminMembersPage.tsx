@@ -53,6 +53,13 @@ import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("AdminMembersPage", ko, en);
 
 interface MemberRow {
   id: string;
@@ -145,6 +152,7 @@ const formatDate = (value: string | null) =>
   value ? new Date(value).toLocaleString() : "—";
 
 export function AdminMembersPage() {
+  useBilingualI18nRevision();
   const t = useT();
   const lang = useI18n((state) => state.lang);
   useDocumentTitle(t("admin.members.title"));
@@ -195,6 +203,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
   selfId: string;
   canManageMembers: boolean;
 }) {
+  useBilingualI18nRevision();
   const [listRequests] = useState(() => new AdminRequestScope());
   const [detailRequests] = useState(() => new AdminRequestScope());
   const [refreshRevision, setRefreshRevision] = useState(0);
@@ -552,9 +561,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
     <div className="flex flex-col gap-4" aria-busy={loading || refreshing}>
       {!canManageMembers ? (
         <p role="status" className="rounded-xl border border-line bg-card/70 p-3 text-sm text-fg-2">
-          {lang === "ko"
-            ? "읽기 전용: 회원 조회와 내보내기는 가능하며, 역할·상태·삭제 변경은 관리자만 할 수 있어요."
-            : "Read only: you can view and export members. Only administrators can change roles, account status, or delete members."}
+          {bi("읽기 전용: 회원 조회와 내보내기는 가능하며, 역할·상태·삭제 변경은 관리자만 할 수 있어요.", "Read only: you can view and export members. Only administrators can change roles, account status, or delete members.")}
         </p>
       ) : null}
       <section className="rounded-2xl border border-line bg-card/70 p-4">

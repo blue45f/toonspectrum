@@ -11,6 +11,10 @@ import type { StudioAiAssistToolId } from "../ai/studio-ai-assist-ux";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 export type StudioProjectAssistantSection =
   | "overview"

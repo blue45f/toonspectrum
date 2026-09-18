@@ -18,6 +18,10 @@ import {
 } from "@/shared/lib/webtoon-production-onboarding";
 import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 function localizedLabel(
   options: readonly { readonly id: string; readonly labelKo: string; readonly labelEn: string }[],

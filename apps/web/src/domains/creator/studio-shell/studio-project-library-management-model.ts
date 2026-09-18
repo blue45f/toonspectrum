@@ -6,6 +6,13 @@ import type {
   StudioProjectKind,
   StudioProjectLibraryEntry,
 } from "../studio-project-library-store";
+import {
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("studio-project-library-management-model", ko, en);
 
 export type StudioProjectLibraryLocale = "ko" | "en";
 export type StudioProjectLibraryManagementView = "active" | "archived" | "trash";
@@ -49,8 +56,8 @@ export const STUDIO_PROJECT_KIND_LABELS: Readonly<
   animation: { ko: "애니메이션", en: "Animation" },
 };
 
-export function studioProjectLibraryLocale(language: string): StudioProjectLibraryLocale {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+export function studioProjectLibraryLocale(_language): StudioProjectLibraryLocale {
+  return getActiveI18nLocale();
 }
 
 export function resolveStudioProjectLibraryManagementView(
@@ -68,12 +75,12 @@ export function studioProjectLibraryManagementViewHref(
 
 export function studioProjectLibraryDateLabel(
   value: string | null,
-  locale: StudioProjectLibraryLocale,
+  _locale,
 ): string {
   if (!value || !Number.isFinite(Date.parse(value))) {
-    return locale === "ko" ? "아직 없음" : "Not yet";
+    return bi("아직 없음", "Not yet");
   }
-  return new Intl.DateTimeFormat(locale === "ko" ? "ko-KR" : "en-US", {
+  return new Intl.DateTimeFormat(getActiveI18nLocale(), {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -87,12 +94,12 @@ export function studioProjectIsTemporaryWork(profile: StudioSaveProfile): boolea
 
 export function studioProjectLibrarySearchText(
   project: StudioProjectLibraryEntry,
-  locale: StudioProjectLibraryLocale,
+  _locale,
 ): string {
   return [
     project.title,
     project.description,
-    STUDIO_PROJECT_KIND_LABELS[project.kind][locale],
+    bi((STUDIO_PROJECT_KIND_LABELS[project.kind]).ko, (STUDIO_PROJECT_KIND_LABELS[project.kind]).en),
   ].join(" ").toLocaleLowerCase();
 }
 

@@ -152,6 +152,7 @@ export function StudioSaveFirstProjectLibraryPage({
 }: {
   readonly initialView?: InitialLibraryView;
 }) {
+  useBilingualI18nRevision();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: session } = useSession();
   const l = useBilingualLocalizer("studioProjectLibrary");

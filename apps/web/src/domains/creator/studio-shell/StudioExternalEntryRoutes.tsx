@@ -16,6 +16,10 @@ import {
   studioExternalReviewHref,
   validateStudioExternalToken,
 } from "../studio-route-registry";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 type EntryKind = "join" | "present" | "review";
 
@@ -64,6 +68,7 @@ function InvalidExternalEntry({ kind }: { readonly kind: EntryKind }) {
 }
 
 function ExternalEntry({ kind }: { readonly kind: EntryKind }) {
+  useBilingualI18nRevision();
   const params = useParams<{
     inviteToken?: string;
     presentationToken?: string;
@@ -86,13 +91,16 @@ function ExternalEntry({ kind }: { readonly kind: EntryKind }) {
 }
 
 export function StudioExternalReviewRoute() {
+  useBilingualI18nRevision();
   return <ExternalEntry kind="review" />;
 }
 
 export function StudioExternalPresentationRoute() {
+  useBilingualI18nRevision();
   return <ExternalEntry kind="present" />;
 }
 
 export function StudioExternalJoinRoute() {
+  useBilingualI18nRevision();
   return <ExternalEntry kind="join" />;
 }

@@ -19,6 +19,10 @@ import {
   type StudioProjectLibraryState,
   type StudioProjectStatus,
 } from "../studio-project-library-store";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 export interface StudioProjectLibraryController {
   readonly state: StudioProjectLibraryState | null;

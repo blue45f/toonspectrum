@@ -25,6 +25,11 @@ import {
   resolveStudioAssetHubView,
   type AssetHubView,
 } from "./studio-asset-hub-view";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const CreatorEssentialsPage = lazy(() => import("./creator-essentials/CreatorEssentialsPage"));
 
@@ -104,6 +109,7 @@ function MissingProjectView({ view }: { readonly view: "safety" | "series-kit" }
 
 /** Render the one canonical Studio asset destination over existing server-backed capabilities. */
 export function StudioAssetHubPage() {
+  useBilingualI18nRevision();
   const [searchParams] = useSearchParams();
   const t = useT();
   const language = useI18n((state) => state.lang);

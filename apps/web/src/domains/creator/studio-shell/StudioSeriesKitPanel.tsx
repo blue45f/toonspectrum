@@ -13,6 +13,11 @@ import {
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 function numericValue(value: string, fallback: number): number {
   const parsed = Number(value);

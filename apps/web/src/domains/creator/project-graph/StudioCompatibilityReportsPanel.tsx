@@ -20,6 +20,11 @@ import {
 } from "./studio-project-graph-client";
 import type { CompatibilityReport } from "./studio-project-graph-contract";
 import { useStudioProjectGraph } from "./useStudioProjectGraph";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const GRADE_STYLES = Object.freeze({
   A: "border-success/30 bg-success-soft/30 text-success",

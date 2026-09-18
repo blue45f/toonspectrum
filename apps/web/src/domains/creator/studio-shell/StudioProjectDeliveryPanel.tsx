@@ -47,6 +47,11 @@ import {
 } from "./studio-platform-delivery-plan";
 import { useStudioProjectDocuments } from "./useStudioProjectDocuments";
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 type DeliveryView = "publish" | "package" | "archive";
 
@@ -164,6 +169,7 @@ function downloadJson(fileName: string, value: unknown): void {
 }
 
 function Metric({ label, value }: { readonly label: string; readonly value: string | number }) {
+  useBilingualI18nRevision();
   return (
     <div className="rounded-xl border border-line bg-panel p-3">
       <p className="text-[0.65rem] font-semibold text-fg-3">{label}</p>

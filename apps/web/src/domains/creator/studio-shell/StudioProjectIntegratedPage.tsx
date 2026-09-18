@@ -24,6 +24,10 @@ import {
   StudioProjectShellPage,
   type StudioProjectSection,
 } from "./StudioProjectShellPage";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const WEBTOON_ONBOARDING_PROFILE_PREFIX = "toonstudio:webtoon-onboarding:v1:";
 const LazyStudioWebtoonOnboardingPanel = lazy(async () => {
@@ -125,6 +129,7 @@ function SectionWorkflow({
   readonly view: string;
   readonly locale: string;
 }) {
+  useBilingualI18nRevision();
   const showDelivery = section === "export" || (section === "settings" && view === "archive");
 
   return (
@@ -197,6 +202,7 @@ export function StudioProjectIntegratedPage({
 }: {
   readonly section: StudioProjectSection;
 }) {
+  useBilingualI18nRevision();
   const { projectId = "" } = useParams<{ projectId: string }>();
   const location = useLocation();
   const language = useI18n((state) => state.lang);

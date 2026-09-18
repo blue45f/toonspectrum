@@ -14,6 +14,11 @@ import type {
   PersonalCloudProviderId,
 } from "../save-first/personal-cloud-client";
 import type { PersonalCloudUploadProgress } from "../save-first/personal-cloud-upload";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 interface ActiveUpload extends PersonalCloudUploadProgress {
   readonly provider: PersonalCloudProviderId;

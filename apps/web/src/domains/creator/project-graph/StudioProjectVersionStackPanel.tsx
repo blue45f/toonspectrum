@@ -27,6 +27,12 @@ import type {
 } from "./studio-project-graph-contract";
 import { getStudioProjectGraphDeviceId } from "./studio-project-graph-device";
 import { useStudioProjectGraph } from "./useStudioProjectGraph";
+import {
+  formatI18nTemplate,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const KIND_LABELS: Readonly<Record<StudioRevisionRecord["kind"], BilingualText>> = {
   autosave: { ko: "자동 저장", en: "Autosave" },

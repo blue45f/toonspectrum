@@ -103,6 +103,7 @@ function FeatureCard({
   readonly description: string;
   readonly children: ReactNode;
 }) {
+  useBilingualI18nRevision();
   return (
     <section className="rounded-3xl border border-line bg-card p-4 shadow-sm sm:p-6">
       <div className="flex items-start gap-3">
@@ -121,6 +122,7 @@ function FeatureCard({
 }
 
 function Metric({ label, value }: { readonly label: string; readonly value: string | number }) {
+  useBilingualI18nRevision();
   return (
     <div className="rounded-xl border border-line bg-panel p-3">
       <p className="text-[0.65rem] font-semibold text-fg-3">{label}</p>

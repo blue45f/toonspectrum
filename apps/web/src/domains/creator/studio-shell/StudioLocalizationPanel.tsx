@@ -30,6 +30,11 @@ import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bil
 import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 interface LayoutDraft {
   sourceRemoved: boolean;

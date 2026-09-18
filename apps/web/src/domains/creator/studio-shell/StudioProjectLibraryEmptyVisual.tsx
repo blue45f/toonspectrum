@@ -10,6 +10,10 @@ import {
 } from "@/shared/lib/i18n-bilingual-copy";
 
 import "./studio-project-library-empty-visual.css";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const COPY = {
   ko: {

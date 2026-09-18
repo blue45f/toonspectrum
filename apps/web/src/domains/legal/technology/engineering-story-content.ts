@@ -2,6 +2,12 @@ import {
   ENGINEERING_DEEP_DIVE_CHAPTERS,
   ENGINEERING_DEEP_DIVE_GUIDES,
 } from "./engineering-story-deep-dive-content";
+import {
+  translateBilingualValueForActiveLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("engineering-story-content", ko, en);
 
 export type EngineeringLocale = "ko" | "en";
 
@@ -1061,4 +1067,4 @@ export const ENGINEERING_VIDEO_FORMATS = [
   },
 ] as const;
 
-export const localize = <T extends LocalizedText>(copy: T, locale: EngineeringLocale): string => copy[locale];
+export const localize = <T extends LocalizedText>(copy: T, _locale): string => bi((copy).ko, (copy).en);
