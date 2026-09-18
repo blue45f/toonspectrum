@@ -351,27 +351,10 @@ function cloneJson<T extends JsonValue>(value: T): T {
   return value;
 }
 
-function assertSafeJsonPointerSegment(segment: string, pointer: string): void {
-  if (segment === "__proto__" || segment === "constructor" || segment === "prototype") {
-    throw new Error(`unsafe JSON pointer segment in ${pointer}`);
-  }
-}
-
-function hasOwnJsonProperty(object: { [key: string]: JsonValue }, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(object, key);
-}
-
 function pointerSegments(pointer: string): string[] {
   if (pointer === "") return [];
   if (!pointer.startsWith("/")) throw new Error(`invalid JSON pointer ${pointer}`);
-  return pointer
-    .slice(1)
-    .split("/")
-    .map((encodedSegment) => {
-      const segment = encodedSegment.replace(/~1/gu, "/").replace(/~0/gu, "~");
-      assertSafeJsonPointerSegment(segment, pointer);
-      return segment;
-    });
+  return pointer.slice(1).split("/").map((segment) => segment.replace(/~1/gu, "/").replace(/~0/gu, "~"));
 }
 
 function readPointer(root: JsonValue, pointer: string): JsonValue {
@@ -383,7 +366,7 @@ function readPointer(root: JsonValue, pointer: string): JsonValue {
       if (value === undefined) throw new Error(`missing JSON pointer ${pointer}`);
       current = value;
     } else if (current !== null && typeof current === "object") {
-      if (!hasOwnJsonProperty(current, segment)) throw new Error(`missing JSON pointer ${pointer}`);
+      if (!(segment in current)) throw new Error(`missing JSON pointer ${pointer}`);
       current = current[segment] as JsonValue;
     } else {
       throw new Error(`JSON pointer traverses a primitive at ${pointer}`);
@@ -414,15 +397,8 @@ function writePointer(
     }
     return root;
   }
-  if (mode === "replace" && !hasOwnJsonProperty(parent, key)) {
-    throw new Error(`missing JSON pointer ${pointer}`);
-  }
-  Object.defineProperty(parent, key, {
-    configurable: true,
-    enumerable: true,
-    value,
-    writable: true,
-  });
+  if (mode === "replace" && !(key in parent)) throw new Error(`missing JSON pointer ${pointer}`);
+  parent[key] = value;
   return root;
 }
 
@@ -435,7 +411,7 @@ function removePointer(root: JsonValue, pointer: string): JsonValue {
     if (parent[index] === undefined) throw new Error(`missing JSON pointer ${pointer}`);
     parent.splice(index, 1);
   } else {
-    if (!hasOwnJsonProperty(parent, key)) throw new Error(`missing JSON pointer ${pointer}`);
+    if (!(key in parent)) throw new Error(`missing JSON pointer ${pointer}`);
     delete parent[key];
   }
   return root;
@@ -454,7 +430,6 @@ function resolveParent(
       if (next === undefined) throw new Error(`missing JSON pointer ${pointer}`);
       parent = next;
     } else if (parent !== null && typeof parent === "object") {
-      if (!hasOwnJsonProperty(parent, segment)) throw new Error(`missing JSON pointer ${pointer}`);
       const next = parent[segment];
       if (next === undefined) throw new Error(`missing JSON pointer ${pointer}`);
       parent = next;
