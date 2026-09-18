@@ -5,6 +5,11 @@ const ACTIVE_EVENTS = new Set(["push", "pull_request", "dynamic"]);
 const ACTIVE_STATUSES = ["pending", "queued", "in_progress"];
 const WAITING_STATUSES = new Set(["pending", "queued"]);
 const DEFAULT_STALE_QUEUED_AFTER_MS = 6 * 60 * 60 * 1_000;
+const CODEQL_DEFAULT_SETUP_WORKFLOW_PATH = "dynamic/github-code-scanning/codeql";
+
+function isProtectedDefaultSetupRun(run) {
+  return run.event === "dynamic" && run.path === CODEQL_DEFAULT_SETUP_WORKFLOW_PATH;
+}
 
 export function selectSupersededActionsRuns(
   runs,
@@ -18,7 +23,9 @@ export function selectSupersededActionsRuns(
 ) {
   const current = Number(currentRunId);
   const active = runs.filter((run) =>
-    Number(run.id) !== current && ACTIVE_EVENTS.has(run.event),
+    Number(run.id) !== current &&
+    ACTIVE_EVENTS.has(run.event) &&
+    !isProtectedDefaultSetupRun(run),
   );
 
   const groups = new Map();
