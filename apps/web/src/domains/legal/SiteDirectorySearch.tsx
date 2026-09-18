@@ -1,8 +1,10 @@
 import {
   formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
   translateLocaleBranchForLocale,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, Heart, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -29,7 +31,6 @@ import type {
   SiteRouteProduct,
   SiteRoutePurpose,
 } from "@/shared/lib/site-route-metadata";
-import { translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("SiteDirectorySearch", ko, en);
