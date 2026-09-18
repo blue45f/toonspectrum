@@ -10,11 +10,11 @@ import {
 describe("Studio Subscription Entitlements & Quota Monitor", () => {
   it("derives tier entitlements from the canonical membership policy", () => {
     const freeSpec = getTierEntitlements("free");
-    expect(freeSpec.maxStorageMb).toBe(5_000);
+    expect(freeSpec.maxStorageMb).toBe(10_000);
     expect(freeSpec.allowWebGpuExport).toBe(false);
 
     const creatorSpec = getTierEntitlements("creator");
-    expect(creatorSpec.maxStorageMb).toBe(25_000);
+    expect(creatorSpec.maxStorageMb).toBe(100_000);
     expect(creatorSpec.allowWebGpuExport).toBe(true);
   });
 
@@ -22,7 +22,7 @@ describe("Studio Subscription Entitlements & Quota Monitor", () => {
     const state: SubscriptionUsageState = {
       userIdOrOrgId: "user_free",
       tier: "free",
-      currentStorageMbUsed: 3_900,
+      currentStorageMbUsed: 7_900,
       currentAiTokensUsed: 0,
       currentCollabSeatsActive: 1,
     };
@@ -36,7 +36,7 @@ describe("Studio Subscription Entitlements & Quota Monitor", () => {
 
     const checkBlock = checkActionEntitlement(state, {
       type: "consume-storage",
-      requestedMb: 1_200,
+      requestedMb: 2_200,
     });
     expect(checkBlock.allowed).toBe(false);
     expect(checkBlock.reason).toContain("초과");

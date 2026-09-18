@@ -1,8 +1,8 @@
 import {
   formatI18nTemplate,
-  translateBilingualValueForLocale,
+  translateBilingualValueForActiveLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
@@ -32,10 +32,6 @@ import { useEngineeringLocale } from "./use-engineering-locale";
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringStoryPage", ko, en);

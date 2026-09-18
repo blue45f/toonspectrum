@@ -9,6 +9,8 @@ type PolicyState = {
   economy: {
     mode: string;
     paymentsEnabled: boolean;
+    studioCreditsEnabled: boolean;
+    membershipCreditsEnabled: boolean;
     creditPurchasesEnabled: boolean;
   };
   plans: Array<{
@@ -42,6 +44,11 @@ type UserOverview = {
   };
   wallet: {
     points: {
+      available: number;
+      lifetimeGranted: number;
+      lifetimeSpent: number;
+    };
+    studioCredits: {
       available: number;
       lifetimeGranted: number;
       lifetimeSpent: number;
@@ -308,10 +315,11 @@ export function AdminMembershipPolicy({ uid }: { uid: string }) {
 
           {user ? (
             <div className="mt-4 space-y-4">
-              <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
                 {[
                   ["멤버십", user.membership.planId],
                   ["포인트", user.wallet.points.available.toLocaleString() + " P"],
+                  ["Credit", user.wallet.studioCredits.available.toLocaleString() + " C"],
                   ["Trust", user.levels.trustLevel],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-xl border border-line bg-card/45 p-3">

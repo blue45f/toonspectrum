@@ -6,11 +6,14 @@ export type WalletAsset = (typeof WALLET_ASSETS)[number];
 export const PUBLIC_WALLET_ASSET = "reward_point" as const;
 
 export const MEMBERSHIP_ECONOMY_POLICY = Object.freeze({
-  mode: "activity-points" as const,
+  mode: "dual-wallet-beta" as const,
   paymentsEnabled: false,
+  studioCreditsEnabled: true,
+  membershipCreditsEnabled: true,
   creditPurchasesEnabled: false,
   publicAsset: PUBLIC_WALLET_ASSET,
-  pointExpiryDays: null,
+  pointExpiryDays: 365,
+  purchasedCreditExpiryDays: null,
   fairUseLimitsApplyDuringBeta: true,
 });
 
@@ -23,6 +26,39 @@ export const MEMBER_CREATOR_LEVELS = [
   "partner",
 ] as const;
 export type MemberCreatorLevel = (typeof MEMBER_CREATOR_LEVELS)[number];
+
+export interface CreatorLevelMetrics {
+  readonly verifiedCreator: boolean;
+  readonly publishedWorks: number;
+  readonly activityPoints: number;
+}
+
+export const CREATOR_LEVEL_AUTO_POLICIES = Object.freeze({
+  new: { verifiedCreator: false, publishedWorks: 0, activityPoints: 0 },
+  verified: { verifiedCreator: true, publishedWorks: 0, activityPoints: 0 },
+  active: { verifiedCreator: true, publishedWorks: 1, activityPoints: 300 },
+  trusted: { verifiedCreator: true, publishedWorks: 5, activityPoints: 1_500 },
+  professional: { verifiedCreator: true, publishedWorks: 20, activityPoints: 5_000 },
+} as const);
+
+export function automaticCreatorLevel(
+  metrics: CreatorLevelMetrics,
+): Exclude<MemberCreatorLevel, "partner"> {
+  if (!metrics.verifiedCreator) return "new";
+  if (
+    metrics.publishedWorks >= CREATOR_LEVEL_AUTO_POLICIES.professional.publishedWorks
+    && metrics.activityPoints >= CREATOR_LEVEL_AUTO_POLICIES.professional.activityPoints
+  ) return "professional";
+  if (
+    metrics.publishedWorks >= CREATOR_LEVEL_AUTO_POLICIES.trusted.publishedWorks
+    && metrics.activityPoints >= CREATOR_LEVEL_AUTO_POLICIES.trusted.activityPoints
+  ) return "trusted";
+  if (
+    metrics.publishedWorks >= CREATOR_LEVEL_AUTO_POLICIES.active.publishedWorks
+    && metrics.activityPoints >= CREATOR_LEVEL_AUTO_POLICIES.active.activityPoints
+  ) return "active";
+  return "verified";
+}
 
 export const MEMBER_TRUST_LEVELS = [
   "new",
@@ -55,6 +91,8 @@ export const MEMBERSHIP_ENTITLEMENT_KEYS = [
   "collaboration.videoPeers",
   "collaboration.canvasPeers",
   "ai.monthlyTokens",
+  "credit.monthlyIncluded",
+  "credit.dailyLimit",
   "market.sell",
   "market.bulkUpload",
   "export.highResolution",
@@ -84,20 +122,22 @@ export const MEMBERSHIP_PLAN_POLICIES = Object.freeze({
     label: "Free",
     description: "기본 창작·커뮤니티 기능과 개인 작업을 위한 시작 등급",
     entitlements: {
-      "storage.bytes": 5 * GB,
+      "storage.bytes": 10 * GB,
       "storage.warningRatio": 0.8,
       "upload.file.maxBytes": 250 * MB,
       "upload.daily.maxBytes": 2 * GB,
-      "upload.concurrent": 2,
+      "upload.concurrent": 3,
       "canvas.maxHeightPx": 10_000,
       "render.concurrent": 1,
       "retention.versionsDays": 30,
-      "retention.trashDays": 14,
+      "retention.trashDays": 30,
       "collaboration.members": 3,
       "collaboration.viewers": 20,
       "collaboration.videoPeers": 4,
       "collaboration.canvasPeers": 10,
       "ai.monthlyTokens": 100,
+      "credit.monthlyIncluded": 500,
+      "credit.dailyLimit": 150,
       "market.sell": false,
       "market.bulkUpload": false,
       "export.highResolution": false,
@@ -111,7 +151,7 @@ export const MEMBERSHIP_PLAN_POLICIES = Object.freeze({
     label: "Creator",
     description: "꾸준히 작품을 제작·공개하는 개인 창작자를 위한 운영 등급",
     entitlements: {
-      "storage.bytes": 25 * GB,
+      "storage.bytes": 100 * GB,
       "storage.warningRatio": 0.8,
       "upload.file.maxBytes": 1 * GB,
       "upload.daily.maxBytes": 10 * GB,
@@ -125,6 +165,8 @@ export const MEMBERSHIP_PLAN_POLICIES = Object.freeze({
       "collaboration.videoPeers": 6,
       "collaboration.canvasPeers": 25,
       "ai.monthlyTokens": 2_000,
+      "credit.monthlyIncluded": 2_000,
+      "credit.dailyLimit": 500,
       "market.sell": true,
       "market.bulkUpload": false,
       "export.highResolution": true,
@@ -138,7 +180,7 @@ export const MEMBERSHIP_PLAN_POLICIES = Object.freeze({
     label: "Pro",
     description: "고용량 제작·배포와 고급 협업을 위한 전문 창작자 등급",
     entitlements: {
-      "storage.bytes": 100 * GB,
+      "storage.bytes": 500 * GB,
       "storage.warningRatio": 0.8,
       "upload.file.maxBytes": 2 * GB,
       "upload.daily.maxBytes": 30 * GB,
@@ -152,6 +194,8 @@ export const MEMBERSHIP_PLAN_POLICIES = Object.freeze({
       "collaboration.videoPeers": 10,
       "collaboration.canvasPeers": 50,
       "ai.monthlyTokens": 10_000,
+      "credit.monthlyIncluded": 5_000,
+      "credit.dailyLimit": 1_500,
       "market.sell": true,
       "market.bulkUpload": true,
       "export.highResolution": true,
@@ -165,7 +209,7 @@ export const MEMBERSHIP_PLAN_POLICIES = Object.freeze({
     label: "Team",
     description: "스튜디오·팀 단위 장기 제작과 다인 협업을 위한 최상위 운영 등급",
     entitlements: {
-      "storage.bytes": 500 * GB,
+      "storage.bytes": 1_000 * GB,
       "storage.warningRatio": 0.8,
       "upload.file.maxBytes": 5 * GB,
       "upload.daily.maxBytes": 100 * GB,
@@ -179,6 +223,8 @@ export const MEMBERSHIP_PLAN_POLICIES = Object.freeze({
       "collaboration.videoPeers": 12,
       "collaboration.canvasPeers": 100,
       "ai.monthlyTokens": 50_000,
+      "credit.monthlyIncluded": 20_000,
+      "credit.dailyLimit": 5_000,
       "market.sell": true,
       "market.bulkUpload": true,
       "export.highResolution": true,
@@ -298,8 +344,9 @@ function credit(
 }
 
 /**
- * Future/internal cost model only. These values are intentionally not exposed as
- * a purchasable user wallet while MEMBERSHIP_ECONOMY_POLICY.creditPurchasesEnabled is false.
+ * Studio Credit cost catalog for operator-funded features. Current BYOK,
+ * personal-runtime and browser-local work must not consume this wallet.
+ * Purchases stay disabled while creditPurchasesEnabled is false.
  */
 export const CREDIT_COST_POLICIES = Object.freeze({
   "ai.text.generate": credit("ai.text.generate", "AI text generation", 1, 1, 20),

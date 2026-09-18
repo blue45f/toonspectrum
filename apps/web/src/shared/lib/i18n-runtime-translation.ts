@@ -4,6 +4,7 @@ import {
 } from "./i18n-asset-loader";
 import {
   DICT,
+  FALLBACK_LANG,
   getI18nRuntimeTranslationSources,
   triggerTranslationBundleUpdate,
 } from "./i18n-core";
@@ -70,6 +71,16 @@ function getTranslatorLocaleCandidates(locale: string): string[] {
     if (translatorLocale) candidates.add(translatorLocale);
   }
   return [...candidates];
+}
+
+function shouldAutoTranslateLocale(locale: string): boolean {
+  const normalized = normalizeLocaleCode(locale);
+  if (!normalized) return false;
+
+  // Korean is the complete product fallback dictionary and never needs machine translation.
+  // English remains eligible so Korean-authored static UI added by lazy Studio modules can be
+  // translated into English; source/target root equality is filtered per key below.
+  return normalized.split("-")[0] !== FALLBACK_LANG;
 }
 
 
@@ -271,9 +282,9 @@ function getAttemptedKeys(locale: string): Set<string> {
 }
 
 /**
- * Runtime translation sources carry their authored source locale. Existing app/Admin/Studio
- * dictionaries use English, while legacy static JSX can register Korean directly without sending
- * user-generated DOM text to the translator.
+ * Returns registered runtime source keys that still need automatic translation. Each source keeps
+ * its authored locale so lazy Studio surfaces can translate Korean-authored static copy without
+ * mislabeling that text as English or sending user-generated DOM text to the translator.
  */
 type RuntimeTranslationPendingEntry = {
   readonly key: string;
@@ -285,7 +296,7 @@ function getRuntimeTranslationPendingEntries(
   locale: string,
 ): readonly RuntimeTranslationPendingEntry[] {
   const normalized = normalizeLocaleCode(locale);
-  if (!normalized) return [];
+  if (!normalized || !shouldAutoTranslateLocale(normalized)) return [];
 
   const targetRoot = normalized.split("-")[0];
   const targetDictionary = getLocaleDictionary(normalized);
