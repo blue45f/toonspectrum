@@ -15086,7 +15086,7 @@ const puppetWarpArmed =
   const writerRoomAiAbortRef = useRef<AbortController | null>(null);
   useEffect(() => () => writerRoomAiAbortRef.current?.abort(), []);
   const configuredServerAiProviders = useMemo(
-    () => serverAiStatus?.providers.filter((provider) => provider.configured) ?? [],
+    () => (serverAiStatus?.providers ?? []).filter((provider) => provider.configured),
     [serverAiStatus]
   );
   const activeServerAiProviderLabel = resolveActiveServerAiProviderLabel(serverAiProvider, serverAiStatus);
