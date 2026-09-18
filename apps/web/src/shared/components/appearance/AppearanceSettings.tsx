@@ -1,6 +1,7 @@
 import { Check, Monitor, RotateCcw, Sparkles } from "lucide-react";
 import { useId, useState } from "react";
 
+import { CreatorExperienceModeSwitch } from "@/shared/components/CreatorExperienceModeSwitch";
 import { useI18n } from "@/shared/lib/i18n";
 import { useTheme } from "@/shared/lib/theme";
 import { getThemeSceneAsset } from "@/shared/lib/theme-scene-assets";
@@ -40,6 +41,13 @@ export function AppearanceSettings({ initialScope = "site" }: { initialScope?: A
 
   return (
     <div className="appearance-settings">
+      <section className="appearance-experience-mode" aria-labelledby={`${id}-experience`}>
+        <div>
+          <h3 id={`${id}-experience`}>{korean ? "홈 경험" : "Home experience"}</h3>
+          <p>{korean ? "현재 메인을 유지하거나 협업 공간 중심의 Virtual Studio 홈으로 전환합니다. 기능과 데이터는 동일하게 연결됩니다." : "Keep the current home or switch to the collaboration-first Virtual Studio home. Both views share the same tools and data."}</p>
+        </div>
+        <CreatorExperienceModeSwitch />
+      </section>
       <div className="appearance-scope" role="group" aria-label={korean ? "테마 적용 범위" : "Theme scope"}>
         {(["site", "studio"] as const).map((value) => (
           <button key={value} type="button" aria-pressed={scope === value} onClick={() => setScope(value)}>
