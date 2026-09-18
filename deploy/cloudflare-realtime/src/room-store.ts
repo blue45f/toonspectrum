@@ -1986,20 +1986,25 @@ export class RealtimeRoomStore {
   }
 
   hasExpiringRows(): boolean {
+    // This method only needs a boolean. COUNT(*) scans every matching row and
+    // turns a cleanup-scheduling probe into billable Durable Objects read
+    // amplification as replay/receipt tables grow. EXISTS can stop at the
+    // first row in each table while preserving the exact scheduling contract.
     const row = firstRow(
       this.sql
         .exec<CountRow>(
-          `SELECT
-             (SELECT COUNT(*) FROM event_log) +
-             (SELECT COUNT(*) FROM idempotency_receipt) +
-             (SELECT COUNT(*) FROM teardown_idempotency_receipt) +
-             (SELECT COUNT(*) FROM teardown_ack_tombstone) +
-             (SELECT COUNT(*) FROM ticket_nonce) +
-             (SELECT COUNT(*) FROM connection_registry) +
-             (SELECT COUNT(*) FROM rate_budget) +
-             (SELECT COUNT(*) FROM screen_share) +
-             (SELECT COUNT(*) FROM screen_session_member) +
-             (SELECT COUNT(*) FROM screen_peer) AS count`,
+          `SELECT CASE WHEN
+             EXISTS(SELECT 1 FROM event_log LIMIT 1) OR
+             EXISTS(SELECT 1 FROM idempotency_receipt LIMIT 1) OR
+             EXISTS(SELECT 1 FROM teardown_idempotency_receipt LIMIT 1) OR
+             EXISTS(SELECT 1 FROM teardown_ack_tombstone LIMIT 1) OR
+             EXISTS(SELECT 1 FROM ticket_nonce LIMIT 1) OR
+             EXISTS(SELECT 1 FROM connection_registry LIMIT 1) OR
+             EXISTS(SELECT 1 FROM rate_budget LIMIT 1) OR
+             EXISTS(SELECT 1 FROM screen_share LIMIT 1) OR
+             EXISTS(SELECT 1 FROM screen_session_member LIMIT 1) OR
+             EXISTS(SELECT 1 FROM screen_peer LIMIT 1)
+           THEN 1 ELSE 0 END AS count`,
         )
         .toArray(),
     );
