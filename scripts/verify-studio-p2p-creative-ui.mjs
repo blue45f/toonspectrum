@@ -60,12 +60,12 @@ try {
         await pages[i].exposeFunction("qaRelay", (packet) => pages[1 - i].evaluate(async ({ path, packet }) => (await import(path)).signal(packet), { path: fixture, packet }));
         if (profile.generatedMedia) await pages[i].evaluate(async (path) => (await import(path)).installGeneratedMedia(), fixture);
         await pages[i].evaluate(async ({ path, index }) => { window.qaFixture = await import(path); await window.qaFixture.mount(index); }, { path: fixture, index: i });
-        await pages[i].getByRole("button", { name: "P2P 채팅·통화", exact: true }).waitFor();
+        await pages[i].getByRole("button", { name: "채팅·통화", exact: true }).waitFor();
       }
       await Promise.all(pages.map((p) => p.evaluate(async (path) => (await import(path)).announce(), fixture)));
       await Promise.all(pages.map((p) => p.waitForFunction(() => window.qaFixture.peerCount() === 1)));
       for (const page of pages) {
-        await page.getByRole("button", { name: "P2P 채팅·통화", exact: true }).click();
+        await page.getByRole("button", { name: "채팅·통화", exact: true }).click();
         await page.getByRole("button", { name: "동의하고 P2P 채팅 참여", exact: true }).click();
         assert.equal(await page.evaluate(() => window.qaCaptureCalls), 0);
       }
