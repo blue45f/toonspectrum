@@ -49,8 +49,7 @@ describe("production engine verifier entry", () => {
       .split(/\r?\n/u)
       .filter(Boolean);
 
-    expect(staticJob).toContain("mapfile -t targets < scripts/ci-required-vitest-targets.txt");
-    expect(staticJob).toContain('pnpm exec vitest run "${targets[@]}"');
+    expect(staticJob).toContain('node scripts/ci-core-regression-shards.mjs "${{ matrix.shard }}"');
     for (const target of [
       "scripts/verify-studio-engine-editor-entry.test.ts",
       "scripts/verify-studio-hokusai-live-integration.test.ts",
