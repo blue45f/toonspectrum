@@ -102,6 +102,7 @@ describe("Cloudflare static gateway", () => {
       "/collaborate/*",
       "/assets/opencascade.wasm-*.wasm",
       "/assets/studio/cc0-20260906/assets/polyhaven-modular-street-seating/modular_street_seating.glb",
+      "/brand/toonstudio-product-tour.mp4",
     ]);
     expect(wrangler.assets?.run_worker_first).not.toContain("/market/*");
     expect(wrangler.r2_buckets).toEqual([{

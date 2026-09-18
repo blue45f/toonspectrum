@@ -51,6 +51,23 @@ export const DICT: DictByLocale = {
   en: { ...builtinAppDictionaries.en },
 };
 
+// Runtime machine translation must not blindly treat every DICT.en entry as a source. Tests and
+// feature modules can register diagnostic/reference dictionaries that are not currently rendered.
+// Start with the app-shell surface, then let lazy Admin/Studio loaders explicitly opt their English
+// dictionaries in when those routes are actually loaded.
+const runtimeTranslationSourceKeys = new Set<string>(Object.keys(DICT.en));
+
+export function registerI18nEnglishSourceEntries(
+  entries: Readonly<Record<string, string>>,
+): void {
+  registerI18nLocaleEntries("en", entries);
+  for (const key of Object.keys(entries)) runtimeTranslationSourceKeys.add(key);
+}
+
+export function getI18nRuntimeTranslationSourceKeys(): readonly string[] {
+  return [...runtimeTranslationSourceKeys];
+}
+
 export interface I18nState {
   lang: Lang;
   translationBundleRevision: number;
@@ -92,6 +109,33 @@ export function resolveTranslation(
 }
 
 /**
+ * Turns a missing i18n identifier into a readable emergency label. The low-level resolver keeps
+ * returning the raw key for diagnostics/tests, while UI translators use this formatter so users
+ * never see implementation identifiers such as `studio.mainMenu.item.view.density-focus`.
+ */
+export function formatMissingTranslationKey(key: string): string {
+  const leaf = key.split(".").filter(Boolean).at(-1) ?? key;
+  const readable = leaf
+    .replace(/[_-]+/gu, " ")
+    .replace(/([\p{Ll}\p{N}])([\p{Lu}])/gu, "$1 $2")
+    .replace(/\s+/gu, " ")
+    .trim();
+
+  if (!readable) return "Translation unavailable";
+  return readable.charAt(0).toLocaleUpperCase() + readable.slice(1);
+}
+
+/** UI-safe resolver: preserve all normal fallback behavior but never expose a raw translation key. */
+export function resolveTranslationForDisplay(
+  lang: string,
+  key: string,
+  fallbackChain: readonly string[] = FALLBACK_CHAIN,
+): string {
+  const resolved = resolveTranslation(lang, key, fallbackChain);
+  return resolved === key ? formatMissingTranslationKey(key) : resolved;
+}
+
+/**
  * Registers a route-owned dictionary without forcing its strings into the
  * application shell bundle. Route modules call this synchronously while their
  * lazy chunk is evaluated, so the first committed render already sees the
@@ -129,7 +173,7 @@ function getTranslationResolver(lang: string): TranslationResolver {
   if (cached) return cached;
 
   const resolver: TranslationResolver = (key) =>
-    resolveTranslation(normalized, key);
+    resolveTranslationForDisplay(normalized, key);
   translationResolvers.set(normalized, resolver);
   return resolver;
 }
@@ -174,10 +218,12 @@ export function getLang(): string {
 export function useT(): (key: string) => string {
   const lang = useI18n((s) => s.lang);
   const translationBundleRevision = useI18n((s) => s.translationBundleRevision);
-  void translationBundleRevision;
   useEffect(() => {
+    // Route-owned dictionaries (Studio/Admin) arrive after the app-shell bundle. Re-run the
+    // automatic translator when a route registers new source keys so non-English locales are not
+    // permanently left with English copies merely because the first app-shell pass already ran.
     void loadRuntimeTranslationBundle(lang);
-  }, [lang]);
+  }, [lang, translationBundleRevision]);
   return getTranslationResolver(lang);
 }
 

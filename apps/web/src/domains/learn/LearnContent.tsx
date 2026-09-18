@@ -539,6 +539,8 @@ export function LearnPage() {
       <nav className="learn-navigation" aria-label="웹툰 학습">
         <Link to="/learn">학습 홈</Link>
         <Link to="/learn#learning-paths">학습 경로</Link>
+        <Link to="/learn/resources">강좌·자료</Link>
+        <Link to="/learn/classroom">Classroom</Link>
         <Link to="/learn/glossary" aria-current={location.pathname.startsWith("/learn/glossary") ? "page" : undefined}>용어 사전</Link>
         <Link to="/learn/studio" aria-current={location.pathname.startsWith("/learn/studio") ? "page" : undefined}>툰스튜디오 실습</Link>
       </nav>

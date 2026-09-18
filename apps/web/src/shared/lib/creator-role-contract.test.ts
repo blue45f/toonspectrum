@@ -17,6 +17,7 @@ describe("creator role profile contract", () => {
       primaryRole: null,
       secondaryRoles: [],
       specialties: [],
+      creatorStage: null,
       experienceLevel: null,
       collaborationStatus: null,
       roleVisibility: true,
@@ -34,6 +35,7 @@ describe("creator role profile contract", () => {
       primaryRole: "story",
       secondaryRoles: ["assistant"],
       specialties: ["dialogue"],
+      creatorStage: null,
       experienceLevel: null,
       collaborationStatus: null,
       roleVisibility: false,
@@ -47,6 +49,7 @@ describe("creator role profile contract", () => {
       primaryRole: "line-art",
       secondaryRoles: ["assistant", "background"],
       specialties: ["line-art", "inking", "background-2d"],
+      creatorStage: "professional",
       experienceLevel: "professional",
       collaborationStatus: "limited",
       roleVisibility: true,
@@ -89,12 +92,14 @@ describe("creator role profile contract", () => {
     })).toBeNull();
     const publicProfile = publicCreatorRoleProfile({
       primaryRole: "producer",
+      creatorStage: "professional",
       roleVisibility: true,
       activeRole: "producer",
     });
     expect(publicProfile).toMatchObject({ primaryRole: "producer" });
     expect(publicProfile).not.toHaveProperty("roleVisibility");
     expect(publicProfile).not.toHaveProperty("activeRole");
+    expect(publicProfile).not.toHaveProperty("creatorStage");
   });
 
   it("maps detailed jobs to production lenses and deduplicates recommendations", () => {

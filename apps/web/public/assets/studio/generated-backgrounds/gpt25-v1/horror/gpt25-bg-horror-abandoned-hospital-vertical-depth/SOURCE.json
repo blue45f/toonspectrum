@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "id": "gpt25-bg-horror-abandoned-hospital-vertical-depth",
+  "model": "gpt-image-2.5-sunburst",
+  "quality": "max",
+  "size": "1152x2048",
+  "promptSha256": "dec401442ac61b449104242d358a7a33cf4b182feaa2eb14ead06d479b3f48d9",
+  "prompt": "premium 2D webtoon background illustration, hand-painted environment concept art, clean controlled linework, cel-shaded forms with painterly light, production-ready details, coherent perspective and architecture, material-specific textures, crisp edges near focal plane, subtle atmospheric depth, no photorealistic people. Scene: abandoned hospital ward. Composition: 세로 웹툰 컷에 맞는 깊은 원근, 아래에서 위로 시선이 흐르는 S자 동선 (28mm lens, slightly low camera, strong vertical leading lines); negative space reserved for speech balloons without blank white boxes. Lighting and atmosphere: bright daytime with natural directional light, gentle snow and cold ambient light. Palette: high-contrast noir palette with selective color accents. Environment must be empty and immediately usable behind webtoon characters. Preserve believable scale, orthogonal lines, floor contact, material continuity, and several crop-safe regions. Output one complete background only. No characters, no silhouettes, no crowds, no readable text, no letters, no signs with glyphs, no logos, no watermark, no speech balloons, no UI, no frame border, no split panels, no duplicated furniture, no floating objects, no melted geometry, no impossible stairs, no fisheye distortion, no extreme blur, no low-resolution texture, no photographic collage.",
+  "negativePrompt": "No characters, no silhouettes, no crowds, no readable text, no letters, no signs with glyphs, no logos, no watermark, no speech balloons, no UI, no frame border, no split panels, no duplicated furniture, no floating objects, no melted geometry, no impossible stairs, no fisheye distortion, no extreme blur, no low-resolution texture, no photographic collage.",
+  "generatedAt": "2026-09-18T00:15:49.022886Z",
+  "outputSha256": "05ba261d4eb6dea91b39fa745a2c353de4abbf3e7c0dff318e3d59a3be3992e9",
+  "outputBytes": 3793166,
+  "reviewRequired": false,
+  "operatorFunded": false,
+  "generationChannel": "ChatGPT image generation"
+}

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "id": "gpt25-bg-horror-dark-tunnel-vertical-depth",
+  "model": "gpt-image-2.5-sunburst",
+  "quality": "max",
+  "size": "1152x2048",
+  "promptSha256": "e35cf01d1c065a7b574b984ee13633b14553bef1480d437409f21cacb51c9e50",
+  "prompt": "premium 2D webtoon background illustration, hand-painted environment concept art, clean controlled linework, cel-shaded forms with painterly light, production-ready details, coherent perspective and architecture, material-specific textures, crisp edges near focal plane, subtle atmospheric depth, no photorealistic people. Scene: long dark tunnel. Composition: 세로 웹툰 컷에 맞는 깊은 원근, 아래에서 위로 시선이 흐르는 S자 동선 (28mm lens, slightly low camera, strong vertical leading lines); readable vanishing point and consistent perspective. Lighting and atmosphere: night scene with motivated practical lights, thin atmospheric fog. Palette: rich jewel tones, elegant but not oversaturated. Environment must be empty and immediately usable behind webtoon characters. Preserve believable scale, orthogonal lines, floor contact, material continuity, and several crop-safe regions. Output one complete background only. No characters, no silhouettes, no crowds, no readable text, no letters, no signs with glyphs, no logos, no watermark, no speech balloons, no UI, no frame border, no split panels, no duplicated furniture, no floating objects, no melted geometry, no impossible stairs, no fisheye distortion, no extreme blur, no low-resolution texture, no photographic collage.",
+  "negativePrompt": "No characters, no silhouettes, no crowds, no readable text, no letters, no signs with glyphs, no logos, no watermark, no speech balloons, no UI, no frame border, no split panels, no duplicated furniture, no floating objects, no melted geometry, no impossible stairs, no fisheye distortion, no extreme blur, no low-resolution texture, no photographic collage.",
+  "generatedAt": "2026-09-18T00:15:49.022886Z",
+  "outputSha256": "a649c91a38483b6b171692385e552a283c9d9ed900ea6befe78f7e8e498f0fc6",
+  "outputBytes": 4001333,
+  "reviewRequired": false,
+  "operatorFunded": false,
+  "generationChannel": "ChatGPT image generation"
+}

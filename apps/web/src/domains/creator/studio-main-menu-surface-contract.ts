@@ -90,8 +90,8 @@ export interface StudioMainMenuSurfaceActions {
   openContinuityCheck: () => unknown;
   /** §15.3 Comic ▸ Story Bible — production bible workspace. */
   openProductionBible: () => unknown;
-  /** §15.3 File ▸ 새 프로젝트. With a preset, opens the exact platform canvas creator. */
-  openQuickStart: (presetId?: StudioWebtoonCanvasPresetId) => unknown;
+  /** §15.3 File ▸ 새 프로젝트 — opens the existing quick-start surface. */
+  openQuickStart: () => unknown;
   /** §15.3 File ▸ Publish Package. */
   openPublishPackage: () => unknown;
   openPublishPreflight: () => unknown;
@@ -103,6 +103,8 @@ export interface StudioMainMenuSurfaceActions {
   openCanvasNavigator: () => unknown;
   /** §15.3 Canvas ▸ 크기·해상도 — the document canvas settings route. */
   openCanvasSettings: () => unknown;
+  /** Canvas ▸ platform size — resizes the current drawing in one undoable commit. */
+  applyWebtoonCanvasPreset: (presetId: StudioWebtoonCanvasPresetId) => unknown;
   /** §15.3 Canvas ▸ 그리드. */
   toggleCanvasGrid: () => unknown;
   /** Canvas ▸ 웹툰 플랫폼 규격 가이드. */

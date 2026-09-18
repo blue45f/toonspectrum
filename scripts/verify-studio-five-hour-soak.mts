@@ -59,6 +59,9 @@ interface HeapSample {
   readonly totalBytes: number;
   readonly embedderBytes: number;
   readonly backingStorageBytes: number;
+  readonly documents: number | null;
+  readonly nodes: number | null;
+  readonly jsEventListeners: number | null;
 }
 
 interface GpuEvent {
@@ -190,16 +193,43 @@ async function gcHeap(cdp: CDPSession | null, startedAt: number): Promise<HeapSa
       embedderHeapUsedSize: number;
       backingStorageSize: number;
     };
+    const dom = await cdp.send("Memory.getDOMCounters").catch(() => null) as {
+      documents: number;
+      nodes: number;
+      jsEventListeners: number;
+    } | null;
     return {
       atMs: nowMs(startedAt),
       usedBytes: usage.usedSize,
       totalBytes: usage.totalSize,
       embedderBytes: usage.embedderHeapUsedSize,
       backingStorageBytes: usage.backingStorageSize,
+      documents: dom?.documents ?? null,
+      nodes: dom?.nodes ?? null,
+      jsEventListeners: dom?.jsEventListeners ?? null,
     };
   } catch {
     return null;
   }
+}
+
+function heapSlopeBytesPerHour(samples: readonly HeapSample[]): number | null {
+  if (samples.length < 2) return null;
+  const firstAt = samples[0]?.atMs ?? 0;
+  const points = samples.map((sample) => ({
+    x: (sample.atMs - firstAt) / 3_600_000,
+    y: sample.usedBytes,
+  }));
+  const meanX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
+  const meanY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+  let numerator = 0;
+  let denominator = 0;
+  for (const point of points) {
+    const dx = point.x - meanX;
+    numerator += dx * (point.y - meanY);
+    denominator += dx * dx;
+  }
+  return denominator > 0 ? numerator / denominator : null;
 }
 
 async function closeBrushSurfaces(page: Page): Promise<boolean> {
@@ -389,7 +419,15 @@ const report = {
   longTasks: [] as LongTaskSample[],
   runtimeErrors: [] as StudioInAppRuntimeError[],
   failures: [] as SoakFailure[],
-  checkpoints: [] as Array<{ atMs: number; cycle: number; heapBytes: number | null; failures: number }>,
+  checkpoints: [] as Array<{
+    atMs: number;
+    cycle: number;
+    heapBytes: number | null;
+    heapSlopeBytesPerHour: number | null;
+    domNodes: number | null;
+    eventListeners: number | null;
+    failures: number;
+  }>,
 };
 
 const writeReport = (): void => {

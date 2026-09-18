@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RoutePurposeScene } from "./RoutePurposeScene";
 import { SiteRouteExperienceBoundary } from "./SiteRouteExperienceBoundary";
 
+import { useI18n } from "@/shared/lib/i18n";
 import { resolveSiteRouteExperience } from "@/shared/lib/site-route-experience";
 import { resolveSiteRouteVisual } from "@/shared/lib/site-route-visual";
 
@@ -15,6 +16,7 @@ let reducedMotion = false;
 
 beforeEach(() => {
   reducedMotion = false;
+  useI18n.setState({ lang: "ko" });
   vi.stubGlobal("IntersectionObserver", class {
     constructor(callback: IntersectionObserverCallback) {
       intersection = (visible) => callback(
@@ -47,7 +49,6 @@ function scene(pathname: string) {
   return render(
     <RoutePurposeScene
       title="페이지 제목"
-      locale="ko"
       experience={resolveSiteRouteExperience(pathname)}
       profile={resolveSiteRouteVisual(pathname)}
     />,
@@ -81,8 +82,11 @@ describe("route purpose scene", () => {
     const result = scene("/studio/new");
     const video = result.container.querySelector<HTMLVideoElement>("video")!;
     expect(video.dataset.ready).toBe("false");
-    fireEvent.canPlay(video);
+    expect(video.querySelector("source")?.getAttribute("src")).toBe("/brand/toonstudio-route-header.mp4");
+    expect(video.querySelectorAll("source")).toHaveLength(1);
+    fireEvent.playing(video);
     expect(video.dataset.ready).toBe("true");
+    expect(result.container.querySelector<HTMLElement>("[data-route-visual-kind]")?.dataset.routeVisualVideoReady).toBe("true");
   });
 
   it("loops only the route-specific film chapter", () => {

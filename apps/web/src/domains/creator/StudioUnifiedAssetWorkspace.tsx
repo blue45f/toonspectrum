@@ -413,7 +413,7 @@ export function StudioUnifiedAssetWorkspace({
       aria-label="통합 에셋 작업 공간"
       data-studio-unified-asset-workspace="true"
       data-studio-asset-workspace-layout="responsive-three-pane"
-      className="w-[min(74rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] min-w-0"
+      className="w-full max-w-full min-w-0"
     >
       <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-line bg-card p-1">
         <div className="grid flex-1 grid-cols-2 gap-1">
@@ -580,9 +580,9 @@ export function StudioUnifiedAssetWorkspace({
             </div>
           ) : null}
 
-          <div className="grid min-h-0 gap-3 lg:grid-cols-[11rem_minmax(22rem,1fr)_20rem]">
-            <aside className="min-w-0 rounded-xl border border-line bg-panel p-2 lg:max-h-[min(68dvh,46rem)] lg:overflow-y-auto">
-              <div className="flex gap-1 overflow-x-auto lg:block lg:space-y-1" aria-label="에셋 분류">
+          <div data-studio-asset-workspace-grid="true" className="grid min-h-0 gap-3">
+            <aside data-studio-asset-sidebar="true" className="min-w-0 rounded-xl border border-line bg-panel p-2">
+              <div data-studio-asset-facet-list="true" className="flex gap-1 overflow-x-auto" aria-label="에셋 분류">
                 {BROWSE_FACETS.map((option) => (
                   <button
                     key={option.id}
@@ -593,7 +593,7 @@ export function StudioUnifiedAssetWorkspace({
                     }}
                     aria-pressed={facet === option.id}
                     className={cn(
-                      "flex min-h-10 shrink-0 items-center justify-between gap-2 rounded-lg px-3 text-left text-xs font-semibold transition-colors lg:w-full",
+                      "flex min-h-10 shrink-0 items-center justify-between gap-2 rounded-lg px-3 text-left text-xs font-semibold transition-colors",
                       FOCUS,
                       facet === option.id
                         ? "bg-accent-soft text-accent"
@@ -609,10 +609,10 @@ export function StudioUnifiedAssetWorkspace({
               </div>
 
               <div className="mt-2 border-t border-line pt-2">
-                <p className="mb-1 hidden px-3 text-[0.68rem] font-bold uppercase tracking-wide text-fg-3 lg:block">
+                <p data-studio-asset-sidebar-label="true" className="mb-1 hidden px-3 text-[0.68rem] font-bold uppercase tracking-wide text-fg-3">
                   내 작업
                 </p>
-                <div className="flex gap-1 overflow-x-auto lg:block lg:space-y-1">
+                <div data-studio-asset-collection-list="true" className="flex gap-1 overflow-x-auto">
                   {COLLECTIONS.map((option) => {
                     const Icon = option === "favorites"
                       ? Heart
@@ -629,7 +629,7 @@ export function StudioUnifiedAssetWorkspace({
                         }}
                         aria-pressed={collection === option}
                         className={cn(
-                          "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-xs font-semibold transition-colors lg:w-full",
+                          "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-xs font-semibold transition-colors",
                           FOCUS,
                           collection === option
                             ? "bg-raised text-fg"
@@ -706,12 +706,9 @@ export function StudioUnifiedAssetWorkspace({
 
               {results.length > 0 ? (
                 <div
-                  className={cn(
-                    "grid max-h-[min(64dvh,43rem)] gap-2 overflow-y-auto pr-1",
-                    density === "visual"
-                      ? "grid-cols-2 2xl:grid-cols-3"
-                      : "grid-cols-2 sm:grid-cols-3 2xl:grid-cols-4",
-                  )}
+                  data-studio-asset-results-grid="true"
+                  data-density={density}
+                  className="grid max-h-[min(64dvh,43rem)] gap-2 overflow-y-auto pr-1"
                 >
                   {results.map((entry) => {
                     const item = entry.item;
@@ -849,7 +846,7 @@ export function StudioUnifiedAssetWorkspace({
               )}
             </div>
 
-            <aside className="min-w-0 rounded-xl border border-line bg-panel p-3 lg:max-h-[min(68dvh,46rem)] lg:overflow-y-auto">
+            <aside data-studio-asset-detail-pane="true" className="min-w-0 rounded-xl border border-line bg-panel p-3">
               {selected && selectedPreview ? (
                 <div data-studio-asset-detail={selected.id}>
                   <div className="aspect-[4/3] overflow-hidden rounded-xl border border-line bg-card">

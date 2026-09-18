@@ -2,8 +2,10 @@ import { defineAppRoutes } from "../app-route-definition";
 import {
   AboutPage,
   AccessibilityPage,
+  BusinessPage,
   ContactPage,
   CopyrightPage,
+  CreatorSupportPage,
   CrawlerPolicyPage,
   DataSourcesPage,
   DesignSystemPage,
@@ -20,6 +22,7 @@ import {
   ProductPrinciplesPage,
   SitemapPage,
   SupportPage,
+  SupportUsPage,
   TechnologyPage,
   TermsPage,
   WebtoonWorkflowPage,
@@ -87,6 +90,9 @@ export const legalRoutes = defineAppRoutes([
   { id: "legal-privacy", path: "/privacy", element: <PrivacyPage /> },
   { id: "legal-copyright", path: "/copyright", element: <CopyrightPage /> },
   { id: "legal-contact", path: "/contact", element: <ContactPage /> },
+  { id: "legal-business", path: "/business", element: <BusinessPage /> },
+  { id: "legal-support-us", path: "/support-us", element: <SupportUsPage /> },
+  { id: "legal-creator-support", path: "/support-creators", element: <CreatorSupportPage /> },
   { id: "legal-support", path: "/support", element: <SupportPage /> },
   { id: "legal-feedback", path: "/feedback", element: <FeedbackPage /> },
 ]);

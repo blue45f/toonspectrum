@@ -13,6 +13,7 @@ export const AUTH_RATE_LIMIT_POLICIES = {
   "password-reset-confirm": { limit: 10 },
   "account-link": { limit: 10 },
   "account-unlink": { limit: 10 },
+  "account-merge": { limit: 5 },
 } as const;
 
 export type AuthRateLimitAction = keyof typeof AUTH_RATE_LIMIT_POLICIES;

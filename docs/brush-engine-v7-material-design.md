@@ -59,13 +59,29 @@ stroke contact, material transport, pigment optics, deterministic replay이므�
 
 ## 6. V7 시그니처 브러시 팩
 
-이번 단계에서는 12개 표면에 대해 24개의 수작업 시그니처 레시피를 추가했다.
+V7 기본 단계에서는 12개 표면에 대해 24개의 수작업 시그니처 레시피를 추가했고, V7.1에서는 고급 물리/토폴로지 24종을 추가해 V7 계열을 총 48개 시그니처 브러시로 확장했다.
 각 레시피는 단순 이름/색상 변형이 아니라 carrier, tip, deposition, pigment, physics, finish를 다르게 조합한다.
 
 대표 계열: 정밀 흑연, 잉크 글레이즈, 광물 과립 수채, 드라이 과슈, 콩테 해칭,
 레터프레스 잉크, 화지 수묵, 갈필, 벨루어 목탄, 소프트 파스텔, 색연필,
 세필 잉크, 젯소 스크레이프 오일, 캔버스 임파스토, 뉴스프린트 마커,
 크라프트 흑연, 우드그레인 드라이브러시/스테인, 스톤 그릿 파스텔/스페클.
+
+## 6.1 V7.1 고급 물리·토폴로지 확장
+
+V7.1은 기존 저장 포맷을 바꾸지 않고 physics/pattern/finish 노드 조합으로 다음 기능을 추가한다.
+
+- `physics-backrun-capillary`: 반건조 경계에서 모세관 역침투가 일어난 것처럼 문서 좌표·seed·resampled dab index에 고정된 cauliflower/backrun lobe를 생성한다.
+- `physics-pigment-sedimentation`: tooth와 국소 흡수성에 따라 무거운 광물 안료가 valley에 가라앉는 grain contact를 분리한다.
+- `physics-bristle-split-merge`: 강모를 cluster 단위로 묶고 마찰·점도·필압·이동 거리에 따라 splay/merge를 변화시키며 일부 cluster는 두 번째 branch contact를 생성한다.
+- `finish-directional-relief`: 공통 material mark의 height와 진행 방향을 고정된 사광 방향에 투영해 Canvas/SVG 모두 동일한 ridge highlight/shadow를 갖게 한다.
+- `pattern-vector-flow / vortex / contour`: document-space vector field에서 짧은 capsule segment의 방향을 직접 얻는다.
+- `pattern-textile-satin / twill`: warp/weft 교차 순서와 height를 가진 직조 contact를 생성하고 directional relief와 결합한다.
+
+이 기능들은 V1 저장 receipt를 재생할 때 활성화되지 않는다. 새 노드를 명시적으로 선택한 live/V2 program만 enhanced adapter 경로를 사용한다. 따라서 이미 저장된 작품의 픽셀 결과는 변경하지 않는다.
+
+V7.1 시그니처 24종은 backrun 3, sediment/hybrid 4, bristle split/merge 6, directional impasto 4, vector-field 4, textile 3으로 구성된다.
+
 ## 7. 브러시 양산 규칙
 
 향후 프리셋 수를 늘릴 때는 `surface × medium × tip × topology × dynamics`의 조합 공간을 사용하되,
@@ -94,12 +110,15 @@ stroke contact, material transport, pigment optics, deterministic replay이므�
 
 최종 QA에서 V7 표면 샘플러는 약 948 samples/ms, legacy 대비 1.417x였다. shipping guard 1.50x 안에는 들지만
 stretch target 1.25x에는 미달하므로 tile/contact cache와 field fusion을 후속 최적화 항목으로 유지한다.
-24개 QA stroke는 총 52,502 marks, 평균 solve 6.39ms, p95 16.82ms였다. 초기 튜닝 전 73,187 marks 대비 28.3% 감소했다.
+초기 24개 V7 QA stroke는 총 52,502 marks였다. V7.1 24종을 더한 최신 48개 visual matrix는 총 89,040 marks이며, 신규 24종이 약 36,538 marks를 추가한다. CPU timing은 같은 머신의 동시 빌드 부하에 따라 크게 흔들리므로 raw metrics JSON을 보존하고 mark budget과 전체 품질 게이트를 우선적인 회귀 기준으로 사용한다.
 ## 9. 품질 게이트와 시각 검증
+
+최종 제품 품질 게이트는 기존/신규를 합친 114개 레시피를 실제 Chromium pen input으로 재생했고 0 failures였다.
+V7.1 전용 테스트는 신규 24종 모두에 대해 normal coalesced streaming에서 `clippedDabs === 0`, per-push marks < 512를 검증하며 backrun/split 대표 브러시의 sparse/dense resampling 결정성도 고정한다.
 
 `brush-studio-v7-surface-library.test.ts`가 다음 계약을 고정한다.
 
-- V7 표면 12종과 V7 시그니처 레시피 24종이 모두 등록됨
+- V7 표면 12종과 V7/V7.1 시그니처 레시피 48종이 모두 등록됨
 - 기존 V6 surface의 scalar tooth field가 이전 수식과 소수점 14자리 수준으로 일치
 - 모든 V7 채널이 deterministic / finite / bounded
 - 12개 표면의 공간 시그니처가 서로 다름
@@ -112,14 +131,18 @@ stretch target 1.25x에는 미달하므로 tile/contact cache와 field fusion을
 시각 QA는 surface swatch뿐 아니라 pressure/tilt/twist가 동시에 변하는 동일 경로를 모든 레시피에 적용한다.
 이 방식으로 서로 다른 브러시가 같은 입력에서 얼마나 다른 결과를 내는지 직접 비교한다.
 
+`generate-studio-brush-v7-blind-ab.mts`는 후보/기준 브러시의 이름을 숨기고 A/B 좌우 순서를 seed 기반으로 뒤섞는다. 동일한 색·크기·불투명도에서 실제 contact solver 결과를 렌더하고 별도 `blind-ab-key.json`에만 정답을 저장한다. 현재 backrun, sediment, split bristle, impasto lighting, vector field, satin/twill의 12쌍을 기본 blind matrix로 사용한다.
+
 ## 10. 다음 고도화 우선순위
 
-1. pigment granule 크기/밀도/침강을 별도 채널로 분리해 수채 과립의 색상별 차이를 강화
-2. bristle bundle에 split/merge와 paint reservoir depletion을 추가해 fan/mop/rigger를 더 현실적으로 구현
-3. wet-on-wet 영역 간 경계 결합과 backrun/cauliflower 현상을 active-region GPU solver로 확장
-4. impasto height field에 directional specular와 palette-knife ridge self-shadow를 추가
-5. vector-field / curl-field / textile topology를 신규 signature pack으로 확장
-6. 자동 후보 생성 + perceptual duplicate rejection + human visual QA를 묶어 60~120개 단위로 팩 생산
+V7.1에서 backrun, sedimentation, split/merge, directional relief, vector/textile topology의 제품 경로를 연결했으므로 다음 단계는 양적 확장보다 물리 해상도와 GPU 상태장을 강화한다.
+
+1. 현재 deterministic contact-level backrun을 active-region wetness/velocity field와 결합해 시간에 따른 wet-on-wet 충돌을 구현
+2. pigment별 입자 크기·비중·staining coefficient를 분리해 cobalt/ultramarine/earth 계열의 침전 차이를 색상 모델과 연결
+3. bristle cluster의 reservoir를 공유/분리하여 split 이후 각 묶음의 독립적인 paint depletion과 재병합을 구현
+4. directional relief를 WebGPU normal field와 self-shadow/specular lobe로 승격해 고해상도 임파스토 조명을 구현
+5. vector-field를 curl/noise/artist-authored field texture까지 확장하고 textile에 knit, herringbone, basket, lace topology 추가
+6. 자동 후보 생성 + perceptual duplicate rejection + blind A/B human QA를 묶어 60~120개 단위로 팩 생산
 7. 실제 Apple Pencil/Windows Ink 장치에서 latency, pressure curve, tilt response를 회귀 측정
 
 ## 11. 경쟁 기준
@@ -138,6 +161,7 @@ V7은 이 기능을 단순 체크리스트로 복제하기보다 표면 미세�
 - Google Ink Stroke Modeler — https://github.com/google/ink-stroke-modeler
 - p5.brush — https://github.com/acamposuribe/p5.brush
 - WetBrush: GPU-based 3D Painting Simulation at the Bristle Level, SIGGRAPH Asia 2015
+- Xu et al., Advanced Design for a Realistic Virtual Brush, Computer Graphics Forum 2003 — hierarchical bristle/bundle modeling
 - Curtis et al., Computer-Generated Watercolor, SIGGRAPH 1997, DOI 10.1145/258734.258896
 
 이 문서는 현재 구현 기준의 living design이다. 신규 surface/provider/physics를 추가할 때

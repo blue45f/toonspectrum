@@ -42,11 +42,11 @@ function renderSurface(surface: string, wet: boolean): string {
     mark.radiusX.toFixed(3), mark.radiusY.toFixed(3), mark.angle.toFixed(3), mark.opacity.toFixed(4)].join(":" )).join("|");
 }
 describe("Brush Studio V7 material surfaces", () => {
-  it("registers twelve native, uniquely named surface materials and twenty-four signature recipes", () => {
+  it("registers twelve native, uniquely named surface materials and forty-eight V7 signature recipes", () => {
     expect(BRUSH_STUDIO_V7_ADVANCED_SURFACES).toHaveLength(12);
     expect(new Set(BRUSH_STUDIO_V7_ADVANCED_SURFACES.map((entry) => entry.id)).size).toBe(12);
     expect(BRUSH_STUDIO_V7_ADVANCED_SURFACES.every((entry) => brushStudioV6MaterialNodeExecution(entry.id) === "native")).toBe(true);
-    expect(BRUSH_STUDIO_V6_RECIPES.filter((entry) => entry.id.startsWith("v7-"))).toHaveLength(24);
+    expect(BRUSH_STUDIO_V6_RECIPES.filter((entry) => entry.id.startsWith("v7-"))).toHaveLength(48);
   });
 
   it("preserves the scalar tooth field of every legacy surface", () => {

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { isStudioProjectView } from "../creator/studio-project-views";
+
+import {
+  WEBTOON_PRODUCTION_STAGE_SUPPORT,
+  webtoonProductionActionHref,
+  webtoonProductionStagesForProjectView,
+} from "@/shared/lib/webtoon-production-support";
+
 import {
   WEBTOON_APPROVAL_GATES,
   WEBTOON_EPISODE_PIPELINE,
@@ -47,4 +55,31 @@ describe("webtoon production guide data", () => {
     expect(unique(WEBTOON_ROLLING_PIPELINE.map((item) => item.episode))).toBe(true);
     expect(WEBTOON_ROLLING_PIPELINE.some((item) => item.risk === "risk")).toBe(true);
   });
+
+  it("maps every episode stage to concrete project conveniences", () => {
+    expect(WEBTOON_PRODUCTION_STAGE_SUPPORT.map((stage) => stage.stageId)).toEqual(
+      WEBTOON_EPISODE_PIPELINE.map((stage) => stage.id),
+    );
+    expect(WEBTOON_PRODUCTION_STAGE_SUPPORT.every((stage) => (
+      stage.actions.length >= 2
+      && stage.readinessChecksKo.length >= 3
+      && stage.conveniencesKo.length >= 3
+    ))).toBe(true);
+
+    const projectDestinations = WEBTOON_PRODUCTION_STAGE_SUPPORT.flatMap((stage) =>
+      stage.actions.map((action) => action.destination).filter((destination) => destination.kind === "project"),
+    );
+    expect(projectDestinations.every((destination) => isStudioProjectView(destination.section, destination.view))).toBe(true);
+
+    expect(webtoonProductionStagesForProjectView("review", "approvals").map((stage) => stage.stageId)).toEqual([
+      "script-lock",
+      "storyboard-lock",
+      "qa",
+    ]);
+
+    const layoutAction = WEBTOON_PRODUCTION_STAGE_SUPPORT.find((stage) => stage.stageId === "layout")?.actions[0];
+    expect(layoutAction).toBeTruthy();
+    expect(webtoonProductionActionHref("series/한글", layoutAction!)).toContain("/studio/work/series%2F");
+  });
+
 });

@@ -544,6 +544,74 @@ function cachedKmasLookupForTitle(title: Title, env: EnvLike): KmasLookupCacheHi
   return { hit: true, item: cached.item };
 }
 
+function estimateKmasLookupBytes(key: string, item: KmasBookAndWebtoonItem | null): number {
+  let serializedBytes = 0;
+  try {
+    serializedBytes = JSON.stringify(item)?.length * 2 || 0;
+  } catch {
+    serializedBytes = 1024;
+  }
+  return Math.max(128, key.length * 2 + serializedBytes + 128);
+}
+
+function deleteKmasLookupCacheEntry(key: string): void {
+  const cached = lookupCache.get(key);
+  if (!cached) return;
+  lookupCache.delete(key);
+  lookupCacheEstimatedBytes = Math.max(0, lookupCacheEstimatedBytes - cached.estimatedBytes);
+}
+
+function clearKmasLookupCache(): void {
+  lookupCache.clear();
+  lookupCacheEstimatedBytes = 0;
+}
+
+function pruneKmasLookupCache(env: EnvLike, now: number): void {
+  const cacheTtlMs = lookupCacheTtlMs(env);
+  if (cacheTtlMs <= 0) {
+    clearKmasLookupCache();
+    return;
+  }
+  for (const [key, cached] of lookupCache) {
+    if (now - cached.fetchedAt >= cacheTtlMs) deleteKmasLookupCacheEntry(key);
+  }
+
+  const maxEntries = lookupCacheMaxEntries(env);
+  const maxBytes = lookupCacheMaxBytes(env);
+  while (lookupCache.size > maxEntries || lookupCacheEstimatedBytes > maxBytes) {
+    const oldestKey = lookupCache.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    deleteKmasLookupCacheEntry(oldestKey);
+  }
+}
+
+function setKmasLookupCache(
+  key: string,
+  item: KmasBookAndWebtoonItem | null,
+  env: EnvLike,
+  now: number,
+): void {
+  const maxEntries = lookupCacheMaxEntries(env);
+  const maxBytes = lookupCacheMaxBytes(env);
+  if (maxEntries <= 0 || maxBytes <= 0) {
+    clearKmasLookupCache();
+    return;
+  }
+  deleteKmasLookupCacheEntry(key);
+  const estimatedBytes = estimateKmasLookupBytes(key, item);
+  lookupCache.set(key, { item, fetchedAt: now, estimatedBytes });
+  lookupCacheEstimatedBytes += estimatedBytes;
+  pruneKmasLookupCache(env, now);
+}
+
+export function kmasLookupCacheDiagnostics(): { entries: number; estimatedBytes: number } {
+  return { entries: lookupCache.size, estimatedBytes: lookupCacheEstimatedBytes };
+}
+
+export function clearKmasLookupCacheForTests(): void {
+  clearKmasLookupCache();
+}
+
 function bestKmasMatch(title: Title, items: KmasBookAndWebtoonItem[]): KmasMatch | null {
   const titleKey = normalizeLookupKey(title.title);
   const authorKey = normalizeCreatorKey(title.author);
@@ -599,6 +667,14 @@ function siteAccessMergeTtlMs(env: EnvLike): number {
 
 function lookupCacheTtlMs(env: EnvLike): number {
   return boundInt(Number(env.KMAS_LOOKUP_CACHE_TTL_MS), DEFAULT_LOOKUP_CACHE_TTL_MS, 0, 24 * 60 * 60 * 1000);
+}
+
+function lookupCacheMaxEntries(env: EnvLike): number {
+  return boundInt(Number(env.KMAS_LOOKUP_CACHE_MAX_ENTRIES), DEFAULT_LOOKUP_CACHE_MAX_ENTRIES, 0, 10_000);
+}
+
+function lookupCacheMaxBytes(env: EnvLike): number {
+  return boundInt(Number(env.KMAS_LOOKUP_CACHE_MAX_BYTES), DEFAULT_LOOKUP_CACHE_MAX_BYTES, 0, 64 * 1024 * 1024);
 }
 
 function collectResponseTitles(value: unknown, out: Title[] = [], seen = new Set<unknown>()): Title[] {

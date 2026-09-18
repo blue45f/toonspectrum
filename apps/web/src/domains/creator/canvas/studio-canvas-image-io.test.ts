@@ -265,6 +265,55 @@ describe("Studio canvas image file loading", () => {
     await expect(loadImageFileForCanvas(file)).rejects.toThrow(/\.qoi.*\.bmp/);
   });
 
+  it("materializes runtime-supported AVIF animation into editable Studio frames", async () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+    const closedFrames = [vi.fn(), vi.fn()];
+    const decoderClose = vi.fn();
+    class ImageDecoderMock {
+      readonly tracks = {
+        ready: Promise.resolve(),
+        selectedTrack: { frameCount: 2, animated: true, repetitionCount: Infinity },
+      };
+      decode({ frameIndex }: { frameIndex: number }) {
+        return Promise.resolve({
+          complete: true,
+          image: {
+            duration: frameIndex === 0 ? 100_000 : 200_000,
+            timestamp: frameIndex * 100_000,
+            displayWidth: 2,
+            displayHeight: 1,
+            close: closedFrames[frameIndex]!,
+          },
+        });
+      }
+      close() { decoderClose(); }
+    }
+    vi.stubGlobal("ImageDecoder", ImageDecoderMock);
+    const context = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+    mockCanvas2dContext(context);
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback, type) => {
+      callback(new Blob([Uint8Array.from([1, 2, 3])], { type: type ?? "image/png" }));
+    });
+
+    const result = await loadImageFileForCanvas(
+      new File([Uint8Array.from([0, 1, 2, 3])], "motion.avif", { type: "image/avif" }),
+    );
+
+    expect(result.isAnimatedGif).toBe(false);
+    expect(result.width).toBe(2);
+    expect(result.height).toBe(1);
+    expect(result.frameFps).toBe(7);
+    expect(result.frameLoop).toBe(true);
+    expect(result.frames).toHaveLength(2);
+    expect(result.frames?.map((frame) => frame.durationMs)).toEqual([100, 200]);
+    expect(result.src).toBe(result.frames?.[0]?.src);
+    expect(result.frames?.every((frame) => frame.src.startsWith("data:image/png;base64,"))).toBe(true);
+    expect(context.drawImage).toHaveBeenCalledTimes(2);
+    expect(closedFrames[0]).toHaveBeenCalledTimes(1);
+    expect(closedFrames[1]).toHaveBeenCalledTimes(1);
+    expect(decoderClose).toHaveBeenCalledTimes(1);
+  });
+
   it("preserves animated GIF bytes and dimensions without a canvas re-encode", async () => {
     const instances = installControlledImage({ width: 320, height: 180 });
     const createElement = vi.spyOn(document, "createElement");

@@ -8,6 +8,7 @@ import {
   createCharacterShaperHistory,
   pushCharacterShaperHistory,
   redoCharacterShaperHistory,
+  trimCharacterShaperHistoryEntries,
   undoCharacterShaperHistory,
 } from "./useCharacterShaperHistory";
 

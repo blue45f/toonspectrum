@@ -20,7 +20,11 @@ import {
   useMetaDescription,
   usePageSocialMeta,
 } from "@/hooks/use-document-title";
-import { useI18n } from "@/shared/lib/i18n";
+import {
+  defineBilingualText,
+  translateParallelBilingualCopy,
+} from "@/shared/lib/i18n-bilingual-copy";
+import { normalizeLocaleCode, useI18n, useT } from "@/shared/lib/i18n";
 
 import "./creator-home.css";
 import "./creator-film.css";
@@ -111,13 +115,21 @@ const PAGE_COPY = {
   },
 } as const;
 
+const FULL_TOUR_KEY = defineBilingualText(
+  "brandFilmPage",
+  "fullProductTour",
+  "8분 전체 제품 투어",
+  "8-minute full product tour",
+);
 const PRODUCTION_ICONS = [Clapperboard, Ratio, Subtitles] as const;
 const BRAND_FILM_POSTER = `${SITE_URL}/brand/toonstudio-film-poster.jpg`;
 
 export function BrandFilmPage() {
+  const t = useT();
   const language = useI18n((state) => state.lang);
   const locale = creatorHomeLocale(language);
-  const copy = PAGE_COPY[locale];
+  const documentLocale = normalizeLocaleCode(language) || "en";
+  const copy = translateParallelBilingualCopy(t, "brandFilmPage", PAGE_COPY);
   const filmCopy = HOME_COPY[locale];
 
   useDocumentTitle(copy.pageTitle);
@@ -138,7 +150,7 @@ export function BrandFilmPage() {
     contentUrl: `${SITE_URL}${CREATOR_FILM.src}`,
     embedUrl: `${SITE_URL}/brand-film#creator-film`,
     duration: "PT24S",
-    inLanguage: locale === "ko" ? "ko-KR" : "en",
+    inLanguage: documentLocale,
     isFamilyFriendly: true,
   });
 
@@ -146,7 +158,7 @@ export function BrandFilmPage() {
     <div
       className="creator-home brand-film-page"
       data-brand-film="remotion"
-      lang={locale}
+      lang={documentLocale}
     >
       <header className="brand-film-page__hero">
         <div className="brand-film-page__hero-copy">
@@ -185,7 +197,7 @@ export function BrandFilmPage() {
         </dl>
       </header>
 
-      <BrandFilmStoryboard locale={locale} />
+      <BrandFilmStoryboard />
 
       <div className="brand-film-page__film-shell">
         <CreatorBrandFilm copy={filmCopy} locale={locale} />
@@ -230,6 +242,9 @@ export function BrandFilmPage() {
           </Link>
           <Link href="/showcase/promo" className="ch-button ch-button--quiet">
             {copy.promo}
+          </Link>
+          <Link href="/product-tour" className="ch-button ch-button--quiet">
+            {t(FULL_TOUR_KEY)}
           </Link>
         </div>
       </section>

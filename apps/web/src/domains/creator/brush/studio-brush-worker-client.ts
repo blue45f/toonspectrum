@@ -20,7 +20,10 @@ const pendingRequests = new Map<
     reject: (err: unknown) => void;
     timeout: ReturnType<typeof setTimeout>;
   }
->();
+  deferred.abortSignal = null;
+  deferred.abortListener = null;
+  return true;
+}
 
 function retireBrushWorker(worker: Worker, reason: unknown): void {
   if (globalBrushWorker === worker) globalBrushWorker = null;
@@ -34,7 +37,7 @@ function retireBrushWorker(worker: Worker, reason: unknown): void {
     // A crashed or already-terminated Worker is still considered retired.
   }
 
-  for (const [id, deferred] of pendingRequests.entries()) {
+  for (const [id, deferred] of [...pendingRequests.entries()]) {
     if (deferred.worker !== worker) continue;
     clearTimeout(deferred.timeout);
     pendingRequests.delete(id);
@@ -95,8 +98,11 @@ export async function processFreehandPointsInWorker(
   minDistance?: number,
   brushId = "pen",
   strokeWidth = 6,
-  seed = 42
+  seed = 42,
+  options: StudioBrushWorkerRequestOptions = {},
 ): Promise<number[]> {
+  if (options.signal?.aborted) return processFreehandPoints(points, minDistance);
+
   const worker = getOrCreateBrushWorker();
   if (!worker) {
     return processFreehandPoints(points, minDistance);

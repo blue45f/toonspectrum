@@ -6,7 +6,7 @@
  * 각 손가락 Flex(0~1) 및 Spread(-1~1) 슬라이더로 세밀하게 미세 조정 가능.
  */
 
-import { Hand, RotateCcw, Video } from "lucide-react";
+import { CircleStop, RotateCcw, Video } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -110,11 +110,11 @@ export function StudioHandPosePanel({
         })}
       >
         {webcamActive ? (
-          <Hand size={13} aria-hidden />
+          <CircleStop size={13} aria-hidden />
         ) : (
           <Video size={13} aria-hidden />
         )}
-        {webcamActive ? "🔴 손 인식 중지" : "✋ 웹캠 손 인식 시작"}
+        {webcamActive ? "손 인식 중지" : "웹캠 손 인식 시작"}
       </button>
 
       {/* 프리셋 칩 */}

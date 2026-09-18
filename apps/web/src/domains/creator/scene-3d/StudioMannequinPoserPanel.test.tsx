@@ -742,7 +742,7 @@ describe("StudioMannequinPoserPanel", () => {
     await waitFor(() => expect((heightSlider as HTMLInputElement).value).toBe("190"));
   });
 
-  it("exposes 3D Head Model (Face Proportions) presets and morphing sliders (CSP 2.0)", async () => {
+  it("exposes face proportion presets and morphing sliders", async () => {
     renderPanel();
     fireEvent.click(screen.getByRole("button", { name: /^체형/ }));
 

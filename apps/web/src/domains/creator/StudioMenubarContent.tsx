@@ -84,6 +84,7 @@ import type { StudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import type { ExportFormat } from "./export/studio-export";
 import type { PsdExportResult } from "./export/studio-psd-export";
 import type { SvgExportResult } from "./export/studio-svg-export";
+import type { StudioVectorPdfExportResult } from "./export/studio-vector-pdf-product";
 import type { StudioWillV1PageExportResult } from "./export/studio-will-v1-export-bridge";
 import type {
   StudioRasterEncoded,
@@ -889,6 +890,7 @@ export interface StudioMenubarContentHandlers extends StudioProjectReviewActionH
   exportCurrentPageToInkMl: () => Promise<StudioInkMlExportResult>;
   exportCurrentPageToWillV1: () => Promise<StudioWillV1PageExportResult>;
   exportCurrentPageToSvg: () => Promise<SvgExportResult>;
+  exportCurrentPageToVectorPdf?: () => Promise<StudioVectorPdfExportResult>;
   handleCapturePagesForPreset: (scope: "current" | "all") => Promise<HTMLCanvasElement[]>;
   handleCapturePagesForIndices: (indices: number[]) => Promise<HTMLCanvasElement[]>;
   handleCopyToClipboard: () => Promise<void>;
@@ -1107,6 +1109,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     exportCurrentPageToInkMl,
     exportCurrentPageToWillV1,
     exportCurrentPageToSvg,
+    exportCurrentPageToVectorPdf,
     handleCapturePagesForPreset,
     handleCapturePagesForIndices,
     toggleAnimationTimeline,
@@ -1720,6 +1723,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                       exportCurrentPageToInkMl={exportCurrentPageToInkMl}
                       exportCurrentPageToWillV1={exportCurrentPageToWillV1}
                       exportCurrentPageToSvg={exportCurrentPageToSvg}
+                      exportCurrentPageToVectorPdf={exportCurrentPageToVectorPdf}
                       exportCurrentPageToPsd={exportCurrentPageToPsd}
                       exportCurrentPageToRasterInterchange={exportCurrentPageToRasterInterchange}
                       setExportScale={setExportScale}

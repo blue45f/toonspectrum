@@ -33,10 +33,10 @@ describe("site-wide visual UX contracts", () => {
       const image = fileURLToPath(new URL(`../../../public${profile.image}`, import.meta.url));
       expect(existsSync(image), `${profile.kind}: ${profile.image}`).toBe(true);
       if (profile.video) {
-        const landscape = fileURLToPath(new URL(`../../../public${profile.video.src}`, import.meta.url));
-        const portrait = fileURLToPath(new URL(`../../../public${profile.video.portraitSrc}`, import.meta.url));
-        expect(existsSync(landscape)).toBe(true);
-        expect(existsSync(portrait)).toBe(true);
+        const routeHeader = fileURLToPath(new URL(`../../../public${profile.video.src}`, import.meta.url));
+        const routeHeaderPoster = fileURLToPath(new URL(`../../../public${profile.video.poster}`, import.meta.url));
+        expect(existsSync(routeHeader)).toBe(true);
+        expect(existsSync(routeHeaderPoster)).toBe(true);
       }
     }
   });
@@ -64,7 +64,9 @@ describe("site-wide visual UX contracts", () => {
     expect(component).toContain("videoFailed");
     expect(component).toContain('data-ready={videoReady ? "true" : "false"}');
     expect(routeCss).toContain('video[data-ready="true"]');
-    expect(component).toContain("aria-label={paused");
+    expect(component).toContain('data-route-visual-video-ready={videoReady ? "true" : "false"}');
+    expect(component).not.toContain('media="(max-width: 639px)"');
+    expect(component).toContain("aria-label={t(paused ? COPY.playMotion : COPY.pauseMotion)}");
     expect(component).not.toMatch(/from ["'](?:remotion|@remotion)/u);
     expect(routeCss).toContain("perspective: 1050px");
     expect(routeCss).toContain("prefers-reduced-motion: reduce");

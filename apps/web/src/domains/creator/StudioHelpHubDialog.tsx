@@ -880,7 +880,7 @@ export function StudioHelpHubDialog({
           { section: "diagnostics" as const, icon: Stethoscope, title: locale === "ko" ? "느림 · 검은 화면 · 입력 문제" : "Slowness, black canvas or input issues", body: locale === "ko" ? "브라우저·GPU·저장소·렌더 백엔드를 실제 값으로 점검합니다." : "Inspect browser, GPU, storage and render backend using measured values." },
           { section: "recovery" as const, icon: LifeBuoy, title: locale === "ko" ? "초안·작업 복구" : "Draft and work recovery", body: locale === "ko" ? "로컬 저장소와 복구 후보를 덮어쓰기 전에 안전하게 확인합니다." : "Inspect local storage and recovery candidates before overwriting them." },
           { section: "bug-report" as const, icon: Bug, title: locale === "ko" ? "재현되는 오류 신고" : "Report a reproducible problem", body: locale === "ko" ? "포함·제외 항목을 먼저 보여 주고 오류 저널과 진단 패키지를 만듭니다." : "Review included and excluded data, then build a diagnostic package." },
-          { section: "terminology" as const, icon: Command, title: locale === "ko" ? "CSP · Photoshop 용어로 찾기" : "Find features using CSP or Photoshop terms", body: locale === "ko" ? "익숙한 타사 도구 이름을 툰스튜디오 명령과 연결합니다." : "Map familiar editor terms to ToonStudio commands." },
+          { section: "terminology" as const, icon: Command, title: locale === "ko" ? "다른 앱 용어로 찾기" : "Find features using other app terms", body: locale === "ko" ? "익숙한 다른 앱의 도구 이름을 툰스튜디오 명령과 연결합니다." : "Map familiar editor terms to ToonStudio commands." },
         ].map((item) => {
           const Icon = item.icon;
           return (
