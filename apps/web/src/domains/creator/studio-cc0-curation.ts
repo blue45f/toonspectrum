@@ -91,6 +91,37 @@ export function studioCc0StyleLabel(asset: Pick<StudioCc0Asset, "kind" | "provid
   return hasDetailedStyle(asset) ? "디테일 PBR" : "스타일라이즈 · 로우폴리";
 }
 
+/**
+ * Marketplace admission is intentionally stricter than ordinary Studio insertion.
+ * The market should surface finished, visually reviewed assets with enough source
+ * resolution, while 3D listings additionally require a successful Studio runtime pass.
+ */
+export function isStudioCc0MarketplaceReady(asset: StudioCc0Asset): boolean {
+  if (
+    getStudioCc0ReviewStatus(asset) !== "contact-sheet-reviewed"
+    || isStudioCc0AssemblyComponent(asset)
+    || asset.role !== "finished-asset"
+  ) {
+    return false;
+  }
+  const width = asset.width ?? 0;
+  const height = asset.height ?? 0;
+  switch (asset.kind) {
+    case "model":
+      return asset.browserRenderVerified === true
+        && asset.studioRuntimeVerified === true
+        && hasDetailedStyle(asset);
+    case "background":
+      return Math.max(width, height) >= 2048;
+    case "prop-image":
+      return Math.min(width, height) >= 1536;
+    case "surface-texture":
+      return Math.min(width, height) >= 1024;
+    case "effect-mask":
+      return Math.min(width, height) >= 512;
+  }
+}
+
 /** Apply after the ordinary text/kind filter; default selection hides parts.
  * This also protects against a stale cached manifest offering a quarantined ID.
  * Stable copies preserve the source array and every retained asset identity.

@@ -13,16 +13,15 @@ Raise the visual quality floor of Studio asset discovery and Marketplace without
 
 ## Marketplace source expansion
 
-The reviewed CC0 Marketplace registry grows from **14 to 100 distinct source assets**:
+The strict reviewed CC0 Marketplace fallback catalogue now grows from **100 to 338 market-ready source assets** selected from the 1,427-entry visually reviewed CC0 manifest:
 
-- 28 high-resolution backgrounds, generally 2048×1152;
-- 24 transparent 2D prop renders, 1536×1536;
-- 24 actual PBR GLB models with integrity and mobile-budget validation;
-- 12 production surface textures, typically 2K;
-- 12 transparent effect masks for fire, smoke, magic, sparks and action accents.
-The fallback catalogue is intentionally round-robin ordered across background, 2D prop, 3D PBR, material and effect sources, so an empty/offline Marketplace shows useful variety on its first page instead of one homogeneous asset class.
+- **39** high-resolution backgrounds;
+- **71** transparent 2D prop renders;
+- **50** detailed PBR GLB models that pass both browser-render and Studio-runtime verification;
+- **82** production surface textures;
+- **96** transparent effect masks.
 
-Marketplace records now retain the real provider (`Poly Haven` or `Kenney`) and describe each source accurately. Surface textures and effect masks are no longer mislabeled as transparent 2D prop renders.
+Marketplace admission is no longer a fixed hand-picked ID list. It is derived from visual-review evidence, finished-asset role, runtime verification and per-kind quality floors, while quarantined/assembly-only assets remain excluded. The generated fallback catalogue is deterministic and preserves real provider/source metadata.
 
 ## Marketplace card quality
 
@@ -40,3 +39,25 @@ The 20 legacy portrait backgrounds that previously used 627×940 JPEGs now have 
 Each replacement has a deterministic source manifest with prompt hash, output SHA-256 and byte size. The 20 assets are marked `full-image / usable / recommended`, contain no characters or readable text, and the old small-panel-only metadata is removed from the active quality registry. Only four unrelated legacy compatibility backgrounds remain outside the default picker.
 
 The replacement contract now verifies all 20 output files are real PNGs, exactly 1152×2048, and match the recorded byte count and SHA-256. Existing documents that reference the preserved legacy IDs therefore receive the upgraded background without an ID migration.
+
+## Final curation completion — 2026-09-18
+
+The repository-wide completion pass keeps small assets when their role requires them instead of treating pixel size alone as a quality defect. The strict visual audit reports 86 sub-256px rasters, all accounted for by compact CC0 thumbnails, Android density-specific launcher/splash assets, PWA/brand icons, or test golden images.
+
+The 20 obsolete 627×940 legacy Studio backgrounds had both JPG and PNG compatibility binaries tracked. Their 40 binaries (**3.96 MiB**) are now removed because the same stable scene IDs resolve to reviewed 1152×2048 GPT Image 2.5 replacements. Runtime source search found no live source reference to the deleted binaries, and the 20/20 replacement contract still verifies generated output dimensions, byte counts and SHA-256.
+
+All **53/53 scene templates** now expose at least two reviewed high-quality background recommendations. Unified asset search carries the relationship in both directions: templates surface recommended backgrounds, and backgrounds expose linked templates.
+
+Validation for this completion pass:
+
+- focused Studio asset regression: **5 files / 511 tests passed**;
+- tracked visual audit: **2,485 visual files**, **0 visual gate violations**;
+- deep format audit: **2,483 raster/SVG files**, **0 unexpected extension/MIME mismatches**;
+- active VRM thumbnails: **88/88 >= 768px**;
+- Studio legacy image manifest audit: **9 originals / 0 errors / 0 small originals**;
+- curated CC0 background manifest audit: **28 assets / 0 errors**;
+- Studio asset workspace: **456 real visual assets / 100% non-tool preview coverage**;
+- Marketplace CC0 catalogue regeneration: deterministic, **338** market-ready sources;
+- pre-commit ESLint + secret scan: pass.
+
+The repository-wide TypeScript and Vite bundle gates remain blocked by unrelated failures already present on the current `main`. A clean TypeScript replay reports no diagnostics in any TS/TSX/MTS file changed by this branch; the bundle reaches duplicate declaration/import failures in unrelated legal/i18n and Studio-shell sources. Those files are unchanged by this curation branch, while the asset-specific tests and audits above pass.

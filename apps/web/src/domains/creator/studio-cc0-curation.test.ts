@@ -7,6 +7,7 @@ import {
   getStudioCc0ReviewStatus,
   isStudioCc0AssemblyComponent,
   isStudioCc0EligibleForNewSelection,
+  isStudioCc0MarketplaceReady,
   isStudioCc0Quarantined,
   studioCc0ReviewLabel,
   studioCc0StyleLabel,
@@ -108,6 +109,36 @@ describe("visually reviewed CC0 selection", () => {
     expect(studioCc0StyleLabel(stylized)).toContain("로우폴리");
     expect(studioCc0StyleLabel(texture)).toBe("원본 표면 재질");
     expect(studioCc0StyleLabel(effect)).toBe("투명 효과");
+  });
+  it("admits only finished reviewed high-resolution assets to the marketplace", () => {
+    const model = {
+      ...asset("polyhaven-runtime-chair", "Poly Haven"),
+      role: "finished-asset",
+      style: "pbr-detailed",
+      studioRuntimeVerified: true,
+    };
+    expect(isStudioCc0MarketplaceReady(model)).toBe(true);
+    expect(isStudioCc0MarketplaceReady({...model, studioRuntimeVerified: false})).toBe(false);
+    expect(isStudioCc0MarketplaceReady({...model, style: "stylized-low-poly"})).toBe(false);
+    expect(isStudioCc0MarketplaceReady({...model, role: "assembly-component"})).toBe(false);
+
+    const background = {
+      ...asset("polyhaven-market-bg", "Poly Haven", "background"),
+      role: "finished-asset",
+      width: 2048,
+      height: 1152,
+    };
+    expect(isStudioCc0MarketplaceReady(background)).toBe(true);
+    expect(isStudioCc0MarketplaceReady({...background, width: 1536})).toBe(false);
+
+    const effect = {
+      ...asset("kenney-market-effect", "Kenney", "effect-mask"),
+      role: "finished-asset",
+      width: 512,
+      height: 512,
+    };
+    expect(isStudioCc0MarketplaceReady(effect)).toBe(true);
+    expect(isStudioCc0MarketplaceReady({...effect, width: 511})).toBe(false);
   });
   it("retains explicit enlargement, contrast, focus and success-only dismissal contracts", () => {
     const source = readFileSync(new URL("./StudioCc0AssetLibraryPanel.tsx", import.meta.url), "utf8");

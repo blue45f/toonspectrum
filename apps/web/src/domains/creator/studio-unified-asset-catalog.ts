@@ -8,6 +8,10 @@ import {
   studio2dResolutionLabel,
 } from "./studio-2d-asset-quality";
 import {
+  getStudioBackgroundTemplateIds,
+  getStudioSceneTemplateBackgroundIds,
+} from "./studio-scene-template-asset-recommendations";
+import {
   listStudioObjectInsertItems,
   type StudioObjectInsertItem,
 } from "./studio-object-insert-catalog";
@@ -238,9 +242,12 @@ function queryScore(
 function backgroundItem(
   background: StudioUnifiedBackgroundSource,
   index: number,
+  sceneTemplates: readonly SceneTemplate[],
 ): StudioUnifiedAssetItem {
   const metadata = getStudio2dAssetMetadata(background);
   const recommended = isRecommendedStudio2dScene(background);
+  const linkedTemplateIds = getStudioBackgroundTemplateIds(background.id);
+  const linkedTemplates = sceneTemplates.filter((template) => linkedTemplateIds.includes(template.id));
   const vector = !background.imgSrc && Boolean(background.svg);
   const rightsUnverified = metadata?.provenance.licenseStatus === "unverified";
   const cc0Verified = metadata?.provenance.licenseStatus === "cc0-verified";
@@ -253,6 +260,7 @@ function backgroundItem(
     recommended ? "검수 추천" : vector ? "벡터" : "Studio 내장",
     metadata ? studio2dResolutionLabel(background) : vector ? "크기 조절" : "원본 확인 필요",
     cc0Verified ? "CC0" : rightsUnverified ? "권리 미확인" : null,
+    linkedTemplates.length > 0 ? `템플릿 연계 ${linkedTemplates.length}` : null,
   ].filter((value): value is string => Boolean(value));
   const discoverability: StudioUnifiedAssetDiscoverability = rightsUnverified
     ? "caution"
@@ -273,8 +281,15 @@ function backgroundItem(
       metadata?.environment ?? "",
       metadata?.timeOfDay ?? "",
       ...(metadata?.tags ?? []),
+      ...linkedTemplates.flatMap((template) => [
+        template.id,
+        template.label,
+        template.category,
+        template.description,
+      ]),
       "배경",
       "장면",
+      linkedTemplates.length > 0 ? "템플릿 추천" : "",
     ].filter(Boolean)),
     badges: Object.freeze(badges),
     preview,
@@ -289,7 +304,11 @@ function backgroundItem(
 function sceneTemplateItem(
   template: SceneTemplate,
   index: number,
+  backgrounds: readonly StudioUnifiedBackgroundSource[],
 ): StudioUnifiedAssetItem {
+  const recommendedBackgroundIds = getStudioSceneTemplateBackgroundIds(template.id);
+  const recommendedBackgrounds = backgrounds.filter((background) =>
+    recommendedBackgroundIds.includes(background.id));
   return {
     id: `scene-template:${template.id}`,
     category: "scene",
@@ -302,10 +321,22 @@ function sceneTemplateItem(
       template.label,
       template.category,
       template.description,
+      ...recommendedBackgrounds.flatMap((background) => [
+        background.id,
+        background.label,
+        background.genre,
+      ]),
       "장면",
       "템플릿",
+      recommendedBackgrounds.length > 0 ? "추천 배경" : "",
+    ].filter(Boolean)),
+    badges: Object.freeze([
+      "장면 레시피",
+      "편집 가능",
+      ...(recommendedBackgrounds.length > 0
+        ? [`추천 배경 ${recommendedBackgrounds.length}`]
+        : []),
     ]),
-    badges: Object.freeze(["장면 레시피", "편집 가능"]),
     preview: { kind: "none" },
     useMode: "apply",
     useLabel: "장면 배치",
@@ -435,12 +466,14 @@ export function buildStudioUnifiedAssetCatalog(
   const elements = input.elements ?? listStudioElementLibrary();
   const objects = input.objects ?? listStudioObjectInsertItems();
   const nativeTools = input.nativeTools ?? DEFAULT_NATIVE_TOOLS;
+  const backgrounds = input.backgrounds ?? [];
+  const sceneTemplates = input.sceneTemplates ?? [];
   const localAssets = [...(input.localAssets ?? [])].sort(
     (left, right) => right.createdAt - left.createdAt,
   );
   const candidates = [
-    ...(input.backgrounds ?? []).map((item, index) => backgroundItem(item, index)),
-    ...(input.sceneTemplates ?? []).map((item, index) => sceneTemplateItem(item, index)),
+    ...backgrounds.map((item, index) => backgroundItem(item, index, sceneTemplates)),
+    ...sceneTemplates.map((item, index) => sceneTemplateItem(item, index, backgrounds)),
     ...localAssets.map((item, index) => localItem(item, index)),
     ...nativeTools.map((item, index) => nativeToolItem(item, index)),
     ...elements.map((item, index) => elementItem(item, index)),
