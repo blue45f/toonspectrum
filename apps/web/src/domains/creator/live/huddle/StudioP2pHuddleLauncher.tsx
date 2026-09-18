@@ -47,6 +47,22 @@ export default function StudioP2pHuddleLauncher() {
     controller.current?.setMediaPeerScope(proximityMedia ? nearbyPeerIds : null);
   }, [active, nearbyPeerIds, proximityMedia]);
   useEffect(() => {
+    if (!active) return undefined;
+    const resume = () => {
+      if (document.visibilityState === "visible" && navigator.onLine !== false) {
+        controller.current?.resume();
+      }
+    };
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("online", resume);
+    window.addEventListener("pageshow", resume);
+    return () => {
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("online", resume);
+      window.removeEventListener("pageshow", resume);
+    };
+  }, [active]);
+  useEffect(() => {
     const element = log.current;
     if (element && element.scrollHeight - element.scrollTop - element.clientHeight < 160)
       element.scrollTop = element.scrollHeight;

@@ -127,6 +127,65 @@ describe("P2P huddle consent and delivery", () => {
     expect(controller.snapshot().closed).toBe(false);
     expect(controller.snapshot().error).toContain("권한");
   });
+  it("prefers the front camera without requiring an exact mobile device match", async () => {
+    const camera = track("video");
+    const getUserMedia = vi.fn(async () => stream([camera]));
+    const { controller } = single({ getUserMedia });
+
+    await controller.setVideo("camera");
+
+    expect(getUserMedia).toHaveBeenCalledWith({
+      video: expect.objectContaining({
+        facingMode: { ideal: "user" },
+      }),
+      audio: false,
+    });
+    expect(controller.snapshot().camera).toBe(true);
+  });
+
+  it("restarts ICE after a disconnected media link and keeps the session alive", () => {
+    let inbound: ((sender: StudioLiveParticipant, raw: string) => void) | null = null;
+    let connectionState: RTCPeerConnectionState = "new";
+    const restartIce = vi.fn();
+    const replaceTrack = vi.fn(async () => undefined);
+    const peer = {
+      get connectionState() { return connectionState; },
+      signalingState: "stable",
+      localDescription: null,
+      remoteDescription: null,
+      addTransceiver: vi.fn(() => ({ sender: { replaceTrack } })),
+      setLocalDescription: vi.fn(async () => undefined),
+      setRemoteDescription: vi.fn(async () => undefined),
+      addIceCandidate: vi.fn(async () => undefined),
+      restartIce,
+      close: vi.fn(),
+      onicecandidate: null,
+      ontrack: null,
+      onnegotiationneeded: null,
+      onconnectionstatechange: null,
+    } as unknown as RTCPeerConnection;
+    const port: StudioLiveDirectPort = {
+      getPeers: () => [B],
+      subscribe: (listener) => { inbound = listener; return () => { inbound = null; }; },
+      send: () => true,
+    };
+    const controller = new StudioP2pHuddleController(A, port, {
+      createPeerConnection: () => peer,
+    });
+    sessions.push(controller);
+    controller.start();
+    inbound?.(B, JSON.stringify({
+      kind: "state", epoch: "epoch-b", muted: false, camera: false, sharing: false, hand: false,
+    }));
+
+    connectionState = "disconnected";
+    peer.onconnectionstatechange?.(new Event("connectionstatechange"));
+
+    expect(restartIce).toHaveBeenCalledOnce();
+    expect(controller.snapshot().closed).toBe(false);
+    expect(controller.snapshot().error).toContain("복구");
+  });
+
   it("creates media peer connections only for the current proximity scope", () => {
     let inbound: ((sender: StudioLiveParticipant, raw: string) => void) | null = null;
     const close = vi.fn();

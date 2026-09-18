@@ -23,6 +23,7 @@ interface Link {
   pc: RTCPeerConnection; audio: RTCRtpSender; video: RTCRtpSender;
   makingOffer: boolean; ignoreOffer: boolean; settingAnswer: boolean;
   pendingIce: RTCIceCandidateInit[]; queue: Promise<void>; epoch: string; pendingSignals: number;
+  iceRestartAttempts: number; lastIceRestartAt: number;
 }
 export interface HuddleDependencies {
   createPeerConnection?: (config: RTCConfiguration) => RTCPeerConnection;
@@ -95,6 +96,11 @@ export class StudioP2pHuddleController {
     for (const [id, peer] of this.peers) {
       if (!available.has(id) || this.now() - peer.lastSeen > 12_000) this.removePeer(id);
       else if (peer.reactionUntil < this.now()) peer.reaction = null;
+    }
+    for (const [id, link] of this.links) {
+      if (link.pc.connectionState === "failed" || link.pc.connectionState === "disconnected") {
+        this.restartLinkIce(id, link);
+      }
     }
     this.announce(); this.emit();
   }
@@ -208,7 +214,8 @@ export class StudioP2pHuddleController {
         ?? new RTCPeerConnection(huddleRtcConfiguration());
       const link: Link = { pc, audio: pc.addTransceiver("audio", { direction: "sendrecv" }).sender,
         video: pc.addTransceiver("video", { direction: "sendrecv" }).sender, makingOffer: false,
-        ignoreOffer: false, settingAnswer: false, pendingIce: [], queue: Promise.resolve(), epoch: peer.epoch, pendingSignals: 0 };
+        ignoreOffer: false, settingAnswer: false, pendingIce: [], queue: Promise.resolve(), epoch: peer.epoch, pendingSignals: 0,
+        iceRestartAttempts: 0, lastIceRestartAt: 0 };
       this.links.set(id, link);
       pc.onicecandidate = ({ candidate }) => {
         if (candidate && this.links.get(id) === link) this.send(id,
@@ -222,7 +229,13 @@ export class StudioP2pHuddleController {
       pc.onconnectionstatechange = () => {
         if (this.links.get(id) !== link) return;
         peer.connection = pc.connectionState;
-        if (pc.connectionState === "failed") this.error = "직접 통화 연결에 실패했습니다. 다른 네트워크에서 재참여해 주세요. TURN 중계는 사용하지 않습니다.";
+        if (pc.connectionState === "connected") {
+          link.iceRestartAttempts = 0;
+          link.lastIceRestartAt = 0;
+          this.error = null;
+        } else if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+          this.restartLinkIce(id, link);
+        }
         this.emit();
       };
       pc.onnegotiationneeded = () => {
@@ -248,6 +261,45 @@ export class StudioP2pHuddleController {
   }
   private signalError(id: string, link: Link): void {
     if (!this.closed && this.links.get(id) === link) this.fail("통화 연결 신호를 처리하지 못했습니다. 나간 뒤 재참여해 주세요.");
+  }
+  private restartLinkIce(id: string, link: Link): boolean {
+    if (this.closed || this.links.get(id) !== link) return false;
+    const state = link.pc.connectionState;
+    if (state !== "failed" && state !== "disconnected") return false;
+    const now = this.now();
+    if (now - link.lastIceRestartAt < 4_000) return false;
+    if (link.iceRestartAttempts >= 3) {
+      this.error = "직접 통화 연결을 자동 복구하지 못했습니다. 네트워크를 확인하거나 P2P 대화에 다시 참여해 주세요. TURN 중계는 사용하지 않습니다.";
+      return false;
+    }
+    link.lastIceRestartAt = now;
+    link.iceRestartAttempts += 1;
+    this.error = "네트워크 변경을 감지해 직접 통화 연결을 복구하는 중입니다.";
+    try {
+      if (typeof link.pc.restartIce === "function") {
+        link.pc.restartIce();
+      } else {
+        link.queue = link.queue.then(async () => {
+          if (this.links.get(id) !== link || link.pc.signalingState !== "stable") return;
+          const offer = await link.pc.createOffer({ iceRestart: true });
+          await link.pc.setLocalDescription(offer);
+          if (this.links.get(id) === link) this.sendDescription(id, link);
+        }).catch(() => this.signalError(id, link));
+      }
+      return true;
+    } catch {
+      this.signalError(id, link);
+      return false;
+    }
+  }
+  resume(): void {
+    if (this.closed) return;
+    this.sync();
+    for (const [id, link] of this.links) {
+      if (link.pc.connectionState === "failed" || link.pc.connectionState === "disconnected") {
+        this.restartLinkIce(id, link);
+      }
+    }
   }
   private enqueueSignal(id: string, packet: HuddlePacket & { kind: "description" | "ice" }): void {
     const link = this.ensureLink(id);
@@ -294,7 +346,7 @@ export class StudioP2pHuddleController {
     if (this.closed || !this.unsubscribe) return;
     try {
       const constraints = { video: { width: { ideal: 640, max: 1280 }, height: { ideal: 360, max: 720 },
-        frameRate: { ideal: 15, max: 24 } }, audio: false };
+        frameRate: { ideal: 15, max: 24 }, facingMode: { ideal: "user" } }, audio: false };
       const stream = mode === "screen"
         ? await (this.deps.getDisplayMedia?.() ?? navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { max: 15 } }, audio: false }))
         : await (this.deps.getUserMedia?.(constraints) ?? navigator.mediaDevices.getUserMedia(constraints));

@@ -309,7 +309,7 @@ export function useStudioVrmWebcamSession({
               width: { ideal: 640 },
               height: { ideal: 480 },
               frameRate: { ideal: 30, max: 30 },
-              facingMode: "user",
+              facingMode: { ideal: "user" },
             },
             audio: false,
           });
