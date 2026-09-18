@@ -58,8 +58,12 @@ import {
   revokeAuthOneTimeTokens,
 } from "../../server/auth-one-time-token";
 import {
+  oauthLinkSessionCookieName,
   oauthPkceVerifierCookieName,
   oauthStateCookieName,
+  resolveOAuthLinkSessionCookieClearOptions,
+  resolveOAuthLinkSessionCookieOptions,
+  resolveOAuthLinkSessionCookieValue,
   resolveOAuthPkceVerifierCookieClearOptions,
   resolveOAuthPkceVerifierCookieOptions,
   resolveOAuthPkceVerifierCookieValue,
@@ -329,6 +333,16 @@ export class AuthController {
         error: "이 제공자의 계정 연결을 시작하지 못했어요.",
       });
     }
+    if (provider === "apple") {
+      const linkSessionToken = resolveSessionCookieValue(request.headers.cookie);
+      const linkPrincipal = verifySessionToken(linkSessionToken);
+      if (!linkSessionToken || !linkPrincipal || linkPrincipal.userId !== userId) {
+        throw new UnauthorizedException({
+          error: "Apple 계정을 연결하려면 다시 로그인해 주세요.",
+        });
+      }
+      applyOAuthLinkSessionCookie(response, provider, linkSessionToken);
+    }
     applyOAuthStateCookie(response, provider, state);
     if (pkceVerifier) {
       applyOAuthPkceVerifierCookie(response, provider, pkceVerifier);
@@ -347,6 +361,7 @@ export class AuthController {
     @Query("error") error: unknown,
     @Req() request: Request,
     @Res() res: Response,
+    appleUser?: unknown,
   ) {
     const web = webAppBaseUrl();
     if (!isOAuthProvider(provider))
@@ -393,11 +408,15 @@ export class AuthController {
     // Consume browser-bound material only after the callback proves it owns the
     // current flow. A stale callback must not erase a newer tab's valid state.
     clearOAuthStateCookie(res, provider);
+    if (provider === "apple") clearOAuthLinkSessionCookie(res, provider);
     if (provider === "github") clearOAuthPkceVerifierCookie(res, provider);
     let linkToUserId: string | undefined;
     if (stateContext.purpose === "link") {
       const principal = verifySessionToken(
-        resolveSessionCookieValue(request.headers.cookie),
+        resolveSessionCookieValue(request.headers.cookie)
+          ?? (provider === "apple"
+            ? resolveOAuthLinkSessionCookieValue(request.headers.cookie, provider)
+            : null),
       );
       if (!principal || principal.userId !== stateContext.userId) {
         return res.redirect(`${web}/auth/callback#error=bad_state`);
@@ -447,14 +466,24 @@ export class AuthController {
             code,
             state,
             browserPkceVerifier ?? undefined,
-            { linkToUserId },
+            provider === "apple"
+              ? { linkToUserId, appleUser }
+              : { linkToUserId },
           )
-        : await handleOAuthCallback(
-            provider,
-            code,
-            state,
-            browserPkceVerifier ?? undefined,
-          );
+        : provider === "apple"
+          ? await handleOAuthCallback(
+              provider,
+              code,
+              state,
+              browserPkceVerifier ?? undefined,
+              { appleUser },
+            )
+          : await handleOAuthCallback(
+              provider,
+              code,
+              state,
+              browserPkceVerifier ?? undefined,
+            );
       const token = signSession(
         user.id,
         normalizeSessionVersion(user.sessionVersion),
@@ -483,6 +512,27 @@ export class AuthController {
       );
       return res.redirect(`${web}/auth/callback#error=oauth_failed`);
     }
+  }
+
+  @Post("oauth/apple/callback")
+  async oauthAppleCallback(
+    @Body() body: Record<string, unknown>,
+    @Req() request: Request,
+    @Res() response: Response,
+  ) {
+    // Apple sends web authorization responses as application/x-www-form-urlencoded
+    // form_post when name/email scopes are requested. Reuse the same browser-bound
+    // state/session checks as every other provider and only pass the one-time user
+    // name payload through for first-authorization profile seeding.
+    return this.oauthCallback(
+      "apple",
+      body.code,
+      body.state,
+      body.error,
+      request,
+      response,
+      body.user,
+    );
   }
 
   // GIS(Google Identity Services) ID 토큰 로그인 — 프론트 GIS 버튼이 받은 ID 토큰을 서버 검증.
@@ -1369,6 +1419,22 @@ function applyOAuthStateCookie(
   );
 }
 
+function applyOAuthLinkSessionCookie(
+  response: Response,
+  provider: OAuthProviderId,
+  token: string,
+): void {
+  response.cookie(
+    oauthLinkSessionCookieName(provider),
+    token,
+    {
+      ...resolveOAuthLinkSessionCookieOptions(provider),
+      httpOnly: true,
+      secure: true,
+    },
+  );
+}
+
 function applyOAuthPkceVerifierCookie(
   response: Response,
   provider: OAuthProviderId,
@@ -1392,6 +1458,16 @@ function clearOAuthStateCookie(
   response.clearCookie(
     oauthStateCookieName(provider),
     resolveOAuthStateCookieClearOptions(provider),
+  );
+}
+
+function clearOAuthLinkSessionCookie(
+  response: Response,
+  provider: OAuthProviderId,
+): void {
+  response.clearCookie(
+    oauthLinkSessionCookieName(provider),
+    resolveOAuthLinkSessionCookieClearOptions(provider),
   );
 }
 

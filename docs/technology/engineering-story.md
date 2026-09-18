@@ -92,7 +92,7 @@ Open API entries never equate public access with redistribution permission. Refe
 
 ## Authentication wording
 
-The current provider allowlist is Google, Kakao, Naver and GitHub. Toss is not described as excluded merely because it is paid. Its product scope, review process and security operating model differ from a general web OAuth adapter. Provider policy and pricing must be rechecked at implementation time.
+The current provider allowlist is Google, Apple, Kakao, Naver and GitHub. Toss is not described as excluded merely because it is paid. Its product scope, review process and security operating model differ from a general web OAuth adapter. Provider policy and pricing must be rechecked at implementation time.
 
 Public examples may contain environment variable names, but never client secrets, API keys, private endpoints, user identifiers or operations credentials.
 

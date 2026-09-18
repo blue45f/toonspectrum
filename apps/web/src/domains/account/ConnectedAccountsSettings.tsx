@@ -12,7 +12,7 @@ import { GoogleIdentityButton } from "@/domains/auth/components/google-identity-
 import { persistSession } from "@/compat/auth-session-store";
 import { api, apiPath } from "@/infrastructure/api";
 
-type ProviderId = "google" | "kakao" | "naver" | "github";
+type ProviderId = "google" | "apple" | "kakao" | "naver" | "github";
 
 type LinkedAccounts = {
   password: boolean;
@@ -25,6 +25,7 @@ const PROVIDERS: ReadonlyArray<{
   label: string;
 }> = [
   { id: "google", label: "Google" },
+  { id: "apple", label: "Apple" },
   { id: "kakao", label: "카카오" },
   { id: "naver", label: "네이버" },
   { id: "github", label: "GitHub" },
