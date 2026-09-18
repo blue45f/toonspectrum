@@ -1,6 +1,8 @@
 import {
   getCurrentUiLocale,
+  translateBilingualValueForActiveLocale,
   translateBilingualValueForLocale,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, PanelsTopLeft, PencilLine, Plus, Zap } from "lucide-react";
 import { useRef, useState } from "react";
@@ -10,11 +12,6 @@ import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { buildStudioModeLaunchHref, resolveStudioModeCreationPlan } from "../studio-mode-creation-plan";
 import { createStudioProjectWithInitialDocument } from "../studio-project-creation";
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioQuickStart", ko, en);
@@ -45,7 +42,7 @@ const QUICK_STARTS = [
 type QuickStart = (typeof QUICK_STARTS)[number];
 
 /** A deliberate click creates a real, recoverable project; mounting/prefetching never does. */
-export function StudioQuickStart({ locale: _locale }: { readonly locale: "ko" | "en" }) {
+export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
   useBilingualI18nRevision();
   const navigate = useNavigate();
   const starting = useRef(false);

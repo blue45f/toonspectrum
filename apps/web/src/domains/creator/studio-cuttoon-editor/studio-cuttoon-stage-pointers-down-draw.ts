@@ -53,7 +53,7 @@ import {
   submitStudioCanonicalVNextQualityShadowFinalParity,
 } from "../studio-canonical-vnext-quality-shadow";
 import { studioElementIdOf } from "../canvas/studio-canvas-shared-runtime";
-import { setStudioStrokeFocusActivity } from "../studio-stroke-focus-activity";
+import { setStudioStrokeFocusActivity, shouldActivateStudioStrokeFocusForPointer } from "../studio-stroke-focus-activity";
 import { shouldAppendStudioCausalInkSample } from "../studio-causal-ink";
 import { shouldOwnStudioCoalescedBatchDraft } from "../studio-coalesced-batch-mutation";
 import { COLOR_WHEEL_LONG_PRESS_MS, shouldCancelLongPress } from "../studio-color-wheel";
@@ -685,7 +685,11 @@ export function bindStudioCuttoonStagePointersDownDraw(
       );
       drawingInkTimeOriginRef.current = studioInkGestureTimeOrigin(next.inkInput, pointerSample.timeStamp);
       drawingRef.current = next;
-      setStudioStrokeFocusActivity("canvas-stroke", true);
+      // Finger drawing must not reflow shell chrome on pointerdown: mobile WebViews can otherwise
+      // spend the first paint on layout/compositing instead of the first visible dab.
+      if (shouldActivateStudioStrokeFocusForPointer(pointerSample.pointerType)) {
+        setStudioStrokeFocusActivity("canvas-stroke", true);
+      }
       drawingGesturePreviewPublisherRef.current.begin({
         pageId: activePage.id,
         documentGeneration: collaborationAccessRef.current.documentGeneration,

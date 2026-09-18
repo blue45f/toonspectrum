@@ -39,6 +39,14 @@ export function studioStrokeFocusActivitySnapshot(): StudioStrokeFocusPhase {
   return phase;
 }
 
+/**
+ * Finger drawing keeps shell chrome stable on pointerdown. Hiding floating chrome for a touch
+ * contact can trigger layout/compositing work before the first visible dab on mobile WebViews.
+ */
+export function shouldActivateStudioStrokeFocusForPointer(pointerType: string): boolean {
+  return pointerType !== "touch";
+}
+
 export function subscribeStudioStrokeFocusActivity(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);

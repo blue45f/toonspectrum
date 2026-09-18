@@ -5,6 +5,10 @@ import {
   type PublicShareOgReaders,
   type PublicShareOgSource,
 } from "./og-public-share";
+import {
+  resolvePublicOgPage,
+  type PublicOgReaders,
+} from "./og-public-pages";
 
 const DEFAULT_CANONICAL_HOST = "www.toonstudio.cloud";
 const CANONICAL_HOST_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/iu;
@@ -52,7 +56,7 @@ type MarketplaceMetadata = Readonly<{
   updatedAt?: string;
 }>;
 
-type OgReaders = PublicShareOgReaders & Readonly<{
+type OgReaders = PublicShareOgReaders & PublicOgReaders & Readonly<{
   readTitle?: (identifier: string) => TitleMetadata | null | Promise<TitleMetadata | null>;
   readMarketResource?: (identifier: string) => unknown | Promise<unknown>;
 }>;
@@ -65,6 +69,7 @@ export type OgPageResult = Readonly<{
     | "title"
     | "market"
     | "market-resource"
+    | "public"
     | "fallback"
     | PublicShareOgSource;
 }>;
@@ -424,6 +429,33 @@ export async function renderOgPage(input: OgPageInput = {}): Promise<OgPageResul
       safeDecode(query.marketResourceId),
       input.readers?.readMarketResource,
     );
+  }
+
+  if (Object.hasOwn(query, "publicPath")) {
+    const rawPath = queryValue(query.publicPath);
+    const readers = input.readers ?? {};
+    const publicPage = await resolvePublicOgPage(origin, rawPath, {
+      readAuthor: readers.readAuthor ?? readers.readCatalogAuthor,
+      readCreatorProfile: readers.readCreatorProfile,
+      readCreatorWork: readers.readCreatorWork,
+      readCreatorSeries: readers.readCreatorSeries,
+      readCommunityPost: readers.readCommunityPost,
+      readCommunityCafe: readers.readCommunityCafe,
+      readCollaboration: readers.readCollaboration ?? readers.readCollaborationPost,
+      readPromotion: readers.readPromotion ?? readers.readPromotionPost,
+    });
+    if (publicPage) {
+      return {
+        html: renderHtml(publicPage.metadata, publicPage.structuredData),
+        cacheControl: publicPage.cacheControl,
+        source: "public",
+      };
+    }
+    return {
+      html: renderHtml(siteMetadata(origin)),
+      cacheControl: "no-store",
+      source: "fallback",
+    };
   }
 
   const publicShare = await resolvePublicShareOg({

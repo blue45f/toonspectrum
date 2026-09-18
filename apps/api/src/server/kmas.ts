@@ -432,7 +432,7 @@ function estimateLookupCacheEntryBytes(
   key: string,
   item: KmasBookAndWebtoonItem | null,
 ): number {
-  let payload = "null";
+  let payload: string;
   try {
     payload = JSON.stringify(item) ?? "null";
   } catch {
@@ -452,15 +452,17 @@ function deleteLookupCacheEntry(key: string, cached = lookupCache.get(key)): voi
   );
 }
 
-function pruneLookupCache(now: number, cacheTtlMs: number): void {
+function pruneLookupCache(now: number, cacheTtlMs: number, env: EnvLike): void {
   for (const [key, cached] of lookupCache.entries()) {
     if (cacheTtlMs <= 0 || now - cached.fetchedAt >= cacheTtlMs) {
       deleteLookupCacheEntry(key, cached);
     }
   }
+  const maxEntries = lookupCacheMaxEntries(env);
+  const maxBytes = lookupCacheMaxBytes(env);
   while (
-    lookupCache.size > KMAS_LOOKUP_CACHE_MAX_ENTRIES
-    || lookupCacheRetainedBytes > KMAS_LOOKUP_CACHE_MAX_ESTIMATED_BYTES
+    lookupCache.size > maxEntries
+    || lookupCacheRetainedBytes > maxBytes
   ) {
     const oldestKey = lookupCache.keys().next().value as string | undefined;
     if (!oldestKey) break;
@@ -473,17 +475,20 @@ function setLookupCacheEntry(
   item: KmasBookAndWebtoonItem | null,
   fetchedAt: number,
   cacheTtlMs: number,
+  env: EnvLike,
 ): void {
-  if (cacheTtlMs <= 0) {
-    pruneLookupCache(fetchedAt, cacheTtlMs);
+  const maxEntries = lookupCacheMaxEntries(env);
+  const maxBytes = lookupCacheMaxBytes(env);
+  if (cacheTtlMs <= 0 || maxEntries <= 0 || maxBytes <= 0) {
+    clearKmasLookupCache();
     return;
   }
   deleteLookupCacheEntry(key);
   const estimatedBytes = estimateLookupCacheEntryBytes(key, item);
-  if (estimatedBytes > KMAS_LOOKUP_CACHE_MAX_ESTIMATED_BYTES) return;
+  if (estimatedBytes > maxBytes) return;
   lookupCache.set(key, { item, fetchedAt, estimatedBytes });
   lookupCacheRetainedBytes += estimatedBytes;
-  pruneLookupCache(fetchedAt, cacheTtlMs);
+  pruneLookupCache(fetchedAt, cacheTtlMs, env);
 }
 
 export function clearKmasLookupCache(): void {
@@ -515,7 +520,7 @@ async function lookupKmasForTitle(title: Title, env: EnvLike): Promise<KmasBookA
   const response = await fetchKmasBookAndWebtoon({ title: title.title, pageNo: 1, viewItemCnt: 10 }, env);
   const match = bestKmasMatch(title, kmasItems(response));
   const item = match?.item ?? null;
-  setLookupCacheEntry(key, item, Date.now(), cacheTtlMs);
+  setLookupCacheEntry(key, item, Date.now(), cacheTtlMs, env);
   return item;
 }
 
@@ -530,7 +535,7 @@ function cachedKmasLookupForTitle(title: Title, env: EnvLike): KmasLookupCacheHi
   const cacheTtlMs = lookupCacheTtlMs(env);
   const now = Date.now();
   if (!cached) {
-    if (cacheTtlMs <= 0) pruneLookupCache(now, cacheTtlMs);
+    if (cacheTtlMs <= 0) pruneLookupCache(now, cacheTtlMs, env);
     return { hit: false, item: null };
   }
   if (cacheTtlMs <= 0 || now - cached.fetchedAt >= cacheTtlMs) {
@@ -611,11 +616,11 @@ function lookupCacheTtlMs(env: EnvLike): number {
 }
 
 function lookupCacheMaxEntries(env: EnvLike): number {
-  return boundInt(Number(env.KMAS_LOOKUP_CACHE_MAX_ENTRIES), DEFAULT_LOOKUP_CACHE_MAX_ENTRIES, 0, 10_000);
+  return boundInt(Number(env.KMAS_LOOKUP_CACHE_MAX_ENTRIES), KMAS_LOOKUP_CACHE_MAX_ENTRIES, 0, 10_000);
 }
 
 function lookupCacheMaxBytes(env: EnvLike): number {
-  return boundInt(Number(env.KMAS_LOOKUP_CACHE_MAX_BYTES), DEFAULT_LOOKUP_CACHE_MAX_BYTES, 0, 64 * 1024 * 1024);
+  return boundInt(Number(env.KMAS_LOOKUP_CACHE_MAX_BYTES), KMAS_LOOKUP_CACHE_MAX_ESTIMATED_BYTES, 0, 64 * 1024 * 1024);
 }
 
 function collectResponseTitles(value: unknown, out: Title[] = [], seen = new Set<unknown>()): Title[] {

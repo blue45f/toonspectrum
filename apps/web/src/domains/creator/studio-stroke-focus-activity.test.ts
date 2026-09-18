@@ -5,6 +5,7 @@ import {
   STUDIO_STROKE_FOCUS_SETTLE_MS,
   resetStudioStrokeFocusActivityForTests,
   setStudioStrokeFocusActivity,
+  shouldActivateStudioStrokeFocusForPointer,
   studioStrokeFocusActivitySnapshot,
   subscribeStudioStrokeFocusActivity,
 } from "./studio-stroke-focus-activity";
@@ -20,6 +21,12 @@ afterEach(() => {
 });
 
 describe("studio stroke focus activity", () => {
+  it("keeps mobile finger pointerdown out of shell-focus layout mutations", () => {
+    expect(shouldActivateStudioStrokeFocusForPointer("touch")).toBe(false);
+    expect(shouldActivateStudioStrokeFocusForPointer("pen")).toBe(true);
+    expect(shouldActivateStudioStrokeFocusForPointer("mouse")).toBe(true);
+  });
+
   it("publishes drawing synchronously and holds a settling window after release", () => {
     const phases: string[] = [];
     const unsubscribe = subscribeStudioStrokeFocusActivity(() => {

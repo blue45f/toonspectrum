@@ -42,12 +42,6 @@ const COPY = {
 } as const;
 
 const HREFS = ["/studio/new", "/studio/import", "/production/projects/sample-project/overview"] as const;
-const PROTECTION_LABEL = defineBilingualText(
-  "studioProjectLibraryEmpty",
-  "protectionLabel",
-  "작업 보호 기능",
-  "Work protection features",
-);
 
 export function StudioProjectLibraryEmptyVisual({ locale }: { readonly locale: string }) {
   const t = useT();
@@ -55,7 +49,7 @@ export function StudioProjectLibraryEmptyVisual({ locale }: { readonly locale: s
   const copy = translateParallelBilingualCopy(t, "StudioProjectLibraryEmptyVisual", COPY);
   const reducedMotion = useReducedMotion();
   return (
-    <section className="studio-project-empty-visual" aria-labelledby="studio-project-empty-title" lang={language}>
+    <section className="studio-project-empty-visual" aria-labelledby="studio-project-empty-title" lang={locale}>
       <div className="studio-project-empty-visual__copy">
         <p className="studio-project-empty-visual__eyebrow"><Sparkles size={14} aria-hidden="true" />{copy.eyebrow}</p>
         <h2 id="studio-project-empty-title">{copy.title}</h2>
