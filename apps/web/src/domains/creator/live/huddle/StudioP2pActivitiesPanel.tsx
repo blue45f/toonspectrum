@@ -18,9 +18,6 @@ export function StudioP2pActivitiesPanel({ controller }: { controller: StudioP2p
   const [template, setTemplate] = useState<string>(HUDDLE_CHALLENGES[0].id);
   const [question, setQuestion] = useState("어떤 구도가 더 좋을까요?");
   const [options, setOptions] = useState(["A안", "B안", "", ""]);
-  const [open, setOpen] = useState(false);
-  const hasRunningChallenge = view.activities.some((activity) =>
-    Boolean(activity.challenge?.running && activity.challenge.remainingMs > 0));
   useEffect(() => {
     const refresh = () => setView(controller.snapshot());
     refresh();
