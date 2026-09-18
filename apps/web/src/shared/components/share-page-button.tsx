@@ -58,6 +58,7 @@ export function SharePageButton({
   return (
     <Suspense fallback={trigger(true)}>
       <LazyShareDialog
+        defaultOpen
         payload={{
           title: text,
           text: description || `${text} · ${t("app.name")}`,
