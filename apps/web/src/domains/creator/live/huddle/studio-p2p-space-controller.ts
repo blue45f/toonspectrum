@@ -8,12 +8,14 @@ export const STUDIO_P2P_SPACE_PROXIMITY_RADIUS = 24;
 const STUDIO_P2P_SPACE_MAX_FRAME_BYTES = 4 * 1024;
 
 export const STUDIO_P2P_SPACE_ZONES = [
-  { id: "lobby", label: "Project Lobby", x: 2, y: 3, width: 30, height: 28 },
-  { id: "writers", label: "Writers Room", x: 35, y: 3, width: 28, height: 28 },
-  { id: "storyboard", label: "Storyboard Wall", x: 66, y: 3, width: 32, height: 28 },
-  { id: "drawing", label: "Drawing Studio", x: 2, y: 35, width: 45, height: 62 },
-  { id: "review", label: "Review Room", x: 50, y: 35, width: 24, height: 62 },
-  { id: "lounge", label: "Creator Lounge", x: 77, y: 35, width: 21, height: 62 },
+  { id: "writers", label: "Writers Room", x: 2, y: 3, width: 29, height: 28 },
+  { id: "storyboard", label: "Storyboard Wall", x: 35, y: 3, width: 30, height: 28 },
+  { id: "lounge", label: "Creator Lounge", x: 69, y: 3, width: 29, height: 28 },
+  { id: "assets", label: "Asset Library", x: 2, y: 35, width: 29, height: 28 },
+  { id: "lobby", label: "Project Lobby", x: 35, y: 35, width: 30, height: 28 },
+  { id: "drawing", label: "Drawing Studio", x: 69, y: 35, width: 29, height: 28 },
+  { id: "review", label: "Review Room", x: 2, y: 67, width: 46, height: 30 },
+  { id: "assistant", label: "Assistant Desk", x: 52, y: 67, width: 46, height: 30 },
 ] as const;
 
 export type StudioP2pSpaceZoneId = (typeof STUDIO_P2P_SPACE_ZONES)[number]["id"];
@@ -120,7 +122,7 @@ export class StudioP2pSpaceController {
     private readonly deps: StudioP2pSpaceDependencies = {},
   ) {
     this.epoch = deps.id?.() ?? crypto.randomUUID();
-    this.selfState = { epoch: this.epoch, sequence: 0, x: 17, y: 17, zone: "lobby", activity: "available" };
+    this.selfState = { epoch: this.epoch, sequence: 0, x: 50, y: 49, zone: "lobby", activity: "available" };
   }
 
   private now(): number { return this.deps.now?.() ?? Date.now(); }
@@ -166,8 +168,10 @@ export class StudioP2pSpaceController {
     if (this.closed) return;
     const nextX = clamp(x);
     const nextY = clamp(y);
-    this.selfState = { ...this.selfState, x: nextX, y: nextY, zone: inferZone(nextX, nextY) };
-    this.broadcast(force);
+    const nextZone = inferZone(nextX, nextY);
+    const changedZone = nextZone !== this.selfState.zone;
+    this.selfState = { ...this.selfState, x: nextX, y: nextY, zone: nextZone };
+    this.broadcast(force || changedZone);
     this.emit();
   }
 
