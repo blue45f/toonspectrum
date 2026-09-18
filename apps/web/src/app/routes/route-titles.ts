@@ -1,4 +1,7 @@
-import { translateLocaleBranchForLocale } from "@/shared/lib/i18n-bilingual-copy";
+import {
+  translateLocaleBranchForLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect } from "react";
 
 import "./reference-labels";
