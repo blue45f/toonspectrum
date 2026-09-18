@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { MessageCircle, Mic, MicOff, Video, MonitorUp, PhoneOff, Hand, VolumeX, X } from "lucide-react";
+
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useStudioLiveCollaboration } from "../studio-live-collaboration-context";
 import { StudioP2pCreativeHuddleController as StudioP2pHuddleController, type CreativeHuddleSnapshot as HuddleSnapshot } from "./studio-p2p-creative-huddle-controller";
 import { HUDDLE_REACTIONS, HUDDLE_TEXT_LIMIT } from "./studio-p2p-huddle-protocol";
@@ -85,16 +90,16 @@ export default function StudioP2pHuddleLauncher() {
   const canJoin = Boolean(room.direct && live.availability === "ready");
   const mediaAvailable = Boolean(navigator.mediaDevices?.getUserMedia);
   return <aside
-    className="fixed bottom-[calc(var(--studio-canvas-bottom-inset,5rem)+0.75rem)] right-3 z-[65] max-w-[calc(100vw-1.5rem)] sm:bottom-3"
+    className="studio-p2p-huddle-dock fixed bottom-[calc(var(--studio-canvas-bottom-inset,5rem)+0.75rem)] right-3 z-[65] max-w-[calc(100vw-1.5rem)] sm:bottom-3"
     aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "협업 대화")}
     data-studio-shell-floating-target="collaboration"
     data-studio-shell-force-visible={active ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "en", "true") : undefined}
   >
-    <section hidden={!open} className="mb-2 w-[360px] max-w-full overflow-hidden rounded-2xl border border-accent/40 bg-panel text-fg shadow-2xl"
+    <section hidden={!open} className="studio-p2p-huddle-panel mb-2 w-[min(760px,calc(100vw-1.5rem))] max-w-full overflow-hidden rounded-2xl border border-accent/40 bg-panel text-fg shadow-2xl"
       aria-labelledby="studio-p2p-huddle-heading" data-studio-p2p-huddle="true">
       <header className="flex items-center justify-between border-b border-line p-3">
-        <div><h3 id="studio-p2p-huddle-heading" className="text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "채팅·화상통화")}</h3>
-          <p className="text-[11px] text-fg-3">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "2–4인 작업팀 · TURN 중계 없음")}</p></div>
+        <div><h3 id="studio-p2p-huddle-heading" className="text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "Virtual Studio · Huddle")}</h3>
+          <p className="text-[11px] text-fg-3">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "근접 P2P 우선 · 카메라·마이크는 직접 켤 때만 사용")}</p></div>
         <button type="button" className={controlClass} aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "대화 패널 접기")} onClick={() => setOpen(false)}><X size={16} /></button>
       </header>
       <div className="max-h-[68dvh] space-y-3 overflow-y-auto p-3">
