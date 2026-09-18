@@ -8,10 +8,12 @@ import {
   creatorRoleNotificationSettings,
   creatorRoleStudioWorkspace,
   creatorWorkspaceStudioUiMode,
+  creatorCollaborationUiEnabled,
   isCreatorRoleProjectKey,
   normalizeCreatorRoleWorkspacePreference,
   rankCreatorRoleWork,
   recommendCreatorTeamRoles,
+  resolveCreatorCollaborationLevel,
   resolveCreatorRoleProjectKey,
   scoreCreatorRoleMatch,
   type PublicCreatorRoleCandidate,
@@ -50,6 +52,7 @@ describe("creator role workspace contract", () => {
       notificationOverrides: {},
       usageGoals: ["team-production"],
       workspaceMode: "creator",
+      collaborationMode: "team",
       capacity: {
         weeklyCapacityHours: 168,
         currentAssignedHours: 0,
@@ -91,6 +94,33 @@ describe("creator role workspace contract", () => {
       pathname: "/studio/projects",
       search: "",
     })).toBe("draft");
+  });
+
+  it("keeps collaboration preference orthogonal to workspace density", () => {
+    expect(normalizeCreatorRoleWorkspacePreference({}).collaborationMode).toBe("solo");
+    expect(normalizeCreatorRoleWorkspacePreference({
+      usageGoals: ["studio-management"],
+    }).collaborationMode).toBe("team");
+    expect(resolveCreatorCollaborationLevel({
+      collaborationMode: "solo",
+      workspaceMode: "creator",
+      memberCount: 1,
+      serverBacked: false,
+    })).toBe("solo");
+    expect(resolveCreatorCollaborationLevel({
+      collaborationMode: "team",
+      workspaceMode: "creator",
+      memberCount: 1,
+      serverBacked: false,
+    })).toBe("lightweight");
+    expect(resolveCreatorCollaborationLevel({
+      collaborationMode: "solo",
+      workspaceMode: "production",
+      memberCount: 8,
+      serverBacked: true,
+    })).toBe("studio");
+    expect(creatorCollaborationUiEnabled("solo")).toBe(false);
+    expect(creatorCollaborationUiEnabled("lightweight")).toBe(true);
   });
 
   it("maps every detailed role to an operational lens and editor preset", () => {
