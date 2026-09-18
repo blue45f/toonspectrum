@@ -483,12 +483,10 @@ export function StudioProjectCenterSearch(): ReactElement {
     };
     panel.addEventListener("click", recordAction, true);
     return () => {
-      disposed = true;
-      if (rebuildFrame !== null && typeof cancelAnimationFrame === "function") {
+      if (rebuildFrame !== 0 && typeof cancelAnimationFrame === "function") {
         cancelAnimationFrame(rebuildFrame);
       }
       observer?.disconnect();
-      if (rebuildFrame !== 0) cancelAnimationFrame(rebuildFrame);
       panel.removeEventListener("click", recordAction, true);
     };
   }, [rebuildIndex, rememberRecent]);

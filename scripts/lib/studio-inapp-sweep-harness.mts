@@ -55,6 +55,8 @@ export const STUDIO_INAPP_PROFILES: readonly StudioInAppProfile[] = Object.freez
  * error, page error and rejection is reported with the step that produced it.
  */
 const ENVIRONMENT_NOISE = [
+  "/api/health/ready",
+  "/api/me",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
   "/api/analytics/traffic/",

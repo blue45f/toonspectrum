@@ -114,11 +114,42 @@ function dock(page: Page) {
   return page.locator('[data-studio-mobile-editing-dock="true"]');
 }
 
+async function centerInView(locator: Locator): Promise<void> {
+  await locator.evaluate((element) => {
+    element.scrollIntoView({ block: "center", inline: "center" });
+  });
+}
+
+async function clickInView(locator: Locator, timeout = 15_000): Promise<void> {
+  await centerInView(locator);
+  try {
+    await locator.click({ timeout });
+  } catch (error) {
+    const blocker = await locator.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      return document.elementsFromPoint(x, y).slice(0, 6).map((node) => ({
+        tag: node.tagName,
+        id: node.id,
+        aria: node.getAttribute("aria-label"),
+        className: typeof node.className === "string" ? node.className.slice(0, 160) : "",
+        pointerEvents: getComputedStyle(node).pointerEvents,
+      }));
+    }).catch(() => []);
+    const detail = error instanceof Error ? error.message.split("\n")[0] : String(error);
+    throw new Error(
+      "control click failed (" + detail + "); hit-test=" + JSON.stringify(blocker),
+      { cause: error },
+    );
+  }
+}
+
 async function openDrawSettings(page: Page): Promise<Locator> {
   const pen = dock(page).locator('button[data-studio-primary-action="draw"]');
-  if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
+  if (await pen.getAttribute("aria-pressed") !== "true") await clickInView(pen);
   const settings = dock(page).getByRole("button", { name: "브러시 설정 (굵기·색·프리셋)", exact: true });
-  if (await settings.getAttribute("aria-expanded") !== "true") await settings.click();
+  if (await settings.getAttribute("aria-expanded") !== "true") await clickInView(settings);
   const sheet = page.locator("#studio-mobile-draw-settings");
   await sheet.getByRole("slider", { name: "브러시 굵기 슬라이더", exact: true }).waitFor();
   return sheet;
@@ -126,7 +157,7 @@ async function openDrawSettings(page: Page): Promise<Locator> {
 
 async function openBrushLibrary(page: Page): Promise<Locator> {
   const sheet = await openDrawSettings(page);
-  await sheet.locator('[data-studio-open-brush-library="true"]').click();
+  await clickInView(sheet.locator('[data-studio-open-brush-library="true"]'));
   const library = page.locator('[data-studio-brush-library="true"]').first();
   await library.waitFor();
   return library;
@@ -158,7 +189,31 @@ async function clickLocator(
   for (let index = 0; index < Math.min(count, 6); index += 1) {
     const candidate = locator.nth(index);
     if (!(await candidate.isVisible().catch(() => false))) continue;
-    await candidate.click({ timeout: 5_000 });
+    await candidate.evaluate((element) => {
+      element.scrollIntoView({ block: "center", inline: "center" });
+    });
+    try {
+      await candidate.click({ timeout: 5_000 });
+    } catch (error) {
+      const blocker = await candidate.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        return document.elementsFromPoint(x, y).slice(0, 6).map((node) => ({
+          tag: node.tagName,
+          id: node.id,
+          aria: node.getAttribute("aria-label"),
+          testId: node.getAttribute("data-testid"),
+          className: typeof node.className === "string" ? node.className.slice(0, 160) : "",
+          pointerEvents: getComputedStyle(node).pointerEvents,
+        }));
+      }).catch(() => []);
+      const detail = error instanceof Error ? error.message.split("\n")[0] : String(error);
+      throw new Error(
+        what + ": click failed (" + detail + "); hit-test=" + JSON.stringify(blocker),
+        { cause: error },
+      );
+    }
     await settle(page);
     return "ok";
   }
@@ -289,17 +344,22 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
     label: "굵기·투명도 조절",
     run: async (page) => {
       const sheet = await openDrawSettings(page);
-      for (const name of ["브러시 굵기", "브러시 투명도"]) {
+      for (const name of ["브러시 굵기", "브러시 불투명도"]) {
         const number = sheet.getByRole("spinbutton", { name: `${name} 숫자`, exact: true });
         const slider = sheet.getByRole("slider", { name: `${name} 슬라이더`, exact: true });
+        await centerInView(number);
         await number.fill("40");
         if (await slider.inputValue() !== "40") throw new Error(`${name}: numeric entry did not update the slider`);
         await slider.focus();
         await slider.press("ArrowRight");
         if (await number.inputValue() !== "41") throw new Error(`${name}: slider keyboard input did not update the value`);
       }
-      await sheet.getByRole("spinbutton", { name: "브러시 굵기 숫자", exact: true }).fill("8");
-      await sheet.getByRole("spinbutton", { name: "브러시 투명도 숫자", exact: true }).fill("100");
+      const widthNumber = sheet.getByRole("spinbutton", { name: "브러시 굵기 숫자", exact: true });
+      await centerInView(widthNumber);
+      await widthNumber.fill("8");
+      const opacityNumber = sheet.getByRole("spinbutton", { name: "브러시 불투명도 숫자", exact: true });
+      await centerInView(opacityNumber);
+      await opacityNumber.fill("100");
       await settle(page);
       return "ok";
     },
@@ -312,10 +372,10 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       const swatches = sheet.getByRole("button", { name: /^색상 #/u });
       if (await swatches.count() === 0) throw new Error("brush colour swatches are missing");
       for (const swatch of await swatches.all()) {
-        await swatch.click();
+        await clickInView(swatch);
         if (await swatch.getAttribute("aria-pressed") !== "true") throw new Error("selected colour was not applied");
       }
-      await swatches.first().click();
+      await clickInView(swatches.first());
       return "ok";
     },
   },
@@ -329,10 +389,10 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       const count = await buttons.count();
       if (count !== 4) throw new Error(`expected four draw modes, found ${count}`);
       for (let index = 0; index < count; index += 1) {
-        await buttons.nth(index).click();
+        await clickInView(buttons.nth(index));
         if (await buttons.nth(index).getAttribute("aria-pressed") !== "true") throw new Error("draw mode did not activate");
       }
-      await group.getByRole("button", { name: "펜", exact: true }).click();
+      await clickInView(group.getByRole("button", { name: "펜", exact: true }));
       await settle(page);
       return "ok";
     },
@@ -414,7 +474,7 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       await sheet.waitFor({ state: "visible" });
       for (const tab of ["properties", "layers", "document"]) {
         const target = sheet.locator(`[data-studio-inspector-primary-tab="${tab}"]`);
-        await target.click();
+        await clickInView(target);
         if (await target.getAttribute("aria-selected") !== "true") throw new Error(`inspector ${tab} tab did not become selected`);
         const panelId = await target.getAttribute("aria-controls");
         if (!panelId) throw new Error(`inspector ${tab} tab has no associated panel`);
@@ -429,31 +489,31 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
     label: "레이어 내비게이터",
     run: async (page) => {
       await expandWorkRow(page);
-      await page.getByRole("button", { name: "작업 패널", exact: true }).click();
+      await clickInView(page.getByRole("button", { name: "작업 패널", exact: true }));
       const sheet = page.locator('[data-studio-sheet-id="props"]');
       const height = sheet.getByRole("slider", { name: /^작업 패널 크기 조절/u });
       await height.press("ArrowUp");
       await height.press("ArrowUp");
       if (await height.getAttribute("aria-valuenow") !== "2") throw new Error("inspector did not expand to full height");
       await settle(page);
-      await sheet.locator('[data-studio-inspector-primary-tab="layers"]').click();
+      await clickInView(sheet.locator('[data-studio-inspector-primary-tab="layers"]'));
       const navigator = page.locator('[aria-label="전문 레이어 내비게이터"]');
       await navigator.waitFor();
       const rows = navigator.locator('[data-studio-layer-row="true"]');
       if (await rows.count() === 0) throw new Error("layer navigator has no rows after drawing");
-      await rows.first().click();
+      await clickInView(rows.first());
       await page.waitForTimeout(300);
       for (const action of ["visibility", "lock"]) {
         const button = rows.first().locator(`[data-studio-layer-row-action="${action}"]`);
         const originalLabel = await button.getAttribute("aria-label");
-        await button.click();
+        await clickInView(button);
         await settle(page);
         if (await button.getAttribute("aria-label") === originalLabel) throw new Error(`layer ${action} did not change`);
-        await button.click();
+        await clickInView(button);
         await settle(page);
         if (await button.getAttribute("aria-label") !== originalLabel) throw new Error(`layer ${action} did not restore`);
       }
-      await rows.first().locator('[data-studio-layer-row-action="menu"]').click();
+      await clickInView(rows.first().locator('[data-studio-layer-row-action="menu"]'));
       await navigator.getByRole("dialog").waitFor({ state: "visible" });
       await page.keyboard.press("Escape");
       await settle(page);
@@ -463,21 +523,22 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       await idleComps.waitFor({ state: "visible" });
       const visibility = rows.first().locator('[data-studio-layer-row-action="visibility"]');
       const capturedVisibility = await visibility.getAttribute("aria-label");
-      await comps.getByRole("button", { name: "현재 보기 저장", exact: true }).click();
+      await clickInView(comps.getByRole("button", { name: "현재 보기 저장", exact: true }));
       await comps.getByPlaceholder("이름 (예: 대사 없는 클린본)").fill("PR831 레이어 상태");
-      await comps.getByRole("button", { name: "보기 저장", exact: true }).click();
+      await clickInView(comps.getByRole("button", { name: "보기 저장", exact: true }));
       // Capture and delivery are asynchronous; wait for both before another document edit.
-      await comps.getByRole("button", { name: /^PR831 레이어 상태/u }).waitFor({ state: "visible" });
+      const savedComp = comps.getByRole("button", { name: /^PR831 레이어 상태/u });
+      await savedComp.waitFor({ state: "visible" });
       await idleComps.waitFor({ state: "visible" });
-      await visibility.click();
+      await clickInView(visibility);
       await settle(page);
-      await comps.getByRole("button", { name: "적용", exact: true }).click();
+      await clickInView(savedComp);
       await idleComps.waitFor({ state: "visible" });
       await settle(page);
       if (await visibility.getAttribute("aria-label") !== capturedVisibility) throw new Error("layer comp did not restore captured visibility");
-      await comps.getByTitle("이름 수정").click();
-      await comps.getByRole("textbox", { name: "PR831 레이어 상태 이름 수정" }).fill("PR831 복원 상태");
-      await comps.getByRole("button", { name: "콤프 이름 저장" }).click();
+      await clickInView(comps.getByRole("button", { name: "보기 이름 바꾸기", exact: true }));
+      await comps.getByRole("textbox", { name: "PR831 레이어 상태 보기 이름 바꾸기" }).fill("PR831 복원 상태");
+      await clickInView(comps.getByRole("button", { name: "보기 이름 저장", exact: true }));
       const compButton = comps.getByRole("button", { name: /^PR831 복원 상태/u });
       await compButton.waitFor({ state: "visible" });
       await idleComps.waitFor({ state: "visible" });
@@ -492,11 +553,11 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       await page.keyboard.press("Escape");
       await sheet.waitFor({ state: "hidden" });
       await expandWorkRow(page);
-      await page.getByRole("button", { name: "작업 패널", exact: true }).click();
-      await sheet.locator('[data-studio-inspector-primary-tab="layers"]').click();
+      await clickInView(page.getByRole("button", { name: "작업 패널", exact: true }));
+      await clickInView(sheet.locator('[data-studio-inspector-primary-tab="layers"]'));
       await compButton.waitFor({ state: "visible" });
       await idleComps.waitFor({ state: "visible" });
-      await comps.getByTitle("콤프 삭제").click();
+      await clickInView(comps.getByRole("button", { name: "저장한 보기 삭제", exact: true }));
       await compButton.waitFor({ state: "detached" });
       await idleComps.waitFor({ state: "visible" });
       if (await compButton.count() !== 0) throw new Error("layer comp was not deleted");
@@ -572,7 +633,7 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       if (await compare.getAttribute("aria-pressed") !== "true") throw new Error("held filter comparison did not show the original");
       await page.keyboard.up("Space");
       if (await compare.getAttribute("aria-pressed") !== "false") throw new Error("released filter comparison did not restore the preview");
-      await dialog.getByRole("button", { name: "취소", exact: true }).click();
+      await clickInView(dialog.getByRole("button", { name: "취소", exact: true }));
       await dialog.waitFor({ state: "hidden" });
       return "ok";
     },

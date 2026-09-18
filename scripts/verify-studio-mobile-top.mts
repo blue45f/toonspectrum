@@ -1,6 +1,6 @@
 /**
  * scripts/verify-studio-mobile-top.mts
- * Mobile TOP-chrome probe for /studio — everything rendered above the canvas.
+ * Mobile TOP-chrome probe for /studio/canvas — everything rendered above the canvas.
  *
  * At widths 320/360/390/430 (portrait, touch, iPhone-like UA), for both the
  * immersive (default) and windowed mobile shells, measures:
@@ -50,6 +50,7 @@ const MAX_HEIGHT_RATIO = 1.6;
 // Static preview has no Nest API; these best-effort calls must not fail the gate
 // (same contract as verify-studio-launch).
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
+  "/api/health/ready",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
   "/api/analytics/traffic/",

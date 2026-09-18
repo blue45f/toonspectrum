@@ -212,7 +212,7 @@ async function verifyFramingProfile(
       throw new Error(`Framing fixture canvas has not painted (${initialCanvas.distinctColors} colours)`);
     }
     const dialog = page.getByTestId("studio-bg3d-dialog");
-    await dialog.getByRole("tab", { name: "도형", exact: true }).click();
+    await dialog.getByRole("tab", { name: /^(?:도형|소품)$/u }).click();
     await dialog.getByRole("button", { name: "상자 추가", exact: true }).first().click();
     for (const [axis, value] of [["X", "0.8"], ["Y", "6"], ["Z", "0.4"]]) {
       const field = dialog.getByRole("spinbutton", { name: `크기 ${axis}`, exact: true }).first();
@@ -320,7 +320,7 @@ async function dismissQuickStart(page: Page): Promise<void> {
   // Since 4583af11 the coach is non-modal and no longer yields to a foreign modal. On the routed
   // `/studio/bg3d` entry the editor dialog is already stacked above it, so a click on the card's
   // close button only ever hits the dialog and times out. The card underneath changes nothing this
-  // verifier measures, so leave it and drive the dialog; on a plain `/studio` visit it still closes.
+  // verifier measures, so leave it and drive the dialog; on a plain `/studio/canvas` visit it still closes.
   const editorOpen = await page
     .locator('[data-testid="studio-bg3d-dialog"]')
     .isVisible()
@@ -530,6 +530,7 @@ async function verifyNativeTouchScroll(
   const handle = page.locator(selector);
   diagnostics.phase = "measure";
   await handle.waitFor({ state: "visible", timeout: 10_000 });
+  await handle.scrollIntoViewIfNeeded();
   const geometry = await readNativeTouchScrollGeometry(handle);
   diagnostics.initialGeometry = geometry;
   if (Math.min(geometry.width, geometry.height) < MIN_TOUCH_TARGET_PX) {
@@ -742,7 +743,7 @@ async function openBackground3d(page: Page, baseUrl: string): Promise<void> {
  * is what the engine policy has to survive, while this says how discoverable the surface is.
  */
 async function probeRailEntryVisible(page: Page, baseUrl: string): Promise<boolean> {
-  await page.goto(`${baseUrl}/studio`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseUrl}/studio/canvas`, { waitUntil: "domcontentloaded" });
   await dismissQuickStart(page);
   const dock = page.locator('[data-studio-mobile-editing-dock="true"]');
   const docked = await dock
@@ -878,7 +879,7 @@ async function main(): Promise<void> {
   const baseUrl = externalOrigin ?? `http://127.0.0.1:${port}`;
   let browser: Browser | null = null;
   try {
-    await waitForServer(`${baseUrl}/studio`, { timeoutMs: 60_000, requestInit: { method: "GET" } });
+    await waitForServer(`${baseUrl}/studio/canvas`, { timeoutMs: 60_000, requestInit: { method: "GET" } });
     browser = await chromium.launch({
       headless: true,
       executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined,

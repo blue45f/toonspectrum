@@ -39,6 +39,7 @@ describe("Studio Scene3D professional integration boundary", () => {
     expect(sidebar).toContain("resolveStudioBg3dProfessionalRuntimeReadiness");
     expect(sidebar).not.toContain('from "./studio-bg3d-professional-runtime-readiness"');
     expect(sidebar).toContain("attachmentByStorageModelId: attachmentByStorageModelIdRef.current");
+    expect(sidebar).toContain("canonicalRevision, savedShots");
     expect(sidebar).toContain("sharedSceneSession");
     expect(sidebar).toContain("professionalReadiness={professionalRuntimeReadiness}");
     expect(viewPanel).toContain("professionalReadiness: props.professionalReadiness");

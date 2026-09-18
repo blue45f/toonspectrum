@@ -597,7 +597,7 @@ export const StudioDockButton = forwardRef<
       title={hintDescription ? undefined : title}
       style={{ minWidth: 44, ...style }}
       className={cn(
-        "flex min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[0.6875rem] font-semibold leading-none",
+        "flex min-w-[44px] flex-none flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[0.6875rem] font-semibold leading-none",
         STUDIO_EASE,
         STUDIO_FOCUS_RING,
         STUDIO_TOUCH_TARGET,
@@ -679,7 +679,7 @@ export function StudioDockNavButton({
       disabled={disabled}
       style={{ minWidth: 44, ...style }}
       className={cn(
-        "flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.6875rem] font-medium",
+        "flex min-h-11 min-w-[44px] flex-none flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.6875rem] font-medium",
         STUDIO_EASE,
         STUDIO_FOCUS_RING,
         active ? "bg-accent-soft/70 text-accent" : "text-fg-2 hover:bg-raised",

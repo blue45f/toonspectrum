@@ -97,6 +97,12 @@ export function resolveStudioScene3dLinkedLayerRoundTrip(input: {
     shared3dStage: input.shared3dStage,
   });
   if (!crossReference.ok) {
+    if (crossReference.code === "missing-shot") {
+      return failure(
+        "shot-mismatch",
+        "Canvas에 연결된 Shot과 SceneDocument의 활성 Shot이 다릅니다.",
+      );
+    }
     return failure(
       "page-cross-reference-invalid",
       "Canvas 레이어·3D Stage·pass receipt 교차참조가 일치하지 않습니다.",
@@ -126,11 +132,25 @@ export function resolveStudioScene3dLinkedLayerRoundTrip(input: {
     input.elements,
     input.bundleId,
   );
+  const linkedViewportAspectRatio = link.layers
+    .map(({ elementId }) => input.elements.find((element) => element.id === elementId))
+    .find((element) =>
+      typeof element?.width === "number"
+      && Number.isFinite(element.width)
+      && element.width > 0
+      && typeof element.height === "number"
+      && Number.isFinite(element.height)
+      && element.height > 0
+    );
+  const viewportAspectRatio = scene.output.exportAspectRatio
+    ?? (linkedViewportAspectRatio?.width && linkedViewportAspectRatio.height
+      ? linkedViewportAspectRatio.width / linkedViewportAspectRatio.height
+      : undefined);
   const authority = createStudioScene3dAuthority({
     authorityId: input.authorityId ?? `linked3d:${input.bundleId}`,
     bg3d: scene,
     sharedSceneSession,
-    viewportAspectRatio: scene.output.exportAspectRatio,
+    viewportAspectRatio,
     revision: link.passRevision.revision,
   });
   return Object.freeze({

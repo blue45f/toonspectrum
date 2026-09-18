@@ -15415,9 +15415,9 @@ const puppetWarpArmed =
       ? studioImageAiProviderContext(aiSettings)
       : { provider: "openai", model: "gpt-image-2", transport: "server" as const };
     const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
-    const byokSize: StudioAiImageSize = assetPromptSize === "1536x1024"
+    const aiImageSize: StudioAiImageSize = assetPromptSize === "1536x1024"
       ? "1792x1024"
-      : assetPromptSize === "1024x1536" ? "1024x1792" : "1024x1024";
+      : assetPromptSize === "1024x1536" ? "1024x1792" : assetPromptSize;
     const qualityDirection = assetPromptQuality === "low"
       ? "Create a fast preview with a clean silhouette and restrained detail."
       : assetPromptQuality === "high"
@@ -15442,10 +15442,12 @@ No text, logo, watermark, or copyrighted character.`;
         promptVersion: 1,
         prompt: providerPrompt,
         target: { pageId: activePage.id },
-        requestedSize: parseStudioAiRequestedSize(useByok ? byokSize : assetPromptSize),
+        requestedSize: parseStudioAiRequestedSize(useByok ? aiImageSize : assetPromptSize),
         references: [],
       });
-      const result = await generateBackgroundImage(aiSettings, providerPrompt, { size });
+      const result = await generateBackgroundImage(aiSettings, providerPrompt, {
+        size: aiImageSize,
+      });
       if (!canApplyStudioMutation(mutationTicket)) return;
       settleTrackedStudioAiOperation(operationId, result);
       operationId = null;

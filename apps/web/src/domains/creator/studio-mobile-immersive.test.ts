@@ -119,7 +119,7 @@ describe("Studio mobile immersive preference", () => {
 
   it("keeps every 320px dock target at 44px and scrolls only the two tool rows", () => {
     expect(studioChromeSource).toContain(
-      '"flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center',
+      '"flex min-h-11 min-w-[44px] flex-none flex-col items-center justify-center',
     );
     expect(studioMobileEditingDockSource).toContain('data-studio-mobile-dock-scroll="primary"');
     expect(studioMobileEditingDockSource).toContain('data-studio-mobile-dock-scroll="secondary"');
@@ -151,6 +151,16 @@ describe("Studio mobile immersive preference", () => {
   it("overlays one dock row by default and keeps its final canvas pixels scroll-reachable", () => {
     expect(studioGlobalsSource).toContain("--studio-mobile-dock-compact-height: calc(4rem");
     expect(studioGlobalsSource).toContain("--studio-mobile-dock-expanded-height: calc(7.5rem");
+    expect(studioGlobalsSource).toContain(":root,");
+    expect(studioGlobalsSource).toContain(":root:has(");
+    expect(studioGlobalsSource).toContain(
+      'body:has([data-studio-mobile-sheet="true"]) [data-studio-shell-view-options="true"]',
+    );
+    expect(studioGlobalsSource).toContain(
+      'body:has([data-studio-mobile-sheet="true"]) .studio-p2p-huddle-dock',
+    );
+    expect(studioGlobalsSource).toContain("@media (hover: none), (pointer: coarse)");
+    expect(studioGlobalsSource).toContain('[data-app-tooltip-layer="true"]');
     expect(studioGlobalsSource).toContain('data-studio-mobile-dock-expanded="false"');
     expect(studioGlobalsSource).toContain('[data-studio-mobile-canvas-workspace="true"]');
     expect(studioGlobalsSource).toContain("padding-bottom: 0 !important");

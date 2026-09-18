@@ -465,11 +465,11 @@ export function attachStudioBg3dEditorPhysicsHost(h) {
       return;
     }
 
-    const sourceToken = createStudioBg3dPhysicsSessionSourceToken({
-      primitives,
-      customModels,
-      document: sceneBaseDocument,
-    });
+    const sourceSnapshot = physicsRuntimeSourceRef.current;
+    const sourcePrimitives = sourceSnapshot.primitives;
+    const sourceCustomModels = sourceSnapshot.customModels;
+    const sourceDocument = sourceSnapshot.document;
+    const sourceToken = createStudioBg3dPhysicsSessionSourceToken(sourceSnapshot);
     if (!sourceToken) {
       setPhysicsError("현재 장면 상태를 물리 세션과 원자적으로 연결하지 못했습니다.");
       transitionPhysicsPhase("error");
@@ -477,10 +477,10 @@ export function attachStudioBg3dEditorPhysicsHost(h) {
     }
 
     const adaptation = tryAdaptStudioBg3dRuntimeToDocument({
-      primitives,
-      customModels,
+      primitives: sourcePrimitives,
+      customModels: sourceCustomModels,
       attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
-      baseDocument: sceneBaseDocument,
+      baseDocument: sourceDocument,
     });
     if (!adaptation.ok) {
       setPhysicsError("현재 장면이 안전 예산을 초과해 물리 미리보기를 시작하지 않았습니다.");
@@ -491,8 +491,8 @@ export function attachStudioBg3dEditorPhysicsHost(h) {
     if (
       adapted.diagnostics.length > 0 || adapted.omittedDiagnosticCount > 0 ||
       adapted.counts.droppedPrimitives > 0 || adapted.counts.droppedCustomModels > 0 ||
-      adapted.counts.emittedPrimitives !== primitives.length ||
-      adapted.counts.emittedCustomModels !== customModels.length
+      adapted.counts.emittedPrimitives !== sourcePrimitives.length ||
+      adapted.counts.emittedCustomModels !== sourceCustomModels.length
     ) {
       setPhysicsError("장면 원본을 손실 없이 준비하지 못해 물리 미리보기를 시작하지 않았습니다.");
       transitionPhysicsPhase("error");
@@ -500,7 +500,7 @@ export function attachStudioBg3dEditorPhysicsHost(h) {
     }
     const localWorld = createStudioBg3dPhysicsWorld(adapted.document, selectedIds);
     const modelLocalBoundsByNodeId = new Map(
-      customModels.flatMap((model) => {
+      sourceCustomModels.flatMap((model) => {
         const cachedRoot = modelRootCacheRef.current.get(model.modelId)?.root;
         const bounds = cachedRoot
           ? measureStudioBg3dPhysicsModelLocalBounds(cachedRoot)

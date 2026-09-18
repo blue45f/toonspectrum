@@ -29,6 +29,7 @@ function document(transparentBackground = false) {
         transparentBackground,
       },
     },
+    viewportAspectRatio: 16 / 9,
     now: "2026-09-17T00:00:00.000Z",
   });
 }

@@ -37,6 +37,7 @@ const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
 const LANGUAGE_KEY = "toonspectrum-lang";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
+  "/api/health/ready",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
   "/api/analytics/traffic/page-view",
@@ -56,6 +57,7 @@ interface PhysicsStatus {
   sampleCount: number;
   previewNodeId: string;
   previewY: number | null;
+  message: string;
 }
 
 interface BrowserCaseResult {
@@ -291,8 +293,8 @@ async function openMobileBackground3d(page: Page): Promise<Locator> {
   const backgroundCard = starter.locator('[data-studio-quick-tool="background-3d"]');
   await backgroundCard.waitFor({ state: "visible", timeout: 5_000 });
   assertCondition(
-    (await backgroundCard.innerText()).includes("3D 배경"),
-    "mobile quick-start 3D background card lost its visible label",
+    (await backgroundCard.innerText()).includes("3D로 장면 잡기"),
+    "mobile quick-start 3D scene card lost its visible action label",
   );
   await backgroundCard.scrollIntoViewIfNeeded();
   await backgroundCard.click();
@@ -304,7 +306,7 @@ async function waitForBackground3dDialog(page: Page): Promise<Locator> {
   await dialog.waitFor({ state: "visible", timeout: 25_000 });
   await waitForElementAnimations(dialog);
   const namedDialog = page.getByRole("dialog", {
-    name: "3D 장면 스튜디오",
+    name: "3D 장면 연출",
     exact: true,
   });
   assertCondition(await namedDialog.count() === 1, "3D dialog lost its accessible name contract");
@@ -316,7 +318,7 @@ async function selectPhysicsRenderer(dialog: Locator): Promise<void> {
   // ADR-0018 keeps an unavailable WebGPU selection visible without mounting another engine.
   // This headless physics lane must make the same explicit WebGL2 choice as an artist before
   // preparing scene objects; otherwise a successful Worker result has no objects to project onto.
-  await dialog.getByRole("tab", { name: "보기", exact: true }).click();
+  await dialog.getByRole("tab", { name: /^(?:보기|구도)$/u }).click();
   const webgl2 = dialog.getByTestId("studio-bg3d-engine-preference-webgl2");
   await webgl2.waitFor({ state: "visible", timeout: 15_000 });
   await waitForEnabled(webgl2, "explicit WebGL2 selection enabled");
@@ -345,7 +347,7 @@ async function selectPhysicsRenderer(dialog: Locator): Promise<void> {
 }
 
 async function setupPlaneAndBox(page: Page, dialog: Locator): Promise<Locator> {
-  await dialog.getByRole("tab", { name: "도형", exact: true }).click();
+  await dialog.getByRole("tab", { name: /^(?:도형|소품)$/u }).click();
   await dialog.getByRole("button", { name: "평면 추가", exact: true }).click();
   await dialog.getByRole("button", { name: "상자 추가", exact: true }).click();
   const positionY = dialog.getByRole("spinbutton", { name: "위치 Y", exact: true });
@@ -363,7 +365,7 @@ async function setupPlaneAndBox(page: Page, dialog: Locator): Promise<Locator> {
 }
 
 async function openPhysicsPanel(dialog: Locator): Promise<Locator> {
-  await dialog.getByRole("tab", { name: "보기", exact: true }).click();
+  await dialog.getByRole("tab", { name: /^(?:보기|구도)$/u }).click();
   const physicsTab = dialog.getByRole("tab", { name: "물리 배치", exact: true });
   await physicsTab.waitFor({ state: "visible", timeout: 5_000 });
   await physicsTab.click();
@@ -386,6 +388,7 @@ async function readPhysicsStatus(status: Locator): Promise<PhysicsStatus> {
       sampleCount: Number.isFinite(sampleCount) ? sampleCount : 0,
       previewNodeId: element.getAttribute("data-preview-node-id") ?? "",
       previewY: previewY !== null && Number.isFinite(previewY) ? previewY : null,
+      message: element.textContent?.trim() ?? "",
     };
   });
 }
@@ -440,12 +443,12 @@ async function selectBoxForTransformRead(dialog: Locator): Promise<void> {
   // Runtime hydration may replace object instances during bake/history restoration. Re-select by
   // the user-visible layer identity before inspecting the transform instead of assuming that a
   // transient selection survives undo/redo.
-  await dialog.getByRole("tab", { name: "레이어", exact: true }).click();
+  await dialog.getByRole("tab", { name: /^(?:레이어|장면)$/u }).click();
   const boxLayer = dialog.getByRole("button", { name: "상자 1", exact: true });
   await boxLayer.waitFor({ state: "attached", timeout: 5_000 });
   await boxLayer.scrollIntoViewIfNeeded();
   await boxLayer.click();
-  await dialog.getByRole("tab", { name: "도형", exact: true }).click();
+  await dialog.getByRole("tab", { name: /^(?:도형|소품)$/u }).click();
 }
 
 async function pauseRunningPreview(dialog: Locator, status: Locator): Promise<PhysicsStatus> {
@@ -509,7 +512,7 @@ async function runDesktop(browser: Browser, url: string): Promise<string[]> {
     await dialog.getByTestId("bg3d-physics-reset").click();
     const reset = await waitForPhysicsState(status, "idle");
     assertCondition(reset.previewY === null && reset.sampleCount === 0, "reset retained transient samples");
-    await dialog.getByRole("tab", { name: "도형", exact: true }).click();
+    await dialog.getByRole("tab", { name: /^(?:도형|소품)$/u }).click();
     assertCondition(Math.abs(await readPositionY(dialog) - 3) <= 0.001, "reset changed persistent Y");
     screenshots.push(await screenshot(page, "desktop-reset.png"));
 
@@ -524,7 +527,7 @@ async function runDesktop(browser: Browser, url: string): Promise<string[]> {
     await dialog.getByTestId("bg3d-physics-bake").click();
     await waitForPhysicsState(status, "idle");
 
-    await dialog.getByRole("tab", { name: "도형", exact: true }).click();
+    await dialog.getByRole("tab", { name: /^(?:도형|소품)$/u }).click();
     const bakedY = await readPositionY(dialog);
     assertCondition(bakedY < 3, `bake did not update persistent Y (${bakedY})`);
     assertCondition(
@@ -704,7 +707,7 @@ async function main(): Promise<void> {
 
   const port = await findFreePort();
   const rootUrl = `http://127.0.0.1:${port}/`;
-  const studioUrl = `${rootUrl}studio`;
+  const studioUrl = `${rootUrl}studio/canvas`;
   const server: ChildProcess = spawn(
     process.platform === "win32" ? "pnpm.cmd" : "pnpm",
     ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],

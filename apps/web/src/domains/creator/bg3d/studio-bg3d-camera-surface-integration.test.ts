@@ -109,6 +109,18 @@ describe("Studio BG3D Camera vNext and surface snap integration", () => {
     ]);
   });
 
+  it("keeps primitive ref registration stable across React commits", () => {
+    const registration = sourceBetween(
+      "const registerPrimitiveRef = useCallback(",
+      "h.registerPrimitiveRef = registerPrimitiveRef",
+    );
+
+    expect(registration).toContain("const current = primitiveObjectsRef.current.get(id) ?? null");
+    expect(registration).toContain("if (current === obj) return");
+    expect(registration).toContain("setRefTick((n) => n + 1)");
+    expect(registration).toContain("}, [primitiveObjectsRef, setRefTick])");
+  });
+
   it("routes every zoom button through one projection-aware, undoable command", () => {
     const zoom = sourceBetween("function zoomCameraBy(", "function applyCameraPreset(");
     expect(zoom).toContain("const beforeView = viewport.readView()");
@@ -152,8 +164,8 @@ describe("Studio BG3D Camera vNext and surface snap integration", () => {
     expect(source).toContain("alignRotationToNormal");
     expect(source).toContain("surfaceSnapAlignNormal");
     expect(source).toContain('data-testid="bg3d-surface-snap-align-normal"');
-    expect(source).toMatch(/aria-label=\{translateCurrentStaticSourceText\([^\n]*"법선 정렬"\)\}/u);
-    expect(source).toMatch(/aria-label=\{translateCurrentStaticSourceText\([^\n]*"배치 정리"\)\}/u);
+    expect(source).toContain('aria-label="법선 정렬"');
+    expect(source).toContain('aria-label="배치 정리"');
     expect(source).toContain("STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS");
     expect(source).toContain("planStudioBg3dMultiSurfaceSnap");
     expect(source).toContain("canPlaceSelectedModelRecipe");
