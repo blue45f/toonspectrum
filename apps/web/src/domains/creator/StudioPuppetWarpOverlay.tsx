@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Puppet Warp Overlay — 핀 마커(네이티브 Konva 드래그) + 변형된 메쉬 그물선.
  * StudioPerspectiveOverlay.tsx 와 동일한 이유로 lazy-load 하지 않고 일반 import 로 쓴다(react-konva
@@ -52,7 +53,7 @@ export function StudioPuppetWarpOverlay({
       {meshLines.map((points, i) => (
         <Line
           // 삼각형 목록은 위상(rest 메쉬)이 고정이라 매 렌더 같은 순서 — 인덱스를 안정적인 키로 써도 안전하다.
-          key={`pw-tri-${i}`}
+          key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpOverlay", "en", "pw-tri-{v0}"), { v0: String(i) })}
           points={points}
           closed
           stroke={MESH_STROKE}

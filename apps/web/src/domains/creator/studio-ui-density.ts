@@ -113,37 +113,51 @@ export function studioUiDensityAllows(
   return true;
 }
 
+const DENSITY_LABEL_FALLBACK: Readonly<Record<StudioUiDensityMode, string>> = {
+  simple: "기본 작업",
+  focus: "집중 작업",
+  full: "전체 도구",
+};
+
+const DENSITY_DESCRIPTION_FALLBACK: Readonly<Record<StudioUiDensityMode, string>> = {
+  simple: "자주 쓰는 도구와 설정을 보여 주고 고급 기능은 필요할 때 펼칩니다.",
+  focus: "캔버스와 그리기·말풍선·소재 같은 핵심 도구만 남깁니다.",
+  full: "AI·3D를 포함한 모든 전문 도구와 패널을 표시합니다.",
+};
+
+function translatedOrFallback(
+  t: ((key: string) => string) | undefined,
+  key: string,
+  fallback: string,
+): string {
+  if (!t) return fallback;
+  const translated = t(key)?.trim();
+  return translated && translated !== key ? translated : fallback;
+}
+
 /** Short labels describe the work style, not a judgement about the user's skill. */
 export function studioUiDensityLabel(
   mode: StudioUiDensityMode,
   t?: (key: string) => string
 ): string {
-  if (t) {
-    if (mode === "simple") return t("studio.settings.uiDensityMode.simple");
-    if (mode === "focus") return t("studio.settings.uiDensityMode.focus");
-    return t("studio.settings.uiDensityMode.full");
-  }
-  if (mode === "simple") return "기본 작업";
-  if (mode === "focus") return "집중 작업";
-  return "전체 도구";
+  const normalized = normalizeStudioUiDensityMode(mode);
+  return translatedOrFallback(
+    t,
+    `studio.settings.uiDensityMode.${normalized}`,
+    DENSITY_LABEL_FALLBACK[normalized],
+  );
 }
 
 export function studioUiDensityDescription(
   mode: StudioUiDensityMode,
   t?: (key: string) => string
 ): string {
-  if (t) {
-    if (mode === "simple") return t("studio.settings.uiDensityDescription.simple");
-    if (mode === "focus") return t("studio.settings.uiDensityDescription.focus");
-    return t("studio.settings.uiDensityDescription.full");
-  }
-  if (mode === "simple") {
-    return "자주 쓰는 도구와 설정을 보여 주고 고급 기능은 필요할 때 펼칩니다.";
-  }
-  if (mode === "focus") {
-    return "캔버스와 그리기·말풍선·소재 같은 핵심 도구만 남깁니다.";
-  }
-  return "AI·3D를 포함한 모든 전문 도구와 패널을 표시합니다.";
+  const normalized = normalizeStudioUiDensityMode(mode);
+  return translatedOrFallback(
+    t,
+    `studio.settings.uiDensityDescription.${normalized}`,
+    DENSITY_DESCRIPTION_FALLBACK[normalized],
+  );
 }
 
 /** Map the existing mobile immersive flag without changing established non-immersive sessions. */

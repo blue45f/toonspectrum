@@ -72,6 +72,7 @@ describe("Render Core API verification", () => {
   it.each([
     "",
     "http://api.example.test",
+    // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic unsafe-origin rejection fixture
     "https://user:pass@api.example.test",
     "https://api.example.test/path",
     "https://api.example.test?query=1",

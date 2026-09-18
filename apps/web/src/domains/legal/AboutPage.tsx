@@ -1,4 +1,10 @@
 import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   BookOpen,
   Layers,
@@ -16,7 +22,11 @@ import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
 import { Container } from "@/shared/components/section";
-import { useI18n } from "@/shared/lib/i18n";
+
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("AboutPage", ko, en);
 
 const SERVICE_PILLARS = [
   {
@@ -144,17 +154,31 @@ const GUIDE_CARDS = [
       cta: "See technology and trust",
     },
   },
+  {
+    href: "/about/principles",
+    icon: ShieldCheck,
+    eyebrow: "03 · PRINCIPLES",
+    ko: {
+      title: "어떤 기준으로 제품과 정책을 결정할까요?",
+      body: "창작 흐름, 작품 권리, AI 보조, 열린 파일, 협업, 수익화와 접근성을 판단하는 창작자 중심 제품 원칙을 공개합니다.",
+      cta: "제품 원칙 보기",
+    },
+    en: {
+      title: "What standards guide product and policy decisions?",
+      body: "Review creator-first principles for creative flow, rights, AI assistance, open files, collaboration, monetisation and accessibility.",
+      cta: "See product principles",
+    },
+  },
 ] as const;
 
 export function AboutPage() {
-  const language = useI18n((state) => state.lang);
-  const locale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
-  const ko = locale === "ko";
+  useBilingualI18nRevision();
+
+
+
 
   useDocumentTitle(
-    ko
-      ? "ToonStudio 서비스 소개 · 웹툰 제작을 잇는 작업실"
-      : "About ToonStudio · A connected webtoon production studio",
+    bi("ToonStudio 서비스 소개 · 웹툰 제작을 잇는 작업실", "About ToonStudio · A connected webtoon production studio"),
   );
 
   return (
@@ -162,25 +186,17 @@ export function AboutPage() {
       <PublicStoryHero
         eyebrow="ABOUT · TOONSTUDIO"
         title={
-          ko
-            ? "아이디어부터 완성된 웹툰까지, 하나의 작업실에서."
-            : "From the first idea to a finished webtoon, in one studio."
+          bi("아이디어부터 완성된 웹툰까지, 하나의 작업실에서.", "From the first idea to a finished webtoon, in one studio.")
         }
         description={
-          ko
-            ? "ToonStudio는 스토리 기획, 콘티, 드로잉, 캐릭터와 배경, 협업, 검수, 저장과 내보내기를 연결하는 브라우저 기반 웹툰 제작 작업실입니다."
-            : "ToonStudio is a browser-based webtoon production studio connecting story planning, storyboards, drawing, characters, backgrounds, collaboration, review, saving and export."
+          bi("ToonStudio는 스토리 기획, 콘티, 드로잉, 캐릭터와 배경, 협업, 검수, 저장과 내보내기를 연결하는 브라우저 기반 웹툰 제작 작업실입니다.", "ToonStudio is a browser-based webtoon production studio connecting story planning, storyboards, drawing, characters, backgrounds, collaboration, review, saving and export.")
         }
         image="world"
         imageAlt={
-          ko
-            ? "이야기 기획과 드로잉, 협업과 완성 원고가 하나의 창작 세계로 연결된 일러스트"
-            : "Illustration connecting story planning, drawing, collaboration and finished pages in one creative world"
+          bi("이야기 기획과 드로잉, 협업과 완성 원고가 하나의 창작 세계로 연결된 일러스트", "Illustration connecting story planning, drawing, collaboration and finished pages in one creative world")
         }
         caption={
-          ko
-            ? "PLAN → DRAW → REVIEW → SAVE · 연결된 웹툰 제작 작업실"
-            : "PLAN → DRAW → REVIEW → SAVE · A connected webtoon production studio"
+          bi("PLAN → DRAW → REVIEW → SAVE · 연결된 웹툰 제작 작업실", "PLAN → DRAW → REVIEW → SAVE · A connected webtoon production studio")
         }
       >
         <div className="flex flex-wrap gap-3">
@@ -188,7 +204,7 @@ export function AboutPage() {
             href="/studio/new"
             className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2"
           >
-            {ko ? "새 작품 시작하기" : "Start a new work"}
+            {bi("새 작품 시작하기", "Start a new work")}
             <ArrowRight size={16} aria-hidden="true" />
           </Link>
           <Link
@@ -196,7 +212,7 @@ export function AboutPage() {
             className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-line-strong px-5 py-3 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"
           >
             <BookOpen size={16} aria-hidden="true" />
-            {ko ? "제작 과정 알아보기" : "Learn the workflow"}
+            {bi("제작 과정 알아보기", "Learn the workflow")}
           </Link>
         </div>
       </PublicStoryHero>
@@ -206,26 +222,22 @@ export function AboutPage() {
       <section className="py-14 sm:py-20" aria-labelledby="about-purpose-title">
         <div className="grid gap-8 md:grid-cols-[0.72fr_1.28fr] md:gap-14">
           <div>
-            <p className="eyebrow text-accent">WHAT TOONSTUDIO CONNECTS</p>
+            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.AboutPage", "en", "WHAT TOONSTUDIO CONNECTS")}</p>
             <h2
               id="about-purpose-title"
               className="mt-4 max-w-sm text-balance text-2xl font-bold tracking-tight text-fg sm:text-3xl"
             >
-              {ko
-                ? "도구를 늘어놓기보다, 다음 행동을 이어줍니다."
-                : "Not a pile of tools, but a connected next action."}
+              {bi("도구를 늘어놓기보다, 다음 행동을 이어줍니다.", "Not a pile of tools, but a connected next action.")}
             </h2>
             <p className="mt-4 max-w-md text-sm leading-7 text-fg-2">
-              {ko
-                ? "기능이 많아도 창작자가 길을 잃지 않도록 현재 제작 단계에 맞는 작업공간과 자료, 저장 경로를 함께 안내합니다."
-                : "Even as the feature set grows, the studio guides creators toward the workspace, reference and saving path that fit the current stage."}
+              {bi("기능이 많아도 창작자가 길을 잃지 않도록 현재 제작 단계에 맞는 작업공간과 자료, 저장 경로를 함께 안내합니다.", "Even as the feature set grows, the studio guides creators toward the workspace, reference and saving path that fit the current stage.")}
             </p>
           </div>
 
           <div className="grid gap-4">
             {SERVICE_PILLARS.map((pillar) => {
               const Icon = pillar.icon;
-              const copy = pillar[locale];
+              const copy = bi((pillar).ko, (pillar).en);
 
               return (
                 <article
@@ -247,23 +259,21 @@ export function AboutPage() {
       </section>
 
       <section aria-labelledby="about-audience-title">
-        <p className="eyebrow text-accent">BUILT AROUND CREATOR ROLES</p>
+        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.AboutPage", "en", "BUILT AROUND CREATOR ROLES")}</p>
         <h2
           id="about-audience-title"
           className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl"
         >
-          {ko ? "누구의 작업이든, 시작점을 찾기 쉽게." : "An understandable starting point for every creator."}
+          {bi("누구의 작업이든, 시작점을 찾기 쉽게.", "An understandable starting point for every creator.")}
         </h2>
         <p className="mt-4 max-w-3xl text-sm leading-7 text-fg-2">
-          {ko
-            ? "처음 방문한 사용자는 자신의 역할과 현재 단계에서 출발하고, 익숙해진 뒤에는 같은 프로젝트 안에서 더 전문적인 작업공간으로 이동할 수 있습니다."
-            : "New visitors can begin from their role and current stage, then move into more advanced workspaces within the same project as they grow."}
+          {bi("처음 방문한 사용자는 자신의 역할과 현재 단계에서 출발하고, 익숙해진 뒤에는 같은 프로젝트 안에서 더 전문적인 작업공간으로 이동할 수 있습니다.", "New visitors can begin from their role and current stage, then move into more advanced workspaces within the same project as they grow.")}
         </p>
 
         <div className="mt-7 grid gap-4 sm:grid-cols-2">
           {AUDIENCES.map((audience) => {
             const Icon = audience.icon;
-            const copy = audience[locale];
+            const copy = bi((audience).ko, (audience).en);
 
             return (
               <Link
@@ -289,18 +299,18 @@ export function AboutPage() {
       </section>
 
       <section className="py-14 sm:py-20" aria-labelledby="about-guides-title">
-        <p className="eyebrow text-accent">EXPLORE THE PRODUCT</p>
+        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.AboutPage", "en", "EXPLORE THE PRODUCT")}</p>
         <h2
           id="about-guides-title"
           className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl"
         >
-          {ko ? "제작 흐름과 기술을 더 깊이 살펴보세요." : "Go deeper into the workflow and technology."}
+          {bi("제작 흐름과 기술을 더 깊이 살펴보세요.", "Go deeper into the workflow and technology.")}
         </h2>
 
-        <div className="mt-7 grid gap-5 lg:grid-cols-2">
+        <div className="mt-7 grid gap-5 lg:grid-cols-3">
           {GUIDE_CARDS.map((guide) => {
             const Icon = guide.icon;
-            const copy = guide[locale];
+            const copy = bi((guide).ko, (guide).en);
 
             return (
               <Link
@@ -336,23 +346,21 @@ export function AboutPage() {
 
       <section
         className="grid gap-7 border-y border-line bg-panel/45 px-6 py-8 md:grid-cols-2 sm:px-8"
-        aria-label={ko ? "제품의 약속과 데이터 안내" : "Product commitments and data"}
+        aria-label={bi("제품의 약속과 데이터 안내", "Product commitments and data")}
       >
         <div>
           <ShieldCheck size={22} className="text-accent" aria-hidden="true" />
           <h2 className="mt-4 text-lg font-bold text-fg">
-            {ko ? "작업을 지키는 습관까지." : "A practice that protects your work."}
+            {bi("작업을 지키는 습관까지.", "A practice that protects your work.")}
           </h2>
           <p className="mt-3 text-sm leading-7 text-fg-2">
-            {ko
-              ? "자동 저장과 복구가 있더라도 중요한 작업은 별도 파일로 내보내 보관하는 흐름을 안내합니다. 게시 여부와 관계없이 작품은 먼저 창작자의 작업물입니다."
-              : "Even with autosave and recovery, the product encourages exported copies of important work. A work belongs to its creator before it is ever published."}
+            {bi("자동 저장과 복구가 있더라도 중요한 작업은 별도 파일로 내보내 보관하는 흐름을 안내합니다. 게시 여부와 관계없이 작품은 먼저 창작자의 작업물입니다.", "Even with autosave and recovery, the product encourages exported copies of important work. A work belongs to its creator before it is ever published.")}
           </p>
           <Link
             href="/help"
             className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-accent"
           >
-            {ko ? "저장·복구 도움말" : "Saving and recovery help"}
+            {bi("저장·복구 도움말", "Saving and recovery help")}
             <ArrowRight size={14} aria-hidden="true" />
           </Link>
         </div>
@@ -360,18 +368,16 @@ export function AboutPage() {
         <div>
           <BookOpen size={22} className="text-accent" aria-hidden="true" />
           <h2 className="mt-4 text-lg font-bold text-fg">
-            {ko ? "출처와 사용 조건을 함께." : "Sources and usage conditions stay visible."}
+            {bi("출처와 사용 조건을 함께.", "Sources and usage conditions stay visible.")}
           </h2>
           <p className="mt-3 text-sm leading-7 text-fg-2">
-            {ko
-              ? "참고자료와 외부 데이터는 출처, 갱신 상태와 사용 범위를 구분해 안내합니다. 기술 소개에서도 사용자에게 필요한 정보와 공개하면 안 되는 운영 정보를 분리합니다."
-              : "References and external data distinguish source, update state and usage scope. Technology documentation also separates useful user information from sensitive operations detail."}
+            {bi("참고자료와 외부 데이터는 출처, 갱신 상태와 사용 범위를 구분해 안내합니다. 기술 소개에서도 사용자에게 필요한 정보와 공개하면 안 되는 운영 정보를 분리합니다.", "References and external data distinguish source, update state and usage scope. Technology documentation also separates useful user information from sensitive operations detail.")}
           </p>
           <Link
             href="/about/data"
             className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-accent"
           >
-            {ko ? "데이터 출처 확인하기" : "Review data sources"}
+            {bi("데이터 출처 확인하기", "Review data sources")}
             <ArrowRight size={14} aria-hidden="true" />
           </Link>
         </div>

@@ -1,4 +1,11 @@
 import {
+  formatI18nTemplate,
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowLeft,
   BookOpen,
   Bookmark,
@@ -56,6 +63,13 @@ import { useI18n, useT } from "@/shared/lib/i18n";
 
 import type { StudioHelpCenterSection } from "./studio-help-center-channel";
 import type { StudioHelpHubActions, StudioHelpHubTab } from "./studio-help-hub-channel";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioHelpHubDialog", ko, en);
 
 export interface StudioHelpHubDialogProps {
   readonly open: boolean;
@@ -111,7 +125,7 @@ interface HelpHubCopy {
   readonly updatesSeen: string;
 }
 
-const COPY: Readonly<Record<StudioHelpLocale, HelpHubCopy>> = {
+const COPY: Readonly<Record<"ko" | "en", HelpHubCopy>> = {
   ko: {
     title: "도움말 · 배우기",
     subtitle: "지금 하는 작업에 맞춰 찾고, 따라 하고, 문제를 해결하세요.",
@@ -186,7 +200,7 @@ const COPY: Readonly<Record<StudioHelpLocale, HelpHubCopy>> = {
 
 const NAV_ITEMS: readonly {
   readonly id: StudioHelpHubTab;
-  readonly label: Readonly<Record<StudioHelpLocale, string>>;
+  readonly label: Readonly<Record<"ko" | "en", string>>;
   readonly icon: LucideIcon;
 }[] = [
   { id: "home", label: { ko: "홈", en: "Home" }, icon: Home },
@@ -197,7 +211,7 @@ const NAV_ITEMS: readonly {
 ];
 
 const TECHNICAL_SECTION_LABELS: Readonly<
-  Record<Extract<StudioHelpCenterSection, "terminology" | "diagnostics" | "recovery" | "bug-report">, Readonly<Record<StudioHelpLocale, string>>>
+  Record<Extract<StudioHelpCenterSection, "terminology" | "diagnostics" | "recovery" | "bug-report">, Readonly<Record<"ko" | "en", string>>>
 > = {
   terminology: { ko: "용어 사전 열기", en: "Open terminology" },
   diagnostics: { ko: "기기 · 브라우저 진단", en: "Device and browser diagnostics" },
@@ -228,6 +242,7 @@ function writeStoredJson(key: string, value: unknown): void {
 }
 
 function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  useBilingualI18nRevision();
   return (
     <div className="mb-2 flex items-center justify-between gap-3">
       <h3 className="text-[0.72rem] font-semibold uppercase tracking-wide text-fg-3">{children}</h3>
@@ -251,6 +266,7 @@ function ArticleCard({
   onOpen: () => void;
   onToggleBookmark: () => void;
 }) {
+  useBilingualI18nRevision();
   return (
     <article className="group relative rounded-xl border border-line bg-card p-3 transition hover:border-accent/40 hover:bg-raised/60">
       <button type="button" className="block w-full pr-9 text-left" onClick={onOpen}>
@@ -275,7 +291,7 @@ function ArticleCard({
         aria-pressed={bookmarked}
         className="absolute right-2 top-2 grid size-9 place-items-center rounded-lg text-fg-3 hover:bg-panel hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
       >
-        <Bookmark className={`size-4 ${bookmarked ? "fill-current text-accent" : ""}`} aria-hidden />
+        <Bookmark className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "size-4 {v0}"), { v0: String(bookmarked ? "fill-current text-accent" : "") })} aria-hidden />
       </button>
     </article>
   );
@@ -290,9 +306,10 @@ export function StudioHelpHubDialog({
   onOpenLegacySection,
   onClose,
 }: StudioHelpHubDialogProps) {
+  useBilingualI18nRevision();
   const language = useI18n((state) => state.lang);
   const locale: StudioHelpLocale = language.toLocaleLowerCase().startsWith("ko") ? "ko" : "en";
-  const copy = COPY[locale];
+  const copy = bi((COPY).ko, (COPY).en);
   const t = useT();
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -518,7 +535,7 @@ export function StudioHelpHubDialog({
             aria-pressed={bookmarks.includes(article.id)}
             className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl border border-line px-3 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
-            <Bookmark className={`size-4 ${bookmarks.includes(article.id) ? "fill-current text-accent" : ""}`} aria-hidden />
+            <Bookmark className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "size-4 {v0}"), { v0: String(bookmarks.includes(article.id) ? "fill-current text-accent" : "") })} aria-hidden />
             {bookmarks.includes(article.id) ? copy.removeBookmark : copy.bookmark}
           </button>
         </div>
@@ -552,7 +569,7 @@ export function StudioHelpHubDialog({
               className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-panel px-3 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             >
               <LifeBuoy className="size-4" aria-hidden />
-              {TECHNICAL_SECTION_LABELS[article.technicalSection][locale]}
+              {bi((TECHNICAL_SECTION_LABELS[article.technicalSection]).ko, (TECHNICAL_SECTION_LABELS[article.technicalSection]).en)}
             </button>
           ) : null}
           <button
@@ -561,7 +578,7 @@ export function StudioHelpHubDialog({
             className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-panel px-3 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             <ExternalLink className="size-4" aria-hidden />
-            {locale === "ko" ? "전체 매뉴얼" : "Full manual"}
+            {bi("전체 매뉴얼", "Full manual")}
           </button>
         </div>
       </div>
@@ -572,19 +589,19 @@ export function StudioHelpHubDialog({
             type="button"
             onClick={() => setArticleFeedback(article.id, "yes")}
             aria-pressed={feedback[article.id] === "yes"}
-            className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${feedback[article.id] === "yes" ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-2 hover:bg-raised"}`}
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent {v0}"), { v0: String(feedback[article.id] === "yes" ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-2 hover:bg-raised") })}
           >
             <ThumbsUp className="size-4" aria-hidden />
-            {locale === "ko" ? "예" : "Yes"}
+            {bi("예", "Yes")}
           </button>
           <button
             type="button"
             onClick={() => setArticleFeedback(article.id, "no")}
             aria-pressed={feedback[article.id] === "no"}
-            className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${feedback[article.id] === "no" ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-2 hover:bg-raised"}`}
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent {v0}"), { v0: String(feedback[article.id] === "no" ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-2 hover:bg-raised") })}
           >
             <ThumbsDown className="size-4" aria-hidden />
-            {locale === "ko" ? "아니요" : "No"}
+            {bi("아니요", "No")}
           </button>
         </div>
         {feedback[article.id] ? <p className="mt-2 text-[0.68rem] text-fg-3">{copy.helpfulThanks}</p> : null}
@@ -633,7 +650,7 @@ export function StudioHelpHubDialog({
               className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-line bg-card px-3 text-left hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             >
               <span>
-                <span className="block text-[0.66rem] font-medium text-accent">{locale === "ko" ? "단축키" : "Shortcut"}</span>
+                <span className="block text-[0.66rem] font-medium text-accent">{bi("단축키", "Shortcut")}</span>
                 <span className="mt-0.5 block text-sm font-semibold text-fg">{t(action.labelKey)}</span>
               </span>
               <kbd className="shrink-0 rounded-lg border border-line bg-panel px-2 py-1 font-mono text-xs text-fg-2">
@@ -672,7 +689,7 @@ export function StudioHelpHubDialog({
               ) : null}
             </div>
             <p className="mt-1 text-xs leading-relaxed text-fg-3">
-              {currentTool.description ?? (locale === "ko" ? "이 도구와 관련된 도움말을 추천합니다." : "Recommended guidance for this tool.")}
+              {currentTool.description ?? (bi("이 도구와 관련된 도움말을 추천합니다.", "Recommended guidance for this tool."))}
             </p>
             {currentTool.aliases.length > 0 ? (
               <div className="mt-2 flex flex-wrap gap-1">
@@ -692,19 +709,19 @@ export function StudioHelpHubDialog({
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <button type="button" onClick={openCommandSearch} className="flex min-h-20 items-start gap-3 rounded-xl border border-line bg-card p-3 text-left hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
             <Command className="mt-0.5 size-5 text-accent" aria-hidden />
-            <span><b className="block text-sm text-fg">F1</b><span className="mt-0.5 block text-xs leading-relaxed text-fg-3">{locale === "ko" ? "명령 · 속성 · 도움말 통합 검색" : "Search commands, properties and help"}</span></span>
+            <span><b className="block text-sm text-fg">F1</b><span className="mt-0.5 block text-xs leading-relaxed text-fg-3">{bi("명령 · 속성 · 도움말 통합 검색", "Search commands, properties and help")}</span></span>
           </button>
           <button type="button" onClick={() => setActiveTab("learn")} className="flex min-h-20 items-start gap-3 rounded-xl border border-line bg-card p-3 text-left hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
             <GraduationCap className="mt-0.5 size-5 text-accent" aria-hidden />
-            <span><b className="block text-sm text-fg">{locale === "ko" ? "단계별 학습" : "Guided learning"}</b><span className="mt-0.5 block text-xs leading-relaxed text-fg-3">{locale === "ko" ? "목표별 체크리스트로 끝까지 따라가기" : "Follow goal-based checklists"}</span></span>
+            <span><b className="block text-sm text-fg">{bi("단계별 학습", "Guided learning")}</b><span className="mt-0.5 block text-xs leading-relaxed text-fg-3">{bi("목표별 체크리스트로 끝까지 따라가기", "Follow goal-based checklists")}</span></span>
           </button>
           <button type="button" onClick={() => setActiveTab("shortcuts")} className="flex min-h-20 items-start gap-3 rounded-xl border border-line bg-card p-3 text-left hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
             <Keyboard className="mt-0.5 size-5 text-accent" aria-hidden />
-            <span><b className="block text-sm text-fg">?</b><span className="mt-0.5 block text-xs leading-relaxed text-fg-3">{locale === "ko" ? "기능 이름과 키로 단축키 찾기" : "Find shortcuts by feature or key"}</span></span>
+            <span><b className="block text-sm text-fg">?</b><span className="mt-0.5 block text-xs leading-relaxed text-fg-3">{bi("기능 이름과 키로 단축키 찾기", "Find shortcuts by feature or key")}</span></span>
           </button>
           <button type="button" onClick={() => setActiveTab("solve")} className="flex min-h-20 items-start gap-3 rounded-xl border border-line bg-card p-3 text-left hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
             <LifeBuoy className="mt-0.5 size-5 text-accent" aria-hidden />
-            <span><b className="block text-sm text-fg">{locale === "ko" ? "문제 해결" : "Troubleshoot"}</b><span className="mt-0.5 block text-xs leading-relaxed text-fg-3">{locale === "ko" ? "진단 · 복구 · 버그 리포트" : "Diagnostics, recovery and bug reports"}</span></span>
+            <span><b className="block text-sm text-fg">{bi("문제 해결", "Troubleshoot")}</b><span className="mt-0.5 block text-xs leading-relaxed text-fg-3">{bi("진단 · 복구 · 버그 리포트", "Diagnostics, recovery and bug reports")}</span></span>
           </button>
         </div>
       </section>
@@ -771,8 +788,8 @@ export function StudioHelpHubDialog({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-card p-4">
         <div>
-          <h2 className="text-lg font-bold text-fg">{locale === "ko" ? "목표를 끝까지 따라가는 학습 경로" : "Guided paths that end in a result"}</h2>
-          <p className="mt-1 text-xs leading-relaxed text-fg-3">{locale === "ko" ? "체크 상태는 이 브라우저에만 저장되며 언제든 직접 해제할 수 있습니다." : "Checklist progress is stored only in this browser and can be changed at any time."}</p>
+          <h2 className="text-lg font-bold text-fg">{bi("목표를 끝까지 따라가는 학습 경로", "Guided paths that end in a result")}</h2>
+          <p className="mt-1 text-xs leading-relaxed text-fg-3">{bi("체크 상태는 이 브라우저에만 저장되며 언제든 직접 해제할 수 있습니다.", "Checklist progress is stored only in this browser and can be changed at any time.")}</p>
         </div>
         {actions.openFeatureTutorial ? (
           <button type="button" onClick={() => exitThen(actions.openFeatureTutorial!)} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-accent px-4 text-xs font-semibold text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
@@ -816,7 +833,7 @@ export function StudioHelpHubDialog({
                         onChange={() => toggleGuideStep(guide.id, step.id)}
                         className="peer sr-only"
                       />
-                      <span className={`grid size-5 place-items-center rounded-md border ${checked ? "border-accent bg-accent text-on-accent" : "border-line bg-card"}`} aria-hidden>
+                      <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "grid size-5 place-items-center rounded-md border {v0}"), { v0: String(checked ? "border-accent bg-accent text-on-accent" : "border-line bg-card") })} aria-hidden>
                         {checked ? <Check className="size-3.5" /> : null}
                       </span>
                       <span className="sr-only">{studioHelpText(step.label, locale)}</span>
@@ -827,7 +844,7 @@ export function StudioHelpHubDialog({
                       onClick={() => article && openArticle(article)}
                       className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-1.5 py-2 text-left hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                     >
-                      <span className={`truncate text-sm ${checked ? "text-fg-3 line-through" : "font-medium text-fg"}`}>{studioHelpText(step.label, locale)}</span>
+                      <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "truncate text-sm {v0}"), { v0: String(checked ? "text-fg-3 line-through" : "font-medium text-fg") })}>{studioHelpText(step.label, locale)}</span>
                       <ChevronRight className="size-4 shrink-0 text-fg-3" aria-hidden />
                     </button>
                   </li>
@@ -843,7 +860,7 @@ export function StudioHelpHubDialog({
   const renderShortcuts = () => (
     <div className="space-y-4">
       <div className="rounded-2xl border border-line bg-card p-4">
-        <h2 className="text-lg font-bold text-fg">{locale === "ko" ? "키를 외우기보다 동작으로 찾으세요" : "Search by action instead of memorising keys"}</h2>
+        <h2 className="text-lg font-bold text-fg">{bi("키를 외우기보다 동작으로 찾으세요", "Search by action instead of memorising keys")}</h2>
         <p className="mt-1 text-xs leading-relaxed text-fg-3">{copy.defaultShortcutNotice}</p>
         {actions.openShortcuts ? (
           <button type="button" onClick={() => exitThen(actions.openShortcuts!)} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl bg-accent px-4 text-xs font-semibold text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
@@ -872,21 +889,21 @@ export function StudioHelpHubDialog({
   const renderSolve = () => (
     <div className="space-y-5">
       <div className="rounded-2xl border border-line bg-card p-4">
-        <h2 className="text-lg font-bold text-fg">{locale === "ko" ? "증상에서 해결 도구로 바로 이동" : "Go from symptom to the right support tool"}</h2>
-        <p className="mt-1 text-xs leading-relaxed text-fg-3">{locale === "ko" ? "진단 정보는 사용자가 복사하거나 내려받기 전까지 기기 밖으로 전송하지 않습니다." : "Diagnostic information stays on-device until you choose to copy or download it."}</p>
+        <h2 className="text-lg font-bold text-fg">{bi("증상에서 해결 도구로 바로 이동", "Go from symptom to the right support tool")}</h2>
+        <p className="mt-1 text-xs leading-relaxed text-fg-3">{bi("진단 정보는 사용자가 복사하거나 내려받기 전까지 기기 밖으로 전송하지 않습니다.", "Diagnostic information stays on-device until you choose to copy or download it.")}</p>
       </div>
       <div className="grid gap-2 lg:grid-cols-2">
         {[
           { section: "diagnostics" as const, icon: Stethoscope, title: locale === "ko" ? "느림 · 검은 화면 · 입력 문제" : "Slowness, black canvas or input issues", body: locale === "ko" ? "브라우저·GPU·저장소·렌더 백엔드를 실제 값으로 점검합니다." : "Inspect browser, GPU, storage and render backend using measured values." },
           { section: "recovery" as const, icon: LifeBuoy, title: locale === "ko" ? "초안·작업 복구" : "Draft and work recovery", body: locale === "ko" ? "로컬 저장소와 복구 후보를 덮어쓰기 전에 안전하게 확인합니다." : "Inspect local storage and recovery candidates before overwriting them." },
           { section: "bug-report" as const, icon: Bug, title: locale === "ko" ? "재현되는 오류 신고" : "Report a reproducible problem", body: locale === "ko" ? "포함·제외 항목을 먼저 보여 주고 오류 저널과 진단 패키지를 만듭니다." : "Review included and excluded data, then build a diagnostic package." },
-          { section: "terminology" as const, icon: Command, title: locale === "ko" ? "CSP · Photoshop 용어로 찾기" : "Find features using CSP or Photoshop terms", body: locale === "ko" ? "익숙한 타사 도구 이름을 툰스튜디오 명령과 연결합니다." : "Map familiar editor terms to ToonStudio commands." },
+          { section: "terminology" as const, icon: Command, title: locale === "ko" ? "다른 앱 용어로 찾기" : "Find features using other app terms", body: locale === "ko" ? "익숙한 다른 앱의 도구 이름을 툰스튜디오 명령과 연결합니다." : "Map familiar editor terms to ToonStudio commands." },
         ].map((item) => {
           const Icon = item.icon;
           return (
             <button key={item.section} type="button" onClick={() => onOpenLegacySection(item.section)} className="flex min-h-28 items-start gap-3 rounded-2xl border border-line bg-card p-4 text-left hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent"><Icon className="size-5" aria-hidden /></span>
-              <span className="min-w-0"><b className="block text-sm text-fg">{item.title}</b><span className="mt-1 block text-xs leading-relaxed text-fg-3">{item.body}</span><span className="mt-2 inline-flex items-center gap-1 text-[0.68rem] font-semibold text-accent">{locale === "ko" ? "열기" : "Open"}<ChevronRight className="size-3.5" aria-hidden /></span></span>
+              <span className="min-w-0"><b className="block text-sm text-fg">{item.title}</b><span className="mt-1 block text-xs leading-relaxed text-fg-3">{item.body}</span><span className="mt-2 inline-flex items-center gap-1 text-[0.68rem] font-semibold text-accent">{bi("열기", "Open")}<ChevronRight className="size-3.5" aria-hidden /></span></span>
             </button>
           );
         })}
@@ -895,7 +912,7 @@ export function StudioHelpHubDialog({
         <SectionTitle>{copy.technicalTools}</SectionTitle>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={openCommandSearch} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"><Search className="size-4" aria-hidden />F1</button>
-          <button type="button" onClick={openManual} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"><ExternalLink className="size-4" aria-hidden />{locale === "ko" ? "사용자 매뉴얼" : "User manual"}</button>
+          <button type="button" onClick={openManual} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"><ExternalLink className="size-4" aria-hidden />{bi("사용자 매뉴얼", "User manual")}</button>
         </div>
       </section>
     </div>
@@ -905,8 +922,8 @@ export function StudioHelpHubDialog({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-card p-4">
         <div>
-          <h2 className="text-lg font-bold text-fg">{locale === "ko" ? "도움말에서 새로 달라진 점" : "What's new in help"}</h2>
-          <p className="mt-1 text-xs text-fg-3">{locale === "ko" ? "과장된 출시 문구 대신 실제로 사용할 수 있는 변화만 기록합니다." : "Only shipped, usable changes are listed here."}</p>
+          <h2 className="text-lg font-bold text-fg">{bi("도움말에서 새로 달라진 점", "What's new in help")}</h2>
+          <p className="mt-1 text-xs text-fg-3">{bi("과장된 출시 문구 대신 실제로 사용할 수 있는 변화만 기록합니다.", "Only shipped, usable changes are listed here.")}</p>
         </div>
         <button
           type="button"
@@ -918,7 +935,7 @@ export function StudioHelpHubDialog({
           className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line px-3 text-xs font-semibold text-fg-2 hover:bg-raised disabled:cursor-default disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           <Check className="size-4" aria-hidden />
-          {updatesSeen ? copy.updatesSeen : locale === "ko" ? "모두 확인" : "Mark all reviewed"}
+          {updatesSeen ? copy.updatesSeen : bi("모두 확인", "Mark all reviewed")}
         </button>
       </div>
       {STUDIO_HELP_UPDATES.map((update) => (
@@ -937,7 +954,7 @@ export function StudioHelpHubDialog({
   if (!open) return null;
 
   const content = (
-    <div ref={overlayRef} className={`fixed inset-0 ${STUDIO_Z_CLASS.help} flex items-end justify-center bg-canvas/75 backdrop-blur-sm sm:items-center sm:p-5`}>
+    <div ref={overlayRef} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "fixed inset-0 {v0} flex items-end justify-center bg-canvas/75 backdrop-blur-sm sm:items-center sm:p-5"), { v0: String(STUDIO_Z_CLASS.help) })}>
       <button type="button" tabIndex={-1} aria-label={copy.close} className="absolute inset-0 cursor-default" onClick={onClose} />
       <div
         ref={dialogRef}
@@ -1014,18 +1031,18 @@ export function StudioHelpHubDialog({
                       setActiveTab(item.id);
                       setSelectedArticleId(null);
                     }}
-                    aria-current={active ? "page" : undefined}
-                    className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:w-full ${active ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised"}`}
+                    aria-current={active ? translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "page") : undefined}
+                    className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:w-full {v0}"), { v0: String(active ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised") })}
                   >
                     <Icon className="size-4" aria-hidden />
-                    {item.label[locale]}
-                    {item.id === "updates" && !updatesSeen ? <span className="ml-auto size-1.5 rounded-full bg-accent" aria-label={locale === "ko" ? "읽지 않은 업데이트" : "Unread updates"} /> : null}
+                    {bi((item.label).ko, (item.label).en)}
+                    {item.id === "updates" && !updatesSeen ? <span className="ml-auto size-1.5 rounded-full bg-accent" aria-label={bi("읽지 않은 업데이트", "Unread updates")} /> : null}
                   </button>
                 );
               })}
             </div>
             <div className="mt-3 hidden border-t border-line/60 pt-3 sm:block">
-              <button type="button" onClick={openManual} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[0.68rem] text-fg-3 hover:bg-raised hover:text-fg-2"><ExternalLink className="size-3.5" aria-hidden />{locale === "ko" ? "전체 매뉴얼" : "Full manual"}</button>
+              <button type="button" onClick={openManual} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[0.68rem] text-fg-3 hover:bg-raised hover:text-fg-2"><ExternalLink className="size-3.5" aria-hidden />{bi("전체 매뉴얼", "Full manual")}</button>
             </div>
           </nav>
 

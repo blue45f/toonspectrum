@@ -24,6 +24,7 @@ import {
   CREATOR_ASSET_LIST_RESPONSE_MAX_BYTES,
   assertCreatorAssetListResponseBudget,
 } from "@/shared/lib/creator-asset-contract";
+import type { PublicCreatorRoleProfile } from "@/shared/lib/creator-role-contract";
 import { ensureArray } from "@/shared/lib/http-safe";
 import { projectRevisionComparisonValue } from "@/shared/lib/revision-comparison-projection";
 import { getAuthUserId } from "@/compat/auth-session-store";
@@ -1006,7 +1007,7 @@ export async function markSharedAssetUsed(id: string): Promise<void> {
 }
 
 // ── 연재 시리즈(코미코 베스트도전 스타일) ──────────────────────────────
-export type SeriesStatus = "ongoing" | "completed";
+export type SeriesStatus = "ongoing" | "hiatus" | "completed";
 export type SeriesSort = "recent" | "likes" | "views";
 
 export interface SeriesSummary {
@@ -1129,6 +1130,7 @@ export interface CreatorProfile {
   isFollowing: boolean;
   works: number;
   series: number;
+  creatorRoleProfile: PublicCreatorRoleProfile | null;
 }
 
 export async function getCreatorProfile(userId: string, signal?: AbortSignal): Promise<CreatorProfile> {

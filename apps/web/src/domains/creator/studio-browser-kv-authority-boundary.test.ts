@@ -386,6 +386,22 @@ const HISTORY_LEGACY_IDB =
   "Explicit pages-history emergency adapter only; the product factory cannot construct or infer this IndexedDB authority.";
 const HISTORY_LEGACY_IDB_PROOF =
   "The default factory accepts only a caller-created legacyRecoveryVault and otherwise selects SQLite, native OPFS, or observable memory-only state.";
+const BOUNDED_LOCAL_CACHE =
+  "TTL-bound cache, one-shot handoff, device token, offline outbox, or storage-event transport; it does not replace canonical project persistence.";
+const BOUNDED_LOCAL_CACHE_PROOF =
+  "The exact file, key, method, and count are pinned while schema, expiry, consume, removal, or replay behavior stays independently testable.";
+const OPTIONAL_LOCAL_TOOL_STATE =
+  "Optional browser-local draft, preset, benchmark receipt, or device preference for a standalone Studio tool; losing it cannot corrupt a canonical project.";
+const OPTIONAL_LOCAL_TOOL_STATE_PROOF =
+  "The feature retains memory, export, or deterministic defaults when storage fails, and only the exact reviewed call is admitted here.";
+const REVIEWED_LOCAL_WORKING_COPY =
+  "Reviewed browser-local working copy for validated adjunct project metadata; it does not authorize new canonical browser-KV stores.";
+const REVIEWED_LOCAL_WORKING_COPY_PROOF =
+  "The injected storage port, parser or schema, exact key expression, and occurrence count are pinned so expansion requires a fresh architecture review.";
+const STANDALONE_DRAFT_IDB =
+  "Explicit IndexedDB draft for the standalone promo editor; JSON export and revision checks bound this local working copy.";
+const STANDALONE_DRAFT_IDB_PROOF =
+  "The database name, object-store operation, revision conflict check, and exact call count are pinned; no other Studio authority is covered.";
 
 const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   // Deletion-only cleanup of browser compatibility remnants.
@@ -453,6 +469,58 @@ const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   allow("apps/web/src/domains/creator/studio-palette-library.ts", "durable-storage-write", '"toonspectrum-studio-palette-library"', 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
   allow("apps/web/src/domains/creator/studio-pose-material-library.ts", "durable-storage-write", '"toonspectrum-studio-pose-material-library-v1"', 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
   allow("apps/web/src/domains/creator/studio-translation-memory.ts", "durable-storage-write", "key", 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
+
+  // Reviewed browser-KV additions accumulated after the original authority baseline. Every entry
+  // remains file/key/kind/count exact; this section must shrink as synchronous compatibility stores
+  // move behind the SQLite/OPFS repositories.
+  allow("apps/web/src/domains/creator/StudioFileControlCenter.tsx", "local-storage-write", '"toonspectrum-studio-file-control-center:recent-files:v1"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/StudioFileControlCenter.tsx", "local-storage-cleanup", '"toonspectrum-studio-file-control-center:recent-files:v1"', 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("apps/web/src/domains/creator/StudioHelpHubDialog.tsx", "local-storage-write", "key", 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/StudioProjectCenterSearch.tsx", "local-storage-write", "key", 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/StudioUnifiedAssetSmartLibrary.tsx", "local-storage-write", "STUDIO_UNIFIED_ASSET_LIBRARY_STORAGE_KEY", 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/bg3d/studio-bg3d-professional-workspace-layout.ts", "durable-storage-write", '"toonspectrum.studio.bg3d.workspace-layout.v1"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/brush/studio-pen-button-policy-store.ts", "durable-storage-write", '"toonstudio:pen-button-policy:v1"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/brush/studio-stylus-pressure-profile-store.ts", "durable-storage-write", '"toonstudio:stylus-pressure-profile:v1"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/lettering/studio-bubble-library.ts", "durable-storage-write", '"toonstudio.studio.bubble-library.v1"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/production-hub/ProductionVisualPlanningWorkspace.tsx", "local-storage-write", '`production-planning-view:${aggregate.projectId}:${showEpisodeRail?"project":"episode"}`', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/spatial-reader/StudioSpatialReaderPage.tsx", "local-storage-write", '`toonstudio-spatial-progress:${book.id}`', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/studio-template-catalog.ts", "durable-storage-write", '"toonspectrum:studio-template-favorites:v1"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/studio-workspace-arrangement.ts", "durable-storage-write", '`${STUDIO_WORKSPACE_ARRANGEMENT_KEY}:${id}`', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/studio-workspace-arrangement.ts", "durable-storage-write", '"toonspectrum:studio:arrangement:v1"', 1, UI_ONLY, UI_PROOF),
+
+  allow("apps/web/src/domains/creator/brush-lab/StudioBrushIntegratedWorkbench.tsx", "local-storage-write", "brushStudioV6StorageKey(scope)", 1, OPTIONAL_LOCAL_TOOL_STATE, OPTIONAL_LOCAL_TOOL_STATE_PROOF),
+  allow("apps/web/src/domains/creator/brush-lab/StudioBrushV5Composer.tsx", "local-storage-write", '"toonspectrum.brush-studio-v5.library"', 1, OPTIONAL_LOCAL_TOOL_STATE, OPTIONAL_LOCAL_TOOL_STATE_PROOF),
+  allow("apps/web/src/domains/creator/brush-lab/StudioBrushV5Composer.tsx", "local-storage-write", '`${DRAFT_KEY_PREFIX}${encodeURIComponent(scope)}`', 1, OPTIONAL_LOCAL_TOOL_STATE, OPTIONAL_LOCAL_TOOL_STATE_PROOF),
+  allow("apps/web/src/domains/creator/brush-lab/StudioBrushV5QualityWorkbench.tsx", "local-storage-write", '`toonspectrum.brush-quality-v1:${encodeURIComponent(scope)}`', 1, OPTIONAL_LOCAL_TOOL_STATE, OPTIONAL_LOCAL_TOOL_STATE_PROOF),
+  allow("apps/web/src/domains/creator/brush-lab/StudioBrushV5RuntimeWorkbench.tsx", "local-storage-write", '`toonspectrum.brush-runtime-benchmark-v1:${encodeURIComponent(scope)}`', 1, OPTIONAL_LOCAL_TOOL_STATE, OPTIONAL_LOCAL_TOOL_STATE_PROOF),
+  allow("apps/web/src/domains/creator/brush-lab/StudioBrushV6Workbench.tsx", "local-storage-write", '"toonspectrum.brush-studio.experience"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/brush-lab/StudioBrushV6Workbench.tsx", "local-storage-write", '`toonspectrum.brush-program-v6:${encodeURIComponent(scope)}`', 1, OPTIONAL_LOCAL_TOOL_STATE, OPTIONAL_LOCAL_TOOL_STATE_PROOF),
+  allow("apps/web/src/domains/creator/brush/StudioMaterialBrushControls.tsx", "local-storage-write", '`toonspectrum.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`', 1, OPTIONAL_LOCAL_TOOL_STATE, OPTIONAL_LOCAL_TOOL_STATE_PROOF),
+  allow("apps/web/src/domains/creator/layer/StudioLayerFilterPresetShelf.tsx", "local-storage-write", "STUDIO_LAYER_FILTER_PRESET_STORAGE_KEY", 1, OPTIONAL_LOCAL_TOOL_STATE, OPTIONAL_LOCAL_TOOL_STATE_PROOF),
+
+  allow("apps/web/src/domains/creator/ai/studio-ai-project-handoff.ts", "durable-storage-write", '"toonstudio:ai-project-handoff:v1"', 1, BOUNDED_LOCAL_CACHE, BOUNDED_LOCAL_CACHE_PROOF),
+  allow("apps/web/src/domains/creator/project-graph/studio-project-graph-cache.ts", "durable-storage-write", "key", 1, BOUNDED_LOCAL_CACHE, BOUNDED_LOCAL_CACHE_PROOF),
+  allow("apps/web/src/domains/creator/project-graph/studio-project-graph-device.ts", "durable-storage-write", '"toonstudio:project-graph-device:v1"', 1, BOUNDED_LOCAL_CACHE, BOUNDED_LOCAL_CACHE_PROOF),
+  allow("apps/web/src/domains/creator/studio-document-window-coordination.ts", "durable-storage-write", "this.storageKey", 1, BOUNDED_LOCAL_CACHE, BOUNDED_LOCAL_CACHE_PROOF),
+  allow("apps/web/src/domains/creator/studio-draft-save-outbox.ts", "durable-storage-write", "key", 2, BOUNDED_LOCAL_CACHE, BOUNDED_LOCAL_CACHE_PROOF),
+  allow("apps/web/src/domains/creator/studio-template-catalog.ts", "durable-storage-write", '"toonspectrum:studio-template-handoff:v1"', 1, BOUNDED_LOCAL_CACHE, BOUNDED_LOCAL_CACHE_PROOF),
+
+  allow("apps/web/src/domains/creator/save-first/studio-project-package-import.ts", "durable-storage-write", "studioAutosaveKey({userId:options.authUserId??null,workId:restored.document.id,})", 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
+  allow("apps/web/src/domains/creator/studio-asset-governance.ts", "durable-storage-write", "studioAssetGovernanceStorageKey(projectId)", 1, REVIEWED_LOCAL_WORKING_COPY, REVIEWED_LOCAL_WORKING_COPY_PROOF),
+  allow("apps/web/src/domains/creator/studio-localization-project-store.ts", "durable-storage-write", "storageKey(parsed.projectId)", 1, REVIEWED_LOCAL_WORKING_COPY, REVIEWED_LOCAL_WORKING_COPY_PROOF),
+  allow("apps/web/src/domains/creator/studio-marketplace-submission-store.ts", "durable-storage-write", "studioMarketplaceSubmissionStorageKey(sellerId)", 1, REVIEWED_LOCAL_WORKING_COPY, REVIEWED_LOCAL_WORKING_COPY_PROOF),
+  allow("apps/web/src/domains/creator/studio-project-diagnostic-source-store.ts", "durable-storage-write", "storageKey(source.projectId)", 1, REVIEWED_LOCAL_WORKING_COPY, REVIEWED_LOCAL_WORKING_COPY_PROOF),
+  allow("apps/web/src/domains/creator/studio-project-document-store.ts", "durable-storage-write", "studioProjectDocumentStorageKey(state.projectId)", 1, REVIEWED_LOCAL_WORKING_COPY, REVIEWED_LOCAL_WORKING_COPY_PROOF),
+  allow("apps/web/src/domains/creator/studio-project-feature-suite-store.ts", "durable-storage-write", "studioProjectFeatureSuiteStorageKey(id)", 1, REVIEWED_LOCAL_WORKING_COPY, REVIEWED_LOCAL_WORKING_COPY_PROOF),
+  allow("apps/web/src/domains/creator/studio-project-library-store.ts", "durable-storage-write", "STUDIO_PROJECT_LIBRARY_STORAGE_KEY", 1, REVIEWED_LOCAL_WORKING_COPY, REVIEWED_LOCAL_WORKING_COPY_PROOF),
+  allow("apps/web/src/domains/creator/studio-project-readiness-store.ts", "durable-storage-write", "storageKey(snapshot.projectId)", 1, REVIEWED_LOCAL_WORKING_COPY, REVIEWED_LOCAL_WORKING_COPY_PROOF),
+  allow("apps/web/src/domains/creator/studio-review-history-store.ts", "durable-storage-write", "keyFor(projectId)", 1, REVIEWED_LOCAL_WORKING_COPY, REVIEWED_LOCAL_WORKING_COPY_PROOF),
+  allow("apps/web/src/domains/creator/studio-series-kit-store.ts", "durable-storage-write", "studioSeriesKitStorageKey(kit.projectId)", 1, REVIEWED_LOCAL_WORKING_COPY, REVIEWED_LOCAL_WORKING_COPY_PROOF),
+
+  allow("apps/web/src/domains/creator/studio-cuttoon-editor/StudioTemplateHandoffHost.tsx", "local-storage-cleanup", "STUDIO_TEMPLATE_HANDOFF_KEY", 2, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("apps/web/src/domains/creator/studio-shell/useStudioProjectLibraryManagementController.ts", "local-storage-cleanup", "studioProjectDocumentStorageKey(projectId)", 1, CLEANUP_ONLY, CLEANUP_PROOF),
+  allow("apps/web/src/domains/creator/promo/promo-draft.ts", "indexeddb-open", '"toonstudio-promo-drafts"', 1, STANDALONE_DRAFT_IDB, STANDALONE_DRAFT_IDB_PROOF),
+  allow("apps/web/src/domains/creator/promo/promo-draft.ts", "indexeddb-write", "put", 1, STANDALONE_DRAFT_IDB, STANDALONE_DRAFT_IDB_PROOF),
 
   // Explicit legacy IndexedDB seams. Operation counts prevent a file-level blanket exemption.
   allow("apps/web/src/domains/creator/bg3d/bg3d-model-library.ts", "indexeddb-open", '"toonspectrum-studio-bg3d-model-library"', 1, LEGACY_IDB, LEGACY_IDB_PROOF),

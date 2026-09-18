@@ -16,6 +16,7 @@ import type { StudioMaterialBrushDefinition } from "./studio-material-brush-cata
 
 export function materializeStudioMaterialBrushDynamics(
   definition: StudioMaterialBrushDefinition,
+  defaultWidth: number,
 ): NormalizedStudioBrushDynamicsSettings {
   const base = studioBrushDynamicsPresetSettings(definition.runtime);
   const dry = definition.runtime === "dry-media";
@@ -59,7 +60,11 @@ export function materializeStudioMaterialBrushDynamics(
       minOpacityRatio: 0.65,
       curve: 1.1,
     },
-    width: { base: definition.width, mappings: widthMappings, jitter: null },
+    // The morphology definition retains its authored footprint for provenance, while the live
+    // catalogue contract owns the artist-facing first-stroke width. Keeping both values separate
+    // prevents the picker from showing a normalized size while the first rendered mark uses the
+    // oversized authored radius.
+    width: { base: defaultWidth, mappings: widthMappings, jitter: null },
     // The draw element owns toolbar opacity. Do not multiply the catalogue opacity twice.
     opacity: { base: 1, mappings: [{ source: "pressure", from: 0.62, to: 1 }], jitter: null },
     flow: {

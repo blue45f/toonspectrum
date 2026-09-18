@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { createContext, lazy, Suspense, useContext, useState, type ReactNode } from "react";
 import type { PageState } from "../studio-page-state";
 import type { StudioColorProofDocument } from "./studio-color-proof-document";
@@ -17,7 +18,7 @@ export function StudioColorProofProvider({ children, ...host }: StudioColorProof
   const [opened, setOpened] = useState(false);
   return <Context value={() => setOpened(true)}>
     {children}
-    {opened ? <Suspense fallback={<div role="status" className="fixed bottom-4 right-4 z-[190] rounded bg-panel p-3 text-sm">ICC 도구를 여는 중… <button type="button" className="min-h-11 px-3" onClick={() => setOpened(false)}>취소</button></div>}>
+    {opened ? <Suspense fallback={<div role="status" className="fixed bottom-4 right-4 z-[190] rounded bg-panel p-3 text-sm">{translateCurrentStaticSourceText("domains.creator.color.StudioColorProofContext", "ko", "ICC 도구를 여는 중… ")}<button type="button" className="min-h-11 px-3" onClick={() => setOpened(false)}>{translateCurrentStaticSourceText("domains.creator.color.StudioColorProofContext", "ko", "취소")}</button></div>}>
       <ProofDialog key={host.page.id} host={host} onClose={() => setOpened(false)} />
     </Suspense> : null}
   </Context>;
@@ -25,5 +26,5 @@ export function StudioColorProofProvider({ children, ...host }: StudioColorProof
 export function StudioColorProofLauncher() {
   const open = useContext(Context);
   if (!open) return null;
-  return <button type="button" onClick={open} className="min-h-11 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" aria-haspopup="dialog">ICC 색상 확인·출력</button>;
+  return <button type="button" onClick={open} className="min-h-11 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" aria-haspopup="dialog">{translateCurrentStaticSourceText("domains.creator.color.StudioColorProofContext", "ko", "ICC 색상 확인·출력")}</button>;
 }

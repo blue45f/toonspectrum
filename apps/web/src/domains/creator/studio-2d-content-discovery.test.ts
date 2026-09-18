@@ -9,7 +9,7 @@ const scene = (id: string) => BG_SCENES.find((item) => item.id === id)!;
 describe("2D reviewed content filters", () => {
   it("combines source metadata instead of guessing from a scene name", () => {
     const result = filterStudio2dScenes(groups, { environment: "실내", timeOfDay: "밤", textFreeOnly: true, emptySceneOnly: true, quality: "large" });
-    expect(result.map((item) => item.id).sort()).toEqual(["webtoon-creator-room", "webtoon-palace"]);
+    expect(result.map((item) => item.id).sort()).toEqual(["webtoon-bedroom", "webtoon-creator-room", "webtoon-drama-courtroom", "webtoon-drama-hospital-corridor", "webtoon-horror-dark-tunnel", "webtoon-palace"]);
   });
   it("checks every environment/time/text combination against the original metadata", () => {
     for (const environment of ["all", "실내", "실외"] as const) {

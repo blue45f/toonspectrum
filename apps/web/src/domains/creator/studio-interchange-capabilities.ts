@@ -285,18 +285,18 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     extensions: [".avif"],
     mime: ["image/avif"],
     category: "raster",
-    import: "engine-ready",
+    import: "available",
     export: "unsupported",
-    roundTrip: "none",
+    roundTrip: "rendered",
     lossModel: [
       "ImageDecoder가 제공하는 픽셀·프레임 시간만 materialize하며 원본 ISOBMFF item 구조와 metadata는 보존하지 않음",
       "브라우저별 ImageDecoder AVIF 지원 여부가 달라 지원되지 않는 런타임에서는 사용할 수 없음",
     ],
     runtimeRequirement: ["ImageDecoder", "브라우저 AV1/AVIF decoder", "OffscreenCanvas materializer"],
     sizeBudget: { maxItems: 120, notes: "generic frame decode orchestrator의 기본 프레임 상한" },
-    status: "engine-ready",
+    status: "available",
     notes: [
-      "프레임 디코드 orchestration과 예산 테스트는 있으나 Studio 가져오기 메뉴에는 연결되지 않았습니다.",
+      "Studio 이미지 가져오기가 ImageDecoder 지원 런타임에서 AVIF 픽셀과 다중 프레임 timing을 편집 가능한 셀 애니메이션으로 materialize합니다.",
       "ToonSpectrum이 AV1 decoder를 번들하거나 AVIF 규격 적합성을 인증했다는 뜻이 아닙니다.",
     ],
     recommendedBridge: ["현재 사용자 작업 흐름에서는 PNG 또는 WebP로 변환 후 가져오기"],
@@ -311,9 +311,9 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
       notes: ["generic ImageDecoder pipeline only; bundled AV1 decoder 없음"],
     },
     uiWiring: {
-      import: "not-wired",
+      import: "wired",
       export: "not-applicable",
-      notes: ["범용 Studio 파일 가져오기/내보내기 UI에는 노출하지 않음"],
+      notes: ["Studio 통합 에셋/이미지 가져오기 입력(image/*)에서 런타임 지원을 판정해 연결"],
     },
     metadata: {
       general: "discarded",
@@ -610,8 +610,8 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     extensions: [".inkml"],
     mime: ["application/inkml+xml"],
     category: "vector",
-    import: "engine-ready",
-    export: "engine-ready",
+    import: "available",
+    export: "partial",
     roundTrip: "partial",
     lossModel: [
       "좌표·필압·기울기·회전·속도·배럴압은 보존하지만 ToonSpectrum 레이어·그룹·브러시 질감은 네이티브 프로젝트에만 유지",
@@ -720,8 +720,8 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     extensions: [".icc", ".icm"],
     mime: ["application/vnd.iccprofile", "application/octet-stream"],
     category: "publication",
-    import: "engine-ready",
-    export: "engine-ready",
+    import: "available",
+    export: "partial",
     roundTrip: "partial",
     lossModel: [
       "RGB matrix/TRC만 Studio 내부 색 변환에 사용하며 LUT·CMYK는 권리가 확인된 검사·원본 임베딩 경계로 제한",
@@ -737,8 +737,10 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
       maxFileBytes: 16 * MiB,
       notes: "헤더·tag table·reserved 영역·profile ID·checksum·provider 권한을 적용 전에 검증",
     },
-    status: "engine-ready",
+    status: "partial",
     notes: [
+      "페이지 색보정의 ICC 색상 확인·출력 UI에서 사용자 RGB matrix/TRC 프로필을 권한 확인 후 가져와 문서에 보존하고 소프트 프루프합니다.",
+      "ICC 포함 RGB PNG 출력까지 연결되어 있으며, 범용 CMYK/LUT 관리나 모든 PDF OutputIntent 선택을 의미하지 않습니다.",
       "제품 생성 sRGB는 고정 SHA-256 allowlist로 감사하며, 외부 프로파일은 출처·권한·identity가 일치해야 합니다.",
       "성공 영수증은 ToonSpectrum 정책 통과이며 ICC·인쇄소·vendor의 제3자 공식 인증이 아닙니다.",
     ],
@@ -753,9 +755,9 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
       notes: ["원본 검사·권한 정책과 결정적 ToonSpectrum sRGB profile builder 구현"],
     },
     uiWiring: {
-      import: "not-wired",
-      export: "not-wired",
-      notes: ["전문 PDF OutputIntent orchestration에서 engine API를 사용하며 독립 ICC 메뉴는 후속 연결"],
+      import: "wired",
+      export: "wired",
+      notes: ["페이지 색보정 패널의 ICC 색상 확인·출력 런처에서 가져오기·소프트 프루프·ICC 포함 PNG 출력에 연결"],
     },
     metadata: {
       general: "preserved",
@@ -796,7 +798,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     mime: ["application/pdf"],
     category: "publication",
     import: "unsupported",
-    export: "engine-ready",
+    export: "partial",
     roundTrip: "none",
     lossModel: [
       "지원하지 않는 Studio 브러시·필터·합성 효과는 별도 래스터 자원으로 평탄화해야 함",
@@ -811,10 +813,11 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
       maxDimensionPx: 32_768,
       notes: "문서 생성 전에 이미지·폰트·페이지 작업 예산을 별도로 적용",
     },
-    status: "engine-ready",
+    status: "partial",
     notes: [
       "벡터 path·텍스트·JPEG·알파·ICC OutputIntent를 쓰는 독립 PDF writer가 구현되어 있습니다.",
-      "현재 보이는 메뉴의 PDF 버튼은 기존 평탄화 PDF이며 벡터 writer는 전문 출고 UI에 아직 연결하지 않았습니다.",
+      "현재 Export 메뉴의 PDF 1.7 벡터 선화 경로는 화면 충실도를 JPEG 배경으로 보존하고 지원되는 펜 자유곡선을 실제 PDF 벡터 패스로 중첩합니다.",
+      "텍스트·필터·이미지까지 모두 편집 가능한 순수 벡터 PDF는 아직 제공하지 않습니다.",
     ],
     technicalLayers: {
       format: ["PDF 1.7 writer subset"],
@@ -828,8 +831,8 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     },
     uiWiring: {
       import: "not-applicable",
-      export: "not-wired",
-      notes: ["전문 출고 패널 연결 전 engine API로만 제공"],
+      export: "partial",
+      notes: ["Studio Export 메뉴에서 화면 보존 + 펜 선화 벡터 패스의 하이브리드 PDF 1.7 출고로 연결"],
     },
     metadata: {
       general: "partial",
@@ -1357,7 +1360,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     extensions: [".gif", ".apng"],
     mime: ["image/gif", "image/apng"],
     category: "animation",
-    import: "unsupported",
+    import: "partial",
     export: "partial",
     roundTrip: "none",
     lossModel: [
@@ -1376,7 +1379,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     status: "partial",
     notes: [
       "프레임 애니메이션 패널에서 GIF와 APNG를 무한 반복으로 내보냅니다(프레임별 지연 시간 유지, 투명 배경 지원).",
-      "GIF/APNG 가져오기는 이 행에서 지원하지 않으며 별도 정적 GIF 가져오기 행과 혼동하지 않습니다.",
+      "GIF는 기존 브라우저 재생 경로로, APNG는 ImageDecoder 지원 런타임에서 편집 가능한 프레임으로 가져옵니다.",
     ],
     technicalLayers: {
       format: ["GIF89a", "APNG"],
@@ -1384,14 +1387,14 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
       codec: ["GIF LZW + palette quantization", "PNG image data"],
     },
     implementation: {
-      import: "not-implemented",
+      import: "runtime-dependent",
       export: "partial",
-      notes: ["GIF/APNG encoder subset만 구현; 범용 animated image importer는 UI 미연결"],
+      notes: ["GIF 원본 재생 + ImageDecoder 기반 APNG 다중 프레임 materialization; 브라우저 codec 지원에 따라 런타임 게이트"],
     },
     uiWiring: {
-      import: "not-applicable",
+      import: "wired",
       export: "wired",
-      notes: ["프레임 애니메이션 패널의 WebM·GIF·APNG 내보내기 선택기에 연결"],
+      notes: ["Studio 이미지 가져오기와 프레임 애니메이션 패널의 WebM·GIF·APNG 내보내기 선택기에 연결"],
     },
     metadata: {
       general: "discarded",

@@ -1,4 +1,7 @@
 import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowLeft,
   ArrowDown,
   ArrowUp,
@@ -741,36 +744,31 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
           className="inline-flex min-h-11 items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg pointer-coarse:min-h-11 pointer-coarse:-mx-1 pointer-coarse:px-1"
         >
           <ArrowLeft size={15} />
-          창작 게시판
-        </Link>
+          {translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "창작 게시판")}</Link>
         {!workId && (
           <Link
             href={buildStudioHref({ seriesId, challengeId, titleId })}
             className={buttonClass({ size: "sm", variant: "outline", className: "ml-auto min-h-11 gap-1.5" })}
           >
             <PenLine size={14} />
-            컷툰 스튜디오로 전환
-          </Link>
+            {translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "컷툰 스튜디오로 전환")}</Link>
         )}
       </div>
 
       <header className="mb-5 rounded-2xl border border-line bg-panel/45 p-5 surface-hl sm:p-6">
-        <p className="eyebrow text-accent">{workId ? "UPLOAD EDIT" : "UPLOAD PUBLISH"}</p>
+        <p className="eyebrow text-accent">{workId ? translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "en", "UPLOAD EDIT") : translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "en", "UPLOAD PUBLISH")}</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-          {workId ? "업로드 작품 수정" : "이미지 업로드 게시"}
+          {workId ? translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "업로드 작품 수정") : translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "이미지 업로드 게시")}
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
-          완성된 이미지를 그대로 올려 공유하세요. 여러 장을 순서대로 배치하면 세로 스크롤 웹툰처럼 읽을 수
-          있습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "완성된 이미지를 그대로 올려 공유하세요. 여러 장을 순서대로 배치하면 세로 스크롤 웹툰처럼 읽을 수 있습니다.")}</p>
       </header>
 
       <StudioPublishContextBanner context={publishContext} />
 
       {!loggedIn && (
         <div className="mb-4 rounded-xl border border-line bg-card/60 px-3 py-2 text-sm text-fg-2">
-          게시하려면 로그인이 필요해요. (이미지 추가·미리보기는 로그인 없이도 가능)
-        </div>
+          {translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "게시하려면 로그인이 필요해요. (이미지 추가·미리보기는 로그인 없이도 가능)")}</div>
       )}
 
       {error && (
@@ -798,9 +796,7 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
           className="mb-4 flex items-center gap-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-sm text-fg-2"
           role="status"
         >
-          <Loader2 size={14} className="animate-spin motion-reduce:animate-none" /> 기존 작품을
-          불러오는 중…
-        </div>
+          <Loader2 size={14} className="animate-spin motion-reduce:animate-none" /> {translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "기존 작품을 불러오는 중…")}</div>
       )}
 
       {workId && hydrationStatus === "error" && (
@@ -808,14 +804,13 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
           className="mb-4 rounded-xl border border-bad/40 bg-bad/10 px-3 py-3"
           role="alert"
         >
-          <p className="text-sm font-semibold text-fg">기존 작품을 열지 못했어요</p>
+          <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "기존 작품을 열지 못했어요")}</p>
           <p className="mt-1 text-sm leading-relaxed text-fg-2">
-            {hydrationError ?? "작품을 다시 불러와 주세요."}
+            {hydrationError ?? translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "작품을 다시 불러와 주세요.")}
           </p>
           {dirty && (
             <p className="mt-2 text-xs leading-relaxed text-warn">
-              화면의 미저장 변경은 보존되어 있습니다. 다시 불러오면 서버 원고로 교체됩니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "화면의 미저장 변경은 보존되어 있습니다. 다시 불러오면 서버 원고로 교체됩니다.")}</p>
           )}
           <button
             className={buttonClass({
@@ -840,7 +835,7 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
             }}
           >
             <RefreshCw size={15} aria-hidden="true" />
-            {dirty ? "로컬 변경 버리고 다시 불러오기" : "다시 시도"}
+            {dirty ? translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "로컬 변경 버리고 다시 불러오기") : translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "다시 시도")}
           </button>
         </div>
       )}
@@ -850,25 +845,21 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
           className="mb-4 rounded-xl border border-warn/40 bg-warn/10 px-3 py-3 text-sm"
           role="note"
         >
-          <p className="font-semibold text-fg">읽기 전용 공동 원고입니다</p>
+          <p className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "읽기 전용 공동 원고입니다")}</p>
           <p className="mt-1 leading-relaxed text-fg-2">
-            {sharedMeta.role === "commenter" ? "검토자" : "열람자"} 권한으로 원고를 볼 수
-            있지만 이미지·작품 정보·서버 원본은 변경할 수 없습니다.
-          </p>
+            {sharedMeta.role === "commenter" ? translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "검토자") : translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "열람자")} {translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "권한으로 원고를 볼 수 있지만 이미지·작품 정보·서버 원본은 변경할 수 없습니다.")}</p>
         </div>
       )}
 
       {workId && hydrationStatus === "ready" && sharedCanEdit && !sharedCanPublish && (
         <div className="mb-4 rounded-xl border border-line bg-card/60 px-3 py-2 text-sm text-fg-2" role="note">
-          공동 편집 변경 사항은 저장할 수 있습니다. 공개·비공개 상태와 연결 작품은 소유자만
-          변경할 수 있습니다.
-        </div>
+          {translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "공동 편집 변경 사항은 저장할 수 있습니다. 공개·비공개 상태와 연결 작품은 소유자만 변경할 수 있습니다.")}</div>
       )}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <section className="rounded-2xl border border-line bg-panel/35 p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-bold text-fg">이미지 ({pages.length})</h2>
+            <h2 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "이미지 (")}{pages.length})</h2>
             <label
               aria-disabled={mutationLocked}
               className={cn(
@@ -886,8 +877,7 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
               ) : (
                 <ImagePlus size={14} />
               )}
-              이미지 추가
-              <input
+              {translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "이미지 추가")}<input
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 multiple
@@ -907,8 +897,8 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
               )}
             >
               <Upload size={28} className="mb-3 text-fg-3" />
-              <p className="text-sm font-medium text-fg">이미지를 끌어다 놓거나 탭해서 선택</p>
-              <p className="mt-1 text-xs text-fg-3">PNG, JPG, WebP · 최대 {MAX_PAGES}장</p>
+              <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "이미지를 끌어다 놓거나 탭해서 선택")}</p>
+              <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "PNG, JPG, WebP · 최대 ")}{MAX_PAGES}{translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "장")}</p>
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
@@ -944,7 +934,7 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
                         STUDIO_UPLOAD_PAGE_CONTROL_CLASS,
                         "text-fg-3 hover:bg-raised focus-visible:outline-accent"
                       )}
-                      aria-label="위로 이동"
+                      aria-label={translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "위로 이동")}
                     >
                       <ArrowUp size={14} />
                     </button>
@@ -956,7 +946,7 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
                         STUDIO_UPLOAD_PAGE_CONTROL_CLASS,
                         "text-fg-3 hover:bg-raised focus-visible:outline-accent"
                       )}
-                      aria-label="아래로 이동"
+                      aria-label={translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "아래로 이동")}
                     >
                       <ArrowDown size={14} />
                     </button>
@@ -968,7 +958,7 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
                         STUDIO_UPLOAD_PAGE_CONTROL_CLASS,
                         "text-bad hover:bg-bad/10 focus-visible:outline-bad"
                       )}
-                      aria-label="삭제"
+                      aria-label={translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "삭제")}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -981,10 +971,9 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
 
         <aside className="flex flex-col gap-4">
           <div className="rounded-2xl border border-line bg-panel/35 p-4">
-            <h2 className="text-sm font-bold text-fg">작품 정보</h2>
+            <h2 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "작품 정보")}</h2>
             <label className="mt-3 flex flex-col gap-1 text-xs text-fg-2">
-              제목
-              <input
+              {translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "제목")}<input
                 disabled={mutationLocked}
                 value={title}
                 onChange={(event) => {
@@ -992,13 +981,12 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
                   setDirty(true);
                   setSuccessMessage(null);
                 }}
-                placeholder="작품 제목"
+                placeholder={translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "작품 제목")}
                 className="h-10 rounded-lg border border-line bg-canvas px-3 text-sm text-fg outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:h-11"
               />
             </label>
             <label className="mt-3 flex flex-col gap-1 text-xs text-fg-2">
-              설명
-              <textarea
+              {translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "설명")}<textarea
                 disabled={mutationLocked}
                 value={description}
                 onChange={(event) => {
@@ -1007,13 +995,12 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
                   setSuccessMessage(null);
                 }}
                 rows={4}
-                placeholder="작품 소개 (선택)"
+                placeholder={translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "작품 소개 (선택)")}
                 className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </label>
             <label className="mt-3 flex flex-col gap-1 text-xs text-fg-2">
-              태그
-              <input
+              {translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "태그")}<input
                 disabled={mutationLocked}
                 value={tagsText}
                 onChange={(event) => {
@@ -1021,7 +1008,7 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
                   setDirty(true);
                   setSuccessMessage(null);
                 }}
-                placeholder="로맨스, 일상 (쉼표로 구분)"
+                placeholder={translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "로맨스, 일상 (쉼표로 구분)")}
                 className="h-10 rounded-lg border border-line bg-canvas px-3 text-sm text-fg outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-60 pointer-coarse:h-11"
               />
             </label>
@@ -1038,13 +1025,13 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
                 className: "min-h-11 w-full",
               })}
             >
-              {workId && sharedMeta?.role !== "owner" ? "공동 변경사항 저장" : workId ? "초안으로 저장" : "임시저장"}
+              {workId && sharedMeta?.role !== "owner" ? translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "공동 변경사항 저장") : workId ? translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "초안으로 저장") : translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "임시저장")}
             </button>
             <button
               type="button"
               onClick={() => handlePublish("published")}
               disabled={publishLocked}
-              title={workId && !sharedCanPublish ? "게시 상태는 작품 소유자만 변경할 수 있습니다." : undefined}
+              title={workId && !sharedCanPublish ? translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "게시 상태는 작품 소유자만 변경할 수 있습니다.") : undefined}
               className={buttonClass({
                 size: "md",
                 variant: "solid",
@@ -1056,7 +1043,7 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
               ) : (
                 <Send size={15} />
               )}
-              {workId && !sharedCanPublish ? "소유자만 게시 가능" : workId ? "수정사항 게시" : "게시하기"}
+              {workId && !sharedCanPublish ? translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "소유자만 게시 가능") : workId ? translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "수정사항 게시") : translateCurrentStaticSourceText("domains.creator.StudioUploadPublish", "ko", "게시하기")}
             </button>
           </div>
         </aside>

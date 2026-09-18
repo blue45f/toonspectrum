@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ArrowDownToLine, ArrowRight, Bookmark, BookOpen, ChevronLeft, ChevronRight, Copy, ExternalLink, Search, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -93,11 +94,11 @@ function ReferenceCard({ item, index, saved, onSave, onOpen }: {
 }) {
   const t = useT();
   return <article className="ref-card">
-    <div className="ref-card-index"><span>{String(index + 1).padStart(2, "0")}</span><span>{item.genre || "KMAS"}</span>
+    <div className="ref-card-index"><span>{String(index + 1).padStart(2, "0")}</span><span>{item.genre || translateCurrentStaticSourceText("domains.catalog.references.ReferencePage", "en", "KMAS")}</span>
       <button type="button" className="ref-icon-button" data-saved={saved || undefined}
         aria-label={`${t(saved ? "ref.saved" : "ref.save")}: ${item.title}`}
         onClick={(event) => saved ? onOpen(item, event.currentTarget) : onSave(item)}>
-        <Bookmark size={19} fill={saved ? "currentColor" : "none"} aria-hidden="true" />
+        <Bookmark size={19} fill={saved ? translateCurrentStaticSourceText("domains.catalog.references.ReferencePage", "en", "currentColor") : translateCurrentStaticSourceText("domains.catalog.references.ReferencePage", "en", "none")} aria-hidden="true" />
       </button>
     </div>
     <button type="button" className="ref-card-main" aria-label={`${t("ref.detail")}: ${item.title}`}
@@ -144,7 +145,7 @@ function SearchResults({ query, notes, onSave, onOpen, onPage }: {
   const { data } = state;
   const pageText = `${t("ref.page")} ${page}`;
   return <section className="ref-result-section" aria-labelledby="ref-results-heading">
-    <header className="ref-results-header"><div><p className="ref-eyebrow">SEARCH INDEX</p>
+    <header className="ref-results-header"><div><p className="ref-eyebrow">{translateCurrentStaticSourceText("domains.catalog.references.ReferencePage", "en", "SEARCH INDEX")}</p>
       <h2 id="ref-results-heading">{t("ref.results")} <span className="ref-result-count">{data.total === null ? t("ref.totalUnknown") : `${data.total.toLocaleString()} ${t("ref.countUnit")}`}</span></h2>
     </div><span className="ref-small">{pageText}</span></header>
     <p className="ref-small">{t("ref.pageScope")}</p>
@@ -162,7 +163,7 @@ function SearchResults({ query, notes, onSave, onOpen, onPage }: {
 
 function ReferenceGuide() {
   const t = useT();
-  return <section className="ref-guide" aria-labelledby="ref-guide-heading"><p className="ref-eyebrow">SOURCE & METHOD</p>
+  return <section className="ref-guide" aria-labelledby="ref-guide-heading"><p className="ref-eyebrow">{translateCurrentStaticSourceText("domains.catalog.references.ReferencePage", "en", "SOURCE & METHOD")}</p>
     <h2 id="ref-guide-heading">{t("ref.guideTitle")}</h2>
     {REFERENCE_GUIDE_SECTIONS.map(({ title, body }, index) => <article key={title}>
       <span className="ref-guide-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
@@ -185,7 +186,7 @@ function ReferenceDetails({ item, fromNotes, note, onCommit, onRemove, onNotice,
     catch { onNotice("copyFailed"); }
   };
   return <>
-    <p className="ref-eyebrow">KMAS / REFERENCE</p><Dialog.Title className="ref-dialog-title">{item.title}</Dialog.Title>
+    <p className="ref-eyebrow">{translateCurrentStaticSourceText("domains.catalog.references.ReferencePage", "en", "KMAS / REFERENCE")}</p><Dialog.Title className="ref-dialog-title">{item.title}</Dialog.Title>
     <Dialog.Description className="ref-small">{t("ref.detailsDescription")}</Dialog.Description>
     <dl className="ref-metadata">{REFERENCE_METADATA_FIELDS.map((key) => <div key={key}><dt>{t(REFERENCE_METADATA_LABEL_KEYS[key])}</dt><dd>{item[key] || t("ref.missing")}</dd></div>)}</dl>
     <section className="ref-synopsis"><h3>{t("ref.outline")}</h3><p>{item.outline || t(fromNotes ? "ref.noStoredOutline" : "ref.noOutline")}</p></section>
@@ -306,11 +307,11 @@ export function ReferencePage() {
       <p className="ref-intro">{t("ref.intro")}</p>
       <Link to="/studio" reloadDocument className="ref-text-link">{t("ref.studio")}<ArrowRight size={17} aria-hidden="true" /></Link>
     </div><aside className="ref-journey" aria-label={t("ref.journeyTitle")}>
-      <p className="ref-eyebrow">FIELD NOTES / 01—03</p>
+      <p className="ref-eyebrow">{translateCurrentStaticSourceText("domains.catalog.references.ReferencePage", "en", "FIELD NOTES / 01—03")}</p>
       {REFERENCE_JOURNEY_STEPS.map(({ title, body }, index) => <div key={title}><span className="ref-step-number" aria-hidden="true">0{index + 1}</span><div><h2>{t(title)}</h2><p>{t(body)}</p></div></div>)}
     </aside></header>
     <nav className="ref-tabs" aria-label={t("ref.nav")}>
-      {REFERENCE_VIEWS.map((key) => <button key={key} type="button" aria-current={view === key ? "page" : undefined} onClick={() => switchView(key)}>
+      {REFERENCE_VIEWS.map((key) => <button key={key} type="button" aria-current={view === key ? translateCurrentStaticSourceText("domains.catalog.references.ReferencePage", "en", "page") : undefined} onClick={() => switchView(key)}>
         {t(REFERENCE_VIEW_TAB_KEYS[key])}{key === "notes" && <span className="ref-tab-count">{storage.notes.length}</span>}
       </button>)}
     </nav>
@@ -323,7 +324,7 @@ export function ReferencePage() {
         : <section className="ref-empty ref-start"><p className="ref-eyebrow">{t("ref.emptyTag")}</p><BookOpen size={34} aria-hidden="true" /><h2>{t("ref.emptyTitle")}</h2><p>{t("ref.emptyBody")}</p></section>}
     </>}
     {view === "notes" && <section className="ref-notebook" aria-labelledby="ref-notes-heading">
-      <div className="ref-results-header"><div><p className="ref-eyebrow">PERSONAL RESEARCH</p><h2 id="ref-notes-heading">{t("ref.notesTitle")}</h2><p className="ref-small">{t("ref.noteHelp")}</p></div>
+      <div className="ref-results-header"><div><p className="ref-eyebrow">{translateCurrentStaticSourceText("domains.catalog.references.ReferencePage", "en", "PERSONAL RESEARCH")}</p><h2 id="ref-notes-heading">{t("ref.notesTitle")}</h2><p className="ref-small">{t("ref.noteHelp")}</p></div>
         <div className="ref-actions">
           <button type="button" className="ref-button" disabled={!storage.notes.length || saving} onClick={() => exportNotes()}><ArrowDownToLine size={17} />{t("ref.export")}</button>
           <button type="button" className="ref-button" disabled={!storage.notes.length || saving} onClick={() => exportNotes("json")}>{t("ref.backup")}</button>
@@ -343,7 +344,7 @@ export function ReferencePage() {
       {storage.notes.length > 0 && <label className="ref-notes-filter"><span>{t("ref.notesFilter")}</span><input type="search" value={filter} onChange={(event) => setFilter(event.target.value)} maxLength={120} /></label>}
       {!storage.notes.length ? <div className="ref-empty"><Bookmark size={30} aria-hidden="true" /><h3>{t("ref.notesEmpty")}</h3><p>{t("ref.notesEmptyBody")}</p><button className="ref-button" type="button" onClick={() => switchView("search")}>{t("ref.searchTab")}<ArrowRight size={16} /></button></div>
         : filtered.length ? <div className="ref-note-list">{filtered.map(({ item, note, savedAt }) => <article key={item.id}>
-          <div><p className="ref-small">{item.genre || "KMAS"} · <time dateTime={savedAt}>{new Date(savedAt).toLocaleDateString()}</time></p><h3>{item.title}</h3><p className="ref-note-preview">{note || t("ref.noNote")}</p></div>
+          <div><p className="ref-small">{item.genre || translateCurrentStaticSourceText("domains.catalog.references.ReferencePage", "en", "KMAS")} · <time dateTime={savedAt}>{new Date(savedAt).toLocaleDateString()}</time></p><h3>{item.title}</h3><p className="ref-note-preview">{note || t("ref.noNote")}</p></div>
           <button type="button" className="ref-button" onClick={(event) => open(item, event.currentTarget, true)} aria-label={`${t("ref.edit")}: ${item.title}`}>{t("ref.edit")}<ArrowRight size={16} /></button>
         </article>)}</div> : <p className="ref-empty">{t("ref.notesNoMatch")}</p>}
     </section>}

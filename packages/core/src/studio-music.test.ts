@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyMusicThemePack,
+  buildMusicCompositionPlan,
   buildMusicPrompt,
   defaultMusicBrief,
   isMp3,
   MUSIC_MOODS,
   MUSIC_PURPOSES,
+  MUSIC_SONG_STRUCTURES,
   MUSIC_THEME_PACKS,
+  MUSIC_VOCAL_STYLES,
   musicFilename,
   parseMusicBrief,
 } from "./studio-music";
@@ -35,6 +38,33 @@ describe("studio music contract", () => {
     expect(prompt).toContain("Strictly instrumental");
     expect(prompt).toContain("Do not imitate");
     expect(prompt.length).toBeLessThanOrEqual(4100);
+  });
+
+  it("offers bounded original vocal directions without named-artist cloning", () => {
+    expect(MUSIC_VOCAL_STYLES.length).toBeGreaterThanOrEqual(6);
+    expect(new Set(MUSIC_VOCAL_STYLES.map((entry) => entry.id)).size).toBe(MUSIC_VOCAL_STYLES.length);
+    const prompt = buildMusicPrompt({ ...valid(), vocals: true, lyrics: "우리의 페이지를 열어", vocalStyle: "power-vocal", purpose: "opening" });
+    expect(prompt).toContain("powerful lead vocal");
+    expect(prompt).toContain("animation soundtrack");
+    expect(prompt).toContain("non-derivative refrain");
+  });
+
+  it("builds a section-controlled anime OST composition plan with exact duration", () => {
+    expect(MUSIC_SONG_STRUCTURES.length).toBeGreaterThanOrEqual(5);
+    const plan = buildMusicCompositionPlan({
+      ...valid(),
+      vocals: true,
+      purpose: "opening",
+      songStructure: "anime-op",
+      seconds: 60,
+      lyrics: "[Verse]\n눈 덮인 플랫폼 끝에 네가 서 있어\n돌아온 계절이 우리를 부르고\n[Pre-Chorus]\n한 걸음만 더 가까이\n[Chorus]\n다시 우리의 페이지를 열어\n같은 내일을 향해 달려\n[Bridge]\n두려움도 이름을 잃어",
+    });
+    expect(plan.chunks.length).toBeGreaterThanOrEqual(6);
+    expect(plan.chunks.reduce((sum, chunk) => sum + chunk.duration_ms, 0)).toBe(60_000);
+    expect(plan.chunks.every((chunk) => chunk.duration_ms >= 3_000)).toBe(true);
+    expect(plan.chunks[0]?.positive_styles).toContain("fully original animation soundtrack");
+    expect(plan.chunks.find((chunk) => chunk.text.startsWith("[Chorus]"))?.text).toContain("다시 우리의 페이지를 열어");
+    expect(plan.chunks.find((chunk) => chunk.text.startsWith("[Final Chorus]"))?.text).toContain("다시 우리의 페이지를 열어");
   });
 
   it("keeps original Korean lyrics and max-length input inside provider limits", () => {
@@ -72,12 +102,18 @@ describe("studio music contract", () => {
     const legacy = Object.fromEntries(Object.entries(current).filter(([key]) => ![
       "episodeId",
       "lyricsLanguage",
+      "vocalStyle",
+      "songStructure",
+      "lyricTheme",
       "intensity",
       "arc",
     ].includes(key)));
     expect(parseMusicBrief(legacy)).toMatchObject({
       episodeId: "",
       lyricsLanguage: "ko",
+      vocalStyle: "bright-heroine",
+      songStructure: "anime-op",
+      lyricTheme: "",
       intensity: "balanced",
       arc: "steady",
     });
@@ -93,6 +129,9 @@ describe("studio music contract", () => {
     { intensity: "maximum" },
     { arc: "random" },
     { lyricsLanguage: "xx" },
+    { vocalStyle: "celebrity-clone" },
+    { songStructure: "through-composed" },
+    { lyricTheme: "x".repeat(181) },
     { seconds: 600 },
     { seconds: "30" },
     { bpm: NaN },

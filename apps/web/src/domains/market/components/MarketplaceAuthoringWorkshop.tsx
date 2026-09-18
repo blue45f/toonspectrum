@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -418,24 +422,20 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-3xl">
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-              Creator publishing workshop
-            </p>
+              {translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "Creator publishing workshop")}</p>
             <h2
               id="marketplace-authoring-heading"
               className="text-balance text-2xl font-bold text-fg sm:text-3xl"
             >
-              제작부터 업데이트까지 이어지는 에셋 등록 워크숍
-            </h2>
+              {translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "제작부터 업데이트까지 이어지는 에셋 등록 워크숍")}</h2>
             <p className="mt-3 text-sm leading-6 text-fg-2">
-              Brush Studio 원본, 엔진 조합, 실사용 미리보기, 호환성, 권리와 릴리스
-              이력을 하나의 게시 초안으로 보존합니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "Brush Studio 원본, 엔진 조합, 실사용 미리보기, 호환성, 권리와 릴리스 이력을 하나의 게시 초안으로 보존합니다.")}</p>
           </div>
-          <div className="grid min-w-[260px] grid-cols-3 gap-2" aria-label="게시 준비 상태">
-            <Metric label="오류" value={errors.length} tone={errors.length > 0 ? "danger" : "ok"} />
-            <Metric label="권고" value={warnings.length} tone={warnings.length > 0 ? "warn" : "ok"} />
+          <div className="grid min-w-[260px] grid-cols-3 gap-2" aria-label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "게시 준비 상태")}>
+            <Metric label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "오류")} value={errors.length} tone={errors.length > 0 ? translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "danger") : translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "ok")} />
+            <Metric label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "권고")} value={warnings.length} tone={warnings.length > 0 ? translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "warn") : translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "ok")} />
             <Metric
-              label="조합"
+              label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "조합")}
               value={normalized.kind === "brush" ? combinations : normalized.bundle.length + 1}
               tone="neutral"
             />
@@ -448,11 +448,9 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
               type="button"
               aria-pressed={normalized.kind === kind}
               onClick={() => setKind(kind)}
-              className={`min-h-10 rounded-full border px-4 text-sm font-medium transition-colors motion-reduce:transition-none ${
-                normalized.kind === kind
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "min-h-10 rounded-full border px-4 text-sm font-medium transition-colors motion-reduce:transition-none {v0}"), { v0: String(normalized.kind === kind
                   ? "border-accent bg-accent text-accent-fg"
-                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
-              }`}
+                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
             >
               {KIND_LABELS[kind]}
             </button>
@@ -462,7 +460,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
 
       <nav
         className="overflow-x-auto border-b border-line bg-card px-3 sm:px-5"
-        aria-label="에셋 등록 단계"
+        aria-label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "에셋 등록 단계")}
       >
         <div className="flex min-w-max gap-1 py-2" role="tablist">
           {STEPS.map((item, index) => {
@@ -473,13 +471,11 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                 type="button"
                 role="tab"
                 aria-selected={step === item.id}
-                aria-controls={`market-authoring-panel-${item.id}`}
+                aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "market-authoring-panel-{v0}"), { v0: String(item.id) })}
                 onClick={() => setStep(item.id)}
-                className={`min-h-11 rounded-lg px-3 text-sm font-semibold transition-colors motion-reduce:transition-none ${
-                  step === item.id
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "min-h-11 rounded-lg px-3 text-sm font-semibold transition-colors motion-reduce:transition-none {v0}"), { v0: String(step === item.id
                     ? "bg-raised text-fg"
-                    : "text-fg-2 hover:bg-raised/60 hover:text-fg"
-                }`}
+                    : "text-fg-2 hover:bg-raised/60 hover:text-fg") })}
               >
                 <span className="mr-2 text-xs opacity-60">{index + 1}</span>
                 {item.label}
@@ -498,29 +494,29 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
         {step === "source" && (
           <div id="market-authoring-panel-source" role="tabpanel" className="space-y-6">
             <SectionTitle
-              title="제작 원본과 검색 정보"
-              description="원본은 업데이트·재편집·설치 복구의 기준이 됩니다."
+              title={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "제작 원본과 검색 정보")}
+              description={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "원본은 업데이트·재편집·설치 복구의 기준이 됩니다.")}
             />
             <div className="grid gap-3 lg:grid-cols-3">
               {normalized.kind === "brush" && (
                 <SourceCard
-                  title="Brush Studio에서 계속"
-                  description="현재 게시 초안을 보존하고 전문 브러시 편집 화면으로 이동합니다."
-                  action="Brush Studio 열기"
+                  title={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "Brush Studio에서 계속")}
+                  description={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "현재 게시 초안을 보존하고 전문 브러시 편집 화면으로 이동합니다.")}
+                  action={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "Brush Studio 열기")}
                   onClick={launchBrushStudio}
                   emphasized
                 />
               )}
               <SourceCard
-                title="원본 파일 가져오기"
-                description="Brush Studio JSON, 브러시 세트, 이미지·3D·템플릿 패키지를 연결합니다."
-                action="파일 선택"
+                title={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "원본 파일 가져오기")}
+                description={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "Brush Studio JSON, 브러시 세트, 이미지·3D·템플릿 패키지를 연결합니다.")}
+                action={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "파일 선택")}
                 onClick={() => fileRef.current?.click()}
               />
               <SourceCard
-                title="새 에셋으로 설계"
-                description="빈 레시피에서 엔진·번들·호환성 계약을 직접 구성합니다."
-                action="초기화"
+                title={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "새 에셋으로 설계")}
+                description={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "빈 레시피에서 엔진·번들·호환성 계약을 직접 구성합니다.")}
+                action={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "초기화")}
                 onClick={() => setDraft(createCreatorMarketplaceAuthoringDraft(normalized.kind))}
               />
             </div>
@@ -537,7 +533,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
               }}
             />
             <div className="grid gap-4 lg:grid-cols-2">
-              <Field label="에셋 이름" hint="검색 결과와 설치 화면에 표시됩니다.">
+              <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "에셋 이름")} hint={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "검색 결과와 설치 화면에 표시됩니다.")}>
                 <input
                   value={normalized.title}
                   onChange={(event) => updateDraft((current) => ({
@@ -548,7 +544,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                   data-testid="market-authoring-title"
                 />
               </Field>
-              <Field label="카드 요약" hint="용도와 차별점을 한 문장으로 작성하세요.">
+              <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "카드 요약")} hint={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "용도와 차별점을 한 문장으로 작성하세요.")}>
                 <input
                   value={normalized.summary}
                   onChange={(event) => updateDraft((current) => ({
@@ -560,8 +556,8 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
               </Field>
             </div>
             <Field
-              label="상세 설명"
-              hint="권장 크기·해상도·레이어·사용 순서와 제한 사항을 포함하세요."
+              label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "상세 설명")}
+              hint={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "권장 크기·해상도·레이어·사용 순서와 제한 사항을 포함하세요.")}
             >
               <textarea
                 rows={5}
@@ -570,10 +566,10 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                   ...current,
                   description: event.target.value,
                 }))}
-                className={`${INPUT_CLASS} resize-y`}
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "{v0} resize-y"), { v0: String(INPUT_CLASS) })}
               />
             </Field>
-            <Field label="검색 태그" hint="쉼표 또는 #으로 구분합니다.">
+            <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "검색 태그")} hint={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "쉼표 또는 #으로 구분합니다.")}>
               <div className="flex gap-2">
                 <input
                   value={tagInput}
@@ -585,15 +581,14 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                     }
                   }}
                   className={INPUT_CLASS}
-                  placeholder="웹툰, 선화, 거친 연필"
+                  placeholder={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "웹툰, 선화, 거친 연필")}
                 />
                 <button
                   type="button"
                   onClick={addTag}
                   className="min-h-11 shrink-0 rounded-lg border border-line bg-raised px-4 text-sm font-semibold text-fg"
                 >
-                  추가
-                </button>
+                  {translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "추가")}</button>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {normalized.tags.map((tag) => (
@@ -605,7 +600,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                       tags: current.tags.filter((value) => value !== tag),
                     }))}
                     className="rounded-full border border-line bg-card px-3 py-1 text-xs text-fg-2"
-                    aria-label={`${tag} 태그 삭제`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "{v0} 태그 삭제"), { v0: String(tag) })}
                   >
                     #{tag} ×
                   </button>
@@ -618,23 +613,23 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
         {step === "recipe" && (
           <div id="market-authoring-panel-recipe" role="tabpanel" className="space-y-6">
             <SectionTitle
-              title={normalized.kind === "brush" ? "실제 브러시 엔진 조합" : `${KIND_LABELS[normalized.kind]} 구성`}
+              title={normalized.kind === "brush" ? translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "실제 브러시 엔진 조합") : formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "{v0} 구성"), { v0: String(KIND_LABELS[normalized.kind]) })}
               description={
                 normalized.kind === "brush"
-                  ? "Brush Studio native enginePrograms와 정규화된 조합 그래프를 함께 보존합니다."
-                  : "구성 요소와 기술 메타데이터를 패키지에 명시합니다."
+                  ? translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "Brush Studio native enginePrograms와 정규화된 조합 그래프를 함께 보존합니다.")
+                  : translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "구성 요소와 기술 메타데이터를 패키지에 명시합니다.")
               }
             />
             {normalized.kind === "brush" ? (
               <>
                 <div className="flex flex-col gap-3 rounded-xl border border-line bg-raised/40 p-4 sm:flex-row sm:items-end">
-                  <Field label="추가할 엔진" compact>
+                  <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "추가할 엔진")} compact>
                     <select
                       value={selectedEngine}
                       onChange={(event) => setSelectedEngine(
                         event.target.value as CreatorMarketplaceBrushEngineKind,
                       )}
-                      className={`${INPUT_CLASS} min-w-[220px]`}
+                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "{v0} min-w-[220px]"), { v0: String(INPUT_CLASS) })}
                     >
                       {CREATOR_MARKETPLACE_BRUSH_ENGINES.map((engine) => (
                         <option key={engine} value={engine}>{ENGINE_LABELS[engine]}</option>
@@ -647,12 +642,9 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                     className="min-h-11 rounded-lg bg-accent px-5 text-sm font-bold text-accent-fg"
                     data-testid="market-authoring-add-engine"
                   >
-                    엔진 패스 추가
-                  </button>
+                    {translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "엔진 패스 추가")}</button>
                   <p className="text-xs leading-5 text-fg-2">
-                    순서·블렌드·백엔드·입력 채널·팁 레이어를 조합합니다. 지원되지 않는
-                    조합은 검수 전에 차단됩니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "순서·블렌드·백엔드·입력 채널·팁 레이어를 조합합니다. 지원되지 않는 조합은 검수 전에 차단됩니다.")}</p>
                 </div>
 
                 <div className="space-y-3" data-testid="market-authoring-engine-list">
@@ -682,11 +674,10 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                         </label>
                         {node.sourceProgram !== undefined && (
                           <span className="rounded-full border border-success/30 bg-success/10 px-2 py-1 text-[10px] font-semibold text-success">
-                            Studio 원본 보존
-                          </span>
+                            {translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "Studio 원본 보존")}</span>
                         )}
                         <select
-                          aria-label={`${ENGINE_LABELS[node.engine]} 블렌드`}
+                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "{v0} 블렌드"), { v0: String(ENGINE_LABELS[node.engine]) })}
                           value={node.blend}
                           onChange={(event) => updateDraft((current) => ({
                             ...current,
@@ -709,7 +700,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                           ))}
                         </select>
                         <select
-                          aria-label={`${ENGINE_LABELS[node.engine]} 백엔드`}
+                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "{v0} 백엔드"), { v0: String(ENGINE_LABELS[node.engine]) })}
                           value={node.backend}
                           onChange={(event) => updateDraft((current) => ({
                             ...current,
@@ -744,7 +735,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                               },
                             }))}
                             className="size-10 rounded-lg border border-line text-fg-2 disabled:opacity-30"
-                            aria-label="위로 이동"
+                            aria-label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "위로 이동")}
                           >↑</button>
                           <button
                             type="button"
@@ -757,7 +748,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                               },
                             }))}
                             className="size-10 rounded-lg border border-line text-fg-2 disabled:opacity-30"
-                            aria-label="아래로 이동"
+                            aria-label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "아래로 이동")}
                           >↓</button>
                           <button
                             type="button"
@@ -766,7 +757,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                             )}
                             className="min-h-10 rounded-lg border border-line px-3 text-xs font-semibold text-fg"
                           >
-                            {expandedEngine === node.id ? "접기" : "세부 설정"}
+                            {expandedEngine === node.id ? translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "접기") : translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "세부 설정")}
                           </button>
                           <button
                             type="button"
@@ -781,7 +772,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                               },
                             }))}
                             className="size-10 rounded-lg border border-line text-danger disabled:opacity-30"
-                            aria-label="엔진 삭제"
+                            aria-label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "엔진 삭제")}
                           >×</button>
                         </div>
                       </div>
@@ -789,7 +780,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                       {expandedEngine === node.id && (
                         <div className="grid gap-5 border-t border-line p-4 lg:grid-cols-2">
                           <div>
-                            <h4 className="text-sm font-bold text-fg">입력 채널 매핑</h4>
+                            <h4 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "입력 채널 매핑")}</h4>
                             <div className="mt-3 space-y-2">
                               {node.mappings.map((mapping) => (
                                 <div
@@ -820,7 +811,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                                         ),
                                       },
                                     }))}
-                                    aria-label="매핑 활성화"
+                                    aria-label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "매핑 활성화")}
                                   />
                                   <select
                                     value={mapping.channel}
@@ -885,7 +876,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                             </div>
                           </div>
                           <div>
-                            <h4 className="text-sm font-bold text-fg">팁·그레인 레이어</h4>
+                            <h4 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "팁·그레인 레이어")}</h4>
                             <div className="mt-3 space-y-2">
                               {node.tipLayers.map((tip, tipIndex) => (
                                 <div
@@ -897,9 +888,9 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                                     <span>{tip.source} · {tip.blend}</span>
                                   </div>
                                   <div className="mt-2 grid grid-cols-3 gap-2">
-                                    <span>간격 {tip.spacing.toFixed(2)}</span>
-                                    <span>산포 {tip.scatter.toFixed(2)}</span>
-                                    <span>회전 {tip.rotationDeg}°</span>
+                                    <span>{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "간격 ")}{tip.spacing.toFixed(2)}</span>
+                                    <span>{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "산포 ")}{tip.scatter.toFixed(2)}</span>
+                                    <span>{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "회전 ")}{tip.rotationDeg}°</span>
                                   </div>
                                 </div>
                               ))}
@@ -912,7 +903,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="결정적 시드" compact>
+                  <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "결정적 시드")} compact>
                     <input
                       type="number"
                       value={normalized.brush.deterministicSeed}
@@ -926,7 +917,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                       className={INPUT_CLASS}
                     />
                   </Field>
-                  <Field label="프리셋 계열" compact>
+                  <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "프리셋 계열")} compact>
                     <input
                       value={normalized.brush.presetFamily}
                       onChange={(event) => updateDraft((current) => ({
@@ -937,7 +928,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                     />
                   </Field>
                   <div className="rounded-xl border border-line bg-raised/40 p-4">
-                    <p className="text-xs text-fg-2">가능한 테스트 조합</p>
+                    <p className="text-xs text-fg-2">{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "가능한 테스트 조합")}</p>
                     <p className="mt-1 text-2xl font-bold tabular-nums text-fg">
                       {combinations.toLocaleString()}
                     </p>
@@ -953,14 +944,14 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
         {step === "preview" && (
           <div id="market-authoring-panel-preview" role="tabpanel" className="space-y-6">
             <SectionTitle
-              title="실사용 미리보기와 검증 시나리오"
-              description="장식용 썸네일뿐 아니라 실제 사용 조건을 설명하는 미디어를 구성합니다."
+              title={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "실사용 미리보기와 검증 시나리오")}
+              description={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "장식용 썸네일뿐 아니라 실제 사용 조건을 설명하는 미디어를 구성합니다.")}
             />
             {normalized.kind === "brush" && (
               <canvas
                 ref={canvasRef}
                 className="h-[190px] w-full rounded-xl border border-line"
-                aria-label="브러시 레시피 결정적 미리보기"
+                aria-label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "브러시 레시피 결정적 미리보기")}
                 data-testid="market-authoring-brush-preview"
               />
             )}
@@ -1006,8 +997,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                   >
                     <strong className="block text-sm text-fg">{kind}</strong>
                     <span className="mt-1 block text-xs leading-5 text-fg-2">
-                      미디어 슬롯 추가 · 대체 텍스트와 시나리오 포함
-                    </span>
+                      {translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "미디어 슬롯 추가 · 대체 텍스트와 시나리오 포함")}</span>
                   </button>
                 ))}
             </div>
@@ -1024,7 +1014,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                           media: current.media.filter((item) => item.id !== media.id),
                         }))}
                         className="text-xs text-danger"
-                      >삭제</button>
+                      >{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "삭제")}</button>
                     </div>
                     <p className="mt-2 text-xs text-fg-2">{media.alt}</p>
                   </div>
@@ -1037,8 +1027,8 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
         {step === "bundle" && (
           <div id="market-authoring-panel-bundle" role="tabpanel" className="space-y-6">
             <SectionTitle
-              title="패키지 구성·종속 에셋"
-              description="설치 시 함께 필요한 팁·그레인·텍스처·폰트·포즈·3D 모델을 명시합니다."
+              title={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "패키지 구성·종속 에셋")}
+              description={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "설치 시 함께 필요한 팁·그레인·텍스처·폰트·포즈·3D 모델을 명시합니다.")}
             />
             <div className="grid gap-3 md:grid-cols-3">
               {(["texture", "palette", "reference"] as const).map((kind) => (
@@ -1060,8 +1050,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                   }))}
                   className="min-h-20 rounded-xl border border-dashed border-line bg-raised/30 p-4 text-left text-sm font-semibold text-fg hover:border-accent"
                 >
-                  + {kind} 추가
-                </button>
+                  + {kind} {translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "추가")}</button>
               ))}
             </div>
             <div className="space-y-2">
@@ -1071,7 +1060,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                   className="grid gap-3 rounded-xl border border-line bg-card p-4 md:grid-cols-[1fr_140px_140px_auto] md:items-center"
                 >
                   <input
-                    aria-label="번들 항목 이름"
+                    aria-label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "번들 항목 이름")}
                     value={item.name}
                     onChange={(event) => updateDraft((current) => ({
                       ...current,
@@ -1083,7 +1072,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                     className={INPUT_CLASS}
                   />
                   <input
-                    aria-label="버전 범위"
+                    aria-label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "버전 범위")}
                     value={item.versionRange ?? ""}
                     onChange={(event) => updateDraft((current) => ({
                       ...current,
@@ -1107,8 +1096,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                         })),
                       }))}
                     />
-                    필수 설치
-                  </label>
+                    {translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "필수 설치")}</label>
                   <button
                     type="button"
                     onClick={() => updateDraft((current) => ({
@@ -1116,11 +1104,11 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                       bundle: current.bundle.filter((entry) => entry.id !== item.id),
                     }))}
                     className="min-h-10 rounded-lg border border-line px-3 text-xs text-danger"
-                  >삭제</button>
+                  >{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "삭제")}</button>
                 </div>
               ))}
               {normalized.bundle.length === 0 && (
-                <EmptyState text="단독 설치 에셋입니다. 필요한 종속 에셋이 있으면 추가하세요." />
+                <EmptyState text={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "단독 설치 에셋입니다. 필요한 종속 에셋이 있으면 추가하세요.")} />
               )}
             </div>
           </div>
@@ -1129,8 +1117,8 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
         {step === "compatibility" && (
           <div id="market-authoring-panel-compatibility" role="tabpanel" className="space-y-6">
             <SectionTitle
-              title="런타임·입력·버전 호환성"
-              description="지원하지 않는 환경을 숨기지 않고 설치 전에 명확히 안내합니다."
+              title={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "런타임·입력·버전 호환성")}
+              description={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "지원하지 않는 환경을 숨기지 않고 설치 전에 명확히 안내합니다.")}
             />
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {(["canvas2d", "webgl2", "webgpu", "wasm"] as const).map((backend) => (
@@ -1159,7 +1147,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
               ))}
             </div>
             <div className="grid gap-4 lg:grid-cols-2">
-              <Field label="최소 앱 버전">
+              <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "최소 앱 버전")}>
                 <input
                   value={normalized.compatibility.minAppVersion}
                   onChange={(event) => updateDraft((current) => ({
@@ -1172,7 +1160,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                   className={INPUT_CLASS}
                 />
               </Field>
-              <Field label="검증 브라우저">
+              <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "검증 브라우저")}>
                 <input
                   value={normalized.compatibility.testedBrowsers.join(", ")}
                   onChange={(event) => updateDraft((current) => ({
@@ -1189,7 +1177,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                 />
               </Field>
             </div>
-            <Field label="호환성 참고">
+            <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "호환성 참고")}>
               <textarea
                 rows={4}
                 value={normalized.compatibility.notes}
@@ -1197,7 +1185,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                   ...current,
                   compatibility: { ...current.compatibility, notes: event.target.value },
                 }))}
-                className={`${INPUT_CLASS} resize-y`}
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "{v0} resize-y"), { v0: String(INPUT_CLASS) })}
               />
             </Field>
           </div>
@@ -1206,11 +1194,11 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
         {step === "rights" && (
           <div id="market-authoring-panel-rights" role="tabpanel" className="space-y-6">
             <SectionTitle
-              title="라이선스와 권리 확인"
-              description="구매·설치 전에 사용 범위를 구조화하고, 검수 시 원본 권리를 확인합니다."
+              title={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "라이선스와 권리 확인")}
+              description={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "구매·설치 전에 사용 범위를 구조화하고, 검수 시 원본 권리를 확인합니다.")}
             />
             <div className="grid gap-4 lg:grid-cols-2">
-              <Field label="라이선스">
+              <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "라이선스")}>
                 <select
                   value={normalized.rights.license}
                   onChange={(event) => updateDraft((current) => ({
@@ -1219,10 +1207,10 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                   }))}
                   className={INPUT_CLASS}
                 >
-                  <option value="free">무료 사용</option>
-                  <option value="personal">개인 사용</option>
-                  <option value="commercial">상업 사용</option>
-                  <option value="custom">사용자 정의</option>
+                  <option value="free">{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "무료 사용")}</option>
+                  <option value="personal">{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "개인 사용")}</option>
+                  <option value="commercial">{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "상업 사용")}</option>
+                  <option value="custom">{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "사용자 정의")}</option>
                 </select>
               </Field>
               <div className="grid grid-cols-2 gap-2">
@@ -1241,7 +1229,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
               </div>
             </div>
             {normalized.rights.containsThirdPartyContent && (
-              <Field label="제3자 콘텐츠 출처·허가">
+              <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "제3자 콘텐츠 출처·허가")}>
                 <textarea
                   rows={4}
                   value={normalized.rights.thirdPartyAttribution}
@@ -1252,13 +1240,13 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                       thirdPartyAttribution: event.target.value,
                     },
                   }))}
-                  className={`${INPUT_CLASS} resize-y`}
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "{v0} resize-y"), { v0: String(INPUT_CLASS) })}
                 />
               </Field>
             )}
             <div className="space-y-2 rounded-xl border border-line bg-raised/30 p-4">
               <CheckRow
-                label="이 에셋을 게시할 권리를 보유하고 있습니다."
+                label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "이 에셋을 게시할 권리를 보유하고 있습니다.")}
                 checked={normalized.rights.originalWorkAttested}
                 onChange={(checked) => updateDraft((current) => ({
                   ...current,
@@ -1266,7 +1254,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                 }))}
               />
               <CheckRow
-                label="미리보기 이미지·영상의 게시 권리를 보유하고 있습니다."
+                label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "미리보기 이미지·영상의 게시 권리를 보유하고 있습니다.")}
                 checked={normalized.rights.previewRightsAttested}
                 onChange={(checked) => updateDraft((current) => ({
                   ...current,
@@ -1280,11 +1268,11 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
         {step === "release" && (
           <div id="market-authoring-panel-release" role="tabpanel" className="space-y-6">
             <SectionTitle
-              title="버전·검수·배포"
-              description="신규 공개와 업데이트를 같은 초안 수명주기로 관리합니다."
+              title={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "버전·검수·배포")}
+              description={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "신규 공개와 업데이트를 같은 초안 수명주기로 관리합니다.")}
             />
             <div className="grid gap-4 lg:grid-cols-3">
-              <Field label="배포 방식">
+              <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "배포 방식")}>
                 <select
                   value={normalized.release.mode}
                   onChange={(event) => updateDraft((current) => ({
@@ -1296,11 +1284,11 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                   }))}
                   className={INPUT_CLASS}
                 >
-                  <option value="new">새 리소스</option>
-                  <option value="update">기존 리소스 업데이트</option>
+                  <option value="new">{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "새 리소스")}</option>
+                  <option value="update">{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "기존 리소스 업데이트")}</option>
                 </select>
               </Field>
-              <Field label="버전">
+              <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "버전")}>
                 <input
                   value={normalized.release.version}
                   onChange={(event) => updateDraft((current) => ({
@@ -1311,7 +1299,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                 />
               </Field>
               {normalized.release.mode === "update" && (
-                <Field label="기존 리소스 ID">
+                <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "기존 리소스 ID")}>
                   <input
                     value={normalized.release.previousResourceId ?? ""}
                     onChange={(event) => updateDraft((current) => ({
@@ -1326,7 +1314,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                 </Field>
               )}
             </div>
-            <Field label="변경 이력">
+            <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "변경 이력")}>
               <textarea
                 rows={4}
                 value={normalized.release.changelog}
@@ -1334,10 +1322,10 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                   ...current,
                   release: { ...current.release, changelog: event.target.value },
                 }))}
-                className={`${INPUT_CLASS} resize-y`}
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "{v0} resize-y"), { v0: String(INPUT_CLASS) })}
               />
             </Field>
-            <Field label="이전 버전 마이그레이션 안내">
+            <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "이전 버전 마이그레이션 안내")}>
               <textarea
                 rows={3}
                 value={normalized.release.migrationNotes}
@@ -1345,10 +1333,10 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                   ...current,
                   release: { ...current.release, migrationNotes: event.target.value },
                 }))}
-                className={`${INPUT_CLASS} resize-y`}
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "{v0} resize-y"), { v0: String(INPUT_CLASS) })}
               />
             </Field>
-            <Field label="검수자 참고">
+            <Field label={translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "검수자 참고")}>
               <textarea
                 rows={3}
                 value={normalized.reviewNotes}
@@ -1356,18 +1344,17 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                   ...current,
                   reviewNotes: event.target.value,
                 }))}
-                className={`${INPUT_CLASS} resize-y`}
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "{v0} resize-y"), { v0: String(INPUT_CLASS) })}
               />
             </Field>
             <div className="space-y-2" data-testid="market-authoring-diagnostics">
               {diagnostics.length === 0 ? (
                 <div className="rounded-xl border border-success/30 bg-success/10 p-4 text-sm font-semibold text-success">
-                  필수 사전 검사를 통과했습니다.
-                </div>
+                  {translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "필수 사전 검사를 통과했습니다.")}</div>
               ) : diagnostics.map((diagnostic) => (
                 <div
                   key={diagnostic.id}
-                  className={`rounded-xl border p-4 ${diagnosticClass(diagnostic)}`}
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "rounded-xl border p-4 {v0}"), { v0: String(diagnosticClass(diagnostic)) })}
                 >
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                     <strong className="text-sm">{diagnostic.message}</strong>
@@ -1387,7 +1374,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
         <div>
           <p className="text-xs font-medium text-fg-2">{status}</p>
           <p className="mt-1 text-[10px] text-fg-3">
-            초안 {normalized.resumeToken.slice(-8)} · 원본 {normalized.source.name}
+            {translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "초안 ")}{normalized.resumeToken.slice(-8)} {translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "· 원본 ")}{normalized.source.name}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1395,7 +1382,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
             type="button"
             onClick={() => downloadJson(`${normalized.title || "marketplace-draft"}.draft.json`, normalized)}
             className="min-h-11 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-fg"
-          >초안 내보내기</button>
+          >{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "초안 내보내기")}</button>
           <button
             type="button"
             onClick={() => downloadJson(
@@ -1403,14 +1390,14 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
               buildCreatorMarketplaceAuthoringManifest(normalized),
             )}
             className="min-h-11 rounded-lg border border-line bg-card px-4 text-sm font-semibold text-fg"
-          >패키지 내려받기</button>
+          >{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "패키지 내려받기")}</button>
           <button
             type="button"
             onClick={applyToForm}
             className="min-h-11 rounded-lg bg-accent px-5 text-sm font-bold text-accent-fg disabled:cursor-not-allowed disabled:opacity-50"
             data-testid="market-authoring-apply"
             disabled={errors.length > 0}
-          >등록 폼에 적용</button>
+          >{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "ko", "등록 폼에 적용")}</button>
         </div>
       </footer>
     </section>
@@ -1434,7 +1421,7 @@ function Metric({
         ? "border-success/30 bg-success/5"
         : "border-line bg-card";
   return (
-    <div className={`rounded-xl border p-3 text-center ${toneClass}`}>
+    <div className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "rounded-xl border p-3 text-center {v0}"), { v0: String(toneClass) })}>
       <div className="text-xl font-bold tabular-nums text-fg">{value.toLocaleString()}</div>
       <div className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-fg-2">
         {label}
@@ -1464,7 +1451,7 @@ function Field({
   compact?: boolean;
 }): ReactElement {
   return (
-    <label className={`block ${compact ? "flex-1" : ""}`}>
+    <label className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "block {v0}"), { v0: String(compact ? "flex-1" : "") })}>
       <span className="mb-1.5 block text-sm font-semibold text-fg">{label}</span>
       {children}
       {hint && <span className="mt-1.5 block text-xs leading-5 text-fg-3">{hint}</span>}
@@ -1489,11 +1476,9 @@ function SourceCard({
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-36 rounded-xl border p-4 text-left transition-colors motion-reduce:transition-none ${
-        emphasized
+      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "min-h-36 rounded-xl border p-4 text-left transition-colors motion-reduce:transition-none {v0}"), { v0: String(emphasized
           ? "border-accent/50 bg-accent/5 hover:bg-accent/10"
-          : "border-line bg-card hover:bg-raised"
-      }`}
+          : "border-line bg-card hover:bg-raised") })}
     >
       <strong className="block text-base text-fg">{title}</strong>
       <span className="mt-2 block text-xs leading-5 text-fg-2">{description}</span>
@@ -1512,9 +1497,7 @@ function ToggleCard({
   onChange: (checked: boolean) => void;
 }): ReactElement {
   return (
-    <label className={`flex min-h-14 items-center justify-between gap-3 rounded-xl border p-3 text-sm font-semibold ${
-      checked ? "border-accent/40 bg-accent/5 text-fg" : "border-line bg-card text-fg-2"
-    }`}>
+    <label className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringWorkshop", "en", "flex min-h-14 items-center justify-between gap-3 rounded-xl border p-3 text-sm font-semibold {v0}"), { v0: String(checked ? "border-accent/40 bg-accent/5 text-fg" : "border-line bg-card text-fg-2") })}>
       <span>{label}</span>
       <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
     </label>

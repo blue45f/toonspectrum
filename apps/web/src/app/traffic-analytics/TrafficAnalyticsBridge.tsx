@@ -4,6 +4,9 @@ import { useLocation } from "react-router-dom";
 import { apiPath } from "../../infrastructure/api";
 
 import { withCsrfProtection } from "@/shared/lib/csrf";
+import { TOONSPECTRUM_SHARE_EVENT } from "@/shared/lib/share";
+
+import { parseShareAnalyticsDetail } from "./share-analytics-event";
 
 const VISITOR_STORAGE_KEY = "toonspectrum-traffic-visitor-v1";
 const SESSION_STORAGE_KEY = "toonspectrum-traffic-session-v1";
@@ -113,7 +116,7 @@ function campaign(search: string): {
 let trafficEndpointUnavailable = false;
 
 function postTrafficEvent(
-  endpoint: "page-view" | "heartbeat",
+  endpoint: "page-view" | "heartbeat" | "share-event",
   body: Record<string, unknown>,
 ): void {
   const init = withCsrfProtection({
@@ -232,6 +235,24 @@ export function TrafficAnalyticsBridge() {
 
     return () => globalThis.clearTimeout(timer);
   }, [location.key, location.pathname, location.search]);
+
+  useEffect(() => {
+    const handleShare = (event: Event) => {
+      const detail = parseShareAnalyticsDetail(
+        (event as CustomEvent<unknown>).detail,
+      );
+      if (!detail || !analyticsEnabled(detail.path)) return;
+      identifiersRef.current ??= createRuntimeIdentifiers();
+      postTrafficEvent("share-event", {
+        ...identifiersRef.current,
+        path: detail.path,
+        channel: detail.channel,
+        outcome: detail.outcome,
+      });
+    };
+    globalThis.addEventListener(TOONSPECTRUM_SHARE_EVENT, handleShare);
+    return () => globalThis.removeEventListener(TOONSPECTRUM_SHARE_EVENT, handleShare);
+  }, []);
 
   useEffect(() => {
     const sendHeartbeat = () => {

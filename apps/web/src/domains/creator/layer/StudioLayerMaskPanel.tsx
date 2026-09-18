@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Layer Mask Panel — 레이어 마스크(비파괴) 컨트롤. 마스크가 없으면 추가 액션(흰/검정)만
  * 보여주고, 있으면 켬/끔·삭제·반전(즉시 굽기 액션 4종) + 브러시로 직접 그리기(무장 토글 + 모드
@@ -111,15 +115,14 @@ export function StudioLayerMaskPanel({
 
   return (
     <section
-      aria-label="레이어 마스크"
+      aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "레이어 마스크")}
       aria-busy={busy}
       className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5"
     >
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
           <SquareDashedMousePointer size={12} aria-hidden />
-          레이어 마스크
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "레이어 마스크")}</p>
         {busy && (
           <Loader2
             size={13}
@@ -136,23 +139,21 @@ export function StudioLayerMaskPanel({
             onClick={() => onAddMask("reveal")}
             disabled={busy}
             aria-describedby={statusId}
-            title="전체가 보이는 흰 마스크를 추가합니다(기본 — 이후 검정으로 칠한 부분만 가려집니다)."
+            title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "전체가 보이는 흰 마스크를 추가합니다(기본 — 이후 검정으로 칠한 부분만 가려집니다).")}
             className={cn(PANEL_CHIP_CLASS, "flex min-w-0 items-center justify-center gap-1")}
           >
             <Plus className="size-3" aria-hidden />
-            마스크 추가
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "마스크 추가")}</button>
           <button
             type="button"
             onClick={() => onAddMask("conceal")}
             disabled={busy}
             aria-describedby={statusId}
-            title="전체가 가려지는 검정 마스크를 추가합니다(이후 흰색으로 칠한 부분만 드러납니다)."
+            title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "전체가 가려지는 검정 마스크를 추가합니다(이후 흰색으로 칠한 부분만 드러납니다).")}
             className={cn(PANEL_CHIP_CLASS, "flex min-w-0 items-center justify-center gap-1")}
           >
             <EyeOff className="size-3" aria-hidden />
-            숨김으로 추가
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "숨김으로 추가")}</button>
         </div>
       ) : null}
 
@@ -163,21 +164,19 @@ export function StudioLayerMaskPanel({
             onClick={() => onCreateFromSelection(false)}
             disabled={busy || !hasUsableSelection}
             aria-describedby={statusId}
-            title="현재 픽셀 선택 안쪽만 보이는 마스크를 만듭니다. 페더 경계는 부드럽게 이어집니다."
+            title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "현재 픽셀 선택 안쪽만 보이는 마스크를 만듭니다. 페더 경계는 부드럽게 이어집니다.")}
             className={cn(PANEL_CHIP_CLASS, "flex min-w-0 items-center justify-center gap-1")}
           >
-            선택으로 마스크
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "선택으로 마스크")}</button>
           <button
             type="button"
             onClick={() => onCreateFromSelection(true)}
             disabled={busy || !hasUsableSelection}
             aria-describedby={statusId}
-            title="현재 픽셀 선택 바깥만 보이는 마스크를 만듭니다(선택한 부분이 가려집니다)."
+            title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "현재 픽셀 선택 바깥만 보이는 마스크를 만듭니다(선택한 부분이 가려집니다).")}
             className={cn(PANEL_CHIP_CLASS, "flex min-w-0 items-center justify-center gap-1")}
           >
-            선택 밖으로 마스크
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "선택 밖으로 마스크")}</button>
         </div>
       ) : null}
 
@@ -194,49 +193,47 @@ export function StudioLayerMaskPanel({
               onClick={onToggleEnabled}
               disabled={busy}
               aria-describedby={statusId}
-              title={enabled ? "마스크를 끕니다(데이터는 보존 — 잠깐 원본을 보고 싶을 때)." : "마스크를 다시 켭니다."}
+              title={enabled ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "마스크를 끕니다(데이터는 보존 — 잠깐 원본을 보고 싶을 때).") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "마스크를 다시 켭니다.")}
             >
-              {enabled ? "사용 중" : "꺼짐"}
+              {enabled ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "사용 중") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "꺼짐")}
             </StudioToggleChip>
             <button
               type="button"
               onClick={onInvert}
               disabled={busy}
               aria-describedby={statusId}
-              title="마스크의 보이는/가려진 영역을 뒤집습니다(즉시 적용, ⌘Z로 되돌리기 가능)."
+              title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "마스크의 보이는/가려진 영역을 뒤집습니다(즉시 적용, ⌘Z로 되돌리기 가능).")}
               className={cn(PANEL_CHIP_CLASS, "flex items-center gap-1")}
             >
               <Contrast className="size-3" aria-hidden />
-              반전
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "반전")}</button>
             <button
               type="button"
               onClick={onDeleteMask}
               disabled={busy}
               aria-describedby={statusId}
-              title="마스크를 삭제합니다(원본 이미지는 영향 없음)."
+              title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "마스크를 삭제합니다(원본 이미지는 영향 없음).")}
               className={cn(PANEL_CHIP_CLASS, "ml-auto flex items-center gap-1 text-fg-3 hover:text-fg")}
             >
               <Trash2 className="size-3" aria-hidden />
-              삭제
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "삭제")}</button>
           </div>
 
           <StudioToggleChip
             active={paintActive}
             disabled={busy && !paintActive}
             onClick={onTogglePaintActive}
-            aria-label={paintActive ? "레이어 마스크 그리기 종료" : "레이어 마스크에 그리기"}
+            aria-label={paintActive ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "레이어 마스크 그리기 종료") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "레이어 마스크에 그리기")}
             aria-describedby={statusId}
             title={
               paintActive
-                ? "마스크 그리기 도구를 종료합니다."
-                : "켜고 이미지를 드래그하면 마스크에 직접 그릴 수 있습니다."
+                ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "마스크 그리기 도구를 종료합니다.")
+                : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "켜고 이미지를 드래그하면 마스크에 직접 그릴 수 있습니다.")
             }
           >
             <span className="inline-flex items-center gap-1">
               <SquareDashedMousePointer className="size-3" aria-hidden />
-              {paintActive ? "그리기 종료" : "마스크에 그리기"}
+              {paintActive ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "그리기 종료") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "마스크에 그리기")}
             </span>
           </StudioToggleChip>
 
@@ -262,17 +259,17 @@ export function StudioLayerMaskPanel({
           </div>
 
           <StudioSliderRow
-            label="브러시 크기"
+            label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "브러시 크기")}
             min={LAYER_MASK_BRUSH_RADIUS_RANGE.min}
             max={LAYER_MASK_BRUSH_RADIUS_RANGE.max}
             step={LAYER_MASK_BRUSH_RADIUS_RANGE.step}
             value={radiusPx}
             onChange={onRadiusChange}
             disabled={busy}
-            readout={`${radiusPx}px`}
+            readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "en", "{v0}px"), { v0: String(radiusPx) })}
           />
           <StudioSliderRow
-            label="경도"
+            label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "경도")}
             min={LAYER_MASK_BRUSH_HARDNESS_RANGE.min}
             max={LAYER_MASK_BRUSH_HARDNESS_RANGE.max}
             step={LAYER_MASK_BRUSH_HARDNESS_RANGE.step}
@@ -282,7 +279,7 @@ export function StudioLayerMaskPanel({
             readout={`${Math.round(hardness * 100)}%`}
           />
           <StudioSliderRow
-            label="강도"
+            label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerMaskPanel", "ko", "강도")}
             min={LAYER_MASK_BRUSH_STRENGTH_RANGE.min}
             max={LAYER_MASK_BRUSH_STRENGTH_RANGE.max}
             step={LAYER_MASK_BRUSH_STRENGTH_RANGE.step}

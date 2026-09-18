@@ -81,7 +81,7 @@ export function captureLayerComp<T extends StudioLayerLikeItem>(
   const compId = id || `comp-${nowMs.toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   return Object.freeze({
     id: compId,
-    name: name.trim() || "새 레이어 콤프",
+    name: name.trim() || "새 레이어 보기",
     createdAt: nowMs,
     layerStates: captureLayerStates(layers),
     ...(groups === undefined ? {} : { groupStates: captureGroupStates(groups) }),

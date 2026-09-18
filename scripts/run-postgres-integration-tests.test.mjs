@@ -13,10 +13,13 @@ import {
 } from "./run-postgres-integration-tests.mjs";
 
 const LOCAL_URL =
+// secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic local integration fixture
   "postgresql://webdex:local-secret@127.0.0.1:55432/webdex";
 const REMOTE_TEST_URL =
+// secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic disposable remote-test fixture
   "postgresql://ci:remote-secret@db.example.test/toonspectrum_integration?sslmode=verify-full&channel_binding=require";
 const REMOTE_PRODUCTION_URL =
+// secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic production-target rejection fixture
   "postgresql://app:production-secret@db.example.com/toonspectrum?sslmode=verify-full";
 const RUNTIME_ROLE = "webdex_runtime";
 

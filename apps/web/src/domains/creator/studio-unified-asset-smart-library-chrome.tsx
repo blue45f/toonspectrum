@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Bookmark,
   ChevronDown,
   Clock3,
@@ -64,17 +68,16 @@ export function StudioUnifiedAssetSmartLibraryHeader({
       <div className="min-w-0">
         <p className="inline-flex items-center gap-1 text-xs font-black text-fg">
           <WandSparkles size={14} className="text-accent" aria-hidden />
-          Smart library
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.studio.unified.asset.smart.library.chrome", "en", "Smart library")}</p>
         <p className="mt-0.5 truncate text-[0.58rem] text-fg-3">
-          {visibleCount} / {totalCount}개 · {persistence === "memory" ? "세션 보관" : "기기 저장"}
+          {visibleCount} / {totalCount}{translateCurrentStaticSourceText("domains.creator.studio.unified.asset.smart.library.chrome", "ko", "개 · ")}{persistence === "memory" ? translateCurrentStaticSourceText("domains.creator.studio.unified.asset.smart.library.chrome", "ko", "세션 보관") : translateCurrentStaticSourceText("domains.creator.studio.unified.asset.smart.library.chrome", "ko", "기기 저장")}
         </p>
       </div>
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        aria-label={`스마트 라이브러리 ${expanded ? "접기" : "펼치기"}`}
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.unified.asset.smart.library.chrome", "ko", "스마트 라이브러리 {v0}"), { v0: String(expanded ? "접기" : "펼치기") })}
         className={cn(
           "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-accent",
           SMART_LIBRARY_FOCUS,
@@ -104,7 +107,7 @@ export function StudioUnifiedAssetShelfNav({
   readonly onSelect: (view: StudioUnifiedAssetLibraryView) => void;
 }) {
   return (
-    <div className="mt-2 grid grid-cols-4 gap-1" aria-label="스마트 에셋 선반">
+    <div className="mt-2 grid grid-cols-4 gap-1" aria-label={translateCurrentStaticSourceText("domains.creator.studio.unified.asset.smart.library.chrome", "ko", "스마트 에셋 선반")}>
       {SHELVES.map((option) => {
         const Icon = option.icon;
         const count = shelfCount(option.id, state, availableIds, totalCount);

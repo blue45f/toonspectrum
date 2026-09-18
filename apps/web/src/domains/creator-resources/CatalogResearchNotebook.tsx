@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { downloadResearchFile } from "./catalog-research-data";
@@ -53,27 +57,27 @@ export function CatalogResearchNotebook({ works, snapshot, onRestore }: { works:
     catch { setFeedback("파일을 내보내지 못했습니다. 일반 브라우저에서 다시 시도하세요."); }
   }
   return <section className="space-y-5 rounded-2xl border border-line bg-panel p-5 sm:p-7" aria-labelledby="research-notebook-title">
-    <div><p className="eyebrow text-accent">OBSERVE → QUESTION → CREATE</p><h2 id="research-notebook-title" className="mt-2 text-2xl font-bold">비교에서 나만의 기획으로</h2>
-      <p className="mt-3 text-sm leading-7 text-fg-2">노트는 이 브라우저에만 저장되며 공유 링크에 포함되지 않습니다. 변경 후 저장 버튼을 누르세요. 계정 동기화는 하지 않습니다.</p></div>
-    {note.sourceHash && note.sourceHash !== snapshot.sourceHash && <p className="text-sm text-fg-2">노트 작성 이후 색인이 달라졌습니다. 비교 작품의 정보와 출처를 다시 확인하세요.</p>}
-    <details className="rounded-xl border border-line p-4"><summary className="min-h-8 cursor-pointer font-semibold">선택한 작품에서 출발하는 연출 질문</summary>
+    <div><p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "en", "OBSERVE → QUESTION → CREATE")}</p><h2 id="research-notebook-title" className="mt-2 text-2xl font-bold">{translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "비교에서 나만의 기획으로")}</h2>
+      <p className="mt-3 text-sm leading-7 text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "노트는 이 브라우저에만 저장되며 공유 링크에 포함되지 않습니다. 변경 후 저장 버튼을 누르세요. 계정 동기화는 하지 않습니다.")}</p></div>
+    {note.sourceHash && note.sourceHash !== snapshot.sourceHash && <p className="text-sm text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "노트 작성 이후 색인이 달라졌습니다. 비교 작품의 정보와 출처를 다시 확인하세요.")}</p>}
+    <details className="rounded-xl border border-line p-4"><summary className="min-h-8 cursor-pointer font-semibold">{translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "선택한 작품에서 출발하는 연출 질문")}</summary>
       <ol className="mt-3 list-decimal space-y-3 pl-5 text-sm leading-7 text-fg-2">{researchPrompts(works).map((prompt) => <li key={prompt}>{prompt}</li>)}</ol>
-      <p className="mt-3 text-xs text-fg-3">장르·태그로 구성한 규칙 기반 질문입니다. AI 작품 분석이나 흥행 예측이 아닙니다.</p></details>
+      <p className="mt-3 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "장르·태그로 구성한 규칙 기반 질문입니다. AI 작품 분석이나 흥행 예측이 아닙니다.")}</p></details>
     <div className="grid gap-5 md:grid-cols-2">{FIELDS.map(([key, label, placeholder]) => <label key={key} className="block text-sm font-semibold">{label}
-      <textarea className={`${RESOURCE_INPUT} mt-2 min-h-36 font-normal leading-7`} value={note[key]} disabled={saving} maxLength={6000} placeholder={placeholder}
+      <textarea className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "en", "{v0} mt-2 min-h-36 font-normal leading-7"), { v0: String(RESOURCE_INPUT) })} value={note[key]} disabled={saving} maxLength={6000} placeholder={placeholder}
         onChange={(event) => { setNote({ ...note, [key]: event.target.value }); setDirty(true); }} />
       <span className="mt-1 block text-right text-xs font-normal text-fg-3">{note[key].length.toLocaleString("ko-KR")} / 6,000</span></label>)}</div>
     <div className="flex flex-wrap gap-2">
-      <button type="button" className={`${RESOURCE_BUTTON} bg-accent text-on-accent`} onClick={() => void save()} disabled={!canSave || Boolean(saved.error) || saving}>{saving ? "저장 중…" : "기획 노트 저장"}</button>
-      <button type="button" className={RESOURCE_BUTTON} onClick={() => exportFile("md")}>Markdown 내보내기</button>
-      <button type="button" className={RESOURCE_BUTTON} onClick={() => exportFile("json")}>노트 JSON 백업</button>
-      <button type="button" className={RESOURCE_BUTTON} onClick={restore} disabled={saving}>저장된 노트 다시 불러오기</button>
-      <label className={`${RESOURCE_BUTTON} cursor-pointer focus-within:outline-2 focus-within:outline-accent`}>노트 JSON 가져오기<input className="sr-only" type="file" disabled={saving} accept=".json,application/json" onChange={(event) => { void importNote(event.target.files?.[0]); event.target.value = ""; }} /></label>
+      <button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "en", "{v0} bg-accent text-on-accent"), { v0: String(RESOURCE_BUTTON) })} onClick={() => void save()} disabled={!canSave || Boolean(saved.error) || saving}>{saving ? translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "저장 중…") : translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "기획 노트 저장")}</button>
+      <button type="button" className={RESOURCE_BUTTON} onClick={() => exportFile("md")}>{translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "Markdown 내보내기")}</button>
+      <button type="button" className={RESOURCE_BUTTON} onClick={() => exportFile("json")}>{translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "노트 JSON 백업")}</button>
+      <button type="button" className={RESOURCE_BUTTON} onClick={restore} disabled={saving}>{translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "저장된 노트 다시 불러오기")}</button>
+      <label className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "en", "{v0} cursor-pointer focus-within:outline-2 focus-within:outline-accent"), { v0: String(RESOURCE_BUTTON) })}>{translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "노트 JSON 가져오기")}<input className="sr-only" type="file" disabled={saving} accept=".json,application/json" onChange={(event) => { void importNote(event.target.files?.[0]); event.target.value = ""; }} /></label>
     </div>
-    <p className="text-sm text-fg-2">{dirty ? "저장하지 않은 변경사항이 있습니다." : saved.note.savedAt ? `최근 노트 저장: ${new Date(saved.note.savedAt).toLocaleString("ko-KR")}` : "아직 이 브라우저에 저장된 기획 노트가 없습니다."}</p>
-    {!canSave && <p className="text-sm text-fg-2">이 환경은 안전한 동시 저장을 지원하지 않습니다. Markdown·JSON 내보내기를 이용하세요.</p>}
+    <p className="text-sm text-fg-2">{dirty ? translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "저장하지 않은 변경사항이 있습니다.") : saved.note.savedAt ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "최근 노트 저장: {v0}"), { v0: String(new Date(saved.note.savedAt).toLocaleString("ko-KR")) }) : translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "아직 이 브라우저에 저장된 기획 노트가 없습니다.")}</p>
+    {!canSave && <p className="text-sm text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "이 환경은 안전한 동시 저장을 지원하지 않습니다. Markdown·JSON 내보내기를 이용하세요.")}</p>}
     {feedback && <p role="status" className="rounded-xl border border-line p-4 text-sm leading-7">{feedback}</p>}
-    <div className="flex flex-wrap gap-2 border-t border-line pt-5"><Link to="/story-lab" className={RESOURCE_BUTTON}>스토리 연구실로 이동</Link><Link to="/studio" className={RESOURCE_BUTTON}>스튜디오로 이동</Link></div>
-    <p className="text-xs leading-6 text-fg-3">노트가 스튜디오에 자동 삽입되지는 않습니다. 저장·내보내기 후 제작을 이어가세요.</p>
+    <div className="flex flex-wrap gap-2 border-t border-line pt-5"><Link to="/story-lab" className={RESOURCE_BUTTON}>{translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "스토리 연구실로 이동")}</Link><Link to="/studio" className={RESOURCE_BUTTON}>{translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "스튜디오로 이동")}</Link></div>
+    <p className="text-xs leading-6 text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.CatalogResearchNotebook", "ko", "노트가 스튜디오에 자동 삽입되지는 않습니다. 저장·내보내기 후 제작을 이어가세요.")}</p>
   </section>;
 }

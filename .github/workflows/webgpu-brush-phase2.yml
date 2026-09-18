@@ -83,7 +83,7 @@ jobs:
 
       - name: Typecheck
         env:
-          NODE_OPTIONS: --max-old-space-size=8192
+          NODE_OPTIONS: --max-old-space-size=12288
         run: pnpm exec tsc -p tsconfig.json --noEmit
 
       - name: Topology parity benchmark

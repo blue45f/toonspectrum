@@ -44,8 +44,11 @@ for (const width of [320, 390, 820, 1440]) {
     await expect(page).toHaveTitle(/기획부터 연재까지/u);
     await expect(page.locator("h1")).toHaveCount(1);
     await expect(page.locator("h1")).toContainText("기획부터 연재까지");
-    await expect(home.locator("img")).toHaveCount(3);
     await expect(home.locator(".cf-home-preview img")).toBeVisible();
+    await expect(home.locator(".cf-intent-visual-nav img")).toHaveCount(6);
+    await expect(home.locator(".cf-intent-film img")).toBeVisible();
+    await expect(home.locator(".cf-bridge-visual img")).toBeVisible();
+    await expect(home.locator(".cf-production-journey img")).toBeVisible();
     await expect(startCards).toHaveCount(4);
     await expect(primaryAction).toBeVisible();
 
@@ -70,7 +73,7 @@ for (const width of [320, 390, 820, 1440]) {
 
 test("task-first search opens the global command palette without losing the query", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "프로젝트·회차·컷·도구·소재 검색" }).click();
+  await page.getByRole("button", { name: "프로젝트·컷·도구·소재를 바로 찾기" }).click();
   const search = page.getByPlaceholder(/작품 제목, 작가, 기능 명령/u);
   await expect(search).toBeVisible();
   await search.fill("비 오는 교실 배경");

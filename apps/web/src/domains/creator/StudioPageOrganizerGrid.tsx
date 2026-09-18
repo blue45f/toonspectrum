@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Search } from "lucide-react";
 import type {
   KeyboardEvent as ReactKeyboardEvent,
@@ -60,15 +64,14 @@ export function StudioPageOrganizerGrid({
       <div className="grid min-h-64 place-items-center rounded-2xl border border-dashed border-line bg-card/40 px-6 text-center">
         <div>
           <Search size={24} aria-hidden className="mx-auto mb-3 text-fg-3" />
-          <p className="text-sm font-semibold text-fg">일치하는 페이지가 없습니다.</p>
-          <p className="mt-1 text-xs text-fg-3">검색어를 줄이거나 필터를 초기화해 보세요.</p>
+          <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerGrid", "ko", "일치하는 페이지가 없습니다.")}</p>
+          <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerGrid", "ko", "검색어를 줄이거나 필터를 초기화해 보세요.")}</p>
           <button
             type="button"
             onClick={onReset}
             className="mt-4 min-h-10 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg"
           >
-            검색·필터 초기화
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerGrid", "ko", "검색·필터 초기화")}</button>
         </div>
       </div>
     );
@@ -77,7 +80,7 @@ export function StudioPageOrganizerGrid({
   return (
     <div
       role="listbox"
-      aria-label="페이지 검색 결과"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerGrid", "ko", "페이지 검색 결과")}
       aria-multiselectable="true"
       className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] gap-3 lg:grid-cols-[repeat(auto-fill,minmax(13rem,1fr))]"
     >
@@ -113,7 +116,7 @@ export function StudioPageOrganizerGrid({
               onKeyDown={(event: ReactKeyboardEvent<HTMLButtonElement>) =>
                 onPageKeyDown(event, page.id)
               }
-              aria-label={`${displayName} 선택`}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerGrid", "ko", "{v0} 선택"), { v0: String(displayName) })}
               aria-pressed={selected}
               aria-keyshortcuts="ArrowUp ArrowDown Home End PageUp PageDown Control+A Meta+A Escape"
               className="absolute inset-0 z-10 cursor-pointer rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -126,8 +129,7 @@ export function StudioPageOrganizerGrid({
               </span>
               {selected ? (
                 <span className="absolute right-1.5 top-1.5 rounded-md bg-accent px-1.5 py-0.5 text-[0.62rem] font-bold text-on-accent shadow-sm">
-                  선택
-                </span>
+                  {translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerGrid", "ko", "선택")}</span>
               ) : null}
             </div>
 
@@ -137,8 +139,7 @@ export function StudioPageOrganizerGrid({
                   {displayName}
                 </strong>
                 <span className="shrink-0 text-[0.62rem] tabular-nums text-fg-3">
-                  {page.elements.length}요소
-                </span>
+                  {page.elements.length}{translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerGrid", "ko", "요소")}</span>
               </div>
               <div className="mt-1 flex min-h-5 flex-wrap items-center gap-1">
                 {shotBadge ? (
@@ -160,7 +161,7 @@ export function StudioPageOrganizerGrid({
                   {page.note}
                 </p>
               ) : (
-                <p className="mt-1 text-[0.68rem] text-fg-3/70">메모 없음</p>
+                <p className="mt-1 text-[0.68rem] text-fg-3/70">{translateCurrentStaticSourceText("domains.creator.StudioPageOrganizerGrid", "ko", "메모 없음")}</p>
               )}
             </div>
           </article>

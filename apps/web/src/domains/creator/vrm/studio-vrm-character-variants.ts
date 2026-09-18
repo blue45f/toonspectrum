@@ -18,6 +18,8 @@ export const STUDIO_VRM_CHARACTER_VARIANT_REVISION = 1 as const;
 
 export interface StudioVrmCharacterVariantHairOverride {
   readonly style?: AvatarForgeHairStyle;
+  /** Curated hairstyle recipes are replacements, not overlays, when original hair is separable. */
+  readonly replaceOriginal?: boolean;
   readonly bangStyle?: AvatarForgeBangStyle;
   readonly baseColor?: string;
   readonly tipColor?: string;
@@ -103,6 +105,9 @@ export function sanitizeStudioVrmCharacterVariant(
       : {}),
     hair: {
       ...(hairSource.style !== undefined ? { style: hairSource.style as AvatarForgeHairStyle } : {}),
+      ...(typeof hairSource.replaceOriginal === "boolean"
+        ? { replaceOriginal: hairSource.replaceOriginal }
+        : {}),
       ...(hairSource.bangStyle !== undefined
         ? { bangStyle: hairSource.bangStyle as AvatarForgeBangStyle }
         : {}),
@@ -144,11 +149,12 @@ export const STUDIO_VRM_CHARACTER_VARIANTS: readonly StudioVrmCharacterVariant[]
       bodyPresetId: "balanced",
       hair: {
         style: "short",
+        replaceOriginal: true,
         bangStyle: "full",
         baseColor: "#8a5a33",
         tipColor: "#b07b46",
-        volume: 0.45,
-        length: 0.25,
+        volume: 0.9,
+        length: 0.66,
         fringe: 0.55,
         curl: 0.1,
       },
@@ -162,11 +168,12 @@ export const STUDIO_VRM_CHARACTER_VARIANTS: readonly StudioVrmCharacterVariant[]
       bodyPresetId: "long-line",
       hair: {
         style: "hime",
+        replaceOriginal: true,
         bangStyle: "blunt",
         baseColor: "#17121c",
         tipColor: "#2c2136",
-        volume: 0.5,
-        length: 0.9,
+        volume: 0.96,
+        length: 1.24,
         fringe: 0.4,
         shine: 0.7,
       },
@@ -180,11 +187,12 @@ export const STUDIO_VRM_CHARACTER_VARIANTS: readonly StudioVrmCharacterVariant[]
       bodyPresetId: "hero",
       hair: {
         style: "ponytail",
+        replaceOriginal: true,
         bangStyle: "side-swept",
         baseColor: "#d8a94e",
         tipColor: "#efd28a",
-        volume: 0.4,
-        length: 0.65,
+        volume: 1.02,
+        length: 1.08,
         tailHeight: 0.85,
         ahoge: 0.3,
       },
@@ -199,11 +207,12 @@ export const STUDIO_VRM_CHARACTER_VARIANTS: readonly StudioVrmCharacterVariant[]
       bodyPresetId: "compact",
       hair: {
         style: "twin-braid",
+        replaceOriginal: true,
         bangStyle: "split",
         baseColor: "#4a3a52",
         tipColor: "#6b5675",
-        volume: 0.35,
-        length: 0.7,
+        volume: 0.92,
+        length: 1.05,
         tailHeight: 0.45,
       },
       accents: [{ id: "freckles", enabled: true, color: "#c98a5e", intensity: 0.3 }],
@@ -217,11 +226,12 @@ export const STUDIO_VRM_CHARACTER_VARIANTS: readonly StudioVrmCharacterVariant[]
       bodyPresetId: "soft",
       hair: {
         style: "twintail",
+        replaceOriginal: true,
         bangStyle: "curtain",
         baseColor: "#f2a7c3",
         tipColor: "#ffd9e8",
-        volume: 0.65,
-        length: 0.8,
+        volume: 1.12,
+        length: 1.16,
         wave: 0.45,
         tailHeight: 0.75,
         shine: 0.85,
@@ -240,11 +250,12 @@ export const STUDIO_VRM_CHARACTER_VARIANTS: readonly StudioVrmCharacterVariant[]
       bodyPresetId: "hero",
       hair: {
         style: "wolf",
+        replaceOriginal: true,
         bangStyle: "full",
         baseColor: "#5b6068",
         tipColor: "#8b9099",
-        volume: 0.7,
-        length: 0.5,
+        volume: 1.0,
+        length: 0.82,
         fringe: 0.65,
       },
       accents: [{ id: "beauty-mark", enabled: true, color: "#2d2226", intensity: 0.5 }],
@@ -258,11 +269,12 @@ export const STUDIO_VRM_CHARACTER_VARIANTS: readonly StudioVrmCharacterVariant[]
       bodyPresetId: "long-line",
       hair: {
         style: "bun",
+        replaceOriginal: true,
         bangStyle: "side-swept",
         baseColor: "#31261f",
         tipColor: "#4c3b30",
-        volume: 0.4,
-        length: 0.3,
+        volume: 0.92,
+        length: 0.72,
         tailHeight: 0.6,
       },
     },
@@ -275,11 +287,12 @@ export const STUDIO_VRM_CHARACTER_VARIANTS: readonly StudioVrmCharacterVariant[]
       bodyPresetId: "soft",
       hair: {
         style: "wavy",
+        replaceOriginal: true,
         bangStyle: "full",
         baseColor: "#6e4f3a",
         tipColor: "#a37b58",
-        volume: 0.55,
-        length: 0.6,
+        volume: 1.08,
+        length: 1.12,
         wave: 0.6,
         curl: 0.35,
       },

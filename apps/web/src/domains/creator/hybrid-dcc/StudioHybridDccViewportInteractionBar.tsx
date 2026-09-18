@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useId, useState } from "react";
 
 import {
@@ -22,15 +25,14 @@ export function StudioHybridDccViewportInteractionBar({
   const id = useId();
   const [inputError, setInputError] = useState("");
   return (
-    <section aria-label="뷰포트 스냅과 표시 설정" className="mt-2 space-y-2 rounded-xl border border-line bg-panel p-2.5">
+    <section aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportInteractionBar", "ko", "뷰포트 스냅과 표시 설정")} className="mt-2 space-y-2 rounded-xl border border-line bg-panel p-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" className={CONTROL} aria-pressed={preferences.snapping} disabled={dragging}
           onClick={() => onChange({ snapping: !preferences.snapping })}>
-          스냅 {preferences.snapping ? "켜짐" : "꺼짐"} · Shift+Tab
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportInteractionBar", "ko", "스냅 ")}{preferences.snapping ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportInteractionBar", "ko", "켜짐") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportInteractionBar", "ko", "꺼짐")} {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportInteractionBar", "en", "· Shift+Tab")}</button>
         <button type="button" className={CONTROL} aria-pressed={Boolean(isolatedAssetId)}
           disabled={dragging || (!hasSelection && !isolatedAssetId)} onClick={onToggleIsolation}>
-          {isolatedAssetId ? "격리 해제 · 전체 복원" : "선택 오브젝트 격리"}
+          {isolatedAssetId ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportInteractionBar", "ko", "격리 해제 · 전체 복원") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportInteractionBar", "ko", "선택 오브젝트 격리")}
         </button>
         {([
           ["showGrid", "그리드"], ["showAxes", "좌표축"], ["showGround", "바닥 그림자"],
@@ -38,10 +40,10 @@ export function StudioHybridDccViewportInteractionBar({
           <button key={key} type="button" className={CONTROL} aria-pressed={preferences[key]}
             onClick={() => onChange({ [key]: !preferences[key] })}>{label}</button>
         ))}
-        <span className="text-[11px] text-fg-3">/ 격리 · F 선택 맞춤 · Esc 드래그 취소</span>
+        <span className="text-[11px] text-fg-3">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportInteractionBar", "ko", "/ 격리 · F 선택 맞춤 · Esc 드래그 취소")}</span>
       </div>
       <fieldset disabled={!preferences.snapping || dragging} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <legend className="sr-only">드래그 스냅 간격</legend>
+        <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportInteractionBar", "ko", "드래그 스냅 간격")}</legend>
         {([
           ["translationStep", "이동 스냅 간격 (m)", 0.01],
           ["rotationStepDegrees", "회전 스냅 각도 (°)", 1],
@@ -76,7 +78,7 @@ export function StudioHybridDccViewportInteractionBar({
           </div>
         ))}
       </fieldset>
-      {isolatedAssetId ? <p role="status" className="truncate text-xs text-accent">{isolatedAssetId}만 표시 중 · 문서의 숨김 상태는 변경하지 않습니다.</p> : null}
+      {isolatedAssetId ? <p role="status" className="truncate text-xs text-accent">{isolatedAssetId}{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportInteractionBar", "ko", "만 표시 중 · 문서의 숨김 상태는 변경하지 않습니다.")}</p> : null}
       {inputError ? <p role="alert" className="text-xs text-fg-2">{inputError}</p> : null}
       {notice ? <p role="status" className="text-xs text-fg-2">{notice}</p> : null}
     </section>

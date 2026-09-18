@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Authoritative selection geometry panel. Canvas handles stay primary; exact values remain folded
  * until requested, preserving the inspector density budget while keeping DCC-grade transforms one
@@ -107,11 +111,11 @@ export function StudioFigmaDesignPanel({
       ref={rootRef}
       tabIndex={-1}
       data-studio-figma-design-panel="true"
-      data-studio-selection-scope={multi ? "multiple" : "single"}
+      data-studio-selection-scope={multi ? translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "en", "multiple") : translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "en", "single")}
       data-inspector-section="selection.geometry"
-      data-inspector-section-open={open ? "true" : "false"}
-      data-inspector-section-highlighted={focusHighlighted ? "true" : undefined}
-      aria-label="위치와 크기"
+      data-inspector-section-open={open ? translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "en", "false")}
+      data-inspector-section-highlighted={focusHighlighted ? translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "en", "true") : undefined}
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "ko", "위치와 크기")}
       className={cn(
         "rounded-xl border border-line/80 bg-panel/50 p-2.5 shadow-[inset_0_1px_0_oklch(0.98_0.01_85/0.04)] transition-[background-color,box-shadow] duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
         focusHighlighted && "bg-accent-soft/55 shadow-[0_0_0_2px_oklch(0.72_0.185_42/0.55)]",
@@ -121,18 +125,18 @@ export function StudioFigmaDesignPanel({
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,7rem)] items-end gap-2">
         <div className="min-w-0">
           <p className="text-xs font-extrabold tracking-tight text-fg">
-            {multi ? `${metrics.elementCount}개 선택 · 공통 속성` : "선택 대상"}
+            {multi ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "ko", "{v0}개 선택 · 공통 속성"), { v0: String(metrics.elementCount) }) : translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "ko", "선택 대상")}
           </p>
           <p className="truncate text-[0.6875rem] font-medium text-fg-3">
             {multi
               ? precisionControls
-                ? "위치·크기·회전·불투명도를 묶음 전체에 적용합니다"
-                : "위치와 불투명도는 묶음 전체에 함께 적용됩니다"
-              : "위치·크기는 캔버스 핸들 또는 아래 변형에서"}
+                ? translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "ko", "위치·크기·회전·불투명도를 묶음 전체에 적용합니다")
+                : translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "ko", "위치와 불투명도는 묶음 전체에 함께 적용됩니다")
+              : translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "ko", "위치·크기는 캔버스 핸들 또는 아래 변형에서")}
           </p>
         </div>
         <StudioTransformField
-          key={`opacity:${metrics.selectionKey}`}
+          key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "en", "opacity:{v0}"), { v0: String(metrics.selectionKey) })}
           label={STUDIO_INSPECTOR_CANONICAL_LABELS.opacity}
           controlId="selection.opacity"
           priority="essential"
@@ -140,7 +144,7 @@ export function StudioFigmaDesignPanel({
           disabled={disabled || !metrics.supportsOpacity}
           disabledReason={
             interactionDisabledReason
-            ?? (metrics.supportsOpacity ? null : "프레임이 포함된 선택은 불투명도를 함께 바꿀 수 없어요.")
+            ?? (metrics.supportsOpacity ? null : translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "ko", "프레임이 포함된 선택은 불투명도를 함께 바꿀 수 없어요."))
           }
           mixed={metrics.opacityMixed}
           step={1}
@@ -168,7 +172,7 @@ export function StudioFigmaDesignPanel({
         )}
       >
         <span className="flex min-w-0 items-baseline gap-2">
-          <span className="shrink-0 text-xs font-bold text-fg">변형</span>
+          <span className="shrink-0 text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "ko", "변형")}</span>
           <span
             className="truncate text-[0.6875rem] font-medium tabular-nums text-fg-3"
             data-studio-selection-geometry-summary="true"
@@ -179,7 +183,7 @@ export function StudioFigmaDesignPanel({
         <ChevronDown
           size={14}
           aria-hidden
-          className={open ? "shrink-0 rotate-180 transition-transform" : "shrink-0 transition-transform"}
+          className={open ? translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "en", "shrink-0 rotate-180 transition-transform") : translateCurrentStaticSourceText("domains.creator.StudioFigmaDesignPanel", "en", "shrink-0 transition-transform")}
         />
       </button>
 

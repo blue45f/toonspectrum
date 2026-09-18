@@ -1,6 +1,10 @@
 // 팔로우/공개 프로필 — 토글, 통계, 창작 활동 요약.
 import { and, eq, sql } from "drizzle-orm";
 
+import {
+  publicCreatorRoleProfile,
+  type PublicCreatorRoleProfile,
+} from "../../../../web/src/shared/lib/creator-role-contract";
 import { creatorFollows, creatorSeries, creatorWorks, db, users } from "../../db";
 
 import { validateFollowPair } from "./community-contract";
@@ -24,6 +28,7 @@ export interface CreatorPublicProfile {
   isFollowing: boolean;
   works: number; // 공개 창작 작품 수
   series: number; // 시리즈 수
+  creatorRoleProfile: PublicCreatorRoleProfile | null;
 }
 
 async function countFollowers(creatorId: string): Promise<number> {
@@ -99,7 +104,14 @@ export async function getCreatorPublicProfile(
 ): Promise<CreatorPublicProfile | null> {
   try {
     const [user] = await db
-      .select({ id: users.id, name: users.name, avatar: users.avatar, bio: users.bio, createdAt: users.createdAt })
+      .select({
+        id: users.id,
+        name: users.name,
+        avatar: users.avatar,
+        bio: users.bio,
+        createdAt: users.createdAt,
+        creatorRoleProfile: users.creatorRoleProfile,
+      })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
@@ -130,6 +142,7 @@ export async function getCreatorPublicProfile(
         series = 0;
       }
     }
+    const publicRoleProfile = publicCreatorRoleProfile(user.creatorRoleProfile);
     return {
       id: user.id,
       name: user.name ?? "익명",
@@ -141,6 +154,7 @@ export async function getCreatorPublicProfile(
       isFollowing: stats.isFollowing,
       works,
       series,
+      creatorRoleProfile: publicRoleProfile,
     };
   } catch {
     return null;

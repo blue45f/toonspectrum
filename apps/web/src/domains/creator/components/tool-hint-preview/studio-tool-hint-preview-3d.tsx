@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { COLOR, previewVariantMatches } from "./studio-tool-hint-preview-shared";
 
 import type { ReactElement } from "react";
@@ -12,7 +13,7 @@ import type { ReactElement } from "react";
 export function Object3dPreview({ animate }: { animate: boolean }): ReactElement {
   return (
     <>
-      <g transform="translate(108 52)" data-preview-motion={animate ? "object-3d" : undefined}>
+      <g transform="translate(108 52)" data-preview-motion={animate ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "object-3d") : undefined}>
         <path d="m0-28 31 15L0 2l-31-15Z" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="1.6" />
         <path d="M-31-13 0 2v31l-31-15Z" fill={COLOR.canvas} stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="1.6" />
         <path d="M31-13 0 2v31l31-15Z" fill={COLOR.raised} stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="1.6" />
@@ -49,7 +50,7 @@ export function Pose3dPreview({ animate }: { animate: boolean }): ReactElement {
       <g transform="translate(108 18)" fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="4">
         <circle cx="0" cy="10" r="9" fill={COLOR.raised} stroke={COLOR.accent} strokeWidth="1.8" />
         <path d="M0 21v34M0 55-17 78M0 55l20 22" />
-        <g transform={animate ? undefined : "rotate(-28 0 29)"} data-preview-motion={animate ? "pose-3d" : undefined}>
+        <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "rotate(-28 0 29)")} data-preview-motion={animate ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "pose-3d") : undefined}>
           <path d="M0 29 24 43 39 25" />
           <circle cx="24" cy="43" r="4" fill={COLOR.accent} stroke={COLOR.canvas} strokeWidth="1.5" />
           <circle cx="39" cy="25" r="4" fill={COLOR.fg} stroke={COLOR.canvas} strokeWidth="1.5" />
@@ -81,7 +82,7 @@ export function Camera3dPreview({ animate }: { animate: boolean }): ReactElement
       <path d="M91 72 117 43l18 17 12-11 20 23Z" fill={COLOR.accentSoft} stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="1.5" />
       <circle cx="151" cy="38" r="8" fill={COLOR.accent} opacity=".75" />
       <path d="M91 32h14M91 32v14M163 32h-14M163 32v14M91 77h14M91 77V63M163 77h-14M163 77V63" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="2" />
-      <g transform={animate ? undefined : "translate(28 47)"} data-preview-motion={animate ? "camera-3d" : undefined}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "translate(28 47)")} data-preview-motion={animate ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "camera-3d") : undefined}>
         <rect x="0" y="0" width="30" height="23" rx="5" fill={COLOR.raised} stroke={COLOR.fg} strokeWidth="1.5" />
         <path d="m30 7 14-7v23l-14-7Z" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="1.5" />
         <circle cx="15" cy="11.5" r="5" fill={COLOR.canvas} stroke={COLOR.cool} strokeWidth="1.5" />
@@ -104,7 +105,7 @@ export function Camera3dPreview({ animate }: { animate: boolean }): ReactElement
 export function Lighting3dPreview({ animate }: { animate: boolean }): ReactElement {
   return (
     <>
-      <g transform={animate ? undefined : "translate(57 28)"} data-preview-motion={animate ? "lighting-3d" : undefined}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "translate(57 28)")} data-preview-motion={animate ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "lighting-3d") : undefined}>
         <circle cx="0" cy="0" r="10" fill={COLOR.accent} />
         {Array.from({ length: 8 }, (_, index) => {
           const angle = (index * Math.PI) / 4;
@@ -140,12 +141,12 @@ export function Lighting3dPreview({ animate }: { animate: boolean }): ReactEleme
 function ObjectCubeShape({ ghost = false }: { ghost?: boolean }): ReactElement {
   return (
     <g
-      data-preview-object={ghost ? "ghost" : "live"}
+      data-preview-object={ghost ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "ghost") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "live")}
       opacity={ghost ? ".24" : "1"}
       strokeDasharray={ghost ? "4 3" : undefined}
     >
-      <path d="m108 25 35 18-35 18-35-18Z" fill={ghost ? "none" : COLOR.accentSoft} stroke={ghost ? COLOR.fg3 : COLOR.accent} strokeLinejoin="round" strokeWidth="2" />
-      <path d="m73 43 35 18 35-18v34l-35 18-35-18Z" fill={ghost ? "none" : COLOR.canvas} stroke={ghost ? COLOR.fg3 : COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
+      <path d="m108 25 35 18-35 18-35-18Z" fill={ghost ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "none") : COLOR.accentSoft} stroke={ghost ? COLOR.fg3 : COLOR.accent} strokeLinejoin="round" strokeWidth="2" />
+      <path d="m73 43 35 18 35-18v34l-35 18-35-18Z" fill={ghost ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "none") : COLOR.canvas} stroke={ghost ? COLOR.fg3 : COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
       <path d="M108 61v34" fill="none" stroke={ghost ? COLOR.fg3 : COLOR.lineStrong} strokeWidth="1.4" />
     </g>
   );
@@ -200,7 +201,7 @@ export function ObjectTransformActionPreview({
             <animate attributeName="stroke-dashoffset" dur=".7s" values="0;-12" repeatCount="indefinite" />
           ) : null}
         </path>
-        <g transform={animate ? undefined : "translate(0 30)"} data-preview-object-origin="live">
+        <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "translate(0 30)")} data-preview-object-origin="live">
           <path d="M108 48v26M95 61h26M99 70l18-18" stroke={COLOR.cool} strokeLinecap="round" strokeWidth="2" />
           <path d="m108 48-4 7h8ZM121 61l-7-4v8ZM117 52l-8 2 6 5Z" fill={COLOR.cool} />
           <circle cx="108" cy="61" r="5" fill={COLOR.canvas} stroke={COLOR.cool} strokeWidth="2" />
@@ -211,33 +212,33 @@ export function ObjectTransformActionPreview({
   }
 
   const liveObject = action === "translate" ? (
-    <g transform={animate ? undefined : "translate(18 -9)"} data-preview-object-transform="translate">
+    <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "translate(18 -9)")} data-preview-object-transform="translate">
       <ObjectCubeShape />
       {animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="0 0;18 -9;18 -9;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
     </g>
   ) : action === "rotate" ? (
     <g transform="translate(108 60)" data-preview-object-transform="rotate">
-      <g transform={animate ? undefined : "rotate(28)"}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "rotate(28)")}>
         <g transform="translate(-108 -60)"><ObjectCubeShape /></g>
         {animate ? <animateTransform attributeName="transform" type="rotate" dur="2.7s" values="0;28;28;0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
       </g>
     </g>
   ) : action === "scale" ? (
     <g transform="translate(108 60)" data-preview-object-transform="scale">
-      <g transform={animate ? undefined : "scale(1.18)"}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "scale(1.18)")}>
         <g transform="translate(-108 -60)"><ObjectCubeShape /></g>
         {animate ? <animateTransform attributeName="transform" type="scale" dur="2.7s" values=".86;1.18;1.18;.86" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
       </g>
     </g>
   ) : (
-    <g transform={animate ? undefined : "translate(0 0)"} data-preview-object-transform="ground">
+    <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "translate(0 0)")} data-preview-object-transform="ground">
       <ObjectCubeShape />
       {animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="0 -18;0 0;0 0;0 -18" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
     </g>
   );
 
   return (
-    <g data-preview-operation={`object-${action}`}>
+    <g data-preview-operation={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "object-{v0}"), { v0: String(action) })}>
       <ObjectCubeShape ghost />
       {liveObject}
       {action === "translate" ? <path d="M108 20V6m0 0-5 7m5-7 5 7M148 48h18m0 0-7-5m7 5-7 5" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" /> : null}
@@ -251,11 +252,11 @@ export function ObjectTransformActionPreview({
 export function ObjectSnapPreview({ animate, variant }: { animate: boolean; variant: string }): ReactElement {
   const disable = previewVariantMatches(variant, "disable");
   return (
-    <g data-preview-operation={disable ? "object-snap-disable" : "object-snap-enable"}>
+    <g data-preview-operation={disable ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "object-snap-disable") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "object-snap-enable")}>
       {[48, 78, 108, 138, 168].map((x) => <path key={`x-${x}`} d={`M${x} 15v74`} stroke={x === 108 ? COLOR.cool : COLOR.lineStrong} strokeWidth={x === 108 ? "1.4" : "1"} opacity={disable ? ".2" : x === 108 ? ".7" : ".45"} />)}
       {[22, 52, 82].map((y) => <path key={`y-${y}`} d={`M34 ${y}h148`} stroke={y === 52 ? COLOR.cool : COLOR.lineStrong} strokeWidth={y === 52 ? "1.4" : "1"} opacity={disable ? ".2" : y === 52 ? ".7" : ".45"} />)}
       <rect x="58" y="27" width="42" height="30" rx="5" fill="none" stroke={COLOR.fg3} strokeDasharray="4 3" strokeWidth="1.5" opacity=".56" />
-      <g transform={animate ? undefined : disable ? "translate(29 -10)" : "translate(0 0)"}>
+      <g transform={animate ? undefined : disable ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "translate(29 -10)") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "translate(0 0)")}>
         <rect x="87" y="37" width="42" height="30" rx="5" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />
         <circle cx="108" cy="52" r="4" fill={COLOR.accent} stroke={COLOR.canvas} strokeWidth="1.5" />
         {animate ? <animateTransform attributeName="transform" type="translate" dur="2.8s" values={disable ? "0 0;29 -10;29 -10;0 0" : "-29 -10;0 0;0 0;-29 -10"} keyTimes="0;.42;.74;1" repeatCount="indefinite" /> : null}
@@ -276,8 +277,8 @@ export function ObjectSnapPreview({ animate, variant }: { animate: boolean; vari
 
 function CameraSceneShape({ ghost = false }: { ghost?: boolean }): ReactElement {
   return (
-    <g data-preview-camera-scene={ghost ? "ghost" : "live"} opacity={ghost ? ".22" : "1"}>
-      <circle cx="108" cy="52" r="25" fill={ghost ? "none" : COLOR.accentSoft} stroke={ghost ? COLOR.fg3 : COLOR.accent} strokeDasharray={ghost ? "4 3" : undefined} strokeWidth="2" />
+    <g data-preview-camera-scene={ghost ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "ghost") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "live")} opacity={ghost ? ".22" : "1"}>
+      <circle cx="108" cy="52" r="25" fill={ghost ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "none") : COLOR.accentSoft} stroke={ghost ? COLOR.fg3 : COLOR.accent} strokeDasharray={ghost ? "4 3" : undefined} strokeWidth="2" />
       <path d="M98 72v-16h20v16M101 56v-12h14v12M108 44V33" fill="none" stroke={ghost ? COLOR.fg3 : COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
     </g>
   );
@@ -304,7 +305,7 @@ export function CameraActionPreview({
       { x: 109, y: 55, label: "원", scene: "m118 78 12-14 9 8 8-7 9 13" },
     ] as const;
     return (
-      <g data-preview-operation={closeQuad ? "quad-view-close" : "quad-view-open"}>
+      <g data-preview-operation={closeQuad ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "quad-view-close") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "quad-view-open")}>
         {animate || closeQuad ? (
           <rect
             x={animate ? (closeQuad ? "48" : "36") : "36"}
@@ -312,7 +313,7 @@ export function CameraActionPreview({
             width={animate ? (closeQuad ? "56" : "144") : "144"}
             height={animate ? (closeQuad ? "31" : "78") : "78"}
             rx="5"
-            data-preview-camera-layout={closeQuad ? "quad-to-single" : "single-to-quad"}
+            data-preview-camera-layout={closeQuad ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "quad-to-single") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "single-to-quad")}
             fill={COLOR.accentSoft}
             stroke={COLOR.accent}
             strokeWidth="1.8"
@@ -380,10 +381,10 @@ export function CameraActionPreview({
     return (
       <g data-preview-operation={operation}>
         <CameraSceneShape ghost />
-        <g transform={focusSelection && !animate ? "translate(0 0)" : undefined}>
+        <g transform={focusSelection && !animate ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "translate(0 0)") : undefined}>
           {focusSelection && animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="18 8;0 0;0 0;18 8" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
           <g transform="translate(108 52)" data-preview-camera-transform={operation}>
-            <g transform={animate ? undefined : `scale(${staticScale})`}>
+            <g transform={animate ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "scale({v0})"), { v0: String(staticScale) })}>
               <g transform="translate(-108 -52)"><CameraSceneShape /></g>
               {animate ? <animateTransform attributeName="transform" type="scale" dur="2.7s" values={scaleValues} keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
             </g>
@@ -411,7 +412,7 @@ export function CameraActionPreview({
     return (
       <g data-preview-operation="camera-reset">
         <g transform="translate(108 52)">
-          <g transform={animate ? undefined : "scale(1)"}>
+          <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "scale(1)")}>
             <g transform="translate(-108 -52)"><CameraSceneShape /></g>
             {animate ? <animateTransform attributeName="transform" type="scale" dur="2.8s" values="1.22;1;1;1.22" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
           </g>
@@ -422,13 +423,13 @@ export function CameraActionPreview({
   }
 
   return (
-    <g data-preview-operation={stopOrbit ? "camera-orbit-stop" : "camera-orbit-start"}>
+    <g data-preview-operation={stopOrbit ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "camera-orbit-stop") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "camera-orbit-start")}>
       <CameraSceneShape />
       <ellipse cx="108" cy="52" rx="65" ry="32" fill="none" stroke={stopOrbit ? COLOR.fg3 : COLOR.cool} strokeDasharray={stopOrbit ? "3 8" : "4 4"} opacity={stopOrbit ? ".45" : ".8"} />
       <path d="M43 52c10-15 27-25 47-30M173 52c-10 15-27 25-47 30" fill="none" stroke={COLOR.cool} strokeDasharray="3 4" strokeWidth="1.2" opacity=".55" />
       <g
-        data-preview-camera={stopOrbit ? "stopping" : "orbiting"}
-        transform={animate ? (stopOrbit ? "translate(160 35) rotate(110)" : undefined) : stopOrbit ? "translate(160 35) rotate(110)" : "translate(173 52) rotate(90)"}
+        data-preview-camera={stopOrbit ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "stopping") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "orbiting")}
+        transform={animate ? (stopOrbit ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "translate(160 35) rotate(110)") : undefined) : stopOrbit ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "translate(160 35) rotate(110)") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.3d", "en", "translate(173 52) rotate(90)")}
       >
         <g transform="rotate(90)">
           <rect x="-11" y="-8" width="22" height="16" rx="4" fill={COLOR.raised} stroke={COLOR.fg} strokeWidth="1.6" />

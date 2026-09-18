@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioLayerTonePanel.tsx
  *
@@ -94,10 +97,9 @@ export function StudioLayerTonePanel({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <Grid size={14} className="text-amber-400 shrink-0" aria-hidden />
-          <span className="font-semibold text-fg truncate">스크린톤 (Tone)</span>
+          <span className="font-semibold text-fg truncate">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerTonePanel", "ko", "스크린톤 (Tone)")}</span>
           <span className="px-1 py-0.2 text-[10px] rounded font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
-            CSP
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerTonePanel", "en", "CSP")}</span>
         </div>
 
         <button
@@ -113,7 +115,7 @@ export function StudioLayerTonePanel({
             disabled && "cursor-not-allowed opacity-50",
           )}
         >
-          {isEnabled ? "톤 On" : "톤 Off"}
+          {isEnabled ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerTonePanel", "ko", "톤 On") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerTonePanel", "ko", "톤 Off")}
         </button>
       </div>
 
@@ -144,7 +146,7 @@ export function StudioLayerTonePanel({
 
           {/* Dot Pattern Shape */}
           <div className="space-y-1">
-            <p className="text-[11px] text-fg-3">망점 형태 (Dot Pattern)</p>
+            <p className="text-[11px] text-fg-3">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerTonePanel", "ko", "망점 형태 (Dot Pattern)")}</p>
             <div className="grid grid-cols-4 gap-1">
               {PATTERN_OPTIONS.map((opt) => {
                 const active = (current.pattern ?? "circle") === opt.id;
@@ -172,8 +174,7 @@ export function StudioLayerTonePanel({
           {/* Line Frequency (dotSize) Slider */}
           <div className={LABEL_ROW}>
             <label htmlFor="tone-dot-size" className="text-[11px]">
-              망점 크기 (선수 LPI)
-            </label>
+              {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerTonePanel", "ko", "망점 크기 (선수 LPI)")}</label>
             <div className="flex items-center gap-1.5">
               <input
                 id="tone-dot-size"
@@ -185,7 +186,7 @@ export function StudioLayerTonePanel({
                 disabled={disabled}
                 onChange={(e) => patch({ dotSize: Number(e.target.value) })}
                 className={RANGE_CLASS}
-                aria-label="망점 크기 조절"
+                aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerTonePanel", "ko", "망점 크기 조절")}
               />
               <span className={READOUT_CLASS}>{current.dotSize}px</span>
             </div>
@@ -194,8 +195,7 @@ export function StudioLayerTonePanel({
           {/* Angle Slider */}
           <div className={LABEL_ROW}>
             <label htmlFor="tone-angle" className="text-[11px]">
-              망점 각도 (Angle)
-            </label>
+              {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerTonePanel", "ko", "망점 각도 (Angle)")}</label>
             <div className="flex items-center gap-1.5">
               <input
                 id="tone-angle"
@@ -207,7 +207,7 @@ export function StudioLayerTonePanel({
                 disabled={disabled}
                 onChange={(e) => patch({ angle: Number(e.target.value) })}
                 className={RANGE_CLASS}
-                aria-label="망점 각도 조절"
+                aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerTonePanel", "ko", "망점 각도 조절")}
               />
               <span className={READOUT_CLASS}>{current.angle}°</span>
             </div>
@@ -216,8 +216,7 @@ export function StudioLayerTonePanel({
           {/* Density / Strength Slider */}
           <div className={LABEL_ROW}>
             <label htmlFor="tone-strength" className="text-[11px]">
-              농도 (Strength)
-            </label>
+              {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerTonePanel", "ko", "농도 (Strength)")}</label>
             <div className="flex items-center gap-1.5">
               <input
                 id="tone-strength"
@@ -229,7 +228,7 @@ export function StudioLayerTonePanel({
                 disabled={disabled}
                 onChange={(e) => patch({ strength: Number(e.target.value) })}
                 className={RANGE_CLASS}
-                aria-label="망점 농도 조절"
+                aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerTonePanel", "ko", "망점 농도 조절")}
               />
               <span className={READOUT_CLASS}>{current.strength}%</span>
             </div>
@@ -237,7 +236,7 @@ export function StudioLayerTonePanel({
 
           {/* Mode Switch (Mono / CMYK) */}
           <div className="flex items-center justify-between pt-1 text-[11px]">
-            <span className="text-fg-3">표현 방식</span>
+            <span className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerTonePanel", "ko", "표현 방식")}</span>
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -250,8 +249,7 @@ export function StudioLayerTonePanel({
                     : "bg-card text-fg-3 border-line hover:bg-raised",
                 )}
               >
-                모노크롬 (흑백)
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerTonePanel", "ko", "모노크롬 (흑백)")}</button>
               <button
                 type="button"
                 onClick={() => patch({ mode: "cmyk" })}
@@ -263,8 +261,7 @@ export function StudioLayerTonePanel({
                     : "bg-card text-fg-3 border-line hover:bg-raised",
                 )}
               >
-                컬러 (CMYK)
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerTonePanel", "ko", "컬러 (CMYK)")}</button>
             </div>
           </div>
         </div>

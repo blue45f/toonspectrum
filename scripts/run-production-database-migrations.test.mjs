@@ -11,6 +11,10 @@ import {
   POST_BASELINE_RELATIONS,
   buildAuthRuntimeAclSql,
   buildCommunityCommentRuntimeAclSql,
+  buildTrafficAnalyticsRuntimeAclSql,
+  buildTrafficAnalyticsRuntimeAclViolationSql,
+  buildCreatorRoleWorkspaceRuntimeAclSql,
+  buildCreatorRoleWorkspaceRuntimeAclViolationSql,
   buildCommunityCommentRuntimeAclViolationSql,
   buildAuthRuntimeAclViolationSql,
   buildCreatorAssetObjectStorageRuntimeAclSql,
@@ -29,6 +33,8 @@ import {
   buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
   buildStudioProductionRuntimeAclSql,
+  buildStudioProjectGraphRuntimeAclSql,
+  buildStudioProjectGraphRuntimeAclViolationSql,
   buildStudioProductionRuntimeAclViolationSql,
   decideMigrationAction,
   loadMigrationManifest,
@@ -38,10 +44,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(62);
+  expect(manifest).toHaveLength(73);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0062_auth_identity_hardening");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(62);
+  expect(manifest.at(-1).id).toBe("0073_commerce_payments");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(73);
 });
 
 test("applied studio media inference migration remains checksum-immutable", () => {
@@ -52,6 +58,29 @@ test("applied studio media inference migration remains checksum-immutable", () =
   expect(migration?.checksum).toBe(
     "319baddddcd1f478477ea1175c27b773b0f29cf3baf920816b7263e6a3d3fd38",
   );
+});
+
+test("share analytics migration stores bounded privacy-preserving events", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0066_share_analytics_events",
+  );
+  expect(migration?.id).toBe("0066_share_analytics_events");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    "CREATE TABLE IF NOT EXISTS public.traffic_share_event",
+    "visitor_hash text NOT NULL",
+    "session_hash text NOT NULL",
+    "traffic_share_event_channel",
+    "traffic_share_event_outcome",
+    "'opened', 'completed', 'cancelled', 'failed'",
+    "traffic_share_event_occurred_at_idx",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/\b(?:ip_address|query_string|message_body)\b/iu);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
 });
 
 test("auth identity hardening migration preserves legacy access and enforces normalized ownership", () => {
@@ -71,6 +100,128 @@ test("auth identity hardening migration preserves legacy access and enforces nor
     expect(sql).toContain(requiredFragment);
   }
   expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
+});
+
+test("account consolidation migration is additive, auditable, and keeps merged aliases", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0069_account_consolidation",
+  );
+  expect(migration?.id).toBe("0069_account_consolidation");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'ADD COLUMN IF NOT EXISTS "mergedIntoUserId" text',
+    "'active', 'suspended', 'deleted', 'merged'",
+    'CREATE TABLE IF NOT EXISTS public.account_merge',
+    'account_merge_sourceUserId_user_id_fk',
+    'account_merge_targetUserId_user_id_fk',
+    'account_merge_token_hash_check',
+    'idx_account_merge_source_status',
+    'REVOKE ALL ON TABLE public.account_merge FROM PUBLIC',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA|COLUMN)/iu);
+});
+
+test("creator role profile migration is additive, versioned, and structurally guarded", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0063_creator_role_profile",
+  );
+  expect(migration?.id).toBe("0063_creator_role_profile");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'ADD COLUMN IF NOT EXISTS "creatorRoleProfile" jsonb',
+    '"version":1',
+    '"secondaryRoles":[]',
+    '"specialties":[]',
+    '"roleVisibility":true',
+    'ALTER COLUMN "creatorRoleProfile" SET NOT NULL',
+    'user_creator_role_profile_object_check',
+    '"creatorRoleProfile" ?& ARRAY[',
+    "'primaryRole'",
+    "'secondaryRoles'",
+    "'specialties'",
+    "'roleVisibility'",
+    "'activeRole'",
+    "jsonb_typeof(\"creatorRoleProfile\") = 'object'",
+    "jsonb_typeof(\"creatorRoleProfile\" -> 'secondaryRoles') = 'array'",
+    "jsonb_typeof(\"creatorRoleProfile\" -> 'specialties') = 'array'",
+    "jsonb_typeof(\"creatorRoleProfile\" -> 'roleVisibility') = 'boolean'",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA|COLUMN)/iu);
+});
+
+test("creator role workspace migration preserves opt-in privacy and bounded project preferences", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0067_creator_role_workspace_personalization",
+  );
+  expect(migration?.id).toBe("0067_creator_role_workspace_personalization");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'UPDATE public."user"',
+    "'{roleVisibility}'",
+    "'false'::jsonb",
+    'ALTER COLUMN "creatorRoleProfile" SET DEFAULT',
+    'CREATE TABLE IF NOT EXISTS public."creator_role_workspace_preference"',
+    'PRIMARY KEY ("userId", "projectKey")',
+    'creator_role_workspace_preference_document_check',
+    'idx_creator_role_workspace_preference_updated',
+    'idx_user_creator_role_primary_public',
+    'idx_user_creator_role_specialties_gin',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA|COLUMN)/iu);
+});
+
+test("Studio ProjectGraph migration installs immutable revisions and loss-visible imports", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0064_studio_project_graph_v3",
+  );
+  expect(migration?.id).toBe("0064_studio_project_graph_v3");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    "CREATE TABLE IF NOT EXISTS studio_project_graph",
+    "CREATE TABLE IF NOT EXISTS studio_artifact",
+    "CREATE TABLE IF NOT EXISTS studio_revision",
+    "CREATE TABLE IF NOT EXISTS studio_blob",
+    "CREATE TABLE IF NOT EXISTS studio_external_file_binding",
+    "CREATE TABLE IF NOT EXISTS studio_compatibility_report",
+    "CREATE TABLE IF NOT EXISTS studio_review_comment",
+    "CREATE TABLE IF NOT EXISTS studio_capability_ledger",
+    "studio_revision_immutable_update",
+    "studio_validate_review_comment_anchor",
+    "studio_compatibility_report_approval_only",
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
+});
+
+test("creator series lifecycle migration adds hiatus without accepting arbitrary states", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0065_creator_series_lifecycle",
+  );
+  expect(migration?.id).toBe("0065_creator_series_lifecycle");
+  const sql = migration?.contents ?? "";
+
+  expect(sql).toContain("UPDATE public.creator_series");
+  expect(sql).toContain("DROP CONSTRAINT IF EXISTS creator_series_status_check");
+  expect(sql).toContain("ADD CONSTRAINT creator_series_status_check");
+  expect(sql).toContain("'ongoing', 'hiatus', 'completed'");
+  expect(sql).toContain("VALIDATE CONSTRAINT creator_series_status_check");
+  expect(sql).toMatch(/^BEGIN;[\s\S]*COMMIT;\s*$/u);
   expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
 });
 
@@ -591,7 +742,7 @@ test("cloud-save intent migration widens and validates the existing room check",
     "CHECK (\"provisionIntent\" IN ('share-link', 'invite-member', 'cloud-save'))",
   );
   expect(sql).toContain(
-    'VALIDATE CONSTRAINT "creator_draft_collaboration_room_provision_intent_check"',
+    'VALIDATE CONSTRAINT "creator_draft_collaboration_room_state_check"',
   );
   expect(sql).toContain("0026_creator_draft_cloud_save_intent");
   expect(sql).toContain('INSERT INTO "toonspectrum_schema_migration"');
@@ -639,16 +790,87 @@ test("auth runtime ACL is normalized to the exact DML contract", () => {
   const sql = buildAuthRuntimeAclSql("toonspectrum_runtime");
   const violation = buildAuthRuntimeAclViolationSql("toonspectrum_runtime");
 
-  expect(sql).toContain('public."user",\n  public.account\nFROM PUBLIC;');
-  expect(sql).toContain('public."user",\n  public.account\nFROM "toonspectrum_runtime";');
+  expect(sql).toContain('public."user",\n  public.account,\n  public.account_merge\nFROM PUBLIC;');
+  expect(sql).toContain('public."user",\n  public.account,\n  public.account_merge\nFROM "toonspectrum_runtime";');
   expect(sql).toContain(
     'GRANT SELECT, INSERT, UPDATE, DELETE\n  ON TABLE public."user", public.account',
   );
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT\n  ON TABLE public.account_merge",
+  );
+  expect(sql).toContain(
+    'GRANT UPDATE ("targetUserId", status, "completedAt", summary)\n  ON TABLE public.account_merge',
+  );
   expect(sql).not.toMatch(/GRANT[^;]*(?:TRUNCATE|REFERENCES|TRIGGER)/u);
+  expect(violation).toContain("'public.account_merge'");
+  expect(violation).toContain("'SELECT, INSERT'");
+  expect(violation).toContain("'targetUserId', 'status', 'completedAt', 'summary'");
+  expect(violation).toContain("'id', 'sourceUserId', 'tokenHash', 'expiresAt', 'createdAt'");
   expect(violation).toContain("'SELECT, INSERT, UPDATE, DELETE'");
   for (const elevatedPrivilege of ["TRUNCATE", "REFERENCES", "TRIGGER"]) {
     expect(violation).toContain(`'${elevatedPrivilege}'`);
   }
+});
+
+test("traffic analytics runtime ACL is private and least-privilege", () => {
+  const sql = buildTrafficAnalyticsRuntimeAclSql("toonspectrum_runtime");
+  const violation = buildTrafficAnalyticsRuntimeAclViolationSql(
+    "toonspectrum_runtime",
+  );
+
+  for (const relation of [
+    "public.traffic_page_view",
+    "public.traffic_session",
+    "public.traffic_share_event",
+  ]) {
+    expect(sql).toContain(relation);
+  }
+  expect(sql).toContain("FROM PUBLIC;");
+  expect(sql).toContain('FROM "toonspectrum_runtime";');
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT, DELETE\n  ON TABLE public.traffic_page_view, public.traffic_share_event",
+  );
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT, UPDATE, DELETE\n  ON TABLE public.traffic_session",
+  );
+  expect(sql).not.toMatch(/GRANT[^;]*(?:TRUNCATE|REFERENCES|TRIGGER)/u);
+  for (const relation of [
+    "public.traffic_page_view",
+    "public.traffic_session",
+    "public.traffic_share_event",
+  ]) {
+    expect(violation).toContain(`'${relation}'`);
+  }
+  expect(violation).toContain("'SELECT, INSERT, UPDATE, DELETE'");
+  expect(violation).toContain("'TRUNCATE', 'REFERENCES', 'TRIGGER'");
+});
+
+test("creator role workspace runtime ACL is revision-bounded and private", () => {
+  const sql = buildCreatorRoleWorkspaceRuntimeAclSql("toonspectrum_runtime");
+  const violation = buildCreatorRoleWorkspaceRuntimeAclViolationSql(
+    "toonspectrum_runtime",
+  );
+
+  expect(sql).toContain("DO $creator_role_workspace_acl$");
+  expect(sql).toContain(
+    "REVOKE ALL ON TABLE public.creator_role_workspace_preference FROM PUBLIC;",
+  );
+  expect(sql).toContain(
+    'REVOKE ALL ON TABLE public.creator_role_workspace_preference FROM "toonspectrum_runtime";',
+  );
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT\n  ON TABLE public.creator_role_workspace_preference",
+  );
+  expect(sql).toContain(
+    'GRANT UPDATE ("revision", "document", "updatedAt")',
+  );
+  expect(sql).not.toMatch(/GRANT[^;]*(?:DELETE|TRUNCATE|REFERENCES|TRIGGER)/u);
+  for (const mutableColumn of ["revision", "document", "updatedAt"]) {
+    expect(violation).toContain(`'${mutableColumn}'`);
+  }
+  expect(sql).not.toContain('GRANT UPDATE ("userId"');
+  expect(sql).not.toContain('GRANT UPDATE ("projectKey"');
+  expect(sql).not.toContain('GRANT UPDATE ("createdAt"');
 });
 
 test("creator object storage runtime ACL is least-privilege and preserves immutable identity", () => {
@@ -719,6 +941,59 @@ test("creator object-storage grants and verification share one exact SQL contrac
   expect(violation).toContain("has_column_privilege");
   expect(violation).toContain("has_table_privilege");
   expect(violation).toContain("'toonspectrum_runtime'");
+});
+
+test("Studio ProjectGraph runtime ACL keeps immutable evidence append-only", () => {
+  const sql = buildStudioProjectGraphRuntimeAclSql("toonspectrum_runtime");
+  const violation = buildStudioProjectGraphRuntimeAclViolationSql(
+    "toonspectrum_runtime",
+  );
+
+  expect(sql).toContain("DO $studio_project_graph_acl$");
+  expect(sql).toContain("public.studio_project_graph");
+  expect(sql).toContain("public.studio_revision");
+  expect(sql).toContain("public.studio_external_file_binding");
+  expect(sql).toContain("public.studio_capability_ledger");
+  expect(sql).toContain(
+    'GRANT UPDATE ("headRevisionId", "approvedRevisionId", "updatedAt")',
+  );
+  expect(sql).toContain(
+    'GRANT UPDATE ("approvedBy", "approvedAt")',
+  );
+  expect(sql).toContain(
+    'GRANT UPDATE ("displayPath", "syncMode", "remoteVersion", "remoteEtag", "contentHash", "lastSyncedRevisionId", "lastSyncedAt", "updatedAt")',
+  );
+  expect(sql).not.toMatch(/GRANT UPDATE \([^)]*rootGraphHash/u);
+  expect(sql).not.toMatch(/GRANT UPDATE \([^)]*operation/u);
+  expect(sql).not.toMatch(/GRANT INSERT[^;]*studio_capability_ledger/u);
+  expect(sql).not.toContain(
+    'GRANT UPDATE ("decision", "decidedAt")\n  ON TABLE public.studio_review_reviewer',
+  );
+
+  for (const relation of [
+    "studio_project_graph",
+    "studio_artifact",
+    "studio_revision",
+    "studio_operation",
+    "studio_compatibility_report",
+    "studio_external_file_binding",
+    "studio_review",
+    "studio_review_reviewer",
+    "studio_capability_ledger",
+  ]) {
+    expect(violation).toContain(`'${relation}'`);
+  }
+  for (const privilege of [
+    "SELECT WITH GRANT OPTION",
+    "INSERT WITH GRANT OPTION",
+    "UPDATE WITH GRANT OPTION",
+    "DELETE WITH GRANT OPTION",
+    "TRUNCATE WITH GRANT OPTION",
+    "REFERENCES WITH GRANT OPTION",
+    "TRIGGER WITH GRANT OPTION",
+  ]) {
+    expect(violation).toContain(`'${privilege}'`);
+  }
 });
 
 test("Studio production runtime ACL is exact and append-only where required", () => {
@@ -1010,10 +1285,15 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "admin_content_reports",
     "admin_promos",
     "admin_security_policies",
+    "business_inquiry",
     "community_cafe_ban",
     "community_cafe_invite",
     "community_cafe_join_request",
     "community_cafe_moderation_log",
+    "commerce_entitlement",
+    "commerce_order",
+    "commerce_payment_event",
+    "commerce_product_price",
     "creator_asset_artifact",
     "creator_asset_artifact_set",
     "creator_asset_license_snapshot",
@@ -1048,6 +1328,7 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "creator_promotion_comment_like",
     "creator_promotion_post",
     "creator_promotion_report",
+    "creator_role_workspace_preference",
     "creator_work_asset_storage_reference",
     "creator_work_bookmark",
     "creator_work_comment_like",
@@ -1074,12 +1355,34 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "production_project_event",
     "production_project_mutation_receipt",
     "production_push_subscription",
+    "studio_artifact",
+    "studio_blob",
+    "studio_capability_ledger",
+    "studio_compatibility_report",
+    "studio_external_file_binding",
+    "studio_mutation_receipt",
+    "studio_operation",
+    "studio_project_graph",
+    "studio_review",
+    "studio_review_comment",
+    "studio_review_comment_assignee",
+    "studio_review_reviewer",
+    "studio_revision",
+    "studio_revision_blob",
+    "studio_revision_parent",
+    "traffic_page_view",
+    "traffic_session",
+    "traffic_share_event",
     "studio_ai_comic_director_approval",
     "studio_ai_comic_director_artifact",
     "studio_ai_comic_director_job",
     "studio_ai_comic_director_job_event",
     "studio_ai_comic_director_session",
     "studio_ai_visual_bible_revision",
+    "creator_support_application",
+    "creator_support_offer",
+    "supporter_funding_setting",
+    "supporter_payment",
   ]);
   const readinessSource = readFileSync(
     new URL(

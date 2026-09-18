@@ -102,8 +102,8 @@ describe("production VRM thumbnail files", () => {
       expect(dimensions, `${entry.id}: supported PNG/JPEG/WebP header`).not.toBeNull();
       if (!dimensions) continue;
 
-      expect(dimensions.width, `${entry.id}: width`).toBeGreaterThanOrEqual(256);
-      expect(dimensions.height, `${entry.id}: height`).toBeGreaterThanOrEqual(256);
+      expect(dimensions.width, `${entry.id}: width`).toBeGreaterThanOrEqual(768);
+      expect(dimensions.height, `${entry.id}: height`).toBeGreaterThanOrEqual(768);
       expect(dimensions.width / dimensions.height, `${entry.id}: aspect`).toBeGreaterThanOrEqual(0.5);
       expect(dimensions.width / dimensions.height, `${entry.id}: aspect`).toBeLessThanOrEqual(2);
 

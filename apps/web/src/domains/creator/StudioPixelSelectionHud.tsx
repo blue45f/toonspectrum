@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Contrast,
   Maximize2,
   Minimize2,
@@ -213,7 +217,7 @@ export const StudioPixelSelectionHud = memo(function StudioPixelSelectionHud({
     <div
       ref={hudRef}
       role="toolbar"
-      aria-label="픽셀 선택 빠른 작업"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "픽셀 선택 빠른 작업")}
       aria-busy={busy}
       data-studio-pixel-selection-hud="true"
       data-studio-shortcut-boundary="true"
@@ -231,17 +235,16 @@ export const StudioPixelSelectionHud = memo(function StudioPixelSelectionHud({
     >
       <div className="hidden shrink-0 border-r border-line px-2 sm:block">
         <span className="block text-[0.58rem] font-semibold uppercase tracking-wide text-fg-3">
-          픽셀 선택
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "픽셀 선택")}</span>
         <span className="block whitespace-nowrap text-[0.63rem] text-fg-2">
-          {boundarySummary(selection)} · 페더 {feather}px
+          {boundarySummary(selection)} {translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "· 페더 ")}{feather}px
         </span>
       </div>
 
       <div
         className="flex shrink-0 items-center gap-0.5 rounded-lg border border-line bg-card/70 p-0.5"
         role="group"
-        aria-label="다음 선택 작업"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "다음 선택 작업")}
       >
         {SELECTION_OPERATION_MODES.map((candidate) => (
           <button
@@ -254,7 +257,7 @@ export const StudioPixelSelectionHud = memo(function StudioPixelSelectionHud({
                 : "text-fg-3 hover:bg-accent/10 hover:text-fg",
               "disabled:cursor-not-allowed disabled:opacity-40",
             )}
-            aria-label={`다음 선택: ${candidate.label}`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "다음 선택: {v0}"), { v0: String(candidate.label) })}
             aria-pressed={operation === candidate.id}
             title={candidate.shortcut ? `${candidate.tip} (${candidate.shortcut})` : candidate.tip}
             disabled={locked}
@@ -270,46 +273,43 @@ export const StudioPixelSelectionHud = memo(function StudioPixelSelectionHud({
         className={BUTTON_CLASS}
         disabled={locked || noVectorBoundary}
         onClick={onExpand}
-        aria-label="픽셀 선택 경계 확장"
-        title="선택 경계를 기본 간격만큼 확장"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "픽셀 선택 경계 확장")}
+        title={translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "선택 경계를 기본 간격만큼 확장")}
       >
         <Maximize2 className="size-3.5" aria-hidden="true" />
-        확장
-      </button>
+        {translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "확장")}</button>
       <button
         type="button"
         className={BUTTON_CLASS}
         disabled={locked || noVectorBoundary}
         onClick={onContract}
-        aria-label="픽셀 선택 경계 축소"
-        title="선택 경계를 기본 간격만큼 축소"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "픽셀 선택 경계 축소")}
+        title={translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "선택 경계를 기본 간격만큼 축소")}
       >
         <Minimize2 className="size-3.5" aria-hidden="true" />
-        축소
-      </button>
+        {translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "축소")}</button>
       <button
         type="button"
         className={BUTTON_CLASS}
         disabled={locked || noVectorBoundary}
         onClick={onSmooth}
-        aria-label="픽셀 선택 경계 스무딩"
-        title="선택 경계의 지터를 줄이고 면적과 중심을 보존"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "픽셀 선택 경계 스무딩")}
+        title={translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "선택 경계의 지터를 줄이고 면적과 중심을 보존")}
       >
         <Sparkles className="size-3.5" aria-hidden="true" />
-        스무딩
-      </button>
+        {translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "스무딩")}</button>
 
       <div
         className="flex shrink-0 items-center gap-0.5 rounded-lg border border-line bg-card/70 p-0.5"
         role="group"
-        aria-label="선택 페더 조절"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "선택 페더 조절")}
       >
         <button
           type="button"
           className="grid size-7 place-items-center rounded-md text-fg-3 transition hover:bg-accent/10 hover:text-fg disabled:opacity-40 pointer-coarse:size-10"
           disabled={locked || feather <= SELECTION_FEATHER_RANGE.min}
           onClick={() => changeFeather(feather - 2)}
-          aria-label="선택 페더 2픽셀 줄이기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "선택 페더 2픽셀 줄이기")}
         >
           <Minus className="size-3.5" aria-hidden="true" />
         </button>
@@ -322,7 +322,7 @@ export const StudioPixelSelectionHud = memo(function StudioPixelSelectionHud({
           inputMode="numeric"
           disabled={locked}
           onChange={(event) => changeFeather(event.currentTarget.valueAsNumber)}
-          aria-label="선택 페더 픽셀"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "선택 페더 픽셀")}
           className="h-7 w-12 rounded border border-transparent bg-transparent px-1 text-center text-[0.62rem] tabular-nums text-fg-2 outline-none hover:border-line focus:border-accent disabled:opacity-40 pointer-coarse:h-10"
         />
         <span className="pr-0.5 text-[0.58rem] text-fg-3" aria-hidden="true">px</span>
@@ -331,7 +331,7 @@ export const StudioPixelSelectionHud = memo(function StudioPixelSelectionHud({
           className="grid size-7 place-items-center rounded-md text-fg-3 transition hover:bg-accent/10 hover:text-fg disabled:opacity-40 pointer-coarse:size-10"
           disabled={locked || feather >= SELECTION_FEATHER_RANGE.max}
           onClick={() => changeFeather(feather + 2)}
-          aria-label="선택 페더 2픽셀 늘리기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "선택 페더 2픽셀 늘리기")}
         >
           <Plus className="size-3.5" aria-hidden="true" />
         </button>
@@ -342,21 +342,19 @@ export const StudioPixelSelectionHud = memo(function StudioPixelSelectionHud({
         className={BUTTON_CLASS}
         disabled={locked}
         onClick={onInvert}
-        aria-label="픽셀 선택 반전"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "픽셀 선택 반전")}
       >
         <Contrast className="size-3.5" aria-hidden="true" />
-        반전
-      </button>
+        {translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "반전")}</button>
       <button
         type="button"
         className={cn(BUTTON_CLASS, "text-danger hover:border-danger/50 hover:text-danger")}
         disabled={locked}
         onClick={onClear}
-        aria-label="픽셀 선택 해제"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "픽셀 선택 해제")}
       >
         <X className="size-3.5" aria-hidden="true" />
-        해제
-      </button>
+        {translateCurrentStaticSourceText("domains.creator.StudioPixelSelectionHud", "ko", "해제")}</button>
     </div>,
     globalThis.document.body,
   );
