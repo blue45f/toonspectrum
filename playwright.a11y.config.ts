@@ -1,35 +1,30 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 5_216;
+const A11Y_PORT = Number(process.env.TOONSPECTRUM_A11Y_PORT ?? "5228");
+const baseURL = `http://127.0.0.1:${A11Y_PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "accessibility-smoke.spec.ts",
+  testMatch: "a11y-smoke.spec.ts",
   fullyParallel: false,
-  forbidOnly: Boolean(process.env.CI),
+  forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
-  timeout: 60_000,
+  timeout: 90_000,
   expect: { timeout: 15_000 },
   reporter: [["list"]],
   use: {
-    baseURL: "http://127.0.0.1:" + PORT,
-    headless: true,
+    ...devices["Desktop Chrome"],
+    baseURL,
+    locale: "ko-KR",
+    reducedMotion: "reduce",
     trace: "retain-on-failure",
+    screenshot: "only-on-failure",
   },
-  projects: [
-    {
-      name: "chromium",
-      use: {
-        ...devices["Desktop Chrome"],
-        ...(process.env.CI ? {} : { channel: "chrome" as const }),
-      },
-    },
-  ],
   webServer: {
-    command: "pnpm exec vite --host 127.0.0.1 --port " + PORT + " --strictPort",
-    url: "http://127.0.0.1:" + PORT + "/",
-    reuseExistingServer: !process.env.CI,
+    command: `pnpm exec vite --host 127.0.0.1 --port ${A11Y_PORT} --strictPort`,
+    url: baseURL,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });

@@ -463,9 +463,9 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       await idleComps.waitFor({ state: "visible" });
       const visibility = rows.first().locator('[data-studio-layer-row-action="visibility"]');
       const capturedVisibility = await visibility.getAttribute("aria-label");
-      await comps.getByRole("button", { name: "새 콤프", exact: true }).click();
-      await comps.getByPlaceholder("콤프 이름 (예: 대사 없는 클린본)").fill("PR831 레이어 상태");
-      await comps.getByRole("button", { name: "저장", exact: true }).click();
+      await comps.getByRole("button", { name: "현재 보기 저장", exact: true }).click();
+      await comps.getByPlaceholder("이름 (예: 대사 없는 클린본)").fill("PR831 레이어 상태");
+      await comps.getByRole("button", { name: "보기 저장", exact: true }).click();
       // Capture and delivery are asynchronous; wait for both before another document edit.
       await comps.getByRole("button", { name: /^PR831 레이어 상태/u }).waitFor({ state: "visible" });
       await idleComps.waitFor({ state: "visible" });

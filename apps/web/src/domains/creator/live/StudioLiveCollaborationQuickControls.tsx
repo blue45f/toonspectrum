@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Check,
   Crosshair,
   EyeOff,
@@ -183,7 +187,7 @@ export function StudioLiveCollaborationQuickControls({
         <div
           id={panelId}
           role="dialog"
-          aria-label="실시간 협업 보기 설정"
+          aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "실시간 협업 보기 설정")}
           data-studio-live-quick-controls-panel="true"
           className="absolute right-0 top-[calc(100%+0.5rem)] z-[80] w-[min(20rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-line bg-panel/98 text-left shadow-2xl backdrop-blur-xl"
         >
@@ -191,15 +195,14 @@ export function StudioLiveCollaborationQuickControls({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <Sparkles size={15} className="shrink-0 text-accent" aria-hidden />
-                <h3 className="text-xs font-bold text-fg">집중 협업 보기</h3>
+                <h3 className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "집중 협업 보기")}</h3>
               </div>
               <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                원고 동기화는 유지하고 내 화면의 커서 밀도만 조절합니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "원고 동기화는 유지하고 내 화면의 커서 밀도만 조절합니다.")}</p>
             </div>
             <button
               type="button"
-              aria-label="실시간 협업 보기 설정 닫기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "실시간 협업 보기 설정 닫기")}
               className="grid size-9 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               onClick={() => {
                 setOpen(false);
@@ -212,7 +215,7 @@ export function StudioLiveCollaborationQuickControls({
 
           <div className="space-y-3 p-3.5">
             <fieldset>
-              <legend className="text-[0.68rem] font-bold text-fg-2">커서 표시 범위</legend>
+              <legend className="text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "커서 표시 범위")}</legend>
               <div className="mt-2 grid grid-cols-3 gap-1.5">
                 {(Object.keys(CURSOR_MODE_COPY) as StudioLiveCursorVisibilityMode[]).map(
                   (mode) => {
@@ -226,7 +229,7 @@ export function StudioLiveCollaborationQuickControls({
                         disabled={disabled}
                         title={
                           disabled
-                            ? "아래 팀원 중 한 명을 선택하면 집중 커서 모드를 사용할 수 있습니다."
+                            ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "아래 팀원 중 한 명을 선택하면 집중 커서 모드를 사용할 수 있습니다.")
                             : CURSOR_MODE_COPY[mode].description
                         }
                         className={cn(
@@ -259,14 +262,13 @@ export function StudioLiveCollaborationQuickControls({
             >
               <Waves
                 size={16}
-                className={preferences.showTrails ? "text-accent" : "text-fg-3"}
+                className={preferences.showTrails ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "en", "text-accent") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "en", "text-fg-3")}
                 aria-hidden
               />
               <span className="min-w-0 flex-1">
-                <span className="block text-[0.7rem] font-bold">실시간 획 트레일</span>
+                <span className="block text-[0.7rem] font-bold">{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "실시간 획 트레일")}</span>
                 <span className="mt-0.5 block text-[0.63rem] leading-relaxed text-fg-3">
-                  끄면 포인터만 표시해 저사양 기기와 대규모 세션의 렌더 비용을 줄입니다.
-                </span>
+                  {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "끄면 포인터만 표시해 저사양 기기와 대규모 세션의 렌더 비용을 줄입니다.")}</span>
               </span>
               <span
                 aria-hidden
@@ -281,17 +283,15 @@ export function StudioLiveCollaborationQuickControls({
               </span>
             </button>
 
-            <section aria-labelledby={`${panelId}-participants`}>
+            <section aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "en", "{v0}-participants"), { v0: String(panelId) })}>
               <div className="flex items-center justify-between gap-2">
                 <h4
-                  id={`${panelId}-participants`}
+                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "en", "{v0}-participants"), { v0: String(panelId) })}
                   className="text-[0.68rem] font-bold text-fg-2"
                 >
-                  빠른 집중 따라가기
-                </h4>
+                  {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "빠른 집중 따라가기")}</h4>
                 <span className="text-[0.62rem] text-fg-3">
-                  {live.peers.length.toLocaleString("ko-KR")}명 접속
-                </span>
+                  {live.peers.length.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "명 접속")}</span>
               </div>
               {peerOptions.length > 0 ? (
                 <div className="mt-2 max-h-56 space-y-1 overflow-y-auto pr-0.5">
@@ -322,13 +322,12 @@ export function StudioLiveCollaborationQuickControls({
                             {peer.displayName}
                           </span>
                           <span className="mt-0.5 block truncate text-[0.61rem] text-fg-3">
-                            {roleLabel(peer.role)} · {peer.visibility === "active" ? "작업 중" : "자리 비움"}
+                            {roleLabel(peer.role)} · {peer.visibility === "active" ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "작업 중") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "자리 비움")}
                           </span>
                         </span>
                         {following ? (
                           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent px-1.5 py-1 text-[0.6rem] font-bold text-on-accent">
-                            <Check size={10} aria-hidden /> 집중 중
-                          </span>
+                            <Check size={10} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "집중 중")}</span>
                         ) : (
                           <Crosshair size={14} className="shrink-0 text-fg-3" aria-hidden />
                         )}
@@ -338,8 +337,7 @@ export function StudioLiveCollaborationQuickControls({
                 </div>
               ) : (
                 <p className="mt-2 rounded-xl border border-dashed border-line px-3 py-3 text-[0.67rem] leading-relaxed text-fg-3">
-                  다른 팀원이 접속하면 여기서 바로 따라갈 수 있습니다.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "다른 팀원이 접속하면 여기서 바로 따라갈 수 있습니다.")}</p>
               )}
             </section>
           </div>
@@ -353,8 +351,7 @@ export function StudioLiveCollaborationQuickControls({
                 onOpenTeam();
               }}
             >
-              <UsersRound size={15} aria-hidden /> 팀·화면 공유·채팅 열기
-            </button>
+              <UsersRound size={15} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationQuickControls", "ko", "팀·화면 공유·채팅 열기")}</button>
           </div>
         </div>
       ) : null}

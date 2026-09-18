@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   AlertTriangle,
   Check,
@@ -45,7 +46,7 @@ export function StudioTaskFlow({
           return (
             <li
               key={step.id}
-              aria-current={current ? "step" : undefined}
+              aria-current={current ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioTaskFlow", "en", "step") : undefined}
               className={cn(
                 "relative flex min-h-16 min-w-[10.5rem] flex-1 items-start gap-3 rounded-xl border px-3 py-2.5",
                 complete && "border-good/30 bg-good/10",
@@ -145,7 +146,7 @@ export function RecoverableActionNotice({
   const Icon = NOTICE_ICONS[tone];
   return (
     <section
-      role={tone === "danger" ? "alert" : "status"}
+      role={tone === "danger" ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioTaskFlow", "en", "alert") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioTaskFlow", "en", "status")}
       className={cn("min-w-0 rounded-2xl border p-4", NOTICE_TONES[tone], className)}
     >
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

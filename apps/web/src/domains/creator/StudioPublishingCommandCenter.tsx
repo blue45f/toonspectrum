@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
@@ -965,8 +969,7 @@ export function StudioPublishingCommandCenter({
           className="inline-flex min-h-11 items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg"
         >
           <ArrowLeft size={15} />
-          창작 게시판
-        </Link>
+          {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "창작 게시판")}</Link>
         {!workId && (
           <Link
             href={buildStudioHref({
@@ -981,28 +984,26 @@ export function StudioPublishingCommandCenter({
             })}
           >
             <PenLine size={14} />
-            컷툰 스튜디오로 전환
-          </Link>
+            {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "컷툰 스튜디오로 전환")}</Link>
         )}
       </div>
 
       <header className="mb-5 overflow-hidden rounded-2xl border border-line bg-panel/50 p-5 surface-hl sm:p-6">
         <div className="flex flex-wrap items-start gap-4">
           <div className="min-w-0 flex-1">
-            <p className="eyebrow text-accent">PUBLISH COMMAND CENTER</p>
+            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "en", "PUBLISH COMMAND CENTER")}</p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-              {workId ? "게시 설정 및 작품 수정" : "게시 명령 센터"}
+              {workId ? translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "게시 설정 및 작품 수정") : translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "게시 명령 센터")}
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-relaxed text-fg-2">
-              원고 준비부터 공개 범위, 예약 시각, 독자 정책, 공유 카드와 최종 사전검사까지 한 흐름에서 확인합니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "원고 준비부터 공개 범위, 예약 시각, 독자 정책, 공유 카드와 최종 사전검사까지 한 흐름에서 확인합니다.")}</p>
           </div>
           <div className="grid min-w-40 grid-cols-2 gap-2 rounded-xl border border-line bg-canvas/65 p-2 text-center text-xs">
             <span className="rounded-lg bg-card/70 px-2 py-2 text-fg-3">
-              페이지 <strong className="numeral block text-base text-fg">{pages.length}</strong>
+              {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "페이지 ")}<strong className="numeral block text-base text-fg">{pages.length}</strong>
             </span>
             <span className="rounded-lg bg-card/70 px-2 py-2 text-fg-3">
-              검사 오류 <strong className={cn("numeral block text-base", preflight.errors.length ? "text-bad" : "text-good")}>{preflight.errors.length}</strong>
+              {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "검사 오류 ")}<strong className={cn("numeral block text-base", preflight.errors.length ? "text-bad" : "text-good")}>{preflight.errors.length}</strong>
             </span>
           </div>
         </div>
@@ -1018,8 +1019,7 @@ export function StudioPublishingCommandCenter({
 
       {!loggedIn && (
         <div className="mb-4 rounded-xl border border-line bg-card/60 px-3 py-2 text-sm text-fg-2">
-          이미지와 게시 설정을 미리 준비할 수 있지만, 서버 저장과 게시는 로그인 후 가능합니다.
-        </div>
+          {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "이미지와 게시 설정을 미리 준비할 수 있지만, 서버 저장과 게시는 로그인 후 가능합니다.")}</div>
       )}
       {error && (
         <div className="mb-4 rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-bad" role="alert">
@@ -1034,19 +1034,17 @@ export function StudioPublishingCommandCenter({
       {hydrating && (
         <div className="mb-4 flex items-center gap-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-sm text-fg-2" role="status" aria-busy="true">
           <Loader2 size={14} className="animate-spin motion-reduce:animate-none" />
-          기존 작품과 게시 정책을 불러오는 중…
-        </div>
+          {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "기존 작품과 게시 정책을 불러오는 중…")}</div>
       )}
       {workId && hydrationStatus === "error" && (
         <div className="mb-4 rounded-xl border border-bad/40 bg-bad/10 px-3 py-3" role="alert">
-          <p className="text-sm font-semibold text-fg">게시 작업공간을 열지 못했어요</p>
+          <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "게시 작업공간을 열지 못했어요")}</p>
           <p className="mt-1 text-sm leading-relaxed text-fg-2">
-            {hydrationError ?? "작품을 다시 불러와 주세요."}
+            {hydrationError ?? translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "작품을 다시 불러와 주세요.")}
           </p>
           {dirty && (
             <p className="mt-2 text-xs leading-relaxed text-warn">
-              화면의 미저장 변경은 보존되어 있습니다. 다시 불러오면 서버 원고로 교체됩니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "화면의 미저장 변경은 보존되어 있습니다. 다시 불러오면 서버 원고로 교체됩니다.")}</p>
           )}
           <button
             type="button"
@@ -1059,12 +1057,11 @@ export function StudioPublishingCommandCenter({
               })();
             }}
           >
-            <RefreshCw size={14} /> 다시 불러오기
-          </button>
+            <RefreshCw size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "다시 불러오기")}</button>
         </div>
       )}
 
-      <nav aria-label="게시 단계" className="mb-5 grid gap-2 sm:grid-cols-3">
+      <nav aria-label={translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "게시 단계")} className="mb-5 grid gap-2 sm:grid-cols-3">
         {COMMAND_STEPS.map((candidate, index) => {
           const active = candidate.id === step;
           const complete = index < currentStepIndex;
@@ -1073,7 +1070,7 @@ export function StudioPublishingCommandCenter({
               key={candidate.id}
               type="button"
               disabled={workspaceLocked}
-              aria-current={active ? "step" : undefined}
+              aria-current={active ? translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "en", "step") : undefined}
               onClick={() => setStep(candidate.id)}
               className={cn(
                 "flex min-h-16 items-center gap-3 rounded-xl border px-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-not-allowed disabled:opacity-60",
@@ -1097,13 +1094,12 @@ export function StudioPublishingCommandCenter({
           <section className="rounded-2xl border border-line bg-panel/35 p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
               <div>
-                <h2 className="text-base font-bold text-fg">원고 이미지</h2>
-                <p className="mt-1 text-xs text-fg-3">PNG·JPG·WebP, 최대 {MAX_PAGES}장 · 첫 이미지가 표지가 됩니다.</p>
+                <h2 className="text-base font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "원고 이미지")}</h2>
+                <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "PNG·JPG·WebP, 최대 ")}{MAX_PAGES}{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "장 · 첫 이미지가 표지가 됩니다.")}</p>
               </div>
               <label className={cn(buttonClass({ size: "sm", variant: "outline", className: "ml-auto min-h-11 gap-1.5" }), mutationLocked && "pointer-events-none opacity-60")}>
                 {loadingFiles ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
-                이미지 추가
-                <input
+                {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "이미지 추가")}<input
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
                   multiple
@@ -1117,8 +1113,8 @@ export function StudioPublishingCommandCenter({
             {pages.length === 0 ? (
               <label className={cn("mt-4 flex min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-canvas/35 px-6 text-center transition-colors hover:border-accent/45 hover:bg-accent/5", mutationLocked && "pointer-events-none opacity-60")}>
                 <span className="grid size-12 place-items-center rounded-2xl bg-accent/10 text-accent"><Upload size={22} /></span>
-                <span className="mt-3 text-sm font-semibold text-fg">완성 원고를 선택하세요</span>
-                <span className="mt-1 max-w-sm text-xs leading-relaxed text-fg-3">디코딩 픽셀 수와 원본 배치 크기를 먼저 검사한 뒤 게시용 해상도로 안전하게 변환합니다.</span>
+                <span className="mt-3 text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "완성 원고를 선택하세요")}</span>
+                <span className="mt-1 max-w-sm text-xs leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "디코딩 픽셀 수와 원본 배치 크기를 먼저 검사한 뒤 게시용 해상도로 안전하게 변환합니다.")}</span>
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
@@ -1139,9 +1135,9 @@ export function StudioPublishingCommandCenter({
                       <span className="numeral mt-1 block text-xs text-fg-3">{page.width} × {page.height}px</span>
                     </span>
                     <span className={STUDIO_UPLOAD_PAGE_CONTROLS_CLASS}>
-                      <button type="button" className={STUDIO_UPLOAD_PAGE_CONTROL_CLASS} disabled={mutationLocked || index === 0} onClick={() => movePage(page.id, -1)} aria-label={`${index + 1}번째 이미지를 위로 이동`}><ArrowUp size={14} /></button>
-                      <button type="button" className={STUDIO_UPLOAD_PAGE_CONTROL_CLASS} disabled={mutationLocked || index === pages.length - 1} onClick={() => movePage(page.id, 1)} aria-label={`${index + 1}번째 이미지를 아래로 이동`}><ArrowDown size={14} /></button>
-                      <button type="button" className={cn(STUDIO_UPLOAD_PAGE_CONTROL_CLASS, "text-bad")} disabled={mutationLocked} onClick={() => removePage(page.id)} aria-label={`${index + 1}번째 이미지 삭제`}><Trash2 size={14} /></button>
+                      <button type="button" className={STUDIO_UPLOAD_PAGE_CONTROL_CLASS} disabled={mutationLocked || index === 0} onClick={() => movePage(page.id, -1)} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "{v0}번째 이미지를 위로 이동"), { v0: String(index + 1) })}><ArrowUp size={14} /></button>
+                      <button type="button" className={STUDIO_UPLOAD_PAGE_CONTROL_CLASS} disabled={mutationLocked || index === pages.length - 1} onClick={() => movePage(page.id, 1)} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "{v0}번째 이미지를 아래로 이동"), { v0: String(index + 1) })}><ArrowDown size={14} /></button>
+                      <button type="button" className={cn(STUDIO_UPLOAD_PAGE_CONTROL_CLASS, "text-bad")} disabled={mutationLocked} onClick={() => removePage(page.id)} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "{v0}번째 이미지 삭제"), { v0: String(index + 1) })}><Trash2 size={14} /></button>
                     </span>
                   </li>
                 ))}
@@ -1150,41 +1146,39 @@ export function StudioPublishingCommandCenter({
           </section>
 
           <section className="rounded-2xl border border-line bg-panel/35 p-4 sm:p-5">
-            <h2 className="text-base font-bold text-fg">작품 정보</h2>
-            <p className="mt-1 text-xs leading-relaxed text-fg-3">독자가 탐색 화면에서 작품을 이해하는 데 필요한 기본 정보를 작성합니다.</p>
+            <h2 className="text-base font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "작품 정보")}</h2>
+            <p className="mt-1 text-xs leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "독자가 탐색 화면에서 작품을 이해하는 데 필요한 기본 정보를 작성합니다.")}</p>
             <div className="mt-4 space-y-3">
               <label className="block text-xs text-fg-2">
-                제목 <span className="text-bad">*</span>
+                {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "제목 ")}<span className="text-bad">*</span>
                 <input
                   value={title}
                   maxLength={120}
                   disabled={mutationLocked}
                   onChange={(event) => { setTitle(event.target.value); markChanged(); }}
                   className="mt-1 h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm text-fg outline-none focus:border-accent/55 focus-visible:ring-2 focus-visible:ring-accent/35 disabled:opacity-60"
-                  placeholder="작품 제목"
+                  placeholder={translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "작품 제목")}
                 />
               </label>
               <label className="block text-xs text-fg-2">
-                작품 소개
-                <textarea
+                {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "작품 소개")}<textarea
                   value={description}
                   maxLength={1000}
                   rows={5}
                   disabled={mutationLocked}
                   onChange={(event) => { setDescription(event.target.value); markChanged(); }}
                   className="mt-1 w-full resize-y rounded-xl border border-line bg-canvas px-3 py-2.5 text-sm text-fg outline-none focus:border-accent/55 focus-visible:ring-2 focus-visible:ring-accent/35 disabled:opacity-60"
-                  placeholder="장르, 분위기, 이번 화의 내용을 소개해 주세요."
+                  placeholder={translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "장르, 분위기, 이번 화의 내용을 소개해 주세요.")}
                 />
                 <span className="numeral mt-1 block text-right text-[0.7rem] text-fg-3">{description.length}/1000</span>
               </label>
               <label className="block text-xs text-fg-2">
-                태그 · 최대 8개
-                <input
+                {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "태그 · 최대 8개")}<input
                   value={tagsText}
                   disabled={mutationLocked}
                   onChange={(event) => { setTagsText(event.target.value); markChanged(); }}
                   className="mt-1 h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm text-fg outline-none focus:border-accent/55 focus-visible:ring-2 focus-visible:ring-accent/35 disabled:opacity-60"
-                  placeholder="일상, 코미디, 로맨스"
+                  placeholder={translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "일상, 코미디, 로맨스")}
                 />
               </label>
             </div>
@@ -1196,8 +1190,7 @@ export function StudioPublishingCommandCenter({
         <div>
           {!policyEditable && (
             <div className="mb-4 rounded-xl border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-fg-2">
-              공동 편집자는 원고를 저장할 수 있지만 공개 범위·예약·독자 정책은 소유자만 변경할 수 있습니다.
-            </div>
+              {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "공동 편집자는 원고를 저장할 수 있지만 공개 범위·예약·독자 정책은 소유자만 변경할 수 있습니다.")}</div>
           )}
           <StudioPublicationControls
             directive={directive}
@@ -1216,22 +1209,22 @@ export function StudioPublishingCommandCenter({
           <section className="rounded-2xl border border-line bg-panel/35 p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
               <div>
-                <p className="eyebrow text-accent">READER PREVIEW</p>
-                <h2 className="mt-1 text-lg font-bold text-fg">독자 화면 최종 미리보기</h2>
+                <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "en", "READER PREVIEW")}</p>
+                <h2 className="mt-1 text-lg font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "독자 화면 최종 미리보기")}</h2>
               </div>
               <span className="ml-auto rounded-full border border-line bg-card/60 px-2.5 py-1 text-xs text-fg-3">
-                {directive.readingMode === "vertical" ? "세로 스크롤" : directive.readingDirection === "rtl" ? "페이지 · 우→좌" : "페이지 · 좌→우"}
+                {directive.readingMode === "vertical" ? translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "세로 스크롤") : directive.readingDirection === "rtl" ? translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "페이지 · 우→좌") : translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "페이지 · 좌→우")}
               </span>
             </div>
             <div className="mt-4 rounded-2xl border border-line bg-canvas p-3 sm:p-5">
               <div className="mx-auto max-w-[720px] overflow-hidden rounded-xl bg-black/5">
                 {pages.length === 0 ? (
-                  <div className="grid min-h-80 place-items-center text-sm text-fg-3">표시할 원고가 없습니다.</div>
+                  <div className="grid min-h-80 place-items-center text-sm text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "표시할 원고가 없습니다.")}</div>
                 ) : directive.readingMode === "vertical" ? (
                   pages.map((page) => <img key={page.id} src={page.src} alt={`${title || "작품"} ${page.name}`} className="block h-auto w-full" />)
                 ) : (
                   <div className="relative">
-                    <img src={pages[0].src} alt={`${title || "작품"} 첫 페이지`} className="block h-auto w-full" />
+                    <img src={pages[0].src} alt={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "{v0} 첫 페이지"), { v0: String(title || "작품") })} className="block h-auto w-full" />
                     <span className="absolute bottom-3 right-3 rounded-full bg-black/65 px-2.5 py-1 text-xs text-white">1 / {pages.length}</span>
                   </div>
                 )}
@@ -1241,24 +1234,24 @@ export function StudioPublishingCommandCenter({
 
           <aside className="space-y-4">
             <section className="rounded-2xl border border-line bg-panel/35 p-4">
-              <h2 className="flex items-center gap-2 text-sm font-bold text-fg"><ShieldCheck size={15} className="text-accent" /> 게시 요약</h2>
+              <h2 className="flex items-center gap-2 text-sm font-bold text-fg"><ShieldCheck size={15} className="text-accent" /> {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "게시 요약")}</h2>
               <dl className="mt-3 divide-y divide-line text-sm">
-                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">공개 범위</dt><dd className="flex items-center gap-1.5 font-medium text-fg">{directive.visibility === "public" ? <Globe2 size={13} /> : directive.visibility === "unlisted" ? <Link2 size={13} /> : <LockKeyhole size={13} />}{visibilityLabel(directive)}</dd></div>
-                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">공개 시점</dt><dd className="font-medium text-fg">{scheduleLabel(directive)}</dd></div>
-                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">댓글</dt><dd className="font-medium text-fg">{directive.comments === "open" ? "허용" : "새 댓글 차단"}</dd></div>
-                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">리믹스</dt><dd className="font-medium text-fg">{directive.allowRemix ? "허용" : "차단"}</dd></div>
-                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">독자 등급</dt><dd className="font-medium text-fg">{directive.contentRating === "all" ? "전체 이용" : directive.contentRating === "teen" ? "청소년 주의" : "성인 대상"}</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "공개 범위")}</dt><dd className="flex items-center gap-1.5 font-medium text-fg">{directive.visibility === "public" ? <Globe2 size={13} /> : directive.visibility === "unlisted" ? <Link2 size={13} /> : <LockKeyhole size={13} />}{visibilityLabel(directive)}</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "공개 시점")}</dt><dd className="font-medium text-fg">{scheduleLabel(directive)}</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "댓글")}</dt><dd className="font-medium text-fg">{directive.comments === "open" ? translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "허용") : translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "새 댓글 차단")}</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "리믹스")}</dt><dd className="font-medium text-fg">{directive.allowRemix ? translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "허용") : translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "차단")}</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "독자 등급")}</dt><dd className="font-medium text-fg">{directive.contentRating === "all" ? translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "전체 이용") : directive.contentRating === "teen" ? translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "청소년 주의") : translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "성인 대상")}</dd></div>
               </dl>
             </section>
             <section className={cn("rounded-2xl border p-4", preflight.errors.length ? "border-bad/40 bg-bad/5" : preflight.warnings.length ? "border-warn/40 bg-warn/5" : "border-good/40 bg-good/5")}>
-              <h2 className="flex items-center gap-2 text-sm font-bold text-fg"><Eye size={15} className={preflight.errors.length ? "text-bad" : "text-good"} /> 최종 사전검사</h2>
-              <p className="mt-2 text-xs leading-relaxed text-fg-2">오류 {preflight.errors.length}건 · 경고 {preflight.warnings.length}건</p>
+              <h2 className="flex items-center gap-2 text-sm font-bold text-fg"><Eye size={15} className={preflight.errors.length ? translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "en", "text-bad") : translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "en", "text-good")} /> {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "최종 사전검사")}</h2>
+              <p className="mt-2 text-xs leading-relaxed text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "오류 ")}{preflight.errors.length}{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "건 · 경고 ")}{preflight.warnings.length}{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "건")}</p>
               {preflight.issues.length > 0 ? (
                 <ul className="mt-3 space-y-2">
                   {preflight.issues.slice(0, 8).map((issue) => <li key={`${issue.code}:${issue.path}`} className={cn("text-xs leading-relaxed", issue.severity === "error" ? "text-bad" : "text-fg-2")}>• {issue.message}</li>)}
                 </ul>
               ) : (
-                <p className="mt-3 flex items-center gap-1.5 text-xs text-good"><Check size={13} /> 게시 가능한 상태입니다.</p>
+                <p className="mt-3 flex items-center gap-1.5 text-xs text-good"><Check size={13} /> {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "게시 가능한 상태입니다.")}</p>
               )}
             </section>
           </aside>
@@ -1267,8 +1260,8 @@ export function StudioPublishingCommandCenter({
 
       <div className={cn("mt-5", STUDIO_UPLOAD_ACTION_DOCK_CLASS)}>
         <div className="flex min-w-0 flex-1 items-center gap-2 text-xs text-fg-3">
-          {dirty ? <span className="inline-flex items-center gap-1.5 text-warn"><span className="size-2 rounded-full bg-warn" /> 저장되지 않은 변경</span> : <span className="inline-flex items-center gap-1.5 text-good"><Check size={13} /> 현재 revision 저장됨</span>}
-          {sharedMeta && <span className="hidden sm:inline">· 역할 {sharedMeta.role}</span>}
+          {dirty ? <span className="inline-flex items-center gap-1.5 text-warn"><span className="size-2 rounded-full bg-warn" /> {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "저장되지 않은 변경")}</span> : <span className="inline-flex items-center gap-1.5 text-good"><Check size={13} /> {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "현재 revision 저장됨")}</span>}
+          {sharedMeta && <span className="hidden sm:inline">{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "· 역할 ")}{sharedMeta.role}</span>}
         </div>
         <button
           type="button"
@@ -1277,16 +1270,15 @@ export function StudioPublishingCommandCenter({
           onClick={() => void handleSave("draft")}
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-          초안 저장
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "초안 저장")}</button>
         {step !== "content" && (
-          <button type="button" disabled={workspaceLocked} className={buttonClass({ size: "sm", variant: "ghost", className: "min-h-11 gap-1" })} onClick={() => setStep(step === "review" ? "distribution" : "content")}><ChevronLeft size={15} /> 이전</button>
+          <button type="button" disabled={workspaceLocked} className={buttonClass({ size: "sm", variant: "ghost", className: "min-h-11 gap-1" })} onClick={() => setStep(step === "review" ? "distribution" : "content")}><ChevronLeft size={15} /> {translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "이전")}</button>
         )}
         {step === "content" && (
-          <button type="button" disabled={workspaceLocked} className={buttonClass({ size: "sm", variant: "solid", className: "min-h-11 gap-1.5" })} onClick={openDistribution}>게시 설정 <ArrowRight size={15} /></button>
+          <button type="button" disabled={workspaceLocked} className={buttonClass({ size: "sm", variant: "solid", className: "min-h-11 gap-1.5" })} onClick={openDistribution}>{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "게시 설정 ")}<ArrowRight size={15} /></button>
         )}
         {step === "distribution" && (
-          <button type="button" disabled={workspaceLocked} className={buttonClass({ size: "sm", variant: "solid", className: "min-h-11 gap-1.5" })} onClick={openReview}>최종 확인 <ChevronRight size={15} /></button>
+          <button type="button" disabled={workspaceLocked} className={buttonClass({ size: "sm", variant: "solid", className: "min-h-11 gap-1.5" })} onClick={openReview}>{translateCurrentStaticSourceText("domains.creator.StudioPublishingCommandCenter", "ko", "최종 확인 ")}<ChevronRight size={15} /></button>
         )}
         {step === "review" && (
           <button type="button" disabled={primaryDisabled} className={buttonClass({ size: "sm", variant: "solid", className: "min-h-11 gap-1.5" })} onClick={() => void handleSave("publish")}>

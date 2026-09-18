@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, Boxes, Camera, Clapperboard, Download } from "lucide-react";
 import { lazy, Suspense, useId, useState } from "react";
 
@@ -40,15 +44,15 @@ export function StudioBg3dProSuitePanel({
   return (
     <div className="space-y-3 p-3 text-fg" data-bg3d-production-workbench="true">
       <div>
-        <h2 className="text-sm font-semibold">웹툰 컷 제작</h2>
-        <p className="mt-1 text-xs leading-relaxed text-fg-2">구도를 잡고, 여러 컷으로 저장한 뒤, 레이어가 나뉜 원고로 출력합니다.</p>
+        <h2 className="text-sm font-semibold">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "ko", "웹툰 컷 제작")}</h2>
+        <p className="mt-1 text-xs leading-relaxed text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "ko", "구도를 잡고, 여러 컷으로 저장한 뒤, 레이어가 나뉜 원고로 출력합니다.")}</p>
       </div>
-      {!runtime && <p role="status" className="rounded-lg border border-line p-3 text-xs text-fg-2">3D 장면을 연 뒤 사용할 수 있습니다.</p>}
+      {!runtime && <p role="status" className="rounded-lg border border-line p-3 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "ko", "3D 장면을 연 뒤 사용할 수 있습니다.")}</p>}
       {runtime ? (
         <StudioBg3dProfessionalReadinessPanel readiness={runtime.professionalReadiness} />
       ) : null}
       <section
-        aria-labelledby={`${id}-precision-modeler-title`}
+        aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "en", "{v0}-precision-modeler-title"), { v0: String(id) })}
         className="rounded-xl border border-accent/35 bg-accent-soft/35 p-3 shadow-sm"
       >
         <div className="flex items-start gap-3">
@@ -59,13 +63,10 @@ export function StudioBg3dProSuitePanel({
             <Boxes className="size-4" />
           </span>
           <div className="min-w-0 flex-1">
-            <h3 id={`${id}-precision-modeler-title`} className="text-xs font-bold text-fg">
-              정밀 메시 · CAD 모델링
-            </h3>
+            <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "en", "{v0}-precision-modeler-title"), { v0: String(id) })} className="text-xs font-bold text-fg">
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "ko", "정밀 메시 · CAD 모델링")}</h3>
             <p className="mt-1 text-[0.7rem] leading-relaxed text-fg-2">
-              현재 BG3D 장면을 복구 가능한 원본으로 먼저 보존한 뒤 면·모서리 선택,
-              압출·베벨·불리언, 치수 입력과 파라메트릭 편집을 시작합니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "ko", "현재 BG3D 장면을 복구 가능한 원본으로 먼저 보존한 뒤 면·모서리 선택, 압출·베벨·불리언, 치수 입력과 파라메트릭 편집을 시작합니다.")}</p>
           </div>
         </div>
         <button
@@ -79,24 +80,20 @@ export function StudioBg3dProSuitePanel({
           )}
         >
           <Boxes className="size-3.5" aria-hidden="true" />
-          정밀 모델링 워크스페이스 열기
-          <ArrowUpRight className="ml-auto size-3.5" aria-hidden="true" />
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "ko", "정밀 모델링 워크스페이스 열기")}<ArrowUpRight className="ml-auto size-3.5" aria-hidden="true" />
         </button>
         {onOpenPrecisionModeler ? (
           <p className="mt-1.5 text-[0.66rem] leading-relaxed text-fg-3">
-            BG3D 오브젝트를 CAD 형상으로 자동 변환하지 않습니다. DCC에서 만든 검증된 메시를 다시
-            3D 배경 편집기로 전달하는 안전한 파생 흐름을 사용합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "ko", "BG3D 오브젝트를 CAD 형상으로 자동 변환하지 않습니다. DCC에서 만든 검증된 메시를 다시 3D 배경 편집기로 전달하는 안전한 파생 흐름을 사용합니다.")}</p>
         ) : (
           <p className="mt-1.5 text-[0.66rem] leading-relaxed text-fg-3" aria-live="polite">
-            문서 편집기에서 3D 장면을 열면 정밀 모델링 워크스페이스로 이동할 수 있습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "ko", "문서 편집기에서 3D 장면을 열면 정밀 모델링 워크스페이스로 이동할 수 있습니다.")}</p>
         )}
       </section>
-      <div role="tablist" aria-label="웹툰 컷 제작 단계" className="grid grid-cols-3 gap-1 rounded-xl border border-line bg-card p-1">
+      <div role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "ko", "웹툰 컷 제작 단계")} className="grid grid-cols-3 gap-1 rounded-xl border border-line bg-card p-1">
         {TOOLS.map((tool, index) => {
           const Icon = tool.icon;
-          return <button key={tool.id} type="button" role="tab" id={`${id}-${tool.id}-tab`} aria-controls={`${id}-${tool.id}-panel`}
+          return <button key={tool.id} type="button" role="tab" id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "en", "{v0}-{v1}-tab"), { v0: String(id), v1: String(tool.id) })} aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "en", "{v0}-{v1}-panel"), { v0: String(id), v1: String(tool.id) })}
             aria-selected={activeTab === tool.id} tabIndex={activeTab === tool.id ? 0 : -1}
             className={cx(STUDIO_BG3D_CONTROL_BUTTON, "border-transparent px-1", activeTab === tool.id ? "bg-raised text-fg" : "text-fg-2 hover:bg-raised")}
             onClick={() => activate(tool.id)} onKeyDown={(event) => {
@@ -110,12 +107,12 @@ export function StudioBg3dProSuitePanel({
             }}><Icon className="size-3.5 shrink-0" aria-hidden="true" />{tool.label}</button>;
         })}
       </div>
-      {TOOLS.map((tool) => <div key={tool.id} role="tabpanel" id={`${id}-${tool.id}-panel`} aria-labelledby={`${id}-${tool.id}-tab`} hidden={activeTab !== tool.id}>
-        {visited.has(tool.id) && <Suspense fallback={<p role="status" className="p-3 text-xs text-fg-2">제작 도구를 불러오는 중입니다.</p>}>
+      {TOOLS.map((tool) => <div key={tool.id} role="tabpanel" id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "en", "{v0}-{v1}-panel"), { v0: String(id), v1: String(tool.id) })} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "en", "{v0}-{v1}-tab"), { v0: String(id), v1: String(tool.id) })} hidden={activeTab !== tool.id}>
+        {visited.has(tool.id) && <Suspense fallback={<p role="status" className="p-3 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "ko", "제작 도구를 불러오는 중입니다.")}</p>}>
           {tool.id === "lens" && <StudioBg3dCompositionLensPanel disabled={locked} />}
           {tool.id === "director" && runtime && <Director disabled={locked || activeTab !== "director" || runtime.proSuiteActive === false} />}
           {tool.id === "multipass" && runtime?.productionBatch && <MultiPass disabled={locked} />}
-          {tool.id === "multipass" && runtime && !runtime.productionBatch && <p role="status" className="p-3 text-xs text-fg-2">출력할 장면과 컷 정보를 준비하고 있습니다.</p>}
+          {tool.id === "multipass" && runtime && !runtime.productionBatch && <p role="status" className="p-3 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProSuitePanelContent", "ko", "출력할 장면과 컷 정보를 준비하고 있습니다.")}</p>}
         </Suspense>}
       </div>)}
     </div>

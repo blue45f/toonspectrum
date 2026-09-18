@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   CircleX,
   Download,
   FileUp,
@@ -341,23 +345,18 @@ export function StudioProductionJobWorkspace({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">
-            Production jobs
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "en", "Production jobs")}</p>
           <h2 id="production-jobs-title" className="mt-1 font-display text-xl font-bold text-fg sm:text-2xl">
-            처리 중 작업
-          </h2>
+            {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "처리 중 작업")}</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-fg-3">
-            원본은 브라우저가 선택한 로컬 실행기로만 전송됩니다. 실패한 외부 도구를 다른 품질의 결과로 자동 대체하지 않습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "원본은 브라우저가 선택한 로컬 실행기로만 전송됩니다. 실패한 외부 도구를 다른 품질의 결과로 자동 대체하지 않습니다.")}</p>
         </div>
-        <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-          persistence === "durable"
+        <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "en", "rounded-full px-3 py-1.5 text-xs font-bold {v0}"), { v0: String(persistence === "durable"
             ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
             : persistence === "memory"
               ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-              : "bg-raised text-fg-3"
-        }`}>
-          {persistence === "durable" ? "이 기기에 이력 저장" : persistence === "memory" ? "현재 탭 임시" : "이력 확인 중"}
+              : "bg-raised text-fg-3") })}>
+          {persistence === "durable" ? translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "이 기기에 이력 저장") : persistence === "memory" ? translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "현재 탭 임시") : translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "이력 확인 중")}
         </span>
       </div>
 
@@ -377,8 +376,7 @@ export function StudioProductionJobWorkspace({
         >
           <div className="grid gap-3 lg:grid-cols-2">
             <label className="grid gap-1.5 text-xs font-semibold text-fg-2">
-              제작 도구
-              <select
+              {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "제작 도구")}<select
                 value={selectedTool?.id ?? ""}
                 onChange={(event) => {
                   setToolId(event.currentTarget.value);
@@ -387,13 +385,12 @@ export function StudioProductionJobWorkspace({
                 disabled={!connection.connected || runnableTools.length === 0}
                 className="min-h-11 rounded-xl border border-line bg-canvas px-3 text-sm text-fg outline-none focus:border-accent"
               >
-                {runnableTools.length === 0 ? <option value="">설치된 실행 도구 없음</option> : null}
+                {runnableTools.length === 0 ? <option value="">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "설치된 실행 도구 없음")}</option> : null}
                 {runnableTools.map((tool) => <option key={tool.id} value={tool.id}>{tool.name}</option>)}
               </select>
             </label>
             <label className="grid gap-1.5 text-xs font-semibold text-fg-2">
-              작업
-              <select
+              {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "작업")}<select
                 value={selectedOperation?.id ?? ""}
                 onChange={(event) => setOperationId(event.currentTarget.value)}
                 disabled={!selectedTool || runnableOperations.length === 0}
@@ -416,13 +413,12 @@ export function StudioProductionJobWorkspace({
 
           <div className="mt-3">
             <label className="grid gap-1.5 text-xs font-semibold text-fg-2">
-              입력 파일
-              <span className="relative flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-line-strong bg-canvas px-4 py-3 text-center hover:border-accent/60">
+              {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "입력 파일")}<span className="relative flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-line-strong bg-canvas px-4 py-3 text-center hover:border-accent/60">
                 <FileUp size={22} className="text-accent" aria-hidden="true" />
                 <span className="mt-2 text-sm font-bold text-fg">
-                  {files.length > 0 ? `${files.length}개 파일 선택됨` : "파일 선택"}
+                  {files.length > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "{v0}개 파일 선택됨"), { v0: String(files.length) }) : translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "파일 선택")}
                 </span>
-                <span className="mt-1 text-xs text-fg-3">최대 16개 · 파일당 2GB</span>
+                <span className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "최대 16개 · 파일당 2GB")}</span>
                 <input
                   type="file"
                   multiple
@@ -435,11 +431,9 @@ export function StudioProductionJobWorkspace({
 
           <details className="mt-3 rounded-xl border border-line bg-card/55 px-3 py-2">
             <summary className="cursor-pointer text-xs font-bold text-fg-2">
-              고급 옵션 JSON
-            </summary>
+              {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "고급 옵션 JSON")}</summary>
             <p className="mt-2 text-xs leading-5 text-fg-3">
-              일반 작업은 위 옵션만으로 충분합니다. 추가 어댑터 옵션이 필요할 때만 JSON 객체를 입력하세요. 같은 키는 위 화면 값이 우선합니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "일반 작업은 위 옵션만으로 충분합니다. 추가 어댑터 옵션이 필요할 때만 JSON 객체를 입력하세요. 같은 키는 위 화면 값이 우선합니다.")}</p>
             <textarea
               value={optionsText}
               onChange={(event) => setOptionsText(event.currentTarget.value)}
@@ -465,8 +459,8 @@ export function StudioProductionJobWorkspace({
               {selectedTool
                 ? `${selectedTool.license} · ${selectedTool.description}`
                 : connection.connected
-                  ? "설치된 실행 도구가 없습니다. 엔진 센터에서 설치 상태를 확인하세요."
-                  : "로컬 제작 실행기에 먼저 연결하세요."}
+                  ? translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "설치된 실행 도구가 없습니다. 엔진 센터에서 설치 상태를 확인하세요.")
+                  : translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "로컬 제작 실행기에 먼저 연결하세요.")}
             </p>
             <button
               type="submit"
@@ -474,7 +468,7 @@ export function StudioProductionJobWorkspace({
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-fg px-5 text-sm font-bold text-canvas disabled:cursor-not-allowed disabled:opacity-40"
             >
               {submitting ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Play size={17} aria-hidden="true" />}
-              {submitting ? "작업 준비 중" : "작업 시작"}
+              {submitting ? translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "작업 준비 중") : translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "작업 시작")}
             </button>
           </div>
         </form>
@@ -483,8 +477,8 @@ export function StudioProductionJobWorkspace({
       <div className="grid gap-3">
         {jobs.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-line-strong bg-panel/40 px-5 py-10 text-center">
-            <p className="text-sm font-bold text-fg">아직 제작 작업이 없습니다.</p>
-            <p className="mt-1 text-xs leading-5 text-fg-3">OCR, 벡터화, 영상 변환, 3D 렌더, PDF 검사 결과가 여기에 모입니다.</p>
+            <p className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "아직 제작 작업이 없습니다.")}</p>
+            <p className="mt-1 text-xs leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "OCR, 벡터화, 영상 변환, 3D 렌더, PDF 검사 결과가 여기에 모입니다.")}</p>
           </div>
         ) : jobs.map((job) => {
           const tool = STUDIO_PRODUCTION_TOOLS.find((entry) => entry.id === job.toolId);
@@ -498,13 +492,12 @@ export function StudioProductionJobWorkspace({
                     <h3 className="font-display text-sm font-bold text-fg sm:text-base">
                       {tool?.name ?? job.toolId} · {operation?.name ?? job.operationId}
                     </h3>
-                    <span className={`rounded-full px-2.5 py-1 text-[0.68rem] font-bold ${statusTone(job.status)}`}>
+                    <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "en", "rounded-full px-2.5 py-1 text-[0.68rem] font-bold {v0}"), { v0: String(statusTone(job.status)) })}>
                       {STATUS_LABELS[job.status]}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-fg-3">
-                    {new Date(job.updatedAt).toLocaleString()} · {job.inputs.length}개 입력 · {job.outputs.length}개 결과
-                  </p>
+                    {new Date(job.updatedAt).toLocaleString()} · {job.inputs.length}{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "개 입력 · ")}{job.outputs.length}{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "개 결과")}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {canCancel ? (
@@ -514,8 +507,7 @@ export function StudioProductionJobWorkspace({
                       disabled={!connection.connected}
                       className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-bold text-fg-3 hover:border-red-500/40 hover:text-red-600 disabled:opacity-40"
                     >
-                      <CircleX size={14} aria-hidden="true" /> 취소
-                    </button>
+                      <CircleX size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "취소")}</button>
                   ) : null}
                   {!canCancel ? (
                     <button
@@ -523,8 +515,7 @@ export function StudioProductionJobWorkspace({
                       onClick={() => void removeJob(job)}
                       className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-bold text-fg-3 hover:text-fg"
                     >
-                      <Trash2 size={14} aria-hidden="true" /> 기록 지우기
-                    </button>
+                      <Trash2 size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "기록 지우기")}</button>
                   ) : null}
                 </div>
               </div>
@@ -542,7 +533,7 @@ export function StudioProductionJobWorkspace({
 
               {job.failure ? (
                 <p role="alert" className="mt-3 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-700 dark:text-red-300">
-                  {job.failure.message} {job.failure.retryable ? "다시 시도할 수 있습니다." : "자동 재시도하지 않습니다."}
+                  {job.failure.message} {job.failure.retryable ? translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "다시 시도할 수 있습니다.") : translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "자동 재시도하지 않습니다.")}
                 </p>
               ) : null}
 
@@ -559,7 +550,7 @@ export function StudioProductionJobWorkspace({
                       <Download size={16} className="shrink-0 text-accent" aria-hidden="true" />
                       <span className="min-w-0 flex-1">
                         <strong className="block truncate text-xs text-fg">{output.name}</strong>
-                        <span className="mt-0.5 block text-[0.68rem] text-fg-3">{formatBytes(output.bytes)} · SHA-256 확인됨</span>
+                        <span className="mt-0.5 block text-[0.68rem] text-fg-3">{formatBytes(output.bytes)} {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "· SHA-256 확인됨")}</span>
                       </span>
                     </button>
                   ))}
@@ -568,12 +559,12 @@ export function StudioProductionJobWorkspace({
 
               {job.receipt ? (
                 <details className="mt-4 rounded-xl border border-line bg-panel/60 px-3 py-2 text-xs text-fg-3">
-                  <summary className="cursor-pointer font-bold text-fg-2">실행·라이선스 영수증</summary>
+                  <summary className="cursor-pointer font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "실행·라이선스 영수증")}</summary>
                   <dl className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-[auto_1fr]">
-                    <dt>버전</dt><dd className="break-all">{job.receipt.toolVersion}</dd>
-                    <dt>라이선스</dt><dd>{job.receipt.license}</dd>
-                    <dt>명령 영수증</dt><dd className="break-all font-mono">{job.receipt.commandDigest}</dd>
-                    <dt>완료 시각</dt><dd>{new Date(job.receipt.finishedAt).toLocaleString()}</dd>
+                    <dt>{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "버전")}</dt><dd className="break-all">{job.receipt.toolVersion}</dd>
+                    <dt>{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "라이선스")}</dt><dd>{job.receipt.license}</dd>
+                    <dt>{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "명령 영수증")}</dt><dd className="break-all font-mono">{job.receipt.commandDigest}</dd>
+                    <dt>{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "완료 시각")}</dt><dd>{new Date(job.receipt.finishedAt).toLocaleString()}</dd>
                   </dl>
                 </details>
               ) : null}
@@ -589,8 +580,7 @@ export function StudioProductionJobWorkspace({
           disabled={!connection.connected}
           className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line px-4 text-xs font-bold text-fg-2 hover:border-line-strong hover:text-fg disabled:opacity-40"
         >
-          <RotateCcw size={15} aria-hidden="true" /> 상태 새로 고침
-        </button>
+          <RotateCcw size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionJobWorkspace", "ko", "상태 새로 고침")}</button>
       ) : null}
     </section>
   );

@@ -53,6 +53,20 @@ const AdminRevenue = lazyRetry(
     })),
   "AdminRevenueV2",
 );
+const AdminSupporterPayments = lazyRetry(
+  () =>
+    import("../components/AdminSupporterPayments").then((module) => ({
+      default: module.AdminSupporterPayments,
+    })),
+  "AdminSupporterPaymentsV1",
+);
+const AdminCreatorSupport = lazyRetry(
+  () =>
+    import("../components/AdminCreatorSupport").then((module) => ({
+      default: module.AdminCreatorSupport,
+    })),
+  "AdminCreatorSupportV1",
+);
 const AdminBusinessInquiries = lazyRetry(
   () =>
     import("../components/AdminBusinessInquiries").then((module) => ({
@@ -175,6 +189,10 @@ function AdminRouteSurface({
       return <AdminPlans uid={uid} />;
     case "revenue":
       return <AdminRevenue uid={uid} />;
+    case "supporters":
+      return <AdminSupporterPayments uid={uid} />;
+    case "creatorSupport":
+      return <AdminCreatorSupport uid={uid} />;
     case "campaigns":
       return <AdminCampaigns uid={uid} />;
     case "inquiries":

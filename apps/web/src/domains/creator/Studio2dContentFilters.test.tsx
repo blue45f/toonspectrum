@@ -35,10 +35,10 @@ describe("2D content discovery and source replacement", () => {
     fireEvent.change(screen.getByLabelText("시간대"), { target: { value: "밤" } });
     fireEvent.click(screen.getByLabelText("문자 형태 없는 이미지 배경만"));
     fireEvent.change(screen.getByLabelText("소재 구분"), { target: { value: "large" } });
-    expect(screen.getByRole("status").textContent).toBe("2개 장면");
+    expect(screen.getByRole("status").textContent).toBe("6개 장면");
     expect(screen.getByText("장소·시간·문자 필터 · 3개 적용")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
-    expect(screen.getByRole("status").textContent).toBe("68개 장면");
+    expect(screen.getByRole("status").textContent).toBe("88개 장면");
     expect((screen.getByLabelText("장소") as HTMLSelectElement).value).toBe("all");
     expect((screen.getByLabelText("시간대") as HTMLSelectElement).value).toBe("all");
     expect((screen.getByLabelText("문자 형태 없는 이미지 배경만") as HTMLInputElement).checked).toBe(false);

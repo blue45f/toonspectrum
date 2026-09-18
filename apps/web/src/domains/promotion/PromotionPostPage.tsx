@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Bookmark,
   ExternalLink,
   Flag,
@@ -141,7 +145,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
 
   return (
     <div className="pc-shell pc-narrow">
-      <Link to="/community/promote">← 신작·작가 홍보</Link>
+      <Link to="/community/promote">{translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "← 신작·작가 홍보")}</Link>
 
       {error ? (
         <div className="pc-error" role="alert">
@@ -152,11 +156,10 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
             disabled={loading}
             onClick={() => setRevision((value) => value + 1)}
           >
-            다시 불러오기
-          </button>
+            {translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "다시 불러오기")}</button>
         </div>
       ) : null}
-      {loading && !data ? <p role="status">게시물을 불러오고 있어요.</p> : null}
+      {loading && !data ? <p role="status">{translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "게시물을 불러오고 있어요.")}</p> : null}
       {notice ? <p className="pc-notice" role="status">{notice}</p> : null}
 
       {data && post ? (
@@ -176,19 +179,18 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
             {post.hidden || post.archived ? (
               <p className="pc-notice">
                 {post.hidden
-                  ? "운영자에 의해 비공개 처리된 게시물입니다."
-                  : "작성자가 보관한 게시물입니다."}{" "}
-                공개 목록에는 나타나지 않습니다.
-              </p>
+                  ? translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "운영자에 의해 비공개 처리된 게시물입니다.")
+                  : translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "작성자가 보관한 게시물입니다.")}{" "}
+                {translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "공개 목록에는 나타나지 않습니다.")}</p>
             ) : null}
             {post.contentWarning ? (
-              <p className="pc-notice"><strong>콘텐츠 안내</strong> · {post.contentWarning}</p>
+              <p className="pc-notice"><strong>{translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "콘텐츠 안내")}</strong> · {post.contentWarning}</p>
             ) : null}
             {post.cover ? (
               <img
                 className="pc-post-cover"
                 src={post.cover}
-                alt={`${post.seriesTitle} 표지`}
+                alt={formatI18nTemplate(translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "{v0} 표지"), { v0: String(post.seriesTitle) })}
                 width={640}
                 height={800}
               />
@@ -199,7 +201,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
 
             <div className="pc-tags">
               {post.tags.map((tag) => (
-                <Link key={tag} to={`/community/promote?q=${encodeURIComponent(tag)}`}>#{tag}</Link>
+                <Link key={tag} to={formatI18nTemplate(translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "en", "/community/promote?q={v0}"), { v0: String(encodeURIComponent(tag)) })}>#{tag}</Link>
               ))}
             </div>
             <div className="pc-actions">
@@ -210,7 +212,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  작품 보러 가기 <ExternalLink size={16} aria-hidden />
+                  {translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "작품 보러 가기 ")}<ExternalLink size={16} aria-hidden />
                 </a>
               ) : null}
               <button
@@ -224,7 +226,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
                 )}
               >
                 <Bookmark size={16} aria-hidden />
-                {post.saved ? "저장됨" : "작품 저장"}
+                {post.saved ? translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "저장됨") : translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "작품 저장")}
               </button>
               {shareable ? (
                 <ShareDialog
@@ -238,8 +240,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
                   trigger={
                     <button className="pc-button" type="button">
                       <Share2 size={16} aria-hidden />
-                      게시물 공유
-                    </button>
+                      {translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "게시물 공유")}</button>
                   }
                 />
               ) : null}
@@ -247,10 +248,9 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
 
             {data.canManage ? (
               <div className="pc-actions">
-                <Link className="pc-button" to={`/community/promote/${encodeURIComponent(id)}/edit`}>
+                <Link className="pc-button" to={formatI18nTemplate(translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "en", "/community/promote/{v0}/edit"), { v0: String(encodeURIComponent(id)) })}>
                   <PenLine size={16} aria-hidden />
-                  소개 수정
-                </Link>
+                  {translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "소개 수정")}</Link>
                 <button
                   className="pc-button"
                   type="button"
@@ -262,7 +262,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
                       : "게시물을 보관했어요.",
                   )}
                 >
-                  {post.archived ? "보관 해제" : "공개 목록에서 보관"}
+                  {post.archived ? translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "보관 해제") : translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "공개 목록에서 보관")}
                 </button>
               </div>
             ) : null}
@@ -278,9 +278,9 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
                     "운영 공개 상태를 변경했어요.",
                   )}
                 >
-                  {post.hidden ? "운영 비공개 해제" : "운영 비공개 처리"}
+                  {post.hidden ? translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "운영 비공개 해제") : translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "운영 비공개 처리")}
                 </button>
-                <Link to="/community/promote/moderation">신고 관리</Link>
+                <Link to="/community/promote/moderation">{translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "신고 관리")}</Link>
               </div>
             ) : null}
           </article>
@@ -294,10 +294,10 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
             allowDeleteWhenDisabled
             maxLength={1000}
             maxDepth={4}
-            title="응원·피드백"
-            description="작품에 대한 구체적인 피드백과 따뜻한 응원을 나누고, 댓글에도 답해 보세요."
-            placeholder="좋았던 장면이나 궁금한 이야기를 나눠 주세요."
-            draftStorageKey={`promotion-comment-drafts:${id}:${userId ?? "guest"}`}
+            title={translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "응원·피드백")}
+            description={translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "작품에 대한 구체적인 피드백과 따뜻한 응원을 나누고, 댓글에도 답해 보세요.")}
+            placeholder={translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "좋았던 장면이나 궁금한 이야기를 나눠 주세요.")}
+            draftStorageKey={formatI18nTemplate(translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "en", "promotion-comment-drafts:{v0}:{v1}"), { v0: String(id), v1: String(userId ?? "guest") })}
             className="pc-comments"
             authorHref={(comment) => `/u/${encodeURIComponent(comment.author.id)}`}
             onCreate={(text, parentId) => promotionClient.comment(id, text, parentId)}
@@ -308,7 +308,7 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
 
           {userId ? (
             <details className="pc-report">
-              <summary><Flag size={16} aria-hidden />도용·스팸·부적절한 게시물 신고</summary>
+              <summary><Flag size={16} aria-hidden />{translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "도용·스팸·부적절한 게시물 신고")}</summary>
               <form
                 className="pc-form"
                 onSubmit={(event) => {
@@ -321,18 +321,17 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
                 }}
               >
                 <label>
-                  신고 사유
-                  <textarea
+                  {translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "신고 사유")}<textarea
                     required
                     minLength={10}
                     maxLength={1000}
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
                     rows={4}
-                    placeholder="구체적인 사유와 확인할 수 있는 출처를 적어 주세요. 신고 내용은 공개 댓글에 표시되지 않습니다."
+                    placeholder={translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "구체적인 사유와 확인할 수 있는 출처를 적어 주세요. 신고 내용은 공개 댓글에 표시되지 않습니다.")}
                   />
                 </label>
-                <button className="pc-button" disabled={busy || loading} type="submit">신고 보내기</button>
+                <button className="pc-button" disabled={busy || loading} type="submit">{translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "신고 보내기")}</button>
               </form>
             </details>
           ) : null}

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useId, type ReactNode } from "react";
 
 import type { StudioExpressionPreset } from "../studio-pose-presets";
@@ -12,7 +16,7 @@ type PreviewFrameProps = {
 function PreviewFrame({ label, className, children }: PreviewFrameProps) {
   const gradientId = `vrm-semantic-${useId().replaceAll(":", "")}`;
   return (
-    <svg role="img" aria-label={label} className={`${className} shrink-0`} viewBox="0 0 96 96">
+    <svg role="img" aria-label={label} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmSemanticVisual", "en", "{v0} shrink-0"), { v0: String(className) })} viewBox="0 0 96 96">
       <title>{label}</title>
       <defs>
         <linearGradient id={gradientId} x1="0" x2="1" y1="0" y2="1">
@@ -20,7 +24,7 @@ function PreviewFrame({ label, className, children }: PreviewFrameProps) {
           <stop offset="1" stopColor="var(--color-panel, #eadfd5)" />
         </linearGradient>
       </defs>
-      <rect x="2" y="2" width="92" height="92" rx="20" fill={`url(#${gradientId})`} />
+      <rect x="2" y="2" width="92" height="92" rx="20" fill={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmSemanticVisual", "en", "url(#{v0})"), { v0: String(gradientId) })} />
       <ellipse cx="48" cy="83" rx="28" ry="5" fill="var(--color-line, #705f55)" opacity="0.12" />
       {children}
     </svg>
@@ -55,7 +59,7 @@ export function StudioVrmExpressionPresetVisual({ preset, className = "size-8" }
   const mouthPath = surprised > 0.55 || mouthOpen > 0.55 ? null : happy > sad ? "M37 62q11 10 22 0" : sad > happy ? "M38 68q10-8 20 0" : "M40 64q8 2 16 0";
   const browY = 35 + sad * 2 - angry * 2;
   return (
-    <PreviewFrame label={`${preset.label} 표정 미리보기`} className={className}>
+    <PreviewFrame label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmSemanticVisual", "ko", "{v0} 표정 미리보기"), { v0: String(preset.label) })} className={className}>
       <g>
         <circle cx="48" cy="49" r="31" fill="#f0c8b2" stroke="#9f7567" strokeWidth="1.7" />
         <path d="M20 43c1-25 16-34 30-33 17 1 28 11 27 34-6-11-13-15-19-17-9 8-20 11-38 16Z" fill="#4b3633" />
@@ -90,7 +94,7 @@ function AnimalVisual({ id }: { readonly id: string }) {
       {longEars ? <><path d="M35 25c-6-22 8-26 9-3l-2 6Z" fill={color} /><path d="M54 28c1-26 15-21 8 1Z" fill={color} /></> : null}
       {roundEars ? <><circle cx="34" cy="25" r="7" fill={color} /><circle cx="62" cy="25" r="7" fill={color} /></> : null}
       {pointedEars ? <><path d="m31 28 3-16 11 13Z" fill={color} /><path d="m65 28-3-16-11 13Z" fill={color} /></> : null}
-      {horned ? <path d="M48 20 55 7l2 17" fill={id === "dragon" ? color : "#efe0bd"} /> : null}
+      {horned ? <path d="M48 20 55 7l2 17" fill={id === "dragon" ? color : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmSemanticVisual", "en", "#efe0bd")} /> : null}
       {id === "penguin" ? <ellipse cx="48" cy="61" rx="13" ry="15" fill="#f6f2e9" stroke="none" /> : null}
       <circle cx="41" cy="37" r="2" fill="#2e2725" /><circle cx="55" cy="37" r="2" fill="#2e2725" /><path d="M45 45q3 3 6 0" fill="none" strokeLinecap="round" />
     </g>
@@ -99,7 +103,7 @@ function AnimalVisual({ id }: { readonly id: string }) {
 
 function ItemVisual({ id }: { readonly id: string }) {
   const stroke = "#62534c";
-  if (["sword", "staff", "wand", "hammer"].includes(id)) return <g stroke={stroke} strokeWidth="2"><path d={id === "hammer" ? "M48 18h29v17H48Z" : "m65 16-9 49-8 8 2-12 15-45Z"} fill={id === "staff" || id === "wand" ? "#8b6b4d" : "#cbd5df"} /><path d="M48 60 31 79" fill="none" strokeWidth="5" strokeLinecap="round" /></g>;
+  if (["sword", "staff", "wand", "hammer"].includes(id)) return <g stroke={stroke} strokeWidth="2"><path d={id === "hammer" ? "M48 18h29v17H48Z" : "m65 16-9 49-8 8 2-12 15-45Z"} fill={id === "staff" || id === "wand" ? "#8b6b4d" : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmSemanticVisual", "en", "#cbd5df")} /><path d="M48 60 31 79" fill="none" strokeWidth="5" strokeLinecap="round" /></g>;
   if (id === "shield") return <path d="M48 15 74 26v21c0 18-11 29-26 36-15-7-26-18-26-36V26l26-11Z" fill="#8fa6bd" stroke={stroke} strokeWidth="2.5" />;
   if (["book", "scroll"].includes(id)) return <g stroke={stroke} strokeWidth="2"><path d="M20 26h28c7 0 12 4 12 10v42H32c-7 0-12-4-12-10V26Z" fill="#efe0bf" /><path d="M76 26H48v52h16c7 0 12-4 12-10V26Z" fill="#f6ead2" /></g>;
   if (id === "flower") return <g stroke={stroke} strokeWidth="1.6"><path d="M49 42v38" /><circle cx="48" cy="34" r="8" fill="#d86878" /><circle cx="39" cy="39" r="8" fill="#e88791" /><circle cx="57" cy="39" r="8" fill="#e88791" /><circle cx="48" cy="46" r="8" fill="#d86878" /></g>;
@@ -132,7 +136,7 @@ function EffectVisual({ id }: { readonly id: string }) {
 
 export function StudioVrmScenePropVisual({ prop, className = "size-8" }: { readonly prop: ScenePropDef; readonly className?: string }) {
   return (
-    <PreviewFrame label={`${prop.label} 3D 오브젝트 미리보기`} className={className}>
+    <PreviewFrame label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmSemanticVisual", "ko", "{v0} 3D 오브젝트 미리보기"), { v0: String(prop.label) })} className={className}>
       {prop.category === "animal" ? <AnimalVisual id={prop.id} /> : null}
       {prop.category === "item" ? <ItemVisual id={prop.id} /> : null}
       {prop.category === "effect" ? <EffectVisual id={prop.id} /> : null}

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Pause, Play, Shuffle, Trophy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -34,26 +38,26 @@ export default function SketchSprint({ seed }: PlayGameProps) {
   };
   return <div className="play-lab-content">
     <div className="play-exercise-heading">
-      <div><span className="play-eyebrow">DRAWING SPRINT · ORIGINAL PROMPT</span><h2>{title}</h2><p>{constraint}</p></div>
-      <button type="button" className="play-button" onClick={() => { setValue({ ...draft, offset: (draft.offset + 1) % 100000 }); setRunId(freshSeed()); setRecorded(false); setMessage("새 주제를 골랐습니다. 그리던 그림은 그대로 유지됩니다."); }}><Shuffle size={16} />다른 주제</button>
+      <div><span className="play-eyebrow">{translateCurrentStaticSourceText("domains.play.games.creative.SketchSprint", "en", "DRAWING SPRINT · ORIGINAL PROMPT")}</span><h2>{title}</h2><p>{constraint}</p></div>
+      <button type="button" className="play-button" onClick={() => { setValue({ ...draft, offset: (draft.offset + 1) % 100000 }); setRunId(freshSeed()); setRecorded(false); setMessage("새 주제를 골랐습니다. 그리던 그림은 그대로 유지됩니다."); }}><Shuffle size={16} />{translateCurrentStaticSourceText("domains.play.games.creative.SketchSprint", "ko", "다른 주제")}</button>
     </div>
     <div className="play-timer-strip">
-      <div className="play-actions" aria-label="연습 시간 선택">{[30, 60, 120, 0].map((seconds) => <button className="play-chip" type="button" key={seconds} aria-pressed={duration === seconds} disabled={running} onClick={() => { setDuration(seconds); setRemaining(seconds); setMessage(""); }}>{seconds ? `${seconds}초` : "자유 연습"}</button>)}</div>
+      <div className="play-actions" aria-label={translateCurrentStaticSourceText("domains.play.games.creative.SketchSprint", "ko", "연습 시간 선택")}>{[30, 60, 120, 0].map((seconds) => <button className="play-chip" type="button" key={seconds} aria-pressed={duration === seconds} disabled={running} onClick={() => { setDuration(seconds); setRemaining(seconds); setMessage(""); }}>{seconds ? formatI18nTemplate(translateCurrentStaticSourceText("domains.play.games.creative.SketchSprint", "ko", "{v0}초"), { v0: String(seconds) }) : translateCurrentStaticSourceText("domains.play.games.creative.SketchSprint", "ko", "자유 연습")}</button>)}</div>
       <div className="play-actions">
-        <span className="play-timer" role="timer" aria-label={`남은 시간 ${remaining}초`}>{duration ? `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}` : "∞"}</span>
+        <span className="play-timer" role="timer" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.play.games.creative.SketchSprint", "ko", "남은 시간 {v0}초"), { v0: String(remaining) })}>{duration ? `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}` : "∞"}</span>
         {duration > 0 && <button className="play-button primary" type="button" onClick={() => {
           if (running) { setRemaining(Math.max(0, Math.ceil((deadline.current - performance.now()) / 1000))); setRunning(false); }
           else { const seconds = remaining || duration; setRemaining(seconds); deadline.current = performance.now() + seconds * 1000; setRunning(true); setMessage(""); }
-        }}>{running ? <Pause size={16} /> : <Play size={16} />}{running ? "일시 정지" : remaining === 0 ? "타이머 다시 시작" : "타이머 시작"}</button>}
+        }}>{running ? <Pause size={16} /> : <Play size={16} />}{running ? translateCurrentStaticSourceText("domains.play.games.creative.SketchSprint", "ko", "일시 정지") : remaining === 0 ? translateCurrentStaticSourceText("domains.play.games.creative.SketchSprint", "ko", "타이머 다시 시작") : translateCurrentStaticSourceText("domains.play.games.creative.SketchSprint", "ko", "타이머 시작")}</button>}
       </div>
     </div>
     <SketchPad strokes={draft.strokes} onChange={changeDrawing} />
-    <div className="play-tip"><strong>오늘의 관찰 포인트</strong><p>{tip}</p></div>
+    <div className="play-tip"><strong>{translateCurrentStaticSourceText("domains.play.games.creative.SketchSprint", "ko", "오늘의 관찰 포인트")}</strong><p>{tip}</p></div>
     <div className="play-result-actions"><ExportDrawing svg={drawingSvg(draft.strokes, title)} name="toonstudio-sketch" disabled={!draft.strokes.length} />
       <button type="button" className="play-button" disabled={!draft.strokes.some((s) => !s.erase) || recorded} onClick={() => {
         setRunning(false); setRecorded(true);
         setMessage(recordResult({ id: runId, game: "sketch-sprint", label: title }) ? "연습 완료! 내 창작 기록에 남겼습니다." : "연습을 완료했습니다. 기록 저장은 차단되어 있으니 그림을 파일로 보관해 주세요.");
-      }}><Trophy size={16} />{recorded ? "연습 완료됨" : "연습 완료"}</button>
+      }}><Trophy size={16} />{recorded ? translateCurrentStaticSourceText("domains.play.games.creative.SketchSprint", "ko", "연습 완료됨") : translateCurrentStaticSourceText("domains.play.games.creative.SketchSprint", "ko", "연습 완료")}</button>
     </div>
     <p className="play-feedback" role="status">{message}</p><DraftNotice saved={saved} /><StudioBridge />
   </div>;

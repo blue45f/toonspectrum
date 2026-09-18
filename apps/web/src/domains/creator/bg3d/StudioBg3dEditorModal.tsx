@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 "use no memo";
 // The legacy editor still reuses one mutable host object. Keep this shell out of React Compiler
 // memoization until the remaining document/session controllers stop mutating that identity.
@@ -66,7 +69,7 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
     <div
       ref={modalDialogRef}
       aria-hidden={!open || undefined}
-      aria-modal={open ? "true" : undefined}
+      aria-modal={open ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "en", "true") : undefined}
       aria-labelledby="studio-bg3d-dialog-title"
       data-testid="studio-bg3d-dialog"
       data-studio-bg3d-workspace="professional-v2"
@@ -74,7 +77,7 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
       hidden={!open}
       inert={!open ? true : undefined}
       className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.94)] p-2 text-fg sm:p-4"
-      role={open ? "dialog" : undefined}
+      role={open ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "en", "dialog") : undefined}
       tabIndex={-1}
       style={{
         paddingTop: "max(0.5rem, env(safe-area-inset-top))",
@@ -86,41 +89,36 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
           <div className="min-w-0">
             <p className="eyebrow flex items-center gap-1.5 text-accent">
               <Sparkles size={14} aria-hidden />
-              웹툰 제작 도우미
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "ko", "웹툰 제작 도우미")}</p>
             <h2
               id="studio-bg3d-dialog-title"
               className="mt-1 truncate text-lg font-bold tracking-tight text-fg sm:text-xl"
             >
-              3D 장면 연출
-            </h2>
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "ko", "3D 장면 연출")}</h2>
             <p className="mt-1 line-clamp-1 text-xs text-fg-3">
-              배경·포즈·구도를 먼저 잡고 선화·톤 가이드로 작화에 바로 적용하세요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "ko", "배경·포즈·구도를 먼저 잡고 선화·톤 가이드로 작화에 바로 적용하세요.")}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <div className="hidden items-center rounded-lg border border-line bg-card p-0.5 sm:flex" role="group" aria-label="3D 편집 모드">
+            <div className="hidden items-center rounded-lg border border-line bg-card p-0.5 sm:flex" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "ko", "3D 편집 모드")}>
               <button
                 type="button"
                 aria-pressed={experienceMode === "simple"}
                 className="min-h-8 rounded-md px-2.5 text-[0.65rem] font-bold text-fg-2 hover:text-fg aria-pressed:bg-accent-soft aria-pressed:text-accent"
                 onClick={() => setExperienceMode("simple")}
               >
-                <Sparkles size={12} className="mr-1 inline" aria-hidden />간편
-              </button>
+                <Sparkles size={12} className="mr-1 inline" aria-hidden />{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "ko", "간편")}</button>
               <button
                 type="button"
                 aria-pressed={experienceMode === "pro"}
                 className="min-h-8 rounded-md px-2.5 text-[0.65rem] font-bold text-fg-2 hover:text-fg aria-pressed:bg-accent-soft aria-pressed:text-accent"
                 onClick={() => setExperienceMode("pro")}
               >
-                <SlidersHorizontal size={12} className="mr-1 inline" aria-hidden />전문
-              </button>
+                <SlidersHorizontal size={12} className="mr-1 inline" aria-hidden />{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "ko", "전문")}</button>
             </div>
             {isBatchRenderingShots ? (
               <>
                 <span className="sr-only" role="status" aria-live="polite">
-                  {shotBatchProgress?.stage === "render" ? "컷 렌더" : "ZIP 생성"}{" "}
+                  {shotBatchProgress?.stage === "render" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "ko", "컷 렌더") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "ko", "ZIP 생성")}{" "}
                   {shotBatchProgress?.completed ?? 0}/{shotBatchProgress?.total ?? 0}
                 </span>
                 <button
@@ -132,19 +130,18 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
                   onClick={() => shotBatchAbortRef.current?.abort()}
                 >
                   <X size={14} aria-hidden />
-                  일괄 렌더 취소
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "ko", "일괄 렌더 취소")}</button>
               </>
             ) : null}
             <button
               type="button"
-              aria-label="닫기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "ko", "닫기")}
               data-bg3d-initial-focus="true"
               title={isCapturing || deletingModelId !== null
-                ? "진행 중인 작업이 끝난 뒤 닫을 수 있습니다"
+                ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "ko", "진행 중인 작업이 끝난 뒤 닫을 수 있습니다")
                 : webXrSessionState.status !== "idle" && webXrSessionState.status !== "error"
-                  ? "AR·VR 미리보기를 종료하고 닫기"
-                  : "닫기 (Esc)"}
+                  ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "ko", "AR·VR 미리보기를 종료하고 닫기")
+                  : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "ko", "닫기 (Esc)")}
               className={STUDIO_BG3D_ICON_BUTTON}
               disabled={isCapturing}
               aria-disabled={deletingModelId !== null || undefined}

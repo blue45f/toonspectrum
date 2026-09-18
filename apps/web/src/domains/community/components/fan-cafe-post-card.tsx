@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { MessageCircle, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -75,7 +79,7 @@ export default function FanPostCard({
           ) : null}
           <h3 className="mt-1 line-clamp-2 [overflow-wrap:anywhere] text-sm font-bold leading-snug text-fg">
             <Link
-              href={`/community/post/${encodeURIComponent(post.id)}`}
+              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.fan.cafe.post.card", "en", "/community/post/{v0}"), { v0: String(encodeURIComponent(post.id)) })}
               className="rounded-sm transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               {post.title}
@@ -88,8 +92,8 @@ export default function FanPostCard({
             type="button"
             onClick={handleDelete}
             disabled={deleting}
-            aria-label="내 글 삭제"
-            title="삭제"
+            aria-label={translateCurrentStaticSourceText("domains.community.components.fan.cafe.post.card", "ko", "내 글 삭제")}
+            title={translateCurrentStaticSourceText("domains.community.components.fan.cafe.post.card", "ko", "삭제")}
             className="shrink-0 rounded-lg p-1.5 text-fg-3 opacity-0 transition-colors hover:bg-raised hover:text-bad focus-visible:opacity-100 disabled:opacity-40 group-hover:opacity-100"
           >
             <Trash2 size={15} />
@@ -124,10 +128,10 @@ export default function FanPostCard({
             )}
           >
             <MessageCircle size={15} />
-            댓글 {displayReplyCount}
+            {translateCurrentStaticSourceText("domains.community.components.fan.cafe.post.card", "ko", "댓글 ")}{displayReplyCount}
           </button>
           {loadedCount !== null && displayReplyCount > 0 ? (
-            <span className="text-[0.68rem] text-fg-3">대화 {displayReplyCount}개</span>
+            <span className="text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.post.card", "ko", "대화 ")}{displayReplyCount}{translateCurrentStaticSourceText("domains.community.components.fan.cafe.post.card", "ko", "개")}</span>
           ) : null}
         </div>
         {open && (

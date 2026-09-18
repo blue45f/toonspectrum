@@ -33,6 +33,34 @@ describe("StudioVrmAvatarForgePreview", () => {
     expect(summary.changedControls).toBe(countStudioVrmAvatarForgeChanges(changed, baseline));
     expect(summary.changedControls).toBeGreaterThanOrEqual(3);
   });
+
+  it("keeps the hairless option actually hairless even when a bang preset is selected", () => {
+    const state = createAvatarForgeState();
+    state.hair = { ...state.hair, style: "none", bangStyle: "full" };
+    render(<StudioVrmAvatarForgePreview state={state} label="헤어 없음 미리보기" />);
+
+    const preview = screen.getByRole("img", { name: "헤어 없음 미리보기" });
+    expect(preview.querySelector('[data-forge-hair-back="true"] path')).toBeNull();
+    expect(preview.querySelector('[data-forge-hair-front="true"]')).toBeNull();
+  });
+
+  it("uses genuinely different silhouettes for short and pixie cuts", () => {
+    const shortState = createAvatarForgeState();
+    shortState.hair = { ...shortState.hair, style: "short" };
+    const pixieState = createAvatarForgeState();
+    pixieState.hair = { ...pixieState.hair, style: "pixie" };
+
+    const { rerender } = render(<StudioVrmAvatarForgePreview state={shortState} label="숏 미리보기" />);
+    const shortPath = screen.getByRole("img", { name: "숏 미리보기" })
+      .querySelector('[data-forge-hair-back="true"] path')?.getAttribute("d");
+    rerender(<StudioVrmAvatarForgePreview state={pixieState} label="픽시 미리보기" />);
+    const pixiePath = screen.getByRole("img", { name: "픽시 미리보기" })
+      .querySelector('[data-forge-hair-back="true"] path')?.getAttribute("d");
+
+    expect(shortPath).toBeTruthy();
+    expect(pixiePath).toBeTruthy();
+    expect(shortPath).not.toBe(pixiePath);
+  });
 });
 
 

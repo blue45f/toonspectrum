@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Activity, ChevronDown, Shuffle, Sparkles, Waves } from "lucide-react";
 
 import {
@@ -229,7 +233,7 @@ function SourceControl({
 
       {active && random && jitter ? (
         <CompactRange
-          label={`${controlLabel} 변화량`}
+          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "{v0} 변화량"), { v0: String(controlLabel) })}
           value={jitter.amount}
           min={0}
           max={property === "angle" ? 180 : 1}
@@ -249,7 +253,7 @@ function SourceControl({
       {active && !random && mapping ? (
         <details className="group mt-1 rounded-lg border border-line/70 bg-canvas/35">
           <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-2.5 text-[0.66rem] font-semibold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
-            <span>세부 반응</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "세부 반응")}</span>
             <span className="flex items-center gap-1 tabular-nums text-fg-3">
               {formatMappingValue(property, mapping, mapping.from)}
               <span aria-hidden>→</span>
@@ -263,7 +267,7 @@ function SourceControl({
           </summary>
           <div className="grid gap-1.5 border-t border-line/70 p-2 sm:grid-cols-2">
             <CompactRange
-              label={`${controlLabel} 시작값`}
+              label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "{v0} 시작값"), { v0: String(controlLabel) })}
               value={mapping.from}
               {...mappingRange(property, mapping)}
               display={formatMappingValue(property, mapping, mapping.from)}
@@ -276,7 +280,7 @@ function SourceControl({
               ))}
             />
             <CompactRange
-              label={`${controlLabel} 끝값`}
+              label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "{v0} 끝값"), { v0: String(controlLabel) })}
               value={mapping.to}
               {...mappingRange(property, mapping)}
               display={formatMappingValue(property, mapping, mapping.to)}
@@ -289,7 +293,7 @@ function SourceControl({
               ))}
             />
             <CompactRange
-              label={`${controlLabel} 영향도`}
+              label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "{v0} 영향도"), { v0: String(controlLabel) })}
               value={mapping.amount}
               min={0}
               max={1}
@@ -304,7 +308,7 @@ function SourceControl({
               ))}
             />
             <CompactRange
-              label={`${controlLabel} 반응 곡선`}
+              label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "{v0} 반응 곡선"), { v0: String(controlLabel) })}
               value={mapping.curve}
               min={0.05}
               max={4}
@@ -322,7 +326,7 @@ function SourceControl({
               type="button"
               role="switch"
               aria-checked={mapping.invert}
-              aria-label={`${controlLabel} 방향 반전`}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "{v0} 방향 반전"), { v0: String(controlLabel) })}
               onClick={() => onSettingsChange(updateStudioBrushDynamicsMapping(
                 settings,
                 property,
@@ -337,9 +341,8 @@ function SourceControl({
                   : "border-line bg-card/55 text-fg-2"
               )}
             >
-              입력 방향 반전
-              <span className="text-[0.61rem] font-normal text-fg-3">
-                {mapping.invert ? "높은 입력 → 시작값" : "높은 입력 → 끝값"}
+              {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "입력 방향 반전")}<span className="text-[0.61rem] font-normal text-fg-3">
+                {mapping.invert ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "높은 입력 → 시작값") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "높은 입력 → 끝값")}
               </span>
             </button>
           </div>
@@ -364,10 +367,9 @@ export function StudioBrushDynamicsInputMatrix({
           <Activity size={15} aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-xs font-bold text-fg">입력원별 반응</span>
+          <span className="block text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "입력원별 반응")}</span>
           <span className="block text-[0.65rem] leading-relaxed text-fg-3">
-            굵기·농도·간격마다 필압, 속도, 기울기, 랜덤을 따로 연결
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "굵기·농도·간격마다 필압, 속도, 기울기, 랜덤을 따로 연결")}</span>
         </span>
         <ChevronDown
           size={16}
@@ -377,9 +379,7 @@ export function StudioBrushDynamicsInputMatrix({
       </summary>
       <div className="space-y-2 border-t border-line p-2.5">
         <p className="rounded-lg bg-canvas/45 px-2.5 py-2 text-[0.63rem] leading-relaxed text-fg-3">
-          켠 입력은 위에서 아래 순서로 누적됩니다. 랜덤은 같은 획을 다시 열거나 협업으로
-          재생해도 동일하게 복원됩니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "켠 입력은 위에서 아래 순서로 누적됩니다. 랜덤은 같은 획을 다시 열거나 협업으로 재생해도 동일하게 복원됩니다.")}</p>
         {OUTPUTS.map((output) => {
           const activeSources = SOURCES.filter((source) => (
             inputIsActive(settings, output.id, source.id)
@@ -397,7 +397,7 @@ export function StudioBrushDynamicsInputMatrix({
                 <span className="max-w-[48%] truncate rounded-full border border-line bg-card px-2 py-0.5 text-[0.6rem] text-fg-3">
                   {activeSources.length > 0
                     ? activeSources.map((source) => source.label).join(" · ")
-                    : "고정값"}
+                    : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "고정값")}
                 </span>
                 <ChevronDown
                   size={14}
@@ -436,8 +436,8 @@ export function StudioBrushTaperAdvancedControls({
       <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
         <Waves size={15} className="shrink-0 text-accent" aria-hidden />
         <span className="min-w-0 flex-1">
-          <span className="block text-[0.72rem] font-bold text-fg-2">테이퍼 세부 조정</span>
-          <span className="block text-[0.61rem] text-fg-3">끝 농도와 가늘어지는 곡선</span>
+          <span className="block text-[0.72rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "테이퍼 세부 조정")}</span>
+          <span className="block text-[0.61rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "끝 농도와 가늘어지는 곡선")}</span>
         </span>
         <ChevronDown
           size={14}
@@ -447,7 +447,7 @@ export function StudioBrushTaperAdvancedControls({
       </summary>
       <div className="grid gap-1.5 border-t border-line p-2 sm:grid-cols-2">
         <CompactRange
-          label="테이퍼 끝 최소 불투명도"
+          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "테이퍼 끝 최소 불투명도")}
           value={settings.taper.minOpacityRatio}
           min={0}
           max={1}
@@ -458,7 +458,7 @@ export function StudioBrushTaperAdvancedControls({
           )}
         />
         <CompactRange
-          label="테이퍼 반응 곡선"
+          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "테이퍼 반응 곡선")}
           value={settings.taper.curve}
           min={0.05}
           max={4}
@@ -483,13 +483,12 @@ export function StudioBrushGrainControls({
       <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
         <Shuffle size={15} className="shrink-0 text-accent" aria-hidden />
         <span className="min-w-0 flex-1">
-          <span className="block text-[0.72rem] font-bold text-fg-2">표면 그레인</span>
+          <span className="block text-[0.72rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "표면 그레인")}</span>
           <span className="block text-[0.61rem] text-fg-3">
-            캔버스나 획에 고정되는 재현 가능한 질감
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "캔버스나 획에 고정되는 재현 가능한 질감")}</span>
         </span>
         <span className="rounded-full border border-line bg-raised px-2 py-0.5 text-[0.6rem] tabular-nums text-fg-3">
-          {grainActive ? `${Math.round(settings.grain.amount * 100)}%` : "꺼짐"}
+          {grainActive ? `${Math.round(settings.grain.amount * 100)}%` : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "꺼짐")}
         </span>
         <ChevronDown
           size={14}
@@ -500,7 +499,7 @@ export function StudioBrushGrainControls({
       <div className="space-y-1.5 border-t border-line p-2">
         <div
           role="radiogroup"
-          aria-label="그레인 고정 기준"
+          aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "그레인 고정 기준")}
           className="grid grid-cols-2 gap-1.5"
         >
           {([
@@ -529,7 +528,7 @@ export function StudioBrushGrainControls({
         </div>
         <div className="grid gap-1.5 sm:grid-cols-2">
           <CompactRange
-            label="그레인 강도"
+            label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "그레인 강도")}
             value={settings.grain.amount}
             min={0}
             max={1}
@@ -540,18 +539,18 @@ export function StudioBrushGrainControls({
             )}
           />
           <CompactRange
-            label="그레인 크기"
+            label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "그레인 크기")}
             value={settings.grain.scale}
             min={0.25}
             max={512}
             step={0.25}
-            display={`${Math.round(settings.grain.scale * 100) / 100}px`}
+            display={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "en", "{v0}px"), { v0: String(Math.round(settings.grain.scale * 100) / 100) })}
             onChange={(scale) => onSettingsChange(
               updateStudioBrushDynamicsGrain(settings, { scale })
             )}
           />
           <CompactRange
-            label="그레인 대비"
+            label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "그레인 대비")}
             value={settings.grain.contrast}
             min={0}
             max={1}
@@ -587,14 +586,12 @@ export function StudioBrushColorDynamicsControls({
         <Sparkles size={15} className="shrink-0 text-accent" aria-hidden />
         <span className="min-w-0 flex-1">
           <span className="block text-[0.72rem] font-bold text-fg-2">
-            색상 변화 및 지터 (Color Jitter)
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "색상 변화 및 지터 (Color Jitter)")}</span>
           <span className="block text-[0.61rem] text-fg-3">
-            CSP 1.10.5 펜촉/획 단위 색조·채도·명도 무작위 변화
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "CSP 1.10.5 펜촉/획 단위 색조·채도·명도 무작위 변화")}</span>
         </span>
         <span className="rounded-full border border-line bg-raised px-2 py-0.5 text-[0.6rem] tabular-nums text-fg-3">
-          {isJitterActive ? "활성" : "꺼짐"}
+          {isJitterActive ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "활성") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "꺼짐")}
         </span>
         <ChevronDown
           size={14}
@@ -604,7 +601,7 @@ export function StudioBrushColorDynamicsControls({
       </summary>
       <div className="grid gap-1.5 border-t border-line p-2 sm:grid-cols-2">
         <CompactRange
-          label="색조 지터 (Hue Jitter)"
+          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "색조 지터 (Hue Jitter)")}
           value={colorDynamics.hueJitter}
           min={0}
           max={180}
@@ -617,7 +614,7 @@ export function StudioBrushColorDynamicsControls({
           }
         />
         <CompactRange
-          label="채도 지터 (Saturation Jitter)"
+          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "채도 지터 (Saturation Jitter)")}
           value={colorDynamics.saturationJitter}
           min={0}
           max={1}
@@ -632,7 +629,7 @@ export function StudioBrushColorDynamicsControls({
           }
         />
         <CompactRange
-          label="명도 지터 (Value Jitter)"
+          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "명도 지터 (Value Jitter)")}
           value={colorDynamics.valueJitter}
           min={0}
           max={1}
@@ -645,7 +642,7 @@ export function StudioBrushColorDynamicsControls({
           }
         />
         <CompactRange
-          label="전경/배경색 혼합 지터"
+          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushDynamicsControls", "ko", "전경/배경색 혼합 지터")}
           value={colorDynamics.foregroundBackgroundJitter}
           min={0}
           max={1}

@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   forwardRef,
   useEffect,
@@ -102,7 +103,7 @@ export const StudioNaturalTransformer = forwardRef<
         snapRotation ? STUDIO_TRANSFORM_ROTATION_SNAP_TOLERANCE_DEG : 0
       }
       keepRatio={ratioAlwaysLocked}
-      shiftBehavior={ratioAlwaysLocked ? "none" : "default"}
+      shiftBehavior={ratioAlwaysLocked ? translateCurrentStaticSourceText("domains.creator.StudioNaturalTransformer", "en", "none") : translateCurrentStaticSourceText("domains.creator.StudioNaturalTransformer", "en", "default")}
       centeredScaling={modifiers.altKey}
     />
   );

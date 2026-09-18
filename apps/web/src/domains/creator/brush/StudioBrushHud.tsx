@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Eraser, PenTool } from "lucide-react";
 import { memo, useEffect, useRef, type RefObject } from "react";
 import { createPortal } from "react-dom";
@@ -264,7 +268,7 @@ export const StudioBrushHud = memo(function StudioBrushHud({
       data-studio-shortcut-boundary="true"
       role="toolbar"
       aria-orientation="horizontal"
-      aria-label="브러시 HUD"
+      aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushHud", "ko", "브러시 HUD")}
       style={{
         position: "fixed",
         left: 0,
@@ -281,12 +285,12 @@ export const StudioBrushHud = memo(function StudioBrushHud({
     >
       <StudioInlineScrubber
         surface="brush-size"
-        label="브러시 크기"
+        label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushHud", "ko", "브러시 크기")}
         value={strokeWidth}
         min={STUDIO_BRUSH_SIZE_RANGE.min}
         max={STUDIO_BRUSH_SIZE_RANGE.max}
         step={1}
-        valueText={`${strokeWidth}px`}
+        valueText={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushHud", "en", "{v0}px"), { v0: String(strokeWidth) })}
         onChange={stableHandlers.onStrokeWidthChange}
         className={cn(cellClass, "gap-0 leading-none")}
       >
@@ -304,7 +308,7 @@ export const StudioBrushHud = memo(function StudioBrushHud({
       </StudioInlineScrubber>
       <StudioInlineScrubber
         surface="brush-opacity"
-        label="브러시 불투명도"
+        label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushHud", "ko", "브러시 불투명도")}
         value={opacityPercent}
         min={5}
         max={100}
@@ -325,8 +329,8 @@ export const StudioBrushHud = memo(function StudioBrushHud({
       <button
         type="button"
         data-studio-brush-hud-cell="color"
-        aria-label={`색 선택 · 현재 ${color}`}
-        title="색 선택"
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushHud", "ko", "색 선택 · 현재 {v0}"), { v0: String(color) })}
+        title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushHud", "ko", "색 선택")}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation();
@@ -348,8 +352,8 @@ export const StudioBrushHud = memo(function StudioBrushHud({
         type="button"
         data-studio-brush-hud-cell="eraser"
         aria-pressed={eraserActive}
-        aria-label={eraserActive ? "펜으로 전환" : "지우개로 전환"}
-        title={eraserActive ? "펜 (B)" : "지우개 (E)"}
+        aria-label={eraserActive ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushHud", "ko", "펜으로 전환") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushHud", "ko", "지우개로 전환")}
+        title={eraserActive ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushHud", "ko", "펜 (B)") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushHud", "ko", "지우개 (E)")}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation();

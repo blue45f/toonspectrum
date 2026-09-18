@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense } from "react";
 
 import { isStudioAiConfigured } from "./ai/studio-ai-client";
@@ -314,13 +317,11 @@ export function StudioInspectorSelectedImageTools({
                           role="status"
                           className="rounded-lg border border-accent/35 bg-accent/10 px-3 py-2 text-xs leading-relaxed text-fg-2"
                         >
-                          {selectedWorkAssetDestructiveEditReason} 원본을 바꾸지 않는 새 채색 레이어 생성은
-                          계속 사용할 수 있어요.
-                        </p>
+                          {selectedWorkAssetDestructiveEditReason} {translateCurrentStaticSourceText("domains.creator.StudioInspectorImageToolsSection", "ko", "원본을 바꾸지 않는 새 채색 레이어 생성은 계속 사용할 수 있어요.")}</p>
                       ) : null}
                       {shouldMountImageInspectorTab("quick") ? (
                       <div className="space-y-3" hidden={activeImageInspectorTab !== "quick"}>
-                        <Suspense fallback={<StudioPanelLoading label="빠른 이미지 도구를 여는 중..." />}>
+                        <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorImageToolsSection", "ko", "빠른 이미지 도구를 여는 중...")} />}>
                           {!selectedWorkAssetDestructiveEditReason ? (
                             <>
                               <StudioBgRemoveButton
@@ -352,7 +353,7 @@ export function StudioInspectorSelectedImageTools({
                           ) : null}
                           {selected.stockImageCredit && (
                             <p className="rounded-md border border-line bg-card/50 px-2 py-1 text-[0.6rem] leading-relaxed text-fg-3">
-                              출처:{" "}
+                              {translateCurrentStaticSourceText("domains.creator.StudioInspectorImageToolsSection", "ko", "출처:")}{" "}
                               <a
                                 href={selected.stockImageCredit.photographerProfileUrl}
                                 target="_blank"
@@ -368,8 +369,7 @@ export function StudioInspectorSelectedImageTools({
                                 rel="noopener noreferrer"
                                 className="underline hover:text-fg-2"
                               >
-                                Unsplash
-                              </a>
+                                {translateCurrentStaticSourceText("domains.creator.StudioInspectorImageToolsSection", "en", "Unsplash")}</a>
                             </p>
                           )}
                           {selectedReadableImageSource ? (
@@ -385,7 +385,7 @@ export function StudioInspectorSelectedImageTools({
                   )}
                   {shouldMountImageInspectorTab("fill") ? (
                   <div className="space-y-3" hidden={activeImageInspectorTab !== "fill"}>
-                    <Suspense fallback={<StudioPanelLoading label="채우기·선화 도구를 여는 중..." />}>
+                    <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorImageToolsSection", "ko", "채우기·선화 도구를 여는 중...")} />}>
                       <StudioFloodFillPanel
                         active={advancedFillActive}
                         busy={advancedFillBusy}
@@ -492,8 +492,7 @@ export function StudioInspectorSelectedImageTools({
                               role="status"
                               className="rounded-lg border border-line bg-card/50 px-3 py-2 text-xs text-fg-3"
                             >
-                              검증된 이미지 바이트를 준비하는 중입니다.
-                            </p>
+                              {translateCurrentStaticSourceText("domains.creator.StudioInspectorImageToolsSection", "ko", "검증된 이미지 바이트를 준비하는 중입니다.")}</p>
                           )}
                           {!selectedWorkAssetDestructiveEditReason ? (
                             <StudioLineCleanupPanel
@@ -508,7 +507,7 @@ export function StudioInspectorSelectedImageTools({
                   ) : null}
                   {shouldMountImageInspectorTab("quick") ? (
                   <div className="space-y-3" hidden={activeImageInspectorTab !== "quick"}>
-                    <Suspense fallback={<StudioPanelLoading label="이미지 보정을 여는 중..." />}>
+                    <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorImageToolsSection", "ko", "이미지 보정을 여는 중...")} />}>
                       <StudioInspectorFilterLauncher
                         availability={rasterAvailability("filter", studioFilterPreparationBusy)}
                         busy={studioFilterPreparationBusy}
@@ -532,7 +531,7 @@ export function StudioInspectorSelectedImageTools({
                   ) : null}
                   {shouldMountImageInspectorTab("retouch") ? (
                   <div className="space-y-3" hidden={activeImageInspectorTab !== "retouch"}>
-                    <Suspense fallback={<StudioPanelLoading label="선택·리터치 도구를 여는 중..." />}>
+                    <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorImageToolsSection", "ko", "선택·리터치 도구를 여는 중...")} />}>
                       {selected.type === "image" &&
                       rasterAvailability("pixel-marquee").entry.enabled ? (
                       <>
@@ -540,7 +539,7 @@ export function StudioInspectorSelectedImageTools({
                           availability={rasterAvailability("pixel-marquee")}
                           activeTool={activeInspectorPixelSelectionTool}
                           busy={pixelBusy}
-                          heading="정원 마퀴"
+                          heading={translateCurrentStaticSourceText("domains.creator.StudioInspectorImageToolsSection", "ko", "정원 마퀴")}
                           toolIds={["circle"]}
                           onPickTool={activatePixelSelectionToolFromInspector}
                           onRecover={handleRasterRecovery}
@@ -802,7 +801,7 @@ export function StudioInspectorSelectedImageTools({
                   ) : null}
                   {shouldMountImageInspectorTab("mask") ? (
                   <div className="space-y-3" hidden={activeImageInspectorTab !== "mask"}>
-                    <Suspense fallback={<StudioPanelLoading label="레이어 마스크를 여는 중..." />}>
+                    <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorImageToolsSection", "ko", "레이어 마스크를 여는 중...")} />}>
                       {selected.type === "image" &&
                       rasterAvailability("layer-mask").entry.enabled ? (
                         <>
@@ -873,7 +872,7 @@ export function StudioInspectorSelectedImageTools({
                   ) : null}
                   {shouldMountImageInspectorTab("transform") ? (
                   <div className="space-y-3" hidden={activeImageInspectorTab !== "transform"}>
-                    <Suspense fallback={<StudioPanelLoading label="이미지 변형 도구를 여는 중..." />}>
+                    <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorImageToolsSection", "ko", "이미지 변형 도구를 여는 중...")} />}>
                       {selected.type === "image" &&
                       rasterAvailability("crop").entry.enabled ? (
                         <>

@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Accessibility,
   ArrowRight,
   BookOpen,
@@ -21,13 +26,7 @@ import {
 
 import Link from "@/compat/router-link";
 import { ProductIntentStart } from "@/domains/creator-resources/ProductIntentStart";
-import {
-  PRODUCT_IDENTITY,
-  PRODUCT_START_DESTINATIONS,
-  resolveProductLocale,
-  type ProductLocale,
-  type ProductStartDestinationId,
-} from "@/shared/lib/product-identity";
+import { PRODUCT_IDENTITY, PRODUCT_START_DESTINATIONS, resolveProductLocale, type ProductStartDestinationId } from "@/shared/lib/product-identity";
 import { useI18n } from "@/shared/lib/i18n";
 import { useTheme } from "@/shared/lib/theme";
 
@@ -40,6 +39,13 @@ import "./creator-home-spacing.css";
 
 import { CreatorSectionLink } from "./CreatorHomeNavigation";
 import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("CreatorHomeExperience", ko, en);
 
 interface LocalizedText {
   readonly ko: string;
@@ -218,17 +224,18 @@ const COPY = {
   },
 } as const;
 
-function localeText(copy: LocalizedText, locale: ProductLocale) {
-  return copy[locale];
+function localeText(copy: LocalizedText, _locale) {
+  return bi((copy).ko, (copy).en);
 }
 
 export function CreatorHomeExperience() {
+  useBilingualI18nRevision();
   useCreatorHomeSectionNavigation();
   const language = useI18n((state) => state.lang);
   const resolvedTheme = useTheme((state) => state.resolvedTheme);
   const locale = resolveProductLocale(language);
-  const identity = PRODUCT_IDENTITY[locale];
-  const copy = COPY[locale];
+  const identity = bi((PRODUCT_IDENTITY).ko, (PRODUCT_IDENTITY).en);
+  const copy = bi((COPY).ko, (COPY).en);
 
   return (
     <div
@@ -252,7 +259,7 @@ export function CreatorHomeExperience() {
             <Link href="/studio/projects">{copy.projects}<ArrowRight size={14} aria-hidden="true" /></Link>
             <Link href="/brand-film">{copy.brandFilm}<ArrowRight size={14} aria-hidden="true" /></Link>
           </div>
-          <div className="cf-trust" aria-label={locale === "ko" ? "핵심 제작 기능" : "Core creation capabilities"}>
+          <div className="cf-trust" aria-label={bi("핵심 제작 기능", "Core creation capabilities")}>
             {copy.trust.map((item) => <span key={item}><Check size={12} aria-hidden="true" />{item}</span>)}
           </div>
         </div>
@@ -265,7 +272,7 @@ export function CreatorHomeExperience() {
 
       <div className="cf-shell cf-home-wayfinding">
         <ProductIntentStart />
-        <nav className="cf-jump-nav" aria-label={locale === "ko" ? "홈 주요 영역" : "Home sections"}>
+        <nav className="cf-jump-nav" aria-label={bi("홈 주요 영역", "Home sections")}>
           <CreatorSectionLink sectionId="creator-start">{copy.jumpStart}</CreatorSectionLink>
           <CreatorSectionLink sectionId="creator-flow">{copy.jumpFlow}</CreatorSectionLink>
           <CreatorSectionLink sectionId="creator-principles">{copy.jumpPrinciples}</CreatorSectionLink>
@@ -286,7 +293,7 @@ export function CreatorHomeExperience() {
               <Link key={destination.id} href={destination.href} className="cf-start-card">
                 <span className="cf-start-icon"><Icon size={24} aria-hidden="true" /></span>
                 <span className="cf-start-tag">{localeText(meta.tag, locale)}</span>
-                <strong>{destination.label[locale]}</strong><p>{destination.description[locale]}</p>
+                <strong>{bi((destination.label).ko, (destination.label).en)}</strong><p>{bi((destination.description).ko, (destination.description).en)}</p>
                 <span className="cf-start-action">{localeText(meta.action, locale)}<ArrowRight size={15} aria-hidden="true" /></span>
               </Link>
             );
@@ -296,7 +303,7 @@ export function CreatorHomeExperience() {
 
       <section className="cf-bridge cf-shell" aria-labelledby="creator-bridge-title">
         <figure className="cf-bridge-visual">
-          <img src="/brand/production-os-workspace.svg" alt={locale === "ko" ? "2D·3D 제작, 파일, 일정과 검토가 연결된 ToonStudio 작업공간 예시" : "ToonStudio workspace concept connecting 2D, 3D, files, schedules and review"} width="1600" height="980" loading="lazy" />
+          <img src="/brand/production-os-workspace.svg" alt={bi("2D·3D 제작, 파일, 일정과 검토가 연결된 ToonStudio 작업공간 예시", "ToonStudio workspace concept connecting 2D, 3D, files, schedules and review")} width="1600" height="980" loading="lazy" />
           <figcaption>{copy.previewBadge}</figcaption>
         </figure>
         <div className="cf-bridge-copy">
@@ -317,7 +324,7 @@ export function CreatorHomeExperience() {
           </div>
           <figure className="cf-process-art cf-production-journey">
             <img src="/brand/production-os-journey.svg" alt={copy.flowAlt} width="1600" height="680" loading="lazy" />
-            <figcaption><span>TOONSTUDIO · ALL-IN-ONE CREATION FLOW</span><span>{copy.flowCaption}</span></figcaption>
+            <figcaption><span>{translateCurrentStaticSourceText("domains.marketing.CreatorHomeExperience", "en", "TOONSTUDIO · ALL-IN-ONE CREATION FLOW")}</span><span>{copy.flowCaption}</span></figcaption>
           </figure>
           <ol className="cf-flow-grid">
             {copy.flow.map(({ icon: Icon, title, body, href, action }, index) => (

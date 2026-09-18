@@ -33,7 +33,7 @@ export const STUDIO_MENU_HELP_GROUP_SPEC: StudioMenuGroupSpec = {
       "help/current-tool",
     ),
     part("Tutorial Project", "기능 튜토리얼 32종 허브. 따라 하기용 예제 프로젝트 파일은 없다.", "help/feature-tutorials"),
-    has("CSP/Photoshop terminology search", "help/terminology-search"),
+    has("Other-app terminology search", "help/terminology-search"),
     has("Device/Browser Diagnosis", "help/diagnostics"),
     has("Recovery Guide", "help/recovery"),
     has("License/Attribution", "help/licenses"),

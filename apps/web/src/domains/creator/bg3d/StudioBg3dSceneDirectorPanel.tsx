@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Boxes,
   Camera,
   ChevronRight,
@@ -82,17 +86,14 @@ export function StudioBg3dSceneDirectorPanel({
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-[0.58rem] font-bold uppercase tracking-[0.12em] text-accent">
             <Sparkles size={12} aria-hidden />
-            3D를 배울 필요 없이
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneDirectorPanel", "ko", "3D를 배울 필요 없이")}</p>
           <h3
             id="studio-bg3d-scene-director-title"
             className="mt-1 text-sm font-extrabold tracking-tight text-fg"
           >
-            어떤 장면을 만들까요?
-          </h3>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneDirectorPanel", "ko", "어떤 장면을 만들까요?")}</h3>
           <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
-            필요한 작업을 고르면 관련 도구만 바로 열어드려요. 장면을 잡은 뒤 작화에 적용하면 됩니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneDirectorPanel", "ko", "필요한 작업을 고르면 관련 도구만 바로 열어드려요. 장면을 잡은 뒤 작화에 적용하면 됩니다.")}</p>
         </div>
         <button
           type="button"
@@ -100,8 +101,7 @@ export function StudioBg3dSceneDirectorPanel({
           onClick={onOpenPro}
         >
           <SlidersHorizontal size={12} aria-hidden />
-          전문 설정
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneDirectorPanel", "ko", "전문 설정")}</button>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-1.5">
@@ -115,9 +115,9 @@ export function StudioBg3dSceneDirectorPanel({
               disabled={disabled}
               aria-pressed={selected}
               onClick={() => onSelectGoal(goal.id)}
-              className={`group min-h-[4.25rem] rounded-xl border p-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 ${selected
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneDirectorPanel", "en", "group min-h-[4.25rem] rounded-xl border p-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 {v0}"), { v0: String(selected
                 ? "border-accent/55 bg-accent-soft text-accent"
-                : "border-line bg-card text-fg-2 hover:border-accent/35 hover:bg-raised hover:text-fg"}`}
+                : "border-line bg-card text-fg-2 hover:border-accent/35 hover:bg-raised hover:text-fg") })}
             >
               <span className="flex items-center gap-2">
                 <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-panel text-accent">
@@ -138,24 +138,23 @@ export function StudioBg3dSceneDirectorPanel({
 
       <div className="mt-3 rounded-xl border border-line bg-panel/75 px-2.5 py-2">
         <div className="flex flex-wrap items-center gap-1 text-[0.52rem] font-bold text-fg-3">
-          <span className="rounded-full bg-card px-2 py-1 text-fg-2">1 장면 구성</span>
+          <span className="rounded-full bg-card px-2 py-1 text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneDirectorPanel", "ko", "1 장면 구성")}</span>
           <ChevronRight size={11} aria-hidden />
-          <span className="rounded-full bg-card px-2 py-1 text-fg-2">2 구도·포즈</span>
+          <span className="rounded-full bg-card px-2 py-1 text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneDirectorPanel", "ko", "2 구도·포즈")}</span>
           <ChevronRight size={11} aria-hidden />
           <span
-            className={`rounded-full px-2 py-1 ${lineArtPreview
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneDirectorPanel", "en", "rounded-full px-2 py-1 {v0}"), { v0: String(lineArtPreview
               ? "bg-accent-soft text-accent"
-              : "bg-card text-fg-2"}`}
+              : "bg-card text-fg-2") })}
           >
-            3 웹툰 변환
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneDirectorPanel", "ko", "3 웹툰 변환")}</span>
           <ChevronRight size={11} aria-hidden />
-          <span className="rounded-full bg-good/10 px-2 py-1 text-good">작화에 적용</span>
+          <span className="rounded-full bg-good/10 px-2 py-1 text-good">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneDirectorPanel", "ko", "작화에 적용")}</span>
         </div>
         <p className="mt-1.5 text-[0.52rem] leading-relaxed text-fg-3" role="status">
           {sceneHasContent
-            ? `현재 장면을 편집 중입니다${savedShotCount > 0 ? ` · 저장된 컷 ${savedShotCount}개` : ""}.`
-            : "처음이라면 ‘배경 만들기’에서 장소를 고르거나 ‘인물·포즈’에서 캐릭터부터 시작해보세요."}
+            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneDirectorPanel", "ko", "현재 장면을 편집 중입니다{v0}."), { v0: String(savedShotCount > 0 ? ` · 저장된 컷 ${savedShotCount}개` : "") })
+            : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneDirectorPanel", "ko", "처음이라면 ‘배경 만들기’에서 장소를 고르거나 ‘인물·포즈’에서 캐릭터부터 시작해보세요.")}
         </p>
       </div>
     </section>

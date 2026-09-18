@@ -1,3 +1,6 @@
+import {
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import type { SortKey } from "./search";
 import {
   EMPTY_TITLE_FILTERS,
@@ -13,6 +16,12 @@ import type {
 
 import { PLATFORM_LIST } from "./platforms";
 import { GENRES } from "./taxonomy";
+import {
+  translateBilingualValueForActiveLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("catalog-discovery-state", ko, en);
 
 export type CatalogDiscoveryMode = "search" | "explore" | "recommend";
 export type CatalogDiscoveryView = "grid" | "list";
@@ -283,7 +292,7 @@ export function titleFiltersEqual(
 
 export function recommendationDiversityLabel(
   diversity: RecommendationDiversity,
-  locale: "ko" | "en",
+  _locale,
 ): string {
   const labels = {
     ko: {
@@ -297,5 +306,5 @@ export function recommendationDiversityLabel(
       wide: "Broaden discovery",
     },
   } as const;
-  return labels[locale][diversity];
+  return bi((labels).ko, (labels).en)[diversity];
 }
