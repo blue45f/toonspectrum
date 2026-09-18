@@ -1,8 +1,9 @@
 export const AUTH_MODAL_REQUEST_EVENT = "toonspectrum:auth-modal-request";
 
 export interface AuthModalRequestDetail {
-  readonly reason?: "free-ai" | "protected-action";
+  readonly reason?: "free-ai" | "protected-action" | "beta-event";
   readonly source?: string;
+  readonly mode?: "login" | "signup";
 }
 
 export function requestAuthModalOpen(
