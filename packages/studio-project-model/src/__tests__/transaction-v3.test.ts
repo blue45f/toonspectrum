@@ -126,4 +126,16 @@ describe("RFC 6902 JSON patch subset", () => {
     expect(source).toEqual({ values: ["a", "b"], title: "before" });
     expect(result).toEqual({ values: ["c"], title: "after", copied: "a", moved: "b" });
   });
+
+  it("treats prototype-looking pointer segments as ordinary own JSON properties", () => {
+    const result = applyJsonPatches({ safe: true }, [
+      { op: "add", path: "/__proto__", value: { marker: "isolated" } },
+      { op: "replace", path: "/__proto__/marker", value: "updated" },
+    ]) as Record<string, JsonValue>;
+
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect(Object.hasOwn(result, "__proto__")).toBe(true);
+    expect(result["__proto__"]).toEqual({ marker: "updated" });
+    expect(Object.hasOwn(Object.prototype, "marker")).toBe(false);
+  });
 });
