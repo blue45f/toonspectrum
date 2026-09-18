@@ -19,6 +19,15 @@ export const STUDIO_VIRTUAL_SPACE_PRESENCE_INTERVAL_MS = 150;
 export const STUDIO_VIRTUAL_SPACE_HEARTBEAT_MS = 2_500;
 export const STUDIO_VIRTUAL_SPACE_STALE_MS = 10_000;
 export const STUDIO_VIRTUAL_SPACE_PACKET_MAX_BYTES = 1_024;
+export const STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS = 2_400;
+
+export type StudioVirtualSpaceReaction = "wave" | "heart" | "sparkles" | "thumbs-up";
+
+export interface StudioVirtualSpaceReactionSnapshot {
+  readonly sessionId: string;
+  readonly reaction: StudioVirtualSpaceReaction;
+  readonly expiresAt: number;
+}
 
 interface StudioVirtualSpacePresencePacket {
   readonly wire: typeof STUDIO_VIRTUAL_SPACE_WIRE;
@@ -35,14 +44,25 @@ interface StudioVirtualSpaceLeavePacket {
   readonly at: number;
 }
 
+interface StudioVirtualSpaceReactionPacket {
+  readonly wire: typeof STUDIO_VIRTUAL_SPACE_WIRE;
+  readonly kind: "reaction";
+  readonly sequence: number;
+  readonly at: number;
+  readonly reaction: StudioVirtualSpaceReaction;
+}
+
 export type StudioVirtualSpacePacket =
   | StudioVirtualSpacePresencePacket
-  | StudioVirtualSpaceLeavePacket;
+  | StudioVirtualSpaceLeavePacket
+  | StudioVirtualSpaceReactionPacket;
 
 export interface StudioVirtualSpaceSnapshot {
   readonly self: StudioVirtualSpacePresenceState;
   readonly peers: readonly StudioVirtualSpacePeer[];
   readonly nearbyPeers: readonly StudioVirtualSpacePeer[];
+  readonly selfReaction: StudioVirtualSpaceReaction | null;
+  readonly peerReactions: readonly StudioVirtualSpaceReactionSnapshot[];
   readonly direct: boolean;
 }
 
@@ -64,6 +84,7 @@ const ZONES = new Set<StudioVirtualSpaceZoneId>([
 ]);
 const FACINGS = new Set<StudioVirtualSpaceFacing>(["down", "left", "right", "up"]);
 const ACTIVITIES = new Set<StudioVirtualSpaceActivity>(["available", "focused", "reviewing", "away"]);
+const REACTIONS = new Set<StudioVirtualSpaceReaction>(["wave", "heart", "sparkles", "thumbs-up"]);
 
 function isFiniteCoordinate(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 10_000;
@@ -87,7 +108,7 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
   const packet = candidate as Record<string, unknown>;
   if (
     packet.wire !== STUDIO_VIRTUAL_SPACE_WIRE
-    || (packet.kind !== "presence" && packet.kind !== "leave")
+    || (packet.kind !== "presence" && packet.kind !== "leave" && packet.kind !== "reaction")
     || !Number.isSafeInteger(packet.sequence)
     || Number(packet.sequence) < 0
     || !Number.isFinite(packet.at)
@@ -100,6 +121,18 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
       kind: "leave",
       sequence: Number(packet.sequence),
       at: Number(packet.at),
+    };
+  }
+  if (packet.kind === "reaction") {
+    if (typeof packet.reaction !== "string" || !REACTIONS.has(packet.reaction as StudioVirtualSpaceReaction)) {
+      return null;
+    }
+    return {
+      wire: STUDIO_VIRTUAL_SPACE_WIRE,
+      kind: "reaction",
+      sequence: Number(packet.sequence),
+      at: Number(packet.at),
+      reaction: packet.reaction as StudioVirtualSpaceReaction,
     };
   }
   if (!packet.state || typeof packet.state !== "object" || Array.isArray(packet.state)) return null;
@@ -126,6 +159,7 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
       point,
       state.facing as StudioVirtualSpaceFacing,
       state.activity as StudioVirtualSpaceActivity,
+      typeof state.moving === "boolean" ? state.moving : false,
     ),
   };
 }
@@ -145,6 +179,9 @@ function encodePacket(packet: StudioVirtualSpacePacket): string | null {
 export class StudioVirtualSpacePresenceController {
   private self: StudioVirtualSpacePresenceState;
   private readonly peers = new Map<string, StudioVirtualSpacePeer>();
+  private readonly peerReactions = new Map<string, StudioVirtualSpaceReactionSnapshot>();
+  private readonly reactionSequences = new Map<string, number>();
+  private selfReaction: StudioVirtualSpaceReactionSnapshot | null = null;
   private readonly listeners = new Set<() => void>();
   private sequence = 0;
   private dirty = true;
@@ -187,12 +224,21 @@ export class StudioVirtualSpacePresenceController {
       )
       .slice(0, STUDIO_VIRTUAL_SPACE_MAX_PARTICIPANTS - 1)
       .map((peer) => Object.freeze({ ...peer, state: Object.freeze({ ...peer.state }) }));
+    const now = this.now();
+    const peerReactions = [...this.peerReactions.values()]
+      .filter((reaction) => reaction.expiresAt > now)
+      .sort((left, right) => left.sessionId.localeCompare(right.sessionId))
+      .map((reaction) => Object.freeze({ ...reaction }));
     return Object.freeze({
       self: Object.freeze({ ...this.self }),
       peers: Object.freeze(peers),
       nearbyPeers: Object.freeze(
         [...selectNearbyStudioVirtualPeers(this.self, peers, STUDIO_VIRTUAL_SPACE_NEARBY_RADIUS)],
       ),
+      selfReaction: this.selfReaction && this.selfReaction.expiresAt > now
+        ? this.selfReaction.reaction
+        : null,
+      peerReactions: Object.freeze(peerReactions),
       direct: true,
     });
   }
@@ -214,15 +260,17 @@ export class StudioVirtualSpacePresenceController {
     point: StudioVirtualSpacePoint,
     facing: StudioVirtualSpaceFacing = this.self.facing,
     activity: StudioVirtualSpaceActivity = this.self.activity,
+    moving: boolean = this.self.moving,
   ): void {
     if (this.closed) return;
-    const next = studioVirtualSpaceState(point, facing, activity);
+    const next = studioVirtualSpaceState(point, facing, activity, moving);
     if (
       next.x === this.self.x
       && next.y === this.self.y
       && next.zoneId === this.self.zoneId
       && next.facing === this.self.facing
       && next.activity === this.self.activity
+      && next.moving === this.self.moving
     ) {
       return;
     }
@@ -232,7 +280,36 @@ export class StudioVirtualSpacePresenceController {
   }
 
   setActivity(activity: StudioVirtualSpaceActivity): void {
-    this.update(this.self, this.self.facing, activity);
+    this.update(this.self, this.self.facing, activity, this.self.moving);
+  }
+
+  setMoving(moving: boolean): void {
+    this.update(this.self, this.self.facing, this.self.activity, moving);
+  }
+
+  sendReaction(reaction: StudioVirtualSpaceReaction): void {
+    if (this.closed || !REACTIONS.has(reaction)) return;
+    const now = this.now();
+    this.selfReaction = Object.freeze({
+      sessionId: this.participant.sessionId,
+      reaction,
+      expiresAt: now + STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS,
+    });
+    const packet = encodePacket({
+      wire: STUDIO_VIRTUAL_SPACE_WIRE,
+      kind: "reaction",
+      sequence: ++this.sequence,
+      at: now,
+      reaction,
+    });
+    if (packet) {
+      for (const peer of this.port.getPeers().slice(0, STUDIO_VIRTUAL_SPACE_MAX_PARTICIPANTS - 1)) {
+        if (peer.sessionId !== this.participant.sessionId) {
+          this.port.send(peer.sessionId, packet);
+        }
+      }
+    }
+    this.emit();
   }
 
   refresh(): void {
@@ -245,9 +322,10 @@ export class StudioVirtualSpacePresenceController {
   private tick(): void {
     if (this.closed) return;
     const changed = this.prune();
+    const reactionsChanged = this.pruneReactions();
     const dueHeartbeat = this.now() - this.lastSentAt >= STUDIO_VIRTUAL_SPACE_HEARTBEAT_MS;
     if (this.dirty || dueHeartbeat) this.broadcast(dueHeartbeat);
-    if (changed) this.emit();
+    if (changed || reactionsChanged) this.emit();
   }
 
   private availablePeerIds(): Set<string> {
@@ -266,6 +344,24 @@ export class StudioVirtualSpacePresenceController {
     for (const [sessionId, peer] of this.peers) {
       if (!available.has(sessionId) || now - peer.lastSeen > STUDIO_VIRTUAL_SPACE_STALE_MS) {
         this.peers.delete(sessionId);
+        this.peerReactions.delete(sessionId);
+        this.reactionSequences.delete(sessionId);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  private pruneReactions(): boolean {
+    const now = this.now();
+    let changed = false;
+    if (this.selfReaction && this.selfReaction.expiresAt <= now) {
+      this.selfReaction = null;
+      changed = true;
+    }
+    for (const [sessionId, reaction] of this.peerReactions) {
+      if (reaction.expiresAt <= now) {
+        this.peerReactions.delete(sessionId);
         changed = true;
       }
     }
@@ -297,11 +393,27 @@ export class StudioVirtualSpacePresenceController {
     if (!this.availablePeerIds().has(sender.sessionId)) return;
     const packet = parseStudioVirtualSpacePacket(raw);
     if (!packet) return;
+
+    if (packet.kind === "reaction") {
+      const previousReactionSequence = this.reactionSequences.get(sender.sessionId) ?? -1;
+      if (packet.sequence <= previousReactionSequence) return;
+      this.reactionSequences.set(sender.sessionId, packet.sequence);
+      this.peerReactions.set(sender.sessionId, Object.freeze({
+        sessionId: sender.sessionId,
+        reaction: packet.reaction,
+        expiresAt: this.now() + STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS,
+      }));
+      this.emit();
+      return;
+    }
+
     const previous = this.peers.get(sender.sessionId);
     if (previous && packet.sequence <= previous.sequence) return;
     if (packet.kind === "leave") {
-      if (previous) {
+      if (previous || this.peerReactions.has(sender.sessionId)) {
         this.peers.delete(sender.sessionId);
+        this.peerReactions.delete(sender.sessionId);
+        this.reactionSequences.delete(sender.sessionId);
         this.emit();
       }
       return;
@@ -340,6 +452,9 @@ export class StudioVirtualSpacePresenceController {
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.peers.clear();
+    this.peerReactions.clear();
+    this.reactionSequences.clear();
+    this.selfReaction = null;
     this.listeners.clear();
   }
 }
