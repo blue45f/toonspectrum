@@ -5,6 +5,7 @@ import {
   Brush,
   CircleDot,
   Clapperboard,
+  CloudOff,
   Coffee,
   ExternalLink,
   Gamepad2,
@@ -26,6 +27,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -39,6 +41,13 @@ import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
+
+import {
+  getStudioConnectivityServerSnapshot,
+  getStudioConnectivitySnapshot,
+  startStudioConnectivityRuntime,
+  subscribeStudioConnectivity,
+} from "../offline/studio-connectivity";
 
 import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaborationProvider";
 import { useStudioLiveCollaboration } from "../live/studio-live-collaboration-context";
@@ -399,6 +408,11 @@ function VirtualSpaceExperience({
 }) {
   const bt = useBilingual("StudioVirtualSpaceExperience");
   const live = useStudioLiveCollaboration();
+  const connectivity = useSyncExternalStore(
+    subscribeStudioConnectivity,
+    getStudioConnectivitySnapshot,
+    getStudioConnectivityServerSnapshot,
+  );
   const controllerRef = useRef<StudioVirtualSpacePresenceController | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const fallbackIdentity = live.room?.participant.sessionId ?? `space:${projectId}`;
@@ -410,6 +424,9 @@ function VirtualSpaceExperience({
     direct: false,
   }));
   const [activity, setActivity] = useState<StudioVirtualSpaceActivity>("available");
+  const visibleParticipantCount = connectivity.serverAvailable ? snapshot.peers.length + 1 : 1;
+
+  useEffect(() => startStudioConnectivityRuntime(), []);
 
   const openAssistant = useCallback(() => {
     globalThis.dispatchEvent(new CustomEvent("toonspectrum:command-palette:open"));
@@ -514,12 +531,12 @@ function VirtualSpaceExperience({
   const localName = live.room?.participant.displayName.replace(/\s*·\s*이 탭$/u, "") || bt("나", "Me");
 
   const startNearbyHuddle = useCallback(() => {
-    if (!snapshot.nearbyPeers.length) return;
+    if (!connectivity.serverAvailable || !snapshot.nearbyPeers.length) return;
     openStudioP2pHuddle({
       peerIds: snapshot.nearbyPeers.map((peer) => peer.participant.sessionId),
       source: "virtual-space",
     });
-  }, [snapshot.nearbyPeers]);
+  }, [connectivity.serverAvailable, snapshot.nearbyPeers]);
 
   const setPresenceActivity = (next: StudioVirtualSpaceActivity) => {
     setActivity(next);
@@ -558,9 +575,15 @@ function VirtualSpaceExperience({
             </div>
             <div className="relative flex flex-wrap items-center gap-2 lg:justify-end">
               <ConnectionBadge preparing={preparing} />
+              {connectivity.localOnly ? (
+                <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-warning/35 bg-warning-soft/15 px-3 text-xs font-bold text-warning">
+                  <CloudOff size={14} aria-hidden />
+                  {bt("로컬 탐색 모드", "Local exploration")}
+                </span>
+              ) : null}
               <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-card/90 px-3 text-xs font-bold text-fg-2">
                 <UsersRound size={14} aria-hidden />
-                {snapshot.peers.length + 1}{bt("명 접속", " online")}
+                {visibleParticipantCount}{connectivity.localOnly ? bt("명 로컬", " local") : bt("명 접속", " online")}
               </span>
               <Link
                 href={`/studio/work/${encodeURIComponent(projectId)}/canvas`}
@@ -572,6 +595,16 @@ function VirtualSpaceExperience({
             </div>
           </div>
         </header>
+
+        {connectivity.localOnly ? (
+          <div role="status" className="mt-4 flex items-start gap-3 rounded-2xl border border-warning/35 bg-warning-soft/10 p-4 text-sm text-fg-2">
+            <CloudOff size={18} className="mt-0.5 shrink-0 text-warning" aria-hidden />
+            <div>
+              <p className="font-bold text-fg">{bt("서버 연결 없이 로컬 공간을 탐색하고 있어요.", "Exploring this space locally while the server is unavailable.")}</p>
+              <p className="mt-1 text-xs leading-5 text-fg-3">{bt("이동과 화면 탐색은 계속 사용할 수 있지만 팀원 발견과 P2P 대화는 서버 연결이 복구된 뒤 다시 활성화됩니다.", "Movement and local exploration remain available. Teammate discovery and P2P huddles resume after the server connection recovers.")}</p>
+            </div>
+          </div>
+        ) : null}
 
         <section className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
           <div className="min-w-0">
@@ -698,7 +731,7 @@ function VirtualSpaceExperience({
               </div>
               <button
                 type="button"
-                disabled={!signedIn || !snapshot.direct || snapshot.nearbyPeers.length === 0}
+                disabled={!signedIn || !connectivity.serverAvailable || !snapshot.direct || snapshot.nearbyPeers.length === 0}
                 onClick={startNearbyHuddle}
                 className={buttonClass({ className: "mt-3 w-full gap-2 disabled:cursor-not-allowed disabled:opacity-50" })}
               >
@@ -714,8 +747,8 @@ function VirtualSpaceExperience({
 
             <section className="rounded-3xl border border-line bg-panel/70 p-4 shadow-sm">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-black">{bt("접속 중", "Online")}</h2>
-                <span className="text-xs font-bold text-fg-3">{snapshot.peers.length + 1}</span>
+                <h2 className="text-sm font-black">{connectivity.localOnly ? bt("로컬 상태", "Local state") : bt("접속 중", "Online")}</h2>
+                <span className="text-xs font-bold text-fg-3">{visibleParticipantCount}</span>
               </div>
               <div className="mt-3 space-y-2">
                 <div className="flex items-center gap-2">
