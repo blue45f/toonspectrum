@@ -14,6 +14,7 @@ function run({
   pr = 10,
   attempt = 1,
   status = "queued",
+  path = null,
 }) {
   return {
     id,
@@ -24,6 +25,7 @@ function run({
     created_at: createdAt,
     run_attempt: attempt,
     status,
+    path,
     pull_requests: event === "pull_request" && pr !== null ? [{ number: pr }] : [],
     name: `workflow-${workflow}`,
   };
@@ -147,25 +149,54 @@ describe("selectSupersededActionsRuns", () => {
     expect(selected).toEqual([]);
   });
 
-  it("cancels superseded dynamic code-scanning runs for the same PR head", () => {
+  it("preserves GitHub CodeQL default-setup runs even when superseded or stale", () => {
+    const selected = selectSupersededActionsRuns(
+      [
+        run({
+          id: 20,
+          event: "dynamic",
+          branch: "refs/pull/1578/head",
+          pr: null,
+          createdAt: "2026-09-17T00:00:00Z",
+          path: "dynamic/github-code-scanning/codeql",
+        }),
+        run({
+          id: 21,
+          event: "dynamic",
+          branch: "refs/pull/1578/head",
+          pr: null,
+          createdAt: "2026-09-17T00:01:00Z",
+          path: "dynamic/github-code-scanning/codeql",
+        }),
+      ],
+      {
+        now: Date.parse("2026-09-17T12:00:00Z"),
+      },
+    );
+    expect(selected).toEqual([]);
+  });
+
+  it("still cancels superseded non-CodeQL dynamic runs", () => {
     const selected = selectSupersededActionsRuns([
       run({
-        id: 20,
+        id: 22,
         event: "dynamic",
         branch: "refs/pull/1578/head",
         pr: null,
         createdAt: "2026-09-17T00:00:00Z",
+        path: "dynamic/other",
       }),
       run({
-        id: 21,
+        id: 23,
         event: "dynamic",
         branch: "refs/pull/1578/head",
         pr: null,
         createdAt: "2026-09-17T00:01:00Z",
+        path: "dynamic/other",
       }),
     ]);
     expect(selected).toHaveLength(1);
-    expect(selected[0]).toMatchObject({ reason: "superseded", run: { id: 20 } });
+    expect(selected[0]).toMatchObject({ reason: "superseded", run: { id: 22 } });
   });
 
   it.each(["pending", "queued"])(
