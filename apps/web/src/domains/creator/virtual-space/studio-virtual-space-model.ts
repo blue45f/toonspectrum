@@ -68,11 +68,11 @@ export interface StudioVirtualAvatarProfile {
 export const STUDIO_VIRTUAL_SPACE_ZONES: readonly StudioVirtualSpaceZone[] = Object.freeze([
   {
     id: "lounge",
-    labelKo: "크리에이터 라운지",
-    labelEn: "Creator Lounge",
+    labelKo: "라운지",
+    labelEn: "Lounge",
     descriptionKo: "가볍게 만나고 오늘의 작업을 공유해요.",
     descriptionEn: "Meet casually and share what everyone is working on.",
-    x: 32, y: 32, width: 262, height: 190, destination: "none",
+    x: 32, y: 32, width: 340, height: 190, destination: "none",
   },
   {
     id: "writers",
@@ -80,23 +80,15 @@ export const STUDIO_VIRTUAL_SPACE_ZONES: readonly StudioVirtualSpaceZone[] = Obj
     labelEn: "Writers Room",
     descriptionKo: "시놉시스·대본·에피소드를 함께 정리해요.",
     descriptionEn: "Shape synopsis, scripts and episodes together.",
-    x: 312, y: 32, width: 262, height: 190, destination: "story",
+    x: 390, y: 32, width: 330, height: 190, destination: "story",
   },
   {
     id: "storyboard",
-    labelKo: "스토리보드 월",
+    labelKo: "콘티 보드",
     labelEn: "Storyboard Wall",
     descriptionKo: "컷 흐름과 장면 구성을 한눈에 검토해요.",
     descriptionEn: "Review panel flow and scene composition at a glance.",
-    x: 592, y: 32, width: 276, height: 190, destination: "comic",
-  },
-  {
-    id: "live",
-    labelKo: "라이브 스테이지",
-    labelEn: "Live Stage",
-    descriptionKo: "라이브 드로잉과 공동 작업 세션을 열어요.",
-    descriptionEn: "Host live drawing and co-creation sessions.",
-    x: 886, y: 32, width: 262, height: 190, destination: "live",
+    x: 738, y: 32, width: 410, height: 190, destination: "comic",
   },
   {
     id: "assets",
@@ -104,7 +96,15 @@ export const STUDIO_VIRTUAL_SPACE_ZONES: readonly StudioVirtualSpaceZone[] = Obj
     labelEn: "Asset Library",
     descriptionKo: "캐릭터·배경·브러시·3D 자료를 찾아요.",
     descriptionEn: "Find characters, backgrounds, brushes and 3D assets.",
-    x: 32, y: 250, width: 262, height: 206, destination: "assets",
+    x: 32, y: 250, width: 310, height: 190, destination: "assets",
+  },
+  {
+    id: "live",
+    labelKo: "크리에이터 플라자",
+    labelEn: "Creator Plaza",
+    descriptionKo: "라이브 드로잉과 공동 작업 이벤트가 열리는 중앙 광장이에요.",
+    descriptionEn: "The central plaza for live drawing and co-creation events.",
+    x: 390, y: 250, width: 410, height: 190, destination: "live",
   },
   {
     id: "drawing",
@@ -112,7 +112,7 @@ export const STUDIO_VIRTUAL_SPACE_ZONES: readonly StudioVirtualSpaceZone[] = Obj
     labelEn: "Drawing Studio",
     descriptionKo: "같은 원고를 보며 실시간으로 작업해요.",
     descriptionEn: "Work on the same manuscript with live collaboration.",
-    x: 312, y: 250, width: 390, height: 206, destination: "canvas",
+    x: 838, y: 250, width: 310, height: 190, destination: "canvas",
   },
   {
     id: "review",
@@ -120,19 +120,19 @@ export const STUDIO_VIRTUAL_SPACE_ZONES: readonly StudioVirtualSpaceZone[] = Obj
     labelEn: "Review Room",
     descriptionKo: "댓글·수정 요청·승인을 함께 처리해요.",
     descriptionEn: "Handle comments, change requests and approvals together.",
-    x: 720, y: 250, width: 428, height: 206, destination: "review",
+    x: 32, y: 462, width: 430, height: 226, destination: "review",
   },
   {
     id: "assistant",
-    labelKo: "AI 프로듀서 데스크",
-    labelEn: "AI Producer Desk",
-    descriptionKo: "회의 정리와 다음 작업을 빠르게 찾도록 도와줘요.",
-    descriptionEn: "Turn collaboration context into clear next actions.",
-    x: 32, y: 484, width: 1116, height: 204, destination: "assistant",
+    labelKo: "어시스트 데스크",
+    labelEn: "Assistant Desk",
+    descriptionKo: "어시스트 배정과 AI 프로듀서 도움을 한곳에서 처리해요.",
+    descriptionEn: "Coordinate assistants and AI production support in one place.",
+    x: 718, y: 462, width: 430, height: 226, destination: "assistant",
   },
 ]);
 
-const DEFAULT_POINT: StudioVirtualSpacePoint = Object.freeze({ x: 535, y: 355 });
+const DEFAULT_POINT: StudioVirtualSpacePoint = Object.freeze({ x: 590, y: 640 });
 
 const SKIN = ["oklch(0.91 0.055 55)", "oklch(0.86 0.07 48)", "oklch(0.78 0.08 52)", "oklch(0.68 0.075 50)"] as const;
 const HAIR = ["oklch(0.31 0.055 25)", "oklch(0.36 0.07 300)", "oklch(0.72 0.1 335)", "oklch(0.72 0.11 235)", "oklch(0.77 0.12 95)", "oklch(0.58 0.12 155)"] as const;
@@ -172,10 +172,9 @@ export function studioVirtualAvatarProfile(identity: string): StudioVirtualAvata
 
 export function studioVirtualSpaceInitialPoint(identity: string): StudioVirtualSpacePoint {
   const hash = stableHash(identity || "local");
-  // Spawn in the open upper half of Drawing Studio so the RPG collider never traps a fresh session
-  // inside desks, room walls or the central production props.
-  const spreadX = 455 + (hash % 170);
-  const spreadY = 292 + ((hash >>> 8) % 30);
+  // Spawn on the open entrance path between Review Room and Assistant Desk, mirroring the master scene.
+  const spreadX = 535 + (hash % 110);
+  const spreadY = 610 + ((hash >>> 8) % 42);
   return Object.freeze({ x: spreadX, y: spreadY });
 }
 

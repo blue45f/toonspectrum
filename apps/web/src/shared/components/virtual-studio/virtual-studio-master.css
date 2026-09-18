@@ -1,0 +1,20 @@
+.vs-master-world{position:relative;isolation:isolate;width:100%;height:100%;min-height:0;overflow:hidden;border:1px solid #3a4658;border-radius:0;background:#181b20;box-shadow:inset 0 1px #ffffff12}
+.vs-master-world-svg{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:fill}
+.vs-master-world-svg .vs-master-prop{filter:drop-shadow(0 8px 7px rgb(37 20 15/.24))}
+.vs-master-world-svg .vs-master-plant{filter:drop-shadow(0 5px 6px rgb(22 33 17/.22))}
+.vs-master-room-hotspot{position:absolute;z-index:12;display:block;border:1px solid transparent;border-radius:10px;color:#17120f;transition:border-color .18s,box-shadow .18s,background .18s}
+.vs-master-room-hotspot>span{position:absolute;left:10px;top:9px;display:grid;max-width:80%;padding:5px 8px;border-radius:6px;background:rgb(255 238 217/.88);box-shadow:0 5px 12px rgb(66 40 27/.16);backdrop-filter:blur(5px);transform-origin:left top}
+.vs-master-room-hotspot strong{font-size:11px;line-height:1.05;font-weight:950;letter-spacing:-.02em}
+.vs-master-room-hotspot small{margin-top:2px;font-size:8px;font-weight:750;color:#5f463a}
+.vs-master-room-hotspot:hover,.vs-master-room-hotspot:focus-visible{border-color:#d9c8ff99;background:#ffffff08;box-shadow:inset 0 0 0 2px #b7a5ff2a,0 0 24px #8d70ff21;outline:none}
+.vs-master-room-hotspot:hover>span,.vs-master-room-hotspot:focus-visible>span{background:#fff3df;transform:translateY(-1px)}
+.vs-master-actors{position:absolute;inset:0;z-index:24;pointer-events:none}
+.vs-master-actor{position:absolute;translate:-50% -85%}
+.vs-master-speech{position:absolute;left:50%;bottom:calc(100% + 7px);z-index:50;translate:-50% 0;min-width:max-content;max-width:125px;padding:7px 9px;border:1px solid #ddd5ce;border-radius:16px;background:#fff;color:#3b302d;font-size:9px;font-weight:800;line-height:1.25;text-align:center;box-shadow:0 7px 18px rgb(32 18 13/.2);animation:vs-master-speech-float 3.2s ease-in-out infinite}
+.vs-master-speech::after{content:"";position:absolute;left:50%;bottom:-5px;width:9px;height:9px;translate:-50% 0;rotate:45deg;border-right:1px solid #ddd5ce;border-bottom:1px solid #ddd5ce;background:#fff}
+.vs-master-pet{position:absolute;z-index:20;font-size:25px;filter:drop-shadow(0 5px 5px rgb(0 0 0/.22));animation:vs-master-pet-bob 2.4s ease-in-out infinite}
+.vs-master-pet--cat{left:30%;top:29%}.vs-master-pet--dog{right:8%;bottom:5%;animation-delay:-.7s}.vs-master-pet--bun{left:27%;bottom:4%;animation-delay:-1.2s}
+@keyframes vs-master-speech-float{50%{transform:translateY(-3px)}}@keyframes vs-master-pet-bob{50%{transform:translateY(-4px) rotate(2deg)}}
+@media(prefers-reduced-motion:reduce){.vs-master-speech,.vs-master-pet{animation:none}}
+@media(max-width:900px){.vs-master-world{min-height:580px;border-radius:16px}.vs-master-room-hotspot>span{transform:scale(.88)}.vs-master-actor{scale:.82}.vs-master-speech{display:none}}
+@media(max-width:580px){.vs-master-world{min-height:540px}.vs-master-room-hotspot>span{display:none}.vs-master-actor{scale:.68}.vs-master-pet{font-size:20px}}

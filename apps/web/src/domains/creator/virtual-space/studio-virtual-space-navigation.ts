@@ -53,19 +53,20 @@ function verticalWall(
 }
 
 const TOP_ROOMS = [
-  { x: 32, y: 32, width: 262, height: 190 },
-  { x: 312, y: 32, width: 262, height: 190 },
-  { x: 592, y: 32, width: 276, height: 190 },
-  { x: 886, y: 32, width: 262, height: 190 },
+  { x: 32, y: 32, width: 340, height: 190 },
+  { x: 390, y: 32, width: 330, height: 190 },
+  { x: 738, y: 32, width: 410, height: 190 },
 ] as const;
 
 const MIDDLE_ROOMS = [
-  { x: 32, y: 250, width: 262, height: 206 },
-  { x: 312, y: 250, width: 390, height: 206 },
-  { x: 720, y: 250, width: 428, height: 206 },
+  { x: 32, y: 250, width: 310, height: 190 },
+  { x: 838, y: 250, width: 310, height: 190 },
 ] as const;
 
-const ASSISTANT = { x: 32, y: 484, width: 1116, height: 204 } as const;
+const BOTTOM_ROOMS = [
+  { x: 32, y: 462, width: 430, height: 226 },
+  { x: 718, y: 462, width: 430, height: 226 },
+] as const;
 
 const roomWalls: StudioVirtualSpaceRect[] = [];
 for (const room of TOP_ROOMS) {
@@ -84,32 +85,25 @@ for (const room of MIDDLE_ROOMS) {
     ...verticalWall(room.x + room.width - WALL, room.y, room.height),
   );
 }
-roomWalls.push(
-  ...horizontalWall(ASSISTANT.x, ASSISTANT.y, ASSISTANT.width, ASSISTANT.x + ASSISTANT.width / 2),
-  ...horizontalWall(ASSISTANT.x, ASSISTANT.y + ASSISTANT.height - WALL, ASSISTANT.width),
-  ...verticalWall(ASSISTANT.x, ASSISTANT.y, ASSISTANT.height),
-  ...verticalWall(ASSISTANT.x + ASSISTANT.width - WALL, ASSISTANT.y, ASSISTANT.height),
-);
+for (const room of BOTTOM_ROOMS) {
+  roomWalls.push(
+    ...horizontalWall(room.x, room.y, room.width, room.x + room.width / 2),
+    ...horizontalWall(room.x, room.y + room.height - WALL, room.width),
+    ...verticalWall(room.x, room.y, room.height),
+    ...verticalWall(room.x + room.width - WALL, room.y, room.height),
+  );
+}
 
 const furniture: readonly StudioVirtualSpaceRect[] = [
-  // Collision uses the furniture footprint rather than the full illustration silhouette so
-  // characters can still squeeze past chairs, lamps and desks in an RPG-like way.
-  { x: 62, y: 142, width: 90, height: 36, kind: "furniture" },
-  { x: 194, y: 150, width: 42, height: 30, kind: "furniture" },
-  { x: 350, y: 140, width: 90, height: 38, kind: "furniture" },
-  { x: 482, y: 150, width: 32, height: 30, kind: "furniture" },
-  { x: 630, y: 142, width: 92, height: 38, kind: "furniture" },
-  { x: 770, y: 152, width: 42, height: 28, kind: "furniture" },
-  { x: 924, y: 144, width: 66, height: 36, kind: "furniture" },
-  { x: 1042, y: 152, width: 40, height: 28, kind: "furniture" },
-  { x: 66, y: 374, width: 70, height: 34, kind: "furniture" },
-  { x: 192, y: 382, width: 42, height: 28, kind: "furniture" },
-  { x: 352, y: 370, width: 112, height: 40, kind: "furniture" },
-  { x: 552, y: 378, width: 68, height: 30, kind: "furniture" },
-  { x: 764, y: 366, width: 108, height: 40, kind: "furniture" },
-  { x: 970, y: 380, width: 88, height: 28, kind: "furniture" },
-  { x: 82, y: 612, width: 116, height: 32, kind: "furniture" },
-  { x: 972, y: 612, width: 106, height: 30, kind: "furniture" },
+  // Reference-layout footprints: warm room furniture stays solid while the central plaza remains walkable around its ring.
+  { x: 70, y: 132, width: 190, height: 48, kind: "furniture" },
+  { x: 452, y: 135, width: 190, height: 48, kind: "furniture" },
+  { x: 870, y: 118, width: 230, height: 62, kind: "furniture" },
+  { x: 68, y: 336, width: 185, height: 56, kind: "furniture" },
+  { x: 914, y: 334, width: 184, height: 58, kind: "furniture" },
+  { x: 95, y: 586, width: 260, height: 64, kind: "furniture" },
+  { x: 794, y: 582, width: 266, height: 68, kind: "furniture" },
+  { x: 520, y: 302, width: 140, height: 118, kind: "furniture" },
 ];
 
 export const STUDIO_VIRTUAL_SPACE_COLLIDERS: readonly StudioVirtualSpaceRect[] = Object.freeze([

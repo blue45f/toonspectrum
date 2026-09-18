@@ -176,15 +176,15 @@ describe("Studio virtual space RPG navigation", () => {
   });
 
   it("slides along colliders instead of teleporting through them", () => {
-    const start = { x: 340, y: 360 };
-    const next = resolveStudioVirtualSpaceMovement(start, { x: 40, y: 30 });
+    const start = { x: 80, y: 235 };
+    const next = resolveStudioVirtualSpaceMovement(start, { x: 30, y: -30 });
     expect(next.x).toBeGreaterThan(start.x);
     expect(next.y).toBe(start.y);
   });
 
   it("walks toward click targets in bounded increments", () => {
-    const start = { x: 535, y: 355 };
-    const next = studioVirtualSpaceStepToward(start, { x: 620, y: 330 }, 20);
+    const start = { x: 590, y: 640 };
+    const next = studioVirtualSpaceStepToward(start, { x: 590, y: 600 }, 20);
     expect(Math.hypot(next.x - start.x, next.y - start.y)).toBeLessThanOrEqual(20.01);
   });
 });
@@ -193,8 +193,8 @@ describe("Studio virtual space RPG navigation", () => {
 describe("Studio virtual space pathfinding", () => {
   it("finds a browser-local route through room doors", () => {
     const path = findStudioVirtualSpacePath(
-      { x: 535, y: 305 },
-      { x: 430, y: 95 },
+      { x: 590, y: 640 },
+      { x: 555, y: 105 },
     );
     expect(path.length).toBeGreaterThan(2);
     expect(path.every((point) => studioVirtualSpaceCanOccupy(point))).toBe(true);
@@ -203,8 +203,8 @@ describe("Studio virtual space pathfinding", () => {
 
   it("returns a nearby walkable endpoint when a click lands on furniture", () => {
     const path = findStudioVirtualSpacePath(
-      { x: 535, y: 305 },
-      { x: 380, y: 380 },
+      { x: 590, y: 640 },
+      { x: 190, y: 150 },
     );
     expect(path.length).toBeGreaterThan(0);
     expect(path.every((point) => studioVirtualSpaceCanOccupy(point))).toBe(true);
@@ -224,10 +224,10 @@ describe("Studio virtual space object interactions", () => {
 
   it("selects the nearest nearby production object", () => {
     expect(
-      selectNearestStudioVirtualSpaceInteraction({ x: 520, y: 315 })?.id,
+      selectNearestStudioVirtualSpaceInteraction({ x: 995, y: 305 })?.id,
     ).toBe("drawing-desk");
     expect(
-      selectNearestStudioVirtualSpaceInteraction({ x: 590, y: 540 })?.id,
+      selectNearestStudioVirtualSpaceInteraction({ x: 925, y: 545 })?.id,
     ).toBe("ai-producer-desk");
   });
 });
