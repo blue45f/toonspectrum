@@ -173,7 +173,7 @@ export function StudioLocalizationPanel({
     };
     window.addEventListener(STUDIO_LOCALIZATION_PROJECT_UPDATED_EVENT, handleUpdate);
     return () => window.removeEventListener(STUDIO_LOCALIZATION_PROJECT_UPDATED_EVENT, handleUpdate);
-  }, [locale, projectId]);
+  }, [l, projectId]);
 
   const selected = document.units.find((unit) => unit.id === selectedId) ?? null;
   useEffect(() => {
