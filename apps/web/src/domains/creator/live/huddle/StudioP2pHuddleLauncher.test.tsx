@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EMPTY_STUDIO_LIVE_CONTEXT, StudioLiveCollaborationContext } from "../studio-live-collaboration-context";
 import type { StudioLiveRoom } from "../studio-live-collaboration-room";
 import StudioP2pHuddleLauncher from "./StudioP2pHuddleLauncher";
+import { resetStudioStrokeFocusActivityForTests, setStudioStrokeFocusActivity } from "../../studio-stroke-focus-activity";
 
 const track = { kind: "audio", stop: vi.fn(), onended: null };
 const stream = { getTracks: () => [track] };
@@ -24,7 +25,7 @@ function view(room: StudioLiveRoom, canChat = true) {
     <StudioP2pHuddleLauncher />
   </StudioLiveCollaborationContext.Provider>;
 }
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); getUserMedia.mockClear(); track.stop.mockClear(); });
+afterEach(() => { resetStudioStrokeFocusActivityForTests(); cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); getUserMedia.mockClear(); track.stop.mockClear(); });
 describe("P2P launcher consent and lifetime", () => {
   it("keeps devices off until an explicit media action and preserves calls while collapsed", async () => {
     environment(); render(view(fixture()));
@@ -40,6 +41,19 @@ describe("P2P launcher consent and lifetime", () => {
     fireEvent.click(screen.getByRole("button", { name: /P2P 대화 중/ }));
     fireEvent.click(screen.getByRole("button", { name: "나가기" }));
     expect(track.stop).toHaveBeenCalledOnce();
+  });
+  it("collapses an expanded huddle during a canvas stroke without leaving", () => {
+    environment(); render(view(fixture()));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }));
+    const panel = document.querySelector<HTMLElement>("[data-studio-p2p-huddle]");
+    expect(panel?.hidden).toBe(false);
+
+    act(() => setStudioStrokeFocusActivity("canvas-stroke", true));
+
+    expect(panel?.hidden).toBe(true);
+    expect(screen.getByRole("button", { name: /P2P 대화 중/ })).toBeTruthy();
+    expect(track.stop).not.toHaveBeenCalled();
   });
   it.each(["room", "permission"])("releases capture on %s changes", async (change) => {
     environment(); const original = fixture(); const rendered = render(view(original));

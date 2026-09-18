@@ -34,6 +34,12 @@ describe("studio shell floating integration", () => {
       .toContain('data-studio-shell-floating-target="workspace-arrangement"');
     expect(source("StudioWorkspaceArrangementControls.tsx"))
       .toContain('data-studio-shell-force-visible={arranging ? "true" : undefined}');
+    expect(source("studio-cuttoon-editor/studio-cuttoon-stage-pointers-down-draw.ts"))
+      .toContain('setStudioStrokeFocusActivity("canvas-stroke", true)');
+    expect(source("StudioCuttoonEditorHost.tsx"))
+      .toContain('setStudioStrokeFocusActivity("canvas-stroke", false)');
+    expect(source("live/huddle/StudioP2pHuddleLauncher.tsx"))
+      .toContain('strokeFocusPhase === "drawing"');
   });
 
   it("keeps phone floating status controls in separate lanes above the editing dock", () => {
@@ -81,16 +87,14 @@ describe("studio shell floating integration", () => {
 
     const provider = source("studio-shell/StudioShellFloatingLayoutProvider.tsx");
     expect(provider).not.toContain("navigator.storage");
-    expect(provider).toContain('event.pointerType !== "pen"');
-    expect(provider).toContain("focusModeActive");
-    expect(provider).toContain("setSurfaceMounted");
-    expect(provider).toContain("visibility.autoHideWhileDrawing || arranging");
-    const drawingAutoHide = source("studio-shell/studio-shell-drawing-auto-hide.ts");
-    expect(drawingAutoHide).toContain('[data-studio-canvas-viewport]');
+    expect(provider).toContain('"data-studio-shell-stroke-auto-hide"');
 
     const manager = source("studio-shell/StudioShellFloatingLayoutManager.tsx");
     expect(manager).toContain('aria-keyshortcuts="Control+Shift+L Meta+Shift+L"');
     expect(manager).toContain("z-[70]");
+    expect(manager).toContain("data-studio-shell-stroke-auto-hide");
+    expect(manager).toContain('data-studio-shell-force-visible="true"');
+    expect(manager).toContain("STUDIO_STROKE_FOCUS_SETTLE_MS");
     expect(manager).toContain("플랫폼 규격");
     expect(manager).toContain("펜으로 그리는 동안 자동 숨김");
     expect(manager).toContain("data-studio-shell-drawing-auto-hide-active");
