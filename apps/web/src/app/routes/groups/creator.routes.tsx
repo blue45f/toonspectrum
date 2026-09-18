@@ -28,6 +28,7 @@ import {
   StudioMusicPage,
   StudioNewPage,
   StudioProjectShellPage,
+  StudioVirtualSpacePage,
   StudioProductionToolchainPage,
   StudioEngineCenterPage,
   StudioProductionJobsPage,
@@ -79,6 +80,7 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-studio-project-review", path: studioRoutePath("project-review"), element: <StudioProjectShellPage section="review" /> },
   { id: "creator-studio-project-export", path: studioRoutePath("project-export"), element: <StudioProjectShellPage section="export" /> },
   { id: "creator-studio-project-settings", path: studioRoutePath("project-settings"), element: <StudioProjectShellPage section="settings" /> },
+  { id: "creator-studio-project-space", path: studioRoutePath("project-space"), element: <StudioVirtualSpacePage /> },
 
   // Canonical showcase routes retain the existing gallery implementation.
   { id: "creator-showcase", path: "/showcase", element: <CreateGalleryPage /> },
