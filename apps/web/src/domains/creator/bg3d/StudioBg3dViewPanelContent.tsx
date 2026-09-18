@@ -899,7 +899,7 @@ export function StudioBg3dViewPanel({
                             </label>
                             <button
                               type="button"
-                              aria-current={active ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "en", "true") : undefined}
+                              aria-current={active ? "true" : undefined}
                               disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
                               onClick={() => applySavedShot(shot.id)}
                               className={cx(

@@ -22,6 +22,18 @@ describe("VRM webcam initialization boundary", () => {
     expect(flow).toContain('failureStage = "camera"');
   });
 
+  it("prepares mobile-safe inline camera playback before assigning the stream", () => {
+    const start = webcamSessionSource.indexOf("const video = videoRef.current");
+    const finish = webcamSessionSource.indexOf("if (!active) return;", start);
+    const flow = webcamSessionSource.slice(start, finish);
+    expect(start).toBeGreaterThan(-1);
+    expect(flow.indexOf("video.muted = true")).toBeGreaterThan(-1);
+    expect(flow.indexOf("video.playsInline = true")).toBeGreaterThan(-1);
+    expect(flow.indexOf("video.autoplay = true")).toBeGreaterThan(-1);
+    expect(flow.indexOf("video.muted = true")).toBeLessThan(flow.indexOf("video.srcObject = stream"));
+    expect(webcamSessionSource).toContain('facingMode: { ideal: "user" }');
+  });
+
   it("separates engine guidance from camera permission recovery", () => {
     expect(webcamPanelSource).toContain('webcamErrorStage === "engine"');
     expect(webcamPanelSource).toContain("동작 인식 엔진 오류");

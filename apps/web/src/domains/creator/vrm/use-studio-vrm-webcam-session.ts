@@ -330,6 +330,12 @@ export function useStudioVrmWebcamSession({
 
         const video = videoRef.current;
         if (video) {
+          // iOS/WKWebView and Android WebView only guarantee camera preview autoplay when the
+          // media element is muted and explicitly inline. Set the DOM properties before srcObject
+          // so the first decoded frame never triggers fullscreen playback or an autoplay block.
+          video.muted = true;
+          video.playsInline = true;
+          video.autoplay = true;
           video.srcObject = stream;
           try {
             await video.play();

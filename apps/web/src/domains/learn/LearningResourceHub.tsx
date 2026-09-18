@@ -2,16 +2,30 @@ import { useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import {
-  ACADEMY_DISCOVERY_CONTRACT,
-  LEARNING_RESOURCES,
-  LEARNING_RESOURCE_ACCESS_LABELS,
-  LEARNING_RESOURCE_CATEGORY_LABELS,
-  LEARNING_RESOURCE_PROVIDER_LABELS,
+  CURATED_LEARNING_RESOURCES as LEARNING_RESOURCES,
+  PRODUCTION_STEP_LABELS,
+  RESOURCE_SOURCE_LABELS,
   filterLearningResources,
-  type LearningResourceCategory,
-  type LearningResourceLevel,
-  type LearningResourceProvider,
+  type LearningResourceSource,
+  type ProductionStep,
 } from "./learning-resources";
+import type { LearningLevel } from "./learning-paths";
+
+type LearningResourceProvider = LearningResourceSource;
+type LearningResourceCategory = ProductionStep;
+type LearningResourceLevel = LearningLevel;
+
+const LEARNING_RESOURCE_ACCESS_LABELS = {
+  internal: "ToonStudio",
+  embed: "임베드",
+  "link-only": "외부 링크",
+  "metadata-only": "메타데이터",
+} as const;
+
+const ACADEMY_DISCOVERY_CONTRACT = {
+  youtube: { operations: ["search.list", "playlistItems.list", "videos.list"] },
+  mcp: { tools: ["search_learning_resources", "get_learning_resource"] },
+} as const;
 
 const LEVEL_LABELS: Readonly<Record<LearningResourceLevel, string>> = {
   starter: "입문",
@@ -22,8 +36,8 @@ const LEVEL_LABELS: Readonly<Record<LearningResourceLevel, string>> = {
 function filterValue<T extends string>(value: string | null, allowed: readonly T[]): T | "all" {
   return value && allowed.includes(value as T) ? value as T : "all";
 }
-const PROVIDERS = Object.keys(LEARNING_RESOURCE_PROVIDER_LABELS) as LearningResourceProvider[];
-const CATEGORIES = Object.keys(LEARNING_RESOURCE_CATEGORY_LABELS) as LearningResourceCategory[];
+const PROVIDERS = Object.keys(RESOURCE_SOURCE_LABELS) as LearningResourceProvider[];
+const CATEGORIES = Object.keys(PRODUCTION_STEP_LABELS) as LearningResourceCategory[];
 const LEVELS: readonly LearningResourceLevel[] = ["starter", "growing", "advanced"];
 
 function updateParam(params: URLSearchParams, key: string, value: string): URLSearchParams {
@@ -41,7 +55,7 @@ export function LearningResourceHub() {
   const provider = filterValue(params.get("provider"), PROVIDERS);
   const category = filterValue(params.get("category"), CATEGORIES);
   const level = filterValue(params.get("level"), LEVELS);
-  const resources = filterLearningResources(LEARNING_RESOURCES, { query, provider, category, level });
+  const resources = filterLearningResources(LEARNING_RESOURCES, { query, source: provider, step: category, level });
 
   const setFilter = (key: string, value: string, replace = false) => {
     setParams(updateParam(params, key, value), { replace });
@@ -79,12 +93,12 @@ export function LearningResourceHub() {
           </label>
           <label className="text-sm font-bold text-fg">출처
             <select className="mt-2 w-full rounded-xl border border-line bg-base px-3 py-2.5 font-normal" value={provider} onChange={(event) => setFilter("provider", event.currentTarget.value)}>
-              <option value="all">전체 출처</option>{PROVIDERS.map((item) => <option key={item} value={item}>{LEARNING_RESOURCE_PROVIDER_LABELS[item]}</option>)}
+              <option value="all">전체 출처</option>{PROVIDERS.map((item) => <option key={item} value={item}>{RESOURCE_SOURCE_LABELS[item]}</option>)}
             </select>
           </label>
           <label className="text-sm font-bold text-fg">주제
             <select className="mt-2 w-full rounded-xl border border-line bg-base px-3 py-2.5 font-normal" value={category} onChange={(event) => setFilter("category", event.currentTarget.value)}>
-              <option value="all">전체 주제</option>{CATEGORIES.map((item) => <option key={item} value={item}>{LEARNING_RESOURCE_CATEGORY_LABELS[item]}</option>)}
+              <option value="all">전체 주제</option>{CATEGORIES.map((item) => <option key={item} value={item}>{PRODUCTION_STEP_LABELS[item]}</option>)}
             </select>
           </label>
           <label className="text-sm font-bold text-fg">난이도
@@ -97,25 +111,25 @@ export function LearningResourceHub() {
       {resources.length ? (
         <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="교육 자료 목록">
           {resources.map((resource) => {
-            const external = resource.href.startsWith("http");
+            const external = resource.url.startsWith("http");
             return (
               <article key={resource.id} className="flex min-h-80 flex-col rounded-3xl border border-line bg-panel p-5 shadow-sm">
                 <div className="flex flex-wrap gap-2 text-xs font-bold">
-                  <span className="rounded-full bg-accent-soft px-3 py-1 text-accent">{LEARNING_RESOURCE_PROVIDER_LABELS[resource.provider]}</span>
-                  <span className="rounded-full bg-raised px-3 py-1 text-fg-2">{LEARNING_RESOURCE_CATEGORY_LABELS[resource.category]}</span>
+                  <span className="rounded-full bg-accent-soft px-3 py-1 text-accent">{RESOURCE_SOURCE_LABELS[resource.source]}</span>
+                  <span className="rounded-full bg-raised px-3 py-1 text-fg-2">{PRODUCTION_STEP_LABELS[resource.steps[0] ?? "workflow"]}</span>
                   <span className="rounded-full bg-raised px-3 py-1 text-fg-2">{LEVEL_LABELS[resource.level]}</span>
                 </div>
                 <h2 className="mt-4 text-xl font-black leading-snug text-fg">{resource.title}</h2>
-                <p className="mt-3 flex-1 text-sm leading-6 text-fg-2">{resource.description}</p>
+                <p className="mt-3 flex-1 text-sm leading-6 text-fg-2">{resource.summary}</p>
                 <div className="mt-4 flex flex-wrap gap-2" aria-label="관련 역량">
                   {resource.skills.map((skill) => <span key={skill} className="rounded-lg border border-line px-2.5 py-1 text-xs text-fg-2">{skill}</span>)}
                 </div>
                 <div className="mt-5 border-t border-line pt-4 text-xs text-fg-2">
-                  <p>{LEARNING_RESOURCE_ACCESS_LABELS[resource.access]} · {resource.verifiedLabel}{resource.durationLabel ? ` · ${resource.durationLabel}` : ""}</p>
+                  <p>{LEARNING_RESOURCE_ACCESS_LABELS[resource.rights]} · {resource.verified ? "검증됨" : "미검증"}</p>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {external ? <a className="rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-contrast" href={resource.href} target="_blank" rel="noopener noreferrer">원문 열기 ↗</a> : <Link className="rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-contrast" to={resource.href}>강좌 열기 →</Link>}
-                  {resource.practiceHref && <Link className="rounded-xl border border-line px-4 py-2 text-sm font-bold text-fg hover:bg-raised" to={resource.practiceHref}>바로 실습 →</Link>}
+                  {external ? <a className="rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-contrast" href={resource.url} target="_blank" rel="noopener noreferrer">원문 열기 ↗</a> : <Link className="rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-contrast" to={resource.url}>강좌 열기 →</Link>}
+                  {resource.practicePath && <Link className="rounded-xl border border-line px-4 py-2 text-sm font-bold text-fg hover:bg-raised" to={resource.practicePath}>바로 실습 →</Link>}
                 </div>
               </article>
             );

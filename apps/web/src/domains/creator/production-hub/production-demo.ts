@@ -5,6 +5,7 @@ import {
   episodeScope,
   projectScope,
   type ProductionProjectAggregate,
+  type ProductionRisk,
   type ProductionStudioRevisionLink,
   type RevisionRef,
   type ScopeRef,

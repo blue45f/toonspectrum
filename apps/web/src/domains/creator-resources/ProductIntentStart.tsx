@@ -23,6 +23,7 @@ import {
   getCreatorContinuitySnapshot,
   subscribeCreatorContinuity,
 } from "@/shared/lib/creator-continuity";
+import { creatorDestinationDescription } from "@/shared/lib/creator-continuity-destinations";
 import { useI18n } from "@/shared/lib/i18n";
 import {
   PRODUCT_START_DESTINATIONS,

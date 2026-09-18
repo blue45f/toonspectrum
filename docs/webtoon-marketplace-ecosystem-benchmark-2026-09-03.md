@@ -43,13 +43,13 @@
 
 | 모듈 및 컴포넌트 | 담당 역할 및 벤치마크 기능 | 주요 세부 사양 |
 |---|---|---|
-| [`market-webtoon-spec-inspector.ts`](file:///Users/hjunkim/WebstormProjects/toonspectrum/src/domains/market/models/market-webtoon-spec-inspector.ts) | **기술 스펙 & 호환성 검사기**<br>(Unreal Fab & Acon3D 벤치마크) | • 7대 포맷(GLB, VRM, OBJ, FBX, CS3O, SKP, JSON) 지원<br>• 폴리곤 등급 판정: `ultra-light` (<15k), `optimal-webtoon` (15k~100k), `mid-poly` (100k~300k), `heavy-warning` (>300k LOD 경고)<br>• 웹툰 은선 추출 적합도 및 4K 초과 텍스처 경고 감사 |
-| [`market-webtoon-licensing.ts`](file:///Users/hjunkim/WebstormProjects/toonspectrum/src/domains/market/models/market-webtoon-licensing.ts) | **웹툰 4단계 상업 라이선스 & NoAI 규정**<br>(Acon3D & BOOTH 벤치마크) | • 1인 개인 작가(1인), 스튜디오 팀(5인), 에이전시 법인(무제한), CC0 공개<br>• 티어별 표준 가격 배율 산출 (1.0x, 2.5x, 5.0x, 무료)<br>• AI 무단 학습 방지(NoAI) 보증 및 원본 재판매 금지 컴플라이언스 검증 |
-| [`market-creator-revenue-calculator.ts`](file:///Users/hjunkim/WebstormProjects/toonspectrum/src/domains/market/models/market-creator-revenue-calculator.ts) | **크리에이터 정산 & 로열티 계산기**<br>(포스타입 & Gumroad 벤치마크) | • 플랫폼 수수료 (일반 20%, 파트너 10%), PG 수수료(3.3%), 원천징수세(3.3%) 공제<br>• 크리에이터 부스트 팁 100% 직통 정산 및 실수령액 투명 산출 |
-| [`market-asset-bundle-planner.ts`](file:///Users/hjunkim/WebstormProjects/toonspectrum/src/domains/market/models/market-asset-bundle-planner.ts) | **에피소드 원스톱 에셋 번들 플래너**<br>(클립스튜디오 & Fab 벤치마크) | • 배경 3D + 소품 + 브러시 + 팔레트 올인원 에피소드 키트 빌더<br>• 수량별 할인율(15%~35%) 및 절감액 자동 계산<br>• 배경/소품/브러시 구비율에 따른 씬 완성도 점수(0~100점) 산출 |
-| [`MarketWebtoonSpecBadge.tsx`](file:///Users/hjunkim/WebstormProjects/toonspectrum/src/domains/market/components/MarketWebtoonSpecBadge.tsx) | **웹툰 전문 스펙 뱃지 바** | • 포맷 칩, 폴리곤 최적화 등급, 은선 렌더 지원, NoAI 안심, 라이선스 티어 표기 |
-| [`MarketWebtoon3dViewerModal.tsx`](file:///Users/hjunkim/WebstormProjects/toonspectrum/src/domains/market/components/MarketWebtoon3dViewerModal.tsx) | **3D 인터랙티브 실시간 뷰어 모달**<br>(에이콘3D 웹 뷰어 벤치마크) | • 4대 렌더 모드(은선 Lineart, 셀 셰이딩 Cel, 모노크롬, 컬러 텍스처)<br>• 3단 조명(주간, 노을, 야경) 및 360도 턴테이블, 와이어프레임 토글<br>• 스튜디오 캔버스 원클릭 직통 임포트 CTA 연동 |
-| [`MarketResourceDetailArticle.tsx`](file:///Users/hjunkim/WebstormProjects/toonspectrum/src/domains/market/components/MarketResourceDetailArticle.tsx) | **마켓 리소스 상세 페이지 통합** | • 상단 헤더에 전문 스펙 뱃지 및 3D 뷰어 런처 내장 |
+| [`market-webtoon-spec-inspector.ts`](../apps/web/src/domains/market/models/market-webtoon-spec-inspector.ts) | **기술 스펙 & 호환성 검사기**<br>(Unreal Fab & Acon3D 벤치마크) | • 7대 포맷(GLB, VRM, OBJ, FBX, CS3O, SKP, JSON) 지원<br>• 폴리곤 등급 판정: `ultra-light` (<15k), `optimal-webtoon` (15k~100k), `mid-poly` (100k~300k), `heavy-warning` (>300k LOD 경고)<br>• 웹툰 은선 추출 적합도 및 4K 초과 텍스처 경고 감사 |
+| [`market-webtoon-licensing.ts`](../apps/web/src/domains/market/models/market-webtoon-licensing.ts) | **웹툰 4단계 상업 라이선스 & NoAI 규정**<br>(Acon3D & BOOTH 벤치마크) | • 1인 개인 작가(1인), 스튜디오 팀(5인), 에이전시 법인(무제한), CC0 공개<br>• 티어별 표준 가격 배율 산출 (1.0x, 2.5x, 5.0x, 무료)<br>• AI 무단 학습 방지(NoAI) 보증 및 원본 재판매 금지 컴플라이언스 검증 |
+| [`market-creator-revenue-calculator.ts`](../apps/web/src/domains/market/models/market-creator-revenue-calculator.ts) | **크리에이터 정산 & 로열티 계산기**<br>(포스타입 & Gumroad 벤치마크) | • 플랫폼 수수료 (일반 20%, 파트너 10%), PG 수수료(3.3%), 원천징수세(3.3%) 공제<br>• 크리에이터 부스트 팁 100% 직통 정산 및 실수령액 투명 산출 |
+| [`market-asset-bundle-planner.ts`](../apps/web/src/domains/market/models/market-asset-bundle-planner.ts) | **에피소드 원스톱 에셋 번들 플래너**<br>(클립스튜디오 & Fab 벤치마크) | • 배경 3D + 소품 + 브러시 + 팔레트 올인원 에피소드 키트 빌더<br>• 수량별 할인율(15%~35%) 및 절감액 자동 계산<br>• 배경/소품/브러시 구비율에 따른 씬 완성도 점수(0~100점) 산출 |
+| [`MarketWebtoonSpecBadge.tsx`](../apps/web/src/domains/market/components/MarketWebtoonSpecBadge.tsx) | **웹툰 전문 스펙 뱃지 바** | • 포맷 칩, 폴리곤 최적화 등급, 은선 렌더 지원, NoAI 안심, 라이선스 티어 표기 |
+| [`MarketWebtoon3dViewerModal.tsx`](../apps/web/src/domains/market/components/MarketWebtoon3dViewerModal.tsx) | **3D 인터랙티브 실시간 뷰어 모달**<br>(에이콘3D 웹 뷰어 벤치마크) | • 4대 렌더 모드(은선 Lineart, 셀 셰이딩 Cel, 모노크롬, 컬러 텍스처)<br>• 3단 조명(주간, 노을, 야경) 및 360도 턴테이블, 와이어프레임 토글<br>• 스튜디오 캔버스 원클릭 직통 임포트 CTA 연동 |
+| [`MarketResourceDetailArticle.tsx`](../apps/web/src/domains/market/components/MarketResourceDetailArticle.tsx) | **마켓 리소스 상세 페이지 통합** | • 상단 헤더에 전문 스펙 뱃지 및 3D 뷰어 런처 내장 |
 
 ---
 

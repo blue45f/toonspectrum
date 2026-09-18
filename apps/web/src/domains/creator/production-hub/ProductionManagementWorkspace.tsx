@@ -382,35 +382,35 @@ export function ProductionManagementWorkspace({
           value={nextRelease ? relativeDeadline(nextRelease.daysUntilRelease) : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "미정")}
           detail={nextRelease ? `${nextRelease.title} · ${formatDate(nextRelease.releaseAt)}` : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "게시 마감 설정 필요")}
           icon={CalendarClock}
-          tone={nextRelease?.health === "critical" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "danger") : nextRelease?.health === "risk" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "accent")}
+          tone={nextRelease?.health === "critical" ? "danger" : nextRelease?.health === "risk" ? "warning" : "accent"}
         />
         <MetricCard
           label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "준비 버퍼")}
           value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "{v0}회"), { v0: String(overview.operations.readyBufferCount) })}
           detail={overview.operations.cadenceDays ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "{v0}일 연재 주기 기준"), { v0: String(overview.operations.cadenceDays) }) : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "연재 주기 확인 필요")}
           icon={BadgeCheck}
-          tone={overview.operations.readyBufferCount >= 2 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "warning")}
+          tone={overview.operations.readyBufferCount >= 2 ? "success" : "warning"}
         />
         <MetricCard
           label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "마감 위험")}
           value={String(overview.operations.criticalCount + overview.operations.riskCount)}
           detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "즉시 {v0} · 주의 {v1} · 예측 초과 {v2}"), { v0: String(overview.operations.criticalCount), v1: String(overview.operations.riskCount), v2: String(overview.riskIntelligence.predictedOverrunTaskCount) })}
           icon={AlertTriangle}
-          tone={overview.operations.criticalCount > 0 || overview.riskIntelligence.predictedOverrunTaskCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "danger") : overview.operations.riskCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "success")}
+          tone={overview.operations.criticalCount > 0 || overview.riskIntelligence.predictedOverrunTaskCount > 0 ? "danger" : overview.operations.riskCount > 0 ? "warning" : "success"}
         />
         <MetricCard
           label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "막힌 질문")}
           value={String(overview.blockingQuestionCount)}
           detail={overview.blockingQuestionCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "답변 전 다음 작업 진행 불가") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "차단 질문 없음")}
           icon={ShieldAlert}
-          tone={overview.blockingQuestionCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "success")}
+          tone={overview.blockingQuestionCount > 0 ? "danger" : "success"}
         />
         <MetricCard
           label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "검수·수정")}
           value={String(overview.reviewTaskCount)}
           detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "검수·변경 조치 {v0}건"), { v0: String(reviewOrChangeCount) })}
           icon={ListChecks}
-          tone={overview.reviewTaskCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "success")}
+          tone={overview.reviewTaskCount > 0 ? "warning" : "success"}
         />
         <MetricCard
           label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "미배정·과부하")}
@@ -419,7 +419,7 @@ export function ProductionManagementWorkspace({
             ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "후보 없음 {v0} · 과부하 {v1}"), { v0: String(overview.uncoveredUnassignedTaskCount), v1: String(overview.overloadedAssignmentCount) })
             : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "책임자 미배정 · 기본 가용량 초과")}
           icon={Users}
-          tone={overview.unassignedTaskCount + overview.overloadedAssignmentCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "success")}
+          tone={overview.unassignedTaskCount + overview.overloadedAssignmentCount > 0 ? "warning" : "success"}
         />
       </div>
 
@@ -664,7 +664,7 @@ export function ProductionManagementWorkspace({
                       <Link to={episodeHref} className="group block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
                         <span className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-black text-fg">{operations.episodeNumber ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "{v0}화"), { v0: String(operations.episodeNumber) }) : operations.episode.episodeId}</span>
-                          <Pill tone={operations.health === "critical" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "danger") : operations.health === "risk" || operations.health === "unplanned" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "warning") : operations.health === "published" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "accent")}>
+                          <Pill tone={operations.health === "critical" ? "danger" : operations.health === "risk" || operations.health === "unplanned" ? "warning" : operations.health === "published" ? "success" : "accent"}>
                             {episodeHealthLabel(operations.health)}
                           </Pill>
                         </span>

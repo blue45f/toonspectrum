@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CREATOR_ROLE_MAX_SECONDARY,
+  EMPTY_CREATOR_ROLE_PROFILE,
   creatorRoleLens,
   creatorRoleSelection,
   normalizeCreatorRoleProfile,
@@ -12,17 +13,7 @@ import {
 
 describe("creator role profile contract", () => {
   it("legacy or malformed reads fall back to a safe empty profile", () => {
-    expect(normalizeCreatorRoleProfile(null)).toEqual({
-      version: 1,
-      primaryRole: null,
-      secondaryRoles: [],
-      specialties: [],
-      creatorStage: null,
-      experienceLevel: null,
-      collaborationStatus: null,
-      roleVisibility: true,
-      activeRole: null,
-    });
+    expect(normalizeCreatorRoleProfile(null)).toEqual(EMPTY_CREATOR_ROLE_PROFILE);
 
     expect(normalizeCreatorRoleProfile({
       primaryRole: "story",
@@ -31,15 +22,17 @@ describe("creator role profile contract", () => {
       activeRole: "unknown",
       roleVisibility: false,
     })).toEqual({
-      version: 1,
+      ...EMPTY_CREATOR_ROLE_PROFILE,
       primaryRole: "story",
       secondaryRoles: ["assistant"],
       specialties: ["dialogue"],
-      creatorStage: null,
-      experienceLevel: null,
-      collaborationStatus: null,
       roleVisibility: false,
       activeRole: "story",
+      onboarding: {
+        ...EMPTY_CREATOR_ROLE_PROFILE.onboarding,
+        status: "completed",
+        step: 4,
+      },
     });
   });
 

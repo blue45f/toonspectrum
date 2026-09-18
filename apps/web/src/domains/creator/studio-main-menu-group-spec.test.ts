@@ -181,8 +181,8 @@ describe("§15.3 menu group spec", () => {
       groupsWithItems: 17,
       emptyGroupIds: [],
       specRows: 137,
-      rowsPresent: 38,
-      rowsPartial: 38,
+      rowsPresent: 39,
+      rowsPartial: 37,
       rowsAbsent: 61,
       // 2026-08-20: CSP 경계 효과(layer/border-effect)도 §15.3 행이 없어 extras(37 → 38).
       // 2026-08-27: View 중복이던 검수·미리보기 3종과 창 그룹의 앱 설정 두 번째
@@ -191,7 +191,7 @@ describe("§15.3 menu group spec", () => {
       // 2026-09-03: 현지화 QA(text/localization-qa)는 Localization Layout 행의 두 번째
       // 항목이라 partial 상태를 유지한다. 2026-09-17 웹툰 세로 캔버스가 전용 메뉴 문을
       // 얻어 absent → partial 로 이동했다. 2026-09-18 Vectorize Raster 는 인스펙터 전용임을
-      // 정확히 기록해 present → partial 로 이동했으므로 rowsPresent 38 / rowsPartial 38 이다.
+      // 정확히 기록해 메뉴 item claim 을 제거했고, 위 합계는 최신 main 전체를 다시 측정한 값이다.
       // 2026-09-06: 별도 사용자 매뉴얼 문(help/user-manual, #794)은 §15.3 행이 없어 extras(38 → 39).
       // Recent-stroke correction is a shipped extra alongside the drawing-assist mode.
       extras: 41,
