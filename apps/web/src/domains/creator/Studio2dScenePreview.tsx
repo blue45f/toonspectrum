@@ -79,7 +79,8 @@ export function Studio2dScenePreview({ scene, disabled, onPick, onClose }: {
             {metadata && <p className="text-fg-3">{metadata.environment} · {metadata.timeOfDay} · {metadata.containsPeople ? "인물 포함" : "인물 없는 배경"} · {isLargeStudio2dAsset(metadata) ? "큰 원본" : "소형 컷용 원본"}</p>}
             {metadata?.review.notes.map((note) => <p key={note} className="rounded-lg border border-line bg-raised p-2">{note}</p>)}
             {metadata?.provenance.licenseStatus === "cc0-verified" ? <p className="rounded-lg border border-line bg-raised p-2 text-fg-3">CC0 1.0 · {metadata.provenance.provider ?? "출처 확인 완료"} · 상업 이용과 수정이 가능한 출처 확인 소재입니다.</p>
-              : scene.imgSrc && <p className="rounded-lg border border-line p-2 text-fg-3">기존 카탈로그 소재 · 이용 권리 기록 미확인. 상업 이용·소재 재배포 전 출처와 이용 조건을 확인하세요. 추천 표시는 라이선스 승인이 아닙니다.</p>}
+              : metadata?.provenance.licenseStatus === "first-party-generated" ? <p className="rounded-lg border border-line bg-raised p-2 text-fg-3">Studio 생성 소재 · {metadata.provenance.provider ?? "생성 이력 확인"} · 프롬프트 해시와 생성 기록이 보존된 1차 생성 에셋입니다.</p>
+                : scene.imgSrc && <p className="rounded-lg border border-line p-2 text-fg-3">기존 카탈로그 소재 · 이용 권리 기록 미확인. 상업 이용·소재 재배포 전 출처와 이용 조건을 확인하세요. 추천 표시는 라이선스 승인이 아닙니다.</p>}
           </div>
         </div>
         <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line p-4">
