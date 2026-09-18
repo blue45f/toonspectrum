@@ -61,7 +61,7 @@ export function runShard(name) {
   const targets = expandGlobTargets(executionTargetsByShard()[name]);
   runCommand({
     label: `Vitest shard ${name} (${targets.length} expanded execution targets)`,
-    argv: ["pnpm", "exec", "vitest", "run", ...targets],
+    argv: ["pnpm", "exec", "vitest", "run", ...targets, "--pool=forks", "--maxWorkers=4"],
   });
 }
 
