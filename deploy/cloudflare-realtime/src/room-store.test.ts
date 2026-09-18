@@ -140,8 +140,8 @@ describe("realtime SQLite room store", () => {
       REALTIME_ROOM_APPLICATION_SCHEMA_VERSION,
     );
 
-    // Migrations are additive, so removing v2/v3 state and history recreates
-    // the exact persisted shape produced by application schema v1.
+    // Recreate the exact persisted shape produced by application schema v1:
+    // v2/v3 objects are absent and the v1 rate-budget expiry index still exists.
     database.exec(`
       DROP TRIGGER screen_share_predecessor_cleanup;
       DROP TRIGGER screen_member_predecessor_cleanup;
@@ -152,6 +152,8 @@ describe("realtime SQLite room store", () => {
       DROP TRIGGER teardown_receipt_key_conflict;
       DROP TABLE teardown_receipt_usage;
       DROP TABLE teardown_idempotency_receipt;
+      CREATE INDEX IF NOT EXISTS rate_budget_expiry_idx
+        ON rate_budget (expires_at_ms);
       DELETE FROM _sql_schema_migrations WHERE version >= 2;
     `);
 
@@ -176,7 +178,15 @@ describe("realtime SQLite room store", () => {
       { version: 1, name: "initial-room-schema" },
       { version: 2, name: "reserved-teardown-receipts" },
       { version: 3, name: "predecessor-bound-teardown-acks" },
+      { version: 4, name: "drop-rate-budget-expiry-index" },
     ]);
+    expect(
+      database
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'rate_budget_expiry_idx'",
+        )
+        .all(),
+    ).toEqual([]);
     expect(
       database
         .prepare(
@@ -249,7 +259,9 @@ describe("realtime SQLite room store", () => {
       DROP TABLE teardown_ack_tombstone;
       DROP TABLE screen_member_teardown_predecessor;
       DROP TABLE screen_share_teardown_predecessor;
-      DELETE FROM _sql_schema_migrations WHERE version = 3;
+      CREATE INDEX IF NOT EXISTS rate_budget_expiry_idx
+        ON rate_budget (expires_at_ms);
+      DELETE FROM _sql_schema_migrations WHERE version >= 3;
     `);
 
     const upgraded = new RealtimeRoomStore(storage);
@@ -257,7 +269,9 @@ describe("realtime SQLite room store", () => {
     upgraded.initialize();
     upgraded.initialize();
 
-    expect(upgraded.getApplicationSchemaVersion()).toBe(3);
+    expect(upgraded.getApplicationSchemaVersion()).toBe(
+      REALTIME_ROOM_APPLICATION_SCHEMA_VERSION,
+    );
     expect(
       database
         .prepare(
