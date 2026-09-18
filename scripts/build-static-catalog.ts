@@ -262,40 +262,92 @@ async function main(): Promise<void> {
   console.log("완료.");
 }
 
-// SEO 사이트맵 — 정적 라우트 + 품질 작품 상세 URL. apps/web/public/ 루트에 써서 /sitemap.xml 로 서빙.
-// (apps/web/public/sitemap.xml 은 빌드 산출물이라 .gitignore. robots.txt 가 이 위치를 가리킨다.)
-function writeSitemap(): void {
-  const BASE = "https://www.toonstudio.cloud";
-  const STATIC_ROUTES = [
-    "/", "/search", "/ranking", "/recommend", "/explore", "/calendar",
-    "/reviews", "/community", "/community/cafes", "/insights", "/authors", "/tags", "/compare",
-    "/about", "/brand-film", "/about/technology", "/about/technology/story", "/about/technology/guides",
-    "/about/technology/references", "/about/technology/field-notes", "/about/technology/deck", "/about/technology/videos", "/about/technology/licenses",
-    "/guide", "/news", "/create", "/shaper", "/market", "/market/browse", "/contact",
-  ];
-  // thin-content 방지를 위해 '평점이 있는' 작품만 색인(빈 페이지 제외) — 조회수 상위 15000편.
-  // 표지 유무에 의존하지 않는다(표지 정책 off·19+ 제거와 무관하게 동작). 성인(19+) 작품은
-  // 검색엔진에 노출하지 않는다(미성년 검색 유입 차단).
-  const topTitles = TITLES.filter((t) => t.ageRating !== "19" && t.stats.ratingCount > 0)
-    .sort((a, b) => b.stats.views - a.stats.views)
-    .slice(0, 15000);
-  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const entry = (loc: string, priority: string) =>
-    `  <url><loc>${esc(loc)}</loc><priority>${priority}</priority></url>`;
-  const urls = [
-    ...STATIC_ROUTES.map((r) => entry(`${BASE}${r}`, r === "/" ? "1.0" : "0.8")),
-    // 인기 순위 구간별 priority(상위일수록 높게) — 크롤 우선순위 힌트.
-    ...topTitles.map((t, i) =>
-      entry(`${BASE}/title/${encodeURIComponent(t.slug)}`, i < 1000 ? "0.7" : i < 5000 ? "0.6" : "0.5")
-    ),
-  ];
+// SEO 사이트맵 — 검색 가치가 있는 canonical 공개 URL만 노출한다.
+// 검색/비교/편집기/계정/레거시 alias는 색인 대상이 아니므로 sitemap에서 제외한다.
+const SEO_BASE_URL = "https://www.toonstudio.cloud";
+const SITEMAP_MAX_URLS = 45_000;
+const STATIC_ROUTES = [
+  "/", "/ranking", "/recommend", "/explore", "/calendar", "/reviews",
+  "/community", "/community/cafes", "/insights", "/insights/resources", "/authors", "/tags",
+  "/about", "/about/workflow", "/about/principles", "/about/data", "/about/crawler",
+  "/about/technology", "/about/technology/story", "/about/technology/guides",
+  "/about/technology/references", "/about/technology/field-notes", "/about/technology/deck",
+  "/about/technology/videos", "/about/technology/licenses", "/accessibility", "/copyright",
+  "/design", "/guide", "/help", "/news", "/showcase", "/showcase/challenges",
+  "/showcase/promo", "/market", "/market/browse", "/market/fit", "/research",
+  "/research/assets", "/research/books", "/research/3d-assets", "/references",
+  "/story-lab", "/learn", "/learn/recipes", "/contact", "/business", "/support",
+  "/support-us", "/support-creators", "/sitemap", "/product-tour", "/brand-film",
+];
+
+function sitemapEscape(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function sitemapUrlEntry(loc: string): string {
+  return `  <url><loc>${sitemapEscape(loc)}</loc></url>`;
+}
+
+function writeSitemapUrlSet(relativeFile: string, urls: readonly string[]): void {
+  const file = path.join(ROOT, "apps", "web", "public", relativeFile);
+  mkdirSync(path.dirname(file), { recursive: true });
   const xml =
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-    urls.join("\n") +
+    urls.map(sitemapUrlEntry).join("\n") +
     `\n</urlset>\n`;
-  const file = path.join(ROOT, "apps", "web", "public", "sitemap.xml");
   writeFileSync(file, xml);
-  console.log(`  sitemap.xml      ${(statSync(file).size / 1024).toFixed(0).padStart(5)} KB (${urls.length} URLs)`);
+}
+
+function writeChunkedSitemaps(
+  stem: string,
+  urls: readonly string[],
+  sitemapFiles: string[],
+): void {
+  for (let offset = 0; offset < urls.length; offset += SITEMAP_MAX_URLS) {
+    const chunk = urls.slice(offset, offset + SITEMAP_MAX_URLS);
+    const index = Math.floor(offset / SITEMAP_MAX_URLS) + 1;
+    const relativeFile = `sitemaps/${stem}-${index}.xml`;
+    writeSitemapUrlSet(relativeFile, chunk);
+    sitemapFiles.push(relativeFile);
+  }
+}
+
+function writeSitemap(): void {
+  // thin-content 방지를 위해 평점 참여가 있는 비성인 작품 중 조회수 상위 15,000편만 노출한다.
+  const titleUrls = TITLES
+    .filter((title) => title.ageRating !== "19" && title.stats.ratingCount > 0)
+    .sort((a, b) => b.stats.views - a.stats.views)
+    .slice(0, 15_000)
+    .map((title) => `${SEO_BASE_URL}/title/${encodeURIComponent(title.slug)}`);
+
+  const authorUrls = getAuthorDirectory(Number.MAX_SAFE_INTEGER).authors
+    .filter((author) => author.name !== "미상" && author.workCount > 0)
+    .map((author) => `${SEO_BASE_URL}/author/${encodeURIComponent(author.name)}`);
+
+  const pageUrls = STATIC_ROUTES.map((route) => `${SEO_BASE_URL}${route}`);
+  const sitemapDirectory = path.join(ROOT, "apps", "web", "public", "sitemaps");
+  rmSync(sitemapDirectory, { recursive: true, force: true });
+
+  const sitemapFiles: string[] = [];
+  writeChunkedSitemaps("pages", pageUrls, sitemapFiles);
+  writeChunkedSitemaps("titles", titleUrls, sitemapFiles);
+  writeChunkedSitemaps("authors", authorUrls, sitemapFiles);
+
+  const indexXml =
+    `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    sitemapFiles
+      .map((relativeFile) => `  <sitemap><loc>${SEO_BASE_URL}/${sitemapEscape(relativeFile)}</loc></sitemap>`)
+      .join("\n") +
+    `\n</sitemapindex>\n`;
+  const indexFile = path.join(ROOT, "apps", "web", "public", "sitemap.xml");
+  writeFileSync(indexFile, indexXml);
+  console.log(
+    `  sitemap.xml      ${String(sitemapFiles.length).padStart(5)} files (${pageUrls.length + titleUrls.length + authorUrls.length} URLs)`,
+  );
 }
 
 main().catch((error) => {

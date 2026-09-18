@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { SITE_URL } from "@toonspectrum/core";
 import { PenLine } from "lucide-react";
 import { useParams } from "react-router-dom";
 
@@ -15,8 +16,15 @@ import { formatCount } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 import { ErrorState } from "@/components/error-state";
 import { NotFoundPage } from "@/components/NotFoundPage";
-import { useDocumentTitle, useMetaDescription, usePageSocialMeta } from "@/hooks/use-document-title";
+import {
+  useDocumentTitle,
+  useJsonLd,
+  useMetaDescription,
+  useMetaRobots,
+  usePageSocialMeta,
+} from "@/hooks/use-document-title";
 import { useApiResource } from "@/infrastructure/use-api-resource";
+import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 
 const SharePageButton = lazy(async () => {
   const module = await import("@/shared/components/share-page-button");
@@ -65,8 +73,42 @@ export function AuthorPage() {
     description: shareDescription,
     type: "website",
   });
+  const canonicalUrl = `${SITE_URL}${sharePath}`;
+  const missingAuthor = notFound || (!loading && !error && authorParam && data === null);
+  useMetaRobots(missingAuthor ? NOINDEX_PRIVATE_ROBOTS : null);
+  useJsonLd(data ? {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "ProfilePage",
+        "@id": `${canonicalUrl}#profile`,
+        url: canonicalUrl,
+        name: `${author} 작가`,
+        description: shareDescription,
+        mainEntity: {
+          "@type": "Person",
+          "@id": `${canonicalUrl}#person`,
+          name: author,
+          url: canonicalUrl,
+          knowsAbout: genres,
+        },
+        hasPart: works.slice(0, 20).map((work) => ({
+          "@type": work.type === "webtoon" ? "ComicSeries" : "CreativeWorkSeries",
+          name: work.title,
+          url: `${SITE_URL}/title/${encodeURIComponent(work.slug)}`,
+        })),
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "작가", item: `${SITE_URL}/authors` },
+          { "@type": "ListItem", position: 2, name: author, item: canonicalUrl },
+        ],
+      },
+    ],
+  } : null);
 
-  if (notFound || (!loading && !error && authorParam && data === null)) return <NotFoundPage />;
+  if (missingAuthor) return <NotFoundPage />;
 
   return (
     <Container size="wide" className="py-10">

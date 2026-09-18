@@ -2,6 +2,7 @@ import {
   formatI18nTemplate,
   translateCurrentStaticSourceText,
 } from "@/shared/lib/i18n-bilingual-copy";
+import { SITE_URL } from "@toonspectrum/core";
 import { Bookmark, Eye, Heart, Layers, MapPin, Star } from "lucide-react";
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
@@ -40,8 +41,15 @@ import Link from "@/compat/router-link";
 import { ErrorState } from "@/components/error-state";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { useAppConfig } from "@/hooks/use-app-config";
-import { useDocumentTitle, useMetaDescription } from "@/hooks/use-document-title";
+import {
+  useDocumentTitle,
+  useJsonLd,
+  useMetaDescription,
+  useMetaRobots,
+  usePageSocialMeta,
+} from "@/hooks/use-document-title";
 import { useApiResource } from "@/infrastructure/use-api-resource";
+import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 
 
 interface TitleDetailResponse {
@@ -78,6 +86,55 @@ export function TitleDetailPage() {
         .join(" — ")
     : null;
   useMetaDescription(metaDesc);
+
+  const canonicalPath = t?.slug
+    ? `/title/${encodeURIComponent(t.slug)}`
+    : slug
+      ? `/title/${encodeURIComponent(slug)}`
+      : "/explore";
+  const canonicalUrl = `${SITE_URL}${canonicalPath}`;
+  const shareDescription = metaDesc || "웹툰과 웹소설 작품 정보, 작가, 장르와 감상 경로를 확인해 보세요.";
+  usePageSocialMeta({
+    canonicalPath,
+    title: t?.title ?? "작품 정보",
+    description: shareDescription,
+    type: "article",
+    image: t?.coverImage,
+    imageAlt: t ? `${t.title} 표지` : "작품 표지",
+  });
+  useMetaRobots(
+    notFound || t?.ageRating === "19" ? NOINDEX_PRIVATE_ROBOTS : null,
+  );
+  useJsonLd(t ? {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": t.type === "webtoon" ? "ComicSeries" : "CreativeWorkSeries",
+        "@id": `${canonicalUrl}#work`,
+        url: canonicalUrl,
+        name: t.title,
+        alternateName: t.altTitles,
+        description: shareDescription,
+        image: t.coverImage,
+        creator: {
+          "@type": "Person",
+          name: t.author,
+          url: `${SITE_URL}/author/${encodeURIComponent(t.author)}`,
+        },
+        contributor: t.artist ? { "@type": "Person", name: t.artist } : undefined,
+        genre: t.genres,
+        keywords: t.tags.join(", "),
+        contentRating: t.ageRating,
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "탐색", item: `${SITE_URL}/explore` },
+          { "@type": "ListItem", position: 2, name: t.title, item: canonicalUrl },
+        ],
+      },
+    ],
+  } : null);
 
   const addRecentlyViewed = useApp((s) => s.addRecentlyViewed);
   const viewedId = data?.title?.id;

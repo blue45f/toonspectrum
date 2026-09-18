@@ -10,6 +10,7 @@ import { useRouteTitle } from "./route-titles";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { useRouteSeoPolicy } from "@/hooks/use-document-title";
 import { SiteRouteExperienceBoundary } from "@/shared/components/SiteRouteExperienceBoundary";
 import {
   isStudioWorkspaceLocation,
@@ -51,6 +52,7 @@ function AppRouteTree({
 export function AppRouter() {
   const { pathname, search } = useLocation();
   const routeTitle = useRouteTitle(pathname, search);
+  useRouteSeoPolicy(pathname);
 
   const legacyEditorHref = legacyStudioEditorHref(pathname, search);
   if (legacyEditorHref) return <Navigate replace to={legacyEditorHref} />;

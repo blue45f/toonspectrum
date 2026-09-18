@@ -18,10 +18,75 @@
 /studio
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: credentialless
+  X-Robots-Tag: noindex, nofollow, noarchive
 
 /studio/*
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: credentialless
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/admin
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/admin/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/production
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/production/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/library
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/messages
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/messages/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/me
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/my
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/settings
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/settings/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/auth/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/market/checkout/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/market/library
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/market/manage
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/market/publish
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/market/wishlist
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/search
+  X-Robots-Tag: noindex, follow
+
+/compare
+  X-Robots-Tag: noindex, follow
+
+/random
+  X-Robots-Tag: noindex, follow
+
+/market/compare
+  X-Robots-Tag: noindex, follow
 
 /sw.js
   Cache-Control: no-cache
