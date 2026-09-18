@@ -366,7 +366,7 @@ function readPointer(root: JsonValue, pointer: string): JsonValue {
       if (value === undefined) throw new Error(`missing JSON pointer ${pointer}`);
       current = value;
     } else if (current !== null && typeof current === "object") {
-      if (!(segment in current)) throw new Error(`missing JSON pointer ${pointer}`);
+      if (!Object.hasOwn(current, segment)) throw new Error(`missing JSON pointer ${pointer}`);
       current = current[segment] as JsonValue;
     } else {
       throw new Error(`JSON pointer traverses a primitive at ${pointer}`);
@@ -397,8 +397,15 @@ function writePointer(
     }
     return root;
   }
-  if (mode === "replace" && !(key in parent)) throw new Error(`missing JSON pointer ${pointer}`);
-  parent[key] = value;
+  if (mode === "replace" && !Object.hasOwn(parent, key)) {
+    throw new Error(`missing JSON pointer ${pointer}`);
+  }
+  Object.defineProperty(parent, key, {
+    value,
+    enumerable: true,
+    configurable: true,
+    writable: true,
+  });
   return root;
 }
 
@@ -411,7 +418,7 @@ function removePointer(root: JsonValue, pointer: string): JsonValue {
     if (parent[index] === undefined) throw new Error(`missing JSON pointer ${pointer}`);
     parent.splice(index, 1);
   } else {
-    if (!(key in parent)) throw new Error(`missing JSON pointer ${pointer}`);
+    if (!Object.hasOwn(parent, key)) throw new Error(`missing JSON pointer ${pointer}`);
     delete parent[key];
   }
   return root;
@@ -430,6 +437,7 @@ function resolveParent(
       if (next === undefined) throw new Error(`missing JSON pointer ${pointer}`);
       parent = next;
     } else if (parent !== null && typeof parent === "object") {
+      if (!Object.hasOwn(parent, segment)) throw new Error(`missing JSON pointer ${pointer}`);
       const next = parent[segment];
       if (next === undefined) throw new Error(`missing JSON pointer ${pointer}`);
       parent = next;
