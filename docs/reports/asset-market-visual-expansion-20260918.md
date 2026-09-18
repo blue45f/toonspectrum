@@ -35,6 +35,8 @@ Marketplace records now retain the real provider (`Poly Haven` or `Kenney`) and 
 
 ## GPT Image 2.5 legacy background batch
 
-The remaining 20 legacy portrait backgrounds are 627×940 JPEGs, with `.png` aliases that contain the same JPEG bytes. Their target recipes are already pinned to `gpt-image-2.5-sunburst`, `quality: max`, 1152×2048 PNG output, text/logo-free constraints and deterministic source manifests.
+The 20 legacy portrait backgrounds that previously used 627×940 JPEGs now have reviewed 1152×2048 PNG replacements. The original stable IDs are preserved, while each ID resolves to its new generated binary in the active Studio catalog.
 
-The generator and runtime migration are prepared, but generated binaries must not be faked. The batch is only complete after a secure provider key is available in the execution environment, all 20 PNGs pass dimension/format review, and the compatibility IDs are redirected to the new binaries so old documents also receive the quality upgrade.
+Each replacement has a deterministic source manifest with prompt hash, output SHA-256 and byte size. The 20 assets are marked `full-image / usable / recommended`, contain no characters or readable text, and the old small-panel-only metadata is removed from the active quality registry. Only four unrelated legacy compatibility backgrounds remain outside the default picker.
+
+The replacement contract now verifies all 20 output files are real PNGs, exactly 1152×2048, and match the recorded byte count and SHA-256. Existing documents that reference the preserved legacy IDs therefore receive the upgraded background without an ID migration.
