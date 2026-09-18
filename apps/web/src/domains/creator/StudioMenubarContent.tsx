@@ -1680,8 +1680,8 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 aria-label="내보내기 옵션"
                 style={isMobile ? { minWidth: 44 } : undefined}
                 className={cn(
-                  buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 min-w-11 px-1.5" }),
-                  isMobile && "min-h-11 min-w-11"
+                  buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 min-w-[44px] shrink-0 px-1.5" }),
+                  isMobile && "min-h-11 min-w-[44px]"
                 )}
               >
                 <ChevronDown
@@ -1763,7 +1763,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   variant: "quiet",
                   // `min-w-11`은 셰브론을 접는 폭에서도 44px 터치 타깃을 지킨다
                   // (`verify:studio-mobile-top`은 메뉴바 컨트롤의 가로·세로 모두 하드 체크).
-                  className: "min-h-11 min-w-11 shrink-0 gap-1.5 whitespace-nowrap",
+                  className: "min-h-11 min-w-[44px] shrink-0 gap-1.5 whitespace-nowrap",
                 })}
               >
                 <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트 센터</span>

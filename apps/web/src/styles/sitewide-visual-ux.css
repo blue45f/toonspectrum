@@ -27,7 +27,7 @@ html {
 
 .route-stage > *,
 .route-stage :where(section, article, aside, nav, header, footer),
-.route-stage :where([class*="grid"], [class*="flex"]) > * {
+.route-stage :where([class*="grid"], [class*="flex"]) > :not([class*="min-w-"]) {
   min-inline-size: 0;
 }
 

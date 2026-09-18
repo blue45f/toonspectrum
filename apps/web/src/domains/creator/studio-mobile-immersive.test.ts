@@ -119,7 +119,7 @@ describe("Studio mobile immersive preference", () => {
 
   it("keeps every 320px dock target at 44px and scrolls only the two tool rows", () => {
     expect(studioChromeSource).toContain(
-      '"flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center',
+      '"flex min-h-11 min-w-[44px] flex-none flex-col items-center justify-center',
     );
     expect(studioMobileEditingDockSource).toContain('data-studio-mobile-dock-scroll="primary"');
     expect(studioMobileEditingDockSource).toContain('data-studio-mobile-dock-scroll="secondary"');

@@ -212,7 +212,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
     setTemplateLibraryStatus, isSavingTemplate, setIsSavingTemplate, applyingTemplateId,
     setApplyingTemplateId, generateId, handleSaveSceneAsTemplate, handleDeleteTemplate,
     failedCloneIds, setFailedCloneIds, readyCloneIds, setReadyCloneIds, unbatchableModelIds,
-    setUnbatchableModelIds, sceneBaseDocument, setSceneBaseDocument, savedShots,
+    setUnbatchableModelIds, sceneBaseDocument, setSceneBaseDocument, canonicalRevision, savedShots,
     shotBatchSelectedIds, selectedShotBatchPasses, deviceSignals, setDeviceSignals, skyPresetId,
     insertBackgroundIntent, transparentInsert, captureRef, modalDialogRef, modalRootRef,
     viewportApiRef, pendingInitialCameraRef, cameraLensGestureBeforeViewRef,
@@ -324,6 +324,8 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
     ltUserPresetLibraryStatus, physicsGravityPreset, setPhysicsGravityPreset,
     LazyStudioBg3dAssetLibraryPanel, babylonDiagnosticState, engineRuntime, engineFrameTimeMs, genericModelClassifications, genericModelControlMode, layerListItems, measurementDocument, measurementDraft, measurementInference, measurementLockedLengthMeters, modelLibraryStatus, setMeasurementDocument, webXrController, webXrSessionState, webXrSupport,
   } = { ...R, ...h };
+  /* eslint-disable react-hooks/preserve-manual-memoization -- This extracted editor intentionally reads
+   * the per-render mutable host bag. The memo dependency list is the explicit invalidation contract. */
   const professionalReadinessInput = useMemo(() => {
     const viewportWidth = viewportBoxSize?.width ?? documentCanvasSize?.width ?? 0;
     const viewportHeight = viewportBoxSize?.height ?? documentCanvasSize?.height ?? 0;
@@ -390,6 +392,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
     viewportBoxSize?.height,
     viewportBoxSize?.width,
   ]);
+  /* eslint-enable react-hooks/preserve-manual-memoization */
   const [professionalRuntimeReadiness, setProfessionalRuntimeReadiness] = useReactState();
   useReactEffect(() => {
     if (!open || viewEditorSection !== "prosuite") {

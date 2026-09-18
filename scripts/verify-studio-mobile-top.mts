@@ -50,6 +50,7 @@ const MAX_HEIGHT_RATIO = 1.6;
 // Static preview has no Nest API; these best-effort calls must not fail the gate
 // (same contract as verify-studio-launch).
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
+  "/api/health/ready",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
   "/api/analytics/traffic/",
