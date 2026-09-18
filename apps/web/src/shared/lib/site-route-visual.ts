@@ -41,7 +41,7 @@ export type SiteRouteVisualText = string;
 
 export interface SiteRouteVisualVideo {
   readonly src: string;
-  readonly portraitSrc: string;
+  readonly poster: string;
   readonly startSeconds: number;
   readonly endSeconds: number;
 }
@@ -60,8 +60,8 @@ export interface SiteRouteVisualProfile {
 const t = (ko: string, en: string): SiteRouteVisualText =>
   defineBilingualAutoText("siteRouteVisual", ko, en);
 const FILM = (startSeconds: number, endSeconds = Math.min(24, startSeconds + 6)): SiteRouteVisualVideo => ({
-  src: "/brand/toonstudio-intro.mp4",
-  portraitSrc: "/brand/toonstudio-intro-portrait.mp4",
+  src: "/brand/toonstudio-route-header.mp4",
+  poster: `/brand/toonstudio-route-header-${startSeconds}.jpg`,
   startSeconds,
   endSeconds,
 });

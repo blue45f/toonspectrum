@@ -82,4 +82,3 @@ export function getSupporterOrderStatus(
     { cache: "no-store" },
   );
 }
-

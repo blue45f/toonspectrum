@@ -23,8 +23,9 @@ describe("header width budget", () => {
     );
     expect(primaryNavigation).not.toContain("xl:grid");
     expect(primaryNavigation).not.toContain("<Icon");
-    expect(primaryNavigation).toContain('data-navigation-entry="technology"');
-    expect(primaryNavigation).toContain("siteNavigationText(technology.label, locale)");
+    expect(primaryNavigation).toContain('data-navigation-featured={featured || undefined}');
+    expect(primaryNavigation).toContain('item.id === "research" || item.id === "market"');
+    expect(primaryNavigation).not.toContain('data-navigation-entry="technology"');
   });
 
   it("narrows the search trigger before restoring its roomy xl width", () => {

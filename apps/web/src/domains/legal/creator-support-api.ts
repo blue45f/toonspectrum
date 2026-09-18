@@ -26,11 +26,6 @@ export function listCreatorSupportProjects(
   );
 }
 
-export function getMyCreatorSupportApplication(): Promise<{ item: unknown | null }> {
-  return api.get<{ item: unknown | null }>("/creator-support/me/application", {
-    cache: "no-store",
-  });
-}
 export function submitCreatorSupportApplication(
   input: CreatorSupportApplicationInput,
 ): Promise<{ item: unknown | null; updated: boolean }> {
@@ -50,3 +45,37 @@ export function submitCreatorSupportOffer(
   );
 }
 
+
+export interface CreatorSupportApplicationSnapshot {
+  id: string;
+  title: string;
+  category: CreatorSupportCategory;
+  status: string;
+  reviewNote: string;
+  payoutStatus: string;
+  monetarySupportEnabled: boolean;
+  updatedAt: string;
+}
+
+export interface CreatorSupportReceivedOffer {
+  id: string;
+  applicationId: string;
+  type: string;
+  message: string;
+  contactEmail: string;
+  status: "new" | "shared" | "closed";
+  createdAt: string;
+  projectTitle: string;
+}
+
+export function getMyCreatorSupportApplication(): Promise<{
+  item: CreatorSupportApplicationSnapshot | null;
+}> {
+  return api.get("/creator-support/me/application", { cache: "no-store" });
+}
+
+export function listMyCreatorSupportOffers(): Promise<{
+  items: CreatorSupportReceivedOffer[];
+}> {
+  return api.get("/creator-support/me/offers", { cache: "no-store" });
+}

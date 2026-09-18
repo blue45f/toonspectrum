@@ -1,7 +1,9 @@
 import {
   ArrowLeft,
   BookOpenText,
+  FileJson,
   Headphones,
+  Link2,
   Music4,
   RotateCcw,
   Sparkles,
@@ -11,6 +13,7 @@ import {
 } from "lucide-react";
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -28,6 +31,11 @@ import {
   normalizeGeneratedLyrics,
 } from "./studio-music-lyrics";
 import { createMusicRecovery } from "./studio-music-recovery";
+import {
+  buildMusicWorkBgmPatch,
+  buildSiteOstCurationCandidate,
+  normalizeHostedMusicUrl,
+} from "./studio-music-publication";
 import {
   readMusicEpisodeId,
   readMusicWorkId,
@@ -57,6 +65,7 @@ import {
 } from "@toonspectrum/core/studio-music";
 import { useSession } from "@/compat/auth-session-store";
 import { getApiErrorMessage } from "@/infrastructure/api";
+import { getWork, updateWork } from "@/infrastructure/creator-client";
 import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
 import { completeAutomaticFreeText } from "@/domains/creator/studio-server-ai-client";
 import { cn } from "@/shared/lib/utils";
@@ -107,6 +116,10 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
   const [onlyWork, setOnlyWork] = useState(Boolean(workId));
   const [onlyEpisode, setOnlyEpisode] = useState(Boolean(episodeId));
   const [query, setQuery] = useState("");
+  const [publicationTrackId, setPublicationTrackId] = useState("");
+  const [publicationUrl, setPublicationUrl] = useState("");
+  const [publicationBusy, setPublicationBusy] = useState(false);
+  const [publicationStatus, setPublicationStatus] = useState("");
   const pending = useRef<AbortController | null>(null);
   const lyricsPending = useRef<AbortController | null>(null);
   const lyricsDraft = useRef("");
@@ -144,6 +157,9 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
       : scopeMusicBrief(previous, workId, episodeId));
     setOnlyWork(Boolean(workId));
     setOnlyEpisode(Boolean(episodeId));
+    setPublicationTrackId("");
+    setPublicationUrl("");
+    setPublicationStatus("");
   }, [episodeId, workId]);
 
   useEffect(() => () => {
@@ -361,6 +377,55 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
       .includes(query.toLocaleLowerCase());
     return matchesWork && matchesEpisode && matchesQuery;
   });
+
+  const publicationTracks = useMemo(
+    () => workId ? tracks.filter((track) => track.metadata.brief.workId === workId) : [],
+    [tracks, workId],
+  );
+
+  useEffect(() => {
+    if (!publicationTracks.some((track) => track.metadata.id === publicationTrackId)) {
+      setPublicationTrackId(publicationTracks[0]?.metadata.id ?? "");
+    }
+  }, [publicationTrackId, publicationTracks]);
+
+  const publicationTrack = publicationTracks.find((track) => track.metadata.id === publicationTrackId) ?? null;
+
+  const publishReaderBgm = async () => {
+    if (!workId || !publicationTrack || publicationBusy) return;
+    setPublicationBusy(true);
+    setPublicationStatus("작품 BGM 연결 상태를 확인하는 중…");
+    try {
+      const work = await getWork(workId);
+      const patch = buildMusicWorkBgmPatch(work, publicationTrack, publicationUrl);
+      await updateWork(workId, patch);
+      setPublicationUrl(normalizeHostedMusicUrl(publicationUrl));
+      setPublicationStatus("작품 문서에 독자용 BGM을 저장했습니다. 공개 작품의 효과툰 플레이어가 이 HTTPS 음원을 사용합니다.");
+    } catch (reason) {
+      setPublicationStatus(await getApiErrorMessage(reason, "작품 BGM 연결을 완료하지 못했습니다."));
+    } finally {
+      setPublicationBusy(false);
+    }
+  };
+
+  const downloadSiteOstCandidate = () => {
+    if (!publicationTrack) return;
+    try {
+      const candidate = buildSiteOstCurationCandidate(publicationTrack, publicationUrl);
+      const blob = new Blob([JSON.stringify(candidate, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `site-ost-candidate-${publicationTrack.metadata.id}.json`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+      setPublicationStatus("사이트 전역 OST는 자동 승격하지 않습니다. 검수·권리 확인용 후보 manifest를 저장했습니다.");
+    } catch (reason) {
+      setPublicationStatus(reason instanceof Error ? reason.message : "사이트 OST 후보 정보를 만들지 못했습니다.");
+    }
+  };
 
   const routeScope = workId
     ? episodeId
@@ -772,6 +837,33 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
             </label>
           ) : null}
 
+          {workId && publicationTracks.length > 0 ? (
+            <aside aria-label="독자용 BGM 게시 연결" className="space-y-3 rounded-2xl border border-accent/30 bg-accent/5 p-4">
+              <h3 className="flex items-center gap-2 font-semibold"><Link2 size={16} aria-hidden />독자용 BGM 게시 연결</h3>
+              <p className="text-xs leading-5 text-fg-2">생성 음원은 먼저 MP3로 저장해 지속적인 HTTPS 주소에 호스팅하세요. 여기서 저장한 URL은 작품 문서의 효과툰 BGM으로 들어가 실제 독자 플레이어가 사용합니다.</p>
+              <label className="block space-y-1.5 text-xs font-medium">
+                연결할 음원
+                <select aria-label="독자용 BGM 음원" className={inputClass} value={publicationTrackId} onChange={(event) => setPublicationTrackId(event.target.value)}>
+                  {publicationTracks.map((track) => <option key={track.metadata.id} value={track.metadata.id}>{track.metadata.brief.title}{track.metadata.brief.episodeId ? ` · ${track.metadata.brief.episodeId}` : ""}</option>)}
+                </select>
+              </label>
+              <label className="block space-y-1.5 text-xs font-medium">
+                배포용 HTTPS MP3 URL
+                <input aria-label="배포용 HTTPS MP3 URL" type="url" inputMode="url" className={inputClass} value={publicationUrl} onChange={(event) => setPublicationUrl(event.target.value)} placeholder="https://cdn.example.com/my-original-ost.mp3" />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={buttonClass} disabled={publicationBusy || !publicationTrack || !publicationUrl.trim()} onClick={() => void publishReaderBgm()}>
+                  <Link2 size={15} aria-hidden />{publicationBusy ? "작품에 저장 중…" : "작품 독자용 BGM으로 저장"}
+                </button>
+                <button type="button" className={buttonClass} disabled={publicationBusy || !publicationTrack || !publicationUrl.trim()} onClick={downloadSiteOstCandidate}>
+                  <FileJson size={15} aria-hidden />사이트 OST 검수 후보 JSON
+                </button>
+              </div>
+              <p className="text-[0.68rem] leading-5 text-fg-3">사이트 전역 OST는 임의 자동 승격하지 않습니다. 후보 JSON은 운영 검수·권리 확인 후 정적 playlist에 반영하기 위한 제출 자료입니다.</p>
+              {publicationStatus ? <p role="status" className="rounded-lg border border-line bg-card/60 p-2 text-xs leading-5">{publicationStatus}</p> : null}
+            </aside>
+          ) : null}
+
           <div aria-live="polite" aria-atomic="true">
             {busy ? (
               <p role="status" className="rounded-xl border border-accent/30 bg-accent/10 p-4 text-sm">{savingTrack ? "음원 생성이 완료되어 기기 저장 결과를 확인하고 있습니다. MP3 다운로드는 지금도 가능합니다." : "장면에 맞는 음악을 생성하고 있습니다. 이 화면에서 결과를 받은 뒤 기기 보관함에 저장합니다."}</p>
@@ -812,7 +904,7 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
 
           <aside className="rounded-2xl border border-line bg-card p-5 text-sm leading-relaxed">
             <h3 className="flex items-center gap-2 font-semibold"><BookOpenText size={17} aria-hidden />작품에 사용할 때</h3>
-            <p className="mt-2 text-fg-2">음악을 만든 후 MP3와 제작 정보를 내려받아 영상·모션툰 편집에 사용하세요. 작품·회차 연결은 보관함 분류용이며 독자용 BGM을 자동 게시하지 않습니다. 효과툰의 오디오 URL에는 직접 호스팅한 지속적인 HTTPS 음원 주소가 필요합니다.</p>
+            <p className="mt-2 text-fg-2">음악을 만든 후 MP3와 제작 정보를 별도로 보관하세요. 작품에 연결해 만든 곡은 위 게시 연결에서 직접 호스팅한 지속적인 HTTPS MP3 주소를 저장하면 효과툰 독자용 BGM으로 이어집니다. 사이트 전역 OST 승격은 별도 운영 검수를 거칩니다.</p>
             <a href={MUSIC_TERMS_URL} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block min-h-9 text-accent underline underline-offset-4">음원 이용 조건 확인</a>
             <p className="text-xs text-fg-3">상용 이용 범위는 공급자 요금제·용도에 따라 달라집니다. 모든 배포·재판매에 대한 권리를 보장하지 않습니다.</p>
           </aside>

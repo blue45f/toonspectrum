@@ -25,6 +25,13 @@ import { Container } from "@/shared/components/section";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { resolveSiteRouteMetadata } from "@/shared/lib/site-route-metadata";
 import Link from "@/compat/router-link";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("SitemapPage", ko, en);
 
 const PAGE_COPY = {
   ko: {
@@ -57,11 +64,10 @@ const PAGE_COPY = {
   },
 } as const;
 
-function RouteConditionBadges({ href, locale }: { href: string; locale: "ko" | "en" }) {
+function RouteConditionBadges({ href, locale: _locale }: { href: string; locale: "ko" | "en" }) {
+  useBilingualI18nRevision();
   const metadata = resolveSiteRouteMetadata(href);
-  const labels = locale === "ko"
-    ? { beta: "베타", experimental: "실험", "sign-in": "로그인 필요", project: "프로젝트 필요", desktop: "데스크톱 권장" }
-    : { beta: "Beta", experimental: "Experimental", "sign-in": "Sign-in required", project: "Project required", desktop: "Desktop recommended" };
+  const labels = bi({ beta: "베타", experimental: "실험", "sign-in": "로그인 필요", project: "프로젝트 필요", desktop: "데스크톱 권장" }, { beta: "Beta", experimental: "Experimental", "sign-in": "Sign-in required", project: "Project required", desktop: "Desktop recommended" });
   const badges = [
     metadata.maturity === "beta" ? { key: "beta", label: labels.beta, tone: "accent" } : null,
     metadata.maturity === "experimental" ? { key: "experimental", label: labels.experimental, tone: "warning" } : null,
@@ -71,7 +77,7 @@ function RouteConditionBadges({ href, locale }: { href: string; locale: "ko" | "
   ].filter((badge): badge is { key: string; label: string; tone: string } => badge !== null);
   if (!badges.length) return null;
   return (
-    <span className="mt-2 flex flex-wrap gap-1" aria-label={locale === "ko" ? "사용 조건" : "Usage conditions"}>
+    <span className="mt-2 flex flex-wrap gap-1" aria-label={bi("사용 조건", "Usage conditions")}>
       {badges.map((badge) => (
         <small
           key={badge.key}
@@ -86,9 +92,10 @@ function RouteConditionBadges({ href, locale }: { href: string; locale: "ko" | "
 }
 
 export function SitemapPage() {
+  useBilingualI18nRevision();
   const language = useI18n((state) => state.lang);
   const locale = siteNavigationLocale(language);
-  const copy = PAGE_COPY[locale];
+  const copy = bi((PAGE_COPY).ko, (PAGE_COPY).en);
   const t = useT();
 
   return (
@@ -311,17 +318,15 @@ export function SitemapPage() {
         <div className="flex items-start gap-3">
           <CircleHelp size={20} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
           <p className="max-w-2xl text-sm leading-6 text-fg-2">
-            {locale === "ko"
-              ? "원하는 메뉴를 찾기 어렵거나 기능 제안이 있다면 이용 문의와 제보·제안에서 바로 알려주세요."
-              : "When a destination is hard to find or you have an idea, reach us through Support or Feedback."}
+            {bi("원하는 메뉴를 찾기 어렵거나 기능 제안이 있다면 이용 문의와 제보·제안에서 바로 알려주세요.", "When a destination is hard to find or you have an idea, reach us through Support or Feedback.")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/support" className="inline-flex min-h-11 items-center rounded-xl border border-line-strong bg-panel px-4 py-2 text-sm font-bold text-fg-2 hover:text-accent">
-            {locale === "ko" ? "이용 문의" : "Support"}
+            {bi("이용 문의", "Support")}
           </Link>
           <Link href="/feedback" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-fg bg-fg px-4 py-2 text-sm font-bold text-canvas">
-            {locale === "ko" ? "제보·제안" : "Feedback"}<ArrowRight size={16} aria-hidden="true" />
+            {bi("제보·제안", "Feedback")}<ArrowRight size={16} aria-hidden="true" />
           </Link>
         </div>
       </section>

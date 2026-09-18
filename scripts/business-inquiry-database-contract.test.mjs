@@ -32,8 +32,12 @@ test("business inquiry migration is forward-only, private, and bounded", () => {
   expect(migration).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
 });
 
-test("business inquiry migration is the next managed migration only once", () => {
-  expect(manifest.filter((entry) => entry.endsWith("0068_business_inquiries.sql"))).toHaveLength(1);
+test("business inquiry migration remains registered exactly once", () => {
+  const inquiry = "apps/api/src/db/migrations/0068_business_inquiries.sql";
+  const consolidation = "apps/api/src/db/migrations/0069_account_consolidation.sql";
+  expect(manifest.filter((entry) => entry === inquiry)).toHaveLength(1);
+  expect(manifest.indexOf(inquiry)).toBeGreaterThanOrEqual(0);
+  expect(manifest.indexOf(consolidation)).toBeGreaterThan(manifest.indexOf(inquiry));
 });
 
 test("runtime role can only read, create and update private business inquiries", () => {

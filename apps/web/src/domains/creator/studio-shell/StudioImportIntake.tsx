@@ -17,6 +17,13 @@ import {
   studioImportHandoffHref,
   studioImportHandoffTargetForFormat,
 } from "../studio-import-handoff";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioImportIntake", ko, en);
 
 export type StudioImportIntakeLocale = "ko" | "en";
 
@@ -31,10 +38,10 @@ function statusClasses(status: StudioImportPlanItem["status"]): string {
   return "border-danger/35 bg-danger/10 text-danger";
 }
 
-function statusLabel(status: StudioImportPlanItem["status"], locale: StudioImportIntakeLocale): string {
-  if (status === "accepted") return locale === "ko" ? "바로 가져올 수 있음" : "Ready to import";
-  if (status === "review") return locale === "ko" ? "변환 내용 확인 필요" : "Review conversion";
-  return locale === "ko" ? "가져오기 차단" : "Import blocked";
+function statusLabel(status: StudioImportPlanItem["status"], _locale): string {
+  if (status === "accepted") return bi("바로 가져올 수 있음", "Ready to import");
+  if (status === "review") return bi("변환 내용 확인 필요", "Review conversion");
+  return bi("가져오기 차단", "Import blocked");
 }
 
 function listLabel(values: readonly string[], fallback: string): string {
@@ -46,6 +53,7 @@ function listLabel(values: readonly string[], fallback: string): string {
  * editor import owner. Files never enter localStorage or URL state and the handoff is single-use.
  */
 export function StudioImportIntake({ locale }: { readonly locale: StudioImportIntakeLocale }) {
+  useBilingualI18nRevision();
   const navigate = useNavigate();
   const { data: session } = useSession();
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -85,17 +93,13 @@ export function StudioImportIntake({ locale }: { readonly locale: StudioImportIn
       } catch (error) {
         setMessage(error instanceof Error
           ? error.message
-          : locale === "ko"
-            ? "ToonStudio 프로젝트 파일을 복원하지 못했습니다."
-            : "The ToonStudio project file could not be restored.");
+          : bi("ToonStudio 프로젝트 파일을 복원하지 못했습니다.", "The ToonStudio project file could not be restored."));
         setImporting(false);
       }
       return;
     }
     if (!studioImportHandoffTargetForFormat(selection.item.format)) {
-      setMessage(locale === "ko"
-        ? "이 형식은 아래 전용 작업공간에서 가져와야 합니다. 파일은 전송하거나 저장하지 않았습니다."
-        : "This format must be imported in its dedicated workspace. The file was not uploaded or stored.");
+      setMessage(bi("이 형식은 아래 전용 작업공간에서 가져와야 합니다. 파일은 전송하거나 저장하지 않았습니다.", "This format must be imported in its dedicated workspace. The file was not uploaded or stored."));
       return;
     }
     try {
@@ -127,17 +131,15 @@ export function StudioImportIntake({ locale }: { readonly locale: StudioImportIn
             SAFE IMPORT
           </p>
           <h2 id="studio-import-intake-title" className="mt-1 text-xl font-black text-fg">
-            {locale === "ko" ? "먼저 분석하고, 기존 편집기로 안전하게 전달" : "Analyze first, then hand off safely to the editor"}
+            {bi("먼저 분석하고, 기존 편집기로 안전하게 전달", "Analyze first, then hand off safely to the editor")}
           </h2>
           <p className="mt-2 text-sm leading-6 text-fg-3">
-            {locale === "ko"
-              ? "ToonStudio 프로젝트·JSON·PSD·ORA·CBZ·브러시 팩과 이미지 파일은 보존 항목과 변환 손실을 확인한 뒤 검증된 가져오기 경로로 전달합니다. 프로젝트 파일은 원고 스냅샷까지 새 로컬 프로젝트로 복원합니다."
-              : "ToonStudio projects, JSON, PSD, ORA, CBZ, brush packs and images are previewed for preservation and loss, then sent through verified import paths. Project packages restore canvas snapshots into a new local project."}
+            {bi("ToonStudio 프로젝트·JSON·PSD·ORA·CBZ·브러시 팩과 이미지 파일은 보존 항목과 변환 손실을 확인한 뒤 검증된 가져오기 경로로 전달합니다. 프로젝트 파일은 원고 스냅샷까지 새 로컬 프로젝트로 복원합니다.", "ToonStudio projects, JSON, PSD, ORA, CBZ, brush packs and images are previewed for preservation and loss, then sent through verified import paths. Project packages restore canvas snapshots into a new local project.")}
           </p>
         </div>
         <label className={buttonClass({ size: "lg", className: "shrink-0 cursor-pointer gap-2" })}>
           <FileUp size={17} aria-hidden="true" />
-          {locale === "ko" ? "파일 선택" : "Choose file"}
+          {bi("파일 선택", "Choose file")}
           <input
             type="file"
             accept={STUDIO_IMPORT_HANDOFF_ACCEPT}
@@ -165,15 +167,15 @@ export function StudioImportIntake({ locale }: { readonly locale: StudioImportIn
               </div>
               <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
                 <div>
-                  <dt className="font-bold text-fg-2">{locale === "ko" ? "보존" : "Preserved"}</dt>
+                  <dt className="font-bold text-fg-2">{bi("보존", "Preserved")}</dt>
                   <dd className="mt-1 leading-5 text-fg-3">
-                    {listLabel(selection.item.preservedFeatures, locale === "ko" ? "보존 항목 없음" : "No preserved features")}
+                    {listLabel(selection.item.preservedFeatures, bi("보존 항목 없음", "No preserved features"))}
                   </dd>
                 </div>
                 <div>
-                  <dt className="font-bold text-fg-2">{locale === "ko" ? "변환·손실" : "Conversion and loss"}</dt>
+                  <dt className="font-bold text-fg-2">{bi("변환·손실", "Conversion and loss")}</dt>
                   <dd className="mt-1 leading-5 text-fg-3">
-                    {listLabel(selection.item.losses, locale === "ko" ? "알려진 손실 없음" : "No known loss")}
+                    {listLabel(selection.item.losses, bi("알려진 손실 없음", "No known loss"))}
                   </dd>
                 </div>
               </dl>
@@ -190,10 +192,10 @@ export function StudioImportIntake({ locale }: { readonly locale: StudioImportIn
               className={buttonClass({ className: "shrink-0 gap-2" })}
             >
               {importing
-                ? locale === "ko" ? "프로젝트 복원 중…" : "Restoring project…"
+                ? bi("프로젝트 복원 중…", "Restoring project…")
                 : selection.item.format === "toonstudio"
-                  ? locale === "ko" ? "프로젝트 복원" : "Restore project"
-                  : locale === "ko" ? "편집기에서 가져오기" : "Import in editor"}
+                  ? bi("프로젝트 복원", "Restore project")
+                  : bi("편집기에서 가져오기", "Import in editor")}
               <FileUp size={15} aria-hidden="true" />
             </button>
           </div>

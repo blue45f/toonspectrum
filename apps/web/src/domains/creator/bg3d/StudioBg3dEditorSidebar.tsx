@@ -12,17 +12,7 @@ import type { StudioBg3dSceneGoal } from "./StudioBg3dSceneDirectorPanel";
 import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import { StudioBg3dEditorSidebarExtras } from "./StudioBg3dEditorSidebarExtras";
 
-interface StudioBg3dEditorSidebarProps {
-  readonly h: any;
-  readonly experienceMode?: "simple" | "pro";
-  readonly onOpenPro?: () => void;
-}
-
-export function StudioBg3dEditorSidebar({
-  h,
-  experienceMode = "pro",
-  onOpenPro = (): void => undefined,
-}: StudioBg3dEditorSidebarProps) {
+export function StudioBg3dEditorSidebar({ h, experienceMode = "pro", onOpenPro = () => {} }) {
   const {
     THREE, OrbitControls, OrthographicCamera, PerspectiveCamera, TransformControls, View,
     Canvas, useThree, Aperture, Boxes, Camera, ChevronDown, CircleDashed, Copy, Crosshair, Eye,

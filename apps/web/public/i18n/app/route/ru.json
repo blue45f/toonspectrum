@@ -30,18 +30,7 @@
   "route.news": "Toon & web novel news",
   "route.pencafeSuffix": "fan cafe",
   "route.play": "Arcade",
-  "route.privacy": "Privacy policy",
-  "route.random": "Random discovery",
-  "route.ranking": "Unified ranking",
-  "route.recommend": "Personalized Picks",
-  "route.reviews": "Reviews",
-  "route.search": "Search",
-  "route.settings": "Settings",
-  "route.shaper": "Character Shaper",
-  "route.sitemap": "Sitemap",
-  "route.studio": "Studio",
-  "route.support": "Support",
-  "route.tags": "Search by tag",
-  "route.terms": "Terms of service",
-  "route.unknown": "Page"
+  "route.unknown": "Page",
+  "route.pencafeSuffix": "fan cafe",
+  "route.creatorSupport": "Creator Support"
 }

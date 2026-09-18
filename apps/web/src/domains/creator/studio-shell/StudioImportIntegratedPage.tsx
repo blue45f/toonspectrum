@@ -4,13 +4,17 @@ import { useI18n } from "@/shared/lib/i18n";
 import { StudioImportPage } from "./StudioFrontDoorPages";
 import { StudioImportIntake } from "./StudioImportIntake";
 import { StudioImportVisualGuide } from "./StudioImportVisualGuide";
+import { getActiveI18nLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
-function localeFromLanguage(language: string): "ko" | "en" {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+
+
+function localeFromLanguage(_language): "ko" | "en" {
+  return getActiveI18nLocale();
 }
 
 /** Keeps the visual front door while adding the real preflight-to-editor import path below it. */
 export function StudioImportIntegratedPage() {
+  useBilingualI18nRevision();
   const language = useI18n((state) => state.lang);
   const locale = localeFromLanguage(language);
   return (

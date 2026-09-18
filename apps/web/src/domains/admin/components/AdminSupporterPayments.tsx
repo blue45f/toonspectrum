@@ -10,7 +10,6 @@ import {
   adminFetch,
   type AdminApiError,
 } from "./admin-client";
-import { AdminCommercePayments } from "./AdminCommercePayments";
 import { adminButtonClass } from "./admin-ui-utils";
 
 interface SupporterPaymentItem {
@@ -183,7 +182,6 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <AdminCommercePayments uid={uid} />
 
       <section className="rounded-2xl border border-line bg-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -434,4 +432,3 @@ export function AdminSupporterPayments({ uid }: { uid: string }) {
     </div>
   );
 }
-

@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   CHARACTER_SHAPER_HISTORY_LIMIT,
+  CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES,
   characterShaperHistoryState,
+  estimateCharacterShaperHistoryEntryBytes,
   createCharacterShaperHistory,
   pushCharacterShaperHistory,
   redoCharacterShaperHistory,
+  trimCharacterShaperHistoryEntries,
   undoCharacterShaperHistory,
 } from "./useCharacterShaperHistory";
 
@@ -74,6 +77,24 @@ describe("character shaper history", () => {
     expect(stack.past).toHaveLength(CHARACTER_SHAPER_HISTORY_LIMIT);
     expect(stack.past[0]?.label).toBe("단계 5");
     expect(stack.past[stack.past.length - 1]?.label).toBe(`단계 ${CHARACTER_SHAPER_HISTORY_LIMIT + 4}`);
+  });
+
+  it("also evicts old whole-state snapshots when the byte budget is reached", () => {
+    const payload = "x".repeat(1_100_000);
+    let stack = createCharacterShaperHistory<Snapshot>();
+    for (let index = 0; index < 5; index += 1) {
+      stack = pushCharacterShaperHistory(stack, {
+        label: `large ${index}`,
+        snapshot: { value: `${index}${payload}` },
+      });
+    }
+    expect(stack.past.length).toBeLessThan(5);
+    expect(stack.past.at(-1)?.label).toBe("large 4");
+    const retained = stack.past.reduce(
+      (total, entry) => total + estimateCharacterShaperHistoryEntryBytes(entry),
+      0,
+    );
+    expect(retained).toBeLessThanOrEqual(CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES);
   });
 
   it("never mutates the stack it is given", () => {

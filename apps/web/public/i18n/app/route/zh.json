@@ -29,19 +29,8 @@
   "route.me": "我的个人资料",
   "route.news": "卡通及网络小说新闻",
   "route.pencafeSuffix": "粉丝咖啡馆",
-  "route.play": "拱廊",
-  "route.privacy": "隐私政策",
-  "route.random": "随机发现",
-  "route.ranking": "统一排名",
-  "route.recommend": "个性化精选",
-  "route.reviews": "评论",
-  "route.search": "搜索",
-  "route.settings": "设置",
-  "route.shaper": "角色塑形器",
-  "route.sitemap": "网站地图",
-  "route.studio": "工作室",
-  "route.support": "支持",
-  "route.tags": "按标签搜索",
-  "route.terms": "服务条款",
-  "route.unknown": "页"
+  "route.contact": "广告和合作伙伴关系",
+  "route.copyright": "版权和内容政策",
+  "route.create": "创作者板",
+  "route.creatorSupport": "Creator Support"
 }

@@ -1,6 +1,6 @@
 {
   "studio.hub.title": "Водич за функције",
-  "studio.hub.subtitle": "Једна по једна функција без икаквог оптерећења. Погледао сам __ПХ0__/__ПХ1__.",
+  "studio.hub.subtitle": "Take one feature at a time. {done}/{total} reviewed.",
   "studio.hub.progressAriaLabel": "Напредак туторијала",
   "studio.hub.listAriaLabel": "Листа функција",
   "studio.hub.checked": "погледајте",

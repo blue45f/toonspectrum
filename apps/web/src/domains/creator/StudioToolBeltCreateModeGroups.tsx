@@ -35,7 +35,7 @@ import {
   preloadStudioSceneToolPopoverBody,
   preloadStudioStyleToolPopoverBody,
 } from "./studio-tool-belt-lazy-ui";
-import type { StudioFloatingSurfaceLayout } from "./studio-floating-surface";
+import { STUDIO_FLOATING_MENU_LAYOUTS } from "./studio-floating-menu-layouts";
 import {
   studioToolbarDisclosureAllows,
   studioToolbarIsExpanded,
@@ -66,25 +66,6 @@ const groupPopoverClass = (width: "w-72" | "w-80") =>
     "fixed inset-x-2 top-[6.5rem] z-[70] max-h-[min(78dvh,36rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-2xl lg:inset-x-auto lg:left-3 lg:w-auto lg:max-w-[min(28rem,calc(100vw-1.5rem))]",
     width === "w-72" ? "lg:w-72" : "lg:w-80"
   );
-
-const TOOL_POPOVER_LAYOUTS = {
-  asset: {
-    version: 2, xRatio: 0.02, yRatio: 0.08, width: 420, height: 680,
-    dock: "free", positionLocked: false, sizeLocked: false,
-  },
-  scene: {
-    version: 2, xRatio: 0.03, yRatio: 0.1, width: 380, height: 620,
-    dock: "free", positionLocked: false, sizeLocked: false,
-  },
-  style: {
-    version: 2, xRatio: 0.04, yRatio: 0.12, width: 340, height: 520,
-    dock: "free", positionLocked: false, sizeLocked: false,
-  },
-  ai: {
-    version: 2, xRatio: 0.72, yRatio: 0.08, width: 440, height: 680,
-    dock: "free", positionLocked: false, sizeLocked: false,
-  },
-} satisfies Record<"asset" | "scene" | "style" | "ai", StudioFloatingSurfaceLayout>;
 
 export interface StudioToolBeltCreateModeGroupsProps {
   hints: StudioToolBeltHintMap;
@@ -221,13 +202,13 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
               desktopWindow={{
                 label: "에셋",
                 surfaceId: "toolbar-assets",
-                defaultLayout: TOOL_POPOVER_LAYOUTS.asset,
+                defaultLayout: STUDIO_FLOATING_MENU_LAYOUTS.asset,
                 onClose: () => setMenu(null),
-                minWidth: 320,
-                minHeight: 300,
+                minWidth: 400,
+                minHeight: 320,
                 maxWidth: 860,
                 maxHeight: 1100,
-                contentClassName: "overflow-y-auto",
+                contentClassName: "overflow-y-auto overflow-x-hidden",
               }}
             >
               <Suspense fallback={<StudioPanelLoading label="에셋 메뉴를 여는 중..." />}>
@@ -491,10 +472,10 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 desktopWindow={{
                   label: "장면",
                   surfaceId: "toolbar-scene",
-                  defaultLayout: TOOL_POPOVER_LAYOUTS.scene,
+                  defaultLayout: STUDIO_FLOATING_MENU_LAYOUTS.scene,
                   onClose: () => setMenu(null),
-                  minWidth: 320,
-                  minHeight: 280,
+                  minWidth: 380,
+                  minHeight: 320,
                   maxWidth: 820,
                   maxHeight: 1050,
                   contentClassName: "overflow-y-auto",
@@ -556,10 +537,10 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
               desktopWindow={{
                 label: "스타일",
                 surfaceId: "toolbar-style",
-                defaultLayout: TOOL_POPOVER_LAYOUTS.style,
+                defaultLayout: STUDIO_FLOATING_MENU_LAYOUTS.style,
                 onClose: () => setMenu(null),
-                minWidth: 300,
-                minHeight: 260,
+                minWidth: 360,
+                minHeight: 300,
                 maxWidth: 720,
                 maxHeight: 900,
                 contentClassName: "overflow-y-auto",
@@ -623,10 +604,10 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 desktopWindow={{
                   label: "AI 도우미",
                   surfaceId: "toolbar-ai-assistant",
-                  defaultLayout: TOOL_POPOVER_LAYOUTS.ai,
+                  defaultLayout: STUDIO_FLOATING_MENU_LAYOUTS.ai,
                   onClose: () => setMenu(null),
-                  minWidth: 360,
-                  minHeight: 360,
+                  minWidth: 440,
+                  minHeight: 380,
                   maxWidth: 960,
                   maxHeight: 1100,
                   contentClassName: "flex flex-col overflow-hidden",

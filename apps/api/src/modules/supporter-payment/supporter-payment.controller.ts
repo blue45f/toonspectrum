@@ -116,4 +116,3 @@ export class SupporterPaymentController {
     return this.service.cancelForAdmin(userId ?? "", id, body?.reason);
   }
 }
-

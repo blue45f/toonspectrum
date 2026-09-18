@@ -6,7 +6,7 @@ Import `toonstudio-brand-film.json` into an authorized n8n instance. It is inten
 
 1. Merge the `creator-brand-film.yml` renderer workflow and isolated media lockfile first.
 2. Attach an n8n GitHub credential to **Dispatch approved GitHub renderer**. Use a fine-grained token limited to this repository, with Actions: write and required metadata access. Keep it in n8n credentials, never in workflow JSON, frontend code, webhook URL or Git.
-3. Select exactly `all`, `landscape`, `portrait` or `square` in **Select approved format**.
+3. Select exactly `all`, `landscape`, `portrait`, `square` or `header` in **Select approved format**.
 4. Run manually. GitHub 204 means only that the request was accepted. Inspect the linked workflow run, confirm success, and review/download the resulting artifacts.
 5. Review the video, captions and manifest before any release. Publish through the normal reviewed repository/deployment process. This workflow never posts to social media or bypasses branch protection.
 

@@ -129,3 +129,25 @@ registerI18nEnglishSourceEntries({
   "creatorSupport.error.submit": "Could not process the request.",
 });
 
+
+registerI18nLocaleEntries("ko", {
+  "creatorSupport.mine.title": "내 지원 신청과 받은 제안",
+  "creatorSupport.mine.description": "신청 검토 상태와 멘토링·장비·라이선스·협업 등 비공개 지원 제안을 본인만 확인할 수 있습니다.",
+  "creatorSupport.mine.loading": "내 지원 정보를 불러오는 중…",
+  "creatorSupport.mine.application": "내 지원 신청",
+  "creatorSupport.mine.offers": "받은 비공개 지원 제안",
+  "creatorSupport.mine.noApplication": "아직 제출한 지원 신청이 없습니다.",
+  "creatorSupport.mine.noOffers": "아직 받은 지원 제안이 없습니다.",
+  "creatorSupport.mine.signIn": "지원 신청 상태와 받은 제안은 로그인 후 본인만 확인할 수 있습니다.",
+});
+
+registerI18nEnglishSourceEntries({
+  "creatorSupport.mine.title": "My support application and offers",
+  "creatorSupport.mine.description": "Only you can review your application status and private mentoring, equipment, license, collaboration, and opportunity offers.",
+  "creatorSupport.mine.loading": "Loading your support workspace…",
+  "creatorSupport.mine.application": "My application",
+  "creatorSupport.mine.offers": "Private support offers received",
+  "creatorSupport.mine.noApplication": "You have not submitted a support application yet.",
+  "creatorSupport.mine.noOffers": "No private support offers have arrived yet.",
+  "creatorSupport.mine.signIn": "Sign in to privately view your application status and received support offers.",
+});

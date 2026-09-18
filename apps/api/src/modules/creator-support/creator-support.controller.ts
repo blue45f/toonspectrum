@@ -75,4 +75,3 @@ export class CreatorSupportController {
     return this.service.reviewForAdmin(userId ?? "", id, body);
   }
 }
-

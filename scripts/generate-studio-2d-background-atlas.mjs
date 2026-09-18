@@ -138,7 +138,8 @@ async function requestImage({ apiKey, url, model, recipe, attempt = 0 }) {
       size: recipe.size,
       quality: recipe.quality || "max",
       n: 1,
-      response_format: "b64_json",
+      output_format: "png",
+      background: "opaque",
     }),
   });
   if (!response.ok) {

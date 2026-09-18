@@ -1,4 +1,10 @@
-export const CREATOR_ROLE_PROFILE_VERSION = 1 as const;
+
+import {
+  translateBilingualValueForActiveLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("creator-role-contract", ko, en);export const CREATOR_ROLE_PROFILE_VERSION = 1 as const;
 export const CREATOR_ROLE_MAX_SECONDARY = 5;
 export const CREATOR_ROLE_MAX_SPECIALTIES = 12;
 
@@ -470,8 +476,8 @@ const STAGE_SET = new Set<string>(CREATOR_STAGE_IDS);
 const EXPERIENCE_SET = new Set<string>(CREATOR_EXPERIENCE_LEVELS);
 const COLLABORATION_SET = new Set<string>(CREATOR_COLLABORATION_STATUSES);
 
-export function creatorText(value: LocalizedCreatorText, locale: CreatorRoleLocale): string {
-  return value[locale];
+export function creatorText(value: LocalizedCreatorText, _locale): string {
+  return bi((value).ko, (value).en);
 }
 
 export function normalizeCreatorRoleId(value: unknown): CreatorRoleId | null {

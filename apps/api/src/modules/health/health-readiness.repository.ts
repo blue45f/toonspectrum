@@ -18,6 +18,7 @@ export const HEALTH_READINESS_QUERY_TIMEOUT_MS = 3_000;
  */
 export const REQUIRED_DATABASE_RELATIONS = [
   "account",
+  "account_merge",
   "admin_announcements",
   "admin_audit_logs",
   "admin_banned_words",
@@ -25,6 +26,7 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "admin_promos",
   "admin_security_policies",
   "app_setting",
+  "business_inquiry",
   "collection",
   "collection_item",
   "community_cafe",
@@ -80,6 +82,8 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "creator_role_workspace_preference",
   "creator_series",
   "creator_studio_personal_kit",
+  "creator_support_application",
+  "creator_support_offer",
   "creator_work",
   "creator_work_asset",
   "creator_work_asset_storage_reference",
@@ -167,6 +171,8 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "studio_revision_blob",
   "studio_revision_parent",
   "subscription",
+  "supporter_funding_setting",
+  "supporter_payment",
   "toonspectrum_schema_migration",
   "traffic_page_view",
   "traffic_session",

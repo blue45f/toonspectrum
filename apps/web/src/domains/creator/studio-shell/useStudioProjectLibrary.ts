@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useT } from "@/shared/lib/i18n";
+import { defineBilingualText } from "@/shared/lib/i18n-bilingual-copy";
+
 import {
   STUDIO_PROJECT_LIBRARY_STORAGE_KEY,
   STUDIO_PROJECT_LIBRARY_UPDATED_EVENT,
@@ -16,8 +19,10 @@ import {
   type StudioProjectLibraryState,
   type StudioProjectStatus,
 } from "../studio-project-library-store";
-
-type Locale = "ko" | "en";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 export interface StudioProjectLibraryController {
   readonly state: StudioProjectLibraryState | null;
@@ -34,11 +39,12 @@ export interface StudioProjectLibraryController {
   readonly touch: (projectId: string, documentId?: string | null) => StudioProjectLibraryEntry | null;
 }
 
-function storageError(locale: Locale): string {
-  return locale === "ko"
-    ? "이 기기에서 프로젝트 목록을 저장하지 못했습니다. 브라우저 저장 공간과 개인정보 보호 설정을 확인해 주세요."
-    : "The project list could not be stored on this device. Check browser storage and privacy settings.";
-}
+const STORAGE_ERROR = defineBilingualText(
+  "studioProjectLibrary",
+  "storageError",
+  "이 기기에서 프로젝트 목록을 저장하지 못했습니다. 브라우저 저장 공간과 개인정보 보호 설정을 확인해 주세요.",
+  "The project list could not be stored on this device. Check browser storage and privacy settings.",
+);
 
 function eventState(value: unknown): StudioProjectLibraryState | null {
   if (!value || typeof value !== "object") return null;
@@ -49,9 +55,10 @@ function eventState(value: unknown): StudioProjectLibraryState | null {
 }
 
 export function useStudioProjectLibrary(
-  locale: Locale,
+  _locale: string,
   status?: StudioProjectStatus,
 ): StudioProjectLibraryController {
+  const t = useT();
   const [state, setState] = useState<StudioProjectLibraryState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,9 +68,9 @@ export function useStudioProjectLibrary(
       setState(readStudioProjectLibrary(window.localStorage));
       setError(null);
     } catch {
-      setError(storageError(locale));
+      setError(t(STORAGE_ERROR));
     }
-  }, [locale]);
+  }, [t]);
 
   useEffect(() => {
     reload();
@@ -94,10 +101,10 @@ export function useStudioProjectLibrary(
       setError(null);
       return value;
     } catch {
-      setError(storageError(locale));
+      setError(t(STORAGE_ERROR));
       return null;
     }
-  }, [locale]);
+  }, [t]);
 
   const rename = useCallback((projectId: string, title: string) => run(() => (
     renameStudioProject(window.localStorage, projectId, title, { target: window })

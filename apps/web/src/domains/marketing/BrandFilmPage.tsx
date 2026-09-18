@@ -22,13 +22,18 @@ import {
 } from "@/hooks/use-document-title";
 import {
   defineBilingualText,
+  translateBilingualValueForActiveLocale,
   translateParallelBilingualCopy,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { normalizeLocaleCode, useI18n, useT } from "@/shared/lib/i18n";
 
 import "./creator-home.css";
 import "./creator-film.css";
 import "./brand-film-page.css";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("BrandFilmPage", ko, en);
 
 const PAGE_COPY = {
   ko: {
@@ -125,12 +130,13 @@ const PRODUCTION_ICONS = [Clapperboard, Ratio, Subtitles] as const;
 const BRAND_FILM_POSTER = `${SITE_URL}/brand/toonstudio-film-poster.jpg`;
 
 export function BrandFilmPage() {
+  useBilingualI18nRevision();
   const t = useT();
   const language = useI18n((state) => state.lang);
   const locale = creatorHomeLocale(language);
   const documentLocale = normalizeLocaleCode(language) || "en";
   const copy = translateParallelBilingualCopy(t, "brandFilmPage", PAGE_COPY);
-  const filmCopy = HOME_COPY[locale];
+  const filmCopy = bi((HOME_COPY).ko, (HOME_COPY).en);
 
   useDocumentTitle(copy.pageTitle);
   useMetaDescription(copy.metaDescription);

@@ -55,7 +55,7 @@ export const STUDIO_CHROME_REGIONS: readonly StudioChromeRegionSpec[] = [
     id: "left-tool-rail",
     role: "tool-selection",
     labelKo: "왼쪽 도구",
-    description: "선택·펜·지우개·채우기 등 활성 도구 전환 (CSP 도구 팔레트)",
+    description: "선택·펜·지우개·채우기 등 활성 도구 전환",
   },
   {
     id: "canvas",
@@ -67,7 +67,7 @@ export const STUDIO_CHROME_REGIONS: readonly StudioChromeRegionSpec[] = [
     id: "right-inspector",
     role: "context-properties",
     labelKo: "오른쪽 속성·레이어",
-    description: "활성 도구/선택 속성과 레이어 스택 (CSP 속성 + 레이어)",
+    description: "활성 도구·선택 속성과 레이어 관리",
   },
   {
     id: "status-quick-actions",

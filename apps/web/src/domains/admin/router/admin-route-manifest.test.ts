@@ -17,6 +17,7 @@ describe("admin route manifest", () => {
     expect(duplicates(ADMIN_ROUTES.map((route) => route.id))).toEqual([]);
     expect(duplicates(ADMIN_ROUTES.map((route) => route.path))).toEqual([]);
     expect(resolveAdminRoute("/admin/monetization/supporters")?.id).toBe("supporters");
+    expect(resolveAdminRoute("/admin/monetization/creator-support")?.id).toBe("creatorSupport");
   });
 
   it("assigns every route to exactly one navigation group", () => {

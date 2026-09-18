@@ -22,6 +22,7 @@ export interface StudioDesktopFloatingSurfaceProps {
   readonly maxWidth?: number;
   readonly maxHeight?: number;
   readonly insetTop?: number;
+  readonly zIndexFloor?: number;
   readonly className?: string;
   readonly contentClassName?: string;
   readonly minimizable?: boolean;
@@ -43,6 +44,7 @@ export function StudioDesktopFloatingSurface({
   maxWidth,
   maxHeight,
   insetTop = 68,
+  zIndexFloor,
   className,
   contentClassName,
   minimizable,
@@ -69,6 +71,7 @@ export function StudioDesktopFloatingSurface({
       maxWidth={maxWidth}
       maxHeight={maxHeight}
       insetTop={insetTop}
+      zIndexFloor={zIndexFloor}
       className={className}
       contentClassName={contentClassName}
       minimizable={minimizable}

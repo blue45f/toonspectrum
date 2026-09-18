@@ -69,7 +69,8 @@ export function RoutePurposeScene({
   const mobile = t(MOBILE_LABELS[experience.mobilePolicy]);
   const purpose = t(experience.pagePurpose);
   const action = experience.primaryAction ? t(experience.primaryAction) : null;
-  const imageSrcSet = responsiveAtelierSrcSet(profile.image);
+  const visualImage = profile.video?.poster ?? profile.image;
+  const imageSrcSet = responsiveAtelierSrcSet(visualImage);
   const videoEnabled = Boolean(profile.video) && motionAllowed && !videoFailed;
 
   useEffect(() => {
@@ -94,7 +95,9 @@ export function RoutePurposeScene({
       ) {
         video.currentTime = profile.video.startSeconds;
       }
-      void video.play().catch(() => setVideoFailed(true));
+      void video.play()
+        .then(() => setVideoReady(true))
+        .catch(() => setVideoFailed(true));
     };
     if (video.readyState >= HTMLMediaElement.HAVE_METADATA) play();
     else video.addEventListener("loadedmetadata", play, { once: true });
@@ -131,6 +134,7 @@ export function RoutePurposeScene({
         data-route-visual-kind={profile.kind}
         data-route-visual-motion={profile.motion}
         data-route-visual-running={running ? "true" : "false"}
+        data-route-visual-video-ready={videoReady ? "true" : "false"}
         aria-label={formatI18nTemplate(t(COPY.pageGuide), { title })}
       >
         <div className="route-purpose-scene__copy">
@@ -150,7 +154,7 @@ export function RoutePurposeScene({
         <figure className="route-purpose-scene__visual" aria-hidden="true">
           <div className="route-purpose-scene__media">
             <img
-              src={profile.image}
+              src={visualImage}
               srcSet={imageSrcSet}
               sizes={imageSrcSet ? "(max-width: 760px) calc(100vw - 2rem), 44vw" : undefined}
               alt=""
@@ -167,16 +171,16 @@ export function RoutePurposeScene({
                 ref={videoRef}
                 muted
                 playsInline
-                preload="none"
-                poster={profile.image}
+                preload={profile.density === "prominent" ? "metadata" : "none"}
+                poster={profile.video.poster}
                 tabIndex={-1}
                 data-ready={videoReady ? "true" : "false"}
-                onCanPlay={() => setVideoReady(true)}
+                style={{ objectPosition: profile.imagePosition }}
+                onPlaying={() => setVideoReady(true)}
                 onEnded={restartVideo}
                 onTimeUpdate={keepVideoInSegment}
                 onError={() => setVideoFailed(true)}
               >
-                <source media="(max-width: 639px)" src={profile.video.portraitSrc} type="video/mp4" />
                 <source src={profile.video.src} type="video/mp4" />
               </video>
             ) : null}

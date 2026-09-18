@@ -29,19 +29,6 @@
   "route.me": "私のプロフィール",
   "route.news": "トゥーン＆ウェブ小説ニュース",
   "route.pencafeSuffix": "ファンカフェ",
-  "route.play": "アーケード",
-  "route.privacy": "プライバシーポリシー",
-  "route.random": "ランダムな発見",
-  "route.ranking": "統一ランキング",
-  "route.recommend": "パーソナライズされたおすすめ",
-  "route.reviews": "レビュー",
-  "route.search": "検索",
-  "route.settings": "設定",
-  "route.shaper": "キャラクターシェイパー",
-  "route.sitemap": "サイトマップ",
-  "route.studio": "スタジオ",
-  "route.support": "サポート",
-  "route.tags": "タグで探す",
-  "route.terms": "利用規約",
-  "route.unknown": "ページ"
+  "route.create": "クリエイターボード",
+  "route.creatorSupport": "Creator Support"
 }

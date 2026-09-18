@@ -17,6 +17,7 @@ import { FeedbackModule } from "./modules/feedback/feedback.module";
 import { FortuneModule } from "./modules/fortune/fortune.module";
 import { HealthModule } from "./modules/health/health.module";
 import { LegalModule } from "./modules/legal/legal.module";
+import { LearningModule } from "./modules/learning/learning.module";
 import { MeModule } from "./modules/me/me.module";
 import { MessagingModule } from "./modules/messaging/messaging.module";
 import { OgModule } from "./modules/og/og.module";
@@ -60,6 +61,7 @@ const studioRealtimeTicketModule =
       : []),
     HealthModule,
     LegalModule,
+    LearningModule,
     FortuneModule,
     StudioAiModule,
     StudioMusicModule,

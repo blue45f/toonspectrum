@@ -21,11 +21,16 @@ import {
 
 import "./creator-support-i18n";
 import {
+  getMyCreatorSupportApplication,
   listCreatorSupportProjects,
+  listMyCreatorSupportOffers,
   submitCreatorSupportApplication,
   submitCreatorSupportOffer,
+  type CreatorSupportApplicationSnapshot,
+  type CreatorSupportReceivedOffer,
 } from "./creator-support-api";
 
+import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { getApiErrorMessage } from "@/infrastructure/api";
@@ -88,6 +93,7 @@ const INITIAL_OFFER: OfferForm = {
 
 export function CreatorSupportPage() {
   const t = useT();
+  const { status: sessionStatus } = useSession();
   useDocumentTitle(t("creatorSupport.documentTitle"));
 
   const [filter, setFilter] = useState<CreatorSupportCategory | "">("");
@@ -101,6 +107,11 @@ export function CreatorSupportPage() {
   const [application, setApplication] = useState<ApplicationForm>(INITIAL_APPLICATION);
   const [applicationBusy, setApplicationBusy] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState("");
+  const [myApplication, setMyApplication] =
+    useState<CreatorSupportApplicationSnapshot | null>(null);
+  const [receivedOffers, setReceivedOffers] =
+    useState<CreatorSupportReceivedOffer[]>([]);
+  const [privateLoading, setPrivateLoading] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -116,6 +127,32 @@ export function CreatorSupportPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const loadPrivate = useCallback(() => {
+    if (sessionStatus !== "authenticated") {
+      setMyApplication(null);
+      setReceivedOffers([]);
+      return;
+    }
+    setPrivateLoading(true);
+    Promise.all([
+      getMyCreatorSupportApplication(),
+      listMyCreatorSupportOffers(),
+    ])
+      .then(([applicationResponse, offerResponse]) => {
+        setMyApplication(applicationResponse.item);
+        setReceivedOffers(offerResponse.items);
+      })
+      .catch(() => {
+        setMyApplication(null);
+        setReceivedOffers([]);
+      })
+      .finally(() => setPrivateLoading(false));
+  }, [sessionStatus]);
+
+  useEffect(() => {
+    loadPrivate();
+  }, [loadPrivate]);
 
   const toggleNeed = (need: CreatorSupportNeed) => {
     setApplication((current) => ({
@@ -135,6 +172,7 @@ export function CreatorSupportPage() {
       await submitCreatorSupportApplication(application);
       setApplicationStatus(t("creatorSupport.apply.success"));
       setApplication(INITIAL_APPLICATION);
+      loadPrivate();
     } catch (error) {
       setApplicationStatus(
         await getApiErrorMessage(error, t("creatorSupport.error.submit")),
@@ -215,7 +253,7 @@ export function CreatorSupportPage() {
               <button
                 key={value || "all"}
                 type="button"
-                onClick={() => setFilter(value)}
+                onClick={() => setFilter(value as CreatorSupportCategory | "")}
                 className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
                   filter === value
                     ? "border-accent bg-accent-soft text-accent"
@@ -400,6 +438,91 @@ export function CreatorSupportPage() {
           </form>
         </section>
       ) : null}
+
+      {sessionStatus === "authenticated" ? (
+        <section
+          className="mt-8 rounded-3xl border border-line bg-card p-6 sm:p-8"
+          aria-labelledby="creator-support-my-title"
+        >
+          <p className="text-xs font-bold tracking-[0.14em] text-accent">
+            PRIVATE SUPPORT INBOX
+          </p>
+          <h2 id="creator-support-my-title" className="mt-1 text-2xl font-bold text-fg">
+            {t("creatorSupport.mine.title")}
+          </h2>
+          <p className="mt-2 text-sm leading-7 text-fg-2">
+            {t("creatorSupport.mine.description")}
+          </p>
+          {privateLoading ? (
+            <p className="mt-5 text-sm text-fg-3">{t("creatorSupport.mine.loading")}</p>
+          ) : (
+            <div className="mt-5 grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
+              <article className="rounded-2xl border border-line bg-panel/55 p-5">
+                <p className="text-xs font-bold text-fg-3">
+                  {t("creatorSupport.mine.application")}
+                </p>
+                {myApplication ? (
+                  <>
+                    <h3 className="mt-2 font-bold text-fg">{myApplication.title}</h3>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                      <span className="rounded-full border border-line bg-card px-2.5 py-1 text-fg-2">
+                        {myApplication.status}
+                      </span>
+                      <span className="rounded-full border border-line bg-card px-2.5 py-1 text-fg-2">
+                        {myApplication.payoutStatus}
+                      </span>
+                    </div>
+                    {myApplication.reviewNote ? (
+                      <p className="mt-3 rounded-xl border border-line bg-card p-3 text-sm leading-6 text-fg-2">
+                        {myApplication.reviewNote}
+                      </p>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="mt-3 text-sm text-fg-3">
+                    {t("creatorSupport.mine.noApplication")}
+                  </p>
+                )}
+              </article>
+              <article className="rounded-2xl border border-line bg-panel/55 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-bold text-fg-3">
+                    {t("creatorSupport.mine.offers")}
+                  </p>
+                  <span className="text-xs text-fg-3">{receivedOffers.length}</span>
+                </div>
+                {receivedOffers.length ? (
+                  <div className="mt-3 space-y-3">
+                    {receivedOffers.map((received) => (
+                      <div key={received.id} className="rounded-xl border border-line bg-card p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-bold text-fg">{received.type}</p>
+                          <span className="text-[11px] font-semibold text-fg-3">
+                            {received.status}
+                          </span>
+                        </div>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-fg-2">
+                          {received.message}
+                        </p>
+                        <p className="mt-3 text-sm font-semibold text-accent">
+                          {received.contactEmail}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-fg-3">{t("creatorSupport.mine.noOffers")}</p>
+                )}
+              </article>
+            </div>
+          )}
+        </section>
+      ) : (
+        <section className="mt-8 rounded-3xl border border-line bg-panel/55 p-6">
+          <p className="text-sm leading-6 text-fg-2">{t("creatorSupport.mine.signIn")}</p>
+        </section>
+      )}
+
 
       <section
         id="creator-support-apply"
@@ -620,4 +743,3 @@ export function CreatorSupportPage() {
     </Container>
   );
 }
-

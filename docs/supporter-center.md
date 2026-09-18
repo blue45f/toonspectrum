@@ -42,7 +42,7 @@ The monthly operating-cost progress is aggregate data only. Administrators can c
 
 ## Database and runtime permissions
 
-Migration `0069_supporter_payments.sql` creates:
+Migration `0071_supporter_payments.sql` creates:
 
 - `supporter_payment` — payment lifecycle, privacy choices, receipt URL, and idempotency metadata;
 - `supporter_funding_setting` — monthly goal and public-wall switch.
@@ -96,7 +96,11 @@ Product copy uses **operating-cost support / 후원** as the primary term.
 It does not describe this flow as a tax-deductible statutory donation and does not promise donation receipts.
 Any tax, accounting, cash-receipt, or business-registration obligations for real receipts still depend on the actual operator/merchant setup and should be reviewed before live activation.
 
-## Deliberately excluded
+The admin ledger supports full cancellation for payment states that Toss can cancel without collecting additional sensitive data. Cancellation requests include an idempotency key.
+
+An already-deposited virtual-account payment is intentionally not auto-refunded from ToonSpectrum because Toss requires refund-account handling. Operators are directed to the Toss payment manager for that case, so the application does not collect or store bank refund credentials.
+
+## Tax and terminology boundary
 
 - recurring billing or supporter subscriptions;
 - feature-gated supporter tiers;
@@ -105,3 +109,33 @@ Any tax, accounting, cash-receipt, or business-registration obligations for real
 - creator-to-creator payout and settlement;
 - statutory donation receipts or charitable fundraising claims;
 - collection of card numbers, bank-authentication credentials, or virtual-account refund credentials.
+
+## Creator support program
+
+`/support-creators` is a separate support path for students, amateurs, and emerging creators.
+It supports more than money: approved projects can request mentoring, equipment, software licenses,
+portfolio feedback, collaboration, work/contest opportunities, and business sponsorship.
+
+Applications are private until an operator approves them. Public project responses intentionally
+exclude applicant email, phone, settlement account, guardian contact, and payout credentials.
+Support offers are private messages delivered only to the creator/operator workflow.
+
+For minors, the application contract is fail-closed:
+- ages 14–18 require guardian confirmation before submission;
+- under-14 creators must be submitted by a guardian with guardian confirmation;
+- public monetary support must remain disabled until guardian/KYC and payout readiness are reviewed.
+
+Migration `0072_creator_support_program.sql` creates private application and support-offer ledgers.
+The API runtime role receives bounded SELECT/INSERT/UPDATE privileges and no destructive table
+permissions.
+
+### Creator monetary payout boundary
+
+This PR does not implement a platform wallet or silently re-distribute supporter money.
+Creator monetary support is only a readiness flag. The server refuses to enable it unless
+`CREATOR_SUPPORT_PAYOUTS_ENABLED=true`, an eligible Toss payment secret is configured,
+a 64-hex payout security key is present, and the explicit-cost policy is enabled.
+
+Before a real creator payout button is added, complete the separate Toss Payouts contract,
+seller registration/KYC, guardian handling for minors, JWE encryption, payout webhooks,
+accounting/tax review, dispute/refund policy, and end-to-end payout reconciliation.

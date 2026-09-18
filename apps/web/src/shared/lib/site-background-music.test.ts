@@ -36,6 +36,7 @@ function originalTrack(overrides: Partial<SiteOstTrack> = {}): SiteOstTrack {
     model: "music_v2_5",
     sha256: "a".repeat(64),
     generatedAt: "2026-09-18T00:00:00.000Z",
+    provenance: "c2pa-requested",
     c2paRequested: true,
     status: "published",
     songId: "song_123",
@@ -134,16 +135,28 @@ describe("site background music policy", () => {
 
   it("accepts only reviewed original assets with production provenance", () => {
     const good = originalTrack();
+    const aceStep = originalTrack({
+      id: "ace-step-original",
+      src: "/audio/original/ace-step-original.mp3",
+      provider: "ace-step",
+      model: "acestep-v15-turbo",
+      provenance: "local-generation-recorded",
+      c2paRequested: undefined,
+      generatorRevision: "b".repeat(40),
+      songId: undefined,
+    });
     const tracks = parseSiteBgmManifest({
       tracks: [
         good,
+        aceStep,
         { ...good, id: "legacy-ref", src: "/audio/legacy.mp3", origin: "licensed-reference" },
         { ...good, id: "external", src: "https://untrusted.example/theme.mp3" },
         { ...good, id: "missing-integrity", sha256: "bad" },
         { ...good, id: "not-c2pa", c2paRequested: false },
+        { ...aceStep, id: "missing-revision", generatorRevision: "bad" },
         { ...good, id: "draft", status: "draft" },
       ],
     });
-    expect(tracks).toEqual([good]);
+    expect(tracks).toEqual([good, aceStep]);
   });
 });

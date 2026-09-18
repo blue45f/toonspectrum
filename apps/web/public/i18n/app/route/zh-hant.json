@@ -32,16 +32,9 @@
   "route.play": "拱廊",
   "route.privacy": "隱私權政策",
   "route.random": "隨機發現",
-  "route.ranking": "統一排名",
-  "route.recommend": "個人化精選",
-  "route.reviews": "評論",
-  "route.search": "搜尋",
-  "route.settings": "設定",
-  "route.shaper": "角色塑形器",
-  "route.sitemap": "網站地圖",
-  "route.studio": "工作室",
-  "route.support": "支援",
-  "route.tags": "按標籤搜尋",
-  "route.terms": "服務條款",
-  "route.unknown": "頁"
+  "route.explore": "頻譜探索",
+  "route.news": "卡通及網路小說新聞",
+  "route.contact": "廣告和合作夥伴關係",
+  "route.create": "創作者板",
+  "route.creatorSupport": "Creator Support"
 }

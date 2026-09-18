@@ -14,6 +14,13 @@ import { usePathname } from "@/compat/navigation";
 import Link from "@/compat/router-link";
 import { cx } from "@/shared/lib/cx";
 import { useI18n, useT } from "@/shared/lib/i18n";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("site-header-mobile-nav", ko, en);
 
 interface MobileHeaderNavigationProps {
   menuOpen: boolean;
@@ -94,6 +101,7 @@ export function MobileHeaderNavigation({
   isPurposeActive,
   hideBottomTabs = false,
 }: MobileHeaderNavigationProps) {
+  useBilingualI18nRevision();
   const pathname = usePathname();
   const language = useI18n((state) => state.lang);
   const locale = siteNavigationLocale(language);
@@ -103,8 +111,8 @@ export function MobileHeaderNavigation({
   const navigationGroups = siteNavigationGroupsForPath(pathname);
   const mobileTabs = mobileSiteTabsForPath(pathname);
   const menuDescription = navigationContext === "studio"
-    ? (locale === "ko" ? "기획부터 검수·내보내기까지, 필요한 단계로 바로 이동하세요" : "Jump straight to planning, production, review or export")
-    : (locale === "ko" ? "영감을 찾고, 그리고, 함께 나누는 작업실" : "Discover inspiration, draw and share your work");
+    ? (bi("기획부터 검수·내보내기까지, 필요한 단계로 바로 이동하세요", "Jump straight to planning, production, review or export"))
+    : (bi("영감을 찾고, 그리고, 함께 나누는 작업실", "Discover inspiration, draw and share your work"));
 
   useEffect(() => {
     if (!menuOpen) return;

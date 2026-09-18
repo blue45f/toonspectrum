@@ -63,12 +63,12 @@ describe("quick and task-specific studio workspaces", () => {
   it("selects distinct layouts without changing document state", () => {
     const initial = createStudioWorkspaceDefaultState(null);
     const before = JSON.stringify(initial);
-    const layouts = ["draw", "comic", "design"] as const;
+    const layouts = ["draw", "comic", "design", "3d"] as const;
     expect(layouts.map((task) => applyStudioTaskWorkspace(initial, studioTaskWorkspaceId(task, "simple", "")).activeWorkspaceId))
-      .toEqual(["lineart", "pro-comic", "vector-design"]);
+      .toEqual(["lineart", "pro-comic", "vector-design", "pose-3d"]);
     expect(JSON.stringify(initial)).toBe(before);
     expect(studioTaskWorkspaceId(null, "simple", "")).toBeNull();
-    expect(studioTaskWorkspaceId("3d", "simple", "")).toBeNull();
+    expect(studioTaskWorkspaceId("3d", "simple", "")).toBe("pose-3d");
   });
   it("uses a validated project role layout without interpreting duplicates or unknown ids", () => {
     expect(studioRoleWorkspaceId("?roleWorkspace=coloring")).toBe("coloring");
@@ -91,6 +91,8 @@ describe("quick and task-specific studio workspaces", () => {
     expect(projectStudioTaskAppSettings(settings, "draw", "simple").toolbar.visibleIds).toContain("blend");
     expect(projectStudioTaskAppSettings(settings, "comic", "simple").toolbar.visibleIds).toContain("bubble");
     expect(projectStudioTaskAppSettings(settings, "design", "simple").toolbar.visibleIds).toContain("transform");
+    expect(projectStudioTaskAppSettings(settings, "3d", "simple").toolbar.visibleIds).toContain("reference");
+    expect(projectStudioTaskAppSettings(settings, "animation", "simple").toolbar.visibleIds).toContain("transform");
     expect(JSON.stringify(settings)).toBe(before);
   });
   it("keeps custom toolbars and exposes a compact quick drawing toolbar", () => {

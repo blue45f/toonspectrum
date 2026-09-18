@@ -97,5 +97,9 @@ describe("studio shell floating integration", () => {
     expect(manager).toContain("data-studio-shell-mounted-state");
     expect(manager).toContain("data-studio-shell-focus-mode");
     expect(manager).toContain("--studio-canvas-bottom-inset");
+    expect(manager).toContain("StudioDesktopFloatingSurface");
+    expect(manager).toContain("STUDIO_FLOATING_MENU_LAYOUTS.viewOptions");
+    expect(manager).toContain('data-studio-shell-view-options-panel');
+    expect(manager).toContain("useMediaQuery(STUDIO_DESKTOP_FLOATING_QUERY)");
   });
 });
