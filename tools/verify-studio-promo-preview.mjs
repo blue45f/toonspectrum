@@ -51,6 +51,13 @@ function preview({ hidden = false, hasAudio = true, playing = true } = {}) {
   const dependencies = {
     react,
     "react/jsx-runtime": { jsx, jsxs: jsx },
+    "@/shared/lib/i18n-bilingual-copy": {
+      translateCurrentStaticSourceText: (_scope, _locale, source) => source,
+      formatI18nTemplate: (template, values) =>
+        String(template).replace(/\{([^}]+)\}/gu, (match, key) =>
+          Object.hasOwn(values ?? {}, key) ? String(values[key]) : match
+        ),
+    },
     "./promo-audio": { preparePromoVoicePreview: async () => null },
     "./promo-canvas": { drawPromoFrame: () => {}, loadPromoImages: async () => new Map() },
     "./promo-model": { PROMO_FPS: 30, promoMusicGain: () => 0.25, promoTimeline: () => [], promoFrameCount: () => 450, promoSize: () => ({ width: 480, height: 854 }) },
