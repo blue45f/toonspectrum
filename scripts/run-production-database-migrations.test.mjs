@@ -44,10 +44,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(69);
+  expect(manifest).toHaveLength(70);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0069_account_consolidation");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(69);
+  expect(manifest.at(-1).id).toBe("0070_commerce_payments");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(70);
 });
 
 test("applied studio media inference migration remains checksum-immutable", () => {
@@ -1289,6 +1289,10 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "community_cafe_invite",
     "community_cafe_join_request",
     "community_cafe_moderation_log",
+    "commerce_entitlement",
+    "commerce_order",
+    "commerce_payment_event",
+    "commerce_product_price",
     "creator_asset_artifact",
     "creator_asset_artifact_set",
     "creator_asset_license_snapshot",

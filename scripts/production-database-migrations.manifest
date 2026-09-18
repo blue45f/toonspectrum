@@ -67,3 +67,4 @@ apps/api/src/db/migrations/0066_share_analytics_events.sql
 apps/api/src/db/migrations/0067_creator_role_workspace_personalization.sql
 apps/api/src/db/migrations/0068_business_inquiries.sql
 apps/api/src/db/migrations/0069_account_consolidation.sql
+apps/api/src/db/migrations/0070_commerce_payments.sql

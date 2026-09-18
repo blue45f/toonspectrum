@@ -7,6 +7,7 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { BusinessInquiryModule } from "./modules/business-inquiry/business-inquiry.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
 import { CommunityModule } from "./modules/community/community.module";
+import { CommerceModule } from "./modules/commerce/commerce.module";
 import { CreatorModule } from "./modules/creator/creator.module";
 import { CreatorMarketplaceModule } from "./modules/creator-marketplace/creator-marketplace.module";
 import { CreatorIntelligenceModule } from "./modules/creator-intelligence/creator-intelligence.module";
@@ -39,6 +40,7 @@ const studioRealtimeTicketModule =
     OgModule,
     PersonalCloudModule,
     CommunityModule,
+    CommerceModule,
     CatalogModule,
     AdminModule,
     TrafficAnalyticsModule,
