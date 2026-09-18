@@ -39,6 +39,16 @@ const creatorLevelLabels: Record<string, string> = {
   professional: "Professional",
   partner: "Partner",
 };
+const ledgerActionLabels: Record<string, string> = {
+  grant: "지급",
+  reserve: "사용 예약",
+  capture: "사용 확정",
+  release: "예약 해제",
+  refund: "환불",
+  expire: "만료",
+  adjustment: "조정",
+  reversal: "취소",
+};
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1_000_000_000) {
