@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   EMPTY_CREATOR_ROLE_WORKSPACE_PREFERENCE,
+  creatorAccountContextFromLegacyStage,
   creatorDetailedRoleLens,
+  creatorExperienceLevelFromLegacyStage,
   creatorRoleAiTools,
   creatorRoleChecklist,
   creatorRoleNotificationSettings,
@@ -12,6 +14,7 @@ import {
   normalizeCreatorRoleWorkspacePreference,
   rankCreatorRoleWork,
   recommendCreatorTeamRoles,
+  recommendCreatorWorkspaceMode,
   resolveCreatorRoleProjectKey,
   scoreCreatorRoleMatch,
   type PublicCreatorRoleCandidate,
@@ -49,6 +52,7 @@ describe("creator role workspace contract", () => {
       notificationPreset: "balanced",
       notificationOverrides: {},
       usageGoals: ["team-production"],
+      accountContext: "individual",
       workspaceMode: "creator",
       capacity: {
         weeklyCapacityHours: 168,
@@ -69,6 +73,29 @@ describe("creator role workspace contract", () => {
       },
     });
     expect(EMPTY_CREATOR_ROLE_WORKSPACE_PREFERENCE.visibility.roles).toBe(false);
+  });
+
+  it("separates account context, experience and workspace-mode recommendations", () => {
+    expect(creatorAccountContextFromLegacyStage("student")).toBe("education");
+    expect(creatorAccountContextFromLegacyStage("studio")).toBe("studio");
+    expect(creatorAccountContextFromLegacyStage("professional")).toBe("individual");
+    expect(creatorExperienceLevelFromLegacyStage("aspiring")).toBe("experienced");
+
+    expect(recommendCreatorWorkspaceMode({
+      accountContext: "education",
+      experienceLevel: "beginner",
+      usageGoals: ["learning"],
+    })).toBe("guided");
+    expect(recommendCreatorWorkspaceMode({
+      accountContext: "studio",
+      experienceLevel: "experienced",
+      usageGoals: ["personal-project"],
+    })).toBe("production");
+    expect(recommendCreatorWorkspaceMode({
+      accountContext: "individual",
+      experienceLevel: "experienced",
+      usageGoals: ["personal-project"],
+    })).toBe("creator");
   });
 
   it("resolves project-specific keys without leaking malformed paths", () => {
