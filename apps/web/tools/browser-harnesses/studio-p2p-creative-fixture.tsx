@@ -63,7 +63,12 @@ export function installGeneratedMedia(): void {
       audio = new AudioContext(); oscillator = audio.createOscillator();
       const gain = audio.createGain(); gain.gain.value = 0.05;
       const destination = audio.createMediaStreamDestination(); oscillator.connect(gain); gain.connect(destination);
-      oscillator.start(); await audio.resume(); destination.stream.getTracks().forEach((track) => stream.addTrack(track));
+      oscillator.start();
+      // Headless mobile WebKit may reject AudioContext.resume() even after a synthetic Playwright
+      // click. The destination track itself is still valid for RTC wiring and must not make the
+      // generated-media harness fall through to the host's physical-device permission path.
+      await audio.resume().catch(() => undefined);
+      destination.stream.getTracks().forEach((track) => stream.addTrack(track));
     }
     if (constraints?.video) {
       canvas = document.createElement("canvas"); canvas.width = 320; canvas.height = 180;

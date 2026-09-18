@@ -79,8 +79,14 @@ try {
       await chat("브라우저 P2P 한글 검증"); row.checks.push("UI consent, zero implicit capture, Korean chat and receipt");
       if (profile.media) {
         for (const page of pages) {
+          if (profile.generatedMedia) {
+            await page.evaluate(async (path) => (await import(path)).installGeneratedMedia(), fixture);
+          }
           await page.getByRole("button", { name: "마이크 켜기", exact: true }).click();
           await page.getByRole("button", { name: "마이크 끄기", exact: true }).waitFor();
+          if (profile.generatedMedia) {
+            await page.evaluate(async (path) => (await import(path)).installGeneratedMedia(), fixture);
+          }
           await page.getByRole("button", { name: "카메라 켜기", exact: true }).click();
           await page.getByRole("button", { name: "카메라 끄기", exact: true }).waitFor();
         }
@@ -139,6 +145,29 @@ try {
       assert.equal(row.errors.length, 0, row.errors.join("\n")); row.result = "PASS";
     } catch (error) {
       row.result = "FAIL"; row.failure = String(error?.stack ?? error);
+      row.capture = await Promise.all(pages.map((page) => page.evaluate(() => ({
+        calls: window.qaCaptureCalls ?? 0,
+        tracks: (window.qaTracks ?? []).map((track) => ({
+          kind: track.kind,
+          readyState: track.readyState,
+        })),
+        getUserMedia: String(navigator.mediaDevices?.getUserMedia).slice(0, 80),
+      })).catch(() => ({ calls: -1, tracks: [], getUserMedia: "" }))));
+      row.rtc = await Promise.all(pages.map((page) => page.evaluate(() =>
+        (window.qaConnections ?? []).map((pc) => ({
+          connectionState: pc.connectionState,
+          iceConnectionState: pc.iceConnectionState,
+          signalingState: pc.signalingState,
+          senders: pc.getSenders().map((sender) => ({
+            kind: sender.track?.kind ?? null,
+            readyState: sender.track?.readyState ?? null,
+          })),
+          receivers: pc.getReceivers().map((receiver) => ({
+            kind: receiver.track?.kind ?? null,
+            readyState: receiver.track?.readyState ?? null,
+          })),
+        }))
+      ).catch(() => [])));
       for (let i = 0; i < pages.length; i++) {
         row[`body${i}`] = (await pages[i].locator("body").innerText().catch(() => "")).slice(-6000);
         await pages[i].screenshot({ path: `${out}/${profile.name}-failure-${i}.png` }).catch(() => undefined);

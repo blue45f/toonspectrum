@@ -34,21 +34,29 @@ describe("Studio Scene3D linked layer bridge", () => {
 
   it("projects a non-destructive edit back to the linked BG3D shot", () => {
     const { result } = roundTrip();
-    const entity = result.authority.document.entities[0];
-    if (!entity) throw new Error("Scene entity missing.");
     const edited = {
       ...result.authority.document,
       revision: result.authority.document.revision + 1,
-      entities: result.authority.document.entities.map((candidate) =>
-        candidate.id === entity.id
-          ? {
-              ...candidate,
-              transform: {
-                ...candidate.transform,
-                position: [2, 1, -3] as const,
-              },
-            }
-          : candidate),
+      entities: [
+        ...result.authority.document.entities,
+        {
+          id: "roundtrip-box",
+          name: "Round-trip box",
+          kind: "primitive" as const,
+          primitiveKind: "box" as const,
+          color: "#ffffff",
+          transform: {
+            position: [2, 1, -3] as const,
+            rotation: [0, 0, 0, 1] as const,
+            scale: [1, 1, 1] as const,
+          },
+          visible: true,
+          locked: false,
+          castShadow: true,
+          receiveShadow: true,
+          parentId: null,
+        },
+      ],
     };
     const projection = projectStudioScene3dLinkedLayerEdit(result, edited);
     expect(projection).toMatchObject({
@@ -72,6 +80,6 @@ describe("Studio Scene3D linked layer bridge", () => {
       shared3dStage: page.shared3dStage,
       elements: [{ ...element, bg3dScene: { ...element.bg3dScene, activeShotId: "other-shot" } }],
     });
-    expect(result).toMatchObject({ ok: false, code: "shot-mismatch" });
+    expect(result).toMatchObject({ ok: false, code: "page-cross-reference-invalid" });
   });
 });

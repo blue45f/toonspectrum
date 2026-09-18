@@ -1,12 +1,13 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
+"use no memo";
 // The legacy editor still reuses one mutable host object. Keep this shell out of React Compiler
 // memoization until the remaining document/session controllers stop mutating that identity.
+
 import { SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 
 import type { RefObject } from "react";
+
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 
 import type { StudioWebXrSessionState } from "../studio-webxr-session";
 import { StudioBg3dEditorSidebar } from "./StudioBg3dEditorSidebar";
@@ -74,6 +75,7 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
       aria-labelledby="studio-bg3d-dialog-title"
       data-testid="studio-bg3d-dialog"
       data-studio-bg3d-workspace="professional-v2"
+      data-studio-bg3d-experience={experienceMode}
       hidden={!open}
       inert={!open ? true : undefined}
       className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.94)] p-2 text-fg sm:p-4"

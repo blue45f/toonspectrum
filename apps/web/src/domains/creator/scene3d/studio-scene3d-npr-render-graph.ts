@@ -191,7 +191,7 @@ export function buildStudioScene3dNprRenderGraph(input: {
   const requested = Object.freeze([...(input.requestedPasses ?? DEFAULT_REQUESTED)]);
   const wantsFx = fxRequested(input.fx);
   const fxEnabled = wantsFx && input.babylonSpecialistAvailable === true;
-  const transparent = input.document.output.transparentBackground;
+  const transparent = input.document.output.transparent;
   const dependencies = dependencyMap({ transparent, fx: fxEnabled });
   const requestedWithFx = fxEnabled && requested.includes("beauty")
     ? Object.freeze([...requested, "fx-overlay"] as StudioScene3dNprPassId[])

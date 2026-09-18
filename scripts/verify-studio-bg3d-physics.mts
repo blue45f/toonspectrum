@@ -704,7 +704,7 @@ async function main(): Promise<void> {
 
   const port = await findFreePort();
   const rootUrl = `http://127.0.0.1:${port}/`;
-  const studioUrl = `${rootUrl}studio`;
+  const studioUrl = `${rootUrl}studio/canvas`;
   const server: ChildProcess = spawn(
     process.platform === "win32" ? "pnpm.cmd" : "pnpm",
     ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],

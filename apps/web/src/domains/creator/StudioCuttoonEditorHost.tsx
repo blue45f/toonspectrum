@@ -15445,7 +15445,9 @@ No text, logo, watermark, or copyrighted character.`;
         requestedSize: parseStudioAiRequestedSize(useByok ? byokSize : assetPromptSize),
         references: [],
       });
-      const result = await generateBackgroundImage(aiSettings, providerPrompt, { size });
+      const result = await generateBackgroundImage(aiSettings, providerPrompt, {
+        size: useByok ? byokSize : assetPromptSize,
+      });
       if (!canApplyStudioMutation(mutationTicket)) return;
       settleTrackedStudioAiOperation(operationId, result);
       operationId = null;
