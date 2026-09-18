@@ -19,6 +19,7 @@ import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 import {
   DEFAULT_WEBTOON_ONBOARDING_SELECTION,
@@ -114,14 +115,13 @@ function OnboardingSelect<T extends string>({
   label,
   value,
   choices,
-  locale,
+  locale: _locale,
   onChange,
-}: {
-  readonly id: string;
+}: {  readonly id: string;
   readonly label: string;
   readonly value: T;
   readonly choices: readonly Choice<T>[];
-  readonly locale: Locale;
+  readonly locale?: string;
   readonly onChange: (next: T) => void;
 }) {
   const bt = useBilingual("StudioModeProjectCreatePage.onboardingSelect");
@@ -185,7 +185,7 @@ export function StudioModeProjectCreatePage() {
     [showMoreKinds],
   );
   const titleReady = title.trim().length > 0;
-  const modeName = studioModeLabel(modePlan.profile, locale);
+  const modeName = l(studioModeLabel(modePlan.profile, "ko"), studioModeLabel(modePlan.profile, "en"));
   const steps: readonly StudioTaskFlowStep[] = [
     {
       id: "kind",
@@ -336,7 +336,7 @@ export function StudioModeProjectCreatePage() {
 
           <section className="mt-7 grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,.65fr)]">
             <div className="min-w-0 space-y-4">
-              <StudioModeWorkspacePreview profile={modePlan.profile} locale={locale} />
+              <StudioModeWorkspacePreview profile={modePlan.profile} locale={legacyLocale} />
 
               {kind === "webtoon" ? (
                 <div className="rounded-2xl border border-line bg-card p-4 sm:p-5">
@@ -375,7 +375,7 @@ export function StudioModeProjectCreatePage() {
                           label={bt("현재 가지고 있는 자료", "What you already have")}
                           value={selection.startingPoint}
                           choices={WEBTOON_STARTING_POINTS}
-                          locale={locale}
+                          locale={legacyLocale}
                           onChange={(startingPoint) => setSelection((current) => ({ ...current, startingPoint }))}
                         />
                         <OnboardingSelect<WebtoonOnboardingGoalId>
@@ -383,7 +383,7 @@ export function StudioModeProjectCreatePage() {
                           label={bt("이번 프로젝트 목표", "Project goal")}
                           value={selection.goal}
                           choices={WEBTOON_ONBOARDING_GOALS}
-                          locale={locale}
+                          locale={legacyLocale}
                           onChange={(goal) => setSelection((current) => ({ ...current, goal }))}
                         />
                         <OnboardingSelect<WebtoonTeamModelId>
@@ -391,7 +391,7 @@ export function StudioModeProjectCreatePage() {
                           label={bt("제작 인원", "Team model")}
                           value={selection.teamModel}
                           choices={WEBTOON_TEAM_MODELS}
-                          locale={locale}
+                          locale={legacyLocale}
                           onChange={(teamModel) => setSelection((current) => ({ ...current, teamModel }))}
                         />
                         <OnboardingSelect<WebtoonCadenceId>
@@ -399,7 +399,7 @@ export function StudioModeProjectCreatePage() {
                           label={bt("제작 주기", "Cadence")}
                           value={selection.cadence}
                           choices={WEBTOON_CADENCES}
-                          locale={locale}
+                          locale={legacyLocale}
                           onChange={(cadence) => setSelection((current) => ({ ...current, cadence }))}
                         />
                       </div>

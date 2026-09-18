@@ -22,6 +22,7 @@ import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { WorkflowTrustBadge } from "@/shared/components/WorkflowTrustBadge";
 import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -107,14 +108,14 @@ function WebtoonOnboardingSelect<T extends string>({
   label,
   value,
   options,
-  locale,
+  locale: _locale,
   onChange,
 }: {
   readonly id: string;
   readonly label: string;
   readonly value: T;
   readonly options: readonly WebtoonChoiceOption<T>[];
-  readonly locale: Locale;
+  readonly locale?: string;
   readonly onChange: (value: T) => void;
 }) {
   const bt = useBilingual("StudioDeferredSaveProjectCreatePage.onboardingSelect");
@@ -314,7 +315,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                     )}>
                       <Icon size={19} aria-hidden="true" />
                     </span>
-                    <b className="mt-3 block break-words text-base text-fg">{projectTitle(option, locale)}</b>
+                    <b className="mt-3 block break-words text-base text-fg">{projectTitle(option, l)}</b>
                     <span id={descriptionId} className="mt-1 block break-words text-xs leading-5 text-fg-3">
                       {bt(option.descriptionKo ?? "", option.descriptionEn ?? "")}
                     </span>
@@ -432,7 +433,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                       label={bt("현재 가지고 있는 자료", "What you already have")}
                       value={webtoonSelection.startingPoint}
                       options={WEBTOON_STARTING_POINTS}
-                      locale={locale}
+                      locale={legacyLocale}
                       onChange={(startingPoint) => setWebtoonSelection((current) => ({ ...current, startingPoint }))}
                     />
                     <WebtoonOnboardingSelect<WebtoonOnboardingGoalId>
@@ -440,7 +441,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                       label={bt("프로젝트 목표", "Project goal")}
                       value={webtoonSelection.goal}
                       options={WEBTOON_ONBOARDING_GOALS}
-                      locale={locale}
+                      locale={legacyLocale}
                       onChange={(goal) => setWebtoonSelection((current) => ({ ...current, goal }))}
                     />
                     <WebtoonOnboardingSelect<WebtoonTeamModelId>
@@ -448,7 +449,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                       label={bt("제작 인원", "Team model")}
                       value={webtoonSelection.teamModel}
                       options={WEBTOON_TEAM_MODELS}
-                      locale={locale}
+                      locale={legacyLocale}
                       onChange={(teamModel) => setWebtoonSelection((current) => ({ ...current, teamModel }))}
                     />
                     <WebtoonOnboardingSelect<WebtoonCadenceId>
@@ -456,7 +457,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                       label={bt("예상 연재 주기", "Publishing cadence")}
                       value={webtoonSelection.cadence}
                       options={WEBTOON_CADENCES}
-                      locale={locale}
+                      locale={legacyLocale}
                       onChange={(cadence) => setWebtoonSelection((current) => ({ ...current, cadence }))}
                     />
                   </div>
@@ -488,7 +489,7 @@ export function StudioDeferredSaveProjectCreatePage() {
               <ShieldCheck size={18} aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <WorkflowTrustBadge state="device-saved" locale={locale} className="mb-2 w-fit max-w-full" />
+              <WorkflowTrustBadge state="device-saved" locale={legacyLocale} className="mb-2 w-fit max-w-full" />
               <h2 className="break-words text-sm font-black text-fg">
                 {bt("그리는 동안 이 기기에 자동 저장됩니다", "Your work is autosaved on this device while you draw")}
               </h2>

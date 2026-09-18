@@ -31,12 +31,13 @@ import {
 } from "../studio-plugin-registry";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
+import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 type Locale = string;
 
 const DESTINATION_LABELS: Readonly<
-  Record<StudioAssetDestination, Readonly<Record<Locale, string>>>
+  Record<StudioAssetDestination, BilingualText>
 > = {
   internal: { ko: "프로젝트 안에서만", en: "Inside project only" },
   webtoon: { ko: "웹툰 공개", en: "Webtoon publishing" },
@@ -49,7 +50,7 @@ const DESTINATION_LABELS: Readonly<
 };
 
 const PERMISSION_LABELS: Readonly<
-  Record<StudioPluginPermission, Readonly<Record<Locale, string>>>
+  Record<StudioPluginPermission, BilingualText>
 > = {
   "document-read": { ko: "문서 읽기", en: "Read documents" },
   "document-write": { ko: "문서 수정", en: "Edit documents" },
@@ -104,8 +105,9 @@ function StatusCard({
   readonly label: string;
   readonly status: string;
   readonly description: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
+  const l = useBilingualLocalizer("studioAssetGovernance.status");
   return (
     <article className="rounded-2xl border border-line bg-panel p-4">
       <div className="flex items-start justify-between gap-3">
@@ -135,6 +137,7 @@ function CheckOption({
   readonly description: string;
   readonly onChange: (checked: boolean) => void;
 }) {
+  useBilingualI18nRevision();
   const inputId = useId();
   const descriptionId = `${inputId}-description`;
 
@@ -173,7 +176,7 @@ export function StudioAssetGovernancePanel({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
   const bt = useBilingual("StudioAssetGovernancePanel");
   const [evaluatedAt, setEvaluatedAt] = useState(() => new Date().toISOString());
@@ -219,7 +222,7 @@ export function StudioAssetGovernancePanel({
     patch("confirmedPluginPermissions", STUDIO_PLUGIN_PERMISSIONS.filter((item) => current.has(item)));
   };
 
-  const summaryCopy: Readonly<Record<StudioAssetGovernanceStatus, Readonly<Record<Locale, string>>>> = {
+  const summaryCopy: Readonly<Record<StudioAssetGovernanceStatus, BilingualText>> = {
     ready: {
       ko: "현재 목적에 맞는 품질과 사용 조건을 확인했습니다.",
       en: "Quality and usage conditions match the current purpose.",

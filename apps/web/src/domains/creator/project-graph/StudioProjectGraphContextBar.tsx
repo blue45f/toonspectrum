@@ -19,6 +19,12 @@ import {
   useStudioProjectGraph,
   type StudioProjectGraphStatus,
 } from "./useStudioProjectGraph";
+import {
+  formatI18nTemplate,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 type Locale = string;
 
@@ -32,6 +38,7 @@ const STATUS_LABELS: Readonly<Record<StudioProjectGraphStatus, Readonly<Record<L
 };
 
 function StatusGlyph({ status }: { readonly status: StudioProjectGraphStatus }) {
+  useBilingualI18nRevision();
   const className = status === "loading" ? "animate-spin" : undefined;
   if (status === "synced" || status === "cached") {
     return <Cloud size={15} aria-hidden="true" className={className} />;
@@ -59,7 +66,7 @@ function primaryArtifact(artifacts: readonly StudioArtifactRecord[]): StudioArti
   return artifacts[0] ?? null;
 }
 
-function updatedLabel(value: string | undefined, locale: Locale): string | null {
+function updatedLabel(value: string | undefined, language: string): string | null {
   if (!value) return null;
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return null;
@@ -73,10 +80,10 @@ function updatedLabel(value: string | undefined, locale: Locale): string | null 
 
 export function StudioProjectGraphContextBar({
   projectId,
-  locale,
+  locale: _locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
   const bt = useBilingual("StudioProjectGraphContextBar");
   const controller = useStudioProjectGraph(projectId, locale);
@@ -84,7 +91,7 @@ export function StudioProjectGraphContextBar({
     () => primaryArtifact(controller.project?.artifacts ?? []),
     [controller.project?.artifacts],
   );
-  const syncedAt = updatedLabel(controller.project?.updatedAt, locale);
+  const syncedAt = updatedLabel(controller.project?.updatedAt, language);
   const authority = controller.project?.authorityVersion ?? "legacy-v2";
 
   return (

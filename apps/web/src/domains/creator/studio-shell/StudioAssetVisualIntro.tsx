@@ -5,7 +5,8 @@ import Link from "@/compat/router-link";
 import { useT } from "@/shared/lib/i18n";
 import { translateParallelBilingualCopy } from "@/shared/lib/i18n-bilingual-copy";
 
-import "./studio-asset-visual-intro.css";
+import { useI18n, useT } from "@/shared/lib/i18n";
+import { translateParallelBilingualCopy } from "@/shared/lib/i18n-bilingual-copy";
 
 const COPY = {
   ko: {
@@ -48,7 +49,7 @@ export function StudioAssetVisualIntro({ locale }: { readonly locale: string }) 
   const reducedMotion = useReducedMotion();
 
   return (
-    <section className="studio-asset-visual-intro" aria-labelledby="studio-asset-visual-title" lang={locale}>
+    <section className="studio-asset-visual-intro" aria-labelledby="studio-asset-visual-title" lang={language}>
       <div className="studio-asset-visual-intro__hero">
         <motion.figure
           initial={reducedMotion ? false : { opacity: 0, y: 14 }}

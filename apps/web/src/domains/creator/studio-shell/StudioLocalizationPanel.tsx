@@ -26,6 +26,8 @@ import {
 } from "../studio-localization-project-store";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
@@ -48,7 +50,7 @@ interface LayoutDraft {
   maxLineCount: number;
 }
 
-const STATUS_LABELS: Readonly<Record<StudioLocalizationStatus, Readonly<Record<Locale, string>>>> = {
+const STATUS_LABELS: Readonly<Record<StudioLocalizationStatus, BilingualText>> = {
   untranslated: { ko: "번역 전", en: "Not translated" },
   "ai-draft": { ko: "초안", en: "Draft" },
   translating: { ko: "번역 중", en: "Translating" },
@@ -58,7 +60,7 @@ const STATUS_LABELS: Readonly<Record<StudioLocalizationStatus, Readonly<Record<L
   complete: { ko: "완료", en: "Complete" },
 };
 
-const KIND_LABELS: Readonly<Record<StudioLocalizationUnitKind, Readonly<Record<Locale, string>>>> = {
+const KIND_LABELS: Readonly<Record<StudioLocalizationUnitKind, BilingualText>> = {
   dialogue: { ko: "대사", en: "Dialogue" },
   narration: { ko: "내레이션", en: "Narration" },
   sfx: { ko: "효과음", en: "SFX" },
@@ -90,28 +92,22 @@ function statusTone(status: StudioLocalizationStatus): string {
   return "border-line bg-panel text-fg-2";
 }
 
-function nextActionLabel(status: StudioLocalizationStatus, locale: Locale): string {
-  const labels: Record<Locale, Record<StudioLocalizationStatus, string>> = {
-    ko: {
-      untranslated: "번역 시작",
-      "ai-draft": "번역문 저장",
-      translating: "검토 요청",
-      "review-required": "번역 승인",
-      approved: "원고 배치 확인 시작",
-      "layout-check": "검사하고 완료",
-      complete: "다시 열기",
-    },
-    en: {
-      untranslated: "Start translation",
-      "ai-draft": "Save translation",
-      translating: "Request review",
-      "review-required": "Approve translation",
-      approved: "Start layout check",
-      "layout-check": "Validate and complete",
-      complete: "Reopen",
-    },
-  };
-  return labels[locale][status];
+const NEXT_ACTION_LABELS: Readonly<Record<StudioLocalizationStatus, BilingualText>> = {
+  untranslated: { ko: "번역 시작", en: "Start translation" },
+  "ai-draft": { ko: "번역문 저장", en: "Save translation" },
+  translating: { ko: "검토 요청", en: "Request review" },
+  "review-required": { ko: "번역 승인", en: "Approve translation" },
+  approved: { ko: "원고 배치 확인 시작", en: "Start layout check" },
+  "layout-check": { ko: "검사하고 완료", en: "Validate and complete" },
+  complete: { ko: "다시 열기", en: "Reopen" },
+};
+
+function nextActionLabel(
+  status: StudioLocalizationStatus,
+  localize: (ko: string, en: string) => string,
+): string {
+  const label = NEXT_ACTION_LABELS[status];
+  return localize(label.ko, label.en);
 }
 
 function numberValue(value: string, fallback: number): number {
@@ -140,10 +136,10 @@ function layoutDraftFor(unit: StudioLocalizationUnit | null): LayoutDraft {
 /** Full localization workflow: translate, review, clean, letter and project readiness. */
 export function StudioLocalizationPanel({
   projectId,
-  locale,
+  locale: _locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
   const bt = useBilingual("StudioLocalizationPanel");
   const workspace = useStudioProjectWorkspace(projectId, locale);
@@ -178,7 +174,7 @@ export function StudioLocalizationPanel({
     };
     window.addEventListener(STUDIO_LOCALIZATION_PROJECT_UPDATED_EVENT, handleUpdate);
     return () => window.removeEventListener(STUDIO_LOCALIZATION_PROJECT_UPDATED_EVENT, handleUpdate);
-  }, [locale, projectId]);
+  }, [l, projectId]);
 
   const selected = document.units.find((unit) => unit.id === selectedId) ?? null;
   useEffect(() => {
@@ -583,7 +579,7 @@ export function StudioLocalizationPanel({
                 ) : null}
                 <button type="button" onClick={runNextAction} className={buttonClass({ size: "sm", className: "gap-1.5" })}>
                   <CheckCircle2 size={14} aria-hidden="true" />
-                  {nextActionLabel(selected.status, locale)}
+                  {nextActionLabel(selected.status, l)}
                 </button>
                 {["review-required", "approved", "layout-check"].includes(selected.status) ? (
                   <button

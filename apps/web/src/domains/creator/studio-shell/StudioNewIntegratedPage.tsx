@@ -15,10 +15,16 @@ import {
 import { StudioNewIntegratedPage as StudioProjectCreatePage } from "./StudioProjectCreatePage";
 import "./studio-new-visual-first.css";
 import "./studio-new-visual-gallery.css";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 
 /** Preserve template intent while the existing new-project flow creates the document identity. */
 export function StudioNewIntegratedPage() {
+  useBilingualI18nRevision();
   const [searchParams] = useSearchParams();
   useI18n((state) => state.lang);
   const bt = useBilingual("StudioNewIntegratedPage");

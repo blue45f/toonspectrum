@@ -21,6 +21,7 @@ import {
   type StudioExportDraftInput,
 } from "../studio-project-export-snapshot";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
@@ -69,7 +70,7 @@ export function StudioExportPanel({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale: "ko" | "en";
 }) {
   const bt = useBilingual("StudioExportPanel");
   const workspace = useStudioProjectWorkspace(projectId, locale);

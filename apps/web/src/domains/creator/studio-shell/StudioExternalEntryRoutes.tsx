@@ -12,6 +12,10 @@ import {
   studioExternalReviewHref,
   validateStudioExternalToken,
 } from "../studio-route-registry";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 type EntryKind = "join" | "present" | "review";
 
@@ -32,7 +36,11 @@ function InvalidExternalEntry({ kind }: { readonly kind: EntryKind }) {
       ko: "초대 링크가 올바르지 않습니다. 프로젝트 관리자에게 새 초대를 요청해 주세요.",
       en: "The invitation link is invalid. Ask the project administrator for a new invitation.",
     },
-  };
+};
+
+function InvalidExternalEntry({ kind }: { readonly kind: EntryKind }) {
+  const t = useT();
+  const descriptions = translateBilingualMap(t, "studioExternalEntry.description", DESCRIPTIONS);
   return (
     <div className="min-h-[70vh] bg-canvas">
       <Container size="prose" className="py-16 sm:py-24">
@@ -40,7 +48,7 @@ function InvalidExternalEntry({ kind }: { readonly kind: EntryKind }) {
           <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-warning-soft/25 text-warning">
             <CircleAlert size={22} aria-hidden="true" />
           </span>
-          <h1 className="mt-4 text-2xl font-black text-fg">{title}</h1>
+          <h1 className="mt-4 text-2xl font-black text-fg">{t(COPY.title)}</h1>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-fg-2">
             {bt(descriptions[kind].ko, descriptions[kind].en)}
           </p>
@@ -55,6 +63,7 @@ function InvalidExternalEntry({ kind }: { readonly kind: EntryKind }) {
 }
 
 function ExternalEntry({ kind }: { readonly kind: EntryKind }) {
+  useBilingualI18nRevision();
   const params = useParams<{
     inviteToken?: string;
     presentationToken?: string;
@@ -78,13 +87,16 @@ function ExternalEntry({ kind }: { readonly kind: EntryKind }) {
 }
 
 export function StudioExternalReviewRoute() {
+  useBilingualI18nRevision();
   return <ExternalEntry kind="review" />;
 }
 
 export function StudioExternalPresentationRoute() {
+  useBilingualI18nRevision();
   return <ExternalEntry kind="present" />;
 }
 
 export function StudioExternalJoinRoute() {
+  useBilingualI18nRevision();
   return <ExternalEntry kind="join" />;
 }

@@ -11,6 +11,8 @@ import { useMemo, useState } from "react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -23,6 +25,12 @@ import {
 } from "../studio-project-document-store";
 import { markStudioProjectOpened } from "../studio-project-library-store";
 import { useStudioProjectDocuments } from "./useStudioProjectDocuments";
+import {
+  formatI18nTemplate,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 type Locale = string;
 type DocumentView = "active" | "archived" | "trash";
@@ -52,7 +60,7 @@ const DOCUMENT_KIND_OPTIONS: readonly Readonly<{
   { id: "localization", labelKo: "현지화", labelEn: "Localization" },
 ]);
 
-const WORKSPACE_LABELS: Readonly<Record<StudioDocumentWorkspace, Readonly<Record<Locale, string>>>> = Object.freeze({
+const WORKSPACE_LABELS: Readonly<Record<StudioDocumentWorkspace, BilingualText>> = Object.freeze({
   draw: { ko: "그리기", en: "Draw" },
   comic: { ko: "웹툰", en: "Comic" },
   image: { ko: "이미지", en: "Image" },
@@ -108,7 +116,7 @@ function DocumentRow({
   onDelete,
 }: {
   readonly document: StudioProjectDocumentEntry;
-  readonly locale: Locale;
+  readonly locale: string;
   readonly view: DocumentView;
   readonly onWorkspace: (workspace: StudioDocumentWorkspace) => void;
   readonly onOpen: () => void;
@@ -204,7 +212,7 @@ export function StudioProjectDocumentsPanel({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
   const bt = useBilingual("StudioProjectDocumentsPanel");
   const [view, setView] = useState<DocumentView>("active");

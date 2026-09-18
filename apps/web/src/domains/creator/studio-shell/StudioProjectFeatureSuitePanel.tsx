@@ -31,6 +31,8 @@ import { analyzeStudioWebtoonQuality } from "../studio-webtoon-quality";
 import type { StudioProjectSection } from "../studio-project-views";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectFeatureSuite } from "./useStudioProjectFeatureSuite";
@@ -100,6 +102,7 @@ function FeatureCard({
   readonly description: string;
   readonly children: ReactNode;
 }) {
+  useBilingualI18nRevision();
   return (
     <section className="rounded-3xl border border-line bg-card p-4 shadow-sm sm:p-6">
       <div className="flex items-start gap-3">
@@ -118,6 +121,7 @@ function FeatureCard({
 }
 
 function Metric({ label, value }: { readonly label: string; readonly value: string | number }) {
+  useBilingualI18nRevision();
   return (
     <div className="rounded-xl border border-line bg-panel p-3">
       <p className="text-[0.65rem] font-semibold text-fg-3">{label}</p>
@@ -132,9 +136,11 @@ function OverviewSuite({
   view,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale: "ko" | "en";
   readonly view: string;
 }) {
+  const l = useBilingualLocalizer("studioFeatureSuite.overview");
+  const language = useI18n((state) => state.lang);
   const suite = useStudioProjectFeatureSuite(projectId, locale);
   const state = suite.state;
   const report = useMemo(
@@ -209,9 +215,10 @@ function StorySuite({
   view,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale: "ko" | "en";
   readonly view: string;
 }) {
+  const l = useBilingualLocalizer("studioFeatureSuite.story");
   const suite = useStudioProjectFeatureSuite(projectId, locale);
   const workspace = useStudioProjectWorkspace(projectId, locale);
   const state = suite.state;
@@ -352,7 +359,8 @@ function StorySuite({
   );
 }
 
-function ProductionPipeline({ projectId, locale }: { readonly projectId: string; readonly locale: Locale }) {
+function ProductionPipeline({ projectId, locale }: { readonly projectId: string; readonly locale: string }) {
+  const l = useBilingualLocalizer("studioFeatureSuite.production");
   const workspace = useStudioProjectWorkspace(projectId, locale);
   const workspaceState = workspace.state;
   const report = useMemo(
@@ -406,7 +414,8 @@ function ProductionPipeline({ projectId, locale }: { readonly projectId: string;
   );
 }
 
-function QualityPanel({ projectId, locale }: { readonly projectId: string; readonly locale: Locale }) {
+function QualityPanel({ projectId, locale }: { readonly projectId: string; readonly locale: string }) {
+  const l = useBilingualLocalizer("studioFeatureSuite.quality");
   const suite = useStudioProjectFeatureSuite(projectId, locale);
   const state = suite.state;
   const report = useMemo(
@@ -474,7 +483,8 @@ function QualityPanel({ projectId, locale }: { readonly projectId: string; reado
   );
 }
 
-function RenderAndMotionPanel({ projectId, locale }: { readonly projectId: string; readonly locale: Locale }) {
+function RenderAndMotionPanel({ projectId, locale }: { readonly projectId: string; readonly locale: string }) {
+  const l = useBilingualLocalizer("studioFeatureSuite.render");
   const suite = useStudioProjectFeatureSuite(projectId, locale);
   const state = suite.state;
   const renderPlan = useMemo(
@@ -579,7 +589,8 @@ function RenderAndMotionPanel({ projectId, locale }: { readonly projectId: strin
   );
 }
 
-function DesignTemplatePanel({ projectId, locale }: { readonly projectId: string; readonly locale: Locale }) {
+function DesignTemplatePanel({ projectId, locale }: { readonly projectId: string; readonly locale: string }) {
+  const l = useBilingualLocalizer("studioFeatureSuite.design");
   const suite = useStudioProjectFeatureSuite(projectId, locale);
   const state = suite.state;
   const templatePlan = useMemo(
@@ -637,7 +648,8 @@ function DesignTemplatePanel({ projectId, locale }: { readonly projectId: string
   );
 }
 
-function AutomationPanel({ projectId, locale }: { readonly projectId: string; readonly locale: Locale }) {
+function AutomationPanel({ projectId, locale }: { readonly projectId: string; readonly locale: string }) {
+  const l = useBilingualLocalizer("studioFeatureSuite.automation");
   const suite = useStudioProjectFeatureSuite(projectId, locale);
   const state = suite.state;
   const plan = useMemo(() => state
@@ -715,7 +727,7 @@ export function StudioProjectFeatureSuitePanel({
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
-  readonly locale: Locale;
+  readonly locale: "ko" | "en";
 }) {
   const bt = useBilingual("StudioProjectFeatureSuitePanel");
   if (section === "overview") {

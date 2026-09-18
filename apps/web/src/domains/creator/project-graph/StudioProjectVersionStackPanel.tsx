@@ -26,6 +26,12 @@ import type {
 } from "./studio-project-graph-contract";
 import { getStudioProjectGraphDeviceId } from "./studio-project-graph-device";
 import { useStudioProjectGraph } from "./useStudioProjectGraph";
+import {
+  formatI18nTemplate,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 type Locale = string;
 
@@ -64,14 +70,14 @@ function chooseArtifact(
 
 export function StudioProjectVersionStackPanel({
   projectId,
-  locale,
+  locale: _locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
   const bt = useBilingual("StudioProjectVersionStackPanel");
   const location = useLocation();
-  const graph = useStudioProjectGraph(projectId, locale);
+  const graph = useStudioProjectGraph(projectId, legacyLocale);
   const requestedArtifactId = useMemo(
     () => new URLSearchParams(location.search).get("artifact"),
     [location.search],
@@ -262,7 +268,7 @@ export function StudioProjectVersionStackPanel({
                     {revision.message || revision.id}
                   </p>
                   <p className="mt-1 text-xs text-fg-3">
-                    {formatDate(revision.createdAt, locale)} · {revision.id}
+                    {formatDate(revision.createdAt, language)} · {revision.id}
                     {revision.parentIds.length > 0
                       ? ` · ${bt("부모", "parent")} ${revision.parentIds.join(", ")}`
                       : ""}

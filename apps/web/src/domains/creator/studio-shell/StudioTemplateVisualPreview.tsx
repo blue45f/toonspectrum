@@ -20,7 +20,7 @@ type Locale = string;
 
 export interface StudioTemplateVisualPreviewProps {
   readonly template: StudioTemplateCatalogItem;
-  readonly locale: Locale;
+  readonly locale?: string;
   readonly compact?: boolean;
   readonly showNavigation?: boolean;
   readonly pageIndex?: number;
@@ -43,6 +43,7 @@ function tone(hex: string, alpha: string): string {
 }
 
 function PlaceholderImage({ accent }: { readonly accent: string }) {
+  useBilingualI18nRevision();
   return (
     <div
       className="grid size-full place-items-center rounded-md border"
@@ -54,6 +55,7 @@ function PlaceholderImage({ accent }: { readonly accent: string }) {
 }
 
 function TextLines({ count = 3 }: { readonly count?: number }) {
+  useBilingualI18nRevision();
   return (
     <div className="space-y-1.5" aria-hidden>
       {Array.from({ length: count }, (_, index) => (
@@ -73,6 +75,7 @@ function VerticalStrip({
   readonly page: StudioTemplateCompositionPage;
   readonly accent: string;
 }) {
+  useBilingualI18nRevision();
   const count = clampCount(page.panelCount, 8);
   return (
     <div className="mx-auto flex h-full w-[58%] flex-col gap-1.5 rounded-md bg-white p-2 shadow-sm dark:bg-neutral-950">
@@ -99,6 +102,7 @@ function PanelGrid({
   readonly page: StudioTemplateCompositionPage;
   readonly accent: string;
 }) {
+  useBilingualI18nRevision();
   const count = clampCount(page.panelCount, 6);
   return (
     <div className="grid size-full grid-cols-2 gap-2 rounded-md bg-white p-3 shadow-sm dark:bg-neutral-950">
@@ -116,6 +120,7 @@ function PanelGrid({
   );
 }
 function CharacterSheet({ accent }: { readonly accent: string }) {
+  useBilingualI18nRevision();
   return (
     <div className="grid size-full grid-cols-[1fr_1fr_1fr_.7fr] gap-2 rounded-md bg-white p-3 shadow-sm dark:bg-neutral-950">
       {[0, 1, 2].map((index) => (
@@ -144,6 +149,7 @@ function ExpressionGrid({
   readonly page: StudioTemplateCompositionPage;
   readonly accent: string;
 }) {
+  useBilingualI18nRevision();
   const count = clampCount(page.panelCount, 12);
   return (
     <div className="grid size-full grid-cols-4 gap-2 rounded-md bg-white p-3 shadow-sm dark:bg-neutral-950">
@@ -160,6 +166,7 @@ function ExpressionGrid({
   );
 }
 function EnvironmentBoard({ accent }: { readonly accent: string }) {
+  useBilingualI18nRevision();
   return (
     <div className="grid size-full grid-cols-[1.6fr_.8fr] gap-2 rounded-md bg-white p-3 shadow-sm dark:bg-neutral-950">
       <div className="grid min-h-0 grid-rows-[1.4fr_.7fr] gap-2">
@@ -183,6 +190,7 @@ function EnvironmentBoard({ accent }: { readonly accent: string }) {
   );
 }
 function Poster({ accent }: { readonly accent: string }) {
+  useBilingualI18nRevision();
   return (
     <div
       className="relative size-full overflow-hidden rounded-md border bg-white p-4 shadow-sm dark:bg-neutral-950"
@@ -207,6 +215,7 @@ function Poster({ accent }: { readonly accent: string }) {
 }
 
 function SocialCarousel({ accent }: { readonly accent: string }) {
+  useBilingualI18nRevision();
   return (
     <div className="grid size-full grid-cols-[1.05fr_.95fr] gap-3 rounded-md bg-white p-4 shadow-sm dark:bg-neutral-950">
       <PlaceholderImage accent={accent} />
@@ -227,6 +236,7 @@ function Slide({
   readonly page: StudioTemplateCompositionPage;
   readonly accent: string;
 }) {
+  useBilingualI18nRevision();
   const columns = Math.max(1, Math.min(4, Math.ceil(page.panelCount / 2)));
   return (
     <div className="grid size-full grid-rows-[auto_1fr_auto] gap-3 rounded-md bg-white p-4 shadow-sm dark:bg-neutral-950">
@@ -253,6 +263,7 @@ function Storyboard({
   readonly page: StudioTemplateCompositionPage;
   readonly accent: string;
 }) {
+  useBilingualI18nRevision();
   const count = clampCount(page.panelCount, 6);
   return (
     <div className="grid size-full grid-cols-2 gap-2 rounded-md bg-white p-3 shadow-sm dark:bg-neutral-950">
@@ -297,7 +308,7 @@ function normalizedIndex(index: number, length: number): number {
 }
 export function StudioTemplateVisualPreview({
   template,
-  locale,
+  locale: _locale,
   compact = false,
   showNavigation = false,
   pageIndex,

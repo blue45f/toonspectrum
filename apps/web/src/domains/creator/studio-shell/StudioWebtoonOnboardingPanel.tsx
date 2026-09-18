@@ -37,10 +37,10 @@ function taskId(profile: StudioWebtoonOnboardingProfile, index: number): string 
 
 export function StudioWebtoonOnboardingPanel({
   projectId,
-  locale,
+  locale: _locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
   const bt = useBilingual("StudioWebtoonOnboardingPanel");
   const [profile, setProfile] = useState<StudioWebtoonOnboardingProfile | null>(null);

@@ -3,35 +3,38 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 
 import {
-  ACADEMY_DISCOVERY_CONTRACT,
-  LEARNING_RESOURCES,
+  buildYouTubeLearningSearchUrl,
+  CURATED_LEARNING_RESOURCES,
   filterLearningResources,
+  rankLearningResources,
 } from "./learning-resources";
 
-describe("academy learning resources", () => {
-  it("ships unique resources with explicit rights and practice metadata", () => {
-    assert.ok(LEARNING_RESOURCES.length >= 8);
-    assert.equal(new Set(LEARNING_RESOURCES.map((item) => item.id)).size, LEARNING_RESOURCES.length);
-    for (const resource of LEARNING_RESOURCES) {
-      assert.ok(resource.title.length > 4);
-      assert.ok(resource.description.length > 20);
-      assert.ok(resource.skills.length > 0);
-      assert.ok(resource.verifiedLabel.length > 2);
-      if (resource.provider !== "toonstudio") assert.notEqual(resource.access, "internal");
-      if (resource.provider === "youtube") assert.equal(resource.access, "metadata-only");
-    }
+describe("learning resource catalogue", () => {
+  it("filters across role, source, format, level and production step", () => {
+    const results = filterLearningResources(CURATED_LEARNING_RESOURCES, {
+      role: "artist",
+      source: "clip-studio",
+      format: "guide",
+      level: "growing",
+      step: "background",
+    });
+    assert.deepEqual(results.map((resource) => resource.id), ["clip-perspective-ruler"]);
   });
 
-  it("filters by text, provider, category and level", () => {
-    assert.ok(filterLearningResources(LEARNING_RESOURCES, { query: "콘티" }).length >= 2);
-    assert.ok(filterLearningResources(LEARNING_RESOURCES, { provider: "youtube" }).every((item) => item.provider === "youtube"));
-    assert.ok(filterLearningResources(LEARNING_RESOURCES, { category: "drawing" }).every((item) => item.category === "drawing"));
-    assert.ok(filterLearningResources(LEARNING_RESOURCES, { level: "starter" }).every((item) => item.level === "starter"));
+  it("searches Korean labels and provider metadata", () => {
+    assert.ok(filterLearningResources(CURATED_LEARNING_RESOURCES, { query: "캐릭터" }).some((item) => item.id === "kocca-character-2026"));
+    assert.ok(filterLearningResources(CURATED_LEARNING_RESOURCES, { query: "에듀코카" }).length >= 2);
   });
 
-  it("keeps external discovery behind server/API and MCP contracts", () => {
-    assert.equal(ACADEMY_DISCOVERY_CONTRACT.youtube.mode, "server-side-data-api");
-    assert.ok(ACADEMY_DISCOVERY_CONTRACT.youtube.operations.includes("playlist-sync"));
-    assert.ok(ACADEMY_DISCOVERY_CONTRACT.mcp.tools.includes("search_learning_resources"));
+  it("ranks verified internal practice resources ahead for the selected role", () => {
+    const ranked = rankLearningResources(CURATED_LEARNING_RESOURCES, "artist");
+    assert.equal(ranked[0].source, "toonstudio");
+    assert.equal(ranked[0].roles.includes("artist"), true);
+  });
+
+  it("builds a bounded YouTube discovery URL instead of scraping video pages", () => {
+    const url = buildYouTubeLearningSearchUrl("  콘티   연출  ");
+    assert.match(url, /^https:\/\/www\.youtube\.com\/results\?search_query=/u);
+    assert.equal(decodeURIComponent(url).includes("웹툰 콘티 연출"), true);
   });
 });

@@ -155,8 +155,10 @@ const stage = (id: string, ko: string, en: string): StudioModeWorkflowStage => O
   label: copy(ko, en),
 });
 
+const profile = (value: StudioModeProfile): StudioModeProfile => Object.freeze(value);
+
 export const STUDIO_MODE_PROFILES: Readonly<Record<StudioProjectKind, StudioModeProfile>> = Object.freeze({
-  webtoon: Object.freeze({
+  webtoon: profile({
     id: "webtoon",
     shell: "comic",
     headline: copy("연재 원고를 컷 단위로 완성", "Finish episodes panel by panel"),
@@ -170,7 +172,7 @@ export const STUDIO_MODE_PROFILES: Readonly<Record<StudioProjectKind, StudioMode
     exports: ["webtoon-long-image", "episode-package", "platform-preview"],
     workflow: [stage("storyboard", "콘티", "Storyboard"), stage("draw", "원고", "Drawing"), stage("lettering", "레터링", "Lettering"), stage("review", "모바일 검수", "Mobile review")],
   }),
-  illustration: Object.freeze({
+  illustration: profile({
     id: "illustration",
     shell: "drawing",
     headline: copy("브러시와 레이어에 집중", "Focus on brushes and layers"),
@@ -184,7 +186,7 @@ export const STUDIO_MODE_PROFILES: Readonly<Record<StudioProjectKind, StudioMode
     exports: ["png", "jpeg", "high-resolution"],
     workflow: [stage("rough", "러프", "Rough"), stage("line", "선화", "Line art"), stage("color", "채색", "Color"), stage("finish", "마감", "Finish")],
   }),
-  image: Object.freeze({
+  image: profile({
     id: "image",
     shell: "image",
     headline: copy("원본을 보존하며 정밀 편집", "Edit precisely while preserving the original"),
@@ -198,7 +200,7 @@ export const STUDIO_MODE_PROFILES: Readonly<Record<StudioProjectKind, StudioMode
     exports: ["edited-image", "layered-image", "png", "jpeg"],
     workflow: [stage("source", "원본 확인", "Inspect source"), stage("retouch", "리터치", "Retouch"), stage("grade", "보정", "Grade"), stage("compare", "비교", "Compare")],
   }),
-  design: Object.freeze({
+  design: profile({
     id: "design",
     shell: "layout",
     headline: copy("표지와 홍보물을 규격별로 제작", "Create covers and promotions by format"),
@@ -212,7 +214,7 @@ export const STUDIO_MODE_PROFILES: Readonly<Record<StudioProjectKind, StudioMode
     exports: ["cover", "episode-thumbnail", "social-square", "vertical-promo"],
     workflow: [stage("template", "규격 선택", "Choose format"), stage("layout", "레이아웃", "Layout"), stage("variant", "변형본", "Variants"), stage("deliver", "납품", "Deliver")],
   }),
-  slides: Object.freeze({
+  slides: profile({
     id: "slides",
     shell: "slides",
     headline: copy("작품 피칭을 슬라이드 흐름으로 설계", "Shape the pitch as a slide narrative"),
@@ -226,7 +228,7 @@ export const STUDIO_MODE_PROFILES: Readonly<Record<StudioProjectKind, StudioMode
     exports: ["pitch-pdf", "presentation"],
     workflow: [stage("outline", "구성", "Outline"), stage("slides", "슬라이드", "Slides"), stage("notes", "발표 노트", "Notes"), stage("present", "발표 검수", "Presentation review")],
   }),
-  storyboard: Object.freeze({
+  storyboard: profile({
     id: "storyboard",
     shell: "storyboard",
     headline: copy("대본을 장면과 샷으로 분해", "Break scripts into scenes and shots"),
@@ -240,7 +242,7 @@ export const STUDIO_MODE_PROFILES: Readonly<Record<StudioProjectKind, StudioMode
     exports: ["shot-list", "animatic"],
     workflow: [stage("script", "대본", "Script"), stage("scene", "씬 분해", "Scenes"), stage("shot", "샷 설계", "Shots"), stage("timing", "애니매틱", "Animatic")],
   }),
-  "three-d": Object.freeze({
+  "three-d": profile({
     id: "three-d",
     shell: "spatial",
     headline: copy("카메라와 포즈를 3D에서 설계", "Design cameras and poses in 3D"),
@@ -254,7 +256,7 @@ export const STUDIO_MODE_PROFILES: Readonly<Record<StudioProjectKind, StudioMode
     exports: ["render-reference", "background-render", "camera-snapshot"],
     workflow: [stage("block", "장면 배치", "Block scene"), stage("pose", "포즈", "Pose"), stage("camera", "카메라", "Camera"), stage("render", "레퍼런스 렌더", "Reference render")],
   }),
-  animation: Object.freeze({
+  animation: profile({
     id: "animation",
     shell: "timeline",
     headline: copy("장면과 시간축을 함께 편집", "Edit scenes and time together"),
@@ -268,7 +270,7 @@ export const STUDIO_MODE_PROFILES: Readonly<Record<StudioProjectKind, StudioMode
     exports: ["mp4", "webm", "gif", "vertical-short"],
     workflow: [stage("scene", "장면", "Scene"), stage("motion", "모션", "Motion"), stage("audio", "음성·오디오", "Voice & audio"), stage("review", "재생 검수", "Playback review")],
   }),
-});
+} satisfies Record<StudioProjectKind, StudioModeProfile>);
 
 export function studioModeProfile(kind: StudioProjectKind): StudioModeProfile {
   return STUDIO_MODE_PROFILES[kind];

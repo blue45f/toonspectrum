@@ -12,6 +12,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -33,7 +34,7 @@ import { StudioTemplateVisualPreview } from "./StudioTemplateVisualPreview";
 type Locale = string;
 
 const CATEGORY_LABELS: Readonly<
-  Record<StudioTemplateCategory, Readonly<Record<Locale, string>>>
+  Record<StudioTemplateCategory, BilingualText>
 > = {
   all: { ko: "전체", en: "All" },
   webtoon: { ko: "웹툰", en: "Webtoon" },
@@ -63,7 +64,7 @@ function TemplatePreview({
   favorite,
   onToggleFavorite,
 }: {
-  readonly locale: Locale;
+  readonly locale: string;
   readonly template: StudioTemplateCatalogItem;
   readonly favorite: boolean;
   readonly onToggleFavorite: () => void;
@@ -118,7 +119,7 @@ function TemplatePreview({
 
       <StudioTemplateVisualPreview
         template={template}
-        locale={locale}
+        locale={legacyLocale}
         showNavigation
         className="mt-4"
       />
@@ -351,7 +352,7 @@ export function StudioTemplatesPage() {
                       >
                         <StudioTemplateVisualPreview
                           template={template}
-                          locale={locale}
+                          locale={legacyLocale}
                           compact
                         />
                       </button>
@@ -420,7 +421,7 @@ export function StudioTemplatesPage() {
 
           {selected ? (
             <TemplatePreview
-              locale={locale}
+              locale={language}
               template={selected}
               favorite={favoriteIds.includes(selected.id)}
               onToggleFavorite={() => toggleFavorite(selected.id)}

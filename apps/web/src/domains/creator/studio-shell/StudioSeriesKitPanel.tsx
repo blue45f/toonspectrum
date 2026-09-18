@@ -12,6 +12,7 @@ import {
 } from "../studio-series-kit-store";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 type Locale = string;
@@ -35,10 +36,10 @@ function cloneKit(kit: StudioSeriesKit): StudioSeriesKit {
 /** Edit the one project-wide visual and output contract used by drawing, design and export. */
 export function StudioSeriesKitPanel({
   projectId,
-  locale,
+  locale: _locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
   const bt = useBilingual("StudioSeriesKitPanel");
   const [kit, setKit] = useState<StudioSeriesKit>(() => createDefaultStudioSeriesKit(projectId));
@@ -55,7 +56,7 @@ export function StudioSeriesKitPanel({
     } catch {
       setStorageError(bt("이 기기에 Series Kit를 저장할 수 없습니다. 변경 전에 프로젝트 사본을 받아 두세요.", "Series Kit cannot be stored on this device. Keep a project copy before editing."));
     }
-  }, [locale, projectId]);
+  }, [l, projectId]);
 
   const issues = useMemo(() => validateStudioSeriesKit(kit), [kit]);
   const blocking = issues.filter((issue) => issue.severity === "error");

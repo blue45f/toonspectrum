@@ -4,6 +4,7 @@ import { useLocation, useParams } from "react-router-dom";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 
 import {
   resolveStudioProjectView,
@@ -47,8 +48,9 @@ function StudioWebtoonOnboardingPanelSlot({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
+  const l = useBilingualLocalizer("studioProjectIntegrated.onboarding");
   const [enabled, setEnabled] = useState(() => hasStoredWebtoonOnboarding(projectId));
 
   useEffect(() => {
@@ -92,7 +94,8 @@ const StudioProjectVersionStackPanel = lazy(async () => {
   return { default: module.StudioProjectVersionStackPanel };
 });
 
-function ProjectGraphPanelFallback({ locale }: { readonly locale: Locale }) {
+function ProjectGraphPanelFallback({ locale }: { readonly locale: string }) {
+  const l = useBilingualLocalizer("studioProjectIntegrated.graphFallback");
   return (
     <div
       className="min-h-20 animate-pulse rounded-2xl border border-line bg-card/80"
@@ -102,7 +105,7 @@ function ProjectGraphPanelFallback({ locale }: { readonly locale: Locale }) {
   );
 }
 
-function localeFromLanguage(language: string): Locale {
+function localeFromLanguage(language: string) {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
@@ -123,8 +126,9 @@ function SectionWorkflow({
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
+  useBilingualI18nRevision();
   const showDelivery = section === "export" || (section === "settings" && view === "archive");
 
   return (

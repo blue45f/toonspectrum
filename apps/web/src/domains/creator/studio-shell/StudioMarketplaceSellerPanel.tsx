@@ -25,6 +25,7 @@ import {
 } from "../studio-marketplace-submission-store";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 type Locale = string;
@@ -88,10 +89,10 @@ function statusLabel(status: string, bt: (ko: string, en: string) => string): st
 /** A real seller draft, file checksum, readiness and moderation-state workflow. */
 export function StudioMarketplaceSellerPanel({
   sellerId,
-  locale,
+  locale: _locale,
 }: {
   readonly sellerId: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
   const bt = useBilingual("StudioMarketplaceSellerPanel");
   const [submission, setSubmission] = useState<StudioMarketplaceSubmission>(() => (

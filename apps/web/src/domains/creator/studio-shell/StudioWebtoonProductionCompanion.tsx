@@ -17,9 +17,14 @@ import {
   webtoonProductionStagesForProjectView,
   type WebtoonProductionStageSupport,
 } from "@/shared/lib/webtoon-production-support";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import type { StudioProjectSection } from "../studio-project-views";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 type Locale = string;
 type ProgressMap = Readonly<Record<string, readonly number[]>>;
@@ -60,12 +65,12 @@ export function StudioWebtoonProductionCompanion({
   projectId,
   section,
   view,
-  locale,
+  locale: _locale,
 }: {
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
   const bt = useBilingual("StudioWebtoonProductionCompanion");
   const stages = useMemo(
@@ -127,7 +132,7 @@ export function StudioWebtoonProductionCompanion({
                   <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent text-sm font-black text-on-accent">{stage.order}</span>
                   <div className="min-w-0">
                     <p className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-fg-3">EPISODE PIPELINE</p>
-                    <h3 className="mt-1 text-lg font-black text-fg">{localizedStageTitle(stage, locale)}</h3>
+                    <h3 className="mt-1 text-lg font-black text-fg">{localizedStageTitle(stage, l)}</h3>
                   </div>
                 </div>
                 <span className="rounded-full border border-accent/25 bg-accent-soft px-2.5 py-1 text-xs font-black text-accent">

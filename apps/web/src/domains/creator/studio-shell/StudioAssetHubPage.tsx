@@ -20,6 +20,11 @@ import {
   resolveStudioAssetHubView,
   type AssetHubView,
 } from "./studio-asset-hub-view";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const CreatorEssentialsPage = lazy(() => import("./creator-essentials/CreatorEssentialsPage"));
 
@@ -89,7 +94,9 @@ function MissingProjectView({
 
 /** Render the one canonical Studio asset destination over existing server-backed capabilities. */
 export function StudioAssetHubPage() {
+  useBilingualI18nRevision();
   const [searchParams] = useSearchParams();
+  const t = useT();
   const language = useI18n((state) => state.lang);
   const locale = language;
   const bt = useBilingual("StudioAssetHubPage");
@@ -151,23 +158,23 @@ export function StudioAssetHubPage() {
         </Container>
       </div>
 
-      {view === "overview" ? <StudioAssetVisualIntro locale={locale} /> : null}
+      {view === "overview" ? <StudioAssetVisualIntro /> : null}
       {view === "overview" ? <StudioAssetsPage /> : null}
       {view === "essentials" ? <Suspense fallback={<p role="status" className="p-8 text-sm text-fg-2">{bt("제작 소재 준비 중…", "Loading creator essentials…")}</p>}><CreatorEssentialsPage /></Suspense> : null}
       {view === "series-kit" && projectId ? (
         <Container size="wide" className="py-7 sm:py-10">
-          <StudioSeriesKitPanel projectId={projectId} locale={locale} />
+          <StudioSeriesKitPanel projectId={projectId} locale={legacyLocale} />
         </Container>
       ) : null}
-      {view === "series-kit" && !projectId ? <MissingProjectView locale={locale} view="series-kit" /> : null}
+      {view === "series-kit" && !projectId ? <MissingProjectView view="series-kit" /> : null}
       {view === "library" ? <MarketLibraryPage /> : null}
       {view === "market" ? <MarketBrowsePage /> : null}
       {view === "safety" && projectId ? (
         <Container size="wide" className="py-7 sm:py-10">
-          <StudioAssetGovernancePanel projectId={projectId} locale={locale} />
+          <StudioAssetGovernancePanel projectId={projectId} locale={legacyLocale} />
         </Container>
       ) : null}
-      {view === "safety" && !projectId ? <MissingProjectView locale={locale} view="safety" /> : null}
+      {view === "safety" && !projectId ? <MissingProjectView view="safety" /> : null}
       {view === "seller" ? <MarketManagePage /> : null}
     </div>
   );

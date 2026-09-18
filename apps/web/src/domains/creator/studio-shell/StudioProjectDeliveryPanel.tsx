@@ -37,6 +37,8 @@ import {
 import { auditStudioRightsGraph } from "../studio-rights-graph";
 import type { StudioProjectSection } from "../studio-project-views";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -46,6 +48,11 @@ import {
 } from "./studio-platform-delivery-plan";
 import { useStudioProjectDocuments } from "./useStudioProjectDocuments";
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 type Locale = string;
 type DeliveryView = "publish" | "package" | "archive";
@@ -139,7 +146,7 @@ function sourceLabel(
 
 function documentSizeLabel(
   document: { readonly width: number | null; readonly height: number | null } | null,
-  locale: Locale,
+  localize: (ko: string, en: string) => string,
 ): string {
   if (!document || document.width === null || document.height === null) {
     return bt("크기 정보 없음", "Dimensions unavailable");
@@ -162,6 +169,7 @@ function downloadJson(fileName: string, value: unknown): void {
 }
 
 function Metric({ label, value }: { readonly label: string; readonly value: string | number }) {
+  useBilingualI18nRevision();
   return (
     <div className="rounded-xl border border-line bg-panel p-3">
       <p className="text-[0.65rem] font-semibold text-fg-3">{label}</p>
@@ -174,13 +182,14 @@ function StatusPanel({
   title,
   status,
   description,
-  locale,
+  locale: _locale,
 }: {
   readonly title: string;
   readonly status: string;
   readonly description: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
+  const l = useBilingualLocalizer("studioDelivery.status");
   return (
     <div className="rounded-2xl border border-line bg-panel p-4">
       <div className="flex items-start justify-between gap-3">
@@ -210,12 +219,12 @@ export function StudioProjectDeliveryPanel({
   projectId,
   section,
   view,
-  locale,
+  locale: _locale,
 }: {
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
   const bt = useBilingual("StudioProjectDeliveryPanel");
   const workspace = useStudioProjectWorkspace(projectId, locale);
@@ -303,7 +312,7 @@ export function StudioProjectDeliveryPanel({
       sourceUrl: null,
     }],
     edges: [],
-  }, [documentId]), [documentId, locale]);
+  }, [documentId]), [documentId, l]);
 
   const packagePlan: StudioPublishingPackagePlan | null = useMemo(() => {
     if (!preflight || !state) return null;
@@ -368,7 +377,7 @@ export function StudioProjectDeliveryPanel({
     } catch {
       return null;
     }
-  }, [connector.id, connector.policyVersion, documentId, locale, platformId, preflight, projectId, requestedAt, rights, state]);
+  }, [connector.id, connector.policyVersion, documentId, l, platformId, preflight, projectId, requestedAt, rights, state]);
 
   const packageDeliveryStatus = packagePlan === null
     ? null
@@ -512,7 +521,7 @@ export function StudioProjectDeliveryPanel({
                 {sourceLabel(
                   platformDeliveryPlan.sourceStatus,
                   platformDeliveryPlan.requiresOfficialRecheck,
-                  locale,
+                  l,
                 )}
               </span>
             </div>
@@ -532,7 +541,7 @@ export function StudioProjectDeliveryPanel({
                     ) : null}
                     {webtoonDocuments.map((document) => (
                       <option key={document.id} value={document.id}>
-                        {document.title} · {documentSizeLabel(document, locale)}
+                        {document.title} · {documentSizeLabel(document, l)}
                       </option>
                     ))}
                   </select>
@@ -615,8 +624,8 @@ export function StudioProjectDeliveryPanel({
                     <StatusPanel
                       title={platformDeliveryPlan.platformName}
                       status={platformDeliveryPlan.grade ?? "review"}
-                      description={`${selectedDocument.title} · ${documentSizeLabel(selectedDocument, locale)} · ${selectedFormat.toUpperCase()}`}
-                      locale={locale}
+                      description={`${selectedDocument.title} · ${documentSizeLabel(selectedDocument, l)} · ${selectedFormat.toUpperCase()}`}
+                      locale={legacyLocale}
                     />
                     <div className="grid gap-3 sm:grid-cols-4">
                       <Metric label={bt("현재 가로", "Current width")} value={selectedDocument.width === null ? "—" : `${selectedDocument.width}px`} />

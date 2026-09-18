@@ -29,6 +29,7 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { STUDIO_PROJECT_NAVIGATION } from "../studio-product-ia";
@@ -41,24 +42,28 @@ import {
 import { resolveStudioProjectViewDestination } from "../studio-project-view-destinations";
 import { StudioProjectDiagnosticsBridge } from "./StudioProjectDiagnosticsBridge";
 import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 export type StudioProjectSection = StudioProjectSectionId;
 
 type Locale = string;
 
 type ProjectAction = Readonly<{
-  title: Record<Locale, string>;
-  description: Record<Locale, string>;
+  title: BilingualText;
+  description: BilingualText;
   href: (projectId: string) => string;
   icon: LucideIcon;
-  badge?: Record<Locale, string>;
+  badge?: BilingualText;
 }>;
 
 interface SectionDefinition {
-  label: Record<Locale, string>;
+  label: BilingualText;
   eyebrow: string;
-  title: Record<Locale, string>;
-  description: Record<Locale, string>;
+  title: BilingualText;
+  description: BilingualText;
   icon: LucideIcon;
   actions: readonly ProjectAction[];
 }
@@ -70,7 +75,7 @@ function action(
   koDescription: string,
   enDescription: string,
   href: (projectId: string) => string,
-  badge?: Record<Locale, string>,
+  badge?: BilingualText,
 ): ProjectAction {
   return {
     icon,
@@ -223,7 +228,7 @@ const PRIMARY_SECTIONS = STUDIO_PROJECT_NAVIGATION.map(
   (item) => item.id,
 ) as readonly Exclude<StudioProjectSection, "settings">[];
 
-function localeFromLanguage(language: string): Locale {
+function localeFromLanguage(language: string) {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
@@ -231,7 +236,8 @@ function projectSectionHref(projectId: string, section: StudioProjectSection): s
   return `/studio/p/${encodeURIComponent(projectId)}/${section}`;
 }
 
-function InvalidProject({ locale }: { readonly locale: Locale }) {
+function InvalidProject({ locale: _locale }: { readonly locale?: string }) {
+  const l = useBilingualLocalizer("studioProjectShell.invalid");
   return (
     <Container size="wide" className="py-10">
       <section className="rounded-3xl border border-line bg-card p-6" role="alert">
@@ -280,7 +286,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
     }
   }, [displayProjectId, section, selectedView]);
 
-  useDocumentTitle(`${definition.label[locale]} · ToonStudio`);
+  useDocumentTitle(`${l(definition.label.ko, definition.label.en)} · ToonStudio`);
 
   if (!projectId || !viewResolution || !destination) return <InvalidProject locale={locale} />;
   if (viewResolution.changed) return <Navigate to={viewResolution.canonicalHref} replace />;
@@ -298,10 +304,10 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
               {definition.eyebrow}
             </p>
             <h1 className="mt-2 text-pretty text-2xl font-black tracking-tight text-fg sm:text-4xl">
-              {definition.title[locale]}
+              {l(definition.title.ko, definition.title.en)}
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2">
-              {definition.description[locale]}
+              {l(definition.description.ko, definition.description.en)}
             </p>
             <p className="mt-3 text-xs text-fg-3">
               {bt("프로젝트", "Project")} · {displayProjectId}
@@ -331,7 +337,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
                   active ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
                 )}
               >
-                {SECTION_DEFINITIONS[id].label[locale]}
+                {l(SECTION_DEFINITIONS[id].label.ko, SECTION_DEFINITIONS[id].label.en)}
               </Link>
             );
           })}
@@ -420,7 +426,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
             <SectionIcon size={19} aria-hidden="true" />
           </span>
           <h2 id="project-section-actions" className="text-xl font-bold text-fg">
-            {definition.label[locale]}
+            {l(definition.label.ko, definition.label.en)}
           </h2>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -436,15 +442,15 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
                   <Icon size={18} aria-hidden="true" />
                 </span>
                 <span className="mt-4 flex items-center gap-2">
-                  <strong className="text-sm text-fg">{item.title[locale]}</strong>
+                  <strong className="text-sm text-fg">{l(item.title.ko, item.title.en)}</strong>
                   {item.badge ? (
                     <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[0.62rem] font-bold text-accent">
-                      {item.badge[locale]}
+                      {l(item.badge.ko, item.badge.en)}
                     </span>
                   ) : null}
                 </span>
                 <span className="mt-1.5 flex-1 text-xs leading-5 text-fg-3">
-                  {item.description[locale]}
+                  {l(item.description.ko, item.description.en)}
                 </span>
                 <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">
                   {bt("열기", "Open")}

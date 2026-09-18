@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  BookOpen,
   Check,
   CheckCircle2,
   Copy,
@@ -76,6 +77,8 @@ import type {
 } from "./studio-webtoon-assistant-document";
 
 import { cn } from "@/shared/lib/utils";
+import { StudioContextualLearningPanel } from "./StudioContextualLearningPanel";
+import type { StudioAssistantLearningTool } from "./studio-contextual-learning";
 
 export type AssistantActiveTab =
   | "spec-slicer"
@@ -83,7 +86,8 @@ export type AssistantActiveTab =
   | "sfx-lexicon"
   | "color-harmony"
   | "focus-timer"
-  | "croquis-pose";
+  | "croquis-pose"
+  | "learning";
 
 const TAB_ID_PREFIX = "studio-webtoon-assistant";
 const TITLE_ID = `${TAB_ID_PREFIX}-title`;
@@ -95,6 +99,7 @@ const ASSISTANT_TABS: readonly StudioWorkbenchTab[] = [
   { id: "color-harmony", label: "피부/그림자 컬러 조화", icon: Palette },
   { id: "focus-timer", label: "마감 & 포커스플로우", icon: Timer },
   { id: "croquis-pose", label: "인체 크로키 & 구도 가이드", icon: Maximize },
+  { id: "learning", label: "배우면서 만들기", icon: BookOpen },
 ];
 
 const ASSISTANT_TAB_IDS = ASSISTANT_TABS.map((tab) => tab.id) as readonly AssistantActiveTab[];
@@ -194,6 +199,9 @@ export function StudioWebtoonAssistantModal({
   });
 
   const [activeTab, setActiveTab] = useState<AssistantActiveTab>(restored.activeTab);
+  const [lastLearningTool, setLastLearningTool] = useState<StudioAssistantLearningTool>(() =>
+    restored.activeTab === "learning" ? "focus-timer" : restored.activeTab,
+  );
 
   const dialogRef = useRef<HTMLElement | null>(null);
   const rootRef = useRef<HTMLElement | null>(null);
@@ -379,6 +387,12 @@ export function StudioWebtoonAssistantModal({
     setCroquisSecondsRemaining(seconds);
   }
 
+  function handleAssistantTabSelect(id: string) {
+    const next = id as AssistantActiveTab;
+    setActiveTab(next);
+    if (next !== "learning") setLastLearningTool(next);
+  }
+
   async function handleCopySfx(id: string, text: string) {
     const ok = await copyStudioText(text);
     setSfxCopyResult({ id, ok });
@@ -433,7 +447,7 @@ export function StudioWebtoonAssistantModal({
                 웹툰 창작 보조 센터 (Webtoon Creator Assistant)
               </h2>
               <p className="text-[0.68rem] text-fg-3">
-                플랫폼 규격 검사 · 자동 슬라이서 · 스크롤 페이싱 · 효과음 사전 · 컬러 조화 · 포커스 타이머 · 크로키
+                플랫폼 규격 검사 · 스크롤 페이싱 · 효과음 · 컬러 · 포커스 타이머 · 크로키 · 작업 맥락 학습
               </p>
             </div>
           </div>
@@ -459,7 +473,7 @@ export function StudioWebtoonAssistantModal({
           <StudioWorkbenchTabStrip
             tabs={ASSISTANT_TABS}
             activeId={activeTab}
-            onSelect={(id) => setActiveTab(id as AssistantActiveTab)}
+            onSelect={handleAssistantTabSelect}
             ariaLabel="웹툰 보조 도구"
             idPrefix={TAB_ID_PREFIX}
           />
@@ -1349,6 +1363,14 @@ export function StudioWebtoonAssistantModal({
                 </div>
               </div>
             </div>
+          )}
+
+          {/* TAB 7: Contextual Academy learning */}
+          {activeTab === "learning" && (
+            <StudioContextualLearningPanel
+              tool={lastLearningTool}
+              focusStage={timerState.activeStage}
+            />
           )}
         </div>
       </section>

@@ -52,12 +52,12 @@ export function StudioFeatureOperationsPanel({
   projectId,
   section,
   view,
-  locale,
+  locale: _locale,
 }: {
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
   const bt = useBilingual("StudioFeatureOperationsPanel");
   const registrations = studioFeatureSurfacesForView(section, view);

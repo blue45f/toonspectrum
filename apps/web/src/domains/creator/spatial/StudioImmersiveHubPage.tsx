@@ -24,7 +24,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 import {
   inspectStudioImmersiveCapabilities,
@@ -40,6 +40,11 @@ import {
   type StudioImmersiveStage,
 } from "./studio-immersive-workflows";
 import { SpatialWebtoonReaderLauncher } from "./SpatialWebtoonReaderLauncher";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 type Locale = string;
 type Icon = ComponentType<{ size?: number; className?: string; "aria-hidden"?: boolean }>;
@@ -82,6 +87,7 @@ function supportTone(state: StudioImmersiveSupport): string {
 }
 
 function SupportGlyph({ state }: { readonly state: StudioImmersiveSupport }) {
+  useBilingualI18nRevision();
   return state === "supported"
     ? <CheckCircle2 size={16} aria-hidden />
     : <CircleAlert size={16} aria-hidden />;
@@ -91,14 +97,13 @@ function CapabilityCard({
   label,
   detail,
   state,
-  locale,
 }: {
   readonly icon: Icon;
   readonly label: string;
   readonly detail: string;
   readonly state: StudioImmersiveSupport;
-  readonly locale: Locale;
 }) {
+  const l = useBilingualLocalizer("studioImmersive.capability");
   return (
     <article className="rounded-2xl border border-line bg-card/75 p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -110,7 +115,7 @@ function CapabilityCard({
           supportTone(state),
         )}>
           <SupportGlyph state={state} />
-          {studioImmersiveSupportLabel(state, locale)}
+          {l(studioImmersiveSupportLabel(state, "ko"), studioImmersiveSupportLabel(state, "en"))}
         </span>
       </div>
       <h3 className="mt-3 text-sm font-black text-fg">{label}</h3>
@@ -203,7 +208,7 @@ export function StudioImmersiveHubPage() {
               <span className="inline-flex items-center gap-1.5"><HardDrive size={15} aria-hidden />{bt("로컬 원고 서버 업로드 없음", "Local pages stay on device")}</span>
             </div>
           </div>
-          <ImmersiveHeroVisual locale={locale} />
+          <ImmersiveHeroVisual />
         </section>
         <section className="mt-12 rounded-[2rem] border border-line bg-panel/70 p-5 shadow-sm sm:p-7" aria-labelledby="immersive-capability-title">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -239,28 +244,24 @@ export function StudioImmersiveHubPage() {
               label={bt("공간 렌더링", "Spatial rendering")}
               detail={bt("WebGL2 기반 3D·2.5D 프리뷰", "WebGL2-based 3D and 2.5D previews")}
               state={capabilities?.webgl2 ?? unknown}
-              locale={locale}
             />
             <CapabilityCard
               icon={Camera}
               label={bt("AR 배치", "AR placement")}
               detail={bt("실공간 표면과 관람 크기 검수", "Real-world surface and scale review")}
               state={capabilities?.immersiveAr ?? unknown}
-              locale={locale}
             />
             <CapabilityCard
               icon={Glasses}
               label={bt("VR 감상", "VR reading")}
               detail={bt("집중·곡면·벽면 원고 배치", "Focus, arc and wall page layouts")}
               state={capabilities?.immersiveVr ?? unknown}
-              locale={locale}
             />
             <CapabilityCard
               icon={FileImage}
               label={bt("로컬 원고", "Local pages")}
               detail={bt("이미지 파일을 업로드 없이 열기", "Open image files without uploading")}
               state={capabilities?.localFiles ?? unknown}
-              locale={locale}
             />
           </div>
           {capabilities?.inAppBrowser.inApp ? (
@@ -373,7 +374,7 @@ export function StudioImmersiveHubPage() {
                   return (
                     <li key={deliverable} className="flex items-start gap-2">
                       <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
-                      <span>{deliverable}</span>
+                      <span>{l(deliverable, kit.deliverablesEn[deliverableIndex] ?? deliverable)}</span>
                     </li>
                   );
                 })}

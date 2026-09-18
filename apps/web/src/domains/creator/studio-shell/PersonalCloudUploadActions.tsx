@@ -2,6 +2,13 @@ import { CloudUpload, Link2, Loader2 } from "lucide-react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useT } from "@/shared/lib/i18n";
+import {
+  defineBilingualText,
+  formatI18nTemplate,
+  translateBilingualMap,
+  type BilingualText,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 import type {
   PersonalCloudConnectionStatus,
@@ -34,14 +41,15 @@ function percentage(progress: PersonalCloudUploadProgress): number {
   return Math.min(100, Math.round((progress.uploadedBytes / progress.totalBytes) * 100));
 }
 export function PersonalCloudUploadActions({
-  locale,
+  locale: _locale,
   connections,
   busyProvider,
   progress,
   onAction,
   disabled = false,
 }: {
-  readonly locale: Locale;
+  /** @deprecated Global i18n state is used for visible copy. */
+  readonly locale?: string;
   readonly connections: readonly PersonalCloudConnectionStatus[];
   readonly busyProvider: PersonalCloudProviderId | null;
   readonly progress: ActiveUpload | null;

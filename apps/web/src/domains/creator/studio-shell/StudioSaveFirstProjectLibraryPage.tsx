@@ -24,6 +24,7 @@ import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -65,7 +66,7 @@ type Locale = string;
 type LibraryView = "active" | "storage" | "exports" | "publications" | "archived" | "trash";
 type InitialLibraryView = "active" | "archived" | "trash";
 
-const VIEW_LABELS: Readonly<Record<LibraryView, Readonly<Record<Locale, string>>>> = {
+const VIEW_LABELS: Readonly<Record<LibraryView, BilingualText>> = {
   active: { ko: "내 작업", en: "My work" },
   storage: { ko: "저장·백업", en: "Save and backup" },
   exports: { ko: "내보내기", en: "Export" },
@@ -74,7 +75,7 @@ const VIEW_LABELS: Readonly<Record<LibraryView, Readonly<Record<Locale, string>>
   trash: { ko: "휴지통", en: "Trash" },
 };
 
-const VIEW_DESCRIPTIONS: Readonly<Record<LibraryView, Readonly<Record<Locale, string>>>> = {
+const VIEW_DESCRIPTIONS: Readonly<Record<LibraryView, BilingualText>> = {
   active: { ko: "최근 작업을 이어가거나 새 작품을 시작하세요. 작업은 이 기기에 자동 저장됩니다.", en: "Continue recent work or start something new. Work is saved automatically on this device." },
   storage: { ko: "프로젝트 파일과 연결한 개인 드라이브 백업을 관리합니다.", en: "Manage project files and backups in your connected personal drives." },
   exports: { ko: "플랫폼 제출용 파일과 최근 내보내기를 확인합니다.", en: "Review files prepared for platforms and your recent exports." },
@@ -167,8 +168,9 @@ export function StudioSaveFirstProjectLibraryPage({
   const bt = useBilingual("StudioSaveFirstProjectLibraryPage");
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: session } = useSession();
+  const l = useBilingualLocalizer("studioProjectLibrary");
   const language = useI18n((state) => state.lang);
-  const locale = localeFromLanguage(language);
+  const legacyLocale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
   const authUserId = session?.user?.id ?? null;
   const view = resolveView(searchParams.get("view"), initialView);
   const status: StudioProjectStatus | undefined = view === "archived"
@@ -176,7 +178,7 @@ export function StudioSaveFirstProjectLibraryPage({
     : view === "trash"
       ? "trashed"
       : undefined;
-  const library = useStudioProjectLibrary(locale, status);
+  const library = useStudioProjectLibrary(legacyLocale, status);
   const profiles = useStudioSaveProfiles();
   const cloud = usePersonalCloudConnections();
   const reloadCloudConnections = cloud.reload;
@@ -207,7 +209,7 @@ export function StudioSaveFirstProjectLibraryPage({
     next.delete("cloudError");
     if (result === "error") next.delete("sync");
     setSearchParams(next, { replace: true });
-  }, [locale, reloadCloudConnections, searchParams, setSearchParams]);
+  }, [l, reloadCloudConnections, searchParams, setSearchParams]);
 
   const allProjects = library.state?.projects ?? [];
   const activeProjects = allProjects.filter((project) => project.status === "active");
@@ -449,7 +451,7 @@ export function StudioSaveFirstProjectLibraryPage({
         ) : null}
         {library.error || profiles.error ? <p role="alert" className="mt-4 rounded-xl border border-danger/35 bg-danger-soft/15 px-3 py-2 text-sm font-semibold text-danger">{library.error ?? profiles.error}</p> : null}
 
-        {view === "active" ? <StudioQuickStart locale={locale} /> : null}
+        {view === "active" ? <StudioQuickStart locale={legacyLocale} /> : null}
 
         {(view === "active" || view === "archived" || view === "trash") ? (
           <section className="mt-7">
@@ -477,7 +479,7 @@ export function StudioSaveFirstProjectLibraryPage({
                     <article key={project.id} className="overflow-hidden rounded-2xl border border-line bg-card p-4 shadow-sm">
                       <StudioProjectCardThumbnail
                         authUserId={authUserId}
-                        locale={locale}
+                        locale={legacyLocale}
                         project={project}
                       />
                       <div className="flex flex-wrap items-center gap-2">
@@ -551,7 +553,7 @@ export function StudioSaveFirstProjectLibraryPage({
                           </div>
                           <div className="mt-3 border-t border-line pt-3">
                             <PersonalCloudUploadActions
-                              locale={locale}
+                              locale={legacyLocale}
                               connections={cloud.connections}
                               busyProvider={cloudUpload?.projectId === project.id
                                 ? cloudUpload.provider
@@ -599,7 +601,7 @@ export function StudioSaveFirstProjectLibraryPage({
 
         {view === "storage" ? (
           <div className="mt-7 space-y-5">
-            <PersonalCloudConnectionPanel locale={locale} controller={cloud} />
+            <PersonalCloudConnectionPanel locale={legacyLocale} controller={cloud} />
             <section className="rounded-2xl border border-line bg-card p-5">
               <div className="flex items-start gap-3">
                 <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
@@ -651,7 +653,7 @@ export function StudioSaveFirstProjectLibraryPage({
                         </div>
                         <div className="mt-4 border-t border-line pt-3">
                           <PersonalCloudUploadActions
-                            locale={locale}
+                            locale={legacyLocale}
                             connections={cloud.connections}
                             busyProvider={cloudUpload?.projectId === project.id
                               ? cloudUpload.provider

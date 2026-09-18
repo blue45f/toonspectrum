@@ -37,7 +37,7 @@ function reportSummary(report: CompatibilityReport, bt: (ko: string, en: string)
 
 export function StudioCompatibilityReportsPanel({
   projectId,
-  locale,
+  locale: _locale,
 }: {
   readonly projectId: string;
   readonly locale: string;

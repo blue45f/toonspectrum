@@ -27,6 +27,7 @@ import {
 } from "../studio-review-history-store";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
@@ -35,7 +36,7 @@ type Locale = string;
 
 const CURRENT_REVIEWER_ID = "project-owner";
 
-const STATUS_LABELS: Readonly<Record<StudioReviewStatus, Readonly<Record<Locale, string>>>> = {
+const STATUS_LABELS: Readonly<Record<StudioReviewStatus, BilingualText>> = {
   draft: { ko: "검토 전", en: "Draft" },
   "in-review": { ko: "검토 중", en: "In review" },
   "changes-requested": { ko: "수정 요청", en: "Changes requested" },
@@ -64,6 +65,7 @@ function ReviewStat({
   readonly label: string;
   readonly value: string | number;
 }) {
+  useBilingualI18nRevision();
   return (
     <div className="rounded-xl border border-line bg-panel p-3">
       <p className="text-[0.65rem] text-fg-3">{label}</p>
@@ -74,15 +76,16 @@ function ReviewStat({
 
 function ReviewThreadCard({
   thread,
-  locale,
+  locale: _locale,
   canResolve,
   onResolve,
 }: {
   readonly thread: StudioReviewThread;
-  readonly locale: Locale;
+  readonly locale: "ko" | "en";
   readonly canResolve: boolean;
   readonly onResolve: () => void;
 }) {
+  const l = useBilingualLocalizer("studioReview.thread");
   return (
     <article
       className={cn(
@@ -128,7 +131,7 @@ export function StudioReviewPanel({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale: "ko" | "en";
 }) {
   const bt = useBilingual("StudioReviewPanel");
   const workspace = useStudioProjectWorkspace(projectId, locale);

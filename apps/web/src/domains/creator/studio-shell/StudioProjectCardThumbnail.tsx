@@ -12,6 +12,11 @@ import {
 import { readStudioProjectDocuments } from "../studio-project-document-reader";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-reader";
 import type { ThumbElement, ThumbPageLike } from "../studio-page-thumbs";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const MAX_PREVIEW_DOCUMENTS = 6;
 
@@ -152,6 +157,7 @@ function useNearViewport(): {
   readonly nearViewport: boolean;
   readonly rootRef: RefObject<HTMLDivElement | null>;
 } {
+  useBilingualI18nRevision();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [nearViewport, setNearViewport] = useState(
     () => typeof globalThis.IntersectionObserver !== "function",
@@ -173,7 +179,8 @@ function useNearViewport(): {
   return { nearViewport, rootRef };
 }
 
-function PreviewLoading({ locale }: { readonly locale: Locale }) {
+function PreviewLoading({ locale: _locale }: { readonly locale: string }) {
+  const l = useBilingualLocalizer("studioProjectThumbnail.loading");
   return (
     <div className="grid h-full place-items-center bg-panel/70 text-fg-3">
       <div className="flex items-center gap-2 text-xs font-semibold">
@@ -184,7 +191,8 @@ function PreviewLoading({ locale }: { readonly locale: Locale }) {
   );
 }
 
-function PreviewEmpty({ locale }: { readonly locale: Locale }) {
+function PreviewEmpty({ locale: _locale }: { readonly locale: string }) {
+  const l = useBilingualLocalizer("studioProjectThumbnail.empty");
   return (
     <div className="grid h-full place-items-center bg-panel/70 px-5 text-center text-fg-3">
       <div>
@@ -203,9 +211,10 @@ export function StudioProjectCardThumbnail({
   project,
 }: {
   readonly authUserId: string | null;
-  readonly locale: Locale;
+  readonly locale: string;
   readonly project: StudioProjectLibraryEntry;
 }): ReactElement {
+  const l = useBilingualLocalizer("studioProjectThumbnail");
   const { nearViewport, rootRef } = useNearViewport();
   const [preview, setPreview] = useState<PreviewCandidate | null>(null);
   const [phase, setPhase] = useState<PreviewPhase>("idle");

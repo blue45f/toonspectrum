@@ -52,7 +52,7 @@ export function StudioImportVisualGuide({ locale }: { readonly locale: string })
   const reducedMotion = useReducedMotion();
 
   return (
-    <section className="studio-import-visual-guide" aria-labelledby="studio-import-visual-title" lang={locale}>
+    <section className="studio-import-visual-guide" aria-labelledby="studio-import-visual-title" lang={language}>
       <div className="studio-import-visual-guide__hero">
         <div className="studio-import-visual-guide__copy">
           <p className="studio-import-visual-guide__eyebrow">{copy.eyebrow}</p>

@@ -9,6 +9,13 @@ import {
   type StudioIntentAction,
   type StudioTaskFlowStep,
 } from "./StudioTaskFlow";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioProjectStartPanel", ko, en);
 
 export type StudioProjectStartLocale = string;
 

@@ -727,6 +727,7 @@ import {
   type MagicResizePreset,
   type MagicResizeStrategy,
 } from "./studio-magic-resize";
+import { studioWebtoonCanvasMagicResizePresetForId } from "./studio-webtoon-canvas-presets";
 import {
   applyMagicWandRegionToSelection,
   flipNormalizedPoint,
@@ -1407,12 +1408,7 @@ import type { PaletteSuggestion } from "./studio-palette-suggest";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
 import type { PsdExportEl, PsdExportResult } from "./export/studio-psd-export";
 import type { StudioPublicationAnalyticsDocument } from "./studio-publication-analytics";
-import type {
-  StudioPublishAiProvenance,
-  StudioPublishAiUsage,
-  StudioPublishPreflightInput,
-  StudioPublishProfile,
-} from "./studio-publish-preflight";
+import type { StudioPublishAiProvenance, StudioPublishAiUsage, StudioPublishPreflightInput, StudioPublishProfile } from "./studio-publish-preflight";
 import type { StudioQuickAccessCommandMeta, StudioQuickAccessState } from "./studio-quick-access";
 import type { StudioQuickAccessCommandAvailability } from "./studio-quick-access-integration";
 import { useStudioQuickAccessPersonalKitBridge } from "./use-studio-quick-access-personal-kit";
@@ -1424,10 +1420,7 @@ import type { StudioStockPhoto } from "./studio-stock-image-client";
 import type { StudioTeamCommentMutationPlan } from "./studio-team-comment-mutation-plan";
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { StudioVelocityPressureState } from "./studio-velocity-pressure-response";
-import type {
-  StudioWatermarkPreferenceRuntime,
-  StudioWatermarkPreferenceSnapshot,
-} from "./studio-watermark-preferences-sqlite";
+import type { StudioWatermarkPreferenceRuntime, StudioWatermarkPreferenceSnapshot } from "./studio-watermark-preferences-sqlite";
 import type { StudioWillV1PageExportResult } from "./export/studio-will-v1-export-bridge";
 import type { PendingStudioWillV1Import } from "./studio-will-v1-import-bridge";
 import type { StudioWorkspacePersistenceRuntime } from "./studio-workspace-sqlite-runtime";
@@ -1435,33 +1428,31 @@ import type { StudioAssetShareOptions, StudioAssetSortOrder, StudioAssetTab } fr
 import type { StudioInspectorAsideHandlers } from "./StudioInspectorAside";
 import type { StudioLeftToolRailHandlers } from "./StudioLeftToolRail";
 import type { StudioMenubarContentHandlers } from "./StudioMenubarContent";
-import type {
-  StudioBrushCatalogHandlers,
-  StudioMobileEditingDockHandlers,
-  StudioMobileSheet,
-} from "./StudioMobileEditingDock";
+import type { StudioBrushCatalogHandlers, StudioMobileEditingDockHandlers, StudioMobileSheet } from "./StudioMobileEditingDock";
 import type { StudioPageListPaneHandlers } from "./StudioPageListPane";
 import type { PublishContext } from "./StudioPublishContextBanner";
 import type { StudioWebGpuCanvasHandle } from "./StudioWebGpuCanvas";
 import type { CreatorAssetReportReason } from "@/shared/lib/creator-asset-contract";
-import type {
-  GeneratedAssetQuality,
-  GeneratedAssetSize,
-  SharedAssetCatalogItem,
-  WorkDetail,
-  WorkRevisionSummary,
-} from "@/infrastructure/creator-client";
+import type { GeneratedAssetQuality, GeneratedAssetSize, SharedAssetCatalogItem, WorkDetail, WorkRevisionSummary } from "@/infrastructure/creator-client";
 import type Konva from "konva";
 import { scheduleIdle } from "@/domains/auth/components/schedule-idle";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { useResizable } from "@/hooks/use-resizable";
 import { loadChunkWithReloadRecovery } from "@/shared/lib/chunk-load-recovery";
-import { useI18n, useT } from "@/shared/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-asset-contract";
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/compat/auth-session-store";
+import {
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioCuttoonEditorHost", ko, en);
 
 const StudioAiSuperSuiteModal = lazyRetry(studioAiSuperSuiteModalLoader.load, "StudioAiSuperSuiteModal");
 export function StudioCuttoonEditor({
@@ -1471,11 +1462,12 @@ export function StudioCuttoonEditor({
   readonly remixId: string | null;
   readonly studioRoute: StudioWorkspaceRoute;
 }) {
+  useBilingualI18nRevision();
   const navigate = useNavigate();
   const location = useLocation();
   const t = useT();
-  const studioLanguage = useI18n((state) => state.lang);
-  const studioSaveLocale = studioLanguage.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+
+  const studioSaveLocale = getActiveI18nLocale();
   const [params] = useSearchParams();
   const ecosystemSampleImportRef = useRef<string | null>(null);
   // Live-session identity (`?room=`, per-tab instant id) is owned by StudioDocumentLayout, one level
@@ -2779,11 +2771,22 @@ export function StudioCuttoonEditor({
         setBg3dInitialDataUrl(undefined);
         setBg3dInitialScene(undefined);
         setBg3dInitialElementId(undefined);
-        setBg3dOpen(true);
       }
+      // The committed routed surface is the single interactive 3D owner. Retiring peers only
+      // after the URL changes avoids their close effects racing the requested 3D navigation.
+      setPoserVrmOpen(false);
+      setCharacterShaperOpen(false);
+      setMannequinPoserOpen(false);
+      setBg3dOpen(true);
     } else if (studioRoute.surface === "poser") {
+      setBg3dOpen(false);
+      setCharacterShaperOpen(false);
+      setMannequinPoserOpen(false);
       setPoserVrmOpen(true);
     } else if (studioRoute.surface === "character") {
+      setBg3dOpen(false);
+      setPoserVrmOpen(false);
+      setMannequinPoserOpen(false);
       setCharacterShaperOpen(true);
     } else if (studioRoute.surface === "animation") {
       // 매니페스트가 선언해 온 표면인데 소비자가 없어 죽은 세그먼트였다 — 딥링크/뒤·앞으로
@@ -6055,14 +6058,13 @@ export function StudioCuttoonEditor({
   const [bg3dOpen, setBg3dOpen] = useState(false);
   const [bg3dMarketplaceModelId, setBg3dMarketplaceModelId] = useState<string | null>(null);
   function openVrmPoserFromMenu() {
-    // 두 VRM 표면이 같은 문서 위에 동시에 서지 않게 한다. 셰이퍼에서 레거시 빌더로 무손실
-    // 전환하는 길은 셰이퍼 안의 「고급 편집」이다.
-    setCharacterShaperOpen(false);
+    // 3D→3D 전환은 먼저 다음 라우트를 요청하고, 라우트 커밋에서 이전 렌더러를 내린다.
+    // 이전 표면을 여기서 먼저 닫으면 close-sync가 canvas replace를 예약해 새 poser URL을
+    // 덮을 수 있다. route-aware admission이 전환 중 WebGL 중복 마운트를 막는다.
     setPoserVrmOpen(true);
     navigateStudio2dSurface("poser");
   }
   function openCharacterShaperFromMenu() {
-    setPoserVrmOpen(false);
     setCharacterShaperOpen(true);
     navigateStudio2dSurface("character");
   }
@@ -6087,6 +6089,7 @@ export function StudioCuttoonEditor({
     dccRouteRequested: hybridDccRouteRequested,
     mannequinPoserOpen,
     poserVrmOpen,
+    routedSurface: studioRoute.surface,
   });
   const admittedBg3dOpen = interactiveThreeDSurfaceAdmission.bg3dOpen;
   const admittedCharacterShaperOpen = interactiveThreeDSurfaceAdmission.characterShaperOpen;
@@ -6482,12 +6485,20 @@ export function StudioCuttoonEditor({
   }, [initialWorkspaceLaunchId]);
   /**
    * 라우트 소유 표면(타임라인·스토리보드·3D 배경·포저)의 열림/닫힘 전이를 URL 에 반영한다.
-   * 열림 전이는 canvas 라우트에서만 해당 표면으로 올라가고(다른 표면 위 패널 공존은 URL 을
-   * 다투지 않는다), 닫힘 전이는 URL 이 그 표면을 주장하고 있을 때만 canvas 로 내려온다 —
-   * 반대 방향(라우트→상태)은 위 studioRoute.surface 이펙트가 소유하므로 루프가 없다.
+   * 타임라인·스토리보드 열림은 canvas 에서만 URL 을 올리지만, interactive 3D 표면은 다른
+   * 라우트 위에서 요청돼도 새 3D 표면이 URL 소유권을 넘겨받는다. 닫힘 전이는 URL 이 해당
+   * 표면을 주장하고 있을 때만 canvas 로 내려온다. 반대 방향(라우트→상태)은 위
+   * studioRoute.surface 이펙트가 소유하므로 루프가 없다.
    */
   const upgradeRoutedSurface = useEffectEvent((surface: Studio2dWorkspaceSurface) => {
-    if (studioRoute.surface === "canvas") navigateStudio2dSurface(surface);
+    const requestsInteractiveThreeD =
+      surface === "bg3d" || surface === "poser" || surface === "character";
+    // Timeline/comic keep the historical "upgrade only from canvas" behavior. Interactive 3D
+    // is different: a newly requested renderer must become the URL owner even when another
+    // routed surface is open, otherwise setOpen(true) can leave an invisible/stale 3D tool.
+    if (studioRoute.surface === "canvas" || requestsInteractiveThreeD) {
+      navigateStudio2dSurface(surface);
+    }
   });
   const downgradeRoutedSurface = useEffectEvent((surface: Studio2dWorkspaceSurface) => {
   if (studioRoute.surface === surface || studioRoute.surface === "canvas") {
@@ -6508,6 +6519,7 @@ export function StudioCuttoonEditor({
     surface: "animation" | "bg3d" | "character" | "comic" | "poser",
     open: boolean,
   ): void {
+    useBilingualI18nRevision();
     useEffect(() => {
       const was = routedSurfacePanelSyncRef.current[surface];
       routedSurfacePanelSyncRef.current[surface] = open;
@@ -6521,6 +6533,21 @@ export function StudioCuttoonEditor({
   useRoutedSurfacePanelSync("bg3d", bg3dOpen);
   useRoutedSurfacePanelSync("poser", poserVrmOpen);
   useRoutedSurfacePanelSync("character", characterShaperOpen);
+
+  const normalizeMannequinRoute = useEffectEvent(() => {
+    if (
+      studioRoute.surface === "bg3d"
+      || studioRoute.surface === "poser"
+      || studioRoute.surface === "character"
+    ) {
+      // Mannequin is intentionally a route-less modal. Returning URL ownership to canvas lets
+      // the old routed 3D surface retire before the mannequin becomes the sole renderer.
+      navigateStudio2dSurface("canvas");
+    }
+  });
+  useEffect(() => {
+    if (mannequinPoserOpen) normalizeMannequinRoute();
+  }, [mannequinPoserOpen]);
   const [pageSequenceOpen, setPageSequenceOpen] = useState(false);
   const [timelinePlayhead, setTimelinePlayhead] = useState(0);
   const [timelinePlaying, setTimelinePlaying] = useState(false);
@@ -20218,6 +20245,9 @@ No text, logo, watermark, or copyrighted character.`;
     setBg3dInitialDataUrl(undefined);
     setBg3dInitialScene(undefined);
     setBg3dInitialElementId(undefined);
+    // The routed-surface open edge records ownership before it navigates. Keeping that ordering
+    // is essential: a direct navigation here can make the bg3d route effect treat this seeded
+    // asset as a cold deep link and clear the one-shot template/primitive seed.
     setBg3dOpen(true);
   }
 
@@ -24161,9 +24191,7 @@ No text, logo, watermark, or copyrighted character.`;
   function openLocalStudioFormalSave(): boolean {
     const context = localStudioProjectForSave();
     if (!context) {
-      setError(studioSaveLocale === "ko"
-        ? "이 원고가 속한 프로젝트를 찾지 못했습니다. 내 작업에서 다시 열어 주세요."
-        : "The project for this document could not be found. Reopen it from My work.");
+      setError(bi("이 원고가 속한 프로젝트를 찾지 못했습니다. 내 작업에서 다시 열어 주세요.", "The project for this document could not be found. Reopen it from My work."));
       return false;
     }
     const profile = studioSaveProfileForProject(window.localStorage, context.project.id);
@@ -24178,9 +24206,7 @@ No text, logo, watermark, or copyrighted character.`;
     if (formalSaveInFlightRef.current || typeof window === "undefined") return;
     const context = localStudioProjectForSave();
     if (!context) {
-      setFormalSaveError(studioSaveLocale === "ko"
-        ? "프로젝트 정보를 읽지 못했습니다. 내 작업에서 다시 열어 주세요."
-        : "Project information could not be read. Reopen it from My work.");
+      setFormalSaveError(bi("프로젝트 정보를 읽지 못했습니다. 내 작업에서 다시 열어 주세요.", "Project information could not be read. Reopen it from My work."));
       return;
     }
     formalSaveInFlightRef.current = true;
@@ -24245,20 +24271,14 @@ No text, logo, watermark, or copyrighted character.`;
       setFormalSaveFirstSave(false);
       setFormalSaveOpen(false);
       announceDrawingShortcut(method === "file-picker"
-        ? studioSaveLocale === "ko"
-          ? "편집 가능한 프로젝트 원본을 저장했습니다."
-          : "Saved the editable project original."
-        : studioSaveLocale === "ko"
-          ? "편집 가능한 프로젝트 원본을 다운로드했습니다."
-          : "Downloaded the editable project original.");
+        ? bi("편집 가능한 프로젝트 원본을 저장했습니다.", "Saved the editable project original.")
+        : bi("편집 가능한 프로젝트 원본을 다운로드했습니다.", "Downloaded the editable project original."));
     } catch (cause) {
       if (!(cause instanceof DOMException && cause.name === "AbortError")) {
         formalSaveTargetRef.current = null;
         setFormalSaveError(cause instanceof Error && cause.message.trim()
           ? cause.message.trim().slice(0, 500)
-          : studioSaveLocale === "ko"
-            ? "프로젝트 원본을 저장하지 못했습니다. 임시 자동저장본은 유지됩니다."
-            : "The project original could not be saved. The temporary autosave remains available.");
+          : bi("프로젝트 원본을 저장하지 못했습니다. 임시 자동저장본은 유지됩니다.", "The project original could not be saved. The temporary autosave remains available."));
         setFormalSaveOpen(true);
       }
     } finally {
@@ -25783,14 +25803,14 @@ function clearSelectionForEdit() {
       openProductionBible: () => setProductionBibleOpen(true),
       openWebtoonAssistant: () => setWebtoonAssistantOpen(true),
       openAiSuperSuite: () => setAiSuperSuiteOpen(true),
-      openQuickStart: (presetId) => presetId ? navigate(`/studio/new?kind=webtoon&template=${encodeURIComponent(presetId)}`) : setQuickStartOpen(true),
+      openQuickStart: () => setQuickStartOpen(true),
       openPublishPackage: () => setPublishPackageOpen(true),
       openPublishPreflight: () => setPublishPreflightOpen(true),
       openAssetRightsAudit: () => setAssetRightsAuditOpen(true),
       openAutoActions: () => void openAutoActions(),
-      openCanvasNavigatorRoute: () =>
-        openInspectorRoute({ primary: "document", document: "navigator" }),
+      openCanvasNavigatorRoute: () => openInspectorRoute({ primary: "document", document: "navigator" }),
       openCanvasSettingsRoute: () => openInspectorRoute({ primary: "document", document: "canvas" }),
+      applyWebtoonCanvasPreset: (presetId) => applyMagicResizePreset(studioWebtoonCanvasMagicResizePresetForId(presetId)),
       toggleCanvasGrid: () => setShowGrid((visible) => !visible),
       toggleWebtoonGuides: () => setShowWebtoonGuides((visible) => !visible),
       toggleEraseToIntersection: toggleEraseToIntersectionMode,
@@ -25832,8 +25852,7 @@ function clearSelectionForEdit() {
         ? "circle"
         : "ellipse"
       : pixelTool;
-  const menuCommandBarVisible =
-    workspacePersistence.state.liveLayout.commandBar?.visible !== false;
+  const menuCommandBarVisible = workspacePersistence.state.liveLayout.commandBar?.visible !== false;
   const studioMainMenuSurfaceState = useMemo<StudioMainMenuSurfaceState>(
     () => ({
       pixelSelectionTool: menuPixelSelectionTool,
@@ -26163,14 +26182,14 @@ function clearSelectionForEdit() {
       openPixelSelectionTransform();
     }
   }
-  const openStudioQuickActionsAt = useCallback((anchor: { x: number; y: number }): void => {
+  function openStudioQuickActionsAt(anchor: { x: number; y: number }): void {
     setQuickActionsAnchor(anchor);
     setMobileSheet(null);
     setMenu(null);
     setColorWheelOpen(false);
     setQuickAccessPaletteOpen(false);
     setQuickActionsOpen(true);
-  }, []);
+  }
 
   function openStudioQuickActionsAtCanvasPointer(): void {
     const stage = stageRef.current;
@@ -29711,7 +29730,7 @@ function clearSelectionForEdit() {
         <StudioFormalSaveDialog
           open={formalSaveOpen}
           locale={studioSaveLocale}
-          projectTitle={formalSaveProjectTitle || title || (studioSaveLocale === "ko" ? "제목 없는 프로젝트" : "Untitled project")}
+          projectTitle={formalSaveProjectTitle || title || (bi("제목 없는 프로젝트", "Untitled project"))}
           firstSave={formalSaveFirstSave}
           busy={formalSaveBusy}
           error={formalSaveError}

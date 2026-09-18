@@ -1,6 +1,9 @@
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useT } from "@/shared/lib/i18n";
+import { defineBilingualText } from "@/shared/lib/i18n-bilingual-copy";
+
 import {
   STUDIO_PROJECT_LIBRARY_STORAGE_KEY,
   STUDIO_PROJECT_LIBRARY_UPDATED_EVENT,
@@ -48,9 +51,10 @@ function eventState(value: unknown): StudioProjectLibraryState | null {
 }
 
 export function useStudioProjectLibrary(
-  locale: Locale,
+  _locale: string,
   status?: StudioProjectStatus,
 ): StudioProjectLibraryController {
+  const t = useT();
   const [state, setState] = useState<StudioProjectLibraryState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,9 +64,9 @@ export function useStudioProjectLibrary(
       setState(readStudioProjectLibrary(window.localStorage));
       setError(null);
     } catch {
-      setError(storageError(locale));
+      setError(t(STORAGE_ERROR));
     }
-  }, [locale]);
+  }, [t]);
 
   useEffect(() => {
     reload();
@@ -94,10 +98,10 @@ export function useStudioProjectLibrary(
       setError(null);
       return value;
     } catch {
-      setError(storageError(locale));
+      setError(t(STORAGE_ERROR));
       return null;
     }
-  }, [locale]);
+  }, [t]);
 
   const rename = useCallback((projectId: string, title: string) => run(() => (
     renameStudioProject(window.localStorage, projectId, title, { target: window })

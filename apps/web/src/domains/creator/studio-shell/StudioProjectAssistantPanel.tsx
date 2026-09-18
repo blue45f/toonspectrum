@@ -10,7 +10,12 @@ import {
 import type { StudioAiAssistToolId } from "../ai/studio-ai-assist-ux";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 export type StudioProjectAssistantSection =
   | "overview"
@@ -25,8 +30,8 @@ type Locale = string;
 
 type AssistantSuggestion = Readonly<{
   tool: StudioAiAssistToolId;
-  label: Record<Locale, string>;
-  prompt: Record<Locale, string>;
+  label: BilingualText;
+  prompt: BilingualText;
 }>;
 
 const SUGGESTIONS: Readonly<Record<StudioProjectAssistantSection, readonly AssistantSuggestion[]>> = {
@@ -77,22 +82,22 @@ function editorHref(projectId: string, tool: StudioAiAssistToolId): string {
 export function StudioProjectAssistantPanel({
   projectId,
   section,
-  locale,
+  locale: _locale,
 }: {
   readonly projectId: string;
   readonly section: StudioProjectAssistantSection;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
   const bt = useBilingual("StudioProjectAssistantPanel");
   const navigate = useNavigate();
   const suggestions = useMemo(() => SUGGESTIONS[section], [section]);
   const [selectedTool, setSelectedTool] = useState<StudioAiAssistToolId>(suggestions[0]?.tool ?? "composition");
-  const [prompt, setPrompt] = useState(suggestions[0]?.prompt[locale] ?? "");
+  const [prompt, setPrompt] = useState(() => suggestions[0] ? l(suggestions[0].prompt.ko, suggestions[0].prompt.en) : "");
   const [error, setError] = useState<string | null>(null);
 
   const chooseSuggestion = (suggestion: AssistantSuggestion) => {
     setSelectedTool(suggestion.tool);
-    setPrompt(suggestion.prompt[locale]);
+    setPrompt(l(suggestion.prompt.ko, suggestion.prompt.en));
     setError(null);
   };
 
@@ -138,7 +143,7 @@ export function StudioProjectAssistantPanel({
 
       <div className="mt-4 flex flex-wrap gap-2" aria-label={bt("추천 요청", "Suggested requests")}>
         {suggestions.map((suggestion) => {
-          const active = prompt === suggestion.prompt[locale] && selectedTool === suggestion.tool;
+          const active = prompt === l(suggestion.prompt.ko, suggestion.prompt.en) && selectedTool === suggestion.tool;
           return (
             <button
               key={`${suggestion.tool}:${suggestion.label.en}`}
@@ -153,7 +158,7 @@ export function StudioProjectAssistantPanel({
                   : "border-line bg-card text-fg-2 hover:border-accent/40 hover:text-fg",
               )}
             >
-              {suggestion.label[locale]}
+              {l(suggestion.label.ko, suggestion.label.en)}
             </button>
           );
         })}

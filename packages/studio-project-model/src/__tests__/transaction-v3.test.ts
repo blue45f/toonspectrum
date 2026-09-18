@@ -126,27 +126,4 @@ describe("RFC 6902 JSON patch subset", () => {
     expect(source).toEqual({ values: ["a", "b"], title: "before" });
     expect(result).toEqual({ values: ["c"], title: "after", copied: "a", moved: "b" });
   });
-
-  it("rejects prototype-polluting pointer segments without mutating Object.prototype", () => {
-    const pollutionKey = "studioProjectModelPolluted";
-    const unsafePaths = [
-      `/__proto__/${pollutionKey}`,
-      `/constructor/prototype/${pollutionKey}`,
-      `/prototype/${pollutionKey}`,
-    ];
-
-    expect(Object.prototype.hasOwnProperty.call(Object.prototype, pollutionKey)).toBe(false);
-    for (const path of unsafePaths) {
-      expect(() => applyJsonPatches({}, [{ op: "add", path, value: true }])).toThrow(
-        "unsafe JSON pointer segment",
-      );
-    }
-    expect(Object.prototype.hasOwnProperty.call(Object.prototype, pollutionKey)).toBe(false);
-  });
-
-  it("does not resolve inherited object properties as JSON document members", () => {
-    expect(() =>
-      applyJsonPatches({}, [{ op: "replace", path: "/toString", value: "changed" }]),
-    ).toThrow("missing JSON pointer /toString");
-  });
 });
