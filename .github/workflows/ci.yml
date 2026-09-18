@@ -65,6 +65,8 @@ jobs:
         run: pnpm run lint:strict
       - name: Import and dependency hygiene
         run: pnpm run quality:imports
+      - name: Secret scan
+        run: pnpm run quality:secrets
 
   typecheck:
     name: Core preflight and application typecheck

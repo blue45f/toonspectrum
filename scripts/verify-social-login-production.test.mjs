@@ -210,6 +210,7 @@ describe("social login production verification", () => {
   it.each([
     "",
     "http://www.toonstudio.cloud",
+    // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic unsafe-origin rejection fixture
     "https://user:pass@www.toonstudio.cloud",
     "https://www.toonstudio.cloud/path",
     "https://www.toonstudio.cloud?query=1",

@@ -58,7 +58,7 @@
     "validate:architecture": "node scripts/validate-architecture.mjs",
     "verify:toolchain-coverage": "node scripts/verify-toolchain-coverage.mjs",
     "check:studio-bundle": "node scripts/check-studio-bundle.mjs",
-    "ci": "pnpm run validate:architecture && pnpm run verify:free-infrastructure && pnpm run verify:cloudflare-apex-redirect && pnpm run verify:cloudflare-static && pnpm run verify:csp && pnpm run verify:toolchain-coverage && pnpm run verify:studio-wiring-reachability && pnpm run lint:ci && pnpm run quality:imports && pnpm run typecheck && pnpm run verify:studio-competitor-replacement && pnpm run verify:studio-reference-projects && pnpm run verify:studio-publish-goldens && pnpm run verify:studio-publishing-lifecycle && pnpm run verify:studio-operational-validation && pnpm run test && pnpm run test:toonbridge && pnpm run verify:cloudflare-realtime && pnpm run build && pnpm run check:studio-bundle && pnpm run audit:licenses && pnpm run build:all",
+    "ci": "pnpm run validate:architecture && pnpm run verify:free-infrastructure && pnpm run verify:cloudflare-apex-redirect && pnpm run verify:cloudflare-static && pnpm run verify:csp && pnpm run verify:toolchain-coverage && pnpm run verify:studio-wiring-reachability && pnpm run lint:ci && pnpm run quality:secrets && pnpm run typecheck && pnpm run verify:studio-competitor-replacement && pnpm run verify:studio-reference-projects && pnpm run verify:studio-publish-goldens && pnpm run verify:studio-publishing-lifecycle && pnpm run verify:studio-operational-validation && pnpm run test && pnpm run test:toonbridge && pnpm run verify:cloudflare-realtime && pnpm run build && pnpm run check:studio-bundle && pnpm run audit:licenses && pnpm run build:all",
     "sonar": "sonar-scanner",
     "lint:strict": "NODE_OPTIONS='--max-old-space-size=8192' eslint --max-warnings=0 --cache --cache-strategy content --cache-location node_modules/.cache/eslint/full/",
     "lint:ci": "pnpm run lint:strict",
@@ -69,7 +69,7 @@
     "audit:visual-asset-quality": "node scripts/audit-visual-asset-quality.mjs",
     "audit:auth-modal-visual-ux": "node scripts/audit-auth-modal-visual-ux.mjs",
     "audit:licenses": "node scripts/generate-third-party-notices.mjs --check",
-    "lint:security": "pnpm run lint:strict && pnpm run audit:security",
+    "lint:security": "pnpm run lint:strict && pnpm run quality:secrets && pnpm run audit:security",
     "sonar:ci": "sonar-scanner -Dsonar.qualitygate.wait=true",
     "verify": "pnpm run ci",
     "verify:push": "pnpm run verify && pnpm run audit:security && pnpm run audit:licenses",
@@ -215,7 +215,9 @@
     "quality:imports": "knip --include unlisted,unresolved",
     "quality:deadcode": "knip",
     "quality:cycles": "knip --cycles",
-    "test:a11y": "playwright test --config playwright.a11y.config.ts"
+    "test:a11y": "playwright test --config playwright.a11y.config.ts",
+    "quality:secrets": "node scripts/secretlint-files.mjs --all",
+    "quality:secrets:changed": "node scripts/secretlint-files.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",
@@ -307,6 +309,7 @@
     "@heejun/eslint-config": "^4.0.0",
     "@playwright/test": "1.62.1",
     "@rolldown/plugin-babel": "^0.2.3",
+    "@secretlint/secretlint-rule-preset-recommend": "^13.0.5",
     "@tailwindcss/postcss": "^4.3.0",
     "@testing-library/react": "^16.3.2",
     "@types/culori": "4.0.1",
@@ -338,6 +341,7 @@
     "playwright": "1.62.1",
     "puppeteer-core": "^25.3.0",
     "redis": "^5.12.1",
+    "secretlint": "^13.0.5",
     "tailwindcss": "^4.3.0",
     "three-stdlib": "2.36.1",
     "tsx": "^4.22.3",
@@ -353,6 +357,9 @@
   "lint-staged": {
     "*.{js,mjs,ts,tsx,mts,cts}": [
       "eslint --max-warnings=0 --no-warn-ignored --fix --cache --cache-strategy content --cache-location node_modules/.cache/eslint/staged/"
+    ],
+    "*": [
+      "node scripts/secretlint-files.mjs --"
     ]
   }
 }
