@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  accountMergeDedupePolicyForReference,
   findProviderOverlap,
   isAccountMergeToken,
   maskAccountMergeEmail,
+  normalizeAccountMergeProfilePreference,
   shouldTransferUserReference,
 } from "./account-merge";
 
@@ -52,4 +54,29 @@ describe("account merge policy", () => {
     ).toEqual(["google"]);
     expect(findProviderOverlap(["naver"], ["google"])).toEqual([]);
   });
+  it("deduplicates only set-like relationship rows", () => {
+    expect(accountMergeDedupePolicyForReference({
+      schemaName: "public",
+      tableName: "creator_work_bookmark",
+      columnName: "userId",
+    })).toMatchObject({ keyColumns: ["workId"] });
+    expect(accountMergeDedupePolicyForReference({
+      schemaName: "public",
+      tableName: "creator_follow",
+      columnName: "followerId",
+    })).toMatchObject({ keyColumns: ["creatorId"], peerUserColumn: "creatorId" });
+    expect(accountMergeDedupePolicyForReference({
+      schemaName: "public",
+      tableName: "rating",
+      columnName: "userId",
+    })).toBeNull();
+  });
+
+  it("defaults profile ownership to the target account", () => {
+    expect(normalizeAccountMergeProfilePreference("source")).toBe("source");
+    expect(normalizeAccountMergeProfilePreference("target")).toBe("target");
+    expect(normalizeAccountMergeProfilePreference("unexpected")).toBe("target");
+    expect(normalizeAccountMergeProfilePreference(null)).toBe("target");
+  });
+
 });

@@ -32,6 +32,10 @@ type AccountMergeUserRow = {
   id: string;
   name: string | null;
   email: string | null;
+  image: string | null;
+  avatar: string | null;
+  bio: string | null;
+  creatorRoleProfile: Record<string, unknown>;
   passwordHash: string | null;
   role: string;
   status: string;
@@ -45,20 +49,91 @@ export type UserReference = {
   columnName: string;
 };
 
+export type AccountMergeProfilePreference = "target" | "source";
+
+export type AccountMergeDedupePolicy = {
+  tableName: string;
+  userColumn: string;
+  keyColumns: readonly string[];
+  peerUserColumn?: string;
+};
+
+const ACCOUNT_MERGE_DEDUPE_POLICIES: readonly AccountMergeDedupePolicy[] = [
+  { tableName: "subscription", userColumn: "userId", keyColumns: ["titleId"] },
+  { tableName: "review_like", userColumn: "userId", keyColumns: ["reviewId"] },
+  { tableName: "creator_collab_bookmark", userColumn: "userId", keyColumns: ["postId"] },
+  { tableName: "creator_promotion_comment_like", userColumn: "userId", keyColumns: ["commentId"] },
+  { tableName: "creator_promotion_bookmark", userColumn: "userId", keyColumns: ["postId"] },
+  { tableName: "creator_work_like", userColumn: "userId", keyColumns: ["workId"] },
+  { tableName: "creator_work_bookmark", userColumn: "userId", keyColumns: ["workId"] },
+  { tableName: "creator_work_comment_like", userColumn: "userId", keyColumns: ["commentId"] },
+  {
+    tableName: "creator_follow",
+    userColumn: "followerId",
+    keyColumns: ["creatorId"],
+    peerUserColumn: "creatorId",
+  },
+  {
+    tableName: "creator_follow",
+    userColumn: "creatorId",
+    keyColumns: ["followerId"],
+    peerUserColumn: "followerId",
+  },
+  {
+    tableName: "member_message_block",
+    userColumn: "blockerId",
+    keyColumns: ["blockedUserId"],
+    peerUserColumn: "blockedUserId",
+  },
+  {
+    tableName: "member_message_block",
+    userColumn: "blockedUserId",
+    keyColumns: ["blockerId"],
+    peerUserColumn: "blockerId",
+  },
+];
+
+export function accountMergeDedupePolicyForReference(
+  reference: UserReference,
+): AccountMergeDedupePolicy | null {
+  if (reference.schemaName !== "public") return null;
+  return ACCOUNT_MERGE_DEDUPE_POLICIES.find(
+    (policy) =>
+      policy.tableName === reference.tableName
+      && policy.userColumn === reference.columnName,
+  ) ?? null;
+}
+
+export function normalizeAccountMergeProfilePreference(
+  value: unknown,
+): AccountMergeProfilePreference {
+  return value === "source" ? "source" : "target";
+}
+
+type AccountMergeProfilePreview = {
+  name: string | null;
+  image: string | null;
+  avatar: string | null;
+  bio: string | null;
+};
+
 export type AccountMergePreview = {
   source: {
     id: string;
     name: string | null;
     email: string | null;
     providers: string[];
+    profile: AccountMergeProfilePreview;
   };
   target: {
     id: string;
     name: string | null;
     email: string | null;
     providers: string[];
+    profile: AccountMergeProfilePreview;
   };
   affectedRecordCount: number;
+  deduplicatedRecordCount: number;
   expiresAt: string;
   warnings: string[];
 };
@@ -133,6 +208,10 @@ async function loadUser(
       id,
       name,
       email,
+      image,
+      avatar,
+      bio,
+      "creatorRoleProfile",
       "passwordHash",
       role,
       status,
@@ -325,13 +404,224 @@ async function countTransferableRecords(
   return total;
 }
 
-async function transferReferences(
+function dedupeKeyPredicate(policy: AccountMergeDedupePolicy): string {
+  return policy.keyColumns
+    .map((column) => {
+      const quoted = quoteIdentifier(column);
+      return `source_row.${quoted} IS NOT DISTINCT FROM target_row.${quoted}`;
+    })
+    .join(" AND ");
+}
+
+async function countDeduplicatedReferenceRecords(
+  client: PoolClient,
+  sourceUserId: string,
+  targetUserId: string,
+  reference: UserReference,
+): Promise<number> {
+  const policy = accountMergeDedupePolicyForReference(reference);
+  if (!policy) return 0;
+  const table = `${quoteIdentifier(reference.schemaName)}.${quoteIdentifier(reference.tableName)}`;
+  const userColumn = quoteIdentifier(policy.userColumn);
+  let total = 0;
+
+  if (policy.peerUserColumn) {
+    const peerColumn = quoteIdentifier(policy.peerUserColumn);
+    const selfResult = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count
+       FROM ${table} AS source_row
+       WHERE source_row.${userColumn} = $1
+         AND source_row.${peerColumn} = $2`,
+      [sourceUserId, targetUserId],
+    );
+    total += Number(selfResult.rows[0]?.count ?? 0);
+  }
+
+  const duplicateResult = await client.query<{ count: string }>(
+    `SELECT count(*)::text AS count
+     FROM ${table} AS source_row
+     WHERE source_row.${userColumn} = $1
+       ${policy.peerUserColumn
+         ? `AND source_row.${quoteIdentifier(policy.peerUserColumn)} IS DISTINCT FROM $2`
+         : ""}
+       AND EXISTS (
+         SELECT 1
+         FROM ${table} AS target_row
+         WHERE target_row.${userColumn} = $2
+           AND ${dedupeKeyPredicate(policy)}
+       )`,
+    [sourceUserId, targetUserId],
+  );
+  total += Number(duplicateResult.rows[0]?.count ?? 0);
+  return total;
+}
+
+async function countDeduplicatedRecords(
   client: PoolClient,
   sourceUserId: string,
   targetUserId: string,
   references: readonly UserReference[],
 ): Promise<number> {
-  let transferred = 0;
+  let total = 0;
+  for (const reference of references) {
+    total += await countDeduplicatedReferenceRecords(
+      client,
+      sourceUserId,
+      targetUserId,
+      reference,
+    );
+  }
+  return total;
+}
+
+async function deduplicateReferenceRecords(
+  client: PoolClient,
+  sourceUserId: string,
+  targetUserId: string,
+  reference: UserReference,
+): Promise<number> {
+  const policy = accountMergeDedupePolicyForReference(reference);
+  if (!policy) return 0;
+  const table = `${quoteIdentifier(reference.schemaName)}.${quoteIdentifier(reference.tableName)}`;
+  const userColumn = quoteIdentifier(policy.userColumn);
+  let removed = 0;
+
+  if (policy.peerUserColumn) {
+    const peerColumn = quoteIdentifier(policy.peerUserColumn);
+    const selfResult = await client.query(
+      `DELETE FROM ${table}
+       WHERE ${userColumn} = $1 AND ${peerColumn} = $2`,
+      [sourceUserId, targetUserId],
+    );
+    removed += selfResult.rowCount ?? 0;
+  }
+
+  const duplicateResult = await client.query(
+    `DELETE FROM ${table} AS source_row
+     WHERE source_row.${userColumn} = $1
+       AND EXISTS (
+         SELECT 1
+         FROM ${table} AS target_row
+         WHERE target_row.${userColumn} = $2
+           AND ${dedupeKeyPredicate(policy)}
+       )`,
+    [sourceUserId, targetUserId],
+  );
+  removed += duplicateResult.rowCount ?? 0;
+  return removed;
+}
+
+async function assertStudioAiMergeReady(
+  client: PoolClient,
+  sourceUserId: string,
+  targetUserId: string,
+): Promise<void> {
+  const userIds = [sourceUserId, targetUserId].sort();
+  for (const userId of userIds) {
+    await client.query(
+      `SELECT pg_catalog.pg_advisory_xact_lock(
+         pg_catalog.hashtextextended($1::text, 761903441)
+       )`,
+      [userId],
+    );
+  }
+  const activeLease = await client.query<{ userId: string }>(
+    `SELECT "userId"
+     FROM public.studio_ai_request_gate
+     WHERE "userId" = ANY($1::text[])
+       AND "leaseTokenHash" IS NOT NULL
+       AND "leaseExpiresAt" > clock_timestamp()
+     FOR UPDATE`,
+    [userIds],
+  );
+  if ((activeLease.rowCount ?? 0) > 0) {
+    throw new AccountMergeError(
+      "ACCOUNT_MERGE_AI_REQUEST_IN_FLIGHT",
+      "AI 생성 요청이 처리 중인 계정이 있어요. 요청이 끝난 뒤 계정 통합을 다시 시도해 주세요.",
+      409,
+    );
+  }
+}
+
+async function consolidateStudioAiUsageState(
+  client: PoolClient,
+  sourceUserId: string,
+  targetUserId: string,
+): Promise<number> {
+  let consolidated = 0;
+  const gateResult = await client.query(
+    `INSERT INTO public.studio_ai_request_gate AS target_gate (
+       "userId", "requestTimes", "leaseTokenHash", "leaseFence", "leaseExpiresAt", "createdAt", "updatedAt"
+     )
+     SELECT $1, "requestTimes", NULL, "leaseFence" + 1, NULL, "createdAt", clock_timestamp()
+     FROM public.studio_ai_request_gate
+     WHERE "userId" = $2
+     ON CONFLICT ("userId") DO UPDATE SET
+       "requestTimes" = ARRAY(
+         SELECT merged."at"
+         FROM (
+           SELECT recent."at"
+           FROM unnest(
+             target_gate."requestTimes" || EXCLUDED."requestTimes"
+           ) AS recent("at")
+           ORDER BY recent."at" DESC
+           LIMIT 10000
+         ) AS merged
+         ORDER BY merged."at"
+       ),
+       "leaseTokenHash" = NULL,
+       "leaseFence" = GREATEST(
+         target_gate."leaseFence",
+         EXCLUDED."leaseFence"
+       ) + 1,
+       "leaseExpiresAt" = NULL,
+       "createdAt" = LEAST(target_gate."createdAt", EXCLUDED."createdAt"),
+       "updatedAt" = clock_timestamp()
+     RETURNING "userId"`,
+    [targetUserId, sourceUserId],
+  );
+  if ((gateResult.rowCount ?? 0) > 0) {
+    await client.query(
+      `DELETE FROM public.studio_ai_request_gate WHERE "userId" = $1`,
+      [sourceUserId],
+    );
+    consolidated += 1;
+  }
+
+  const dailyResult = await client.query(
+    `INSERT INTO public.studio_ai_daily_quota AS target_quota (
+       "userId", "usageDay", "requestCount", "tokenCount", "reservedTokens", "createdAt", "updatedAt"
+     )
+     SELECT $1, "usageDay", "requestCount", "tokenCount", "reservedTokens", "createdAt", "updatedAt"
+     FROM public.studio_ai_daily_quota
+     WHERE "userId" = $2
+     ON CONFLICT ("userId", "usageDay") DO UPDATE SET
+       "requestCount" = target_quota."requestCount" + EXCLUDED."requestCount",
+       "tokenCount" = target_quota."tokenCount" + EXCLUDED."tokenCount",
+       "reservedTokens" = target_quota."reservedTokens" + EXCLUDED."reservedTokens",
+       "createdAt" = LEAST(target_quota."createdAt", EXCLUDED."createdAt"),
+       "updatedAt" = GREATEST(target_quota."updatedAt", EXCLUDED."updatedAt")
+     RETURNING "usageDay"`,
+    [targetUserId, sourceUserId],
+  );
+  if ((dailyResult.rowCount ?? 0) > 0) {
+    await client.query(
+      `DELETE FROM public.studio_ai_daily_quota WHERE "userId" = $1`,
+      [sourceUserId],
+    );
+    consolidated += dailyResult.rowCount ?? 0;
+  }
+  return consolidated;
+}
+
+async function transferReferences(
+  client: PoolClient,
+  sourceUserId: string,
+  targetUserId: string,
+  references: readonly UserReference[],
+): Promise<{ transferredRecordCount: number; deduplicatedRecordCount: number }> {
+  let transferredRecordCount = 0;
+  let deduplicatedRecordCount = 0;
   for (const reference of references) {
     const countResult = await client.query<{ count: string }>(
       `SELECT count(*)::text AS count
@@ -340,15 +630,21 @@ async function transferReferences(
       [sourceUserId],
     );
     if (Number(countResult.rows[0]?.count ?? 0) === 0) continue;
+    deduplicatedRecordCount += await deduplicateReferenceRecords(
+      client,
+      sourceUserId,
+      targetUserId,
+      reference,
+    );
     const result = await client.query(
       `UPDATE ${quoteIdentifier(reference.schemaName)}.${quoteIdentifier(reference.tableName)}
        SET ${quoteIdentifier(reference.columnName)} = $1
        WHERE ${quoteIdentifier(reference.columnName)} = $2`,
       [targetUserId, sourceUserId],
     );
-    transferred += result.rowCount ?? 0;
+    transferredRecordCount += result.rowCount ?? 0;
   }
-  return transferred;
+  return { transferredRecordCount, deduplicatedRecordCount };
 }
 
 async function prepareMerge(
@@ -462,30 +758,45 @@ export async function previewAccountMerge(
     const prepared = await prepareMerge(client, targetUserId, token);
     const references = await discoverUserReferences(client);
     await assertTransferPermissions(client, prepared.source.id, references);
-    const affectedRecordCount = await countTransferableRecords(
-      client,
-      prepared.source.id,
-      references,
-    );
+    const [affectedRecordCount, deduplicatedRecordCount] = await Promise.all([
+      countTransferableRecords(client, prepared.source.id, references),
+      countDeduplicatedRecords(
+        client,
+        prepared.source.id,
+        prepared.target.id,
+        references,
+      ),
+    ]);
+    const profilePreview = (user: AccountMergeUserRow): AccountMergeProfilePreview => ({
+      name: user.name,
+      image: user.image,
+      avatar: user.avatar,
+      bio: user.bio,
+    });
     return {
       source: {
         id: prepared.source.id,
         name: prepared.source.name,
         email: maskAccountMergeEmail(prepared.source.email),
         providers: prepared.sourceProviders,
+        profile: profilePreview(prepared.source),
       },
       target: {
         id: prepared.target.id,
         name: prepared.target.name,
         email: maskAccountMergeEmail(prepared.target.email),
         providers: prepared.targetProviders,
+        profile: profilePreview(prepared.target),
       },
       affectedRecordCount,
+      deduplicatedRecordCount,
       expiresAt: prepared.grant.expiresAt.toISOString(),
       warnings: [
-        "통합 후 보조 계정의 프로젝트·에셋·활동 소유권과 로그인 수단은 현재 계정으로 이전돼요.",
+        "프로젝트·에셋·구매·활동 소유권과 로그인 수단은 유지할 계정으로 이전돼요.",
+        "좋아요·북마크·팔로우처럼 같은 항목이 겹쳐도 의미가 같은 데이터는 중복을 제거한 뒤 합쳐요.",
+        "AI 일일 사용량과 최근 요청 제한은 두 계정의 사용량을 합쳐 무료 한도가 초기화되지 않아요.",
+        "리뷰·평점·멤버 역할처럼 자동 선택하면 의미가 달라지는 충돌은 전체 통합을 중단해요.",
         "운영·신고·감사 기록의 작성자 식별자는 보조 계정에 그대로 남아 이력을 보존해요.",
-        "중복 고유 데이터가 발견되면 전체 작업을 취소하고 어떤 데이터도 변경하지 않아요.",
       ],
     };
   } finally {
@@ -496,15 +807,22 @@ export async function previewAccountMerge(
 export async function confirmAccountMerge(
   targetUserId: string,
   token: string,
+  options: { profilePreference?: unknown } = {},
 ): Promise<{
   sourceUserId: string;
   targetUserId: string;
   sourceSessionVersion: number;
   targetSessionVersion: number;
   transferredRecordCount: number;
+  deduplicatedRecordCount: number;
+  consolidatedQuotaRecordCount: number;
+  profilePreference: AccountMergeProfilePreference;
   providers: string[];
 }> {
   const client = await dbPool.connect();
+  const profilePreference = normalizeAccountMergeProfilePreference(
+    options.profilePreference,
+  );
   try {
     await client.query("BEGIN");
     const prepared = await prepareMerge(client, targetUserId, token, { lock: true });
@@ -512,13 +830,27 @@ export async function confirmAccountMerge(
     await assertTransferPermissions(client, prepared.source.id, references);
 
     let transferredRecordCount: number;
+    let deduplicatedRecordCount: number;
+    let consolidatedQuotaRecordCount: number;
     try {
-      transferredRecordCount = await transferReferences(
+      await assertStudioAiMergeReady(
+        client,
+        prepared.source.id,
+        prepared.target.id,
+      );
+      consolidatedQuotaRecordCount = await consolidateStudioAiUsageState(
+        client,
+        prepared.source.id,
+        prepared.target.id,
+      );
+      const transferred = await transferReferences(
         client,
         prepared.source.id,
         prepared.target.id,
         references,
       );
+      transferredRecordCount = transferred.transferredRecordCount;
+      deduplicatedRecordCount = transferred.deduplicatedRecordCount;
       const accountTransfer = await client.query(
         `UPDATE public.account SET "userId" = $1 WHERE "userId" = $2`,
         [prepared.target.id, prepared.source.id],
@@ -551,13 +883,34 @@ export async function confirmAccountMerge(
       ]],
     );
 
-    const targetUpdate = await client.query<{ sessionVersion: number }>(
-      `UPDATE public."user"
-       SET "sessionVersion" = "sessionVersion" + 1
-       WHERE id = $1
-       RETURNING "sessionVersion"`,
-      [prepared.target.id],
-    );
+    const targetUpdate = profilePreference === "source"
+      ? await client.query<{ sessionVersion: number }>(
+          `UPDATE public."user"
+           SET
+             name = $2,
+             image = $3,
+             avatar = $4,
+             bio = $5,
+             "creatorRoleProfile" = $6::jsonb,
+             "sessionVersion" = "sessionVersion" + 1
+           WHERE id = $1
+           RETURNING "sessionVersion"`,
+          [
+            prepared.target.id,
+            prepared.source.name,
+            prepared.source.image,
+            prepared.source.avatar,
+            prepared.source.bio,
+            JSON.stringify(prepared.source.creatorRoleProfile ?? {}),
+          ],
+        )
+      : await client.query<{ sessionVersion: number }>(
+          `UPDATE public."user"
+           SET "sessionVersion" = "sessionVersion" + 1
+           WHERE id = $1
+           RETURNING "sessionVersion"`,
+          [prepared.target.id],
+        );
     const mergedEmail = `merged+${prepared.source.id}.${Date.now()}@merged.local`.slice(0, 240);
     const sourceUpdate = await client.query<{ sessionVersion: number }>(
       `UPDATE public."user"
@@ -596,6 +949,9 @@ export async function confirmAccountMerge(
         prepared.target.id,
         JSON.stringify({
           transferredRecordCount,
+          deduplicatedRecordCount,
+          consolidatedQuotaRecordCount,
+          profilePreference,
           providers,
         }),
         prepared.grant.id,
@@ -609,6 +965,9 @@ export async function confirmAccountMerge(
       sourceSessionVersion,
       targetSessionVersion,
       transferredRecordCount,
+      deduplicatedRecordCount,
+      consolidatedQuotaRecordCount,
+      profilePreference,
       providers,
     };
   } catch (error) {
