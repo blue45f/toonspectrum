@@ -90,6 +90,7 @@ import {
   StudioPublishContextBanner,
   type PublishContext,
 } from "./StudioPublishContextBanner";
+import { StudioPublishVisualJourney } from "./StudioPublishVisualJourney";
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -956,7 +957,8 @@ export function StudioPublishingCommandCenter({
   const cover = pages[0]?.src ?? null;
 
   return (
-    <Container size="wide" className={STUDIO_UPLOAD_CONTAINER_CLASS}>
+    <div data-route-ready="studio-publish">
+      <Container size="wide" className={STUDIO_UPLOAD_CONTAINER_CLASS}>
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <Link
           href="/create"
@@ -1005,6 +1007,12 @@ export function StudioPublishingCommandCenter({
           </div>
         </div>
       </header>
+
+      <StudioPublishVisualJourney
+        activeStep={step}
+        disabled={workspaceLocked}
+        onSelect={(nextStep) => setStep(nextStep)}
+      />
 
       <StudioPublishContextBanner context={publishContext} />
 
@@ -1287,6 +1295,7 @@ export function StudioPublishingCommandCenter({
           </button>
         )}
       </div>
-    </Container>
+      </Container>
+    </div>
   );
 }

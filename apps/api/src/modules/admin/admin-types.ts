@@ -62,7 +62,7 @@ export type DashboardResponse = {
 
 export const ADMIN_ROLES = new Set<AdminRole>(["admin", "operator"]);
 
-export const MEMBER_STATUSES = new Set<MemberStatus>(["active", "suspended", "deleted"]);
+export const MEMBER_STATUSES = new Set<MemberStatus>(["active", "suspended", "deleted", "merged"]);
 
 export const REVENUE_STATUSES: ReadonlyArray<RevenueStatus> = ["pending", "approved", "paid", "rejected", "revoked"];
 

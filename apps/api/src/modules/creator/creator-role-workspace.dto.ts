@@ -12,6 +12,7 @@ import {
   CREATOR_ROLE_NOTIFICATION_PRESETS,
   CREATOR_ROLE_USAGE_GOALS,
   CREATOR_ROLE_WORKSPACE_PRESETS,
+  CREATOR_WORKSPACE_MODES,
   isCreatorRoleProjectKey,
 } from "../../../../web/src/shared/lib/creator-role-workspace-contract";
 
@@ -73,6 +74,7 @@ export const CreatorRoleWorkspaceDocumentSchema = z.object({
   usageGoals: z.array(z.enum(CREATOR_ROLE_USAGE_GOALS))
     .max(CREATOR_ROLE_USAGE_GOALS.length)
     .refine((items) => new Set(items).size === items.length),
+  workspaceMode: z.enum(CREATOR_WORKSPACE_MODES).default("creator"),
   capacity: CapacitySchema,
   visibility: VisibilitySchema,
   customRoleLabel: z.string().trim().min(1).max(48).nullable(),

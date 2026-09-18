@@ -30,12 +30,11 @@ import {
   type StudioPluginPermission,
 } from "../studio-plugin-registry";
 import Link from "@/compat/router-link";
+import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
-type Locale = "ko" | "en";
-
 const DESTINATION_LABELS: Readonly<
-  Record<StudioAssetDestination, Readonly<Record<Locale, string>>>
+  Record<StudioAssetDestination, BilingualText>
 > = {
   internal: { ko: "프로젝트 안에서만", en: "Inside project only" },
   webtoon: { ko: "웹툰 공개", en: "Webtoon publishing" },
@@ -48,7 +47,7 @@ const DESTINATION_LABELS: Readonly<
 };
 
 const PERMISSION_LABELS: Readonly<
-  Record<StudioPluginPermission, Readonly<Record<Locale, string>>>
+  Record<StudioPluginPermission, BilingualText>
 > = {
   "document-read": { ko: "문서 읽기", en: "Read documents" },
   "document-write": { ko: "문서 수정", en: "Edit documents" },
@@ -70,7 +69,7 @@ function tone(status: string): string {
   return "border-warning/35 bg-warning-soft/15 text-warning";
 }
 
-function statusLabel(status: string, locale: Locale): string {
+function statusLabel(status: string, localize: (ko: string, en: string) => string): string {
   const ko: Readonly<Record<string, string>> = {
     ready: "사용 가능",
     allowed: "사용 가능",
@@ -89,7 +88,9 @@ function statusLabel(status: string, locale: Locale): string {
     confirmation: "Confirmation needed",
     blocked: "Blocked",
   };
-  return (locale === "ko" ? ko[status] : en[status]) ?? status;
+  const koLabel = ko[status];
+  const enLabel = en[status];
+  return koLabel && enLabel ? localize(koLabel, enLabel) : status;
 }
 
 function StatusCard({
@@ -103,8 +104,9 @@ function StatusCard({
   readonly label: string;
   readonly status: string;
   readonly description: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
+  const l = useBilingualLocalizer("studioAssetGovernance.status");
   return (
     <article className="rounded-2xl border border-line bg-panel p-4">
       <div className="flex items-start justify-between gap-3">
@@ -112,7 +114,7 @@ function StatusCard({
           <Icon size={17} aria-hidden="true" />
         </span>
         <span className={cn("rounded-full border px-2.5 py-1 text-[0.65rem] font-black", tone(status))}>
-          {statusLabel(status, locale)}
+          {statusLabel(status, l)}
         </span>
       </div>
       <h3 className="mt-3 text-sm font-black text-fg">{label}</h3>
@@ -172,8 +174,9 @@ export function StudioAssetGovernancePanel({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
+  const l = useBilingualLocalizer("studioAssetGovernance");
   const [evaluatedAt, setEvaluatedAt] = useState(() => new Date().toISOString());
   const [preferences, setPreferences] = useState<StudioAssetGovernancePreferences>(
     createDefaultStudioAssetGovernancePreferences,
@@ -202,7 +205,7 @@ export function StudioAssetGovernancePanel({
       );
     setPreferences(normalized);
     setEvaluatedAt(new Date().toISOString());
-    setSavedMessage(locale === "ko" ? "현재 프로젝트 기준을 저장했습니다." : "Saved project asset rules.");
+    setSavedMessage(l("현재 프로젝트 기준을 저장했습니다.", "Saved project asset rules."));
   };
 
   const patch = <K extends keyof StudioAssetGovernancePreferences>(
@@ -217,7 +220,7 @@ export function StudioAssetGovernancePanel({
     patch("confirmedPluginPermissions", STUDIO_PLUGIN_PERMISSIONS.filter((item) => current.has(item)));
   };
 
-  const summaryCopy: Readonly<Record<StudioAssetGovernanceStatus, Readonly<Record<Locale, string>>>> = {
+  const summaryCopy: Readonly<Record<StudioAssetGovernanceStatus, BilingualText>> = {
     ready: {
       ko: "현재 목적에 맞는 품질과 사용 조건을 확인했습니다.",
       en: "Quality and usage conditions match the current purpose.",
@@ -240,16 +243,14 @@ export function StudioAssetGovernancePanel({
             <ShieldCheck size={14} aria-hidden="true" /> ASSET SAFETY
           </p>
           <h2 id="asset-governance-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
-            {locale === "ko" ? "어디에 사용할지만 알려 주세요" : "Tell us where the asset will be used"}
+            {l("어디에 사용할지만 알려 주세요", "Tell us where the asset will be used")}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">
-            {locale === "ko"
-              ? "파일 품질, 팀 좌석, 상업 이용, 글꼴, 출처, AI 참조와 확장 기능 권한을 자동으로 함께 확인합니다. 라이선스 문구 대신 지금 할 수 있는 행동을 보여 줍니다."
-              : "Check file quality, seats, commercial use, fonts, provenance, AI reference and extension permissions together, then show actionable results instead of legal codes."}
+            {l("파일 품질, 팀 좌석, 상업 이용, 글꼴, 출처, AI 참조와 확장 기능 권한을 자동으로 함께 확인합니다. 라이선스 문구 대신 지금 할 수 있는 행동을 보여 줍니다.", "Check file quality, seats, commercial use, fonts, provenance, AI reference and extension permissions together, then show actionable results instead of legal codes.")}
           </p>
         </div>
         <span className={cn("inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-black", tone(report.status))}>
-          {summaryCopy[report.status][locale]}
+          {l(summaryCopy[report.status].ko, summaryCopy[report.status].en)}
         </span>
       </div>
 
@@ -262,7 +263,7 @@ export function StudioAssetGovernancePanel({
       <div className="mt-5 grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
         <div className="space-y-4">
           <label className="block text-xs font-black text-fg-2">
-            {locale === "ko" ? "사용 목적" : "Destination"}
+            {l("사용 목적", "Destination")}
             <select
               value={preferences.destination}
               onChange={(event) => patch("destination", event.target.value as StudioAssetDestination)}
@@ -270,13 +271,13 @@ export function StudioAssetGovernancePanel({
             >
               {STUDIO_ASSET_DESTINATIONS.map((destination) => (
                 <option key={destination} value={destination}>
-                  {DESTINATION_LABELS[destination][locale]}
+                  {l(DESTINATION_LABELS[destination].ko, DESTINATION_LABELS[destination].en)}
                 </option>
               ))}
             </select>
           </label>
           <label className="block text-xs font-black text-fg-2">
-            {locale === "ko" ? "함께 쓰는 사람" : "Team seats"}
+            {l("함께 쓰는 사람", "Team seats")}
             <input
               type="number"
               min={1}
@@ -288,20 +289,20 @@ export function StudioAssetGovernancePanel({
           </label>
           <CheckOption
             checked={preferences.providerAccountConnected}
-            label={locale === "ko" ? "구매한 계정 연결됨" : "Purchased account connected"}
-            description={locale === "ko" ? "구매 내역과 사용 좌석을 확인합니다." : "Verify purchase history and licensed seats."}
+            label={l("구매한 계정 연결됨", "Purchased account connected")}
+            description={l("구매 내역과 사용 좌석을 확인합니다.", "Verify purchase history and licensed seats.")}
             onChange={(checked) => patch("providerAccountConnected", checked)}
           />
           <CheckOption
             checked={preferences.attributionIncluded}
-            label={locale === "ko" ? "필요한 출처 문구 포함" : "Required credits included"}
-            description={locale === "ko" ? "출력 패키지에 필요한 출처를 자동으로 모읍니다." : "Collect required credits in the export package."}
+            label={l("필요한 출처 문구 포함", "Required credits included")}
+            description={l("출력 패키지에 필요한 출처를 자동으로 모읍니다.", "Collect required credits in the export package.")}
             onChange={(checked) => patch("attributionIncluded", checked)}
           />
           <CheckOption
             checked={preferences.sourceReferencesCleared}
-            label={locale === "ko" ? "참조 원본 사용 권리 확인" : "Reference rights cleared"}
-            description={locale === "ko" ? "AI 보조·생성 에셋의 참조 원본을 확인했습니다." : "Reference material for AI-assisted assets is cleared."}
+            label={l("참조 원본 사용 권리 확인", "Reference rights cleared")}
+            description={l("AI 보조·생성 에셋의 참조 원본을 확인했습니다.", "Reference material for AI-assisted assets is cleared.")}
             onChange={(checked) => patch("sourceReferencesCleared", checked)}
           />
         </div>
@@ -310,52 +311,44 @@ export function StudioAssetGovernancePanel({
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <StatusCard
               icon={FileCheck2}
-              label={locale === "ko" ? "파일 품질·호환성" : "File quality & compatibility"}
+              label={l("파일 품질·호환성", "File quality & compatibility")}
               status={report.usage.status}
-              description={locale === "ko" ? report.usage.summaryKo : report.usage.summaryEn}
+              description={l(report.usage.summaryKo, report.usage.summaryEn)}
               locale={locale}
             />
             <StatusCard
               icon={Cloud}
-              label={locale === "ko" ? "구매·설치 확인" : "Purchase & installation"}
+              label={l("구매·설치 확인", "Purchase & installation")}
               status={report.entitlement.status === "active" ? report.provider.status : report.entitlement.status}
-              description={locale === "ko" ? report.provider.messageKo : report.provider.messageEn}
+              description={l(report.provider.messageKo, report.provider.messageEn)}
               locale={locale}
             />
             <StatusCard
               icon={KeyRound}
-              label={locale === "ko" ? "사용 권리·출처" : "Rights & provenance"}
+              label={l("사용 권리·출처", "Rights & provenance")}
               status={report.rights.status}
-              description={locale === "ko"
-                ? `${report.rights.entries.length}개 사용 항목과 ${report.attributionTexts.length}개 출처 문구를 확인했습니다.`
-                : `Checked ${report.rights.entries.length} usage entries and ${report.attributionTexts.length} attribution statements.`}
+              description={l(`${report.rights.entries.length}개 사용 항목과 ${report.attributionTexts.length}개 출처 문구를 확인했습니다.`, `Checked ${report.rights.entries.length} usage entries and ${report.attributionTexts.length} attribution statements.`)}
               locale={locale}
             />
             <StatusCard
               icon={Type}
-              label={locale === "ko" ? "글꼴·글리프" : "Fonts & glyphs"}
+              label={l("글꼴·글리프", "Fonts & glyphs")}
               status={report.fonts.status}
-              description={locale === "ko"
-                ? `${report.fonts.fontIds.length}개 글꼴의 언어·임베딩·용도를 검사합니다.`
-                : `Check language, embedding and destination rights for ${report.fonts.fontIds.length} fonts.`}
+              description={l(`${report.fonts.fontIds.length}개 글꼴의 언어·임베딩·용도를 검사합니다.`, `Check language, embedding and destination rights for ${report.fonts.fontIds.length} fonts.`)}
               locale={locale}
             />
             <StatusCard
               icon={Plug}
-              label={locale === "ko" ? "확장 기능 권한" : "Extension permissions"}
+              label={l("확장 기능 권한", "Extension permissions")}
               status={report.plugin.status}
-              description={locale === "ko"
-                ? `${report.plugin.confirmationPermissions.length}개 권한 확인이 필요합니다.`
-                : `${report.plugin.confirmationPermissions.length} permissions need confirmation.`}
+              description={l(`${report.plugin.confirmationPermissions.length}개 권한 확인이 필요합니다.`, `${report.plugin.confirmationPermissions.length} permissions need confirmation.`)}
               locale={locale}
             />
             <StatusCard
               icon={Store}
-              label={locale === "ko" ? "마켓 등록 준비" : "Marketplace readiness"}
+              label={l("마켓 등록 준비", "Marketplace readiness")}
               status={report.marketplace.status}
-              description={locale === "ko"
-                ? `${report.marketplace.findings.length}개 품질·미리보기·출처 항목을 확인했습니다.`
-                : `Checked ${report.marketplace.findings.length} quality, preview and provenance findings.`}
+              description={l(`${report.marketplace.findings.length}개 품질·미리보기·출처 항목을 확인했습니다.`, `Checked ${report.marketplace.findings.length} quality, preview and provenance findings.`)}
               locale={locale}
             />
           </div>
@@ -364,20 +357,18 @@ export function StudioAssetGovernancePanel({
             <div className="mt-4 rounded-2xl border border-line bg-panel/55 p-4">
               <h3 className="flex items-center gap-2 text-sm font-black text-fg">
                 <Plug size={16} className="text-accent" aria-hidden="true" />
-                {locale === "ko" ? "확장 기능이 요청한 권한" : "Permissions requested by extension"}
+                {l("확장 기능이 요청한 권한", "Permissions requested by extension")}
               </h3>
               <p className="mt-1 text-xs leading-5 text-fg-3">
-                {locale === "ko"
-                  ? "읽기 권한은 자동으로 제한하고, 수정·외부 연결·게시처럼 영향이 큰 기능만 직접 허용합니다."
-                  : "Read access is constrained automatically. Only editing, external connection and publishing require approval."}
+                {l("읽기 권한은 자동으로 제한하고, 수정·외부 연결·게시처럼 영향이 큰 기능만 직접 허용합니다.", "Read access is constrained automatically. Only editing, external connection and publishing require approval.")}
               </p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {report.plugin.confirmationPermissions.map((permission) => (
                   <CheckOption
                     key={permission}
                     checked={preferences.confirmedPluginPermissions.includes(permission)}
-                    label={PERMISSION_LABELS[permission][locale]}
-                    description={locale === "ko" ? "이 프로젝트에서만 허용합니다." : "Allow only in this project."}
+                    label={l(PERMISSION_LABELS[permission].ko, PERMISSION_LABELS[permission].en)}
+                    description={l("이 프로젝트에서만 허용합니다.", "Allow only in this project.")}
                     onChange={(checked) => togglePermission(permission, checked)}
                   />
                 ))}
@@ -387,37 +378,37 @@ export function StudioAssetGovernancePanel({
 
           <details className="mt-4 rounded-2xl border border-line bg-panel/45 p-4">
             <summary className="min-h-10 cursor-pointer text-sm font-black text-fg">
-              {locale === "ko" ? "전문 사용 범위" : "Advanced usage scope"}
+              {l("전문 사용 범위", "Advanced usage scope")}
             </summary>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <CheckOption
                 checked={preferences.commercial}
-                label={locale === "ko" ? "상업 프로젝트" : "Commercial project"}
-                description={locale === "ko" ? "유료 연재·광고·클라이언트 작업을 포함합니다." : "Includes paid publishing, ads and client work."}
+                label={l("상업 프로젝트", "Commercial project")}
+                description={l("유료 연재·광고·클라이언트 작업을 포함합니다.", "Includes paid publishing, ads and client work.")}
                 onChange={(checked) => patch("commercial", checked)}
               />
               <CheckOption
                 checked={preferences.modifiesAsset}
-                label={locale === "ko" ? "에셋 편집·변형" : "Modify the asset"}
-                description={locale === "ko" ? "색상·형태·레이어를 바꾸어 사용합니다." : "Change colors, shape or layers."}
+                label={l("에셋 편집·변형", "Modify the asset")}
+                description={l("색상·형태·레이어를 바꾸어 사용합니다.", "Change colors, shape or layers.")}
                 onChange={(checked) => patch("modifiesAsset", checked)}
               />
               <CheckOption
                 checked={preferences.deliversSourceFiles}
-                label={locale === "ko" ? "원본 파일도 전달" : "Deliver source files"}
-                description={locale === "ko" ? "클라이언트나 팀에 편집 가능한 원본을 전달합니다." : "Deliver editable sources to clients or teammates."}
+                label={l("원본 파일도 전달", "Deliver source files")}
+                description={l("클라이언트나 팀에 편집 가능한 원본을 전달합니다.", "Deliver editable sources to clients or teammates.")}
                 onChange={(checked) => patch("deliversSourceFiles", checked)}
               />
               <CheckOption
                 checked={preferences.usesAsAiReference}
-                label={locale === "ko" ? "AI 생성 참고로 사용" : "Use as AI generation reference"}
-                description={locale === "ko" ? "생성 결과의 구도·캐릭터·스타일 참고에 사용합니다." : "Use as composition, character or style reference."}
+                label={l("AI 생성 참고로 사용", "Use as AI generation reference")}
+                description={l("생성 결과의 구도·캐릭터·스타일 참고에 사용합니다.", "Use as composition, character or style reference.")}
                 onChange={(checked) => patch("usesAsAiReference", checked)}
               />
               <CheckOption
                 checked={preferences.usesForAiTraining}
-                label={locale === "ko" ? "AI 학습에 사용" : "Use for AI training"}
-                description={locale === "ko" ? "대부분의 구매 에셋은 허용하지 않으므로 별도 확인합니다." : "Most purchased assets do not allow this and require separate review."}
+                label={l("AI 학습에 사용", "Use for AI training")}
+                description={l("대부분의 구매 에셋은 허용하지 않으므로 별도 확인합니다.", "Most purchased assets do not allow this and require separate review.")}
                 onChange={(checked) => patch("usesForAiTraining", checked)}
               />
             </div>
@@ -427,7 +418,7 @@ export function StudioAssetGovernancePanel({
             <div className="mt-4 rounded-2xl border border-success/25 bg-success-soft/10 p-4">
               <h3 className="flex items-center gap-2 text-sm font-black text-fg">
                 <BadgeCheck size={16} className="text-success" aria-hidden="true" />
-                {locale === "ko" ? "출력에 포함할 출처" : "Credits included in output"}
+                {l("출력에 포함할 출처", "Credits included in output")}
               </h3>
               <ul className="mt-2 space-y-1 text-xs leading-5 text-fg-2">
                 {report.attributionTexts.map((text) => <li key={text}>• {text}</li>)}
@@ -439,9 +430,7 @@ export function StudioAssetGovernancePanel({
             <div className="mt-4 flex items-start gap-3 rounded-2xl border border-warning/30 bg-warning-soft/12 p-4">
               <CircleAlert size={18} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
               <p className="text-xs leading-5 text-fg-2">
-                {locale === "ko"
-                  ? `수정이 필요한 항목 ${report.blockingCount}개, 조건 확인 ${report.reviewCount}개가 있습니다. 사용 목적이나 연결 상태를 바꾸면 즉시 다시 계산합니다.`
-                  : `${report.blockingCount} blocking and ${report.reviewCount} review items remain. Results update immediately when usage or connection choices change.`}
+                {l(`수정이 필요한 항목 ${report.blockingCount}개, 조건 확인 ${report.reviewCount}개가 있습니다. 사용 목적이나 연결 상태를 바꾸면 즉시 다시 계산합니다.`, `${report.blockingCount} blocking and ${report.reviewCount} review items remain. Results update immediately when usage or connection choices change.`)}
               </p>
             </div>
           ) : null}
@@ -450,16 +439,14 @@ export function StudioAssetGovernancePanel({
             <div className="flex items-start gap-3">
               <ShieldCheck size={18} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
               <p className="text-xs leading-5 text-fg-2">
-                {locale === "ko"
-                  ? "이 확인은 프로젝트의 사용 목적과 권리 조건을 정리하는 도구입니다. 작품·원고·원본 파일의 권리를 서비스로 이전하지 않습니다."
-                  : "This review organises project usage and rights conditions. It does not transfer ownership of artwork, manuscripts or source files to the service."}
+                {l("이 확인은 프로젝트의 사용 목적과 권리 조건을 정리하는 도구입니다. 작품·원고·원본 파일의 권리를 서비스로 이전하지 않습니다.", "This review organises project usage and rights conditions. It does not transfer ownership of artwork, manuscripts or source files to the service.")}
               </p>
             </div>
             <Link
               href="/about/principles"
               className="inline-flex min-h-10 shrink-0 items-center gap-2 text-xs font-black text-accent hover:text-accent-2"
             >
-              {locale === "ko" ? "제품 원칙 보기" : "View product principles"}
+              {l("제품 원칙 보기", "View product principles")}
               <ArrowRight size={14} aria-hidden="true" />
             </Link>
           </div>

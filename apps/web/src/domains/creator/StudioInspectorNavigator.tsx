@@ -52,6 +52,7 @@ import {
 import { STUDIO_FOCUS_RING, StudioContextPill } from "./studio-panel-ui";
 
 import { useT } from "@/shared/lib/i18n";
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
 export interface StudioInspectorNavigatorProps {
@@ -574,22 +575,7 @@ export function StudioInspectorNavigator({
                 {copy("compactTabsHint")}
               </span>
             </span>
-            <span
-              aria-hidden
-              className={cn(
-                "relative h-5 w-9 shrink-0 rounded-full border transition-colors",
-                panelState.compactPrimaryTabs
-                  ? "border-accent bg-accent"
-                  : "border-line-strong bg-canvas",
-              )}
-            >
-              <span
-                className={cn(
-                  "absolute top-0.5 size-3.5 rounded-full bg-panel shadow transition-transform",
-                  panelState.compactPrimaryTabs ? "translate-x-[1.125rem]" : "translate-x-0.5",
-                )}
-              />
-            </span>
+            <SwitchIndicator checked={panelState.compactPrimaryTabs} />
           </button>
           <div className="mt-2 flex items-center justify-between gap-2 border-t border-line/60 pt-2">
             <p className="min-w-0 text-[0.6875rem] leading-relaxed text-fg-3">

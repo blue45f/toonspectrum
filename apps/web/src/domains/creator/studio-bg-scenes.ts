@@ -730,8 +730,14 @@ export const CURATED_CC0_BG_SCENES: readonly BgScene[] = Object.freeze(
  * These scenes are intentionally absent from the default picker because they are small, visually
  * awkward, contain baked-in people/text, or do not have a sufficiently clear source record.
  */
+const GENERATED_GPT25_REPLACEMENT_IDS = new Set(
+  GENERATED_GPT25_BG_SCENES.map((scene) => scene.id),
+);
+
 export const BG_SCENE_COMPATIBILITY_LIBRARY: readonly BgScene[] = Object.freeze(
-  LEGACY_RASTER_BG_SCENES.filter((scene) => !isRecommendedStudio2dScene(scene)),
+  LEGACY_RASTER_BG_SCENES.filter(
+    (scene) => !GENERATED_GPT25_REPLACEMENT_IDS.has(scene.id) && !isRecommendedStudio2dScene(scene),
+  ),
 );
 
 const REVIEWED_LEGACY_BG_SCENES = LEGACY_RASTER_BG_SCENES.filter(isRecommendedStudio2dScene);

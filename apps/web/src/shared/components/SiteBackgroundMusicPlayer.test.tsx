@@ -68,7 +68,7 @@ function renderAt(pathname: string, suspended = false) {
 }
 
 function expandPlayer() {
-  const theme = screen.getByText(/트렌드 시티팝|툰스튜디오 오프닝|소재 마켓 그루브/u);
+  const theme = screen.getByText(/청춘 드라이브|툰스튜디오 오프닝|소재 탐험 테마/u);
   const button = theme.closest("button");
   if (!button) throw new Error("player toggle not found");
   fireEvent.click(button);
@@ -77,6 +77,7 @@ function expandPlayer() {
 describe("SiteBackgroundMusicPlayer", () => {
   beforeEach(() => {
     localStorage.clear();
+    localStorage.setItem("ts_site_bgm_source", "focus-instrumental");
     vi.clearAllMocks();
     mocks.resumeAudio.mockResolvedValue(undefined);
   });
@@ -89,10 +90,10 @@ describe("SiteBackgroundMusicPlayer", () => {
   it("selects the route theme and starts only after an explicit play gesture", async () => {
     renderAt("/ranking");
     expect(screen.getByTestId("site-background-music-player")).toBeTruthy();
-    expect(screen.getByText("트렌드 시티팝")).toBeTruthy();
+    expect(screen.getByText("청춘 드라이브")).toBeTruthy();
     await waitFor(() => expect(mocks.setMood).toHaveBeenCalledWith("citypop"));
 
-    fireEvent.click(screen.getByRole("button", { name: "배경음악 재생" }));
+    fireEvent.click(screen.getByRole("button", { name: "OST 재생" }));
     await waitFor(() => {
       expect(mocks.resumeAudio).toHaveBeenCalledTimes(1);
       expect(mocks.setEnabled).toHaveBeenCalledWith(true);
@@ -101,8 +102,8 @@ describe("SiteBackgroundMusicPlayer", () => {
 
   it("keeps both compact controls at the 44px touch-target minimum", () => {
     renderAt("/");
-    expect(screen.getByRole("button", { name: "배경음악 재생" }).className).toContain("size-11");
-    expect(screen.getByRole("button", { name: /페이지 테마 연주/u }).className).toContain("min-h-11");
+    expect(screen.getByRole("button", { name: "OST 재생" }).className).toContain("size-11");
+    expect(screen.getByRole("button", { name: /집중용 인스트/u }).className).toContain("min-h-11");
   });
 
   it("lets the listener override page following, theme and dedicated BGM volume", () => {
@@ -113,38 +114,36 @@ describe("SiteBackgroundMusicPlayer", () => {
     expect(mocks.setMood).toHaveBeenLastCalledWith("mystery_noir");
     expect(localStorage.getItem("ts_site_bgm_follow_route")).toBe("0");
 
-    fireEvent.change(screen.getByLabelText("배경음악 음량"), { target: { value: "0.7" } });
+    fireEvent.change(screen.getByLabelText("OST 음량"), { target: { value: "0.7" } });
     expect(mocks.setVolume).toHaveBeenCalledWith(0.7);
   });
 
-  it("loads the reviewed hosted OST manifest only when vocal OST is selected", async () => {
+  it("loads role-aware OST metadata only when original OST mode is selected", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
         tracks: [{
-          src: "/audio/theme.mp3",
-          title: "Licensed theme",
-          artist: "Artist",
-          license: "Approved license",
-          creditUrl: "https://example.com/credit",
+          id: "opening-original", src: "/audio/theme.mp3", title: "Original opening", artist: "ToonSpectrum",
+          role: "opening", origin: "original", vocalMode: "vocal", language: "ko",
+          summary: "Original anime opening", license: "ToonSpectrum original", creditUrl: "https://example.com/credit",
         }],
       }),
     }));
 
     renderAt("/market");
     expandPlayer();
-    fireEvent.click(screen.getByRole("button", { name: /고품질 보컬 OST/u }));
+    fireEvent.click(screen.getByRole("button", { name: /오리지널 애니 OST/u }));
 
     await waitFor(() => expect(mocks.register).toHaveBeenCalledWith([
       {
         url: "/audio/theme.mp3",
-        label: "Licensed theme",
-        artist: "Artist",
+        label: "Original opening",
+        artist: "ToonSpectrum",
         creditUrl: "https://example.com/credit",
       },
     ]));
     await waitFor(() => expect(mocks.setMood).toHaveBeenCalledWith("playlist:0"));
-    expect(localStorage.getItem("ts_site_bgm_source")).toBe("vocal-ost");
+    expect(localStorage.getItem("ts_site_bgm_source")).toBe("original-ost");
   });
 
   it("stays out of audio-producing pages and preserves the user's opt-in", () => {

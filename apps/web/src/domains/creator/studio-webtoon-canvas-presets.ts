@@ -19,8 +19,8 @@ export interface StudioWebtoonCanvasPreset {
 }
 
 /**
- * New-document webtoon canvases. The long-strip height stays consistent so switching a target
- * platform changes the authoring width/aspect without silently changing the intended episode length.
+ * Canonical webtoon platform targets for project creation, guides, export planning and explicit
+ * current-document resize. The long-strip height stays consistent across platform choices.
  */
 export const STUDIO_WEBTOON_CANVAS_PRESETS: readonly StudioWebtoonCanvasPreset[] = Object.freeze([
   {
@@ -78,4 +78,13 @@ export function studioWebtoonCanvasMagicResizePreset(
     aspectW: preset.width,
     aspectH: preset.height,
   };
+}
+
+/** Resolve a platform id directly for menu/command handlers; registry drift fails loudly. */
+export function studioWebtoonCanvasMagicResizePresetForId(
+  id: StudioWebtoonCanvasPresetId,
+): MagicResizePreset {
+  const preset = findStudioWebtoonCanvasPreset(id);
+  if (!preset) throw new Error(`Unknown webtoon canvas preset: ${id}`);
+  return studioWebtoonCanvasMagicResizePreset(preset);
 }

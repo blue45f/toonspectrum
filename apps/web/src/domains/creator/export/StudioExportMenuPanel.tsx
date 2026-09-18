@@ -68,6 +68,7 @@ import type {
 import type { StudioInkMlExportResult } from "../studio-inkml-interchange";
 import type { PsdExportResult } from "./studio-psd-export";
 import type { SvgExportResult } from "./studio-svg-export";
+import type { StudioVectorPdfExportResult } from "./studio-vector-pdf-product";
 import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 
@@ -161,6 +162,8 @@ export interface StudioExportMenuPanelProps {
    * (래스터 캡처와 달리 원본 벡터를 보존하되, 픽셀 필터·톤 등 일부는 스킵 집계로 고지.)
    */
   exportCurrentPageToSvg?: () => Promise<SvgExportResult>;
+  /** 현재 렌더 화면을 보존하면서 지원되는 펜 선화를 PDF 1.7 벡터 패스로 함께 기록합니다. */
+  exportCurrentPageToVectorPdf?: () => Promise<StudioVectorPdfExportResult>;
   /** 현재 페이지의 보이는 펜 자유곡선을 검증된 bounded InkML로 내보냅니다. */
   exportCurrentPageToInkMl?: () => Promise<StudioInkMlExportResult>;
   /** 보이는 펜 자유곡선을 ToonSpectrum bounded public-spec WILL v1 Annex B로 내보냅니다. */
@@ -205,6 +208,7 @@ export function StudioExportMenuPanel({
   capturePagesForPreset,
   capturePagesForIndices,
   exportCurrentPageToSvg,
+  exportCurrentPageToVectorPdf,
   exportCurrentPageToInkMl,
   exportCurrentPageToWillV1,
   exportCurrentPageToPsd,
@@ -217,6 +221,8 @@ export function StudioExportMenuPanel({
   // PDF 내보내기 실행 상태 — 규격 슬라이스와 독립 실행이라 상태도 따로 안내한다.
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfStatus, setPdfStatus] = useState<ExportRunStatus | null>(null);
+  const [vectorPdfBusy, setVectorPdfBusy] = useState(false);
+  const [vectorPdfStatus, setVectorPdfStatus] = useState<ExportRunStatus | null>(null);
   // SVG(벡터) 내보내기 결과 안내 — 스킵/근사 집계를 사용자에게 고지한다.
   const [svgBusy, setSvgBusy] = useState(false);
   const [svgStatus, setSvgStatus] = useState<ExportRunStatus | null>(null);
@@ -447,7 +453,7 @@ export function StudioExportMenuPanel({
   async function runOpenRasterExport() {
     if (
       !exportCurrentPageToRasterInterchange || openRasterBusy || psdBusy || svgBusy || pdfBusy ||
-      presetBusy || isExporting || contactBusy || archiveBusy !== null
+      presetBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)
     ) return;
     setOpenRasterBusy(true);
     setOpenRasterStatus({ tone: "info", text: `${openRasterFormat.toUpperCase()} 픽셀을 인코딩하는 중...` });
@@ -478,7 +484,7 @@ export function StudioExportMenuPanel({
 
   async function runArchiveExport(kind: "cbz" | "ora") {
     if (
-      archiveBusy !== null || openRasterBusy || psdBusy || svgBusy || pdfBusy || presetBusy ||
+      (archiveBusy !== null || vectorPdfBusy) || openRasterBusy || psdBusy || svgBusy || pdfBusy || presetBusy ||
       isExporting || contactBusy
     ) return;
     setArchiveBusy(kind);
@@ -570,7 +576,7 @@ export function StudioExportMenuPanel({
 
   async function runInkMlExport() {
     if (
-      !exportCurrentPageToInkMl || archiveBusy !== null || openRasterBusy || psdBusy || svgBusy ||
+      !exportCurrentPageToInkMl || (archiveBusy !== null || vectorPdfBusy) || openRasterBusy || psdBusy || svgBusy ||
       pdfBusy || presetBusy || isExporting || contactBusy
     ) return;
     setArchiveBusy("inkml");
@@ -607,7 +613,7 @@ export function StudioExportMenuPanel({
 
   async function runWillV1Export() {
     if (
-      !exportCurrentPageToWillV1 || archiveBusy !== null || openRasterBusy || psdBusy || svgBusy ||
+      !exportCurrentPageToWillV1 || (archiveBusy !== null || vectorPdfBusy) || openRasterBusy || psdBusy || svgBusy ||
       pdfBusy || presetBusy || isExporting || contactBusy
     ) return;
     setArchiveBusy("will");
@@ -668,7 +674,7 @@ export function StudioExportMenuPanel({
 
   // 선택 범위 페이지 캡처 → JPEG 인코드 → 미니멀 PDF 조립 → 한 파일 다운로드.
   async function runPdfExport() {
-    if (pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null) return;
+    if (pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)) return;
     setPdfBusy(true);
     const pendingRange = exportRangeLabel;
     setPdfStatus({
@@ -704,7 +710,7 @@ export function StudioExportMenuPanel({
   // 페이지 축소판 여러 장을 한 인쇄용 시트에 격자로 배치 → PDF 한 파일. PDF 바이트 조립은
   // exportPagesToPdf와 동일한 buildPdfFromJpegPages를 재사용(studio-pdf-contact-sheet 내부).
   async function runContactSheetExport() {
-    if (contactBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || archiveBusy !== null) return;
+    if (contactBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || (archiveBusy !== null || vectorPdfBusy)) return;
     const preset = CONTACT_SHEET_PAGE_PRESETS.find((p) => p.id === contactPagePresetId) ?? CONTACT_SHEET_PAGE_PRESETS[0];
     setContactBusy(true);
     const pendingRange = exportRangeLabel;
@@ -747,10 +753,41 @@ export function StudioExportMenuPanel({
 
   // 현재 페이지 → 벡터 SVG 한 파일. 요소 직렬화는 StudioPage(exportCurrentPageToSvg)가 하고,
   // 여기선 Blob 다운로드 + 스킵/근사 고지만 담당한다.
+  async function runVectorPdfExport() {
+    if (
+      !exportCurrentPageToVectorPdf || vectorPdfBusy || openRasterBusy || pdfBusy || presetBusy ||
+      psdBusy || svgBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)
+    ) return;
+    setVectorPdfBusy(true);
+    setVectorPdfStatus({ tone: "info", text: "PDF 1.7 벡터 선화 출고를 준비하는 중…" });
+    try {
+      const result = await exportCurrentPageToVectorPdf();
+      if (!mountedRef.current) return;
+      const owned = new Uint8Array(result.bytes.byteLength);
+      owned.set(result.bytes);
+      downloadBlob(
+        new Blob([owned.buffer], { type: "application/pdf" }),
+        `${safeExportBaseName(exportTitle)}.vector.pdf`,
+      );
+      setVectorPdfStatus({
+        tone: result.skippedStrokeCount > 0 || result.warnings.length > 1 ? "warn" : "good",
+        text: [`벡터 선화 ${result.vectorStrokeCount}개를 포함한 PDF를 저장했어요.`, ...result.warnings].join(" "),
+      });
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setVectorPdfStatus({
+        tone: "warn",
+        text: error instanceof Error ? error.message : "벡터 PDF를 만들지 못했습니다.",
+      });
+    } finally {
+      if (mountedRef.current) setVectorPdfBusy(false);
+    }
+  }
+
   async function runSvgExport() {
     if (
       !exportCurrentPageToSvg || svgBusy || psdBusy || pdfBusy || presetBusy || isExporting ||
-      contactBusy || archiveBusy !== null
+      contactBusy || (archiveBusy !== null || vectorPdfBusy)
     ) return;
     setSvgBusy(true);
     setSvgStatus({ tone: "info", text: "벡터 내보내기 엔진을 준비하는 중…" });
@@ -781,7 +818,7 @@ export function StudioExportMenuPanel({
   async function runPsdExport() {
     if (
       !exportCurrentPageToPsd || psdBusy || svgBusy || pdfBusy || presetBusy || isExporting ||
-      contactBusy || archiveBusy !== null
+      contactBusy || (archiveBusy !== null || vectorPdfBusy)
     ) return;
     setPsdBusy(true);
     setPsdStatus({ tone: "info", text: "레이어별로 캡처하는 중…" });
@@ -811,7 +848,7 @@ export function StudioExportMenuPanel({
   // 규격 선택 → 캡처 → 리샘플·분할 → 순차 다운로드까지 한 번에 실행.
   // scope "all"은 패키지 페이지 범위를 존중(전체 문서가 아닌 선택 범위 가능).
   async function runPresetSliceExport(scope: PresetExportScope) {
-    if (!selectedPreset || presetBusy || pdfBusy || psdBusy || svgBusy || contactBusy || archiveBusy !== null) return;
+    if (!selectedPreset || presetBusy || pdfBusy || psdBusy || svgBusy || contactBusy || (archiveBusy !== null || vectorPdfBusy)) return;
     setPresetBusy(true);
     const pendingRange = exportRangeLabel;
     setPresetStatus({
@@ -1408,7 +1445,7 @@ export function StudioExportMenuPanel({
             onClick={() => void runOpenRasterExport()}
             disabled={
               openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy ||
-              archiveBusy !== null
+              (archiveBusy !== null || vectorPdfBusy)
             }
             className="mt-1.5 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-accent/35 bg-accent/10 px-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
           >
@@ -1452,7 +1489,7 @@ export function StudioExportMenuPanel({
             onClick={() => void runArchiveExport("cbz")}
             disabled={
               !packagePreflight.canExport ||
-              archiveBusy !== null || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
+              (archiveBusy !== null || vectorPdfBusy) || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
               isExporting || contactBusy
             }
             className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
@@ -1465,7 +1502,7 @@ export function StudioExportMenuPanel({
             type="button"
             onClick={() => void runArchiveExport("ora")}
             disabled={
-              archiveBusy !== null || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
+              (archiveBusy !== null || vectorPdfBusy) || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
               isExporting || contactBusy
             }
             className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
@@ -1479,7 +1516,7 @@ export function StudioExportMenuPanel({
               type="button"
               onClick={() => void runInkMlExport()}
               disabled={
-                archiveBusy !== null || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
+                (archiveBusy !== null || vectorPdfBusy) || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
                 isExporting || contactBusy
               }
               className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-1.5 text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
@@ -1494,7 +1531,7 @@ export function StudioExportMenuPanel({
               type="button"
               onClick={() => void runWillV1Export()}
               disabled={
-                archiveBusy !== null || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
+                (archiveBusy !== null || vectorPdfBusy) || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
                 isExporting || contactBusy
               }
               className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-accent/35 bg-accent-soft/35 px-1.5 text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-accent-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
@@ -1529,7 +1566,7 @@ export function StudioExportMenuPanel({
       <button
         type="button"
         onClick={() => void runPdfExport()}
-        disabled={!packagePreflight.canExport || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null}
+        disabled={!packagePreflight.canExport || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)}
         className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
         title={`${exportRangeLabel}(${exportRangeCount}장)를 JPG로 담은 PDF 한 파일로 저장`}
       >
@@ -1550,6 +1587,23 @@ export function StudioExportMenuPanel({
         {pdfStatus?.text}
       </p>
 
+      {exportCurrentPageToVectorPdf ? (
+        <button
+          type="button"
+          onClick={() => void runVectorPdfExport()}
+          disabled={vectorPdfBusy || isExporting}
+          className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft/20 py-1.5 text-xs font-semibold text-fg-2 disabled:opacity-50"
+          title="현재 화면을 보존하고 지원되는 펜 선화를 PDF 벡터 패스로 함께 기록"
+        >
+          <FileText size={13} aria-hidden /> PDF 1.7 · 벡터 선화
+        </button>
+      ) : null}
+      {vectorPdfStatus ? (
+        <p aria-live="polite" className="mt-1.5 rounded-md border border-line px-2 py-1 text-[10px] leading-snug text-fg-3">
+          {vectorPdfStatus.text}
+        </p>
+      ) : null}
+
       <StudioContactSheetPanel
         columns={contactColumns}
         rows={contactRows}
@@ -1557,7 +1611,7 @@ export function StudioExportMenuPanel({
         showLabels={contactShowLabels}
         pageCount={exportRangeCount}
         busy={contactBusy}
-        disabled={!packagePreflight.canExport || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || archiveBusy !== null}
+        disabled={!packagePreflight.canExport || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || (archiveBusy !== null || vectorPdfBusy)}
         status={contactStatus}
         setColumns={setContactColumns}
         setRows={setContactRows}
@@ -1576,7 +1630,7 @@ export function StudioExportMenuPanel({
             onPointerDown={preloadStudioSvgExportModule}
             onFocus={preloadStudioSvgExportModule}
             disabled={
-              svgBusy || psdBusy || pdfBusy || presetBusy || isExporting || contactBusy || archiveBusy !== null
+              svgBusy || psdBusy || pdfBusy || presetBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)
             }
             className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
             title="현재 페이지를 벡터 SVG 파일로 저장 (도형·텍스트·말풍선 벡터 보존)"
@@ -1607,7 +1661,7 @@ export function StudioExportMenuPanel({
             onPointerDown={preloadStudioPsdExportModule}
             onFocus={preloadStudioPsdExportModule}
             disabled={
-              psdBusy || svgBusy || pdfBusy || presetBusy || isExporting || contactBusy || archiveBusy !== null
+              psdBusy || svgBusy || pdfBusy || presetBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)
             }
             className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
             title="현재 페이지를 요소별 레이어를 가진 PSD 파일로 저장 (포토샵에서 레이어별 편집 가능)"
@@ -1660,7 +1714,7 @@ export function StudioExportMenuPanel({
               type="button"
               onClick={() => void runPresetSliceExport("current")}
               disabled={
-                presetBusy || pdfBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null
+                presetBusy || pdfBusy || psdBusy || svgBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)
               }
               className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-accent/30 bg-accent/10 px-2 text-[0.68rem] font-semibold text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
               title={`현재 페이지를 ${selectedPreset.label} 규격(폭 리샘플·세로 분할)으로 저장`}
@@ -1673,7 +1727,7 @@ export function StudioExportMenuPanel({
                 onClick={() => void runPresetSliceExport("all")}
                 disabled={
                   !packagePreflight.canExport || openRasterBusy ||
-                  presetBusy || pdfBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null
+                  presetBusy || pdfBusy || psdBusy || svgBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)
                 }
                 className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
                 title={`${exportRangeLabel}(${exportRangeCount}장)를 이어 붙여 ${selectedPreset.label} 규격으로 나눠 저장`}
@@ -1703,7 +1757,7 @@ export function StudioExportMenuPanel({
       {renderAdditionalExports?.({
         pageIndices: packagePreflight.pageIndices,
         canExport: packagePreflight.canExport,
-        busy: isExporting || presetBusy || pdfBusy || svgBusy || psdBusy || openRasterBusy || contactBusy || archiveBusy !== null,
+        busy: isExporting || presetBusy || pdfBusy || svgBusy || psdBusy || openRasterBusy || contactBusy || (archiveBusy !== null || vectorPdfBusy),
         rangeLabel: exportRangeLabel,
         capturePages: captureMultiPageExportCanvases,
       })}

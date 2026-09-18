@@ -55,9 +55,11 @@ const INTERNAL_MATERIAL_NODE_IDS = Object.freeze([
   "deposit-ink", "deposit-marker", "deposit-dry", "deposit-oil", "deposit-particles", "deposit-light",
   "pickup-none", "pickup-pigment-reservoir", "pigment-rgb",
   "physics-dry-contact", "physics-thin-film", "physics-bristle", "physics-particles", "physics-reaction", "physics-height",
+  "physics-backrun-capillary", "physics-pigment-sedimentation", "physics-bristle-split-merge",
   "pattern-none", "pattern-dot-tone", "pattern-cross-hatch", "pattern-weave", "pattern-brick", "pattern-foliage",
-  "pattern-stitch", "pattern-kaleido", "pattern-rainbow",
-  "finish-edge-bloom", "finish-wet-sheen", "finish-relief", "finish-neon", "finish-grain",
+  "pattern-stitch", "pattern-kaleido", "pattern-vector-flow", "pattern-vector-vortex", "pattern-vector-contour",
+  "pattern-textile-satin", "pattern-textile-twill", "pattern-rainbow",
+  "finish-edge-bloom", "finish-wet-sheen", "finish-relief", "finish-directional-relief", "finish-neon", "finish-grain",
   "output-contact-canvas-svg",
 ]);
 
@@ -214,7 +216,7 @@ export function brushStudioV6ProviderManifestById(id: string): BrushStudioV6Prov
 export function brushStudioV6ProviderManifestForNode(
   nodeId: string,
 ): BrushStudioV6ProviderManifestEntry | null {
-  if (nodeId.startsWith("carrier-cpu-")) {
+  if (nodeId.startsWith("carrier-cpu-") || nodeId.startsWith("surface-v7-")) {
     return PROVIDER_BY_ID.get("toonspectrum-cpu-contact-v2") ?? null;
   }
   return PROVIDER_BY_NODE.get(nodeId) ?? null;

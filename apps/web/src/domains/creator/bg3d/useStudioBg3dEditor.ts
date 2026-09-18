@@ -52,6 +52,7 @@ export function useStudioBg3dEditor(props) {
     modelRenderer: h.modelRenderer,
     modelRootCacheRef: h.modelRootCacheRef,
     physicsRuntimeSourceRef: h.physicsRuntimeSourceRef,
+    replaceCanonicalDocumentState: h.replaceCanonicalDocumentState,
     placementSessionRef: h.placementSessionRef,
     sceneBaseDocument: h.sceneBaseDocument,
     sceneRestoreAbortRef: h.sceneRestoreAbortRef,
@@ -107,10 +108,11 @@ export function useStudioBg3dEditor(props) {
         source: plan.command.source,
       },
     );
-    h.physicsRuntimeSourceRef.current = plan.snapshot;
-    h.setPrimitives(plan.snapshot.primitives);
-    h.setCustomModels(plan.snapshot.customModels);
-    h.setSceneBaseDocument(plan.snapshot.document);
+    h.replaceCanonicalDocumentState({
+      primitives: plan.snapshot.primitives,
+      customModels: plan.snapshot.customModels,
+      document: plan.snapshot.document,
+    });
     h.setSelectedIds((current) =>
       applyStudioBg3dOutlinerSelectionEffect(current, plan.selection));
     h.setError(null);

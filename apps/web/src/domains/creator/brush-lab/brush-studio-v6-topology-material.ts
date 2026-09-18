@@ -1,4 +1,5 @@
 import { isBrushStudioV6ArtistryModel } from "./brush-studio-v6-artistry-catalog";
+import { isBrushStudioV7AdvancedSurface } from "./brush-studio-v7-surface-library";
 import { brushStudioV6Topology } from "./brush-studio-v6-topology-catalog";
 import type { BrushStudioV6Tuning } from "./brush-studio-v6-engine";
 import type { BrushStudioV6MaterialMark, BrushStudioV6MaterialProgram } from "./brush-studio-v6-material-engine";
@@ -37,7 +38,7 @@ export function brushStudioV6TopologyStep(program: BrushStudioV6MaterialProgram,
 
 /** Context-sensitive allow-list; disabled nodes never impersonate running providers. */
 export function isBrushStudioV6TopologyNodeCompatible(id: string): boolean {
-  return Boolean(brushStudioV6Topology(id)) || [
+  return Boolean(brushStudioV6Topology(id)) || isBrushStudioV7AdvancedSurface(id) || [
     "input-pointer-v3", "motion-direct", "tip-round-sdf", "tip-chisel-sdf", "tip-grain-exemplar", "tip-krita-dual",
     "surface-smooth", "surface-kent", "surface-coldpress", "surface-printmaking", "surface-linen", "surface-porous",
     "deposit-ink", "deposit-dry", "deposit-wet", "deposit-oil", "deposit-marker",

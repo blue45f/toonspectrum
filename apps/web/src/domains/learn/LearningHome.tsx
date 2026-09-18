@@ -431,6 +431,8 @@ export function LearningHome() {
         <article><span className="learn-eyebrow">GLOSSARY</span><h2>낯선 용어를 바로 찾기</h2><p>한국어·영문·다른 이름으로 36개 핵심 용어를 검색하고 저장합니다.</p><Link to="/learn/glossary">용어 사전 열기 →</Link></article>
         <article><span className="learn-eyebrow">PRACTICE</span><h2>작업 화면에서 직접 해보기</h2><p>기존 작업을 바꾸지 않는 자기주도 툰스튜디오 실습으로 연결합니다.</p><Link to="/learn/studio">실습 과정 보기 →</Link></article>
         <article><span className="learn-eyebrow">RECORDS</span><h2>메모와 완료 기록 지키기</h2><p>현재 브라우저의 학습 기록을 점검하고 파일로 백업하거나 복원합니다.</p><Link to="/learn/records">학습 기록 관리 →</Link></article>
+        <article><span className="learn-eyebrow">RESOURCE HUB</span><h2>외부 강좌와 공식 자료 함께 찾기</h2><p>에듀코카, WEBTOON Academy, 공식 제작 팁과 YouTube 탐색 링크를 주제별로 모았습니다.</p><Link to="/learn/resources">교육 자료 허브 →</Link></article>
+        <article><span className="learn-eyebrow">CLASSROOM</span><h2>교육기관용 수업 흐름 보기</h2><p>10주 기본 커리큘럼과 직군별 학습 축을 실제 강좌·Studio 실습에 연결합니다.</p><Link to="/learn/classroom">교육기관 활용 →</Link></article>
       </section>
 
       <footer className="learn-local-footer">

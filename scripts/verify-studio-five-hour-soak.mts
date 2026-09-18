@@ -47,8 +47,13 @@ const OUT = process.env.TOONSPECTRUM_SOAK_OUT?.trim()
   || `artifacts/studio-five-hour-soak/${PROFILE_ID}${WEBGPU ? "-webgpu" : ""}`;
 const CYCLE_TARGET_MS = Math.max(5_000, Number(process.env.TOONSPECTRUM_SOAK_CYCLE_MS ?? "30000") || 30_000);
 const INK_MIN_CHANGED_PIXELS = 120;
-const HEAP_MIN_ALLOWANCE_BYTES = 384 * 1024 * 1024;
-const HEAP_MULTIPLIER_ALLOWANCE = 2;
+const HEAP_MIN_ALLOWANCE_BYTES = 192 * 1024 * 1024;
+const HEAP_RELATIVE_ALLOWANCE = 0.75;
+const HEAP_SLOPE_WINDOW = 5;
+const HEAP_MIN_TREND_DURATION_MS = 30 * 60_000;
+const HEAP_MAX_SLOPE_BYTES_PER_HOUR = 64 * 1024 * 1024;
+const DOM_NODE_MIN_ALLOWANCE = 25_000;
+const DOM_LISTENER_MIN_ALLOWANCE = 4_000;
 const CHECKPOINT_MS = 10 * 60_000;
 
 interface HeapSample {
@@ -57,6 +62,9 @@ interface HeapSample {
   readonly totalBytes: number;
   readonly embedderBytes: number;
   readonly backingStorageBytes: number;
+  readonly documents: number | null;
+  readonly nodes: number | null;
+  readonly jsEventListeners: number | null;
 }
 
 interface GpuEvent {
@@ -188,16 +196,43 @@ async function gcHeap(cdp: CDPSession | null, startedAt: number): Promise<HeapSa
       embedderHeapUsedSize: number;
       backingStorageSize: number;
     };
+    const dom = await cdp.send("Memory.getDOMCounters").catch(() => null) as {
+      documents: number;
+      nodes: number;
+      jsEventListeners: number;
+    } | null;
     return {
       atMs: nowMs(startedAt),
       usedBytes: usage.usedSize,
       totalBytes: usage.totalSize,
       embedderBytes: usage.embedderHeapUsedSize,
       backingStorageBytes: usage.backingStorageSize,
+      documents: dom?.documents ?? null,
+      nodes: dom?.nodes ?? null,
+      jsEventListeners: dom?.jsEventListeners ?? null,
     };
   } catch {
     return null;
   }
+}
+
+function heapSlopeBytesPerHour(samples: readonly HeapSample[]): number | null {
+  if (samples.length < 2) return null;
+  const firstAt = samples[0]?.atMs ?? 0;
+  const points = samples.map((sample) => ({
+    x: (sample.atMs - firstAt) / 3_600_000,
+    y: sample.usedBytes,
+  }));
+  const meanX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
+  const meanY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+  let numerator = 0;
+  let denominator = 0;
+  for (const point of points) {
+    const dx = point.x - meanX;
+    numerator += dx * (point.y - meanY);
+    denominator += dx * dx;
+  }
+  return denominator > 0 ? numerator / denominator : null;
 }
 
 async function closeBrushSurfaces(page: Page): Promise<boolean> {
@@ -387,7 +422,15 @@ const report = {
   longTasks: [] as LongTaskSample[],
   runtimeErrors: [] as StudioInAppRuntimeError[],
   failures: [] as SoakFailure[],
-  checkpoints: [] as Array<{ atMs: number; cycle: number; heapBytes: number | null; failures: number }>,
+  checkpoints: [] as Array<{
+    atMs: number;
+    cycle: number;
+    heapBytes: number | null;
+    heapSlopeBytesPerHour: number | null;
+    domNodes: number | null;
+    eventListeners: number | null;
+    failures: number;
+  }>,
 };
 
 const writeReport = (): void => {

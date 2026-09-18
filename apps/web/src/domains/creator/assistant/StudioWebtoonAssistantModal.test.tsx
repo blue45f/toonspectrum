@@ -187,7 +187,12 @@ describe("StudioWebtoonAssistantModal — tab accessibility", () => {
     expect(screen.getByText(/샘플 보호 영역 3곳 기준 예시/)).toBeTruthy();
 
     fireEvent.click(screen.getAllByRole("tab")[1]);
-    expect(screen.getByText(/샘플 컷 5개 기준 예시/)).toBeTruthy();
+    expect(screen.getByText(/실제 원고 컷 1개 분석/)).toBeTruthy();
+    expect(screen.getByText(/실제 컷 위치와 컷 안의 대사 요소/)).toBeTruthy();
+
+    rerender(<StudioWebtoonAssistantModal open onClose={() => {}} />);
+    fireEvent.click(screen.getAllByRole("tab")[0]);
+    expect(screen.getByText(/현재 원고에서 컷을 찾지 못함/)).toBeTruthy();
   });
 });
 

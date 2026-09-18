@@ -13,13 +13,34 @@ export function StudioP2pActivitiesPanel({ controller }: { controller: StudioP2p
   const [template, setTemplate] = useState<string>(HUDDLE_CHALLENGES[0].id);
   const [question, setQuestion] = useState("어떤 구도가 더 좋을까요?");
   const [options, setOptions] = useState(["A안", "B안", "", ""]);
+  const [open, setOpen] = useState(false);
+  const hasRunningChallenge = view.activities.some((activity) =>
+    Boolean(activity.challenge?.running && activity.challenge.remainingMs > 0));
   useEffect(() => {
     const refresh = () => setView(controller.snapshot());
-    refresh(); const off = controller.subscribe(refresh);
-    const timer = setInterval(refresh, 1000);
-    return () => { off(); clearInterval(timer); };
+    refresh();
+    return controller.subscribe(refresh);
   }, [controller]);
-  return <details className="rounded-xl border border-line p-2" data-studio-p2p-activities="true">
+  useEffect(() => {
+    if (!open || !hasRunningChallenge) return undefined;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const refresh = () => setView(controller.snapshot());
+    const syncTimer = () => {
+      if (timer !== null) clearInterval(timer);
+      timer = null;
+      if (document.visibilityState === "hidden") return;
+      refresh();
+      timer = setInterval(refresh, 1000);
+    };
+    document.addEventListener("visibilitychange", syncTimer);
+    syncTimer();
+    return () => {
+      document.removeEventListener("visibilitychange", syncTimer);
+      if (timer !== null) clearInterval(timer);
+    };
+  }, [controller, hasRunningChallenge, open]);
+  return <details className="rounded-xl border border-line p-2" data-studio-p2p-activities="true"
+    onToggle={(event) => setOpen(event.currentTarget.open)}>
     <summary className="min-h-11 cursor-pointer content-center text-xs font-bold">함께 그리기·투표</summary>
     <div className="space-y-3 pt-2">
       <label className="block text-xs">드로잉 챌린지<select aria-label="드로잉 챌린지" className={inputClass} value={template}

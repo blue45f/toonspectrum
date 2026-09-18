@@ -2,9 +2,10 @@ import type { ComicCastId } from "@/shared/components/comic/comic-cast";
 import { tryCopyFortuneText } from "./fortune-sharing";
 import { useState } from "react";
 import { BookOpen, List } from "lucide-react";
-import { fortunePillarDetails, FORTUNE_ELEMENT_KEYS, FORTUNE_ELEMENT_NAMES } from "@toonspectrum/core/fortune";
+import { fortunePillarDetails, FORTUNE_ELEMENT_KEYS, FORTUNE_ELEMENT_NAMES, FORTUNE_EXPERIENCES } from "@toonspectrum/core/fortune";
 import type { FortuneReading, SajuResult } from "@toonspectrum/core/fortune";
 import { FortuneStoryReader } from "./FortuneStoryReader";
+import { FortuneElementOrbit, FortuneExperienceArt } from "./FortuneVisuals";
 import { FortuneCreativeMission, FortuneReadingTools } from "./FortuneReadingTools";
 import { TarotCardFace } from "./TarotCardFace";
 
@@ -15,6 +16,7 @@ function Pillars({ chart, label }: { chart: SajuResult; label: string }) {
       {item.pillar.kan ? <><strong data-element={item.pillar.elementKan}>{item.pillar.kan}</strong><strong data-element={item.pillar.elementJi}>{item.pillar.ji}</strong><b>{item.pillar.kanKorean}{item.pillar.jiKorean}</b><small>{item.pillar.elementKan} · {item.pillar.elementJi}</small></> : <div className="fo-unknown">? <small>시간 미상<br />집계 제외</small></div>}
     </div>)}
   </div><p className="fo-help">년주 → 월주 → 일주 → 시주 · 색상과 한글로 오행을 함께 표시합니다.</p>
+  <FortuneElementOrbit chart={chart} label={`${label}의 오행 궤도`} />
   <div className="fo-elements">{FORTUNE_ELEMENT_KEYS.map((key, i) => <label key={key}><span>{FORTUNE_ELEMENT_NAMES[i]}</span><meter min={0} max={100} value={chart.elementsRatio[key]} aria-label={`${FORTUNE_ELEMENT_NAMES[i]} 오행 비율`}>{chart.elementsRatio[key]}%</meter><b>{chart.elementsRatio[key]}%</b></label>)}</div><p className="fo-help">겉글자 동등 집계 · 합계 100% · 많고 적음은 우열이 아닙니다.</p></section>;
 }
 export function FortuneReadingView({ reading, cast = "ara", onCastChange }: { reading: FortuneReading; cast?: ComicCastId; onCastChange?: (id: ComicCastId) => void }) {
@@ -22,8 +24,9 @@ export function FortuneReadingView({ reading, cast = "ara", onCastChange }: { re
   const [paletteNotice, setPaletteNotice] = useState("");
   const [selectedDay, setSelectedDay] = useState(reading.calendar?.[0]?.date ?? "");
   const detail = reading.calendar?.find((d) => d.date === selectedDay);
+  const experience = FORTUNE_EXPERIENCES.find((item) => item.id === reading.id);
   return <article className="fo-report" aria-label={`${reading.title} 결과`}>
-    <header className="fo-result-intro"><p className="fo-eyebrow">YOUR READING · {reading.generatedFor}</p><h3>{reading.eyebrow}</h3><p>{reading.summary}</p>{reading.score !== undefined && <div className="fo-score"><strong>{reading.score}<small>/100</small></strong><span>전통 규칙 참고 지수<br /><small>실제 궁합의 확률이 아닙니다.</small></span></div>}</header>
+    <header className="fo-result-intro"><div className="fo-result-copy"><p className="fo-eyebrow">YOUR READING · {reading.generatedFor}</p><h3>{reading.eyebrow}</h3><p>{reading.summary}</p>{reading.score !== undefined && <div className="fo-score"><strong>{reading.score}<small>/100</small></strong><span>전통 규칙 참고 지수<br /><small>실제 궁합의 확률이 아닙니다.</small></span></div>}</div>{experience && <div className="fo-result-art"><FortuneExperienceArt experience={experience} /></div>}</header>
     <div className="fo-reading-mode" aria-label="해석 읽기 방식"><button type="button" className="fo-button" aria-pressed={mode === "story"} onClick={() => setMode("story")}><BookOpen size={16} />웹툰으로 읽기</button><button type="button" className="fo-button" aria-pressed={mode === "report"} onClick={() => setMode("report")}><List size={16} />상세 리포트</button><span>같은 해석을 원하는 방식으로 읽어요</span></div>
     {mode === "story" && <FortuneStoryReader reading={reading} cast={cast} onCastChange={onCastChange} />}
     {reading.chart && <div className={reading.partnerChart ? "fo-chart-pair" : ""}><Pillars chart={reading.chart} label={reading.partnerChart ? "나의 원국" : "나를 이루는 네 기둥"} />{reading.partnerChart && <Pillars chart={reading.partnerChart} label="상대의 원국" />}</div>}

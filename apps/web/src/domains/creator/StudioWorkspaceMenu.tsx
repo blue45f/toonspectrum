@@ -88,6 +88,7 @@ import {
 } from "./studio-workspaces";
 import { StudioWorkspaceRecommendation } from "./StudioWorkspaceRecommendation";
 
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
 export interface StudioWorkspaceMenuProps {
@@ -2154,24 +2155,7 @@ export function StudioWorkspaceMenu({
                       끄면 현재 6방향 퀵 액션 배치를 유지해요.
                     </span>
                   </span>
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "relative h-5 w-9 shrink-0 rounded-full border transition-colors",
-                      syncedState.applyQuickActionsOnSwitch
-                        ? "border-accent bg-accent"
-                        : "border-line-strong bg-raised"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "absolute top-0.5 size-3.5 rounded-full bg-fg transition-transform",
-                        syncedState.applyQuickActionsOnSwitch
-                          ? "translate-x-[1.125rem]"
-                          : "translate-x-0.5"
-                      )}
-                    />
-                  </span>
+                  <SwitchIndicator checked={syncedState.applyQuickActionsOnSwitch} />
                 </button>
 
                 <div className="px-3 py-2">

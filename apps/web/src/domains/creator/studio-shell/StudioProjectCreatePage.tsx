@@ -1,3 +1,3 @@
 export {
-  StudioDeferredSaveProjectCreatePage as StudioNewIntegratedPage,
-} from "./StudioDeferredSaveProjectCreatePage";
+  StudioModeProjectCreatePage as StudioNewIntegratedPage,
+} from "./StudioModeProjectCreatePage";

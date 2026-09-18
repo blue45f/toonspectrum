@@ -133,6 +133,10 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
       ? copy.install
       : copy.installHelp;
   const swReady = pwa.serviceWorkerStatus === "active" || pwa.serviceWorkerStatus === "update-waiting";
+  const drawingInstallLabel = locale === "ko" ? "순수 드로잉 앱 설치" : "Install ToonStudio Draw";
+  const drawingInstallBody = locale === "ko"
+    ? "별도 간이 편집기가 아니라 현재 Studio와 동일한 문서·브러시·레이어·저장 엔진을 캔버스 중심 앱 UI로 설치합니다."
+    : "Installs the same Studio document, brush, layer and save engine with canvas-first app chrome — not a separate lightweight editor.";
 
   return (
     <section className="clp" aria-labelledby="creator-continuity-title" data-creator-launchpad="v1">
@@ -246,6 +250,14 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
               <Download size={17} aria-hidden="true" />{installLabel}
             </button>
             {showInstallHelp && <p className="clp-install-help" role="status">{copy.installUnavailable}</p>}
+            <button
+              type="button"
+              className="clp-install-button"
+              onClick={() => window.location.assign("/draw-app/install.html?source=site")}
+            >
+              <Brush size={17} aria-hidden="true" />{drawingInstallLabel}
+            </button>
+            <p className="clp-install-help">{drawingInstallBody}</p>
           </section>
         </aside>
       </div>

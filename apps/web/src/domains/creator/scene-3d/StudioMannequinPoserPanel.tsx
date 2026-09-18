@@ -19,11 +19,15 @@ import {
   Download,
   FlipHorizontal2,
   ImageIcon,
+  Hand,
   Loader2,
+  Lock,
   PersonStanding,
   RotateCcw,
+  ScanFace,
   Share2,
   Sliders,
+  Unlock,
   Upload,
   UserRound,
   Video,
@@ -183,8 +187,14 @@ const ANATOMY_SLIDERS: readonly {
   step: number;
 }[] = Object.freeze([
   { key: "torsoDepth", label: "몸통 깊이", step: 0.02 },
+  { key: "chestWidth", label: "흉곽 너비", step: 0.02 },
+  { key: "pelvisDepth", label: "골반 깊이", step: 0.02 },
   { key: "waistWidth", label: "허리 너비", step: 0.02 },
-  { key: "limbThickness", label: "팔다리 굵기", step: 0.02 },
+  { key: "limbThickness", label: "사지 전체 굵기", step: 0.02 },
+  { key: "upperArmThickness", label: "상완 굵기", step: 0.02 },
+  { key: "forearmThickness", label: "전완 굵기", step: 0.02 },
+  { key: "thighThickness", label: "허벅지 굵기", step: 0.02 },
+  { key: "calfThickness", label: "종아리 굵기", step: 0.02 },
   { key: "handScale", label: "손 크기", step: 0.02 },
   { key: "footScale", label: "발 크기", step: 0.02 },
   { key: "neckThickness", label: "목 굵기", step: 0.02 },
@@ -286,7 +296,7 @@ export function StudioMannequinBodySection({
       <div className="space-y-3 pt-3 border-t border-line/60">
         <StudioSectionHeader
           title="해부학 비례"
-          description="몸통 깊이와 말단 크기를 독립 조절해 같은 등신에서도 실루엣과 질량감을 바꿉니다."
+          description="흉곽·골반 깊이와 상완·전완·허벅지·종아리를 독립 조절해 같은 등신에서도 실제 인체에 가까운 테이퍼와 질량 분포를 만듭니다."
         />
         <div className="space-y-2">
           {ANATOMY_SLIDERS.map(({ key, label, step }) => {
@@ -312,8 +322,8 @@ export function StudioMannequinBodySection({
 
       <div className="space-y-3 pt-3 border-t border-line/60">
         <StudioSectionHeader
-          title="3D 헤드 모델 (Face Proportions)"
-          description="CSP 2.0 3D 헤드 모델: 웹툰/애니형, 턱선, 눈, 코 비율을 조절합니다."
+          title="얼굴 비율"
+          description="웹툰·애니 스타일의 머리 형태와 턱선·눈·코 비율을 조절합니다."
         />
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="헤드 프리셋">
           {(Object.keys(STUDIO_MANNEQUIN_HEAD_PRESETS) as StudioMannequinHeadPresetId[]).map(
@@ -641,7 +651,8 @@ export function StudioMannequinCameraSection({
                 className: "text-[0.7rem] justify-center gap-1",
               })}
             >
-              {poseFrozen ? "🔒 포즈 고정됨" : "🔓 포즈 고정"}
+              {poseFrozen ? <Lock size={13} aria-hidden /> : <Unlock size={13} aria-hidden />}
+              {poseFrozen ? "포즈 고정됨" : "포즈 고정"}
             </button>
             <button
               type="button"
@@ -652,7 +663,8 @@ export function StudioMannequinCameraSection({
                 className: "text-[0.7rem] justify-center gap-1",
               })}
             >
-              {mirrorMode ? "↔️ 좌우 반전 ON" : "↔️ 좌우 반전"}
+              <FlipHorizontal2 size={13} aria-hidden />
+              {mirrorMode ? "좌우 반전 ON" : "좌우 반전"}
             </button>
             <button
               type="button"
@@ -663,7 +675,8 @@ export function StudioMannequinCameraSection({
                 className: "text-[0.7rem] justify-center gap-1",
               })}
             >
-              {fingerTracking ? "🖐️ 손가락 솔버 ON" : "🖐️ 손가락 솔버"}
+              <Hand size={13} aria-hidden />
+              {fingerTracking ? "손가락 솔버 ON" : "손가락 솔버"}
             </button>
             <button
               type="button"
@@ -674,7 +687,8 @@ export function StudioMannequinCameraSection({
                 className: "text-[0.7rem] justify-center gap-1",
               })}
             >
-              {facialTracking ? "😀 표정 맵핑 ON" : "😀 표정 맵핑"}
+              <ScanFace size={13} aria-hidden />
+              {facialTracking ? "표정 맵핑 ON" : "표정 맵핑"}
             </button>
           </div>
         )}

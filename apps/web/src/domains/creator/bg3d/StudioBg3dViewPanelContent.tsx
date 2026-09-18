@@ -43,6 +43,7 @@ import type {
 } from "./studio-bg3d-scene-document";
 import type { StudioBg3dSectionPlaneState } from "./studio-bg3d-section-plane";
 import type { StudioBg3dShotBatchRecoveryScope } from "./studio-bg3d-shot-batch-plan";
+import type { StudioBg3dProfessionalRuntimeReadiness } from "./studio-bg3d-professional-runtime-readiness";
 import type { StudioBg3dSunRigConfig } from "./studio-bg3d-sun-rig";
 import type { ViewEditorSection } from "./StudioBackground3DTypes";
 
@@ -196,6 +197,7 @@ export interface StudioBg3dViewPanelProps {
   readonly engineProbing: boolean;
   readonly engineDeviceLostMessage: string | null;
   readonly engineFrameTimeMs: number | null;
+  readonly professionalReadiness?: StudioBg3dProfessionalRuntimeReadiness;
   readonly onEnginePreferenceChange: (preference: StudioBg3dEnginePreference) => void;
   readonly babylonDiagnosticState: StudioBg3dBabylonDiagnosticState;
   readonly onRunBabylonDiagnostic: (

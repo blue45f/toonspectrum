@@ -13,6 +13,8 @@ const previewSource = read("./StudioUnifiedAssetPreviewSurface.tsx");
 const previewModelSource = read("./studio-unified-asset-preview.ts");
 const insertModelSource = read("./studio-insert-hub-model.ts");
 const lazySource = read("./studio-unified-asset-lazy-ui.ts");
+const createModeGroupsSource = read("./StudioToolBeltCreateModeGroups.tsx");
+const globalsSource = read("../../styles/globals.css");
 
 describe("Studio asset workspace boundaries", () => {
   it("loads unified catalogs and the visual workspace only after the asset menu is active", () => {
@@ -122,5 +124,24 @@ describe("Studio asset workspace boundaries", () => {
       "await toolBelt.stableHandlers.onPickImage(event)",
     );
     expect(workspaceSource).toContain("reviewLocked");
+  });
+
+  it("sizes the desktop asset window for the visual workspace without forcing horizontal scroll", () => {
+    expect(createModeGroupsSource).toContain("width: 1080, height: 760");
+    expect(createModeGroupsSource).toContain("maxWidth: 1320");
+    expect(createModeGroupsSource).toContain(
+      'contentClassName: "overflow-y-auto overflow-x-hidden"',
+    );
+  });
+
+  it("uses the asset window as the responsive breakpoint owner", () => {
+    expect(workspaceSource).toContain('data-studio-asset-workspace-grid="true"');
+    expect(workspaceSource).toContain('data-studio-asset-results-grid="true"');
+    expect(workspaceSource).not.toContain(
+      "lg:grid-cols-[11rem_minmax(22rem,1fr)_20rem]",
+    );
+    expect(globalsSource).toContain("container-name: studio-asset-workspace");
+    expect(globalsSource).toContain("@container studio-asset-workspace (min-width: 46rem)");
+    expect(globalsSource).toContain("@container studio-asset-workspace (min-width: 64rem)");
   });
 });
