@@ -4,8 +4,6 @@ import {
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
   translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   ArrowRight,
   Bot,
@@ -29,12 +27,8 @@ import {
   TestTube2,
   Workflow,
   Wrench,
-} from "lucide-react";
-import { useMemo, useState } from "react";
-
-import { AboutSectionNav } from "../AboutSectionNav";
-import {
-  ENGINEERING_FIELD_CATEGORY_META,
+  } from "lucide-react"; import { useMemo,
+  useState } from "react"; import { AboutSectionNav } from "../AboutSectionNav"; import { ENGINEERING_FIELD_CATEGORY_META,
   ENGINEERING_FIELD_NOTES,
   ENGINEERING_IMPLEMENTATION_INVENTORY,
   ENGINEERING_OPEN_APIS,
@@ -42,20 +36,13 @@ import {
   ENGINEERING_REFERENCE_ROLE_META,
   ENGINEERING_TROUBLESHOOTING_CASES,
   type EngineeringFieldCategory,
-} from "./engineering-field-notes-content";
-import type { EngineeringEvidenceKind } from "./engineering-story-content";
-import {
-  EngineeringPageIntro,
+  } from "./engineering-field-notes-content"; import type { EngineeringEvidenceKind } from "./engineering-story-content"; import { EngineeringPageIntro,
   EngineeringStatusBadge,
   EngineeringStoryNav,
-} from "./EngineeringStoryUi";
-import { useEngineeringLocale } from "./use-engineering-locale";
-
-import { useDocumentTitle } from "@/hooks/use-document-title";
-import { Container } from "@/shared/components/section";
-import { cx } from "@/shared/lib/cx";
-import { getActiveI18nLocale, translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
-
+  } from "./EngineeringStoryUi"; import { useEngineeringLocale } from "./use-engineering-locale"; import { useDocumentTitle } from "@/hooks/use-document-title"; import { Container } from "@/shared/components/section"; import { cx } from "@/shared/lib/cx"; import { getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringFieldNotesPage", ko, en);
 
