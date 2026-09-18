@@ -320,11 +320,12 @@ export type BilingualLocalizer = <TKo, TEn>(ko: TKo, en: TEn) => TKo;
  */
 export function useBilingualLocalizer(scope: string): BilingualLocalizer {
   useBilingualI18nRevision();
-  return useCallback(
-    ((ko: unknown, en: unknown) =>
-      translateBilingualValueForActiveLocale(scope, ko, en)) as BilingualLocalizer,
+  const localize = useCallback(
+    (ko: unknown, en: unknown) =>
+      translateBilingualValueForActiveLocale(scope, ko, en),
     [scope],
   );
+  return localize as BilingualLocalizer;
 }
 
 function translateParallelNode(
@@ -526,13 +527,6 @@ export function formatI18nTemplate(
   });
 }
 
-/**
- * Compatibility name used by Studio shell surfaces migrated in parallel with useBilingual.
- * Keep one implementation so those surfaces share locale and runtime translation behavior.
- */
-export function useBilingualLocalizer(scope: string): (ko: string, en: string) => string {
-  return useBilingual(scope);
-}
 /** Subscribe legacy-migrated surfaces to both locale and async translation bundle changes. */
 export function useBilingualI18nRevision(): void {
   useI18n((state) => state.lang);
