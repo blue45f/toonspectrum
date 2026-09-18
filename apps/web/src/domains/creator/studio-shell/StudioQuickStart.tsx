@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { buildStudioModeLaunchHref, resolveStudioModeCreationPlan } from "../studio-mode-creation-plan";
 import { createStudioProjectWithInitialDocument } from "../studio-project-creation";
 
 const QUICK_STARTS = [
@@ -16,8 +17,6 @@ const QUICK_STARTS = [
     labelEn: "Start a webtoon",
     titleKo: "새 웹툰",
     titleEn: "New webtoon",
-    uiMode: "basic",
-    startTool: "draw",
   },
   {
     id: "draw",
@@ -28,8 +27,6 @@ const QUICK_STARTS = [
     labelEn: "Start drawing",
     titleKo: "빠른 스케치",
     titleEn: "Quick sketch",
-    uiMode: "focus",
-    startTool: "draw",
   },
 ] as const;
 
@@ -48,13 +45,21 @@ export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
     setBusyId(item.id);
     setError(null);
     try {
+      const plan = resolveStudioModeCreationPlan(item.kind, item.templateId);
       const result = createStudioProjectWithInitialDocument(window.localStorage, {
         title: locale === "ko" ? item.titleKo : item.titleEn,
         kind: item.kind,
         templateId: item.templateId,
         primaryLocale: locale === "ko" ? "ko-KR" : "en-US",
+        document: {
+          kind: plan.document.kind,
+          defaultWorkspace: plan.document.workspace,
+          width: plan.document.width,
+          height: plan.document.height,
+          pageCount: plan.document.pageCount,
+        },
       }, window);
-      navigate(`${result.href}&uiMode=${item.uiMode}&startTool=${item.startTool}`, { replace: false });
+      navigate(buildStudioModeLaunchHref(result, plan), { replace: false });
     } catch {
       starting.current = false;
       setBusyId(null);
@@ -82,8 +87,8 @@ export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
           </h2>
           <p className="mt-2 max-w-xl text-sm leading-6 text-fg-2">
             {locale === "ko"
-              ? "웹툰이나 그림을 바로 열 수 있어요. 더 많은 형식은 새 작품 만들기에서 선택하세요."
-              : "Open a webtoon or drawing immediately. Choose other formats from Create new work."}
+              ? "웹툰은 컷·말풍선 중심 작업공간으로, 그림은 브러시·레이어 중심 작업공간으로 바로 엽니다."
+              : "Webtoons open panel-and-balloon first; drawings open brush-and-layer first."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

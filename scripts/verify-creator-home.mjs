@@ -10,7 +10,22 @@ const output = "artifacts/creator-home";
 mkdirSync(output, { recursive: true });
 const results = [];
 const manifest = JSON.parse(readFileSync("apps/web/public/brand/film-manifest.json", "utf8"));
-for (const [format, entry] of Object.entries(manifest.assets)) {
+assert.deepEqual(
+  [manifest.routeHeader?.width, manifest.routeHeader?.height],
+  [1920, 768],
+  "Route-header film must keep its high-resolution wide composition",
+);
+for (const startSeconds of [0, 6, 12, 18]) {
+  const poster = manifest.routeHeaderPosters?.[String(startSeconds)];
+  assert(poster, `Missing route-header poster for ${startSeconds}s`);
+  const posterPath = `apps/web/public${poster.src}`;
+  assert.equal(createHash("sha256").update(readFileSync(posterPath)).digest("hex"), poster.sha256);
+  const probe = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_streams", "-of", "json", posterPath], { encoding: "utf8" }));
+  const image = probe.streams.find((stream) => stream.codec_type === "video");
+  assert.deepEqual([image.width, image.height], [1920, 768]);
+}
+const renderedFilms = { ...manifest.assets, header: manifest.routeHeader };
+for (const [format, entry] of Object.entries(renderedFilms)) {
   const path = `apps/web/public${entry.src}`;
   assert.equal(createHash("sha256").update(readFileSync(path)).digest("hex"), entry.sha256);
   const probe = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", path], { encoding: "utf8" }));
@@ -18,6 +33,10 @@ for (const [format, entry] of Object.entries(manifest.assets)) {
   assert.equal(video.width, entry.width);
   assert.equal(video.height, entry.height);
   assert.equal(video.codec_name, "h264");
+  if (format === "header") {
+    assert.equal(probe.streams.some((stream) => stream.codec_type === "audio"), false, "Route-header film must not waste bitrate on a silent audio track");
+    assert(Number(video.bit_rate) >= 1_500_000, `Route-header bitrate regressed: ${video.bit_rate}`);
+  }
   assert(Math.abs(Number(probe.format.duration) - 24) < 0.1);
   execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-ss", "20", "-i", path, "-frames:v", "1", `${output}/film-${format}-20s.png`]);
   results.push({ check: `render-${format}`, dimensions: [video.width, video.height], duration: probe.format.duration, sha256: entry.sha256 });

@@ -42,7 +42,7 @@ The monthly operating-cost progress is aggregate data only. Administrators can c
 
 ## Database and runtime permissions
 
-Migration `0069_supporter_payments.sql` creates:
+Migration `0071_supporter_payments.sql` creates:
 
 - `supporter_payment` — payment lifecycle, privacy choices, receipt URL, and idempotency metadata;
 - `supporter_funding_setting` — monthly goal and public-wall switch.
@@ -121,7 +121,7 @@ For minors, the application contract is fail-closed:
 - under-14 creators must be submitted by a guardian with guardian confirmation;
 - public monetary support must remain disabled until guardian/KYC and payout readiness are reviewed.
 
-Migration `0070_creator_support_program.sql` creates private application and support-offer ledgers.
+Migration `0072_creator_support_program.sql` creates private application and support-offer ledgers.
 The API runtime role receives bounded SELECT/INSERT/UPDATE privileges and no destructive table
 permissions.
 

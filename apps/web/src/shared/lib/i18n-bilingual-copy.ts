@@ -1,6 +1,9 @@
+import { useCallback } from "react";
+
 import {
   registerI18nEnglishSourceEntries,
   registerI18nLocaleEntries,
+  useT,
 } from "./i18n-core";
 
 export interface BilingualText {
@@ -73,13 +76,40 @@ export function defineBilingualMap<
   return Object.freeze(mapped) as { readonly [K in keyof T]: string };
 }
 
+/** Resolves a keyed { ko, en } map through the active translator in one pass. */
+export function translateBilingualMap<
+  const T extends Readonly<Record<string, BilingualText>>,
+>(
+  t: TranslationResolver,
+  scope: string,
+  entries: T,
+): { readonly [K in keyof T]: string } {
+  const keys = defineBilingualMap(scope, entries);
+  return Object.fromEntries(
+    Object.entries(keys).map(([id, key]) => [id, t(key)]),
+  ) as { readonly [K in keyof T]: string };
+}
+
 /** Small-diff bridge for legacy maps shaped as `{ ko, en }`. */
 export function translateBilingualText(
   t: TranslationResolver,
   scope: string,
   value: BilingualText,
 ): string {
+  if (value.ko === value.en) return value.ko;
   return t(defineBilingualAutoText(scope, value.ko, value.en));
+}
+
+/**
+ * Hook-friendly adapter for legacy components with many inline Korean/English branches.
+ * The returned resolver stays on the global i18n pipeline and rerenders when runtime bundles land.
+ */
+export function useBilingualLocalizer(scope: string): (ko: string, en: string) => string {
+  const t = useT();
+  return useCallback(
+    (ko: string, en: string) => translateBilingualText(t, scope, { ko, en }),
+    [scope, t],
+  );
 }
 
 function translateParallelNode(
@@ -90,6 +120,9 @@ function translateParallelNode(
   path: readonly string[],
 ): StringTree {
   if (typeof ko === "string" && typeof en === "string") {
+    // Identical branches are locale-invariant tokens (URLs, ids, numbers, brand terms, etc.).
+    // Preserve them verbatim instead of registering them as machine-translation sources.
+    if (ko === en) return ko;
     const keyScope = path.length > 0 ? `${scope}.${path.join(".")}` : scope;
     return t(defineBilingualAutoText(keyScope, ko, en));
   }

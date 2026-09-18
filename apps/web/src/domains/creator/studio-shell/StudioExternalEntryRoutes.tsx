@@ -3,7 +3,12 @@ import { Navigate, useParams } from "react-router-dom";
 
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
-import { useI18n } from "@/shared/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
+import {
+  defineBilingualText,
+  translateBilingualMap,
+  type BilingualText,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 import {
   studioExternalJoinHref,
@@ -12,16 +17,14 @@ import {
   validateStudioExternalToken,
 } from "../studio-route-registry";
 
-type Locale = "ko" | "en";
 type EntryKind = "join" | "present" | "review";
 
-function localeFromLanguage(language: string): Locale {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
-}
+const COPY = {
+  title: defineBilingualText("studioExternalEntry", "title", "이 링크를 열 수 없어요", "This link cannot be opened"),
+  openStudio: defineBilingualText("studioExternalEntry", "openStudio", "ToonStudio로 이동", "Open ToonStudio"),
+} as const;
 
-function InvalidExternalEntry({ kind, locale }: { readonly kind: EntryKind; readonly locale: Locale }) {
-  const title = locale === "ko" ? "이 링크를 열 수 없어요" : "This link cannot be opened";
-  const descriptions: Readonly<Record<EntryKind, Readonly<Record<Locale, string>>>> = {
+const DESCRIPTIONS: Readonly<Record<EntryKind, BilingualText>> = {
     review: {
       ko: "검토 링크가 잘렸거나 만료됐을 수 있습니다. 링크를 보낸 사람에게 새 링크를 요청해 주세요.",
       en: "The review link may be incomplete or expired. Ask the sender for a new link.",
@@ -34,7 +37,11 @@ function InvalidExternalEntry({ kind, locale }: { readonly kind: EntryKind; read
       ko: "초대 링크가 올바르지 않습니다. 프로젝트 관리자에게 새 초대를 요청해 주세요.",
       en: "The invitation link is invalid. Ask the project administrator for a new invitation.",
     },
-  };
+};
+
+function InvalidExternalEntry({ kind }: { readonly kind: EntryKind }) {
+  const t = useT();
+  const descriptions = translateBilingualMap(t, "studioExternalEntry.description", DESCRIPTIONS);
   return (
     <div className="min-h-[70vh] bg-canvas">
       <Container size="prose" className="py-16 sm:py-24">
@@ -42,13 +49,13 @@ function InvalidExternalEntry({ kind, locale }: { readonly kind: EntryKind; read
           <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-warning-soft/25 text-warning">
             <CircleAlert size={22} aria-hidden="true" />
           </span>
-          <h1 className="mt-4 text-2xl font-black text-fg">{title}</h1>
+          <h1 className="mt-4 text-2xl font-black text-fg">{t(COPY.title)}</h1>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-fg-2">
-            {descriptions[kind][locale]}
+            {descriptions[kind]}
           </p>
           <Link href="/studio" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent">
             <ExternalLink size={16} aria-hidden="true" />
-            {locale === "ko" ? "ToonStudio로 이동" : "Open ToonStudio"}
+            {t(COPY.openStudio)}
           </Link>
         </section>
       </Container>
@@ -62,15 +69,13 @@ function ExternalEntry({ kind }: { readonly kind: EntryKind }) {
     presentationToken?: string;
     shareToken?: string;
   }>();
-  const language = useI18n((state) => state.lang);
-  const locale = localeFromLanguage(language);
   const token = kind === "review"
     ? params.shareToken
     : kind === "present"
       ? params.presentationToken
       : params.inviteToken;
   if (!validateStudioExternalToken(token)) {
-    return <InvalidExternalEntry kind={kind} locale={locale} />;
+    return <InvalidExternalEntry kind={kind} />;
   }
   const href = kind === "review"
     ? studioExternalReviewHref(token)

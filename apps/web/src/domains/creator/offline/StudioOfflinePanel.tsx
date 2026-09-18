@@ -8,8 +8,6 @@ import {
 } from "./studio-offline-client";
 import { useStudioConnectivity } from "./use-studio-connectivity";
 
-import { cn } from "@/shared/lib/utils";
-
 function dataSaverEnabled(): boolean {
   try {
     return Boolean((navigator as Navigator & {
@@ -139,8 +137,10 @@ export function StudioOfflinePanel() {
     ? Math.round(device.usage / device.quota * 100)
     : null;
   const ready = prepared || device?.offlineReady === true;
-  const attentionRequired = connectivity.localOnly
-    || (storagePercent !== null && storagePercent >= 90);
+  const storageWarning = storagePercent !== null && storagePercent >= 90;
+  const shouldShowPanel = connectivity.mode !== "online"
+    || device?.navigationFallback === true
+    || storageWarning;
   const summary = connectivity.mode === "offline"
     ? ready ? "오프라인 모드 · 로컬 작업 중" : "오프라인 모드 · 준비된 기능만 사용"
     : connectivity.mode === "server-unavailable"
@@ -149,21 +149,18 @@ export function StudioOfflinePanel() {
         ? "서버 연결 확인 중"
         : device?.navigationFallback
           ? "저장된 스튜디오 · 로컬 작업 중"
-          : ready
-            ? "오프라인 자동 준비 완료"
-            : busy
-              ? "오프라인 자동 준비 중"
-              : "오프라인 자동 준비";
+          : storageWarning
+            ? "저장 공간 부족 · 백업 권장"
+            : "스튜디오 연결 상태";
+
+  if (!shouldShowPanel) return null;
 
   return (
     <aside
-      className={cn(
-        "fixed bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+7.5rem)] right-3 z-40 max-w-[min(25rem,calc(100vw-1.5rem))]",
-        !attentionRequired && "max-lg:hidden",
-      )}
+      className="fixed bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+7.5rem)] right-3 z-40 max-w-[min(25rem,calc(100vw-1.5rem))]"
       aria-label="스튜디오 연결 및 오프라인 작업 안내"
       data-studio-shell-floating-target="offline-readiness"
-      data-studio-shell-force-visible={attentionRequired ? "true" : undefined}
+      data-studio-shell-force-visible="true"
     >
       <details
         className="rounded-xl border border-line bg-panel p-3 text-xs text-fg shadow-lg"

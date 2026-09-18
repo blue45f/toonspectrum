@@ -43,7 +43,7 @@ describe("site route visual grammar", () => {
     for (const profile of profiles) {
       expect(profile.image).toMatch(/^\//u);
       expect(profile.layers).toHaveLength(3);
-      expect(profile.layers.every((layer) => layer.ko.length > 0 && layer.en.length > 0)).toBe(true);
+      expect(profile.layers.every((layer) => layer.length > 0)).toBe(true);
     }
   });
 
@@ -51,7 +51,8 @@ describe("site route visual grammar", () => {
     for (const path of ["/studio/new", "/story-lab", "/read/spatial", "/production", "/reviews", "/showcase", "/play"]) {
       const profile = resolveSiteRouteVisual(path);
       expect(profile.video?.src).toMatch(/\.mp4$/u);
-      expect(profile.video?.portraitSrc).toMatch(/-portrait\.mp4$/u);
+      expect(profile.video?.src).toBe("/brand/toonstudio-route-header.mp4");
+      expect(profile.video?.poster).toMatch(/^\/brand\/toonstudio-route-header-(?:0|6|12|18)\.jpg$/u);
       expect(profile.video?.endSeconds).toBeGreaterThan(profile.video?.startSeconds ?? 24);
       expect(profile.video?.endSeconds).toBeLessThanOrEqual(24);
       expect(profile.image).toBeTruthy();

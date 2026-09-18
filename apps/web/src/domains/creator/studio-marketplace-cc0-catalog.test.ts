@@ -13,15 +13,29 @@ const root = new URL("../../../public/assets/studio/cc0-20260906/", import.meta.
 const hash = (value: Uint8Array | string) => createHash("sha256").update(value).digest("hex");
 afterEach(() => vi.unstubAllGlobals());
 describe("reviewed market CC0 delivery", () => {
-  it("pins 14 distinct entries to the actual delivery manifest and file bytes", () => {
+  it("pins 100 distinct entries to the actual delivery manifest and file bytes", () => {
     const catalog = parseStudioCc0Catalog(JSON.parse(readFileSync(new URL("manifest.json", root), "utf8")));
-    expect(STUDIO_MARKETPLACE_CC0_ASSETS).toHaveLength(14);
-    expect(new Set(STUDIO_MARKETPLACE_CC0_ASSETS.map(a => a.id)).size).toBe(14);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS).toHaveLength(100);
+    expect(new Set(STUDIO_MARKETPLACE_CC0_ASSETS.map(a => a.id)).size).toBe(100);
     for (const asset of STUDIO_MARKETPLACE_CC0_ASSETS) {
       expect(asset).toEqual(catalog.find(item => item.id === asset.id));
       const bytes = readFileSync(new URL(asset.path, root));
       expect(bytes.byteLength).toBe(asset.bytes); expect(hash(bytes)).toBe(asset.sha256);
       expect(findStudioMarketplaceCc0Asset(studioMarketplaceCc0Reference(asset))).toEqual(asset);
+    }
+    expect(new Set(STUDIO_MARKETPLACE_CC0_ASSETS.map(asset => asset.kind))).toEqual(new Set([
+      "background", "effect-mask", "model", "prop-image", "surface-texture",
+    ]));
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "background")).toHaveLength(28);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "prop-image")).toHaveLength(24);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "model")).toHaveLength(24);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "surface-texture")).toHaveLength(12);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "effect-mask")).toHaveLength(12);
+    for (const asset of STUDIO_MARKETPLACE_CC0_ASSETS) {
+      if (asset.kind === "background") expect(Math.max(asset.width ?? 0, asset.height ?? 0)).toBeGreaterThanOrEqual(2048);
+      if (asset.kind === "prop-image") expect(Math.min(asset.width ?? 0, asset.height ?? 0)).toBeGreaterThanOrEqual(1536);
+      if (asset.kind === "surface-texture") expect(Math.min(asset.width ?? 0, asset.height ?? 0)).toBeGreaterThanOrEqual(1024);
+      if (asset.kind === "effect-mask") expect(Math.min(asset.width ?? 0, asset.height ?? 0)).toBeGreaterThanOrEqual(512);
     }
   });
   it.each(["https://example.com/model.glb", "cc0/../x", "studio-3d-asset:unknown", "cc0/polyhaven-sofa-02", "studio-3d-asset:polyhaven-background-wide-street-01"])("rejects unregistered or mismatched references: %s", value => {

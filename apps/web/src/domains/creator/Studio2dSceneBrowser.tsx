@@ -51,7 +51,7 @@ function SceneCard({ scene, disabled, onPick, onPreview }: {
     <div className="space-y-1.5 p-2">
       <p className="line-clamp-2 min-h-8 text-[0.7rem] font-semibold leading-4 text-fg" title={title}>{title}</p>
       <p className="text-[0.64rem] text-fg-3">{studio2dResolutionLabel(scene)}</p>
-      {asset && <p className="text-[0.64rem] text-fg-3">{asset.environment} · {asset.timeOfDay}{asset.provenance.licenseStatus === "cc0-verified" ? " · CC0" : ""}</p>}
+      {asset && <p className="text-[0.64rem] text-fg-3">{asset.environment} · {asset.timeOfDay}{asset.provenance.licenseStatus === "cc0-verified" ? " · CC0" : asset.provenance.licenseStatus === "first-party-generated" ? " · Studio 생성" : ""}</p>}
       {asset && (asset.containsPeople || asset.containsText) && <p className="text-[0.64rem] leading-relaxed text-fg-3">
         {[asset.containsPeople ? "인물 포함" : null, asset.containsText ? "문자 형태 포함" : null].filter(Boolean).join(" · ")}
       </p>}
