@@ -2,6 +2,7 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 
 import { StudioAssetGovernancePanel } from "./StudioAssetGovernancePanel";
 
@@ -14,13 +15,23 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
+function renderPanel(projectId: string, locale: "ko" | "en" = "ko") {
+  return render(
+    <MemoryRouter initialEntries={["/studio/assets"]}>
+      <StudioAssetGovernancePanel projectId={projectId} locale={locale} />
+    </MemoryRouter>,
+  );
+}
+
 describe("StudioAssetGovernancePanel", () => {
   it("asks for user intent instead of storage or server terminology", async () => {
-    render(<StudioAssetGovernancePanel projectId="project-assets" locale="ko" />);
+    renderPanel("project-assets");
 
     expect(screen.getByRole("heading", { name: "어디에 사용할지만 알려 주세요" })).toBeTruthy();
     expect(screen.getByLabelText("사용 목적")).toBeTruthy();
     expect(screen.getByLabelText("함께 쓰는 사람")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "제품 원칙 보기" }).getAttribute("href"))
+      .toBe("/about/principles");
     expect(document.body.textContent).not.toMatch(/SQLite|OPFS|리비전|서버 잠금/u);
 
     fireEvent.click(screen.getByLabelText("구매한 계정 연결됨"));
@@ -31,7 +42,7 @@ describe("StudioAssetGovernancePanel", () => {
   });
 
   it("recalculates prohibited AI training as a visible blocking condition", async () => {
-    render(<StudioAssetGovernancePanel projectId="project-assets" locale="ko" />);
+    renderPanel("project-assets");
 
     fireEvent.click(screen.getByText("전문 사용 범위"));
     fireEvent.click(screen.getByLabelText("AI 학습에 사용"));
@@ -47,7 +58,7 @@ describe("governance option accessibility", () => {
     { locale: "ko" as const, name: "구매한 계정 연결됨", description: "구매 내역과 사용 좌석을 확인합니다." },
     { locale: "en" as const, name: "Purchased account connected", description: "Verify purchase history and licensed seats." },
   ])("associates the $locale label and description with its checkbox", ({ locale, name, description }) => {
-    render(<StudioAssetGovernancePanel projectId="project-labels" locale={locale} />);
+    renderPanel("project-labels", locale);
 
     const checkbox = screen.getByRole("checkbox", { name });
     const label = checkbox.closest("label");

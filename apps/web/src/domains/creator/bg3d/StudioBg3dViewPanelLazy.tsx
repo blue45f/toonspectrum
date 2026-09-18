@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useState } from "react";
 
 import type { StudioBg3dViewPanelProps } from "./StudioBg3dViewPanelContent";
@@ -20,8 +21,7 @@ export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
     <Suspense
       fallback={
         <p hidden={props.hidden} role="status" className="py-3 text-xs text-fg-3">
-          보기 도구를 불러오는 중입니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelLazy", "ko", "보기 도구를 불러오는 중입니다.")}</p>
       }
     >
       <ViewPanel {...props} />

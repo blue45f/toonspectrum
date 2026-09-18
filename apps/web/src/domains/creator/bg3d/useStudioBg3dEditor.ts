@@ -13,9 +13,22 @@ import { attachStudioBg3dEditorHosts } from "./studio-bg3d-editor-attach-hosts";
 import { bindStudioBg3dEditorSceneGraph } from "./StudioBg3dEditorSceneGraph";
 import { useStudioBg3dEditorEffects } from "./useStudioBg3dEditorEffects";
 import { useStudioBg3dEditorRestoreEffects } from "./useStudioBg3dEditorRestoreEffects";
+import { createStudioBg3dSceneOutlinerController } from "./studio-bg3d-scene-outliner-controller";
+import {
+  applyStudioBg3dOutlinerSelectionEffect,
+  planStudioBg3dOutlinerMutation,
+} from "./studio-bg3d-outliner-mutation";
+
+import type { StudioBg3dOutlinerMutationAction } from "./studio-bg3d-outliner-mutation";
 
 export function useStudioBg3dEditor(props) {
-  const { createStudioBg3dModelImportActions } = R;
+  const {
+    createStudioBg3dHistorySnapshot,
+    createStudioBg3dModelImportActions,
+    duplicateBgCustomModelInstance,
+    duplicatePrimitive,
+    planStudioBg3dSceneEntityRemoval,
+  } = R;
   const h = useStudioBg3dEditorState(props);
   bindStudioBg3dEditorViewModel(h);
   bindStudioBg3dEditorSelectionViewModel(h);
@@ -39,6 +52,7 @@ export function useStudioBg3dEditor(props) {
     modelRenderer: h.modelRenderer,
     modelRootCacheRef: h.modelRootCacheRef,
     physicsRuntimeSourceRef: h.physicsRuntimeSourceRef,
+    replaceCanonicalDocumentState: h.replaceCanonicalDocumentState,
     placementSessionRef: h.placementSessionRef,
     sceneBaseDocument: h.sceneBaseDocument,
     sceneRestoreAbortRef: h.sceneRestoreAbortRef,
@@ -61,6 +75,82 @@ export function useStudioBg3dEditor(props) {
   h.importMarketplaceModelFiles = actions.importModelFiles;
   h.marketplaceModelId = props.marketplaceModelId;
   bindStudioBg3dEditorSceneGraph(h);
+
+  const outlinerMutationDependencies = {
+    duplicatePrimitive,
+    duplicateModel: duplicateBgCustomModelInstance,
+    planRemoval: planStudioBg3dSceneEntityRemoval,
+  };
+
+  const applyOutlinerMutation = (action: StudioBg3dOutlinerMutationAction) => {
+    const live = h.physicsRuntimeSourceRef.current;
+    const plan = planStudioBg3dOutlinerMutation({
+      snapshot: live,
+      action,
+      dependencies: outlinerMutationDependencies,
+    });
+    if (!plan.ok) {
+      if (plan.reason === "remove-failed") {
+        h.setError("부모를 삭제해도 자식의 월드 변환을 보존할 수 없어 삭제를 취소했습니다.");
+      }
+      return;
+    }
+
+    const before = createStudioBg3dHistorySnapshot(live);
+    h.commitImmediateHistoryTransition(
+      plan.snapshot.primitives,
+      plan.snapshot.customModels,
+      plan.snapshot.document,
+      before,
+      {
+        commandId: plan.command.id,
+        label: plan.command.label,
+        source: plan.command.source,
+      },
+    );
+    h.replaceCanonicalDocumentState({
+      primitives: plan.snapshot.primitives,
+      customModels: plan.snapshot.customModels,
+      document: plan.snapshot.document,
+    });
+    h.setSelectedIds((current) =>
+      applyStudioBg3dOutlinerSelectionEffect(current, plan.selection));
+    h.setError(null);
+  };
+
+  h.outlinerController = createStudioBg3dSceneOutlinerController({
+    query: h.layerQuery,
+    items: h.layerListItems,
+    filteredItems: h.filteredLayerItems,
+    hierarchy: h.sceneHierarchy,
+    selectedIds: h.selectedIds,
+    primitiveColors: new Map(h.primitives.map((primitive) => [primitive.id, primitive.color])),
+    onQueryChange: h.setLayerQuery,
+    onSelect: (id, mode) => {
+      h.setSelectedSharedCharacterElementId?.(null);
+      h.setSelectedIds((current) => {
+        if (mode === "replace") return new Set([id]);
+        const next = new Set(current);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    },
+    onRename: (item) => {
+      const name = window.prompt("새 이름을 입력하세요", item.label);
+      if (name === null) return;
+      applyOutlinerMutation({ type: "rename", item, name });
+    },
+    onToggleVisibility: (item) =>
+      applyOutlinerMutation({ type: "toggle-visibility", item }),
+    onToggleLock: (item) =>
+      applyOutlinerMutation({ type: "toggle-lock", item }),
+    onDuplicate: (item) => {
+      if (!h.canAdmitSceneNodes(1)) return;
+      applyOutlinerMutation({ type: "duplicate", item });
+    },
+    onRemove: (item) => applyOutlinerMutation({ type: "remove", item }),
+  });
   h.handleOpenPrecisionModeler = props.onOpenPrecisionModeler
     ? () => {
         const scene = h.readCurrentCanonicalScene?.("precision-modeler");

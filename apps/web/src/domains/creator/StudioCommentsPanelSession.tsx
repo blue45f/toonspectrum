@@ -1,4 +1,7 @@
 import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   StudioCommentsPanel,
   type StudioCommentsPanelSharedReplyController,
 } from "./StudioCommentsPanel";
@@ -123,14 +126,14 @@ export function StudioCommentsPanelSession({
             assign: !collaborationDocumentLocked,
           }}
       mutationDisabledReason={workId && !studioTeamCommentCapabilities
-        ? "팀 댓글 권한과 기록을 확인하는 중이에요."
+        ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanelSession", "ko", "팀 댓글 권한과 기록을 확인하는 중이에요.")
         : workId && !studioTeamCommentCapabilities?.comment
-          ? "열람자는 댓글을 읽고 위치로 이동할 수 있지만 작성할 수는 없어요."
+          ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanelSession", "ko", "열람자는 댓글을 읽고 위치로 이동할 수 있지만 작성할 수는 없어요.")
           : undefined}
       syncError={studioCommentSyncError ?? undefined}
       syncing={studioTeamCommentsSyncing}
       onRefresh={studioTeamCommentsWorkId ? refreshStudioTeamComments : undefined}
-      storageMode={workId ? "team" : "document"}
+      storageMode={workId ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanelSession", "en", "team") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanelSession", "en", "document")}
       unreadThreadIds={studioTeamUnreadCommentIdSet}
       readOnlyThreadIds={studioLegacyCommentThreadIdSet}
       pinsHidden={studioCommentPinsHidden}

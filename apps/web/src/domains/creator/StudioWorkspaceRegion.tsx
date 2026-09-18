@@ -1,12 +1,17 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentType, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 
 import {
   createStudioFloatingSurfaceLayout, moveStudioFloatingSurfaceRect,
   normalizeStudioFloatingSurfaceLayout, resizeStudioFloatingSurfaceRectFromEdge,
+  resizeStudioFloatingSurfaceRectToPreset,
   resolveStudioFloatingSurfaceDock, resolveStudioFloatingSurfaceRect,
   STUDIO_FLOATING_SURFACE_LAYOUT_VERSION,
   type StudioFloatingSurfaceDock, type StudioFloatingSurfaceLayout,
   type StudioFloatingSurfaceRect, type StudioFloatingSurfaceResizeEdge,
+  type StudioFloatingSurfaceSizePreset,
 } from "./studio-floating-surface";
 import { startStudioFloatingSurfacePointerSession, type StudioFloatingSurfacePointerSession } from "./studio-floating-surface-pointer";
 import { bringStudioFloatingSurfaceToFront, registerStudioFloatingSurface, studioFloatingSurfaceStackSnapshot, studioFloatingSurfaceZIndex, subscribeStudioFloatingSurfaceLayoutReset, subscribeStudioFloatingSurfaceStack } from "./studio-floating-surface-stack";
@@ -129,6 +134,21 @@ export function StudioWorkspaceRegion({
     sessionRef.current?.cancel();
     setDetached(true);
     writeStudioWorkspaceRegionDetached(surfaceId, true);
+  }
+  function resizeToPreset(preset: StudioFloatingSurfaceSizePreset) {
+    if (layout.sizeLocked) return;
+    setMenuOpen(false);
+    setCollapsed(false);
+    commit(
+      resizeStudioFloatingSurfaceRectToPreset(
+        rect,
+        preset,
+        viewport,
+        constraints,
+        defaultLayout,
+      ),
+      layout.dock,
+    );
   }
   function startRect(): StudioFloatingSurfaceRect {
     if (floating) return rect;
@@ -256,10 +276,11 @@ export function StudioWorkspaceRegion({
   return (
     <div ref={rootRef} style={style}
       data-studio-workspace-region={surfaceId}
-      data-studio-region-floating={floating ? "true" : "false"}
-      data-studio-region-collapsed={folded ? "true" : "false"}
+      data-studio-region-floating={floating ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "en", "false")}
+      data-studio-region-collapsed={folded ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "en", "false")}
       data-studio-floating-layout-authority={authority}
-      data-dragging={active ? "true" : "false"}
+      data-studio-floating-size={floating ? (rect.width < 360 ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "en", "compact") : rect.width < 720 ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "en", "comfortable") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "en", "wide")) : undefined}
+      data-dragging={active ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "en", "false")}
       className={cn("relative min-h-0 min-w-0 shrink-0", !floating && "grid", !floating && className,
         floating && "flex flex-col rounded-xl border border-line-strong bg-panel text-fg shadow-2xl",
         arranging && available && !floating && "outline outline-1 -outline-offset-1 outline-accent/60")}
@@ -269,21 +290,25 @@ export function StudioWorkspaceRegion({
         positionLocked={layout.positionLocked} sizeLocked={layout.sizeLocked} menuOpen={menuOpen} menuButtonRef={menuButtonRef}
         onBegin={begin} onMoveKey={moveKey} onAttach={attach}
         onToggleCollapsed={() => { sessionRef.current?.cancel(); setCollapsed(value => !value); }}
+        onMaximize={() => resizeToPreset("maximum")}
         onToggleMenu={() => setMenuOpen(value => !value)} />
         : <div role="status" className={cn("shrink-0 bg-raised px-2 py-1 text-xs text-fg-2", compact ? "h-20" : "h-10")}>
-          {chromeFailed ? <button type="button" className={buttonClass} onClick={() => setChromeAttempt(value => value + 1)}>패널 도구 다시 불러오기</button> : "패널 도구 여는 중…"}
+          {chromeFailed ? <button type="button" className={buttonClass} onClick={() => setChromeAttempt(value => value + 1)}>{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "ko", "패널 도구 다시 불러오기")}</button> : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "ko", "패널 도구 여는 중…")}
         </div>)}
       {menuOpen && available && (Menu ? <Menu label={label} buttonClass={buttonClass} choices={choices} layout={layout} setLayout={setLayout}
         changeDetached={changeDetached} move={move} minWidth={minWidth} maxWidth={maxWidth} minHeight={minHeight} maxHeight={maxHeight}
         viewport={viewport} insetTop={insetTop} rect={rect} floating={floating} compact={compact} menuButtonRef={menuButtonRef}
         onClose={() => setMenuOpen(false)} onResize={(width, height) => { setCollapsed(false); commit({ ...rect, width, height }, layout.dock); }}
+        onResizePreset={resizeToPreset}
         attach={attach} reset={reset} authority={authority} /> : <div role="group" className="absolute right-0 top-11 z-[70] rounded-lg border border-line bg-panel p-2 text-xs text-fg shadow-xl"
           onKeyDownCapture={event => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); menuButtonRef.current?.focus(); } }}>
-          {menuFailed ? <>설정을 불러오지 못했어요. <button type="button" className={buttonClass} onClick={() => setMenuAttempt(value => value + 1)}>다시 시도</button></> : "배치 설정 여는 중…"}
+          {menuFailed ? <>{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "ko", "설정을 불러오지 못했어요. ")}<button type="button" className={buttonClass} onClick={() => setMenuAttempt(value => value + 1)}>{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "ko", "다시 시도")}</button></> : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "ko", "배치 설정 여는 중…")}
         </div>)}
-      <div hidden={folded} inert={folded} style={folded ? { display: "none" } : undefined} className={floating
-        ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-auto [&>[data-studio-sheet-id]]:!h-full [&>[data-studio-sheet-id]]:!w-full [&>[data-studio-sheet-id]]:!min-w-0 [&>[data-studio-sheet-id]]:!max-h-none [&_button[title='자유_배치_창으로_분리']]:hidden"
-        : "contents"}>{children}</div>
+      <div hidden={folded} inert={folded} style={folded ? { display: "none" } : undefined}
+        data-studio-floating-content={floating ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "en", "true") : undefined}
+        className={floating
+        ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "ko", "flex min-h-0 min-w-0 flex-1 flex-col overflow-auto overscroll-contain [container-type:inline-size] [scrollbar-gutter:stable] [&>*]:min-w-0 [&>[data-studio-sheet-id]]:!h-full [&>[data-studio-sheet-id]]:!w-full [&>[data-studio-sheet-id]]:!min-w-0 [&>[data-studio-sheet-id]]:!max-h-none [&_button[title='자유_배치_창으로_분리']]:hidden")
+        : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRegion", "en", "contents")}>{children}</div>
 
     </div>
   );

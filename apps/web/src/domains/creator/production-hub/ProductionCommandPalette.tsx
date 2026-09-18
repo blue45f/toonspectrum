@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   BookOpenText,
   BriefcaseBusiness,
   CalendarClock,
@@ -145,8 +149,7 @@ export function ProductionCommandPalette({
         aria-expanded={open}
       >
         <Search className="size-4" aria-hidden="true" />
-        빠른 이동
-        <kbd className="ml-1 rounded border border-line bg-raised px-1.5 py-0.5 text-[0.625rem] text-fg-3">⌘K</kbd>
+        {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionCommandPalette", "ko", "빠른 이동")}<kbd className="ml-1 rounded border border-line bg-raised px-1.5 py-0.5 text-[0.625rem] text-fg-3">⌘K</kbd>
       </button>
 
       {open ? (
@@ -160,7 +163,7 @@ export function ProductionCommandPalette({
           <section
             role="dialog"
             aria-modal="true"
-            aria-label="제작 관리 빠른 이동"
+            aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionCommandPalette", "ko", "제작 관리 빠른 이동")}
             className="w-full max-w-2xl overflow-hidden rounded-2xl border border-line bg-card shadow-2xl"
           >
             <div className="flex items-center gap-3 border-b border-line px-4">
@@ -187,13 +190,13 @@ export function ProductionCommandPalette({
                     setOpen(false);
                   }
                 }}
-                aria-label="제작 관리 메뉴, 회차, 작업 검색"
+                aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionCommandPalette", "ko", "제작 관리 메뉴, 회차, 작업 검색")}
                 aria-controls="production-command-results"
-                aria-activedescendant={filtered[activeIndex] ? `production-command-${filtered[activeIndex].id}` : undefined}
-                placeholder="화면, 회차, 작업을 검색하세요"
+                aria-activedescendant={filtered[activeIndex] ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionCommandPalette", "en", "production-command-{v0}"), { v0: String(filtered[activeIndex].id) }) : undefined}
+                placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionCommandPalette", "ko", "화면, 회차, 작업을 검색하세요")}
                 className="min-h-14 min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
               />
-              <button type="button" className="text-xs font-semibold text-fg-3 hover:text-fg" onClick={() => setOpen(false)}>ESC</button>
+              <button type="button" className="text-xs font-semibold text-fg-3 hover:text-fg" onClick={() => setOpen(false)}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionCommandPalette", "en", "ESC")}</button>
             </div>
             <div id="production-command-results" role="listbox" className="max-h-[60vh] overflow-y-auto p-2">
               {filtered.map((item, index) => {
@@ -204,7 +207,7 @@ export function ProductionCommandPalette({
                   <div key={item.id}>
                     {showGroup ? <p className="px-3 pb-1 pt-3 text-[0.625rem] font-black uppercase tracking-[0.14em] text-fg-3">{item.group}</p> : null}
                     <button
-                      id={`production-command-${item.id}`}
+                      id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionCommandPalette", "en", "production-command-{v0}"), { v0: String(item.id) })}
                       type="button"
                       role="option"
                       aria-selected={active}
@@ -221,9 +224,9 @@ export function ProductionCommandPalette({
                   </div>
                 );
               })}
-              {filtered.length === 0 ? <div className="p-8 text-center"><Settings className="mx-auto size-7 text-fg-3" aria-hidden="true" /><p className="mt-2 text-sm font-bold text-fg">검색 결과가 없습니다</p><p className="mt-1 text-xs text-fg-2">화면 이름, 회차 ID 또는 작업명을 입력하세요.</p></div> : null}
+              {filtered.length === 0 ? <div className="p-8 text-center"><Settings className="mx-auto size-7 text-fg-3" aria-hidden="true" /><p className="mt-2 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionCommandPalette", "ko", "검색 결과가 없습니다")}</p><p className="mt-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionCommandPalette", "ko", "화면 이름, 회차 ID 또는 작업명을 입력하세요.")}</p></div> : null}
             </div>
-            <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-panel px-4 py-2 text-[0.625rem] text-fg-3"><span>↑↓ 이동 · Enter 열기 · Esc 닫기</span><span>{aggregate.title}</span></footer>
+            <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-line bg-panel px-4 py-2 text-[0.625rem] text-fg-3"><span>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionCommandPalette", "ko", "↑↓ 이동 · Enter 열기 · Esc 닫기")}</span><span>{aggregate.title}</span></footer>
           </section>
         </div>
       ) : null}

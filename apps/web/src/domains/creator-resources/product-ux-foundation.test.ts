@@ -32,7 +32,7 @@ describe("purpose-first product UX foundation", () => {
     const source = readFileSync(PRODUCT_INTENT, "utf8");
     expect(source).toContain("state.openCommandPalette");
     expect(source).toContain("onClick={openSearch}");
-    expect(source).toContain("프로젝트·회차·도구·작품 재료 검색");
+    expect(source).toContain("프로젝트·회차·컷·도구·소재 검색");
     expect(source).not.toContain('href="/search"\n              className="mt-6');
   });
 

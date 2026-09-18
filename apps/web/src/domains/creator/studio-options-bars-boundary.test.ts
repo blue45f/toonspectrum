@@ -125,7 +125,6 @@ describe("Studio options-bars module boundary", () => {
     expect(optionsBars.valueImports).toEqual([
       "react",
       "./brush/studio-draw-color-swatches",
-      "./brush/StudioDrawingInputDeck",
       "./studio-page-lazy-ui",
       "@/hooks/use-media-query",
     ]);
@@ -136,6 +135,8 @@ describe("Studio options-bars module boundary", () => {
       "@/shared/lib/lazy-retry",
       "@/shared/lib/utils",
     ]);
+    expect(optionsBars.allImports).not.toContain("./brush/StudioDrawingInputDeck");
+    expect(optionsBars.source).not.toContain("<StudioDrawingInputDeck");
     expect(optionsBars.allImports).not.toContain("konva");
     expect(optionsBars.allImports).not.toContain("react-konva");
     expect(optionsBars.allImports).not.toContain("@/hooks/use-resizable");
@@ -166,13 +167,12 @@ describe("Studio options-bars module boundary", () => {
         (specifier) => specifier === "./StudioDrawingInputDeckPanel"
       )
     ).toEqual(["./StudioDrawingInputDeckPanel"]);
-    // 그리기 옵션 바는 도구를 바꿀 때만 스왑되고 그 자리를 예약하는 이웃 스트립이 따로 없어
-    // `null` 폴백으로 충분하다. 선택 옵션 바는 다르다 — lazy 청크가 풀리는 한 프레임 동안
-    // 44px 레인이 사라지면 그 아래 캔버스가 내려갔다 올라온다(측정된 선택 시 2단계 밀림의
-    // 뒷단계). 그래서 선택 쪽 폴백은 바와 **같은 기하**를 붙들고 있어야 한다.
-    expect(optionsBars.source.match(/<Suspense fallback=\{null\}>/gu)).toHaveLength(1);
-    expect(optionsBars.source).toContain('data-studio-select-options-pending="true"');
-    expect(optionsBars.source).toContain("h-11 min-h-11 shrink-0 border-b border-line");
+    // Draw and selection share one fixed bottom context lane. Both lazy surfaces are layout-neutral:
+    // selection replaces drawing instead of reserving a second document-flow row.
+    expect(optionsBars.source.match(/<Suspense fallback=\{null\}>/gu)).toHaveLength(2);
+    expect(optionsBars.source).not.toContain('data-studio-select-options-pending="true"');
+    expect(optionsBars.source).toContain("const selectionVisible = selection.visible && selection.count > 0;");
+    expect(optionsBars.source).toContain("const drawVisible = draw.visible && !selectionVisible;");
     expect(optionsBars.source).toContain("key={draw.drawMode}");
     expect(drawingInputDeck.source).toContain(
       'data-studio-drawing-input-deck-pending="true"'

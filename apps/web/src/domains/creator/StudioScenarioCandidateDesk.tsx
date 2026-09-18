@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Check, Images, ShieldCheck, Sparkles, AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -129,16 +133,13 @@ export function StudioScenarioCandidateDesk({
             className="flex items-center gap-1.5 text-xs font-bold text-fg"
           >
             <Images size={14} className="text-accent" aria-hidden />
-            컷 후보 보드
-          </h3>
+            {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "컷 후보 보드")}</h3>
           <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-            품질 단계와 연출 변화 폭을 정하고 필요한 컷만 생성하세요. 새 결과는 기존 후보와
-            승인을 덮어쓰지 않습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "품질 단계와 연출 변화 폭을 정하고 필요한 컷만 생성하세요. 새 결과는 기존 후보와 승인을 덮어쓰지 않습니다.")}</p>
           <p className="mt-1 text-[0.62rem] font-semibold text-fg-2" role="status" aria-live="polite">
-            승인 {readiness.approved}/{readiness.total}
-            {" · "}승인 필요 {readiness.unapproved + readiness.stale}
-            {" · "}미생성·실패 {readiness.missing + readiness.failed}
+            {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "승인 ")}{readiness.approved}/{readiness.total}
+            {" · "}{translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "승인 필요 ")}{readiness.unapproved + readiness.stale}
+            {" · "}{translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "미생성·실패 ")}{readiness.missing + readiness.failed}
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1">
@@ -148,41 +149,37 @@ export function StudioScenarioCandidateDesk({
             disabled={busy || readiness.missingIndexes.length === 0}
             className="min-h-11 rounded-md border border-line bg-panel px-2 text-[0.65rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-45 sm:min-h-7"
           >
-            미생성·실패
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "미생성·실패")}</button>
           <button
             type="button"
             onClick={() => setSelectedIndexes([...readiness.reviewIndexes])}
             disabled={busy || readiness.reviewIndexes.length === 0}
             className="min-h-11 rounded-md border border-line bg-panel px-2 text-[0.65rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-45 sm:min-h-7"
           >
-            승인 필요
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "승인 필요")}</button>
           <button
             type="button"
             onClick={() => setSelectedIndexes(items.map((_, index) => index))}
             disabled={busy || items.length === 0}
             className="min-h-11 rounded-md border border-line bg-panel px-2 text-[0.65rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-45 sm:min-h-7"
           >
-            전체 선택
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "전체 선택")}</button>
           <button
             type="button"
             onClick={() => setSelectedIndexes([])}
             disabled={busy || selected.size === 0}
             className="min-h-11 rounded-md border border-line bg-panel px-2 text-[0.65rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-45 sm:min-h-7"
           >
-            선택 해제
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "선택 해제")}</button>
         </div>
       </div>
 
       <div className="mt-2 grid gap-2 rounded-lg border border-line bg-panel/70 p-2 lg:grid-cols-2">
         <fieldset className="min-w-0">
-          <legend className="text-[0.68rem] font-semibold text-fg-2">품질 단계</legend>
+          <legend className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "품질 단계")}</legend>
           <div
             role="radiogroup"
-            aria-label="AI 이미지 품질 단계"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "AI 이미지 품질 단계")}
             className="mt-1 flex flex-wrap gap-1"
           >
             {STUDIO_SCENARIO_IMAGE_QUALITY_PROFILES.map((profile) => (
@@ -195,11 +192,9 @@ export function StudioScenarioCandidateDesk({
                 title={profile.description}
                 onClick={() => setQualityProfile(profile.id)}
                 disabled={busy}
-                className={`min-h-10 rounded-md border px-2 text-[0.64rem] font-bold transition-colors sm:min-h-7 ${
-                  qualityProfile === profile.id
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "en", "min-h-10 rounded-md border px-2 text-[0.64rem] font-bold transition-colors sm:min-h-7 {v0}"), { v0: String(qualityProfile === profile.id
                     ? "border-accent bg-accent text-on-accent"
-                    : "border-line bg-card text-fg-3 hover:bg-raised"
-                }`}
+                    : "border-line bg-card text-fg-3 hover:bg-raised") })}
               >
                 {profile.shortLabel}
               </button>
@@ -213,10 +208,10 @@ export function StudioScenarioCandidateDesk({
         </fieldset>
 
         <fieldset className="min-w-0">
-          <legend className="text-[0.68rem] font-semibold text-fg-2">후보 다양성</legend>
+          <legend className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "후보 다양성")}</legend>
           <div
             role="radiogroup"
-            aria-label="AI 이미지 후보 다양성"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "AI 이미지 후보 다양성")}
             className="mt-1 flex flex-wrap gap-1"
           >
             {STUDIO_SCENARIO_IMAGE_VARIATION_STRATEGIES.map((strategy) => (
@@ -229,11 +224,9 @@ export function StudioScenarioCandidateDesk({
                 title={strategy.description}
                 onClick={() => setVariationStrategy(strategy.id)}
                 disabled={busy}
-                className={`min-h-10 rounded-md border px-2 text-[0.64rem] font-bold transition-colors sm:min-h-7 ${
-                  variationStrategy === strategy.id
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "en", "min-h-10 rounded-md border px-2 text-[0.64rem] font-bold transition-colors sm:min-h-7 {v0}"), { v0: String(variationStrategy === strategy.id
                     ? "border-accent bg-accent text-on-accent"
-                    : "border-line bg-card text-fg-3 hover:bg-raised"
-                }`}
+                    : "border-line bg-card text-fg-3 hover:bg-raised") })}
               >
                 {strategy.label}
               </button>
@@ -248,10 +241,10 @@ export function StudioScenarioCandidateDesk({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-panel/70 p-2">
-        <span className="text-[0.68rem] font-semibold text-fg-2">컷당 후보</span>
+        <span className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "컷당 후보")}</span>
         <div
           role="radiogroup"
-          aria-label="컷당 생성 후보 수"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "컷당 생성 후보 수")}
           className="flex rounded-lg border border-line bg-card p-0.5"
         >
           {VARIANT_OPTIONS.map((count) => (
@@ -262,18 +255,16 @@ export function StudioScenarioCandidateDesk({
               aria-checked={variants === count}
               onClick={() => setVariants(count)}
               disabled={busy}
-              className={`min-h-10 min-w-10 rounded-md px-2 text-xs font-bold transition-colors sm:min-h-7 ${
-                variants === count
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "en", "min-h-10 min-w-10 rounded-md px-2 text-xs font-bold transition-colors sm:min-h-7 {v0}"), { v0: String(variants === count
                   ? "bg-accent text-on-accent"
-                  : "text-fg-3 hover:bg-raised"
-              }`}
+                  : "text-fg-3 hover:bg-raised") })}
             >
               {count}
             </button>
           ))}
         </div>
         <span className="text-[0.68rem] text-fg-3" aria-live="polite">
-          {preflight.indexes.length}컷 × {preflight.variants}개 = 상대 작업량 {preflight.requestedCount}
+          {preflight.indexes.length}{translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "컷 × ")}{preflight.variants}{translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "개 = 상대 작업량 ")}{preflight.requestedCount}
         </span>
         <button
           type="button"
@@ -283,28 +274,21 @@ export function StudioScenarioCandidateDesk({
           className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-8"
         >
           <Sparkles size={13} aria-hidden />
-          선택 컷 후보 {preflight.requestedCount}개 생성
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "선택 컷 후보 ")}{preflight.requestedCount}{translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "개 생성")}</button>
       </div>
       <p className="mt-1.5 text-[0.62rem] leading-relaxed text-fg-3">
-        작업량은 모델·요금과 무관한 실제 요청 개수입니다. 우발적 과금을 줄이기 위해 한 번에 최대
-        {" "}{STUDIO_SCENARIO_IMAGE_MAX_REQUESTS_PER_BATCH}개로 제한하며 실제 비용과 처리 시간은 연결한
-        이미지 제공자에서 확인하세요.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "작업량은 모델·요금과 무관한 실제 요청 개수입니다. 우발적 과금을 줄이기 위해 한 번에 최대")}{" "}{STUDIO_SCENARIO_IMAGE_MAX_REQUESTS_PER_BATCH}{translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "개로 제한하며 실제 비용과 처리 시간은 연결한 이미지 제공자에서 확인하세요.")}</p>
       {!preflight.withinLimit ? (
         <p
           className="mt-1.5 flex items-start gap-1 rounded-md border border-warn/35 bg-warn/10 px-2 py-1.5 text-[0.62rem] leading-relaxed text-warn"
           role="alert"
         >
           <AlertTriangle size={11} className="mt-0.5 shrink-0" aria-hidden />
-          선택한 요청 {preflight.requestedCount}개가 1회 상한을 넘습니다. 선택 컷 또는 후보 수를 줄여
-          나눠 생성하세요.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "선택한 요청 ")}{preflight.requestedCount}{translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "개가 1회 상한을 넘습니다. 선택 컷 또는 후보 수를 줄여 나눠 생성하세요.")}</p>
       ) : null}
       {ignoredEmptyPromptCount > 0 ? (
         <p className="mt-1 text-[0.6rem] text-fg-3">
-          그림 프롬프트가 빈 컷 {ignoredEmptyPromptCount}개는 작업량과 생성 요청에서 제외됩니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "그림 프롬프트가 빈 컷 ")}{ignoredEmptyPromptCount}{translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "개는 작업량과 생성 요청에서 제외됩니다.")}</p>
       ) : null}
 
       <div className="mt-3 grid gap-2 lg:grid-cols-2">
@@ -333,10 +317,10 @@ export function StudioScenarioCandidateDesk({
                     checked={selected.has(index)}
                     onChange={() => toggleIndex(index)}
                     disabled={busy}
-                    aria-label={`${index + 1}번 컷 후보 생성 선택`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "{v0}번 컷 후보 생성 선택"), { v0: String(index + 1) })}
                     className="size-4 accent-accent"
                   />
-                  컷 {index + 1}
+                  {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "컷 ")}{index + 1}
                 </label>
                 <span
                   className="min-w-0 flex-1 truncate text-[0.65rem] text-fg-3"
@@ -346,12 +330,10 @@ export function StudioScenarioCandidateDesk({
                 </span>
                 {reviewStatus === "approved" ? (
                   <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-good/35 bg-good/10 px-2 py-0.5 text-[0.6rem] font-semibold text-good">
-                    <ShieldCheck size={10} aria-hidden /> 승인됨
-                  </span>
+                    <ShieldCheck size={10} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "승인됨")}</span>
                 ) : reviewStatus === "stale" ? (
                   <span className="shrink-0 rounded-full border border-warn/35 bg-warn/10 px-2 py-0.5 text-[0.6rem] font-semibold text-warn">
-                    재검토
-                  </span>
+                    {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "재검토")}</span>
                 ) : null}
               </div>
 
@@ -373,11 +355,9 @@ export function StudioScenarioCandidateDesk({
                         onClick={() => onSelectCandidate(index, candidate.id)}
                         disabled={busy}
                         aria-pressed={active}
-                        aria-label={`${index + 1}번 컷 후보 ${candidateIndex + 1} 사용`}
+                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "{v0}번 컷 후보 {v1} 사용"), { v0: String(index + 1), v1: String(candidateIndex + 1) })}
                         title={`${candidateLabel} · ${qualityShortLabel(candidate.qualityProfile)}`}
-                        className={`relative w-28 shrink-0 overflow-hidden rounded-lg border-2 bg-raised text-left transition-colors disabled:opacity-55 ${
-                          active ? "border-accent" : "border-transparent hover:border-line"
-                        }`}
+                        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "en", "relative w-28 shrink-0 overflow-hidden rounded-lg border-2 bg-raised text-left transition-colors disabled:opacity-55 {v0}"), { v0: String(active ? "border-accent" : "border-transparent hover:border-line") })}
                       >
                         <img
                           src={candidate.imageDataUrl}
@@ -393,12 +373,10 @@ export function StudioScenarioCandidateDesk({
                         </span>
                         {approved ? (
                           <span className="absolute left-1 top-1 rounded bg-good/90 px-1 py-0.5 text-[0.55rem] font-bold text-white">
-                            승인
-                          </span>
+                            {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "승인")}</span>
                         ) : stale ? (
                           <span className="absolute left-1 top-1 rounded bg-warn/90 px-1 py-0.5 text-[0.55rem] font-bold text-black">
-                            검토 필요
-                          </span>
+                            {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "검토 필요")}</span>
                         ) : null}
                       </button>
                     );
@@ -406,8 +384,7 @@ export function StudioScenarioCandidateDesk({
                 </div>
               ) : (
                 <p className="mt-2 rounded-md border border-dashed border-line px-2 py-2 text-[0.65rem] text-fg-3">
-                  아직 후보가 없습니다. 이 컷을 선택해 생성하거나 기존 단일 생성 버튼을 사용하세요.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "아직 후보가 없습니다. 이 컷을 선택해 생성하거나 기존 단일 생성 버튼을 사용하세요.")}</p>
               )}
 
               {selectedCandidate ? (
@@ -415,15 +392,14 @@ export function StudioScenarioCandidateDesk({
                   <span className="min-w-0 flex-1 truncate text-[0.6rem] text-fg-3">
                     {selectedCandidate.imageProvenance
                       ? `${selectedCandidate.imageProvenance.provider} / ${selectedCandidate.imageProvenance.model}`
-                      : "이전 생성 결과"}
+                      : translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "이전 생성 결과")}
                     {selectedCandidate.qualityProfile
                       ? ` · ${qualityShortLabel(selectedCandidate.qualityProfile)} · ${selectedCandidate.variationLabel ?? "기본 연출"}`
                       : ""}
                   </span>
                   {selectedCandidateStale ? (
                     <span className="text-[0.6rem] font-semibold text-warn">
-                      현재 프롬프트·참조와 다름
-                    </span>
+                      {translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "현재 프롬프트·참조와 다름")}</span>
                   ) : null}
                   <button
                     type="button"
@@ -437,8 +413,8 @@ export function StudioScenarioCandidateDesk({
                   >
                     <ShieldCheck size={11} aria-hidden />
                     {item.approvedImageCandidateId === selectedCandidate.id
-                      ? "승인 완료"
-                      : "이 후보 승인"}
+                      ? translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "승인 완료")
+                      : translateCurrentStaticSourceText("domains.creator.StudioScenarioCandidateDesk", "ko", "이 후보 승인")}
                   </button>
                 </div>
               ) : null}

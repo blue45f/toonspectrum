@@ -89,6 +89,7 @@ export const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
     id: "view",
     caption: "보기",
     items: [
+      "플로팅 UI · 배치 설정…",
       "확대",
       "축소",
       "왼쪽으로 90° 회전",
@@ -110,10 +111,10 @@ export const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
       "캔버스 크기 · 문서 설정…",
       "웹툰 플랫폼 규격 가이드",
       "그리드",
-      "새 캔버스 · 범용·고화질 세로 웹툰 · 1080 × 8000px",
-      "새 캔버스 · 네이버 연재형 · 690 × 8000px",
-      "새 캔버스 · 카카오 연재형 · 720 × 8000px",
-      "새 캔버스 · WEBTOON Canvas형 · 800 × 8000px",
+      "현재 캔버스 · 범용·고화질 세로 웹툰 · 1080 × 8000px",
+      "현재 캔버스 · 네이버 연재형 · 690 × 8000px",
+      "현재 캔버스 · 카카오 연재형 · 720 × 8000px",
+      "현재 캔버스 · WEBTOON Canvas형 · 800 × 8000px",
       "스티키 노트",
     ],
   },
@@ -208,7 +209,7 @@ export const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
     caption: "도움말",
     items: [
       "명령 · 속성 통합 검색",
-      "CSP · Photoshop 용어 찾기",
+      "다른 앱 용어 찾기",
       "현재 도구 도움말",
       "도움말 홈 · 단계별 가이드",
       "단축키 · 기본 조작",
@@ -983,6 +984,69 @@ async function assertMenuDrivenPopovers(page: Page): Promise<string[]> {
   return failures;
 }
 
+async function assertCurrentCanvasPlatformResize(page: Page): Promise<string[]> {
+  const failures: string[] = [];
+  const canvasMenuTitle = presentedTitleFor("canvas");
+  const windowMenuTitle = presentedTitleFor("window");
+
+  const waitForHeight = async (height: number): Promise<boolean> =>
+    page
+      .locator(`span[aria-label="높이 ${height}px"]`)
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+
+  const applyPreset = async (itemId: string, expectedHeight: number): Promise<boolean> => {
+    await openMainMenuGroup(page, canvasMenuTitle);
+    const menu = page.locator(`[role="menu"][aria-label="${canvasMenuTitle}"]`);
+    await menu.locator(`[data-studio-menu-item-id="${itemId}"]`).click({ timeout: 4_000 });
+    return waitForHeight(expectedHeight);
+  };
+
+  try {
+    await closeFloatingUi(page);
+    await openMainMenuGroup(page, windowMenuTitle);
+    await page
+      .locator(`[role="menu"][aria-label="${windowMenuTitle}"]`)
+      .locator('[data-studio-menu-item-id="density-full"]')
+      .click({ timeout: 4_000 });
+    await page.waitForTimeout(150);
+
+    await openMainMenuGroup(page, canvasMenuTitle);
+    const menu = page.locator(`[role="menu"][aria-label="${canvasMenuTitle}"]`);
+    await menu
+      .locator('[data-studio-menu-item-id="canvas-settings"]')
+      .click({ timeout: 4_000 });
+    await page.locator("span[aria-label^=\"높이 \"][aria-label$=\"px\"]").first().waitFor({ state: "visible", timeout: 5_000 });
+
+    const drawingUrl = page.url();
+    if (!(await applyPreset("apply-webtoon-naver", 8_348))) {
+      failures.push("현재 드로잉에 네이버 690 × 8000 비율을 적용하지 못함");
+    }
+    if (page.url() !== drawingUrl) {
+      failures.push("플랫폼 규격 적용이 현재 드로잉을 유지하지 않고 다른 화면으로 이동함");
+    }
+    if (!(await applyPreset("apply-webtoon-kakao", 8_000))) {
+      failures.push("현재 드로잉에 카카오 720 × 8000 비율을 적용하지 못함");
+    }
+
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+z" : "Control+z");
+    if (!(await waitForHeight(8_348))) {
+      failures.push("플랫폼 규격 변경을 한 번의 실행취소로 복원하지 못함");
+    }
+
+    if (failures.length === 0) {
+      log("  current canvas platform resize ok: Naver → Kakao → undo");
+    }
+  } catch (err) {
+    failures.push(
+      `현재 캔버스 플랫폼 규격 변경: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    await page.keyboard.press("Escape").catch(() => undefined);
+  }
+  return failures;
+}
+
 async function assertWorkspaceDeviceEditor(page: Page): Promise<string[]> {
   const failures: string[] = [];
   try {
@@ -1052,6 +1116,94 @@ async function assertDrawOptionsBar(page: Page): Promise<string[]> {
     else log("  draw options bar ok");
   } catch (err) {
     failures.push(`드로잉 옵션 바: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  return failures;
+}
+
+async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
+  const failures: string[] = [];
+  try {
+    const launcher = page.locator('[data-studio-shell-view-options="true"] > button');
+    await launcher.waitFor({ state: "visible", timeout: 5000 });
+    await launcher.click();
+    const dialog = page.getByRole("dialog", { name: "보기 및 플로팅 UI 설정" });
+    await dialog.waitFor({ state: "visible", timeout: 5000 });
+
+    const drawingOptions = page.locator('[data-studio-draw-options-dock="true"]');
+    if (await drawingOptions.count() === 0) {
+      failures.push("보기 설정이 관리할 그리기 옵션 바를 찾지 못함");
+    } else {
+      await dialog.getByRole("switch", { name: "그리기 옵션 숨기기" }).click();
+      await drawingOptions.waitFor({ state: "hidden", timeout: 3000 });
+      await dialog.getByRole("switch", { name: "그리기 옵션 표시하기" }).click();
+      await drawingOptions.waitFor({ state: "visible", timeout: 3000 });
+
+      if (await dialog.locator('[data-studio-shell-mounted-state="available"]').count() === 0) {
+        failures.push("현재 화면에서 사용 가능한 플로팅 요소 상태가 표시되지 않음");
+      }
+      await dialog.getByRole("button", { name: /캔버스 집중/ }).click();
+      await drawingOptions.waitFor({ state: "hidden", timeout: 3000 });
+      await dialog.locator('[data-studio-shell-focus-mode="true"]').waitFor({
+        state: "visible",
+        timeout: 3000,
+      });
+      await dialog.getByRole("button", { name: "원래 보기", exact: true }).click();
+      await drawingOptions.waitFor({ state: "visible", timeout: 3000 });
+
+      await dialog.getByRole("button", { name: "배치 편집", exact: true }).click();
+      const handle = page.locator('[data-studio-shell-floating-handle="drawing-options"]');
+      await handle.waitFor({ state: "visible", timeout: 3000 });
+      await handle.getByRole("button", { name: "그리기 옵션 위치 잠금" }).click();
+      if (!(await handle.getByRole("button", { name: "그리기 옵션 이동" }).isDisabled())) {
+        failures.push("그리기 옵션 위치 잠금 미적용");
+      }
+      await handle.getByRole("button", { name: "그리기 옵션 위치 잠금 해제" }).click();
+      const dockSelect = handle.getByRole("combobox", { name: "그리기 옵션 도킹 위치" });
+      await dockSelect.selectOption("top");
+      if (await dockSelect.inputValue() !== "top") {
+        failures.push("그리기 옵션 직접 도킹 선택 미적용");
+      }
+      await dockSelect.selectOption("bottom");
+      await dialog.getByRole("button", { name: "배치 완료", exact: true }).click();
+
+      const autoHide = dialog.getByRole("switch", { name: /펜으로 그리는 동안 자동 숨김/ });
+      if (await autoHide.getAttribute("aria-checked") !== "true") await autoHide.click();
+      const canvas = page.locator('[data-studio-canvas-viewport] canvas').first();
+      if (await canvas.count() === 0) {
+        failures.push("펜 자동 숨김을 검증할 캔버스를 찾지 못함");
+      } else {
+        await canvas.dispatchEvent("pointerdown", {
+          pointerId: 91, pointerType: "pen", button: 0, isPrimary: true,
+        });
+        await page.waitForFunction(() =>
+          document.querySelector('[data-studio-shell-view-options="true"]')
+            ?.getAttribute("data-studio-shell-drawing-auto-hide-active") === "true"
+        );
+        await canvas.dispatchEvent("pointerup", {
+          pointerId: 91, pointerType: "pen", button: 0, isPrimary: true,
+        });
+        await page.waitForFunction(() =>
+          document.querySelector('[data-studio-shell-view-options="true"]')
+            ?.getAttribute("data-studio-shell-drawing-auto-hide-active") === "false"
+        , undefined, { timeout: 2500 });
+      }
+
+      if (!(await dialog.isVisible().catch(() => false))) {
+        await launcher.click();
+        await dialog.waitFor({ state: "visible", timeout: 3000 });
+      }
+      await dialog.getByRole("button", { name: "모두 숨김" }).click();
+      await drawingOptions.waitFor({ state: "hidden", timeout: 3000 });
+      if (!(await launcher.isVisible())) failures.push("모두 숨김 후 보기 복구 버튼이 사라짐");
+      await dialog.getByRole("button", { name: "모두 표시" }).click();
+      await drawingOptions.waitFor({ state: "visible", timeout: 3000 });
+    }
+
+    await dialog.getByRole("button", { name: "보기 설정 닫기" }).click();
+    if (failures.length === 0) log("  floating visibility + WYSIWYG layout ok");
+  } catch (err) {
+    failures.push(`플로팅 보기·배치: ${err instanceof Error ? err.message : String(err)}`);
+    await page.keyboard.press("Escape").catch(() => undefined);
   }
   return failures;
 }
@@ -1133,13 +1285,15 @@ async function main() {
       ...(await assertReferenceWindowToggle(page)),
       ...(await assertRailTools(page)),
       ...(await assertMenuDrivenPopovers(page)),
+      ...(await assertCurrentCanvasPlatformResize(page)),
       ...(await assertWorkspaceDeviceEditor(page)),
       ...(await assertDrawOptionsBar(page)),
+      ...(await assertFloatingLayoutManager(page)),
       ...(await assertExportOptions(page)),
     ];
 
     if (failures.length === 0) {
-      log("PASS: canvas-first menus exposed (9 primary + AI action + sections + rail + popovers)");
+      log("PASS: canvas-first menus exposed (9 primary + AI action + current-canvas platform resize + rail + popovers)");
       exitCode = 0;
     } else {
       log(`FAIL (${failures.length}):`);

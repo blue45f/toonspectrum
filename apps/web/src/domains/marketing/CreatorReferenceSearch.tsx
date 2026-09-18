@@ -1,7 +1,19 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Search, ArrowRight } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveReferenceQuery } from "@toonspectrum/core/reference-query-language";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("CreatorReferenceSearch", ko, en);
 
 const COPY = {
   ko: {
@@ -26,8 +38,9 @@ const COPY = {
   },
 } as const;
 
-export function CreatorReferenceSearch({ locale }: { locale: "ko" | "en" }) {
-  const copy = COPY[locale];
+export function CreatorReferenceSearch({ locale: _locale }: { locale: "ko" | "en" }) {
+  useBilingualI18nRevision();
+  const copy = bi((COPY).ko, (COPY).en);
   const navigate = useNavigate();
   const id = useId();
   const composing = useRef(false);
@@ -47,11 +60,11 @@ export function CreatorReferenceSearch({ locale }: { locale: "ko" | "en" }) {
           navigate(`/research/assets?${new URLSearchParams({ q: resolution.original }).toString()}`);
         }}>
           <label htmlFor={id}>{copy.label}</label>
-          <div className="cf-search-field"><Search size={20} aria-hidden="true" /><input id={id} value={query} maxLength={80} placeholder={copy.placeholder} aria-invalid={invalid || undefined} aria-describedby={`${id}-hint${invalid ? ` ${id}-error` : ""}`} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={(event) => { if (event.key === "Enter" && (composing.current || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.preventDefault(); }} onChange={(event) => { setQuery(event.target.value); setSubmitted(false); }} /><button type="submit">{copy.submit}<ArrowRight size={17} aria-hidden="true" /></button></div>
-          {invalid && <p id={`${id}-error`} role="alert">{copy.invalid}</p>}
+          <div className="cf-search-field"><Search size={20} aria-hidden="true" /><input id={id} value={query} maxLength={80} placeholder={copy.placeholder} aria-invalid={invalid || undefined} aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.CreatorReferenceSearch", "en", "{v0}-hint{v1}"), { v0: String(id), v1: String(invalid ? ` ${id}-error` : "") })} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={(event) => { if (event.key === "Enter" && (composing.current || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.preventDefault(); }} onChange={(event) => { setQuery(event.target.value); setSubmitted(false); }} /><button type="submit">{copy.submit}<ArrowRight size={17} aria-hidden="true" /></button></div>
+          {invalid && <p id={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.CreatorReferenceSearch", "en", "{v0}-error"), { v0: String(id) })} role="alert">{copy.invalid}</p>}
         </form>
         <div className="cf-query-examples">{copy.examples.map((example) => <button type="button" key={example} onClick={() => { setQuery(example); setSubmitted(false); }}>{example}</button>)}</div>
-        <div className="cf-query-preview" id={`${id}-hint`}>
+        <div className="cf-query-preview" id={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.CreatorReferenceSearch", "en", "{v0}-hint"), { v0: String(id) })}>
           {resolution.status === "translated" || resolution.status === "partial" ? <><span>{copy.resolved}</span><strong>{resolution.providerQuery}</strong>{resolution.unresolved.length > 0 && <p>{copy.partial} {resolution.unresolved.join(", ")}</p>}</> : <p>{resolution.status === "unsupported" ? copy.unsupported : copy.unchanged}</p>}
         </div>
         <p className="cf-storage-note">{copy.note}</p>

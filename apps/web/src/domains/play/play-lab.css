@@ -7,7 +7,7 @@
 .play-page :is(input, textarea, select) { accent-color: var(--color-accent); }
 .play-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display), sans-serif; font-size: 11px; font-weight: 600; line-height: 1.7; letter-spacing: .13em; color: var(--color-fg-2); }
 .play-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
-.play-button { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border: 1px solid var(--color-line-strong); border-radius: 10px; background: var(--color-panel); color: var(--color-fg); font-size: 13px; font-weight: 600; line-height: 1.45; transition: background 180ms, border-color 180ms; text-decoration: none; }
+.play-button { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border: 1px solid var(--color-line-strong); border-radius: 10px; background: var(--color-panel); color: var(--color-fg); font-size: 13px; font-weight: 600; line-height: 1.45; transition: background 180ms, border-color 180ms; text-decoration: none; }
 .play-button:hover:not(:disabled) { border-color: var(--color-accent); background: var(--color-raised); }
 .play-button.primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); }
 .play-button.primary:hover:not(:disabled) { background: var(--color-accent-2); }
@@ -51,7 +51,7 @@
 .play-library-heading p { font-size: 13px; line-height: 1.7; color: var(--color-fg-2); }
 .play-filter-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 23px; }
 .play-filter-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
-.play-chip { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 7px; padding: 8px 13px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-panel); color: var(--color-fg-2); font-size: 12px; line-height: 1.4; transition: border-color 180ms, background 180ms; }
+.play-chip { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 7px; padding: 8px 13px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-panel); color: var(--color-fg-2); font-size: 12px; line-height: 1.4; transition: border-color 180ms, background 180ms; }
 .play-chip[aria-pressed="true"] { background: var(--color-accent-soft); border-color: var(--color-accent); color: var(--color-accent); }
 .play-chip span { font-family: var(--font-display), sans-serif; font-size: 10px; opacity: .8; }
 .play-chip:hover:not(:disabled) { border-color: var(--color-accent); }
@@ -67,7 +67,7 @@
 .play-content-card:hover .play-card-art .play-artwork { transform: scale(1.025); }
 .play-card-index { position: absolute; top: 15px; left: 16px; font: 13px var(--font-display), sans-serif; color: var(--color-fg-2); }
 .play-local-badge { position: absolute; bottom: 11px; left: 14px; padding: 4px 7px; border: 1px solid oklch(.62 .018 68 / .35); border-radius: 4px; color: var(--color-fg); background: oklch(.2 .015 68 / .92); font: 8px var(--font-display), sans-serif; letter-spacing: .09em; }
-.play-card-favorite { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 37px; height: 37px; border: 1px solid oklch(.6 .02 68 / .35); border-radius: 50%; color: var(--color-fg); background: oklch(.2 .016 68 / .9); }
+.play-card-favorite { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid oklch(.6 .02 68 / .35); border-radius: 50%; color: var(--color-fg); background: oklch(.2 .016 68 / .9); }
 .play-card-favorite[aria-pressed="true"] { color: var(--color-accent); border-color: var(--color-accent); }
 .play-card-body { display: flex; flex: 1; flex-direction: column; width: 100%; padding: 21px; }
 .play-card-category { display: flex; justify-content: space-between; gap: 8px; color: var(--color-fg-2); font-size: 10px; }

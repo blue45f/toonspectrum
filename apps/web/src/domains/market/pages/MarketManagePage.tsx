@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowUpRight,
   Edit,
   Eye,
@@ -125,14 +129,12 @@ export function MarketManagePage() {
         <div>
           <div className="flex items-center gap-2">
             <UserCheck className="size-5 text-accent" />
-            <h1 className="text-xl font-bold text-fg sm:text-2xl">내 등록 에셋 관리</h1>
+            <h1 className="text-xl font-bold text-fg sm:text-2xl">{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "내 등록 에셋 관리")}</h1>
             <span className="numeral tnum rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-bold text-accent">
-              {items.length}개
-            </span>
+              {items.length}{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "개")}</span>
           </div>
           <p className="mt-1 text-xs text-fg-3">
-            내가 배포한 에셋의 실시간 수정, 버전 릴리즈, 공개/비공개 전환 및 스튜디오 테스트
-          </p>
+            {translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "내가 배포한 에셋의 실시간 수정, 버전 릴리즈, 공개/비공개 전환 및 스튜디오 테스트")}</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -143,7 +145,7 @@ export function MarketManagePage() {
             className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
           >
             <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
-            <span>새로고침</span>
+            <span>{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "새로고침")}</span>
           </button>
           <Link
             href="/market/publish"
@@ -154,7 +156,7 @@ export function MarketManagePage() {
             })}
           >
             <Plus className="size-4" />
-            <span>새 에셋 등록하기</span>
+            <span>{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "새 에셋 등록하기")}</span>
           </Link>
         </div>
       </div>
@@ -165,16 +167,14 @@ export function MarketManagePage() {
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3">
             <PackagePlus className="size-6" />
           </div>
-          <h2 className="text-sm font-bold text-fg">아직 등록한 에셋이 없어요</h2>
+          <h2 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "아직 등록한 에셋이 없어요")}</h2>
           <p className="mx-auto max-w-sm text-xs text-fg-3 leading-relaxed">
-            스튜디오에서 작업한 브러시나 3D 모델, 연출 프리셋을 등록하고 다른 작가들과 공유해보세요.
-          </p>
+            {translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "스튜디오에서 작업한 브러시나 3D 모델, 연출 프리셋을 등록하고 다른 작가들과 공유해보세요.")}</p>
           <Link
             href="/market/publish"
             className={buttonClass({ variant: "solid", size: "md", className: "mt-2" })}
           >
-            지금 첫 에셋 등록하기
-          </Link>
+            {translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "지금 첫 에셋 등록하기")}</Link>
         </div>
       ) : (
         <div className="mt-6 divide-y divide-line rounded-xl border border-line bg-card overflow-hidden">
@@ -203,26 +203,24 @@ export function MarketManagePage() {
                       </span>
                       {isDelisted ? (
                         <span className="rounded bg-warn/20 px-1.5 py-0.2 text-[0.62rem] font-bold text-warn">
-                          비공개
-                        </span>
+                          {translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "비공개")}</span>
                       ) : (
                         <span className="rounded bg-good/20 px-1.5 py-0.2 text-[0.62rem] font-bold text-good">
-                          공개 중
-                        </span>
+                          {translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "공개 중")}</span>
                       )}
                     </div>
 
                     <p className="mt-1 line-clamp-1 text-xs text-fg-3">
-                      {record.description || "설명 없음"}
+                      {record.description || translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "설명 없음")}
                     </p>
 
                     <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[0.68rem] text-fg-3">
-                      <span>종류: {kind.label}</span>
-                      <span>라이선스: {license.label}</span>
-                      <span>항목: {record.entries.length}개</span>
-                      <span>manifest: {formatMarketByteSize(record.manifestByteSize)}</span>
+                      <span>{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "종류: ")}{kind.label}</span>
+                      <span>{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "라이선스: ")}{license.label}</span>
+                      <span>{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "항목: ")}{record.entries.length}{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "개")}</span>
+                      <span>{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "en", "manifest: ")}{formatMarketByteSize(record.manifestByteSize)}</span>
                       <time dateTime={record.updatedAt}>
-                        최근 수정: {record.updatedAt.slice(0, 10)}
+                        {translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "최근 수정: ")}{record.updatedAt.slice(0, 10)}
                       </time>
                     </div>
                   </div>
@@ -240,13 +238,13 @@ export function MarketManagePage() {
                     })}
                   >
                     <Edit className="size-3.5" />
-                    <span>수정 / 판올림</span>
+                    <span>{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "수정 / 판올림")}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => void handleToggleListing(record)}
-                    title={isDelisted ? "마켓에 재공개" : "비공개 전환"}
+                    title={isDelisted ? translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "마켓에 재공개") : translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "비공개 전환")}
                     className={buttonClass({
                       variant: "ghost",
                       size: "sm",
@@ -256,18 +254,18 @@ export function MarketManagePage() {
                     {isDelisted ? (
                       <>
                         <Eye className="size-3.5 text-good" />
-                        <span className="text-good">재공개</span>
+                        <span className="text-good">{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "재공개")}</span>
                       </>
                     ) : (
                       <>
                         <EyeOff className="size-3.5 text-warn" />
-                        <span>비공개</span>
+                        <span>{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "비공개")}</span>
                       </>
                     )}
                   </button>
 
                   <Link
-                    href={`/studio?installMarketResource=${record.id}&assetMarket=community`}
+                    href={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "en", "/studio?installMarketResource={v0}&assetMarket=community"), { v0: String(record.id) })}
                     className={buttonClass({
                       variant: "outline",
                       size: "sm",
@@ -275,29 +273,29 @@ export function MarketManagePage() {
                     })}
                   >
                     <Palette className="size-3.5" />
-                    <span>스튜디오</span>
+                    <span>{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "스튜디오")}</span>
                   </Link>
 
                   <Link
-                    href={`/market/resource/${record.id}`}
+                    href={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "en", "/market/resource/{v0}"), { v0: String(record.id) })}
                     className={buttonClass({
                       variant: "ghost",
                       size: "sm",
                       className: "gap-1 text-xs",
                     })}
                   >
-                    <span>상세</span>
+                    <span>{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "상세")}</span>
                     <ArrowUpRight className="size-3" />
                   </Link>
 
                   <button
                     type="button"
                     onClick={() => void handleDelete(record)}
-                    title="에셋 영구 삭제"
+                    title={translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "에셋 영구 삭제")}
                     className="rounded-lg p-1.5 text-fg-3 opacity-60 hover:text-warn hover:opacity-100 transition-opacity"
                   >
                     <Trash2 className="size-4" />
-                    <span className="sr-only">삭제</span>
+                    <span className="sr-only">{translateCurrentStaticSourceText("domains.market.pages.MarketManagePage", "ko", "삭제")}</span>
                   </button>
                 </div>
               </div>

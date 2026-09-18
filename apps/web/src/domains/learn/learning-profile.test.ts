@@ -18,13 +18,14 @@ describe("learning profile persistence", () => {
   });
 
   it("keeps valid fields and defaults each invalid field independently", () => {
-    assert.deepEqual(parseLearningProfile(JSON.stringify({ version: 1, goal: "visual", level: "advanced", sessionMinutes: 45 })), {
+    assert.deepEqual(parseLearningProfile(JSON.stringify({ version: 1, goal: "visual", role: "educator", level: "advanced", sessionMinutes: 45 })), {
       version: 1,
       goal: "visual",
+      role: "educator",
       level: "advanced",
       sessionMinutes: 45,
     });
-    assert.deepEqual(parseLearningProfile(JSON.stringify({ version: 1, goal: "unknown", level: 7, sessionMinutes: 999 })), DEFAULT_LEARNING_PROFILE);
+    assert.deepEqual(parseLearningProfile(JSON.stringify({ version: 1, goal: "unknown", role: "unknown", level: 7, sessionMinutes: 999 })), DEFAULT_LEARNING_PROFILE);
   });
 
   it("returns independent default objects", () => {
@@ -39,7 +40,7 @@ describe("learning profile persistence", () => {
       getItem: (key: string) => values.get(key) ?? null,
       setItem: (key: string, value: string) => { values.set(key, value); },
     };
-    const profile = { version: 1 as const, goal: "publish" as const, level: "advanced" as const, sessionMinutes: 45 as const };
+    const profile = { version: 1 as const, goal: "publish" as const, role: "producer" as const, level: "advanced" as const, sessionMinutes: 45 as const };
     assert.equal(saveLearningProfile(storage, profile), true);
     assert.equal(values.has(LEARNING_PROFILE_STORAGE_KEY), true);
     assert.deepEqual(loadLearningProfile(storage), profile);

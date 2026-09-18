@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   ArrowLeft,
   FileClock,
@@ -46,8 +50,12 @@ import {
   type ProductionWorkspace,
   type StudioProductionWorkspaceMode,
 } from "./studio-production-workspace";
+import { creatorProfileProductionRoleRecommendations } from "./creator-role-production-bridge";
 import { StudioPitchPptxCard } from "./StudioPitchPptxCard";
-import { StudioProductionOperationsPanel } from "./StudioProductionOperationsPanel";
+import {
+  StudioProductionOperationsPanel,
+  type StudioProductionRoleCandidate,
+} from "./StudioProductionOperationsPanel";
 import { StudioProductionReviewBoard } from "./StudioProductionReviewBoard";
 import { StudioProductionTaskBoard } from "./StudioProductionTaskBoard";
 import {
@@ -58,7 +66,9 @@ import {
 } from "./studio-production-server-client";
 import { StudioReviewLinkManager } from "./StudioReviewLinkManager";
 import { StudioServerVersionsCard } from "./StudioServerVersionsCard";
+import { getStudioTeam, type StudioTeamSnapshot } from "../studio-team-client";
 
+import { getMyProfile, type MeProfile } from "@/infrastructure/me-client";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
@@ -233,31 +243,27 @@ function ModeNotice({ mode }: { readonly mode: StudioProductionWorkspaceMode }) 
     return (
       <div className={cn(sharedClass, "border-sky-500/30 bg-sky-500/10 text-fg")} role="status">
         <Info className="mr-2 inline size-4 text-sky-600" aria-hidden="true" />
-        이 화면은 명시적으로 연 샘플 데모입니다. 변경 내용은 저장·공유·승인되지 않습니다.
-      </div>
+        {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "이 화면은 명시적으로 연 샘플 데모입니다. 변경 내용은 저장·공유·승인되지 않습니다.")}</div>
     );
   }
   if (mode === "server-work") {
     return (
       <div className={cn(sharedClass, "border-emerald-500/30 bg-emerald-500/10 text-fg")} role="status">
         <Server className="mr-2 inline size-4 text-emerald-600" aria-hidden="true" />
-        팀과 공유되는 프로젝트입니다. 권한에 따라 편집과 승인이 제한될 수 있습니다.
-      </div>
+        {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "팀과 공유되는 프로젝트입니다. 권한에 따라 편집과 승인이 제한될 수 있습니다.")}</div>
     );
   }
   if (mode === "read-only-cache") {
     return (
       <div className={cn(sharedClass, "border-amber-500/30 bg-amber-500/10 text-fg")} role="status">
         <WifiOff className="mr-2 inline size-4 text-amber-600" aria-hidden="true" />
-        연결이 없어 마지막으로 확인한 내용을 보여드립니다. 다시 연결되기 전에는 변경하거나 공유할 수 없습니다.
-      </div>
+        {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "연결이 없어 마지막으로 확인한 내용을 보여드립니다. 다시 연결되기 전에는 변경하거나 공유할 수 없습니다.")}</div>
     );
   }
   return (
     <div className={cn(sharedClass, "border-amber-500/30 bg-amber-500/10 text-fg")} role="status">
       <HardDrive className="mr-2 inline size-4 text-amber-600" aria-hidden="true" />
-      이 작업 목록과 검토 의견은 현재 이 기기에 저장됩니다. 다른 기기에서도 사용하려면 백업 파일을 만들어 주세요.
-    </div>
+      {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "이 작업 목록과 검토 의견은 현재 이 기기에 저장됩니다. 다른 기기에서도 사용하려면 백업 파일을 만들어 주세요.")}</div>
   );
 }
 
@@ -273,11 +279,10 @@ export function StudioProductionHubPage({
   if (!resolution.valid) {
     return (
       <section className="m-4 rounded-xl border border-line p-4" role="alert">
-        <h1 className="font-bold">프로젝트 범위를 확인할 수 없습니다</h1>
-        <p className="my-3 text-sm">잘못되거나 서로 충돌하는 작품 정보입니다. 저장된 내용은 변경하지 않았습니다.</p>
+        <h1 className="font-bold">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "프로젝트 범위를 확인할 수 없습니다")}</h1>
+        <p className="my-3 text-sm">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "잘못되거나 서로 충돌하는 작품 정보입니다. 저장된 내용은 변경하지 않았습니다.")}</p>
         <button type="button" className={buttonClass()} onClick={onOpenStudio}>
-          Studio 편집기로 돌아가기
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "Studio 편집기로 돌아가기")}</button>
       </section>
     );
   }
@@ -314,6 +319,8 @@ function StudioProductionHubWorkspace({
   const [serverCapabilities, setServerCapabilities] = useState<
     StudioServerProductionCapabilities | null
   >(null);
+  const [teamSnapshot, setTeamSnapshot] = useState<StudioTeamSnapshot | null>(null);
+  const [myProfile, setMyProfile] = useState<MeProfile | null>(null);
   const capabilities = useMemo(() => {
     const base = studioProductionWorkspaceCapabilities(mode);
     if (mode !== "server-work" || !serverCapabilities) return base;
@@ -385,6 +392,83 @@ function StudioProductionHubWorkspace({
   useEffect(() => {
     void reloadWorkspace(true);
   }, [reloadWorkspace]);
+
+  useEffect(() => {
+    let alive = true;
+    const controller = new AbortController();
+    getMyProfile(controller.signal)
+      .then((profile) => {
+        if (alive) setMyProfile(profile);
+      })
+      .catch(() => {
+        if (alive && !controller.signal.aborted) setMyProfile(null);
+      });
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (mode !== "server-work" || !serverWorkId) {
+      setTeamSnapshot(null);
+      return;
+    }
+    let alive = true;
+    const controller = new AbortController();
+    getStudioTeam(serverWorkId, controller.signal)
+      .then((snapshot) => {
+        if (alive) setTeamSnapshot(snapshot);
+      })
+      .catch(() => {
+        if (alive && !controller.signal.aborted) setTeamSnapshot(null);
+      });
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [mode, serverWorkId]);
+
+  const roleCandidates = useMemo<readonly StudioProductionRoleCandidate[]>(() => {
+    const recommendations = creatorProfileProductionRoleRecommendations(
+      myProfile?.creatorRoleProfile,
+    );
+    if (teamSnapshot) {
+      const candidates = teamSnapshot.members
+        .filter((member) => member.status === "active")
+        .map((member): StudioProductionRoleCandidate => ({
+          memberId: member.userId,
+          displayName: member.name,
+          accessRole: member.role,
+          isCurrentUser: member.userId === myProfile?.id,
+          recommendedRoles: member.userId === myProfile?.id ? recommendations : [],
+        }));
+      if (
+        myProfile
+        && teamSnapshot.viewer.status === "active"
+        && !candidates.some((candidate) => candidate.memberId === myProfile.id)
+      ) {
+        candidates.unshift({
+          memberId: myProfile.id,
+          displayName: myProfile.name ?? myProfile.email ?? "나",
+          accessRole: teamSnapshot.viewer.role,
+          isCurrentUser: true,
+          recommendedRoles: recommendations,
+        });
+      }
+      return candidates;
+    }
+    if (mode !== "server-work" && myProfile) {
+      return [{
+        memberId: myProfile.id,
+        displayName: myProfile.name ?? myProfile.email ?? "나",
+        accessRole: "local",
+        isCurrentUser: true,
+        recommendedRoles: recommendations,
+      }];
+    }
+    return [];
+  }, [mode, myProfile, teamSnapshot]);
 
   useEffect(() => {
     if (!capabilities.canPersistLocally || typeof BroadcastChannel === "undefined") return;
@@ -620,7 +704,7 @@ function StudioProductionHubWorkspace({
             type="button"
             className={buttonClass({ variant: "quiet", size: "icon" })}
             onClick={onOpenStudio}
-            aria-label="Studio 편집기로 돌아가기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "Studio 편집기로 돌아가기")}
           >
             <ArrowLeft className="size-5" aria-hidden="true" />
           </button>
@@ -630,15 +714,15 @@ function StudioProductionHubWorkspace({
               <p className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-fg-3">
                 {SURFACE_META[surface].label}
               </p>
-              <Pill tone={releaseReady ? "success" : configured ? "warning" : "neutral"}>
-                {releaseReady ? "내보낼 준비 완료" : configured ? "확인할 내용 있음" : "시작 전"}
+              <Pill tone={releaseReady ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "success") : configured ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "warning") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "neutral")}>
+                {releaseReady ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "내보낼 준비 완료") : configured ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "확인할 내용 있음") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "시작 전")}
               </Pill>
-              <Pill>변경 {workspace.revision}</Pill>
+              <Pill>{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "변경 ")}{workspace.revision}</Pill>
             </div>
             <input
               key={`${workspace.scopeKey}:${workspace.title}`}
               defaultValue={workspace.title}
-              aria-label="프로젝트 제목"
+              aria-label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "프로젝트 제목")}
               disabled={!capabilities.canEdit || Boolean(loadError)}
               className="mt-0.5 min-h-11 w-full max-w-3xl bg-transparent text-base font-black tracking-tight outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-lg"
               onBlur={(event) => {
@@ -656,12 +740,11 @@ function StudioProductionHubWorkspace({
             href={scope.editorHref}
             className={buttonClass({ variant: "outline", size: "sm" })}
           >
-            원고 열기
-          </Link>
+            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "원고 열기")}</Link>
         </div>
         <nav
           className="mx-auto max-w-[1920px] overflow-x-auto px-3 pb-2 sm:px-5"
-          aria-label="프로젝트 메뉴"
+          aria-label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "프로젝트 메뉴")}
         >
           <div className="flex min-w-max gap-1">
             {STUDIO_PRODUCTION_SURFACES.map((item, index) => {
@@ -672,14 +755,14 @@ function StudioProductionHubWorkspace({
                 <Link
                   key={item}
                   href={surfaceHref(item, scope)}
-                  aria-current={active ? "page" : undefined}
+                  aria-current={active ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "page") : undefined}
                   className={cn(
                     "inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold transition-colors pointer-coarse:min-h-11",
                     active
                       ? "bg-accent text-on-accent"
                       : "text-fg-2 hover:bg-raised hover:text-fg",
                   )}
-                  title={`${meta.label} · Alt+${index + 1}`}
+                  title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "{v0} · Alt+{v1}"), { v0: String(meta.label), v1: String(index + 1) })}
                 >
                   <Icon className="size-4" aria-hidden="true" />
                   {meta.label}
@@ -695,16 +778,15 @@ function StudioProductionHubWorkspace({
 
         {loadError ? (
           <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm" role="alert">
-            <p className="font-bold">저장된 제작 운영 데이터를 안전하게 열지 못했습니다.</p>
+            <p className="font-bold">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "저장된 제작 운영 데이터를 안전하게 열지 못했습니다.")}</p>
             <p className="mt-1 text-xs text-fg-2">{loadError}</p>
-            <p className="mt-2 text-xs text-fg-2">손상된 값을 빈 데이터로 덮어쓰지 않았습니다.</p>
+            <p className="mt-2 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "손상된 값을 빈 데이터로 덮어쓰지 않았습니다.")}</p>
             <button
               type="button"
               className={cn(buttonClass({ variant: "outline", size: "sm" }), "mt-3")}
               onClick={() => void reloadWorkspace(true)}
             >
-              다시 확인
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "다시 확인")}</button>
           </div>
         ) : null}
 
@@ -715,36 +797,35 @@ function StudioProductionHubWorkspace({
           >
             <span>{notice}</span>
             <button type="button" className="font-semibold text-accent" onClick={() => setNotice(null)}>
-              닫기
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "닫기")}</button>
           </div>
         ) : null}
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Metric
-            label="진행률"
+            label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "진행률")}
             value={`${progress}%`}
             detail={workspace.tasks.length === 0
-              ? "제작 작업을 추가해 진행률을 관리하세요."
-              : `${completed}/${workspace.tasks.length} 작업 완료`}
-            tone={workspace.tasks.length > 0 && completed === workspace.tasks.length ? "success" : "neutral"}
+              ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "제작 작업을 추가해 진행률을 관리하세요.")
+              : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}/{v1} 작업 완료"), { v0: String(completed), v1: String(workspace.tasks.length) })}
+            tone={workspace.tasks.length > 0 && completed === workspace.tasks.length ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "success") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "neutral")}
           />
           <Metric
-            label="먼저 해결할 항목"
-            value={`${blocked}건`}
-            detail={blocked > 0 ? "다음 단계 전에 확인해 주세요" : "진행을 막는 항목이 없습니다"}
-            tone={blocked > 0 ? "danger" : "success"}
+            label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "먼저 해결할 항목")}
+            value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}건"), { v0: String(blocked) })}
+            detail={blocked > 0 ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "다음 단계 전에 확인해 주세요") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "진행을 막는 항목이 없습니다")}
+            tone={blocked > 0 ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "danger") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "success")}
           />
           <Metric
-            label="확인할 의견"
-            value={`${openBlockers + openMajor}건`}
-            detail={`중요 ${openBlockers} · 일반 ${openMajor}`}
-            tone={openBlockers > 0 ? "danger" : openMajor > 0 ? "warning" : "success"}
+            label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "확인할 의견")}
+            value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}건"), { v0: String(openBlockers + openMajor) })}
+            detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "중요 {v0} · 일반 {v1}"), { v0: String(openBlockers), v1: String(openMajor) })}
+            tone={openBlockers > 0 ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "danger") : openMajor > 0 ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "warning") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "success")}
           />
           <Metric
-            label="참여자"
-            value={`${workspace.members.length}명`}
-            detail={capabilities.serverAuthoritative ? "팀 권한에 따라 표시" : "이 기기의 프로젝트 정보"}
+            label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "참여자")}
+            value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}명"), { v0: String(workspace.members.length) })}
+            detail={capabilities.serverAuthoritative ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "팀 권한에 따라 표시") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "이 기기의 프로젝트 정보")}
           />
         </div>
 
@@ -752,10 +833,10 @@ function StudioProductionHubWorkspace({
           <div className="space-y-4">
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
             <Card
-              title="다음 할 일"
+              title={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "다음 할 일")}
               description={mode === "server-work"
-                ? "팀과 공유하는 할 일을 추가하고 진행 상태를 확인하세요."
-                : "이 프로젝트에서 이어서 할 일을 간단히 정리하세요."}
+                ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "팀과 공유하는 할 일을 추가하고 진행 상태를 확인하세요.")
+                : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "이 프로젝트에서 이어서 할 일을 간단히 정리하세요.")}
               action={(
                 <button
                   type="button"
@@ -764,8 +845,7 @@ function StudioProductionHubWorkspace({
                   disabled={!capabilities.canEdit || Boolean(loadError)}
                 >
                   <Plus className="size-4" aria-hidden="true" />
-                  작업 추가
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "작업 추가")}</button>
               )}
             >
               <StudioProductionTaskBoard
@@ -777,10 +857,10 @@ function StudioProductionHubWorkspace({
               />
             </Card>
             <Card
-              title="내보내기 전 확인"
+              title={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "내보내기 전 확인")}
               description={mode === "server-work"
-                ? "남은 할 일과 검토 의견을 확인한 뒤 내보내기를 준비하세요."
-                : "현재 기기의 할 일과 검토 의견을 기준으로 준비 상태를 보여드립니다."}
+                ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "남은 할 일과 검토 의견을 확인한 뒤 내보내기를 준비하세요.")
+                : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "현재 기기의 할 일과 검토 의견을 기준으로 준비 상태를 보여드립니다.")}
             >
               <div className={cn(
                 "rounded-2xl border p-4 text-center",
@@ -795,11 +875,11 @@ function StudioProductionHubWorkspace({
                 )}
                 <p className="mt-2 text-sm font-black">
                   {releaseReady
-                    ? "내보낼 준비가 됐어요"
-                    : configured ? "확인할 내용이 있어요" : "할 일을 먼저 추가하세요"}
+                    ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "내보낼 준비가 됐어요")
+                    : configured ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "확인할 내용이 있어요") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "할 일을 먼저 추가하세요")}
                 </p>
                 <p className="mt-1 text-xs text-fg-2">
-                  먼저 해결할 항목 {blocked} · 확인할 의견 {openBlockers + openMajor}
+                  {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "먼저 해결할 항목 ")}{blocked} {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "· 확인할 의견 ")}{openBlockers + openMajor}
                 </p>
               </div>
             </Card>
@@ -808,6 +888,7 @@ function StudioProductionHubWorkspace({
               workspace={workspace}
               canEdit={capabilities.canEdit && !loadError}
               canManageRoles={capabilities.canManageRoles && !loadError}
+              roleCandidates={roleCandidates}
               onCommit={(update, message) => { void commit(update, message); }}
             />
           </div>
@@ -815,10 +896,10 @@ function StudioProductionHubWorkspace({
 
         {surface === "review" ? (
           <Card
-            title={mode === "server-work" ? "검토 의견" : "내 검토 메모"}
+            title={mode === "server-work" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "검토 의견") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "내 검토 메모")}
             description={mode === "server-work"
-              ? "팀이 확인할 의견을 장면과 작업에 연결해 관리합니다."
-              : "이 기기에 저장되는 개인 검토 메모입니다."}
+              ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "팀이 확인할 의견을 장면과 작업에 연결해 관리합니다.")
+              : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "이 기기에 저장되는 개인 검토 메모입니다.")}
             action={(
               <button
                 type="button"
@@ -827,8 +908,7 @@ function StudioProductionHubWorkspace({
                 disabled={!capabilities.canEdit || Boolean(loadError)}
               >
                 <Plus className="size-4" aria-hidden="true" />
-                의견 추가
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "의견 추가")}</button>
             )}
           >
             <StudioProductionReviewBoard
@@ -843,10 +923,10 @@ function StudioProductionHubWorkspace({
         {surface === "versions" ? (
           <div className="space-y-4">
             <Card
-              title={mode === "server-work" ? "제작 운영 체크포인트" : "로컬 작업·검수 체크포인트"}
+              title={mode === "server-work" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "제작 운영 체크포인트") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "로컬 작업·검수 체크포인트")}
               description={mode === "server-work"
-                ? "작업·검수·역할·인계 상태를 서버 제작 운영 문서 안에 저장합니다. 원고 컷·레이어 복원본은 아닙니다."
-                : "로컬 작업·검수 목록만 저장·복원합니다. 원고의 컷·레이어와 서버 리비전은 포함하지 않습니다."}
+                ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "작업·검수·역할·인계 상태를 서버 제작 운영 문서 안에 저장합니다. 원고 컷·레이어 복원본은 아닙니다.")
+                : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "로컬 작업·검수 목록만 저장·복원합니다. 원고의 컷·레이어와 서버 리비전은 포함하지 않습니다.")}
               action={(
                 <button
                   type="button"
@@ -855,14 +935,13 @@ function StudioProductionHubWorkspace({
                   disabled={!capabilities.canEdit || Boolean(loadError)}
                 >
                   <FileClock className="size-4" aria-hidden="true" />
-                  체크포인트 만들기
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "체크포인트 만들기")}</button>
               )}
             >
               {workspace.versions.length === 0 ? (
                 <EmptyState
-                  title={mode === "server-work" ? "제작 운영 체크포인트가 없습니다" : "로컬 체크포인트가 없습니다"}
-                  description="서버 원고 리비전과 별개로, 이 화면의 작업·검수 상태를 보관할 수 있습니다."
+                  title={mode === "server-work" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "제작 운영 체크포인트가 없습니다") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "로컬 체크포인트가 없습니다")}
+                  description={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "서버 원고 리비전과 별개로, 이 화면의 작업·검수 상태를 보관할 수 있습니다.")}
                 />
               ) : (
                 <div className="space-y-2">
@@ -874,7 +953,7 @@ function StudioProductionHubWorkspace({
                       <div>
                         <h3 className="text-sm font-bold">{version.name}</h3>
                         <p className="mt-1 text-xs text-fg-2">
-                          {DATE_TIME_FORMATTER.format(new Date(version.createdAt))} · 작업 {version.tasks.length} · 검수 {version.reviews.length}
+                          {DATE_TIME_FORMATTER.format(new Date(version.createdAt))} {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "· 작업 ")}{version.tasks.length} {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "· 검수 ")}{version.reviews.length}
                         </p>
                       </div>
                       <button
@@ -884,7 +963,7 @@ function StudioProductionHubWorkspace({
                         disabled={!capabilities.canEdit || Boolean(loadError)}
                       >
                         <RotateCcw className="size-4" aria-hidden="true" />
-                        {mode === "server-work" ? "운영 상태 복원" : "로컬 복원"}
+                        {mode === "server-work" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "운영 상태 복원") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "로컬 복원")}
                       </button>
                     </article>
                   ))}
@@ -918,8 +997,8 @@ function StudioProductionHubWorkspace({
             />
           ) : (
           <Card
-            title={capabilities.canInvite ? "서버 프로젝트 공유" : "서버 공유 잠금"}
-            description="초대 링크는 서버에서 난수 토큰을 발급하고 권한·만료·폐기를 검증해야 합니다."
+            title={capabilities.canInvite ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "서버 프로젝트 공유") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "서버 공유 잠금")}
+            description={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "초대 링크는 서버에서 난수 토큰을 발급하고 권한·만료·폐기를 검증해야 합니다.")}
           >
             <div className={cn(
               "rounded-2xl border p-5",
@@ -934,17 +1013,15 @@ function StudioProductionHubWorkspace({
               )}
               <h2 className="mt-3 text-base font-black">
                 {capabilities.canInvite
-                  ? "서버 초대 서비스에서 링크를 발급하세요"
-                  : "이 모드에서는 초대 링크를 만들 수 없습니다"}
+                  ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "서버 초대 서비스에서 링크를 발급하세요")
+                  : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "이 모드에서는 초대 링크를 만들 수 없습니다")}
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-relaxed text-fg-2">
-                브라우저에 저장된 문자열이나 작품 ID에서 계산한 값은 인증 토큰으로 인정하지 않습니다.
-                현재 작업 목록은 {mode === "server-work" ? "서버 프로젝트" : mode === "read-only-cache" ? "읽기 전용 사본" : "이 기기"}에 있으며 팀 권한을 부여하지 않습니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "브라우저에 저장된 문자열이나 작품 ID에서 계산한 값은 인증 토큰으로 인정하지 않습니다. 현재 작업 목록은")}{mode === "server-work" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "서버 프로젝트") : mode === "read-only-cache" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "읽기 전용 사본") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "이 기기")}{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "에 있으며 팀 권한을 부여하지 않습니다.")}</p>
               <div className="mt-4 grid gap-2 text-xs text-fg-2 sm:grid-cols-3">
-                <div className="rounded-xl border border-line bg-panel p-3">초대 권한: {capabilities.canInvite ? "서버 검증" : "사용 불가"}</div>
-                <div className="rounded-xl border border-line bg-panel p-3">승인 권한: {capabilities.canApprove ? "서버 검증" : "사용 불가"}</div>
-                <div className="rounded-xl border border-line bg-panel p-3">출판 권한: {capabilities.canPublish ? "서버 검증" : "사용 불가"}</div>
+                <div className="rounded-xl border border-line bg-panel p-3">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "초대 권한: ")}{capabilities.canInvite ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "서버 검증") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "사용 불가")}</div>
+                <div className="rounded-xl border border-line bg-panel p-3">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "승인 권한: ")}{capabilities.canApprove ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "서버 검증") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "사용 불가")}</div>
+                <div className="rounded-xl border border-line bg-panel p-3">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "출판 권한: ")}{capabilities.canPublish ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "서버 검증") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "사용 불가")}</div>
               </div>
             </div>
           </Card>
@@ -953,23 +1030,21 @@ function StudioProductionHubWorkspace({
 
         {surface === "join" ? (
           <Card
-            title="참여 링크 검증"
-            description="서버에서 발급·서명·폐기 가능한 초대만 프로젝트 권한으로 인정합니다."
+            title={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "참여 링크 검증")}
+            description={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "서버에서 발급·서명·폐기 가능한 초대만 프로젝트 권한으로 인정합니다.")}
           >
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5">
               <AlertTriangle className="size-8 text-amber-600" aria-hidden="true" />
               <h2 className="mt-3 text-base font-black">
                 {inviteParameter
-                  ? "이 링크는 서버에서 검증되지 않았습니다"
-                  : "검증할 서버 초대 링크가 없습니다"}
+                  ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "이 링크는 서버에서 검증되지 않았습니다")
+                  : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "검증할 서버 초대 링크가 없습니다")}
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-relaxed text-fg-2">
-                로컬 ProductionHub 토큰이나 URL 파라미터만으로 멤버를 추가하지 않습니다. 유효한 서버 초대 API가 연결되기 전에는 참여 처리를 실패 안전 상태로 유지합니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "로컬 ProductionHub 토큰이나 URL 파라미터만으로 멤버를 추가하지 않습니다. 유효한 서버 초대 API가 연결되기 전에는 참여 처리를 실패 안전 상태로 유지합니다.")}</p>
               {inviteParameter ? (
                 <p className="mt-3 break-all rounded-xl border border-line bg-panel p-3 font-mono text-xs text-fg-2">
-                  수신 토큰: {inviteParameter.slice(0, 12)}… · 권한 부여 안 됨
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "수신 토큰: ")}{inviteParameter.slice(0, 12)}{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "… · 권한 부여 안 됨")}</p>
               ) : null}
             </div>
           </Card>

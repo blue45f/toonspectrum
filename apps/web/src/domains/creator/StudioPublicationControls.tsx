@@ -1,4 +1,7 @@
 import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   BookOpen,
   CalendarClock,
@@ -264,32 +267,31 @@ export function StudioPublicationControls({
       <section className="rounded-2xl border border-line bg-panel/35 p-4 sm:p-5">
         <SectionHeading
           icon={<CalendarClock size={16} />}
-          title="공개 시점"
-          description="즉시 공개하거나 시간대가 보존되는 예약 공개를 설정합니다."
+          title={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "공개 시점")}
+          description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "즉시 공개하거나 시간대가 보존되는 예약 공개를 설정합니다.")}
         />
         <div className="grid gap-2 sm:grid-cols-2">
           <ChoiceCard
             active={directive.mode === "immediate"}
             disabled={disabled}
             icon={<Clock3 size={16} />}
-            title="저장 즉시 공개"
-            description="사전검사를 통과한 현재 revision을 바로 독자에게 공개합니다."
+            title={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "저장 즉시 공개")}
+            description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "사전검사를 통과한 현재 revision을 바로 독자에게 공개합니다.")}
             onClick={() => setMode("immediate")}
           />
           <ChoiceCard
             active={directive.mode === "scheduled"}
             disabled={disabled || directive.visibility === "private"}
             icon={<CalendarClock size={16} />}
-            title="예약 공개"
-            description="선택한 지역 시각을 UTC로 고정해 서버가 자동 공개합니다."
+            title={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "예약 공개")}
+            description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "선택한 지역 시각을 UTC로 고정해 서버가 자동 공개합니다.")}
             onClick={() => setMode("scheduled")}
           />
         </div>
         {directive.mode === "scheduled" && (
           <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_190px]">
             <label className="text-xs text-fg-2">
-              예약 날짜와 시간
-              <input
+              {translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "예약 날짜와 시간")}<input
                 type="datetime-local"
                 value={scheduleDraft}
                 disabled={disabled}
@@ -298,8 +300,7 @@ export function StudioPublicationControls({
               />
             </label>
             <label className="text-xs text-fg-2">
-              기준 시간대
-              <select
+              {translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "기준 시간대")}<select
                 value={directive.timeZone}
                 disabled={disabled}
                 onChange={(event) =>
@@ -326,32 +327,32 @@ export function StudioPublicationControls({
       <section className="rounded-2xl border border-line bg-panel/35 p-4 sm:p-5">
         <SectionHeading
           icon={<Eye size={16} />}
-          title="공개 범위"
-          description="목록 노출과 정확한 링크 접근 권한을 서로 분리합니다."
+          title={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "공개 범위")}
+          description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "목록 노출과 정확한 링크 접근 권한을 서로 분리합니다.")}
         />
         <div className="grid gap-2 md:grid-cols-3">
           <ChoiceCard
             active={directive.visibility === "public"}
             disabled={disabled}
             icon={<Globe2 size={16} />}
-            title="전체 공개"
-            description="추천·탐색·시리즈 목록과 직접 링크에서 모두 볼 수 있습니다."
+            title={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "전체 공개")}
+            description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "추천·탐색·시리즈 목록과 직접 링크에서 모두 볼 수 있습니다.")}
             onClick={() => setVisibility("public")}
           />
           <ChoiceCard
             active={directive.visibility === "unlisted"}
             disabled={disabled}
             icon={<Link2 size={16} />}
-            title="링크 공개"
-            description="탐색 화면에는 나오지 않고 정확한 작품 링크로만 접근합니다."
+            title={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "링크 공개")}
+            description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "탐색 화면에는 나오지 않고 정확한 작품 링크로만 접근합니다.")}
             onClick={() => setVisibility("unlisted")}
           />
           <ChoiceCard
             active={directive.visibility === "private"}
             disabled={disabled}
             icon={<LockKeyhole size={16} />}
-            title="비공개"
-            description="게시 상태를 초안으로 유지하며 소유자와 공동 작업자만 확인합니다."
+            title={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "비공개")}
+            description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "게시 상태를 초안으로 유지하며 소유자와 공동 작업자만 확인합니다.")}
             onClick={() => setVisibility("private")}
           />
         </div>
@@ -361,31 +362,31 @@ export function StudioPublicationControls({
           ) : (
             <EyeOff size={13} />
           )}
-          현재 설정: {visibilityDescription(directive.visibility)}
+          {translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "현재 설정: ")}{visibilityDescription(directive.visibility)}
         </p>
       </section>
 
       <section className="rounded-2xl border border-line bg-panel/35 p-4 sm:p-5">
         <SectionHeading
           icon={<BookOpen size={16} />}
-          title="독자 경험"
-          description="작품 형식과 페이지 진행 방향을 게시 메타데이터에 고정합니다."
+          title={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "독자 경험")}
+          description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "작품 형식과 페이지 진행 방향을 게시 메타데이터에 고정합니다.")}
         />
         <div className="grid gap-2 sm:grid-cols-2">
           <ChoiceCard
             active={directive.readingMode === "vertical"}
             disabled={disabled}
             icon={<Smartphone size={16} />}
-            title="세로 스크롤"
-            description="모바일 웹툰에 적합하며 위에서 아래로 연속해서 읽습니다."
+            title={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "세로 스크롤")}
+            description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "모바일 웹툰에 적합하며 위에서 아래로 연속해서 읽습니다.")}
             onClick={() => setReadingMode("vertical")}
           />
           <ChoiceCard
             active={directive.readingMode === "paged"}
             disabled={disabled}
             icon={<LayoutPanelTop size={16} />}
-            title="페이지 넘김"
-            description="출판 만화처럼 페이지 단위로 이동하는 작품에 적합합니다."
+            title={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "페이지 넘김")}
+            description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "출판 만화처럼 페이지 단위로 이동하는 작품에 적합합니다.")}
             onClick={() => setReadingMode("paged")}
           />
         </div>
@@ -395,16 +396,16 @@ export function StudioPublicationControls({
               active={directive.readingDirection === "ltr"}
               disabled={disabled}
               icon={<BookOpen size={16} />}
-              title="왼쪽 → 오른쪽"
-              description="한국·서구권 디지털 만화의 일반적인 진행 방향입니다."
+              title={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "왼쪽 → 오른쪽")}
+              description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "한국·서구권 디지털 만화의 일반적인 진행 방향입니다.")}
               onClick={() => setReadingDirection("ltr")}
             />
             <ChoiceCard
               active={directive.readingDirection === "rtl"}
               disabled={disabled}
               icon={<BookOpen size={16} />}
-              title="오른쪽 → 왼쪽"
-              description="일본식 단행본 진행 방향을 유지합니다."
+              title={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "오른쪽 → 왼쪽")}
+              description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "일본식 단행본 진행 방향을 유지합니다.")}
               onClick={() => setReadingDirection("rtl")}
             />
           </div>
@@ -414,15 +415,15 @@ export function StudioPublicationControls({
       <section className="rounded-2xl border border-line bg-panel/35 p-4 sm:p-5">
         <SectionHeading
           icon={<ShieldCheck size={16} />}
-          title="참여·콘텐츠 정책"
-          description="댓글과 리믹스 권한은 화면 표시뿐 아니라 서버 요청에서도 다시 검사합니다."
+          title={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "참여·콘텐츠 정책")}
+          description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "댓글과 리믹스 권한은 화면 표시뿐 아니라 서버 요청에서도 다시 검사합니다.")}
         />
         <div className="grid gap-2 sm:grid-cols-2">
           <ToggleRow
             checked={directive.comments === "open"}
             disabled={disabled}
-            label="새 댓글 허용"
-            description="끄면 기존 댓글은 유지하고 새 댓글 등록만 차단합니다."
+            label={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "새 댓글 허용")}
+            description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "끄면 기존 댓글은 유지하고 새 댓글 등록만 차단합니다.")}
             onChange={(checked) =>
               patch({ comments: checked ? "open" : "closed" })
             }
@@ -430,13 +431,13 @@ export function StudioPublicationControls({
           <ToggleRow
             checked={directive.allowRemix}
             disabled={disabled}
-            label="이어서 편집 허용"
-            description="다른 창작자가 이 작품을 원본으로 리믹스할 수 있습니다."
+            label={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "이어서 편집 허용")}
+            description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "다른 창작자가 이 작품을 원본으로 리믹스할 수 있습니다.")}
             onChange={(allowRemix) => patch({ allowRemix })}
           />
         </div>
         <fieldset className="mt-3">
-          <legend className="text-xs font-medium text-fg-2">독자 등급</legend>
+          <legend className="text-xs font-medium text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "독자 등급")}</legend>
           <div className="mt-1.5 grid gap-2 sm:grid-cols-3">
             {(["all", "teen", "mature"] as const).map((rating) => (
               <button
@@ -462,24 +463,24 @@ export function StudioPublicationControls({
       <section className="rounded-2xl border border-line bg-panel/35 p-4 sm:p-5">
         <SectionHeading
           icon={<Share2 size={16} />}
-          title="검색·공유 카드"
-          description="공개 목록과 메신저 링크 미리보기에 사용할 독자용 문구를 준비합니다."
+          title={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "검색·공유 카드")}
+          description={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "공개 목록과 메신저 링크 미리보기에 사용할 독자용 문구를 준비합니다.")}
         />
         <ToggleRow
           checked={directive.searchIndexing}
           disabled={disabled || directive.visibility !== "public"}
-          label="검색 색인 허용"
+          label={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "검색 색인 허용")}
           description={
             directive.visibility === "public"
-              ? "검색 엔진과 내부 검색이 작품을 수집할 수 있도록 표시합니다."
-              : "링크 공개·비공개 작품은 검색 색인을 항상 끕니다."
+              ? translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "검색 엔진과 내부 검색이 작품을 수집할 수 있도록 표시합니다.")
+              : translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "링크 공개·비공개 작품은 검색 색인을 항상 끕니다.")
           }
           onChange={(searchIndexing) => patch({ searchIndexing })}
         />
         <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div className="space-y-3">
             <label className="block text-xs text-fg-2">
-              공유 카드 제목{" "}
+              {translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "공유 카드 제목")}{" "}
               <span className="numeral text-fg-3">
                 {directive.socialTitle.length}/70
               </span>
@@ -490,12 +491,12 @@ export function StudioPublicationControls({
                 onChange={(event) =>
                   patch({ socialTitle: event.target.value })
                 }
-                placeholder={title.trim() || "작품 제목"}
+                placeholder={title.trim() || translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "작품 제목")}
                 className={cn(fieldClass, "mt-1 h-11")}
               />
             </label>
             <label className="block text-xs text-fg-2">
-              공유 카드 설명{" "}
+              {translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "공유 카드 설명")}{" "}
               <span className="numeral text-fg-3">
                 {directive.socialDescription.length}/160
               </span>
@@ -508,14 +509,13 @@ export function StudioPublicationControls({
                   patch({ socialDescription: event.target.value })
                 }
                 placeholder={
-                  description.trim() || "작품을 한두 문장으로 소개해 주세요."
+                  description.trim() || translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "작품을 한두 문장으로 소개해 주세요.")
                 }
                 className={cn(fieldClass, "mt-1 resize-y py-2.5")}
               />
             </label>
             <label className="block text-xs text-fg-2">
-              읽기 쉬운 주소
-              <div className="mt-1 flex min-h-11 items-center rounded-xl border border-line bg-canvas px-3 focus-within:border-accent/55 focus-within:ring-2 focus-within:ring-accent/35">
+              {translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "읽기 쉬운 주소")}<div className="mt-1 flex min-h-11 items-center rounded-xl border border-line bg-canvas px-3 focus-within:border-accent/55 focus-within:ring-2 focus-within:ring-accent/35">
                 <span className="shrink-0 text-xs text-fg-3">/create/</span>
                 <input
                   value={directive.canonicalSlug}
@@ -524,7 +524,7 @@ export function StudioPublicationControls({
                   onChange={(event) =>
                     patch({ canonicalSlug: event.target.value })
                   }
-                  placeholder="작품-id"
+                  placeholder={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "작품-id")}
                   className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none disabled:cursor-not-allowed"
                 />
               </div>
@@ -536,7 +536,7 @@ export function StudioPublicationControls({
               {cover ? (
                 <img
                   src={cover}
-                  alt="공유 카드 표지 미리보기"
+                  alt={translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "공유 카드 표지 미리보기")}
                   className="h-full w-full object-cover"
                 />
               ) : (
@@ -547,15 +547,14 @@ export function StudioPublicationControls({
             </div>
             <div className="p-3">
               <p className="flex items-center gap-1 text-[0.68rem] uppercase tracking-wide text-fg-3">
-                <Search size={11} /> toonstudio.cloud
-              </p>
+                <Search size={11} /> {translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "en", "toonstudio.cloud")}</p>
               <p className="mt-1 line-clamp-1 text-sm font-semibold text-fg">
-                {directive.socialTitle || title.trim() || "작품 제목"}
+                {directive.socialTitle || title.trim() || translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "작품 제목")}
               </p>
               <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-fg-3">
                 {directive.socialDescription ||
                   description.trim() ||
-                  "작품 설명이 여기에 표시됩니다."}
+                  translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "작품 설명이 여기에 표시됩니다.")}
               </p>
             </div>
           </div>
@@ -581,17 +580,14 @@ export function StudioPublicationControls({
           ) : (
             <Check size={16} className="text-good" />
           )}
-          게시 사전검사
-          <span className="ml-auto text-xs font-normal text-fg-3">
-            오류 <span className="numeral">{preflight.errors.length}</span> · 경고{" "}
+          {translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "게시 사전검사")}<span className="ml-auto text-xs font-normal text-fg-3">
+            {translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "오류 ")}<span className="numeral">{preflight.errors.length}</span> {translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "· 경고")}{" "}
             <span className="numeral">{preflight.warnings.length}</span>
           </span>
         </h3>
         {preflight.issues.length === 0 ? (
           <p className="mt-2 text-xs leading-relaxed text-good">
-            공개를 막는 문제가 없습니다. 최종 미리보기에서 독자 화면을
-            확인하세요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "공개를 막는 문제가 없습니다. 최종 미리보기에서 독자 화면을 확인하세요.")}</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {preflight.issues.map((issue) => (
@@ -612,7 +608,7 @@ export function StudioPublicationControls({
                 )}
                 <span
                   className={
-                    issue.severity === "error" ? "text-bad" : "text-fg-2"
+                    issue.severity === "error" ? translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "en", "text-bad") : translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "en", "text-fg-2")
                   }
                 >
                   {issue.message}
@@ -624,10 +620,10 @@ export function StudioPublicationControls({
       </section>
 
       <div className="sr-only" aria-live="polite">
-        댓글 {directive.comments === "open" ? "허용" : "차단"}, 리믹스{" "}
-        {directive.allowRemix ? "허용" : "차단"}, 독자 등급{" "}
+        {translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "댓글 ")}{directive.comments === "open" ? translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "허용") : translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "차단")}{translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", ", 리믹스")}{" "}
+        {directive.allowRemix ? translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "허용") : translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", "차단")}{translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", ", 독자 등급")}{" "}
         {ratingLabel(directive.contentRating)}
-        {directive.searchIndexing ? ", 검색 색인 허용" : ", 검색 색인 차단"}
+        {directive.searchIndexing ? translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", ", 검색 색인 허용") : translateCurrentStaticSourceText("domains.creator.StudioPublicationControls", "ko", ", 검색 색인 차단")}
       </div>
     </div>
   );

@@ -138,12 +138,22 @@ async function requestImage({ apiKey, url, model, recipe, attempt = 0 }) {
       size: recipe.size,
       quality: recipe.quality || "max",
       n: 1,
-      response_format: "b64_json",
     }),
   });
   if (!response.ok) {
     const body = (await response.text()).slice(0, 800);
-    const retryable = response.status === 429 || response.status >= 500;
+    let providerErrorType = "";
+    let providerErrorCode = "";
+    try {
+      const providerError = JSON.parse(body)?.error;
+      providerErrorType = typeof providerError?.type === "string" ? providerError.type : "";
+      providerErrorCode = typeof providerError?.code === "string" ? providerError.code : "";
+    } catch {
+      // Keep malformed provider errors non-special; status handling below still applies.
+    }
+    const quotaExhausted = providerErrorType === "insufficient_quota"
+      || providerErrorCode === "credit_balance_exhausted";
+    const retryable = !quotaExhausted && (response.status === 429 || response.status >= 500);
     if (retryable && attempt < 5) {
       const retryAfter = Number(response.headers.get("retry-after"));
       const backoff = Number.isFinite(retryAfter) && retryAfter > 0
@@ -289,6 +299,7 @@ async function main() {
   const manifest = await readManifest(manifestPath);
   const byId = new Map(manifest.assets.map((asset) => [asset.id, asset]));
   const failures = [];
+  let generatedThisRun = 0;
 
   await runPool(selected, args.concurrency, async (recipe, index) => {
     const outputPath = path.resolve(ROOT, recipe.outputPath);
@@ -310,6 +321,7 @@ async function main() {
       const asset = manifestAsset(recipe, bytes, dimensions, args.model);
       await writeSource(recipe, asset, args.model);
       byId.set(recipe.id, asset);
+      generatedThisRun += 1;
       console.log(`[${index + 1}/${selected.length}] done ${recipe.id} ${dimensions.width}x${dimensions.height}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -326,11 +338,14 @@ async function main() {
     updatedAt: new Date().toISOString(),
     assets,
   };
-  await mkdir(path.dirname(manifestPath), { recursive: true });
-  await writeFile(manifestPath, `${JSON.stringify(nextManifest, null, 2)}\n`, "utf8");
+  if (generatedThisRun > 0) {
+    await mkdir(path.dirname(manifestPath), { recursive: true });
+    await writeFile(manifestPath, `${JSON.stringify(nextManifest, null, 2)}\n`, "utf8");
+  }
 
   console.log(JSON.stringify({
-    generatedOrInstalled: assets.length,
+    generatedThisRun,
+    installedTotal: assets.length,
     failed: failures.length,
     manifest: path.relative(ROOT, manifestPath),
     failures,

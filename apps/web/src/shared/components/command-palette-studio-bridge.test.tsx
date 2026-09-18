@@ -29,6 +29,7 @@ vi.mock("@toonspectrum/core/fx", () => ({
     bgmEnabled: false,
     muted: false,
     volume: 0.55,
+    bgmVolume: 0.48,
   }),
   setSfxEnabled: vi.fn(),
   setBgmEnabled: vi.fn(),

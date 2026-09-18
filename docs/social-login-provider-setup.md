@@ -218,7 +218,7 @@ macOS에서는 저장 후 Keychain으로 동기화한다. 스크립트는 값 �
 
 ```bash
 pnpm run auth:social-login:keychain
-pnpm run auth:social-login:keychain -- --status
+pnpm run auth:social-login:keychain --status
 ```
 
 운영 값을 회전해야 할 때는 공급자 콘솔 → 로컬 정본 → Keychain → Render secret store 순서로

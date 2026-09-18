@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   applyStudioStrokeProposalTransaction,
   cancelConnectedStudioStrokeProposal,
@@ -11,12 +12,11 @@ export function StudioConnectedStrokeProposalPanel() {
   if (!bridge.connected) {
     return (
       <section
-        aria-label="AI 획 제안 검토"
+        aria-label={translateCurrentStaticSourceText("domains.creator.ai.StudioConnectedStrokeProposalPanel", "ko", "AI 획 제안 검토")}
         className="rounded-xl border border-line bg-card p-3 text-xs text-fg-3"
         data-studio-stroke-proposal-panel="disconnected"
       >
-        현재 캔버스가 준비되면 최근 확정 획을 읽는 로컬 공동 창작 도구가 연결됩니다.
-      </section>
+        {translateCurrentStaticSourceText("domains.creator.ai.StudioConnectedStrokeProposalPanel", "ko", "현재 캔버스가 준비되면 최근 확정 획을 읽는 로컬 공동 창작 도구가 연결됩니다.")}</section>
     );
   }
   return (

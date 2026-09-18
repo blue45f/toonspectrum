@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Move3d, Sparkles } from "lucide-react";
 import React, { useState } from "react";
 
@@ -62,11 +66,10 @@ export function StudioBg3dDeformersPanel({
       <div className="flex items-center justify-between border-b border-line pb-2">
         <div className="flex items-center gap-1.5 font-bold text-fg">
           <Move3d className="size-4 text-accent" />
-          <span>3D 절차적 디포머 (Mesh Deformers)</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDeformersPanel", "ko", "3D 절차적 디포머 (Mesh Deformers)")}</span>
         </div>
         <span className="rounded bg-accent/15 px-1.5 py-0.5 font-mono text-[0.68rem] text-accent font-semibold">
-          {axis.toUpperCase()}축 기준
-        </span>
+          {axis.toUpperCase()}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDeformersPanel", "ko", "축 기준")}</span>
       </div>
 
       {/* Deformer Types */}
@@ -82,11 +85,9 @@ export function StudioBg3dDeformersPanel({
             key={item.id}
             type="button"
             onClick={() => handleKindSelect(item.id)}
-            className={`flex flex-col items-start rounded-lg border p-2 text-left transition-all ${
-              kind === item.id
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDeformersPanel", "en", "flex flex-col items-start rounded-lg border p-2 text-left transition-all {v0}"), { v0: String(kind === item.id
                 ? "border-accent bg-accent/10 font-bold text-accent shadow-sm"
-                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
-            }`}
+                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
           >
             <span className="text-[0.72rem] leading-tight">{item.label}</span>
             <span className="mt-0.5 text-[0.62rem] text-fg-3 line-clamp-1">{item.desc}</span>
@@ -97,7 +98,7 @@ export function StudioBg3dDeformersPanel({
       {/* Deformation Parameters */}
       <div className="flex flex-col gap-2 rounded-lg border border-line bg-card p-2.5">
         <div className="flex items-center justify-between">
-          <span className="text-[0.68rem] text-fg-2">변형 강도 (Strength / Angle):</span>
+          <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDeformersPanel", "ko", "변형 강도 (Strength / Angle):")}</span>
           <div className="flex items-center gap-2">
             <input
               type="range"
@@ -116,18 +117,16 @@ export function StudioBg3dDeformersPanel({
         </div>
 
         <div className="flex items-center justify-between pt-1">
-          <span className="text-[0.68rem] text-fg-2">변형 기준 축 (Deform Axis):</span>
+          <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDeformersPanel", "ko", "변형 기준 축 (Deform Axis):")}</span>
           <div className="flex gap-1">
             {(["x", "y", "z"] as const).map((a) => (
               <button
                 key={a}
                 type="button"
                 onClick={() => handleAxisSelect(a)}
-                className={`w-7 rounded py-0.5 font-mono text-[0.68rem] font-bold uppercase transition-all ${
-                  axis === a
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDeformersPanel", "en", "w-7 rounded py-0.5 font-mono text-[0.68rem] font-bold uppercase transition-all {v0}"), { v0: String(axis === a
                     ? "bg-accent text-accent-fg"
-                    : "border border-line bg-raised text-fg-2 hover:text-fg"
-                }`}
+                    : "border border-line bg-raised text-fg-2 hover:text-fg") })}
               >
                 {a}
               </button>
@@ -150,7 +149,7 @@ export function StudioBg3dDeformersPanel({
         className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90"
       >
         <Sparkles className="size-3.5" />
-        <span>선택 3D 메쉬에 디포머 변형 적용</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDeformersPanel", "ko", "선택 3D 메쉬에 디포머 변형 적용")}</span>
       </button>
     </div>
   );

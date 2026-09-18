@@ -568,10 +568,12 @@ function buildHand(
   const palmReach = knuckleX - wristX;
 
   const stops: readonly (readonly [t: number, ry: number, rz: number, skin: MeshSkinBinding])[] = [
-    [0, 0.0165 / rig.handScale, 0.018 / rig.handScale, mix(rig, lower, hand, 0.6)],
-    [0.34, 0.015, 0.024, only(rig, hand)],
-    [0.78, 0.0135, 0.025, only(rig, hand)],
-    [1, 0.0125, 0.024, only(rig, hand)],
+    // A real palm is much flatter than its width. The old 4–5 cm neutral thickness made every
+    // gesture read as a padded mitten and amplified interpenetration when the fingers curled.
+    [0, 0.0145 / rig.handScale, 0.018 / rig.handScale, mix(rig, lower, hand, 0.6)],
+    [0.32, 0.0108, 0.0245, only(rig, hand)],
+    [0.72, 0.0095, 0.0265, only(rig, hand)],
+    [1, 0.0084, 0.024, only(rig, hand)],
   ];
   addLoft(
     builder,
@@ -582,7 +584,7 @@ function buildHand(
         rz * unit,
         skin,
         index / (stops.length - 1),
-        2.4,
+        2.65,
       ),
     ),
     { segments: LIMB_SEGMENTS, uvRect: palmRect, capEnd: true },
@@ -610,12 +612,41 @@ function buildHand(
       fingerLane(fingersRect, index, laneCount),
     );
   });
+  // Thenar/web bridge: the thumb must grow out of a fleshy mound in the palm, not from a thin
+  // independent tube. This small hand→CMC loft closes the silhouette gap and gives opposition
+  // poses enough volume without changing the rig or finger skinning contract.
+  const thumbMeta = `${prefix}ThumbMetacarpal` as StudioVrmRigBone;
+  const thumbProximal = `${prefix}ThumbProximal` as StudioVrmRigBone;
+  const thumbRoot = rig.worldRest[thumbMeta];
+  const thumbNext = rig.worldRest[thumbProximal];
+  const palmAnchor: MeshVec3 = [
+    wristX + palmReach * 0.34,
+    y,
+    z + 0.0035 * unit,
+  ];
+  const webMid: MeshVec3 = [
+    meshLerp(palmAnchor[0], thumbRoot[0], 0.58),
+    meshLerp(palmAnchor[1], thumbRoot[1], 0.58),
+    meshLerp(palmAnchor[2], thumbRoot[2], 0.58),
+  ];
+  const webDirection = subtractVec(thumbRoot, palmAnchor);
+  const thumbDirection = subtractVec(thumbNext, thumbRoot);
+  addLoft(
+    builder,
+    [
+      tubeRing(palmAnchor, webDirection, 0.0092 * unit, 0.72, only(rig, hand), 0),
+      tubeRing(webMid, webDirection, 0.0105 * unit, 0.7, mix(rig, hand, thumbMeta, 0.35), 0.55),
+      tubeRing(thumbRoot, thumbDirection, 0.0088 * unit, 0.76, mix(rig, hand, thumbMeta, 0.68), 1),
+    ],
+    { segments: 8, uvRect: fingerLane(fingersRect, fingers.length, laneCount) },
+  );
+
   buildFinger(
     builder,
     rig,
     hand,
     [
-      `${prefix}ThumbMetacarpal` as StudioVrmRigBone,
+      thumbMeta,
       `${prefix}ThumbProximal` as StudioVrmRigBone,
       `${prefix}ThumbDistal` as StudioVrmRigBone,
     ],
@@ -1290,8 +1321,10 @@ function buildFaceMorphTargets(
 /* 헤어 — 아바타 조형 파츠 계획을 그대로 굽는다                                 */
 /* -------------------------------------------------------------------------- */
 
-const HAIR_STRAND_RADIAL = 10;
-const HAIR_STRAND_LENGTH = 14;
+const HAIR_STRAND_CROSS = 8;
+const HAIR_STRAND_LENGTH = 18;
+const HAIR_DRAPE_CROSS = 12;
+const HAIR_DRAPE_LENGTH = 16;
 const HAIR_CAP_COLUMNS = 24;
 const HAIR_CAP_ROWS = 14;
 const HAIR_SPHERE_COLUMNS = 20;
@@ -1346,6 +1379,8 @@ function addHairSphere(
     readonly thetaFront: number;
     /** 후두부(−Z)에서 덮는 극각. */
     readonly thetaBack: number;
+    /** Break the mathematically perfect helmet silhouette for the skull cap only. */
+    readonly sculpt?: boolean;
   },
 ): void {
   const [u0, v0, u1, v1] = uvRect;
@@ -1360,7 +1395,18 @@ function addHairSphere(
         (row / options.rows) * meshLerp(options.thetaBack, options.thetaFront, frontness);
       const cosTheta = Math.cos(theta);
       const sinTheta = Math.sin(theta);
-      const unit: MeshVec3 = [-Math.cos(phi) * sinTheta, cosTheta, Math.sin(phi) * sinTheta];
+      const front = Math.max(0, Math.sin(phi));
+      const side = Math.abs(Math.cos(phi));
+      const clump = options.sculpt
+        ? 1 + 0.018 * Math.sin(phi * 5 + 0.65) * Math.pow(sinTheta, 1.35)
+        : 1;
+      const crownLift = options.sculpt ? Math.max(0, cosTheta) * (1 - side) * 0.018 : 0;
+      const foreheadSetback = options.sculpt ? front * Math.pow(sinTheta, 2.2) * 0.045 : 0;
+      const unit: MeshVec3 = [
+        -Math.cos(phi) * sinTheta * clump,
+        cosTheta + crownLift,
+        Math.sin(phi) * sinTheta * (clump - foreheadSetback),
+      ];
       line.push(
         builder.vertex(
           applyTrs(unit, transform.translation, transform.rotation, transform.scale),
@@ -1392,6 +1438,21 @@ function addHairSphere(
  * 같다 — 미리보기와 결과물의 실루엣이 갈라지지 않게 하기 위한 것이다.
  * 감김만 바깥 방향으로 바로잡았다(렌더러는 DoubleSide 라 방향이 문제되지 않았다).
  */
+function hairClumpWidth(t: number, taper: number): number {
+  const progress = meshClamp(t, 0, 1);
+  const rootEase = 0.78 + 0.22 * Math.sin(Math.min(1, progress * 2.25) * Math.PI * 0.5);
+  const tip = Math.pow(Math.max(0, 1 - progress), 0.58 + meshClamp(taper, 0, 1) * 0.5);
+  return Math.max(0.035, rootEase * tip);
+}
+
+/**
+ * Webtoon/anime hair clump.
+ *
+ * The old exporter used a circular tube whose radius never fell below 8% of the root. Side locks and
+ * bangs therefore read as hoses/rectangular pillars from the front. The studio overlay already uses
+ * broad, shallow authored clumps, so exported VRM hair now uses the same visual grammar: a graphic
+ * front face, shallow back, centre ridge and a true tapered tip.
+ */
 function addHairStrand(
   builder: SurfaceBuilder,
   part: AvatarForgeHairPart,
@@ -1400,49 +1461,97 @@ function addHairStrand(
   uvRect: MeshUvRect,
 ): void {
   const [u0, v0, u1, v1] = uvRect;
-
   const place = (unit: MeshVec3): MeshVec3 =>
     applyTrs(unit, transform.translation, transform.rotation, transform.scale);
+  const columns = HAIR_STRAND_CROSS + 1;
+  const front: number[][] = [];
+  const back: number[][] = [];
 
-  const grid: number[][] = [];
   for (let row = 0; row <= HAIR_STRAND_LENGTH; row += 1) {
     const t = row / HAIR_STRAND_LENGTH;
-    // 중심선은 헤어 리그와 **같은 식**을 쓴다 — 어긋나면 흔들릴 때 가닥이 축을 중심으로 비틀린다.
     const [curveX, y, curveZ] = studioVrmHairStrandSpine(part, t);
-    const radius = Math.max(0.08, 1 - part.taper * t ** 0.72);
+    const width = hairClumpWidth(t, part.taper);
+    const depth = width * (0.24 + 0.08 * (1 - t));
     const rowSkin = skin(t);
-
-    const line: number[] = [];
-    for (let column = 0; column <= HAIR_STRAND_RADIAL; column += 1) {
-      const angle = (column / HAIR_STRAND_RADIAL) * Math.PI * 2;
-      line.push(
-        builder.vertex(
-          place([curveX + Math.cos(angle) * radius, y, curveZ + Math.sin(angle) * radius]),
-          [meshLerp(u0, u1, column / HAIR_STRAND_RADIAL), meshLerp(v0, v1, 1 - t)],
-          rowSkin,
-        ),
-      );
+    const frontLine: number[] = [];
+    const backLine: number[] = [];
+    for (let column = 0; column < columns; column += 1) {
+      const u = column / HAIR_STRAND_CROSS;
+      const crossAxis = u * 2 - 1;
+      const crown = Math.pow(Math.max(0, 1 - crossAxis * crossAxis), 0.72);
+      const x = curveX + crossAxis * width;
+      const frontZ = curveZ + depth * crown;
+      const backZ = curveZ - depth * 0.38 * crown;
+      const uv: MeshVec2 = [meshLerp(u0, u1, u), meshLerp(v0, v1, 1 - t)];
+      frontLine.push(builder.vertex(place([x, y, frontZ]), uv, rowSkin));
+      backLine.push(builder.vertex(place([x, y, backZ]), uv, rowSkin));
     }
-    grid.push(line);
+    front.push(frontLine);
+    back.push(backLine);
   }
 
   for (let row = 0; row < HAIR_STRAND_LENGTH; row += 1) {
-    for (let column = 0; column < HAIR_STRAND_RADIAL; column += 1) {
-      builder.quad(
-        grid[row][column],
-        grid[row][column + 1],
-        grid[row + 1][column + 1],
-        grid[row + 1][column],
-      );
+    for (let column = 0; column < HAIR_STRAND_CROSS; column += 1) {
+      builder.quad(front[row][column], front[row][column + 1], front[row + 1][column + 1], front[row + 1][column]);
+      builder.quad(back[row][column + 1], back[row][column], back[row + 1][column], back[row + 1][column + 1]);
     }
+    builder.quad(front[row][0], front[row + 1][0], back[row + 1][0], back[row][0]);
+    const edge = HAIR_STRAND_CROSS;
+    builder.quad(front[row + 1][edge], front[row][edge], back[row][edge], back[row + 1][edge]);
   }
 
-  const top = builder.vertex(place([0, 1, 0]), [meshLerp(u0, u1, 0.5), v1], skin(0));
-  const bottom = builder.vertex(place([0, -1, 0]), [meshLerp(u0, u1, 0.5), v0], skin(1));
-  for (let column = 0; column < HAIR_STRAND_RADIAL; column += 1) {
-    builder.triangle(top, grid[0][column], grid[0][column + 1]);
-    const last = HAIR_STRAND_LENGTH;
-    builder.triangle(bottom, grid[last][column + 1], grid[last][column]);
+  // Close the root. The last row is already near-zero width, so an extra polygon there would only
+  // create a dark pinched cap and visible normal discontinuity.
+  for (let column = 0; column < HAIR_STRAND_CROSS; column += 1) {
+    builder.quad(front[0][column + 1], front[0][column], back[0][column], back[0][column + 1]);
+  }
+}
+
+/** Broad hanging back-hair surface. Replaces vertically stretched spheres that read as two boards. */
+function addHairDrape(
+  builder: SurfaceBuilder,
+  transform: HairTransform,
+  skin: (t: number) => MeshSkinBinding,
+  uvRect: MeshUvRect,
+): void {
+  const [u0, v0, u1, v1] = uvRect;
+  const place = (unit: MeshVec3): MeshVec3 =>
+    applyTrs(unit, transform.translation, transform.rotation, transform.scale);
+  const front: number[][] = [];
+  const back: number[][] = [];
+
+  for (let row = 0; row <= HAIR_DRAPE_LENGTH; row += 1) {
+    const t = row / HAIR_DRAPE_LENGTH;
+    const y = 1 - t * 2;
+    // Fullness through the mid-length, then a visibly narrower hem instead of a spherical bottom.
+    const width = (0.82 + Math.sin(Math.PI * Math.min(1, t * 1.12)) * 0.18)
+      * (1 - 0.24 * Math.pow(t, 1.65));
+    const rowSkin = skin(t);
+    const frontLine: number[] = [];
+    const backLine: number[] = [];
+    for (let column = 0; column <= HAIR_DRAPE_CROSS; column += 1) {
+      const u = column / HAIR_DRAPE_CROSS;
+      const crossAxis = u * 2 - 1;
+      const crown = Math.pow(Math.max(0, 1 - crossAxis * crossAxis), 0.7);
+      const sway = Math.sin(t * Math.PI) * crossAxis * 0.035;
+      const x = crossAxis * width + sway;
+      const depth = (0.22 + 0.08 * (1 - t)) * crown;
+      const uv: MeshVec2 = [meshLerp(u0, u1, u), meshLerp(v0, v1, 1 - t)];
+      frontLine.push(builder.vertex(place([x, y, depth]), uv, rowSkin));
+      backLine.push(builder.vertex(place([x, y, -depth * 0.72]), uv, rowSkin));
+    }
+    front.push(frontLine);
+    back.push(backLine);
+  }
+
+  for (let row = 0; row < HAIR_DRAPE_LENGTH; row += 1) {
+    for (let column = 0; column < HAIR_DRAPE_CROSS; column += 1) {
+      builder.quad(front[row][column], front[row][column + 1], front[row + 1][column + 1], front[row + 1][column]);
+      builder.quad(back[row][column + 1], back[row][column], back[row + 1][column], back[row + 1][column + 1]);
+    }
+    builder.quad(front[row][0], front[row + 1][0], back[row + 1][0], back[row][0]);
+    const edge = HAIR_DRAPE_CROSS;
+    builder.quad(front[row + 1][edge], front[row][edge], back[row][edge], back[row + 1][edge]);
   }
 }
 
@@ -1642,9 +1751,14 @@ function buildHair(
       addHairSphere(builder, transform, partSkin, uvRect, {
         columns: HAIR_CAP_COLUMNS,
         rows: HAIR_CAP_ROWS,
-        thetaFront: Math.PI * 0.4,
-        thetaBack: Math.PI * 0.82,
+        thetaFront: Math.PI * 0.36,
+        thetaBack: Math.PI * 0.8,
+        sculpt: true,
       });
+      return;
+    }
+    if (part.role === "back" && !part.id.includes("wolf-layer") && !part.id.includes("braid-nape")) {
+      addHairDrape(builder, transform, partSkin, uvRect);
       return;
     }
     addHairSphere(builder, transform, partSkin, uvRect, {

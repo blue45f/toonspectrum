@@ -270,7 +270,27 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
 
       expect(result).toEqual({
         ok: true,
-        data: { dataUrl: `data:image/png;base64,${btoa("fake-png-bytes")}`, width: 1024, height: 1792 },
+        data: {
+          dataUrl: `data:image/png;base64,${btoa("fake-png-bytes")}`,
+          width: 1024,
+          height: 1792,
+          model: CONFIGURED.imageModel,
+        },
+      });
+    });
+
+    it("records the model that actually produced the image when the provider reports it", async () => {
+      const mockFetch = vi.fn(async () => new Response(JSON.stringify({
+        model: "provider-image-model-v2",
+        data: [{ b64_json: "AA==" }],
+      }), { status: 200 }));
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateBackgroundImage(CONFIGURED, "prompt");
+
+      expect(result).toMatchObject({
+        ok: true,
+        data: { model: "provider-image-model-v2" },
       });
     });
 

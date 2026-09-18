@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /* Extracted render tree from StudioCuttoonEditor.
  * Session props are an `any` bag matching the original editor closure. */
 // @ts-nocheck
@@ -433,7 +434,7 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
     <>
         {/* 캔버스 ↔ 작업 패널 너비 스플리터(데스크톱) */}
         {visibleRightPanelOpen && (
-          <StudioPanelResizeHandle handleProps={rightResize.handleProps} dragging={rightResize.dragging} label="작업 패널 너비 조절" />
+          <StudioPanelResizeHandle handleProps={rightResize.handleProps} dragging={rightResize.dragging} label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorInspectorColumn", "ko", "작업 패널 너비 조절")} />
         )}
 
         {/* 사이드: 작업 패널(대상·레이어·문서) + 게시 — 접히면 아이콘 엣지 레일 */}
@@ -444,10 +445,10 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
             // (`StudioInspectorNavigator` COPY.panelTitle, `StudioInspectorAsideShell`
             // 의 "작업 패널 접기"). 레일의 접근 이름은 `${label} 펼치기` 로 만들어지므로
             // 라벨을 줄여 쓰면 접기/펼치기 짝이 서로 다른 이름을 갖게 된다.
-            label="작업 패널"
+            label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorInspectorColumn", "ko", "작업 패널")}
             icon={SlidersHorizontal}
             onClick={() => setRightPanelOpenWithOverride(true)}
-            title="작업 패널 펼치기"
+            title={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorInspectorColumn", "ko", "작업 패널 펼치기")}
           />
         )}
         {!isMobile || mobileSheet === "props" ? (

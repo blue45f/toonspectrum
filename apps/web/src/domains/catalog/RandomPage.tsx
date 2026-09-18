@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, RefreshCw, Shuffle, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -69,47 +73,42 @@ export function RandomPage() {
     <Container size="wide" className="py-10 sm:py-14">
       <header className="mx-auto max-w-2xl text-center">
         <span className="mx-auto grid size-14 place-items-center rounded-2xl border border-accent/30 bg-accent-soft text-accent">
-          <Shuffle size={26} className={loading ? "motion-safe:animate-pulse" : ""} aria-hidden="true" />
+          <Shuffle size={26} className={loading ? translateCurrentStaticSourceText("domains.catalog.RandomPage", "en", "motion-safe:animate-pulse") : ""} aria-hidden="true" />
         </span>
-        <p className="eyebrow mt-4 text-accent">RANDOM DISCOVERY</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-fg sm:text-4xl">한 편만 골라줘</h1>
+        <p className="eyebrow mt-4 text-accent">{translateCurrentStaticSourceText("domains.catalog.RandomPage", "en", "RANDOM DISCOVERY")}</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-fg sm:text-4xl">{translateCurrentStaticSourceText("domains.catalog.RandomPage", "ko", "한 편만 골라줘")}</h1>
         <p className="mt-2 text-sm leading-6 text-fg-3">
-          바로 이동하지 않고 먼저 보여드려요. 마음에 들면 열고, 아니면 다시 뽑으면 됩니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.catalog.RandomPage", "ko", "바로 이동하지 않고 먼저 보여드려요. 마음에 들면 열고, 아니면 다시 뽑으면 됩니다.")}</p>
       </header>
 
       {loading ? (
-        <div className="mx-auto mt-8 max-w-sm" role="status" aria-label="랜덤 작품을 고르는 중">
+        <div className="mx-auto mt-8 max-w-sm" role="status" aria-label={translateCurrentStaticSourceText("domains.catalog.RandomPage", "ko", "랜덤 작품을 고르는 중")}>
           <div className="skeleton aspect-[3/4] rounded-2xl" />
           <div className="mt-3 space-y-2"><div className="skeleton h-4 w-3/4" /><div className="skeleton h-3 w-1/2" /></div>
         </div>
       ) : failed || !title ? (
         <div className="mx-auto mt-8 max-w-lg rounded-2xl border border-dashed border-line bg-panel/45 p-8 text-center">
-          <p className="font-semibold text-fg">랜덤 작품을 고르지 못했어요</p>
-          <p className="mt-1 text-sm text-fg-3">현재 조건에 맞는 작품이 부족하거나 일시적으로 데이터를 불러오지 못했습니다.</p>
+          <p className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.catalog.RandomPage", "ko", "랜덤 작품을 고르지 못했어요")}</p>
+          <p className="mt-1 text-sm text-fg-3">{translateCurrentStaticSourceText("domains.catalog.RandomPage", "ko", "현재 조건에 맞는 작품이 부족하거나 일시적으로 데이터를 불러오지 못했습니다.")}</p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <button type="button" onClick={() => setReloadKey((value) => value + 1)} className={buttonClass({ variant: "solid", size: "sm", className: "gap-1.5" })}>
-              <RefreshCw size={14} aria-hidden="true" />다시 뽑기
-            </button>
+              <RefreshCw size={14} aria-hidden="true" />{translateCurrentStaticSourceText("domains.catalog.RandomPage", "ko", "다시 뽑기")}</button>
             <Link href="/explore" className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}>
-              <SlidersHorizontal size={14} aria-hidden="true" />탐색으로 가기
-            </Link>
+              <SlidersHorizontal size={14} aria-hidden="true" />{translateCurrentStaticSourceText("domains.catalog.RandomPage", "ko", "탐색으로 가기")}</Link>
           </div>
         </div>
       ) : (
         <div className="mx-auto mt-8 max-w-sm">
           <TitleCard title={title} size="md" />
           <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            <Link href={`/title/${title.slug}`} className={buttonClass({ variant: "solid", size: "md", className: "justify-center gap-1.5" })}>
-              이 작품 보기<ArrowRight size={15} aria-hidden="true" />
+            <Link href={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.RandomPage", "en", "/title/{v0}"), { v0: String(title.slug) })} className={buttonClass({ variant: "solid", size: "md", className: "justify-center gap-1.5" })}>
+              {translateCurrentStaticSourceText("domains.catalog.RandomPage", "ko", "이 작품 보기")}<ArrowRight size={15} aria-hidden="true" />
             </Link>
             <button type="button" onClick={() => setReloadKey((value) => value + 1)} className={buttonClass({ variant: "outline", size: "md", className: "justify-center gap-1.5" })}>
-              <RefreshCw size={15} aria-hidden="true" />다시 뽑기
-            </button>
+              <RefreshCw size={15} aria-hidden="true" />{translateCurrentStaticSourceText("domains.catalog.RandomPage", "ko", "다시 뽑기")}</button>
           </div>
-          <Link href={query ? `/explore?${query}` : "/explore"} className="mt-3 flex min-h-11 items-center justify-center gap-1.5 text-sm font-semibold text-fg-3 hover:text-accent">
-            <SlidersHorizontal size={14} aria-hidden="true" />조건 바꾸기
-          </Link>
+          <Link href={query ? formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.RandomPage", "en", "/explore?{v0}"), { v0: String(query) }) : "/explore"} className="mt-3 flex min-h-11 items-center justify-center gap-1.5 text-sm font-semibold text-fg-3 hover:text-accent">
+            <SlidersHorizontal size={14} aria-hidden="true" />{translateCurrentStaticSourceText("domains.catalog.RandomPage", "ko", "조건 바꾸기")}</Link>
         </div>
       )}
     </Container>

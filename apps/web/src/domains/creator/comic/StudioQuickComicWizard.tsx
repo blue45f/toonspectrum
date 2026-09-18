@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   Check,
   CheckCircle2,
@@ -113,7 +117,7 @@ function QuickComicPreflightPanel({
 
   return (
     <section
-      aria-labelledby={compact ? "quick-comic-live-preflight" : "quick-comic-review-preflight"}
+      aria-labelledby={compact ? translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "en", "quick-comic-live-preflight") : translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "en", "quick-comic-review-preflight")}
       data-studio-comic-preflight="true"
       className={cn(
         "rounded-2xl border p-3.5",
@@ -140,18 +144,17 @@ function QuickComicPreflightPanel({
           </span>
           <div className="min-w-0">
             <h4
-              id={compact ? "quick-comic-live-preflight" : "quick-comic-review-preflight"}
+              id={compact ? translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "en", "quick-comic-live-preflight") : translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "en", "quick-comic-review-preflight")}
               className="text-sm font-bold text-fg"
             >
-              제작 프리플라이트 · {report.statusLabel}
+              {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "제작 프리플라이트 · ")}{report.statusLabel}
             </h4>
             <p className="mt-0.5 text-xs leading-relaxed text-fg-2">{report.summary}</p>
           </div>
         </div>
         <div className="rounded-xl border border-line bg-panel px-3 py-2 text-right shadow-sm">
           <p className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-fg-3">
-            가독성
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "가독성")}</p>
           <p className="text-lg font-black tabular-nums text-fg">
             {report.score}<span className="text-xs font-semibold text-fg-3">/100</span>
           </p>
@@ -160,28 +163,24 @@ function QuickComicPreflightPanel({
 
       <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className="rounded-xl border border-line bg-panel px-2.5 py-2">
-          <dt className="text-[0.68rem] text-fg-3">컷</dt>
+          <dt className="text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "컷")}</dt>
           <dd className="mt-0.5 text-sm font-bold tabular-nums text-fg">
-            {report.metrics.panelCount}개
-          </dd>
+            {report.metrics.panelCount}{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "개")}</dd>
         </div>
         <div className="rounded-xl border border-line bg-panel px-2.5 py-2">
-          <dt className="text-[0.68rem] text-fg-3">대사</dt>
+          <dt className="text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "대사")}</dt>
           <dd className="mt-0.5 text-sm font-bold tabular-nums text-fg">
-            {report.metrics.total}개
-          </dd>
+            {report.metrics.total}{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "개")}</dd>
         </div>
         <div className="rounded-xl border border-line bg-panel px-2.5 py-2">
-          <dt className="text-[0.68rem] text-fg-3">컷당 최대</dt>
+          <dt className="text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "컷당 최대")}</dt>
           <dd className="mt-0.5 text-sm font-bold tabular-nums text-fg">
-            {report.metrics.maxDialogueInPanel}개
-          </dd>
+            {report.metrics.maxDialogueInPanel}{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "개")}</dd>
         </div>
         <div className="rounded-xl border border-line bg-panel px-2.5 py-2">
-          <dt className="text-[0.68rem] text-fg-3">가장 긴 대사</dt>
+          <dt className="text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "가장 긴 대사")}</dt>
           <dd className="mt-0.5 text-sm font-bold tabular-nums text-fg">
-            {report.metrics.maxCharacters}자
-          </dd>
+            {report.metrics.maxCharacters}{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "자")}</dd>
         </div>
       </dl>
 
@@ -189,8 +188,7 @@ function QuickComicPreflightPanel({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold text-fg">
-              추천 · {report.recommendation.label} ({report.recommendation.frameCount}컷)
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "추천 · ")}{report.recommendation.label} ({report.recommendation.frameCount}{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "컷)")}</p>
             <p className="mt-1 text-xs leading-relaxed text-fg-3">
               {report.recommendation.reason}
             </p>
@@ -202,19 +200,17 @@ function QuickComicPreflightPanel({
               className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Sparkles size={15} aria-hidden="true" />
-              추천 레이아웃 적용
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "추천 레이아웃 적용")}</button>
           ) : (
             <span className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full bg-accent-soft px-2.5 text-[0.68rem] font-bold text-accent">
               <Check size={14} aria-hidden="true" />
-              추천 구성 사용 중
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "추천 구성 사용 중")}</span>
           )}
         </div>
       </div>
 
       {visibleIssues.length > 0 ? (
-        <ul className="mt-3 grid gap-2" aria-label="만화 제작 검수 결과">
+        <ul className="mt-3 grid gap-2" aria-label={translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "만화 제작 검수 결과")}>
           {visibleIssues.map((issue) => (
             <li
               key={issue.id}
@@ -249,13 +245,11 @@ function QuickComicPreflightPanel({
       ) : (
         <p className="mt-3 flex items-center gap-2 rounded-xl border border-line bg-panel px-3 py-2.5 text-xs font-semibold text-fg-2">
           <CheckCircle2 size={16} className="text-accent" aria-hidden="true" />
-          추가로 확인할 가독성 문제가 없습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "추가로 확인할 가독성 문제가 없습니다.")}</p>
       )}
       {hiddenIssueCount > 0 ? (
         <p className="mt-2 text-right text-[0.68rem] text-fg-3">
-          미리보기 단계에서 검수 항목 {hiddenIssueCount}개를 더 보여 줍니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "미리보기 단계에서 검수 항목 ")}{hiddenIssueCount}{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "개를 더 보여 줍니다.")}</p>
       ) : null}
 
       {report.metrics.total > 0 ? (
@@ -265,16 +259,14 @@ function QuickComicPreflightPanel({
             onClick={onNormalizeDialogue}
             className="inline-flex min-h-11 items-center justify-center rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            대사 형식 정리
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "대사 형식 정리")}</button>
           {report.metrics.longDialogueCount > 0 ? (
             <button
               type="button"
               onClick={onSplitDialogue}
               className="inline-flex min-h-11 items-center justify-center rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              긴 대사 자동 나누기
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "긴 대사 자동 나누기")}</button>
           ) : null}
         </div>
       ) : null}
@@ -463,22 +455,19 @@ export function StudioQuickComicWizard({
             </span>
             <div className="min-w-0 flex-1">
               <h2 id="studio-quick-comic-title" className="text-base font-bold text-fg">
-                빠른 웹툰 조립
-              </h2>
+                {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "빠른 웹툰 조립")}</h2>
               <p
                 id="studio-quick-comic-description"
                 className="mt-0.5 max-w-[70ch] text-xs leading-relaxed text-fg-3"
               >
-                컷·장면 연출·대사를 순서대로 골라 한 페이지를 만듭니다. 캐릭터 생성은
-                포함하지 않으며, 적용 전에 대사 밀도와 가독성을 자동 검수합니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "컷·장면 연출·대사를 순서대로 골라 한 페이지를 만듭니다. 캐릭터 생성은 포함하지 않으며, 적용 전에 대사 밀도와 가독성을 자동 검수합니다.")}</p>
             </div>
             <button
               ref={closeButtonRef}
               type="button"
               onClick={onCancel}
               className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              aria-label="빠른 웹툰 조립 취소"
+              aria-label={translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "빠른 웹툰 조립 취소")}
             >
               <X size={18} aria-hidden="true" />
             </button>
@@ -487,11 +476,11 @@ export function StudioQuickComicWizard({
           <div className="mt-3 flex items-center gap-3">
             <div
               role="progressbar"
-              aria-label="빠른 웹툰 조립 진행률"
+              aria-label={translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "빠른 웹툰 조립 진행률")}
               aria-valuemin={1}
               aria-valuemax={QUICK_COMIC_STEPS.length}
               aria-valuenow={step + 1}
-              aria-valuetext={`${step + 1}단계, ${currentStep.label}`}
+              aria-valuetext={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "{v0}단계, {v1}"), { v0: String(step + 1), v1: String(currentStep.label) })}
               className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-card"
             >
               <span
@@ -514,15 +503,13 @@ export function StudioQuickComicWizard({
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h3 id="quick-comic-layout-heading" className="text-sm font-bold text-fg">
-                    컷 흐름을 고르세요
-                  </h3>
+                    {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "컷 흐름을 고르세요")}</h3>
                   <p className="mt-1 text-xs leading-relaxed text-fg-3">
-                    적용하면 현재 페이지 크기와 컷 구성이 선택한 레이아웃으로 바뀝니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "적용하면 현재 페이지 크기와 컷 구성이 선택한 레이아웃으로 바뀝니다.")}</p>
                 </div>
                 {preflight ? (
                   <span className="rounded-full border border-line bg-card px-3 py-1.5 text-xs font-semibold text-fg-2">
-                    현재 적합도 {preflight.layoutFitScore}/100
+                    {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "현재 적합도 ")}{preflight.layoutFitScore}/100
                   </span>
                 ) : null}
               </div>
@@ -530,11 +517,10 @@ export function StudioQuickComicWizard({
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-card p-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-bold text-fg">
-                      자동 추천 · {preflight.recommendation.label}
+                      {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "자동 추천 · ")}{preflight.recommendation.label}
                     </p>
                     <p className="mt-0.5 text-xs leading-relaxed text-fg-3">
-                      {preflight.recommendation.reason} 대사를 입력하면 추천이 실시간으로 바뀝니다.
-                    </p>
+                      {preflight.recommendation.reason} {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "대사를 입력하면 추천이 실시간으로 바뀝니다.")}</p>
                   </div>
                   {preflight.recommendation.layoutId !== draft.layoutId ? (
                     <button
@@ -543,13 +529,12 @@ export function StudioQuickComicWizard({
                       className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     >
                       <Sparkles size={15} aria-hidden="true" />
-                      추천 적용
-                    </button>
+                      {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "추천 적용")}</button>
                   ) : null}
                 </div>
               ) : null}
               <fieldset className="grid gap-2 sm:grid-cols-2">
-                <legend className="sr-only">컷 레이아웃</legend>
+                <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "컷 레이아웃")}</legend>
                 {PANEL_LAYOUTS.map((layout) => {
                   const selected = layout.id === draft.layoutId;
                   const recommended = layout.id === preflight?.recommendation.layoutId;
@@ -580,13 +565,11 @@ export function StudioQuickComicWizard({
                           ) : null}
                           {recommended ? (
                             <span className="rounded-full bg-panel px-1.5 py-0.5 text-[0.62rem] font-bold text-accent">
-                              추천
-                            </span>
+                              {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "추천")}</span>
                           ) : null}
                         </span>
                         <span className="mt-1 block text-xs leading-relaxed text-fg-3">
-                          {layout.hint} · {layout.frames.length}컷
-                        </span>
+                          {layout.hint} · {layout.frames.length}{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "컷")}</span>
                       </span>
                     </label>
                   );
@@ -599,16 +582,13 @@ export function StudioQuickComicWizard({
             <section aria-labelledby="quick-comic-scene-heading">
               <div className="mb-4">
                 <h3 id="quick-comic-scene-heading" className="text-sm font-bold text-fg">
-                  장면 연출을 더할까요?
-                </h3>
+                  {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "장면 연출을 더할까요?")}</h3>
                 <p className="mt-1 text-xs leading-relaxed text-fg-3">
-                  효과선·예시 말풍선·효과음으로 구성된 연출 템플릿입니다. 캐릭터나 3D
-                  배경을 자동 생성하지 않습니다.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "효과선·예시 말풍선·효과음으로 구성된 연출 템플릿입니다. 캐릭터나 3D 배경을 자동 생성하지 않습니다.")}</p>
               </div>
 
               <fieldset>
-                <legend className="sr-only">장면 연출 템플릿</legend>
+                <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "장면 연출 템플릿")}</legend>
                 <label
                   className={cn(
                     "flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent",
@@ -634,10 +614,9 @@ export function StudioQuickComicWizard({
                     <LayoutPanelTop size={18} aria-hidden="true" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-fg">장면 없음</span>
+                    <span className="block text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "장면 없음")}</span>
                     <span className="mt-0.5 block text-xs text-fg-3">
-                      빈 컷과 입력한 대사만 배치
-                    </span>
+                      {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "빈 컷과 입력한 대사만 배치")}</span>
                   </span>
                   {draft.sceneTemplateId === null ? (
                     <Check size={16} className="shrink-0 text-accent" aria-hidden="true" />
@@ -703,8 +682,7 @@ export function StudioQuickComicWizard({
               {selectedScene ? (
                 <label className="mt-4 block rounded-xl border border-line bg-card p-3">
                   <span className="block text-xs font-semibold text-fg-2">
-                    장면을 넣을 컷
-                  </span>
+                    {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "장면을 넣을 컷")}</span>
                   <select
                     value={draft.sceneFrameIndex}
                     onChange={(event) => {
@@ -715,8 +693,7 @@ export function StudioQuickComicWizard({
                   >
                     {selectedLayout.frames.map((_, index) => (
                       <option key={index} value={index}>
-                        {index + 1}번째 컷
-                      </option>
+                        {index + 1}{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "번째 컷")}</option>
                     ))}
                   </select>
                 </label>
@@ -732,16 +709,13 @@ export function StudioQuickComicWizard({
                 </span>
                 <div>
                   <h3 id="quick-comic-dialogue-heading" className="text-sm font-bold text-fg">
-                    대사를 붙여 넣으세요
-                  </h3>
+                    {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "대사를 붙여 넣으세요")}</h3>
                   <p className="mt-1 text-xs leading-relaxed text-fg-3">
-                    한 줄에 한 대사씩 입력하세요. ‘이름: 대사’는 화자별 좌우를 유지하고,
-                    [나레이션]은 박스형으로 배치합니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "한 줄에 한 대사씩 입력하세요. ‘이름: 대사’는 화자별 좌우를 유지하고, [나레이션]은 박스형으로 배치합니다.")}</p>
                 </div>
               </div>
               <label className="block">
-                <span className="sr-only">웹툰 대사</span>
+                <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "웹툰 대사")}</span>
                 <textarea
                   value={draft.dialogueScript}
                   onChange={(event) => {
@@ -750,21 +724,19 @@ export function StudioQuickComicWizard({
                   }}
                   rows={11}
                   spellCheck={false}
-                  placeholder={"민수: 늦어서 미안해.\n지영: 무슨 일 있었어?\n[잠시 후]"}
+                  placeholder={translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "민수: 늦어서 미안해.\n지영: 무슨 일 있었어?\n[잠시 후]")}
                   className="min-h-52 w-full resize-y rounded-xl border border-line-strong bg-card px-3 py-3 text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3 focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 />
               </label>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-3">
-                <p>대사를 비워 두어도 다음 단계로 갈 수 있어요.</p>
+                <p>{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "대사를 비워 두어도 다음 단계로 갈 수 있어요.")}</p>
                 <p aria-live="polite">
-                  인식된 대사 <strong className="text-fg">{preview?.dialogueCount ?? 0}개</strong>
+                  {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "인식된 대사 ")}<strong className="text-fg">{preview?.dialogueCount ?? 0}{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "개")}</strong>
                 </p>
               </div>
               {selectedScene && draft.dialogueScript.trim() ? (
                 <p className="mt-3 rounded-xl border border-line bg-card px-3 py-2.5 text-xs leading-relaxed text-fg-2">
-                  대사를 입력하면 ‘{selectedScene.label}’의 예시 말풍선 대신 입력한 대사가 컷
-                  순서대로 배치됩니다.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "대사를 입력하면 ‘")}{selectedScene.label}{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "’의 예시 말풍선 대신 입력한 대사가 컷 순서대로 배치됩니다.")}</p>
               ) : null}
               {preflight ? (
                 <div className="mt-4">
@@ -785,11 +757,9 @@ export function StudioQuickComicWizard({
             <section aria-labelledby="quick-comic-review-heading">
               <div className="mb-4">
                 <h3 id="quick-comic-review-heading" className="text-sm font-bold text-fg">
-                  적용할 페이지를 확인하세요
-                </h3>
+                  {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "적용할 페이지를 확인하세요")}</h3>
                 <p className="mt-1 text-xs leading-relaxed text-fg-3">
-                  적용 후에도 캔버스에서 컷, 말풍선, 효과를 각각 편집할 수 있습니다.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "적용 후에도 캔버스에서 컷, 말풍선, 효과를 각각 편집할 수 있습니다.")}</p>
               </div>
 
               {preflight ? (
@@ -812,39 +782,36 @@ export function StudioQuickComicWizard({
                   </div>
                   <dl className="divide-y divide-line rounded-xl border border-line bg-card px-3">
                     <div className="flex min-h-11 items-center justify-between gap-4 py-2">
-                      <dt className="text-xs text-fg-3">레이아웃</dt>
+                      <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "레이아웃")}</dt>
                       <dd className="text-right text-sm font-semibold text-fg">
                         {preview.layout.label}
                       </dd>
                     </div>
                     <div className="flex min-h-11 items-center justify-between gap-4 py-2">
-                      <dt className="text-xs text-fg-3">컷</dt>
+                      <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "컷")}</dt>
                       <dd className="text-sm font-semibold text-fg">
-                        {preview.assembly.frameCount}개
-                      </dd>
+                        {preview.assembly.frameCount}{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "개")}</dd>
                     </div>
                     <div className="flex min-h-11 items-center justify-between gap-4 py-2">
-                      <dt className="text-xs text-fg-3">장면 연출</dt>
+                      <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "장면 연출")}</dt>
                       <dd className="text-right text-sm font-semibold text-fg">
                         {preview.scene
-                          ? `${preview.scene.label} · ${(preview.input.sceneFrameIndex ?? 0) + 1}번째 컷`
-                          : "없음"}
+                          ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "{v0} · {v1}번째 컷"), { v0: String(preview.scene.label), v1: String((preview.input.sceneFrameIndex ?? 0) + 1) })
+                          : translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "없음")}
                       </dd>
                     </div>
                     <div className="flex min-h-11 items-center justify-between gap-4 py-2">
-                      <dt className="text-xs text-fg-3">대사</dt>
+                      <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "대사")}</dt>
                       <dd className="text-sm font-semibold text-fg">
-                        {preview.dialogueCount}개
-                      </dd>
+                        {preview.dialogueCount}{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "개")}</dd>
                     </div>
                     <div className="flex min-h-11 items-center justify-between gap-4 py-2">
-                      <dt className="text-xs text-fg-3">말풍선 결과</dt>
+                      <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "말풍선 결과")}</dt>
                       <dd className="text-sm font-semibold text-fg">
-                        {preview.assembly.bubbleCount}개
-                      </dd>
+                        {preview.assembly.bubbleCount}{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "개")}</dd>
                     </div>
                     <div className="flex min-h-11 items-center justify-between gap-4 py-2">
-                      <dt className="text-xs text-fg-3">페이지 높이</dt>
+                      <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "페이지 높이")}</dt>
                       <dd className="text-sm font-semibold tabular-nums text-fg">
                         {preview.assembly.canvasH.toLocaleString("ko-KR")}px
                       </dd>
@@ -856,8 +823,7 @@ export function StudioQuickComicWizard({
                   role="alert"
                   className="rounded-xl border border-danger/45 bg-danger/10 p-3 text-sm text-danger"
                 >
-                  선택한 구성을 읽지 못했습니다. 이전 단계에서 레이아웃을 다시 골라 주세요.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "선택한 구성을 읽지 못했습니다. 이전 단계에서 레이아웃을 다시 골라 주세요.")}</p>
               )}
             </section>
           ) : null}
@@ -874,11 +840,9 @@ export function StudioQuickComicWizard({
             className="inline-flex min-h-11 min-w-24 items-center justify-center gap-1 rounded-xl border border-line bg-card px-3 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
           >
             <ChevronLeft size={17} aria-hidden="true" />
-            이전
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "이전")}</button>
           <p className="hidden min-w-0 flex-1 text-center text-[0.68rem] text-fg-3 sm:block">
-            Esc 취소 · Alt + ←/→ 이동
-            {step === QUICK_COMIC_STEPS.length - 1 ? " · Ctrl/⌘ + Enter 적용" : ""}
+            {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "Esc 취소 · Alt + ←/→ 이동")}{step === QUICK_COMIC_STEPS.length - 1 ? translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", " · Ctrl/⌘ + Enter 적용") : ""}
           </p>
           {step < QUICK_COMIC_STEPS.length - 1 ? (
             <button
@@ -886,8 +850,7 @@ export function StudioQuickComicWizard({
               onClick={goNext}
               className="ml-auto inline-flex min-h-11 min-w-24 items-center justify-center gap-1 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              다음
-              <ChevronRight size={17} aria-hidden="true" />
+              {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "다음")}<ChevronRight size={17} aria-hidden="true" />
             </button>
           ) : (
             <button
@@ -897,8 +860,7 @@ export function StudioQuickComicWizard({
               className="ml-auto inline-flex min-h-11 min-w-28 items-center justify-center gap-1.5 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Check size={17} aria-hidden="true" />
-              페이지 적용
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.comic.StudioQuickComicWizard", "ko", "페이지 적용")}</button>
           )}
         </footer>
       </div>

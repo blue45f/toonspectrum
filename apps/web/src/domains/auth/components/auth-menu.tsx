@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { LoaderCircle, LogOut, Library, Mail, RotateCcw, UserRound, Settings as SettingsIcon, Shield } from "lucide-react";
 import { useState, useEffect, useId, useRef } from "react";
@@ -8,6 +12,7 @@ import { resolveSignupAvatarImage } from "@/shared/lib/avatar";
 import { useT } from "@/shared/lib/i18n";
 import { cn, keepInlineText } from "@/shared/lib/utils";
 import { useSession, signOut } from "@/compat/auth-session-store";
+import { subscribeAuthModalRequests } from "@/compat/auth-modal-intent";
 import Link from "@/compat/router-link";
 import { adminFetch, type AdminMe } from "@/domains/admin/components/admin-client";
 import { messagingClient } from "@/infrastructure/messaging-client";
@@ -51,6 +56,12 @@ export function AuthMenu({
   useEffect(() => {
     if (defaultOpen) setModal(true);
   }, [defaultOpen]);
+
+  useEffect(() => subscribeAuthModalRequests(() => {
+    if (status === "authenticated") return;
+    setMenuOpen(false);
+    setModal(true);
+  }), [status]);
 
   // 관리자 콘솔 링크 노출 — 세션 role(화이트리스트 승격 반영) + /api/admin/me 프로브.
   // 프로브는 세션 role 이 stale 한 탭/캐시에서도 링크가 보이도록 하는 2차 게이트.
@@ -174,7 +185,7 @@ export function AuthMenu({
         className="relative grid size-10 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent outline-none transition-transform active:scale-95"
         aria-label={
           unreadMessageCount > 0
-            ? `${t("auth.menu.triggerLabel")} · 읽지 않은 메시지 ${unreadMessageCount.toLocaleString("ko-KR")}개`
+            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.auth.components.auth.menu", "ko", "{v0} · 읽지 않은 메시지 {v1}개"), { v0: String(t("auth.menu.triggerLabel")), v1: String(unreadMessageCount.toLocaleString("ko-KR")) })
             : t("auth.menu.triggerLabel")
         }
       >
@@ -216,7 +227,7 @@ export function AuthMenu({
           <DropdownMenu.Item asChild>
             <Link href="/messages" className={ITEM_CLASS}>
               <Mail size={15} />
-              <span>메시지</span>
+              <span>{translateCurrentStaticSourceText("domains.auth.components.auth.menu", "ko", "메시지")}</span>
               {unreadMessageCount > 0 ? (
                 <span className="ml-auto min-w-5 rounded-full bg-accent px-1.5 py-0.5 text-center text-[0.65rem] font-bold text-on-accent">
                   {unreadMessageCount > 99 ? "99+" : unreadMessageCount}

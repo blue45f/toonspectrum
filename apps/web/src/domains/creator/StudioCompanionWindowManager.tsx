@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ExternalLink, Images, ListChecks, Map, MonitorCog, Pin, X } from "lucide-react";
 import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 
@@ -90,27 +94,27 @@ export function StudioCompanionWindowManager({ disabled, onOpenSurface, getOpenS
   const nextPinned = profile.pinnedSurfaces.find((surface) => !opened[surface]);
   const remaining = profile.pinnedSurfaces.filter((surface) => !opened[surface]).length;
   return (
-    <section aria-labelledby={`${id}-title`} className="space-y-3" data-studio-browser-workspace>
+    <section aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "en", "{v0}-title"), { v0: String(id) })} className="space-y-3" data-studio-browser-workspace>
       <div className="flex items-start gap-2">
         <MonitorCog className="mt-0.5 size-4 shrink-0 text-fg-3" aria-hidden />
         <div className="min-w-0">
-          <h2 id={`${id}-title`} tabIndex={-1} className="text-xs font-semibold text-fg-2">멀티탭 · 멀티 디스플레이</h2>
-          <p className="mt-1 text-xs leading-relaxed text-fg-3">작업공간과 세 전용 창을 독립 배치해 최대 4화면으로 확장합니다. 원고와 실행 취소는 기본 편집기가 관리합니다.</p>
+          <h2 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "en", "{v0}-title"), { v0: String(id) })} tabIndex={-1} className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "멀티탭 · 멀티 디스플레이")}</h2>
+          <p className="mt-1 text-xs leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "작업공간과 세 전용 창을 독립 배치해 최대 4화면으로 확장합니다. 원고와 실행 취소는 기본 편집기가 관리합니다.")}</p>
         </div>
       </div>
-      <div role="group" aria-label="보조 화면 열기 방식" className="grid grid-cols-2 gap-2">
+      <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "보조 화면 열기 방식")} className="grid grid-cols-2 gap-2">
         {(["window", "tab"] as const).map((mode) => <button key={mode} type="button" disabled={disabled}
           aria-pressed={profile.openMode === mode} onClick={() => changeProfile({ ...profile, openMode: mode })}
           className={cn(CONTROL, profile.openMode === mode ? "border-accent bg-accent-soft text-fg" : "bg-card text-fg-3")}>
-          {mode === "window" ? "분리 창으로 열기" : "브라우저 탭으로 열기"}
+          {mode === "window" ? translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "분리 창으로 열기") : translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "브라우저 탭으로 열기")}
         </button>)}
       </div>
-      <p className="text-xs leading-relaxed text-fg-3">분리 창은 듀얼 모니터에, 탭은 한 화면에서 빠른 전환에 적합합니다. 브라우저가 실제 열기 방식을 결정하며, 이미 열린 화면은 그대로 재사용합니다.</p>
+      <p className="text-xs leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "분리 창은 듀얼 모니터에, 탭은 한 화면에서 빠른 전환에 적합합니다. 브라우저가 실제 열기 방식을 결정하며, 이미 열린 화면은 그대로 재사용합니다.")}</p>
       <div data-companion-window-list className="grid grid-cols-1 gap-2 min-[480px]:grid-cols-2">
         {SURFACES.map(({ surface, label, description, icon: Icon }) => (
           <div key={surface} className="min-w-0 rounded-xl border border-line/70 bg-card p-2">
             <button type="button" disabled={disabled}
-              aria-label={`${label} ${profile.openMode === "tab" ? "새 탭" : "전용 창"} 열기 또는 앞으로 가져오기`}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "{v0} {v1} 열기 또는 앞으로 가져오기"), { v0: String(label), v1: String(profile.openMode === "tab" ? "새 탭" : "전용 창") })}
               onClick={() => openSurface(surface)}
               className="flex min-h-14 w-full items-center gap-2 rounded-lg text-left outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/50 disabled:opacity-50">
               <Icon className="size-5 shrink-0 text-fg-3" aria-hidden />
@@ -119,11 +123,11 @@ export function StudioCompanionWindowManager({ disabled, onOpenSurface, getOpenS
               <ExternalLink className="size-3.5 shrink-0 text-fg-3" aria-hidden />
             </button>
             <div className="mt-2 flex items-center justify-between gap-1 border-t border-line pt-1">
-              <span className="text-[0.68rem] text-fg-3">{opened[surface] ? "열림 · 다시 누르면 앞으로" : "열기 가능"}</span>
+              <span className="text-[0.68rem] text-fg-3">{opened[surface] ? translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "열림 · 다시 누르면 앞으로") : translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "열기 가능")}</span>
               <div className="flex shrink-0 gap-1">
-                <button type="button" disabled={disabled} aria-label={`${label} 화면 고정`} aria-pressed={profile.pinnedSurfaces.includes(surface)}
+                <button type="button" disabled={disabled} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "{v0} 화면 고정"), { v0: String(label) })} aria-pressed={profile.pinnedSurfaces.includes(surface)}
                   onClick={() => togglePin(surface)} className={cn(CONTROL, "px-2", profile.pinnedSurfaces.includes(surface) && "bg-accent-soft text-accent")}><Pin className="size-3.5" aria-hidden /></button>
-                {onCloseSurface ? <button type="button" disabled={disabled || !opened[surface]} aria-label={`${label} 화면 닫기`}
+                {onCloseSurface ? <button type="button" disabled={disabled || !opened[surface]} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "{v0} 화면 닫기"), { v0: String(label) })}
                   onClick={() => closeSurface(surface)} className={cn(CONTROL, "px-2")}><X className="size-3.5" aria-hidden /></button> : null}
               </div>
             </div>
@@ -133,16 +137,16 @@ export function StudioCompanionWindowManager({ disabled, onOpenSurface, getOpenS
       <div className="rounded-xl border border-line bg-card/60 p-3">
         <button type="button" disabled={disabled || !nextPinned} className={CONTROL}
           onClick={() => { if (nextPinned) openSurface(nextPinned); }}>
-          고정 화면 차례로 열기{remaining > 0 ? ` · ${remaining}개 남음` : ""}
+          {translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "고정 화면 차례로 열기")}{remaining > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", " · {v0}개 남음"), { v0: String(remaining) }) : ""}
         </button>
         <p className="mt-2 text-xs leading-relaxed text-fg-3">
-          {profile.pinnedSurfaces.length === 0 ? "핀 버튼으로 필요한 화면을 고정하세요. 다음에도 이 구성을 기억합니다."
-            : remaining === 0 ? "고정한 화면이 모두 열려 있습니다. 창을 닫으면 다시 복원할 수 있습니다."
-            : "한 번 누를 때 한 화면씩 열립니다. 자동 팝업 없이 필요한 화면만 복원합니다."}
+          {profile.pinnedSurfaces.length === 0 ? translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "핀 버튼으로 필요한 화면을 고정하세요. 다음에도 이 구성을 기억합니다.")
+            : remaining === 0 ? translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "고정한 화면이 모두 열려 있습니다. 창을 닫으면 다시 복원할 수 있습니다.")
+            : translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "한 번 누를 때 한 화면씩 열립니다. 자동 팝업 없이 필요한 화면만 복원합니다.")}
         </p>
-        {saved.persistent === false ? <p className="mt-2 text-xs text-warn">브라우저 저장이 제한되어 이 창에서만 설정을 유지합니다.</p> : null}
+        {saved.persistent === false ? <p className="mt-2 text-xs text-warn">{translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "ko", "브라우저 저장이 제한되어 이 창에서만 설정을 유지합니다.")}</p> : null}
       </div>
-      {notice ? <p role={notice.error ? "alert" : "status"}
+      {notice ? <p role={notice.error ? translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowManager", "en", "status")}
         className={cn("rounded-lg border px-3 py-2 text-xs leading-relaxed", notice.error ? "border-bad/40 text-bad" : "border-good/35 text-good")}>
         {notice.text}
       </p> : null}

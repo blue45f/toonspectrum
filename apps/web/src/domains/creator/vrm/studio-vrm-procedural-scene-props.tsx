@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /* eslint-disable react-refresh/only-export-components -- 카탈로그·본 오프셋과 그 카탈로그 전용 R3F 렌더러가 하나의 정적 소유 경계다. */
 import { createPortal } from "@react-three/fiber";
 import { useEffect, useState, type FC } from "react";
@@ -577,7 +578,7 @@ function PropCrown({ scale: s }: { scale: number }) {
       ))}
       {/* gems on spikes */}
       {[0, 144, 288].map((angle) => (
-        <mesh key={`gem-${angle}`} position={[Math.sin(d(angle)) * 0.48, 0.55, Math.cos(d(angle)) * 0.48]}>
+        <mesh key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.studio.vrm.procedural.scene.props", "en", "gem-{v0}"), { v0: String(angle) })} position={[Math.sin(d(angle)) * 0.48, 0.55, Math.cos(d(angle)) * 0.48]}>
           <sphereGeometry args={[0.08, 8, 8]} /><meshStandardMaterial color="#dc2626" metalness={0.3} roughness={0.1} />
         </mesh>
       ))}
@@ -950,6 +951,8 @@ const PROP_COMPONENTS: Record<string, FC<{ scale: number }>> = {
   sparkle: PropSparkle, fire: PropFire, lightning: PropLightning, snowflake: PropSnowflake,
   rainbow: PropRainbow, bubbles: PropBubbles, leaves: PropLeaves, feather: PropFeather,
 };
+
+export const SCENE_PROP_RENDERABLE_IDS = new Set(Object.keys(PROP_COMPONENTS));
 
 export const DEFAULT_BONE_OFFSETS: Record<string, Partial<Record<VRMHumanBoneName, Partial<PropAttachmentConfig>>>> = {
   sword: {

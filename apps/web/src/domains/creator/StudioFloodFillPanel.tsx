@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ChevronDown,
   CircleStop,
   Info,
@@ -190,20 +194,17 @@ export function StudioFloodFillPanel({
             </span>
             <div className="min-w-0">
               <h3 id={titleId} className="text-sm font-bold text-fg">
-                고급 채우기
-              </h3>
+                {translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "고급 채우기")}</h3>
               <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-                메인 캔버스에서 선화 안쪽을 바로 채웁니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "메인 캔버스에서 선화 안쪽을 바로 채웁니다.")}</p>
             </div>
           </div>
           <span
             className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-full border border-good/30 bg-good/10 px-2 text-[0.64rem] font-semibold text-good"
-            title="이미지와 설정은 서버로 전송되지 않습니다."
+            title={translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "이미지와 설정은 서버로 전송되지 않습니다.")}
           >
             <ShieldCheck size={12} aria-hidden="true" />
-            브라우저 로컬
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "브라우저 로컬")}</span>
         </div>
       </header>
 
@@ -237,20 +238,20 @@ export function StudioFloodFillPanel({
             )}
             {busy
               ? active
-                ? "계산 취소"
-                : "계산 중…"
+                ? translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "계산 취소")
+                : translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "계산 중…")
               : active
-                ? "채우기 도구 종료"
-                : "캔버스에서 채우기"}
+                ? translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "채우기 도구 종료")
+                : translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "캔버스에서 채우기")}
           </button>
           <p id={toolHelpId} className="mt-1.5 text-center text-[0.67rem] leading-relaxed text-fg-3">
             {busy
               ? active
-                ? "진행 중에도 이 버튼으로 계산과 채우기 도구를 종료할 수 있습니다."
-                : "이전 계산이 끝나면 채우기 도구를 다시 켤 수 있습니다."
+                ? translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "진행 중에도 이 버튼으로 계산과 채우기 도구를 종료할 수 있습니다.")
+                : translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "이전 계산이 끝나면 채우기 도구를 다시 켤 수 있습니다.")
               : active
-                ? "캔버스를 탭하면 현재 설정으로 채웁니다."
-                : "도구를 켠 다음 채울 영역을 캔버스에서 탭하세요."}
+                ? translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "캔버스를 탭하면 현재 설정으로 채웁니다.")
+                : translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "도구를 켠 다음 채울 영역을 캔버스에서 탭하세요.")}
           </p>
         </div>
 
@@ -267,17 +268,16 @@ export function StudioFloodFillPanel({
 
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_4rem] items-end gap-2">
           <div className="min-w-0 pb-1">
-            <label htmlFor={`${scopeId}-color`} className="block text-xs font-semibold text-fg-2">
-              채우기 색상
-            </label>
+            <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "en", "{v0}-color"), { v0: String(scopeId) })} className="block text-xs font-semibold text-fg-2">
+              {translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "채우기 색상")}</label>
             <span className="mt-1 block truncate font-mono text-[0.68rem] tabular-nums text-fg-3">
               {fillColor.toUpperCase()}
             </span>
           </div>
           <input
-            id={`${scopeId}-color`}
+            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "en", "{v0}-color"), { v0: String(scopeId) })}
             type="color"
-            aria-label="채우기 색상 선택"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "채우기 색상 선택")}
             value={fillColor}
             disabled={busy}
             onChange={(event) => onFillColorChange(event.currentTarget.value)}
@@ -343,18 +343,18 @@ export function StudioFloodFillPanel({
             )}
           >
             {selectedScopeUnavailable
-              ? "선택한 참조 범위에 사용할 수 있는 레이어가 없습니다."
+              ? translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "선택한 참조 범위에 사용할 수 있는 레이어가 없습니다.")
               : STUDIO_ADVANCED_FILL_REFERENCE_SCOPE_DESCRIPTIONS[settings.referenceScope]}
           </p>
         </div>
 
         <fieldset disabled={busy} className="min-w-0 border-y border-line/70 py-3">
-          <legend className="sr-only">기본 채우기 설정</legend>
+          <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "기본 채우기 설정")}</legend>
           <div className="space-y-1">
             <div className="block min-w-0">
               <span className="flex min-w-0 items-center justify-between gap-3 text-xs">
                 <span
-                  id={`${toleranceId}-label`}
+                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "en", "{v0}-label"), { v0: String(toleranceId) })}
                   className="truncate font-semibold text-fg-2"
                 >
                   {STUDIO_ADVANCED_FILL_SETTING_LABELS.tolerance}
@@ -369,7 +369,7 @@ export function StudioFloodFillPanel({
               <input
                 id={toleranceId}
                 type="range"
-                aria-labelledby={`${toleranceId}-label`}
+                aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "en", "{v0}-label"), { v0: String(toleranceId) })}
                 min={STUDIO_ADVANCED_FILL_LIMITS.tolerance.min}
                 max={STUDIO_ADVANCED_FILL_LIMITS.tolerance.max}
                 step={STUDIO_ADVANCED_FILL_LIMITS.tolerance.step}
@@ -385,7 +385,7 @@ export function StudioFloodFillPanel({
             <div className="block min-w-0">
               <span className="flex min-w-0 items-center justify-between gap-3 text-xs">
                 <span
-                  id={`${expansionId}-label`}
+                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "en", "{v0}-label"), { v0: String(expansionId) })}
                   className="truncate font-semibold text-fg-2"
                 >
                   {STUDIO_ADVANCED_FILL_SETTING_LABELS.expansionPx}
@@ -400,7 +400,7 @@ export function StudioFloodFillPanel({
               <input
                 id={expansionId}
                 type="range"
-                aria-labelledby={`${expansionId}-label`}
+                aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "en", "{v0}-label"), { v0: String(expansionId) })}
                 min={STUDIO_ADVANCED_FILL_LIMITS.expansionPx.min}
                 max={STUDIO_ADVANCED_FILL_LIMITS.expansionPx.max}
                 step={STUDIO_ADVANCED_FILL_LIMITS.expansionPx.step}
@@ -418,7 +418,7 @@ export function StudioFloodFillPanel({
             <div className="block min-w-0">
               <span className="flex min-w-0 items-center justify-between gap-3 text-xs">
                 <span
-                  id={`${closeGapId}-label`}
+                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "en", "{v0}-label"), { v0: String(closeGapId) })}
                   className="truncate font-semibold text-fg-2"
                 >
                   {STUDIO_ADVANCED_FILL_SETTING_LABELS.closeGapPx}
@@ -433,7 +433,7 @@ export function StudioFloodFillPanel({
               <input
                 id={closeGapId}
                 type="range"
-                aria-labelledby={`${closeGapId}-label`}
+                aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "en", "{v0}-label"), { v0: String(closeGapId) })}
                 min={STUDIO_ADVANCED_FILL_LIMITS.closeGapPx.min}
                 max={STUDIO_ADVANCED_FILL_LIMITS.closeGapPx.max}
                 step={STUDIO_ADVANCED_FILL_LIMITS.closeGapPx.step}
@@ -457,7 +457,7 @@ export function StudioFloodFillPanel({
             )}
           >
             <SlidersHorizontal size={15} aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate">고급 설정</span>
+            <span className="min-w-0 flex-1 truncate">{translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "고급 설정")}</span>
             <ChevronDown
               size={15}
               className="shrink-0 transition-transform duration-200 group-open/fill-advanced:rotate-180 motion-reduce:transition-none"
@@ -465,34 +465,34 @@ export function StudioFloodFillPanel({
             />
           </summary>
           <fieldset disabled={busy} className="min-w-0 pb-3">
-            <legend className="sr-only">고급 채우기 설정</legend>
+            <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "고급 채우기 설정")}</legend>
             <div className="divide-y divide-line/50">
               <ToggleSetting
                 checked={settings.contiguous}
                 disabled={busy}
                 label={STUDIO_ADVANCED_FILL_SETTING_LABELS.contiguous}
-                description="시드와 이어진 영역만 채웁니다."
+                description={translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "시드와 이어진 영역만 채웁니다.")}
                 onChange={(checked) => updateSetting("contiguous", checked)}
               />
               <ToggleSetting
                 checked={settings.antiAlias}
                 disabled={busy}
                 label={STUDIO_ADVANCED_FILL_SETTING_LABELS.antiAlias}
-                description="채운 영역의 외곽 픽셀을 부드럽게 정리합니다."
+                description={translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "채운 영역의 외곽 픽셀을 부드럽게 정리합니다.")}
                 onChange={(checked) => updateSetting("antiAlias", checked)}
               />
               <ToggleSetting
                 checked={settings.continuousFill}
                 disabled={busy}
                 label={STUDIO_ADVANCED_FILL_SETTING_LABELS.continuousFill}
-                description="한 번 채운 뒤에도 도구를 켜 둡니다."
+                description={translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "한 번 채운 뒤에도 도구를 켜 둡니다.")}
                 onChange={(checked) => updateSetting("continuousFill", checked)}
               />
               <ToggleSetting
                 checked={settings.leakGuard}
                 disabled={busy}
                 label={STUDIO_ADVANCED_FILL_SETTING_LABELS.leakGuard}
-                description="예상보다 넓게 번진 결과는 적용 전에 차단합니다."
+                description={translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "예상보다 넓게 번진 결과는 적용 전에 차단합니다.")}
                 onChange={(checked) => updateSetting("leakGuard", checked)}
               />
               <div
@@ -500,7 +500,7 @@ export function StudioFloodFillPanel({
               >
                 <span className="flex min-w-0 items-center justify-between gap-3 text-xs">
                   <span
-                    id={`${leakRatioId}-label`}
+                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "en", "{v0}-label"), { v0: String(leakRatioId) })}
                     className="truncate font-semibold text-fg-2"
                   >
                     {STUDIO_ADVANCED_FILL_SETTING_LABELS.leakGuardMaxFillRatio}
@@ -515,7 +515,7 @@ export function StudioFloodFillPanel({
                 <input
                   id={leakRatioId}
                   type="range"
-                  aria-labelledby={`${leakRatioId}-label`}
+                  aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "en", "{v0}-label"), { v0: String(leakRatioId) })}
                   min={STUDIO_ADVANCED_FILL_LIMITS.leakGuardMaxFillRatio.min}
                   max={STUDIO_ADVANCED_FILL_LIMITS.leakGuardMaxFillRatio.max}
                   step={STUDIO_ADVANCED_FILL_LIMITS.leakGuardMaxFillRatio.step}
@@ -534,7 +534,7 @@ export function StudioFloodFillPanel({
                 checked={settings.treatCanvasEdgeAsBoundary}
                 disabled={busy}
                 label={STUDIO_ADVANCED_FILL_SETTING_LABELS.treatCanvasEdgeAsBoundary}
-                description="열린 선이 캔버스 밖으로 새는 것을 줄입니다."
+                description={translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "열린 선이 캔버스 밖으로 새는 것을 줄입니다.")}
                 onChange={(checked) => updateSetting("treatCanvasEdgeAsBoundary", checked)}
               />
             </div>
@@ -549,8 +549,7 @@ export function StudioFloodFillPanel({
               )}
             >
               <RotateCcw size={14} aria-hidden="true" />
-              고급 채우기 설정 초기화
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "고급 채우기 설정 초기화")}</button>
           </fieldset>
         </details>
 
@@ -572,7 +571,7 @@ export function StudioFloodFillPanel({
           >
             <Target size={15} className="shrink-0" aria-hidden="true" />
             <span className="min-w-0 truncate">
-              {selectedIsReference ? "선택 레이어 참조 해제" : "선택 레이어를 참조로 설정"}
+              {selectedIsReference ? translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "선택 레이어 참조 해제") : translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "선택 레이어를 참조로 설정")}
             </span>
             <span className="shrink-0 font-mono text-[0.65rem] tabular-nums opacity-75">
               {safeReferenceLayerCount}
@@ -583,9 +582,7 @@ export function StudioFloodFillPanel({
         <p className="flex min-w-0 items-start gap-2 border-y border-line/60 py-2.5 text-[0.67rem] leading-relaxed text-fg-3">
           <Info size={14} className="mt-0.5 shrink-0 text-cool" aria-hidden="true" />
           <span className="min-w-0 break-words">
-            ‘표시 래스터’는 보이는 래스터 원본만 합성하고 편집 대상은 제외합니다. 필터·마스크·기울임
-            변형·혼합 모드·아래 레이어 클리핑·페이지 색보정은 아직 참조 이미지에 굽지 않습니다.
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "‘표시 래스터’는 보이는 래스터 원본만 합성하고 편집 대상은 제외합니다. 필터·마스크·기울임 변형·혼합 모드·아래 레이어 클리핑·페이지 색보정은 아직 참조 이미지에 굽지 않습니다.")}</span>
         </p>
 
         {statusMessage || diagnostics || busy ? (
@@ -619,7 +616,7 @@ export function StudioFloodFillPanel({
               <span className="min-w-0 break-words">
                 {statusMessage ??
                   (busy
-                    ? "영역을 계산하고 있어요."
+                    ? translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "영역을 계산하고 있어요.")
                     : diagnostics
                       ? DIAGNOSTIC_STATUS_LABELS[diagnostics.status]
                       : null)}
@@ -628,12 +625,12 @@ export function StudioFloodFillPanel({
             {diagnostics ? (
               <dl className="mt-2 flex min-w-0 flex-wrap gap-x-3 gap-y-1 border-t border-current/15 pt-2 font-mono text-[0.64rem] tabular-nums">
                 <div className="flex gap-1">
-                  <dt className="font-sans opacity-75">{hasAccumulatedPreview ? "이번 적용" : "적용"}</dt>
+                  <dt className="font-sans opacity-75">{hasAccumulatedPreview ? translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "이번 적용") : translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "적용")}</dt>
                   <dd>{formatPixelCount(diagnostics.paintedPixelCount)}px</dd>
                 </div>
                 <div className="flex gap-1">
                   <dt className="font-sans opacity-75">
-                    {diagnostics.leakGuard.triggered ? "검사 면적" : "최종 면적"}
+                    {diagnostics.leakGuard.triggered ? translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "검사 면적") : translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "최종 면적")}
                   </dt>
                   <dd>
                     {formatPercent(
@@ -644,13 +641,13 @@ export function StudioFloodFillPanel({
                   </dd>
                 </div>
                 <div className="flex gap-1">
-                  <dt className="font-sans opacity-75">참조</dt>
-                  <dd>{diagnostics.referenceSource === "reference-image" ? "합성" : "대상"}</dd>
+                  <dt className="font-sans opacity-75">{translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "참조")}</dt>
+                  <dd>{diagnostics.referenceSource === "reference-image" ? translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "합성") : translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "대상")}</dd>
                 </div>
                 {diagnostics.final.touchesCanvasEdge ? (
                   <div className="flex gap-1">
-                    <dt className="font-sans opacity-75">경계</dt>
-                    <dd>캔버스 접촉</dd>
+                    <dt className="font-sans opacity-75">{translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "경계")}</dt>
+                    <dd>{translateCurrentStaticSourceText("domains.creator.StudioFloodFillPanel", "ko", "캔버스 접촉")}</dd>
                   </div>
                 ) : null}
               </dl>

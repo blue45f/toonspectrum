@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense, useEffect, useState } from "react";
 
 import { compileStudioAiSuitePromptHandoff } from "./studio-ai-suite-handoff";
@@ -26,8 +27,7 @@ export function StudioAiSuperSuiteGateway({ onApplyPrompt }: { readonly onApplyP
     <Suspense fallback={
       <div className="fixed inset-0 z-[120] grid place-items-center bg-bg/80 p-4 backdrop-blur-sm" role="status">
         <div className="rounded-xl border border-line bg-panel px-4 py-3 text-sm font-semibold text-fg shadow-xl">
-          AI 웹툰 레시피 도구를 여는 중…
-          <button type="button" className="ml-3 min-h-11 rounded-lg border border-line px-3" onClick={() => setOpen(false)}>열기 취소</button>
+          {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteGateway", "ko", "AI 웹툰 레시피 도구를 여는 중…")}<button type="button" className="ml-3 min-h-11 rounded-lg border border-line px-3" onClick={() => setOpen(false)}>{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteGateway", "ko", "열기 취소")}</button>
         </div>
       </div>
     }>

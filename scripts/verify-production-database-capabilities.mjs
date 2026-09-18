@@ -10,6 +10,8 @@ import { buildAdminCapabilitySql } from "./admin-database-contract.mjs";
 import { buildFeedbackCapabilitySql } from "./feedback-database-contract.mjs";
 import {
   buildAuthRuntimeAclViolationSql,
+  buildTrafficAnalyticsRuntimeAclViolationSql,
+  buildCreatorRoleWorkspaceRuntimeAclViolationSql,
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
   buildCreatorMarketplaceRuntimeAclViolationSql,
   buildMessagingRuntimeAclViolationSql,
@@ -18,6 +20,7 @@ import {
   buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
   buildStudioProductionRuntimeAclViolationSql,
+  buildStudioProjectGraphRuntimeAclViolationSql,
   loadMigrationManifest,
 } from "./run-production-database-migrations.mjs";
 import {
@@ -422,6 +425,16 @@ BEGIN
       'runtime role lacks the exact authentication lifecycle privileges';
   END IF;
 
+  IF ${buildTrafficAnalyticsRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION
+      'runtime role lacks the exact traffic analytics privileges';
+  END IF;
+
+  IF ${buildCreatorRoleWorkspaceRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION
+      'runtime role lacks the exact creator role workspace privileges';
+  END IF;
+
   IF ${buildPersonalCloudRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
     RAISE EXCEPTION
       'runtime role lacks the exact personal cloud connection privileges';
@@ -435,6 +448,12 @@ BEGIN
   IF ${buildRuntimeCutoverLedgerAclViolationSql(runtimeDatabaseRole)} THEN
     RAISE EXCEPTION
       'runtime role lacks the exact cutover-readiness ledger privileges';
+  END IF;
+
+
+  IF ${buildStudioProjectGraphRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION
+      'runtime role lacks the exact Studio ProjectGraph privileges';
   END IF;
 
   IF ${buildStudioProductionRuntimeAclViolationSql(runtimeDatabaseRole)} THEN

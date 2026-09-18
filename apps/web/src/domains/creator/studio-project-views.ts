@@ -1,5 +1,5 @@
 export const STUDIO_PROJECT_SECTION_VIEWS = {
-  overview: ["summary", "activity", "readiness"],
+  overview: ["summary", "activity", "readiness", "intelligence"],
   story: [
     "overview",
     "episodes",
@@ -29,6 +29,7 @@ export const STUDIO_PROJECT_VIEW_LABELS: Readonly<
     summary: { ko: "요약", en: "Summary" },
     activity: { ko: "최근 활동", en: "Activity" },
     readiness: { ko: "완성 준비", en: "Readiness" },
+    intelligence: { ko: "창작 인텔리전스", en: "Creator Intelligence" },
   }),
   story: Object.freeze({
     overview: { ko: "작품 구조", en: "Overview" },

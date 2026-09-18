@@ -1,4 +1,7 @@
 import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   answerOf,
   buildQuestion,
   isCorrect,
@@ -129,7 +132,7 @@ export function QuizGame({ onExit }: PlayGameProps) {
   if (loading || !question) {
     return (
       <div className="grid min-h-[18rem] place-items-center text-sm text-fg-2">
-        {loading ? "웹툰 문제를 불러오는 중…" : titles.length < 4 ? "문제를 만들 웹툰이 부족합니다." : "문제를 준비하는 중…"}
+        {loading ? translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "웹툰 문제를 불러오는 중…") : titles.length < 4 ? translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "문제를 만들 웹툰이 부족합니다.") : translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "문제를 준비하는 중…")}
       </div>
     );
   }
@@ -144,26 +147,23 @@ export function QuizGame({ onExit }: PlayGameProps) {
         <Trophy className={cn("h-12 w-12", perfect ? "text-amber-400" : "text-accent")} />
         <div>
           <p className="text-lg font-bold text-fg">
-            {score} / {ROUND_COUNT} 정답
-          </p>
-          <p className="mt-1 text-sm text-fg-2">최고 연속 정답 {bestStreak}회</p>
+            {score} / {ROUND_COUNT} {translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "정답")}</p>
+          <p className="mt-1 text-sm text-fg-2">{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "최고 연속 정답 ")}{bestStreak}{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "회")}</p>
         </div>
         <p className="max-w-xs text-sm text-fg-3" aria-live="polite">
           {perfect
-            ? "🏆 만점! 진정한 웹툰 마스터입니다."
+            ? translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "🏆 만점! 진정한 웹툰 마스터입니다.")
             : score >= 7
-              ? "👏 대단해요! 웹툰을 꽤 잘 아시는군요."
+              ? translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "👏 대단해요! 웹툰을 꽤 잘 아시는군요.")
               : score >= 4
-                ? "🙂 나쁘지 않아요. 한 판 더?"
-                : "🌱 더 많은 웹툰을 만나볼 시간!"}
+                ? translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "🙂 나쁘지 않아요. 한 판 더?")
+                : translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "🌱 더 많은 웹툰을 만나볼 시간!")}
         </p>
         <div className="flex items-center justify-center gap-2">
           <Button variant="solid" onClick={restart}>
-            <RotateCcw className="mr-1 h-4 w-4" /> 다시 풀기
-          </Button>
+            <RotateCcw className="mr-1 h-4 w-4" /> {translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "다시 풀기")}</Button>
           <Button variant="outline" onClick={onExit}>
-            다른 게임
-          </Button>
+            {translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "다른 게임")}</Button>
         </div>
       </div>
     );
@@ -177,19 +177,18 @@ export function QuizGame({ onExit }: PlayGameProps) {
       {/* 상단 진행/점수 */}
       <div className="flex items-center justify-between text-sm">
         <span className="flex items-center gap-2 text-fg-2">
-          문제 <span className="font-bold tabular-nums text-fg">{round}</span> / {ROUND_COUNT}
+          {translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "문제 ")}<span className="font-bold tabular-nums text-fg">{round}</span> / {ROUND_COUNT}
           <GameHelp
             id="quiz"
-            title="웹툰 퀴즈"
+            title={translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "웹툰 퀴즈")}
             steps={[
               {
                 emoji: "🎯",
                 title: "목표",
                 desc: (
                   <>
-                    흐릿하게 가려진 <b className="text-fg">표지</b>와 단서를 보고 그 웹툰의{" "}
-                    <b className="text-fg">제목</b>을 맞혀요.
-                  </>
+                    {translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "흐릿하게 가려진 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "표지")}</b>{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "와 단서를 보고 그 웹툰의")}{" "}
+                    <b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "제목")}</b>{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "을 맞혀요.")}</>
                 ),
               },
               {
@@ -197,9 +196,8 @@ export function QuizGame({ onExit }: PlayGameProps) {
                 title: "단서",
                 desc: (
                   <>
-                    표지 아래에 <b className="text-fg">작가</b>와{" "}
-                    <b className="text-fg">장르</b>(최대 3개)가 힌트로 주어져요.
-                  </>
+                    {translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "표지 아래에 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "작가")}</b>{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "와")}{" "}
+                    <b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "장르")}</b>{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "(최대 3개)가 힌트로 주어져요.")}</>
                 ),
               },
               {
@@ -207,12 +205,10 @@ export function QuizGame({ onExit }: PlayGameProps) {
                 title: "정답 고르기",
                 desc: (
                   <>
-                    <b className="text-fg">4개 보기</b> 중 하나를 누르면 바로 채점돼요. 정답은{" "}
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">초록</span>
-                    , 틀린 선택은{" "}
-                    <span className="font-semibold text-rose-600 dark:text-rose-400">빨강</span>으로
-                    표시돼요.
-                  </>
+                    <b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "4개 보기")}</b> {translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "중 하나를 누르면 바로 채점돼요. 정답은")}{" "}
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "초록")}</span>
+                    {translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", ", 틀린 선택은")}{" "}
+                    <span className="font-semibold text-rose-600 dark:text-rose-400">{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "빨강")}</span>{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "으로 표시돼요.")}</>
                 ),
               },
               {
@@ -220,9 +216,8 @@ export function QuizGame({ onExit }: PlayGameProps) {
                 title: "점수와 연속",
                 desc: (
                   <>
-                    맞힐 때마다 <b className="text-fg">1점</b>, 연속으로 맞히면{" "}
-                    <b className="text-fg">연속 기록</b>이 쌓여요(틀리면 0으로 초기화).
-                  </>
+                    {translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "맞힐 때마다 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "1점")}</b>{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", ", 연속으로 맞히면")}{" "}
+                    <b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "연속 기록")}</b>{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "이 쌓여요(틀리면 0으로 초기화).")}</>
                 ),
               },
               {
@@ -230,9 +225,7 @@ export function QuizGame({ onExit }: PlayGameProps) {
                 title: "한 판",
                 desc: (
                   <>
-                    총 <b className="text-fg">{ROUND_COUNT}문제</b>를 풀면 최종 점수와 최고 연속
-                    기록을 보여줘요.
-                  </>
+                    {translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "총 ")}<b className="text-fg">{ROUND_COUNT}{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "문제")}</b>{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "를 풀면 최종 점수와 최고 연속 기록을 보여줘요.")}</>
                 ),
               },
             ]}
@@ -240,11 +233,10 @@ export function QuizGame({ onExit }: PlayGameProps) {
         </span>
         <span className="flex items-center gap-3">
           <span className="text-fg-2">
-            점수 <span className="font-bold tabular-nums text-fg">{score}</span>
+            {translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "점수 ")}<span className="font-bold tabular-nums text-fg">{score}</span>
           </span>
           <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", streak >= 2 ? "bg-accent-soft text-accent" : "text-fg-3")}>
-            🔥 {streak}연속
-          </span>
+            🔥 {streak}{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "연속")}</span>
         </span>
       </div>
 
@@ -258,7 +250,7 @@ export function QuizGame({ onExit }: PlayGameProps) {
         <div className="flex flex-col items-center gap-2">
           <HintCard title={answer} revealed={answered} />
           <p className="text-center text-xs text-fg-3">
-            <span className="font-medium text-fg-2">단서</span> · {answer.author}
+            <span className="font-medium text-fg-2">{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "단서")}</span> · {answer.author}
             {answer.genres.length > 0 && (
               <>
                 {" · "}
@@ -266,7 +258,7 @@ export function QuizGame({ onExit }: PlayGameProps) {
               </>
             )}
           </p>
-          <p className="text-sm font-semibold text-fg">이 표지의 웹툰 제목은?</p>
+          <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "이 표지의 웹툰 제목은?")}</p>
         </div>
       )}
 
@@ -302,14 +294,14 @@ export function QuizGame({ onExit }: PlayGameProps) {
       <p className="min-h-[1.25rem] text-center text-sm" aria-live="polite">
         {answered ? (
           wasCorrect ? (
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400">정답입니다! 🎉</span>
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "정답입니다! 🎉")}</span>
           ) : (
             <span className="font-semibold text-rose-600 dark:text-rose-400">
-              아쉬워요. 정답은 「{answer?.title}」
+              {translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "아쉬워요. 정답은 「")}{answer?.title}」
             </span>
           )
         ) : (
-          <span className="text-fg-3">표지와 단서를 보고 제목을 맞혀 보세요.</span>
+          <span className="text-fg-3">{translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "표지와 단서를 보고 제목을 맞혀 보세요.")}</span>
         )}
       </p>
 
@@ -317,12 +309,11 @@ export function QuizGame({ onExit }: PlayGameProps) {
       <div className="flex items-center justify-center gap-2">
         {answered ? (
           <Button variant="solid" onClick={onNext}>
-            {round >= ROUND_COUNT ? "결과 보기" : "다음 문제"}
+            {round >= ROUND_COUNT ? translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "결과 보기") : translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "다음 문제")}
           </Button>
         ) : (
           <Button variant="quiet" onClick={restart}>
-            <RotateCcw className="mr-1 h-4 w-4" /> 처음부터
-          </Button>
+            <RotateCcw className="mr-1 h-4 w-4" /> {translateCurrentStaticSourceText("domains.play.games.quiz.QuizGame", "ko", "처음부터")}</Button>
         )}
       </div>
     </div>

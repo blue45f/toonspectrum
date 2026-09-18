@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertCircle,
   Check,
   Download,
@@ -279,7 +283,7 @@ export function StudioLiveCollaborationPanelView({
     <section
       aria-labelledby="studio-live-collaboration-title"
       className="mx-4 mt-4 rounded-2xl border border-accent/30 bg-accent-soft/25 p-3.5 sm:mx-5"
-      data-studio-live-mode={mode ?? "unavailable"}
+      data-studio-live-mode={mode ?? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "en", "unavailable")}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -289,22 +293,21 @@ export function StudioLiveCollaborationPanelView({
             </span>
             <div className="min-w-0">
               <h3 className="truncate text-sm font-bold text-fg" id="studio-live-collaboration-title">
-                같이 보기
-              </h3>
+                {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "같이 보기")}</h3>
               <p className="mt-0.5 text-xs text-fg-3">
-                {mode === "server" ? "서버 팀 세션" : "로컬 탭 미리보기"}
+                {mode === "server" ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "서버 팀 세션") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "로컬 탭 미리보기")}
               </p>
             </div>
           </div>
         </div>
         <span
           aria-atomic="true"
-          aria-live={syncPresentation?.assertive ? "assertive" : "polite"}
+          aria-live={syncPresentation?.assertive ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "en", "assertive") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "en", "polite")}
           className={cn(
             "inline-flex min-h-7 w-[11.5rem] shrink-0 items-center justify-center gap-1.5 truncate rounded-full border px-2 text-[0.68rem] font-semibold tabular-nums",
             syncStatusToneClass(syncPresentation?.tone ?? null, ready, availability)
           )}
-          role={syncPresentation?.assertive ? "alert" : "status"}
+          role={syncPresentation?.assertive ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "en", "status")}
         >
           {availability === "connecting" ? (
             <LoaderCircle className="animate-spin motion-reduce:animate-none" size={12} aria-hidden="true" />
@@ -324,7 +327,7 @@ export function StudioLiveCollaborationPanelView({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Sparkles size={16} className="text-accent" aria-hidden />
-            <span className="text-xs font-bold text-fg">팀 초대 링크</span>
+            <span className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "팀 초대 링크")}</span>
           </div>
           <button
             type="button"
@@ -332,13 +335,10 @@ export function StudioLiveCollaborationPanelView({
             className="flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-transform active:scale-95 hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
           >
             <Copy size={13} aria-hidden />
-            초대 링크 복사
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "초대 링크 복사")}</button>
         </div>
         <p className="mt-2 text-[0.72rem] leading-relaxed text-fg-3">
-          링크는 현재 작품의 서버 권한을 우회하지 않습니다. 팀원으로 추가된 사용자가 로그인한 뒤
-          열면 같은 캔버스에서 실시간 획과 커서를 안전하게 동기화합니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "링크는 현재 작품의 서버 권한을 우회하지 않습니다. 팀원으로 추가된 사용자가 로그인한 뒤 열면 같은 캔버스에서 실시간 획과 커서를 안전하게 동기화합니다.")}</p>
         {inviteLinkNotice ? (
           <p aria-live="polite" className="mt-2 text-xs font-medium text-good" role="status">
             {inviteLinkNotice}
@@ -349,8 +349,8 @@ export function StudioLiveCollaborationPanelView({
 
       <p className="mt-3 text-xs leading-relaxed text-fg-2">
         {mode === "server"
-          ? "로그인 세션과 작품 권한을 확인한 팀 연결입니다. 화면은 보기를 직접 요청한 피어에게만 전달됩니다."
-          : "같은 브라우저에서 이 주소로 탭을 하나 더 열면 커서와 획이 바로 같이 움직입니다. 서버 없이 이 기기 안에서만 동기화합니다."}
+          ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "로그인 세션과 작품 권한을 확인한 팀 연결입니다. 화면은 보기를 직접 요청한 피어에게만 전달됩니다.")
+          : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "같은 브라우저에서 이 주소로 탭을 하나 더 열면 커서와 획이 바로 같이 움직입니다. 서버 없이 이 기기 안에서만 동기화합니다.")}
       </p>
 
       <StudioLiveCollaborationCommandCenter
@@ -375,27 +375,26 @@ export function StudioLiveCollaborationPanelView({
               {remoteCursorsVisible ? <Eye size={16} aria-hidden /> : <EyeOff size={16} aria-hidden />}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-fg">팀원 커서와 작업 위치</p>
+              <p className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "팀원 커서와 작업 위치")}</p>
               <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-                커서를 숨겨도 획·문서 변경·댓글·잠금 동기화는 계속됩니다. 단축키 Ctrl/⌘+Alt+\
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "커서를 숨겨도 획·문서 변경·댓글·잠금 동기화는 계속됩니다. 단축키 Ctrl/⌘+Alt+\\")}</p>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={remoteCursorsVisible}
-              aria-label={remoteCursorsVisible ? "팀원 커서 숨기기" : "팀원 커서 표시하기"}
+              aria-label={remoteCursorsVisible ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "팀원 커서 숨기기") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "팀원 커서 표시하기")}
               className={cn(
                 "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border px-3 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-card",
                 remoteCursorsVisible
                   ? "border-accent/50 bg-accent-soft text-accent"
                   : "border-line bg-card text-fg-2 hover:bg-raised"
               )}
-              data-studio-remote-cursor-visibility={remoteCursorsVisible ? "visible" : "hidden"}
+              data-studio-remote-cursor-visibility={remoteCursorsVisible ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "en", "visible") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "en", "hidden")}
               onClick={onToggleRemoteCursors}
             >
               {remoteCursorsVisible ? <Eye size={14} aria-hidden /> : <EyeOff size={14} aria-hidden />}
-              {remoteCursorsVisible ? "표시 중" : "숨김"}
+              {remoteCursorsVisible ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "표시 중") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "숨김")}
             </button>
           </div>
           {cursorQuality && cursorQualityPresentation ? (
@@ -406,8 +405,7 @@ export function StudioLiveCollaborationPanelView({
               <div className="flex items-center justify-between gap-3 text-[0.7rem]">
                 <span className="font-semibold text-fg-2">{cursorQualityPresentation.shortLabel}</span>
                 <span className="shrink-0 font-semibold tabular-nums text-fg-3">
-                  {cursorQuality.cadenceMs}ms · 팀원 {cursorQuality.peerCount}명
-                </span>
+                  {cursorQuality.cadenceMs}{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "ms · 팀원 ")}{cursorQuality.peerCount}{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "명")}</span>
               </div>
               <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
                 {cursorQualityPresentation.detail}
@@ -441,25 +439,25 @@ export function StudioLiveCollaborationPanelView({
           </div>
           <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1.5 text-[0.7rem] sm:grid-cols-3">
             <div className="flex min-w-0 items-center justify-between gap-2 sm:block">
-              <dt className="text-fg-3">서버 경로</dt>
+              <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "서버 경로")}</dt>
               <dd className="truncate font-semibold text-fg-2">
-                {syncSnapshot.transportReady ? "연결됨" : "연결 대기"}
+                {syncSnapshot.transportReady ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "연결됨") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "연결 대기")}
               </dd>
             </div>
             <div className="flex min-w-0 items-center justify-between gap-2 sm:block">
-              <dt className="text-fg-3">기기 복구 저장소</dt>
+              <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "기기 복구 저장소")}</dt>
               <dd className="truncate font-semibold text-fg-2">
                 {syncSnapshot.persistenceDurability === "durable"
-                  ? "보호됨"
+                  ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "보호됨")
                   : syncSnapshot.persistenceDurability === "not-applicable"
-                    ? "열람 전용"
+                    ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "열람 전용")
                     : syncSnapshot.persistenceDurability === "checking"
-                      ? "확인 중"
-                      : "보호 안 됨"}
+                      ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "확인 중")
+                      : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "보호 안 됨")}
               </dd>
             </div>
             <div className="flex min-w-0 items-center justify-between gap-2 sm:block">
-              <dt className="text-fg-3">서버 승인</dt>
+              <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "서버 승인")}</dt>
               <dd className="truncate font-semibold text-fg-2">
                 {formatStudioLiveLastAck(syncSnapshot.lastAckAt)}
               </dd>
@@ -467,8 +465,7 @@ export function StudioLiveCollaborationPanelView({
           </dl>
           {syncSnapshot.pendingCount > 0 ? (
             <p className="mt-2 text-[0.7rem] font-semibold text-warn">
-              아직 서버 승인을 기다리는 변경 {syncSnapshot.pendingCount.toLocaleString("ko-KR")}개
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "아직 서버 승인을 기다리는 변경 ")}{syncSnapshot.pendingCount.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "개")}</p>
           ) : null}
         </div>
       ) : null}
@@ -492,12 +489,9 @@ export function StudioLiveCollaborationPanelView({
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 shrink-0 text-bad" size={16} aria-hidden />
             <div className="min-w-0">
-              <p className="text-xs font-bold text-fg">거부된 로컬 변경을 먼저 보존해 주세요</p>
+              <p className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "거부된 로컬 변경을 먼저 보존해 주세요")}</p>
               <p className="mt-1 text-[0.72rem] leading-relaxed text-fg-2">
-                서버 원고와 다른 변경 {recovery.updateCount.toLocaleString("ko-KR")}개를
-                재전송 큐와 분리했습니다. 복구 JSON은 지원팀 또는 검증된 복구 도구가 분석할 수
-                있는 원본 frontier를 포함하며, 현재 원고에 자동으로 다시 적용되지는 않습니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "서버 원고와 다른 변경 ")}{recovery.updateCount.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "개를 재전송 큐와 분리했습니다. 복구 JSON은 지원팀 또는 검증된 복구 도구가 분석할 수 있는 원본 frontier를 포함하며, 현재 원고에 자동으로 다시 적용되지는 않습니다.")}</p>
             </div>
           </div>
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -516,22 +510,21 @@ export function StudioLiveCollaborationPanelView({
               ) : (
                 <Download size={15} aria-hidden />
               )}
-              {recovery.exported ? "복구 파일 다시 내보내기" : "복구 파일 내보내기"}
+              {recovery.exported ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "복구 파일 다시 내보내기") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "복구 파일 내보내기")}
             </Button>
             <Button
               className="min-h-11"
               disabled={!recovery.exported}
               title={
                 recovery.exported
-                  ? "현재 낙관적 화면을 버리고 서버 권위 원고를 새로 엽니다."
-                  : "복구 파일을 먼저 내보내야 서버 원고를 다시 열 수 있습니다."
+                  ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "현재 낙관적 화면을 버리고 서버 권위 원고를 새로 엽니다.")
+                  : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "복구 파일을 먼저 내보내야 서버 원고를 다시 열 수 있습니다.")
               }
               type="button"
               variant="quiet"
               onClick={onReloadAuthoritative}
             >
-              <RefreshCw size={15} aria-hidden /> 서버 원고 다시 열기
-            </Button>
+              <RefreshCw size={15} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "서버 원고 다시 열기")}</Button>
           </div>
         </div>
       ) : null}
@@ -543,13 +536,12 @@ export function StudioLiveCollaborationPanelView({
         <div className="mt-3 rounded-xl border border-line bg-card/55 p-3">
           <p className="text-xs leading-relaxed text-fg-2">
             {usingLocalFallback
-              ? "현재 같은 출처 로컬 탭 모드입니다. 서버가 복구되면 팀 세션을 다시 확인할 수 있습니다."
-              : "서버 연결을 다시 시도하거나, 이 기기의 같은 출처 탭끼리만 사용하는 로컬 모드로 전환할 수 있습니다."}
+              ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "현재 같은 출처 로컬 탭 모드입니다. 서버가 복구되면 팀 세션을 다시 확인할 수 있습니다.")
+              : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "서버 연결을 다시 시도하거나, 이 기기의 같은 출처 탭끼리만 사용하는 로컬 모드로 전환할 수 있습니다.")}
           </p>
           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Button className="min-h-11" type="button" variant="outline" onClick={onRetryServer}>
-              <Radio size={15} aria-hidden="true" /> 팀 서버 다시 연결
-            </Button>
+              <Radio size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "팀 서버 다시 연결")}</Button>
             {!usingLocalFallback ? (
               <Button
                 className="min-h-11"
@@ -557,14 +549,13 @@ export function StudioLiveCollaborationPanelView({
                 title={
                   localFallbackAllowed
                     ? undefined
-                    : "권한 회수 또는 인증 실패 뒤에는 로컬 모드로 우회할 수 없습니다."
+                    : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "권한 회수 또는 인증 실패 뒤에는 로컬 모드로 우회할 수 없습니다.")
                 }
                 type="button"
                 variant="quiet"
                 onClick={onUseLocalFallback}
               >
-                <UsersRound size={15} aria-hidden="true" /> 로컬 탭 모드
-              </Button>
+                <UsersRound size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "로컬 탭 모드")}</Button>
             ) : null}
           </div>
         </div>
@@ -579,17 +570,16 @@ export function StudioLiveCollaborationPanelView({
           <div className="flex min-w-0 items-center gap-2">
             <UsersRound className="shrink-0 text-accent" size={16} aria-hidden="true" />
             <p className="truncate text-xs font-semibold text-fg">
-              {ready ? `나 포함 ${peers.length + 1}개 작업 탭` : "작업 탭 확인 대기"}
+              {ready ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "나 포함 {v0}개 작업 탭"), { v0: String(peers.length + 1) }) : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "작업 탭 확인 대기")}
             </p>
           </div>
           {ready ? (
             <span className="text-[0.68rem] text-fg-3" aria-live="polite">
-              다른 탭 {peers.length}개
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "다른 탭 ")}{peers.length}{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "개")}</span>
           ) : null}
         </div>
         {peers.length > 0 ? (
-          <ul aria-label="연결된 다른 작업 탭" className="mt-2 flex flex-wrap gap-2">
+          <ul aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "연결된 다른 작업 탭")} className="mt-2 flex flex-wrap gap-2">
             {renderedPeers.map((peer) => {
               const following = peer.sessionId === followingSessionId;
               const participant = (
@@ -606,7 +596,7 @@ export function StudioLiveCollaborationPanelView({
                   </span>
                   <span className="shrink-0 text-fg-3">· {ROLE_LABEL[peer.role]}</span>
                   <span
-                    aria-label={peer.visibility === "active" ? "활성 탭" : "백그라운드 탭"}
+                    aria-label={peer.visibility === "active" ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "활성 탭") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "백그라운드 탭")}
                     className={cn(
                       "size-1.5 shrink-0 rounded-full",
                       peer.visibility === "active" ? "bg-good" : "bg-fg-3"
@@ -620,15 +610,15 @@ export function StudioLiveCollaborationPanelView({
                     <button
                       aria-label={
                         following
-                          ? `${peer.displayName} 따라가기 중지`
-                          : `${peer.displayName} 작업 페이지 따라가기`
+                          ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "{v0} 따라가기 중지"), { v0: String(peer.displayName) })
+                          : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "{v0} 작업 페이지 따라가기"), { v0: String(peer.displayName) })
                       }
                       aria-pressed={following}
                       className={cn(
                         "inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl border bg-panel px-2 text-xs text-fg-2 transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-card",
                         following ? "border-accent/60 bg-accent-soft/55" : "border-line"
                       )}
-                      data-studio-live-peer-follow={following ? "active" : "idle"}
+                      data-studio-live-peer-follow={following ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "en", "active") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "en", "idle")}
                       type="button"
                       onClick={() => onToggleFollow(peer.sessionId)}
                     >
@@ -641,7 +631,7 @@ export function StudioLiveCollaborationPanelView({
                         )}
                       >
                         {following ? <Check size={11} /> : <MousePointer2 size={11} />}
-                        {following ? "중지" : "따라가기"}
+                        {following ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "중지") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "따라가기")}
                       </span>
                     </button>
                   ) : (
@@ -655,8 +645,7 @@ export function StudioLiveCollaborationPanelView({
           </ul>
         ) : ready ? (
           <p className="mt-2 text-xs leading-relaxed text-fg-3">
-            같은 작품을 다른 탭에서 열고 팀 패널의 같이 보기를 켜 보세요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "같은 작품을 다른 탭에서 열고 팀 패널의 같이 보기를 켜 보세요.")}</p>
         ) : null}
       </div>
 
@@ -672,14 +661,13 @@ export function StudioLiveCollaborationPanelView({
           <div className="flex min-w-0 items-center gap-2">
             <MessageCircle className="shrink-0 text-accent" size={16} aria-hidden="true" />
             <h4 className="text-xs font-semibold text-fg" id="studio-live-chat-title">
-              세션 채팅
-            </h4>
+              {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "세션 채팅")}</h4>
           </div>
-          <span className="text-[0.68rem] text-fg-3">기록에 저장되지 않음</span>
+          <span className="text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "기록에 저장되지 않음")}</span>
         </div>
         {chatMessages.length > 0 ? (
           <ul
-            aria-label="세션 채팅 메시지"
+            aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "세션 채팅 메시지")}
             className="mt-2 max-h-48 space-y-1.5 overflow-y-auto pr-1"
             ref={chatLogRef}
             role="log"
@@ -694,7 +682,7 @@ export function StudioLiveCollaborationPanelView({
               >
                 <span className="flex items-baseline justify-between gap-2">
                   <strong className="min-w-0 truncate font-semibold text-fg">
-                    {message.self ? "나" : message.participant.displayName}
+                    {message.self ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "나") : message.participant.displayName}
                   </strong>
                   <time className="shrink-0 text-[0.62rem] text-fg-3">
                     {chatTimeLabel(message.sentAt)}
@@ -709,35 +697,33 @@ export function StudioLiveCollaborationPanelView({
         ) : (
           <p className="mt-2 text-xs leading-relaxed text-fg-3">
             {ready
-              ? "함께 작업 중인 팀에게 첫 메시지를 보내 보세요."
-              : "연결이 준비되면 채팅을 시작할 수 있습니다."}
+              ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "함께 작업 중인 팀에게 첫 메시지를 보내 보세요.")
+              : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "연결이 준비되면 채팅을 시작할 수 있습니다.")}
           </p>
         )}
         <form className="mt-2 flex items-center gap-2" onSubmit={handleChatSubmit}>
           <label className="sr-only" htmlFor="studio-live-chat-input">
-            채팅 메시지
-          </label>
+            {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "채팅 메시지")}</label>
           <input
             autoComplete="off"
             className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-card px-3 text-xs text-fg placeholder:text-fg-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
             disabled={!ready || !canChat}
             id="studio-live-chat-input"
             maxLength={STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH}
-            placeholder={canChat ? "메시지 입력" : "열람자 권한은 채팅을 보낼 수 없습니다"}
+            placeholder={canChat ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "메시지 입력") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "열람자 권한은 채팅을 보낼 수 없습니다")}
             type="text"
             value={chatDraft}
             onChange={(event) => onChatDraftChange(event.target.value)}
           />
           <Button
-            aria-label="채팅 메시지 보내기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "채팅 메시지 보내기")}
             className="min-h-11 shrink-0"
             disabled={!ready || !canChat || !chatDraftReady}
             size="sm"
             type="submit"
             variant="outline"
           >
-            <SendHorizontal size={14} aria-hidden="true" /> 보내기
-          </Button>
+            <SendHorizontal size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "보내기")}</Button>
         </form>
         {chatNotice ? (
           <p aria-live="polite" className="mt-1.5 text-[0.68rem] text-bad" role="status">
@@ -758,8 +744,7 @@ export function StudioLiveCollaborationPanelView({
             variant="outline"
             onClick={onStopShare}
           >
-            <ScreenShareOff size={15} aria-hidden="true" /> 공유 중지
-          </Button>
+            <ScreenShareOff size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "공유 중지")}</Button>
         ) : (
           <Button
             aria-busy={busyAction === "start-share"}
@@ -773,13 +758,12 @@ export function StudioLiveCollaborationPanelView({
             ) : (
               <MonitorUp size={15} aria-hidden="true" />
             )}
-            화면 공유
-          </Button>
+            {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "화면 공유")}</Button>
         )}
         <div
           className="flex min-h-11 items-center rounded-xl border border-line bg-card px-3 text-xs leading-relaxed text-fg-3"
           data-studio-screen-network-mode={
-            screenConnectionLoading ? "loading" : (screenNetworkMode ?? "on-demand")
+            screenConnectionLoading ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "en", "loading") : (screenNetworkMode ?? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "en", "on-demand"))
           }
         >
           {screenNetworkSummary(
@@ -798,20 +782,17 @@ export function StudioLiveCollaborationPanelView({
         >
           <div className="flex items-center justify-between gap-3">
             <h4 className="text-xs font-semibold text-fg" id="studio-screen-request-title">
-              시청 승인 대기
-            </h4>
+              {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "시청 승인 대기")}</h4>
             <span
               aria-atomic="true"
               aria-live="polite"
               className="text-[0.68rem] font-semibold text-warn"
               role="status"
             >
-              {screenState.pendingRequests.length}건
-            </span>
+              {screenState.pendingRequests.length}{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "건")}</span>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-fg-3">
-            승인하기 전에는 화면 트랙이나 WebRTC 연결 제안을 만들지 않습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "승인하기 전에는 화면 트랙이나 WebRTC 연결 제안을 만들지 않습니다.")}</p>
           <ul className="mt-2 space-y-2">
             {screenState.pendingRequests.map((request) => {
               const approveKey = screenItemKey(
@@ -828,7 +809,7 @@ export function StudioLiveCollaborationPanelView({
                     {request.viewer.displayName}
                   </span>
                   <Button
-                    aria-label={`${request.viewer.displayName} 시청 요청 거절`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "{v0} 시청 요청 거절"), { v0: String(request.viewer.displayName) })}
                     className="min-h-11 shrink-0"
                     disabled={busyAction != null}
                     size="sm"
@@ -836,11 +817,10 @@ export function StudioLiveCollaborationPanelView({
                     variant="quiet"
                     onClick={() => onRejectRequest(request)}
                   >
-                    <X size={14} aria-hidden="true" /> 거절
-                  </Button>
+                    <X size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "거절")}</Button>
                   <Button
                     aria-busy={busyAction === approveKey}
-                    aria-label={`${request.viewer.displayName} 시청 요청 승인`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "{v0} 시청 요청 승인"), { v0: String(request.viewer.displayName) })}
                     className="min-h-11 shrink-0"
                     disabled={busyAction != null}
                     size="sm"
@@ -856,8 +836,7 @@ export function StudioLiveCollaborationPanelView({
                     ) : (
                       <Check size={14} aria-hidden="true" />
                     )}
-                    승인
-                  </Button>
+                    {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "승인")}</Button>
                 </li>
               );
             })}
@@ -867,8 +846,8 @@ export function StudioLiveCollaborationPanelView({
 
       {screenState.viewers.length > 0 ? (
         <div className="mt-3 rounded-xl border border-line bg-card/55 p-3">
-          <h4 className="text-xs font-semibold text-fg">현재 시청자</h4>
-          <ul aria-label="현재 화면 시청자" className="mt-2 space-y-2">
+          <h4 className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "현재 시청자")}</h4>
+          <ul aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "현재 화면 시청자")} className="mt-2 space-y-2">
             {screenState.viewers.map((viewer) => (
               <li
                 className="flex min-h-12 items-center gap-2 rounded-lg border border-line bg-panel px-2.5 py-2"
@@ -877,10 +856,10 @@ export function StudioLiveCollaborationPanelView({
                 <Eye className="shrink-0 text-accent" size={15} aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate text-xs text-fg-2">
                   <strong className="font-semibold text-fg">{viewer.viewer.displayName}</strong>
-                  {viewer.status === "live" ? " · 시청 중" : " · 연결 중"}
+                  {viewer.status === "live" ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", " · 시청 중") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", " · 연결 중")}
                 </span>
                 <Button
-                  aria-label={`${viewer.viewer.displayName} 시청 종료`}
+                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "{v0} 시청 종료"), { v0: String(viewer.viewer.displayName) })}
                   className="min-h-11 shrink-0"
                   disabled={busyAction != null}
                   size="sm"
@@ -888,8 +867,7 @@ export function StudioLiveCollaborationPanelView({
                   variant="outline"
                   onClick={() => onStopViewer(viewer)}
                 >
-                  <UserMinus size={14} aria-hidden="true" /> 종료
-                </Button>
+                  <UserMinus size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "종료")}</Button>
               </li>
             ))}
           </ul>
@@ -897,7 +875,7 @@ export function StudioLiveCollaborationPanelView({
       ) : null}
 
       {screenState.shares.length > 0 ? (
-        <div className="mt-3 space-y-2" aria-label="시청 가능한 공유 화면">
+        <div className="mt-3 space-y-2" aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "시청 가능한 공유 화면")}>
           {screenState.shares.map((share) => {
             const selected =
               watching?.host.sessionId === share.host.sessionId && watching.shareId === share.shareId;
@@ -914,11 +892,10 @@ export function StudioLiveCollaborationPanelView({
                 </p>
                 {selected ? (
                   <Button className="min-h-11 shrink-0" size="sm" type="button" variant="quiet" onClick={onStopWatching}>
-                    보기 중지
-                  </Button>
+                    {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "보기 중지")}</Button>
                 ) : (
                   <Button
-                    aria-label={`${share.host.displayName} 화면 보기`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "{v0} 화면 보기"), { v0: String(share.host.displayName) })}
                     className="min-h-11 shrink-0"
                     disabled={!ready || !screenReady || busyAction != null}
                     size="sm"
@@ -931,8 +908,7 @@ export function StudioLiveCollaborationPanelView({
                     ) : (
                       <Eye size={14} aria-hidden="true" />
                     )}
-                    보기
-                  </Button>
+                    {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "보기")}</Button>
                 )}
               </div>
             );
@@ -945,7 +921,7 @@ export function StudioLiveCollaborationPanelView({
           {watching.status === "live" && watching.stream ? (
             <video
               ref={videoRef}
-              aria-label={`${watching.host.displayName} 공유 화면`}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "{v0} 공유 화면"), { v0: String(watching.host.displayName) })}
               autoPlay
               className="aspect-video w-full bg-black object-contain"
               muted
@@ -960,7 +936,7 @@ export function StudioLiveCollaborationPanelView({
             >
               <span>
                 <LoaderCircle className="mx-auto mb-2 animate-spin motion-reduce:animate-none" size={20} aria-hidden="true" />
-                {watching.status === "requesting" ? "시청 요청 보내는 중" : "P2P 영상 연결 중"}
+                {watching.status === "requesting" ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "시청 요청 보내는 중") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "P2P 영상 연결 중")}
               </span>
             </div>
           )}
@@ -970,14 +946,13 @@ export function StudioLiveCollaborationPanelView({
       <details className="group mt-3 rounded-xl border border-line bg-card/45 px-3 py-2">
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-xs font-semibold text-fg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 [&::-webkit-details-marker]:hidden">
           <ShieldCheck className="text-accent" size={15} aria-hidden="true" />
-          화면 공유 보안과 범위
-        </summary>
+          {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "화면 공유 보안과 범위")}</summary>
         <ul className="space-y-1.5 border-t border-line pt-2 text-xs leading-relaxed text-fg-3">
-          <li>공유 버튼을 누른 뒤 브라우저 선택기에서 허용한 탭·창·화면만 캡처합니다.</li>
-          <li>상대의 보기 요청을 화면 공유자가 개별 승인한 뒤에만 WebRTC로 연결합니다.</li>
-          <li>서버 팀 세션은 공유·보기·승인을 누를 때만 로그인 권한으로 단기 ICE 설정을 받고, TURN은 운영자가 명시한 경우에만 사용하며 브라우저에 영구 저장하지 않습니다.</li>
-          <li>오디오는 요청하지 않으며, 패널을 닫으면 로컬 트랙과 모든 피어 연결을 정리합니다.</li>
-          <li>SDP·ICE 신호는 메모리에서만 전달하고 문서·localStorage·활동 기록에 저장하지 않습니다.</li>
+          <li>{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "공유 버튼을 누른 뒤 브라우저 선택기에서 허용한 탭·창·화면만 캡처합니다.")}</li>
+          <li>{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "상대의 보기 요청을 화면 공유자가 개별 승인한 뒤에만 WebRTC로 연결합니다.")}</li>
+          <li>{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "서버 팀 세션은 공유·보기·승인을 누를 때만 로그인 권한으로 단기 ICE 설정을 받고, TURN은 운영자가 명시한 경우에만 사용하며 브라우저에 영구 저장하지 않습니다.")}</li>
+          <li>{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "오디오는 요청하지 않으며, 패널을 닫으면 로컬 트랙과 모든 피어 연결을 정리합니다.")}</li>
+          <li>{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationPanel", "ko", "SDP·ICE 신호는 메모리에서만 전달하고 문서·localStorage·활동 기록에 저장하지 않습니다.")}</li>
         </ul>
       </details>
     </section>

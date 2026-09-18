@@ -9,21 +9,24 @@
  *   (`window`/`AudioContext` 가드 + 전역 try/catch). 비브라우저 환경에서도 안전합니다.
  * - **React/Tailwind/Node 의존 0**: Web Audio + (선택) localStorage 만 씁니다.
  *
- * BGM 성격(2026-06 리튠)
- * - **신나고 대중적**: 전부 장조(major) 팝 진행 + 빠른 템포 + 아르페지오 + 가벼운 킥/하이햇 비트 +
- *   밝은 음색(square/triangle/saw 리드). 5개 무드(밝은 팝 ☀️ · 칩튠 🎮 · 펑키 그루브 🪩 · 신스웨이브 🌃 · 해피 🎉).
- * - `public/audio/*.mp3` 호스티드 플레이리스트가 있으면 우선 재생하고, 없거나 등록이 해제되면
+ * BGM 성격(2026-09 사이트 사운드스케이프)
+ * - **페이지·장르별 15개 테마**: 오프닝·배틀·시티팝 같은 역동적 OST뿐 아니라 작가 작업실,
+ *   밤의 자료실, 로판 왈츠, 미스터리 누아르, 힐링, 세계관 탐색용 저자극 테마를 제공합니다.
+ * - 절차형·호스티드 음원 모두 전용 버스(대역 정리·완만한 컴프레션·짧은 스테레오 룸)를 공유하고,
+ *   마스터와 독립된 BGM 음량으로 읽기·작업 집중을 해치지 않게 제어합니다.
+ * - `public/audio/*.mp3` 검토 완료 플레이리스트를 선택하면 원음 OST를 재생하고, 파일·네트워크 문제 시
  *   생성형으로 graceful 폴백합니다(`registerBgmPlaylist`).
  *
  * 공개 표면(요약)
  * - 효과음:   `playSfx('tick'|'pop'|'success'|'error')`
- * - BGM:      `bgmPlay` / `bgmPause` / `bgmToggle` / `bgmNext` / `bgmSetMood` · 5개 무드 자동 로테이션(crossfade)
+ * - BGM:      `bgmPlay` / `bgmPause` / `bgmToggle` / `bgmNext` / `bgmSetMood` · 15개 무드 자동 로테이션(crossfade)
  * - 무드:     `BGM_PRESETS`(id·name·emoji) · `getCurrentMoodName` · `bgmSetMood`
- * - 마스터:   `setMuted` / `isMuted` · `setMasterVolume` / `getMasterVolume`(기본 0.55 — 은은하게)
+ * - 마스터:   `setMuted` / `isMuted` · `setMasterVolume` / `getMasterVolume` · `setBgmVolume` / `getBgmVolume`
  * - 영속 opt-in: `setSfxEnabled` / `setBgmEnabled`(localStorage) + `getAudioState` / `onAudioStateChange`
  * - UX 가드:  기본 OFF(autoplay 금지) · enable 시 fade-in · 탭 숨김(visibilitychange) 시 자동 일시정지 ·
  *             reduce-motion 이면 SFX 기본 OFF · mute + 영속 opt-in.
  * - 플레이리스트: `registerBgmPlaylist(urls)`(있으면 mp3 우선, 없으면 생성형)
+ * - 컨텍스트 가드: `suspendBgmForContext` / `resumeBgmForContext`(오디오 편집·통화·게임 충돌 방지)
  * - 언락:     `resumeAudio`(제스처 핸들러에서 호출하면 suspended 컨텍스트를 깨워요)
  */
 
@@ -94,13 +97,18 @@ export const resumeAudio = async (): Promise<void> => {
 const MASTER_CEILING = 0.55;
 /** 저장된 볼륨이 없을 때의 낮은 기본 볼륨 — 비트가 있는 BGM 이라도 거슬리지 않게 시작. */
 const DEFAULT_VOLUME = 0.55;
+/** BGM 전용 기본 볼륨. 마스터와 곱해져 내레이션·읽기 집중을 방해하지 않게 시작한다. */
+const DEFAULT_BGM_VOLUME = 0.48;
 
 let masterGain: GainNode | null = null;
 let sfxBus: GainNode | null = null;
-let userVolume = 1; // 0~1, 사용자 볼륨.
+let bgmBus: GainNode | null = null;
+let userVolume = 1; // 0~1, 사용자 마스터 볼륨.
+let bgmUserVolume = DEFAULT_BGM_VOLUME; // 0~1, BGM 전용 볼륨.
 let muted = false;
 
 const targetMasterGain = (): number => (muted ? 0 : MASTER_CEILING * userVolume);
+const targetBgmGain = (): number => bgmUserVolume;
 
 /** 마스터 게인 노드(모든 SFX/BGM 출력의 종착지). 컨텍스트당 1개. */
 const ensureMasterGain = (ctx: AudioContext): GainNode => {
@@ -145,6 +153,63 @@ const ensureSfxBus = (ctx: AudioContext): GainNode => {
   return input;
 };
 
+/** 절차형·호스티드 BGM 공용 버스. 대역 정리, 완만한 컴프레션, 짧은 스테레오 룸을 공유한다. */
+const ensureBgmBus = (ctx: AudioContext): GainNode => {
+  if (bgmBus) return bgmBus;
+
+  const input = ctx.createGain();
+  const highpass = ctx.createBiquadFilter();
+  const lowpass = ctx.createBiquadFilter();
+  const compressor = ctx.createDynamicsCompressor();
+  const dry = ctx.createGain();
+  const wet = ctx.createGain();
+  const convolver = ctx.createConvolver();
+
+  input.gain.setValueAtTime(targetBgmGain(), ctx.currentTime);
+  highpass.type = "highpass";
+  highpass.frequency.setValueAtTime(38, ctx.currentTime);
+  highpass.Q.setValueAtTime(0.55, ctx.currentTime);
+  lowpass.type = "lowpass";
+  lowpass.frequency.setValueAtTime(9200, ctx.currentTime);
+  lowpass.Q.setValueAtTime(0.35, ctx.currentTime);
+  compressor.threshold.setValueAtTime(-19, ctx.currentTime);
+  compressor.knee.setValueAtTime(22, ctx.currentTime);
+  compressor.ratio.setValueAtTime(2.4, ctx.currentTime);
+  compressor.attack.setValueAtTime(0.018, ctx.currentTime);
+  compressor.release.setValueAtTime(0.32, ctx.currentTime);
+  dry.gain.setValueAtTime(0.92, ctx.currentTime);
+  wet.gain.setValueAtTime(0.11, ctx.currentTime);
+
+  const seconds = 1.35;
+  const frames = Math.max(1, Math.floor(ctx.sampleRate * seconds));
+  const impulse = ctx.createBuffer(2, frames, ctx.sampleRate);
+  for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
+    const data = impulse.getChannelData(channel);
+    let seed = (0x9e3779b9 ^ (channel * 0x85ebca6b)) >>> 0;
+    for (let index = 0; index < frames; index += 1) {
+      seed ^= seed << 13;
+      seed ^= seed >>> 17;
+      seed ^= seed << 5;
+      const noise = (seed >>> 0) / 2147483648 - 1;
+      const envelope = (1 - index / frames) ** 3.2;
+      data[index] = noise * envelope;
+    }
+  }
+  convolver.buffer = impulse;
+
+  input.connect(highpass);
+  highpass.connect(lowpass);
+  lowpass.connect(compressor);
+  compressor.connect(dry);
+  dry.connect(ensureMasterGain(ctx));
+  compressor.connect(convolver);
+  convolver.connect(wet);
+  wet.connect(ensureMasterGain(ctx));
+
+  bgmBus = input;
+  return input;
+};
+
 /** 마스터 게인을 현재 mute/volume 상태로 부드럽게 적용. */
 const applyMasterGain = (): void => {
   const ctx = getAudioContext();
@@ -154,6 +219,20 @@ const applyMasterGain = (): void => {
     masterGain.gain.cancelScheduledValues(now);
     masterGain.gain.setValueAtTime(Math.max(0.0001, masterGain.gain.value), now);
     masterGain.gain.linearRampToValueAtTime(targetMasterGain(), now + 0.08);
+  } catch {
+    // 무시.
+  }
+};
+
+/** BGM 전용 게인을 페이지 전환·슬라이더 조작 중에도 클릭 없이 부드럽게 적용한다. */
+const applyBgmGain = (): void => {
+  const ctx = getAudioContext();
+  if (!ctx || !bgmBus) return;
+  try {
+    const now = ctx.currentTime;
+    bgmBus.gain.cancelScheduledValues(now);
+    bgmBus.gain.setValueAtTime(Math.max(0.0001, bgmBus.gain.value), now);
+    bgmBus.gain.linearRampToValueAtTime(targetBgmGain(), now + 0.12);
   } catch {
     // 무시.
   }
@@ -605,9 +684,11 @@ const scheduleVoice = (
     cutoff?: number;
     /** 미세 디튠(cents) — 살짝 풍성하게. */
     detune?: number;
+    /** 좌우 공간 배치(-1~1). 패드와 아르페지오가 중앙에서 뭉치는 것을 줄인다. */
+    pan?: number;
   },
 ): void => {
-  const { type, frequency, startAt, duration, peak, attackRatio = 0.35, cutoff, detune = 0 } = options;
+  const { type, frequency, startAt, duration, peak, attackRatio = 0.35, cutoff, detune = 0, pan = 0 } = options;
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = type;
@@ -622,6 +703,12 @@ const scheduleVoice = (
     filter.frequency.setValueAtTime(cutoff, startAt);
     gain.connect(filter);
     tail = filter;
+  }
+  if (typeof ctx.createStereoPanner === "function" && pan !== 0) {
+    const panner = ctx.createStereoPanner();
+    panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), startAt);
+    tail.connect(panner);
+    tail = panner;
   }
 
   const attack = Math.max(0.01, duration * attackRatio);
@@ -718,14 +805,17 @@ const scheduleSnare = (
 
 // 스케일(루트 기준 반음 오프셋) — 업비트라 전부 밝은 장조 계열.
 const MAJOR = [0, 2, 4, 5, 7, 9, 11];
+const NATURAL_MINOR = [0, 2, 3, 5, 7, 8, 10];
+const DORIAN = [0, 2, 3, 5, 7, 9, 10];
 const PENTATONIC_MAJOR = [0, 2, 4, 7, 9];
 const MIXOLYDIAN = [0, 2, 4, 5, 7, 9, 10]; // 펑키/그루브용(♭7).
 const LYDIAN = [0, 2, 4, 6, 7, 9, 11]; // 살짝 둥둥 뜨는 밝음(#4).
 
-/** 메이저 트라이어드 화음 톤(루트 반음 오프셋 묶음). */
+/** 화음 톤(루트 반음 오프셋 묶음). */
 const MAJOR_TRIAD = [0, 4, 7];
 const MAJOR_SEVENTH = [0, 4, 7, 11];
 const ADD9 = [0, 4, 7, 14];
+const MINOR_ADD9 = [0, 3, 7, 14];
 
 /**
  * 메이저 트라이어드 패드 화음을 한 묶음 길이로 깔아요(공통 헬퍼).
@@ -754,13 +844,14 @@ const scheduleChordBed = (
       attackRatio,
       cutoff,
       detune: i === 1 ? 5 : i === 2 ? -5 : 0, // 살짝 코러스감.
+      pan: chord.length <= 1 ? 0 : (i / (chord.length - 1) - 0.5) * 0.72,
     });
   });
 };
 
 /**
- * 5개 **애니메이션 OST풍** 생성형 무드 — 청춘·마법·로맨스·모험·엔딩의 장면 문법을
- * 장조 진행과 맑은 삼각파 중심으로 재구성했다. 기존 id는 저장 설정 호환을 위해 유지한다.
+ * **애니메이션 OST·웹툰 장르·사이트 작업용** 생성형 무드 카탈로그.
+ * 기존 id는 저장 설정 호환을 위해 유지하고, 저자극 읽기·창작·미스터리·로판 테마를 확장한다.
  */
 export const BGM_PRESETS: readonly BgmPreset[] = [
   {
@@ -1209,6 +1300,287 @@ export const BGM_PRESETS: readonly BgmPreset[] = [
       for (let b = 1; b < beats; b += 2) scheduleHat(ctx, out, startAt + b * beatDuration, 0.04);
     },
   },
+  {
+    // 🎨 작가의 작업실 — 낮은 피아노 질감과 넓은 메이저7 패드. 긴 작업 세션용 저자극 포커스.
+    id: "atelier_focus",
+    name: "작가의 작업실",
+    emoji: "🎨",
+    beatDuration: 0.42,
+    beatsPerBar: 12,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
+      const root = 60; // C4
+      const progression = [0, 5, 9, 7];
+      const rootShift = progression[bar % progression.length] ?? 0;
+      scheduleChordBed(sc, {
+        rootMidi: root - 12 + rootShift,
+        chord: MAJOR_SEVENTH,
+        type: "sine",
+        peak: 0.026,
+        cutoff: 1450,
+        attackRatio: 0.42,
+      });
+      for (let b = 0; b < beats; b += 3) {
+        const degree = PENTATONIC_MAJOR[(bar + b / 3) % PENTATONIC_MAJOR.length] ?? 0;
+        scheduleVoice(ctx, out, {
+          type: "triangle",
+          frequency: midiToFreq(root + rootShift + degree),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 2.2,
+          peak: 0.027,
+          attackRatio: 0.05,
+          cutoff: 2100,
+          pan: b % 6 === 0 ? -0.22 : 0.22,
+        });
+      }
+      for (let b = 1; b < beats; b += 4) {
+        scheduleHat(ctx, out, startAt + b * beatDuration, 0.009, 0.08);
+      }
+    },
+  },
+  {
+    // 📚 밤의 자료실 — 느린 add9 패드와 드문 벨. 검색·학습·자료 읽기에 맞춘 정적 앰비언스.
+    id: "library_night",
+    name: "밤의 자료실",
+    emoji: "📚",
+    beatDuration: 0.5,
+    beatsPerBar: 12,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
+      const root = 62; // D4
+      const progression = [0, 7, 5, 9];
+      const rootShift = progression[bar % progression.length] ?? 0;
+      scheduleChordBed(sc, {
+        rootMidi: root - 12 + rootShift,
+        chord: ADD9,
+        type: "sine",
+        peak: 0.022,
+        cutoff: 1250,
+        attackRatio: 0.48,
+      });
+      scheduleVoice(ctx, out, {
+        type: "sine",
+        frequency: midiToFreq(root - 24 + rootShift),
+        startAt,
+        duration: beatDuration * beats * 0.92,
+        peak: 0.035,
+        attackRatio: 0.28,
+        cutoff: 520,
+      });
+      for (let b = 2; b < beats; b += 4) {
+        const degree = LYDIAN[(bar + b) % LYDIAN.length] ?? 0;
+        scheduleVoice(ctx, out, {
+          type: "sine",
+          frequency: midiToFreq(root + 12 + rootShift + degree),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 2.8,
+          peak: 0.018,
+          attackRatio: 0.04,
+          cutoff: 3800,
+          pan: b % 8 === 2 ? -0.38 : 0.38,
+        });
+      }
+    },
+  },
+  {
+    // 👑 로판 무도회 — 3박 왈츠 펄스와 실내악풍 화음. 로맨스 판타지·캐릭터 페이지용.
+    id: "royal_waltz",
+    name: "로판 무도회",
+    emoji: "👑",
+    beatDuration: 0.34,
+    beatsPerBar: 12,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
+      const root = 67; // G4
+      const progression = [0, 5, 9, 7];
+      const rootShift = progression[bar % progression.length] ?? 0;
+      scheduleChordBed(sc, {
+        rootMidi: root - 12 + rootShift,
+        chord: MAJOR_SEVENTH,
+        type: "triangle",
+        peak: 0.032,
+        cutoff: 2300,
+        attackRatio: 0.24,
+      });
+      for (let b = 0; b < beats; b += 3) {
+        scheduleVoice(ctx, out, {
+          type: "sine",
+          frequency: midiToFreq(root - 24 + rootShift),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 2.5,
+          peak: 0.055,
+          attackRatio: 0.06,
+          cutoff: 700,
+        });
+        for (const offset of [1, 2]) {
+          MAJOR_TRIAD.forEach((semitone, index) => {
+            scheduleVoice(ctx, out, {
+              type: "triangle",
+              frequency: midiToFreq(root + rootShift + semitone),
+              startAt: startAt + (b + offset) * beatDuration,
+              duration: beatDuration * 0.78,
+              peak: 0.012,
+              attackRatio: 0.05,
+              cutoff: 2600,
+              pan: (index - 1) * 0.24,
+            });
+          });
+        }
+      }
+      for (let b = 0; b < beats; b += 3) {
+        const degree = MAJOR[(bar + b / 3) % MAJOR.length] ?? 0;
+        scheduleVoice(ctx, out, {
+          type: "sine",
+          frequency: midiToFreq(root + 12 + rootShift + degree),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 2.4,
+          peak: 0.024,
+          attackRatio: 0.08,
+          cutoff: 3900,
+          pan: b % 6 === 0 ? -0.3 : 0.3,
+        });
+      }
+    },
+  },
+  {
+    // 🔍 비밀의 복선 — D 도리안 기반의 저역 펄스와 유리성 단서음. 미스터리·운세·분석 페이지용.
+    id: "mystery_noir",
+    name: "비밀의 복선",
+    emoji: "🔍",
+    beatDuration: 0.4,
+    beatsPerBar: 12,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
+      const root = 50; // D3
+      const progression = [0, 3, 7, 5];
+      const rootShift = progression[bar % progression.length] ?? 0;
+      scheduleChordBed(sc, {
+        rootMidi: root + rootShift,
+        chord: MINOR_ADD9,
+        type: "sine",
+        peak: 0.026,
+        cutoff: 1050,
+        attackRatio: 0.5,
+      });
+      for (let b = 0; b < beats; b += 2) {
+        const degree = DORIAN[(bar + b) % DORIAN.length] ?? 0;
+        scheduleVoice(ctx, out, {
+          type: "triangle",
+          frequency: midiToFreq(root - 12 + rootShift + (b % 4 === 0 ? 0 : degree)),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 1.25,
+          peak: 0.032,
+          attackRatio: 0.08,
+          cutoff: 780,
+          pan: b % 4 === 0 ? -0.12 : 0.12,
+        });
+      }
+      for (const b of [3, 8, 11]) {
+        const degree = NATURAL_MINOR[(bar + b) % NATURAL_MINOR.length] ?? 0;
+        scheduleVoice(ctx, out, {
+          type: "sine",
+          frequency: midiToFreq(root + 24 + rootShift + degree),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 1.9,
+          peak: 0.018,
+          attackRatio: 0.03,
+          cutoff: 4200,
+          pan: b === 8 ? 0.4 : -0.4,
+        });
+      }
+      for (let b = 1; b < beats; b += 4) scheduleHat(ctx, out, startAt + b * beatDuration, 0.008, 0.11);
+    },
+  },
+  {
+    // 🌿 힐링 산책 — 따뜻한 펜타토닉 플럭과 숨 쉬는 저역. 소개·지원·휴식 페이지용.
+    id: "healing_walk",
+    name: "힐링 산책",
+    emoji: "🌿",
+    beatDuration: 0.38,
+    beatsPerBar: 12,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
+      const root = 57; // A3
+      const progression = [0, 5, 2, 7];
+      const rootShift = progression[bar % progression.length] ?? 0;
+      scheduleChordBed(sc, {
+        rootMidi: root + rootShift,
+        chord: ADD9,
+        type: "sine",
+        peak: 0.024,
+        cutoff: 1650,
+        attackRatio: 0.38,
+      });
+      for (let b = 0; b < beats; b += 3) {
+        scheduleVoice(ctx, out, {
+          type: "triangle",
+          frequency: midiToFreq(root - 12 + rootShift + (b % 6 === 0 ? 0 : 7)),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 2.4,
+          peak: 0.04,
+          attackRatio: 0.08,
+          cutoff: 850,
+        });
+      }
+      for (let b = 1; b < beats; b += 2) {
+        const degree = PENTATONIC_MAJOR[(bar * 2 + b) % PENTATONIC_MAJOR.length] ?? 0;
+        scheduleVoice(ctx, out, {
+          type: "triangle",
+          frequency: midiToFreq(root + 12 + rootShift + degree),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 1.18,
+          peak: 0.018,
+          attackRatio: 0.04,
+          cutoff: 2500,
+          pan: b % 4 === 1 ? -0.32 : 0.32,
+        });
+      }
+    },
+  },
+  {
+    // 🌠 세계관 항해 — 리디안 장패드와 먼 별빛 아르페지오. 세계관·기술·3D 탐색 페이지용.
+    id: "worldbuilding",
+    name: "세계관 항해",
+    emoji: "🌠",
+    beatDuration: 0.52,
+    beatsPerBar: 12,
+    schedule: (sc) => {
+      const { ctx, out, startAt, beatDuration, beats, bar } = sc;
+      const root = 53; // F3
+      const progression = [0, 7, 5, 2];
+      const rootShift = progression[bar % progression.length] ?? 0;
+      scheduleChordBed(sc, {
+        rootMidi: root + rootShift,
+        chord: ADD9,
+        type: "sine",
+        peak: 0.028,
+        cutoff: 1350,
+        attackRatio: 0.55,
+      });
+      scheduleVoice(ctx, out, {
+        type: "triangle",
+        frequency: midiToFreq(root - 12 + rootShift),
+        startAt,
+        duration: beatDuration * beats * 0.94,
+        peak: 0.028,
+        attackRatio: 0.35,
+        cutoff: 560,
+      });
+      for (let b = 0; b < beats; b += 2) {
+        const degree = LYDIAN[(bar + b / 2) % LYDIAN.length] ?? 0;
+        scheduleVoice(ctx, out, {
+          type: "sine",
+          frequency: midiToFreq(root + 24 + rootShift + degree),
+          startAt: startAt + b * beatDuration,
+          duration: beatDuration * 2.3,
+          peak: 0.014,
+          attackRatio: 0.08,
+          cutoff: 4300,
+          pan: b % 4 === 0 ? -0.46 : 0.46,
+        });
+      }
+    },
+  },
 ];
 
 /** 한 묶음(1회 schedule)의 길이(초). */
@@ -1260,7 +1632,7 @@ let playlistIndex = 0;
 const createPresetOut = (ctx: AudioContext): GainNode => {
   const out = ctx.createGain();
   out.gain.setValueAtTime(0.0001, ctx.currentTime);
-  out.connect(ensureMasterGain(ctx));
+  out.connect(ensureBgmBus(ctx));
   return out;
 };
 
@@ -1357,6 +1729,7 @@ const advance = (delta: number): void => {
 
 /** BGM 재생 시작/재개(엔진 메커니즘). 제스처 안에서 호출되면 컨텍스트가 언락돼요. */
 const engineStart = (): void => {
+  if (!isBgmContextAllowed()) return;
   const ctx = getAudioContext();
   if (!ctx) return;
   void resumeAudio();
@@ -1428,7 +1801,7 @@ const startPlaylistTrack = (index: number): void => {
 
   const node = ctx.createGain();
   node.gain.setValueAtTime(0.0001, ctx.currentTime);
-  node.connect(ensureMasterGain(ctx));
+  node.connect(ensureBgmBus(ctx));
 
   // CORS/미지원이면 라우팅 실패 → 엘리먼트 직접 재생(볼륨 가드만 못 받음).
   const src = ((): MediaElementAudioSourceNode | null => {
@@ -1517,6 +1890,7 @@ const advancePlaylist = (delta: number): void => {
 };
 
 const playlistStart = (): void => {
+  if (!isBgmContextAllowed()) return;
   const ctx = getAudioContext();
   if (!ctx || playlist.length === 0) return;
   void resumeAudio();
@@ -1537,9 +1911,12 @@ const playlistStop = (): void => {
 /* ── 디스패처 — 플레이리스트가 있으면 그쪽, 없으면 생성형 ───────────────────── */
 
 const usingPlaylist = (): boolean => playlist.length > 0;
+const bgmSuspensionReasons = new Set<string>();
+const isBgmContextAllowed = (): boolean => bgmSuspensionReasons.size === 0;
 
 /** BGM 시작(제스처 안에서). 호스티드 플레이리스트 우선, 없으면 생성형. */
 const bgmStart = (): void => {
+  if (!isBgmContextAllowed()) return;
   if (usingPlaylist()) playlistStart();
   else engineStart();
 };
@@ -1559,6 +1936,7 @@ const anyBgmPlaying = (): boolean => bgmPlaying || playlistPlaying;
 
 const SFX_KEY = "ts_fx_sfx_enabled";
 const BGM_KEY = "ts_fx_bgm_enabled";
+const BGM_VOL_KEY = "ts_fx_bgm_volume";
 const MUTE_KEY = "ts_fx_muted";
 const VOL_KEY = "ts_fx_volume";
 
@@ -1572,6 +1950,8 @@ export interface AudioState {
   muted: boolean;
   /** 마스터 볼륨(0~1). */
   volume: number;
+  /** BGM 전용 볼륨(0~1). */
+  bgmVolume: number;
   /** 현재(또는 다음 시작할) 무드명. */
   currentMood: string;
   /** 현재(또는 다음 시작할) 무드 id. */
@@ -1641,14 +2021,17 @@ const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
 // 영속값을 모듈 로드 시 1회 읽어 초기 상태/마스터에 반영.
 const initialMuted = readStoredBool(MUTE_KEY) ?? false;
 const initialVolume = clamp01(readStoredNumber(VOL_KEY) ?? DEFAULT_VOLUME);
+const initialBgmVolume = clamp01(readStoredNumber(BGM_VOL_KEY) ?? DEFAULT_BGM_VOLUME);
 muted = initialMuted;
 userVolume = initialVolume;
+bgmUserVolume = initialBgmVolume;
 
 const state: AudioState = {
   sfxEnabled: readStoredBool(SFX_KEY) ?? !prefersReducedMotion(),
   bgmEnabled: readStoredBool(BGM_KEY) ?? false,
   muted: initialMuted,
   volume: initialVolume,
+  bgmVolume: initialBgmVolume,
   currentMood: BGM_PRESETS[presetIndex]?.name ?? "",
   currentMoodId: BGM_PRESETS[presetIndex]?.id ?? "",
   currentTrackArtist: "",
@@ -1758,7 +2141,11 @@ export const setSfxEnabled = (enabled: boolean): void => {
  */
 export const setBgmEnabled = (enabled: boolean): void => {
   ensureWired();
-  if (state.bgmEnabled === enabled) return;
+  if (state.bgmEnabled === enabled) {
+    if (enabled && !anyBgmPlaying()) bgmStart();
+    if (!enabled && anyBgmPlaying()) bgmStop();
+    return;
+  }
   state.bgmEnabled = enabled;
   writeStoredBool(BGM_KEY, enabled);
   pausedByVisibility = false;
@@ -1835,6 +2222,26 @@ export const getCurrentMoodName = (): string => state.currentMood;
 
 /** BGM 재생 중 여부(생성형/플레이리스트 어느 엔진이든). */
 export const isBgmPlaying = (): boolean => anyBgmPlaying();
+
+/** 오디오 편집·통화처럼 배경음악이 방해되는 컨텍스트에서 opt-in 상태를 보존한 채 잠시 멈춘다. */
+export const suspendBgmForContext = (reason: string): void => {
+  const normalized = reason.trim();
+  if (!normalized || bgmSuspensionReasons.has(normalized)) return;
+  const wasAllowed = isBgmContextAllowed();
+  bgmSuspensionReasons.add(normalized);
+  if (wasAllowed && anyBgmPlaying()) bgmStop();
+};
+
+/** 해당 컨텍스트의 일시정지를 해제하고, 사용자가 켜 둔 경우에만 부드럽게 재개한다. */
+export const resumeBgmForContext = (reason: string): void => {
+  const normalized = reason.trim();
+  if (!normalized || !bgmSuspensionReasons.delete(normalized)) return;
+  const visible = typeof document === "undefined" || document.visibilityState !== "hidden";
+  if (isBgmContextAllowed() && visible && state.bgmEnabled) bgmStart();
+};
+
+/** 현재 하나 이상의 컨텍스트가 BGM을 일시정지했는지. */
+export const isBgmSuspended = (): boolean => !isBgmContextAllowed();
 
 /** registerBgmPlaylist 입력 항목 — URL 문자열 또는 크레딧 메타 포함 객체. */
 export interface BgmPlaylistEntry {
@@ -1919,6 +2326,21 @@ export const setMasterVolume = (volume: number): void => {
 
 /** 현재 마스터 볼륨(0~1). */
 export const getMasterVolume = (): number => userVolume;
+
+/** BGM 전용 볼륨 설정(0~1, 영속). SFX와 알림음의 크기는 바꾸지 않는다. */
+export const setBgmVolume = (volume: number): void => {
+  ensureWired();
+  const next = clamp01(volume);
+  if (bgmUserVolume === next) return;
+  bgmUserVolume = next;
+  state.bgmVolume = next;
+  writeStoredNumber(BGM_VOL_KEY, next);
+  applyBgmGain();
+  emit();
+};
+
+/** 현재 BGM 전용 볼륨(0~1). */
+export const getBgmVolume = (): number => bgmUserVolume;
 
 let pausedForAd = false;
 let bgmWasPlayingBeforeAd = false;

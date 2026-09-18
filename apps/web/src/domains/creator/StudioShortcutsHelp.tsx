@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 // 창작 스튜디오 키보드 단축키 도움말 — "?" 키 또는 단축키 버튼으로 토글.
 // StudioPage 내부 상태에 의존하지 않는 자체완결 모달(open/onClose만 받음).
 // optional `shortcuts` prop이 있으면 커스터마이즈된 코드를 formatStudioShortcutChord로 표시.
@@ -472,7 +473,7 @@ export function StudioShortcutsHelp({
             </section>
           ) : null}
 
-          <section aria-labelledby="studio-shortcut-list-title" className={searching ? "" : "mt-4"}>
+          <section aria-labelledby="studio-shortcut-list-title" className={searching ? "" : translateCurrentStaticSourceText("domains.creator.StudioShortcutsHelp", "en", "mt-4")}>
             <div className="mb-2 flex items-center justify-between gap-3">
               <h3 id="studio-shortcut-list-title" className="text-[0.68rem] font-semibold text-fg-2">
                 {searching ? copy.result(visibleShortcutCount) : copy.allShortcuts}

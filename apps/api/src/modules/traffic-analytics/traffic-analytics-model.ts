@@ -5,6 +5,27 @@ export const TRAFFIC_SESSION_PREFIX = "traffic:ss:";
 export const TRAFFIC_SESSION_UPPER_BOUND = "traffic:st:";
 export const TRAFFIC_DEFAULT_RETENTION_DAYS = 90;
 export const TRAFFIC_MAX_ENGAGED_SECONDS = 12 * 60 * 60;
+export const TRAFFIC_SHARE_CHANNELS = [
+  "native",
+  "kakao",
+  "naver",
+  "line",
+  "x",
+  "facebook",
+  "telegram",
+  "email",
+  "copy",
+  "qr",
+] as const;
+export const TRAFFIC_SHARE_OUTCOMES = [
+  "opened",
+  "completed",
+  "cancelled",
+  "failed",
+] as const;
+
+export type TrafficShareChannel = (typeof TRAFFIC_SHARE_CHANNELS)[number];
+export type TrafficShareOutcome = (typeof TRAFFIC_SHARE_OUTCOMES)[number];
 
 const MAX_PATH_LENGTH = 320;
 const MAX_REFERRER_LENGTH = 256;
@@ -37,6 +58,14 @@ export type TrafficHeartbeatPayload = {
   sessionId?: unknown;
   path?: unknown;
   engagedSeconds?: unknown;
+};
+
+export type TrafficShareEventPayload = {
+  visitorId?: unknown;
+  sessionId?: unknown;
+  path?: unknown;
+  channel?: unknown;
+  outcome?: unknown;
 };
 
 export type TrafficRequestContext = {
@@ -107,6 +136,26 @@ export function requireTrafficIdentifier(
     throw new BadRequestException(`${label}가 올바르지 않습니다.`);
   }
   return normalized;
+}
+
+export function requireTrafficShareChannel(value: unknown): TrafficShareChannel {
+  if (
+    typeof value !== "string"
+    || !TRAFFIC_SHARE_CHANNELS.includes(value as TrafficShareChannel)
+  ) {
+    throw new BadRequestException("공유 채널이 올바르지 않습니다.");
+  }
+  return value as TrafficShareChannel;
+}
+
+export function requireTrafficShareOutcome(value: unknown): TrafficShareOutcome {
+  if (
+    typeof value !== "string"
+    || !TRAFFIC_SHARE_OUTCOMES.includes(value as TrafficShareOutcome)
+  ) {
+    throw new BadRequestException("공유 결과가 올바르지 않습니다.");
+  }
+  return value as TrafficShareOutcome;
 }
 
 export function normalizeTrafficPath(value: unknown): string {

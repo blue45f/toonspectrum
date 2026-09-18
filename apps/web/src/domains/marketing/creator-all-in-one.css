@@ -23,6 +23,9 @@
   .cf-bridge-list,
   .cf-flow-grid,
   .cf-flow-grid > li,
+  .cf-principles-grid,
+  .cf-principles-grid > article,
+  .cf-principles-intro,
   .cf-support-grid,
   .cf-support-grid > a,
   .cf-actions
@@ -47,17 +50,18 @@
 .creator-home[data-creator-experience="all-in-one-studio-v3"] :where(
   #creator-toolkit-title,
   #creator-process-title,
+  #creator-principles-title,
   #creator-support-title,
   #creator-closing-title
 ) {
   scroll-margin-block-start: 6rem;
 }
 
-.creator-home[data-creator-experience="all-in-one-studio-v3"] :where(.cf-button, .cf-start-card, .cf-support-grid > a, .cf-jump-nav a) {
+.creator-home[data-creator-experience="all-in-one-studio-v3"] :where(.cf-button, .cf-start-card, .cf-support-grid > a, .cf-principles-intro > a, .cf-jump-nav a) {
   min-block-size: 2.75rem;
 }
 
-.creator-home[data-creator-experience="all-in-one-studio-v3"] :where(.cf-button, .cf-start-card, .cf-support-grid > a):focus-visible {
+.creator-home[data-creator-experience="all-in-one-studio-v3"] :where(.cf-button, .cf-start-card, .cf-support-grid > a, .cf-principles-intro > a):focus-visible {
   outline: 3px solid color-mix(in oklab, var(--cf-accent, currentColor) 72%, transparent);
   outline-offset: 3px;
 }
@@ -85,7 +89,7 @@
     text-align: center;
   }
 
-  .creator-home[data-creator-experience="all-in-one-studio-v3"] :where(.cf-start-grid, .cf-flow-grid, .cf-support-grid) {
+  .creator-home[data-creator-experience="all-in-one-studio-v3"] :where(.cf-start-grid, .cf-flow-grid, .cf-principles-grid, .cf-support-grid) {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -98,7 +102,7 @@
 }
 
 @media (hover: none), (pointer: coarse) {
-  .creator-home[data-creator-experience="all-in-one-studio-v3"] :where(.cf-button, .cf-jump-nav a, .cf-start-action) {
+  .creator-home[data-creator-experience="all-in-one-studio-v3"] :where(.cf-button, .cf-jump-nav a, .cf-start-action, .cf-principles-intro > a) {
     min-block-size: 2.75rem;
   }
 }

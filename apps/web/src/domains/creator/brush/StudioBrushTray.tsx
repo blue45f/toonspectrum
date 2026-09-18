@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioBrushTray — compact recent/favorite shelf with a full-library exit.
  * Pure presentation; the complete searchable catalog lives in StudioBrushLibrarySheet.
@@ -99,8 +103,8 @@ function BrushPreviewGlyph({
         width={PREVIEW_W - 1}
         height={PREVIEW_H - 1}
         rx={3.5}
-        fill={active ? "oklch(0.98 0.01 85 / 0.14)" : surface.paper}
-        stroke={active ? "oklch(0.98 0.01 85 / 0.2)" : "oklch(0.4 0.012 64 / 0.35)"}
+        fill={active ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushTray", "en", "oklch(0.98 0.01 85 / 0.14)") : surface.paper}
+        stroke={active ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushTray", "en", "oklch(0.98 0.01 85 / 0.2)") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushTray", "en", "oklch(0.4 0.012 64 / 0.35)")}
         strokeWidth={0.6}
       />
       {/* Subtle grain for texture media */}
@@ -130,7 +134,7 @@ function BrushPreviewGlyph({
                 key={index}
                 d={pathD}
                 fill="none"
-                stroke={pass.tone === "white-core" ? "oklch(0.97 0.015 85)" : ink}
+                stroke={pass.tone === "white-core" ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushTray", "en", "oklch(0.97 0.015 85)") : ink}
                 strokeWidth={Math.max(1, strokeW * pass.widthScale)}
                 strokeLinecap="round"
                 opacity={pass.opacity * previewOpacity}
@@ -274,20 +278,18 @@ export function StudioBrushTray({
       data-studio-pro-catalog-state={
         needsProMetadata
           ? proMetadataFailed
-            ? "error"
+            ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushTray", "en", "error")
             : deferredCatalogItems
-              ? "loaded"
-              : "loading"
-          : "core"
+              ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushTray", "en", "loaded")
+              : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushTray", "en", "loading")
+          : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushTray", "en", "core")
       }
       aria-busy={proMetadataLoading ? true : undefined}
       className={cn("flex min-w-0 max-w-full items-center gap-1", className)}
     >
       {proMetadataFailed ? (
         <span role="status" className="sr-only">
-          프로 브러시 정보를 불러오지 못해 코어 브러시를 표시합니다. 라이브러리를 열어 다시
-          시도할 수 있습니다.
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushTray", "ko", "프로 브러시 정보를 불러오지 못해 코어 브러시를 표시합니다. 라이브러리를 열어 다시 시도할 수 있습니다.")}</span>
       ) : null}
       <div
         role="listbox"
@@ -308,7 +310,7 @@ export function StudioBrushTray({
               role="option"
               aria-selected={active}
               tabIndex={item.id === rovingBrushId ? 0 : -1}
-              aria-label={`${sourceLabel} 브러시 ${item.name} · ${engineLaneLabel ? `${engineLaneLabel} · ` : ""}${kindLabel} — ${item.hint}`}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushTray", "ko", "{v0} 브러시 {v1} · {v2}{v3} — {v4}"), { v0: String(sourceLabel), v1: String(item.name), v2: String(engineLaneLabel ? `${engineLaneLabel} · ` : ""), v3: String(kindLabel), v4: String(item.hint) })}
               title={`${sourceLabel} · ${engineLaneLabel ? `${engineLaneLabel} · ` : ""}${kindLabel} · ${item.name} — ${item.hint}`}
               onClick={() => onSelect(item)}
               onFocus={() => setFocusedBrushId(item.id)}
@@ -349,7 +351,7 @@ export function StudioBrushTray({
                 <span
                   aria-hidden
                   data-studio-brush-engine-chip={engineLane?.lane}
-                  title={`엔진: ${engineLaneLabel}`}
+                  title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushTray", "ko", "엔진: {v0}"), { v0: String(engineLaneLabel) })}
                   className={cn(
                     "absolute bottom-0.5 left-0.5 max-w-[2.4rem] truncate rounded px-0.5 text-[0.42rem] font-black leading-tight",
                     active
@@ -384,8 +386,8 @@ export function StudioBrushTray({
         onClick={(event) => onOpenLibrary(event.currentTarget)}
         aria-expanded={libraryOpen}
         aria-haspopup="dialog"
-        aria-label="브러시 전체 라이브러리와 관리 열기"
-        title={`전체 ${STUDIO_BRUSH_LISTED_CATALOG_COUNTS.paint}종 검색·분류·즐겨찾기·기본값 다시 적용`}
+        aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushTray", "ko", "브러시 전체 라이브러리와 관리 열기")}
+        title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushTray", "ko", "전체 {v0}종 검색·분류·즐겨찾기·기본값 다시 적용"), { v0: String(STUDIO_BRUSH_LISTED_CATALOG_COUNTS.paint) })}
         data-studio-open-brush-library="true"
         className={cn(
           "flex h-11 shrink-0 items-center gap-1 rounded-xl border border-line/70 bg-card/80 px-2 text-[0.62rem] font-bold text-fg-2 hover:border-accent/40 hover:bg-raised hover:text-fg",
@@ -394,7 +396,7 @@ export function StudioBrushTray({
         )}
       >
         <LayoutGrid size={13} strokeWidth={1.75} aria-hidden />
-        <span className="whitespace-nowrap">라이브러리</span>
+        <span className="whitespace-nowrap">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushTray", "ko", "라이브러리")}</span>
       </button>
     </div>
   );

@@ -7,6 +7,7 @@ import {
   saveStudioUiDensityState,
   STUDIO_UI_DENSITY_MODES,
   studioUiDensityAllows,
+  studioUiDensityDescription,
   studioUiDensityFromImmersive,
   studioUiDensityLabel,
 } from "./studio-ui-density";
@@ -21,6 +22,16 @@ describe("studio ui density modes", () => {
     expect(studioUiDensityLabel("focus")).toBe("집중 작업");
     expect(studioUiDensityLabel("simple")).toBe("기본 작업");
     expect(studioUiDensityLabel("full")).toBe("전체 도구");
+  });
+
+  it("never exposes raw translation keys when a locale entry is missing", () => {
+    const untranslated = (key: string) => key;
+    expect(studioUiDensityLabel("focus", untranslated)).toBe("집중 작업");
+    expect(studioUiDensityLabel("simple", untranslated)).toBe("기본 작업");
+    expect(studioUiDensityDescription("full", untranslated)).toBe(
+      "AI·3D를 포함한 모든 전문 도구와 패널을 표시합니다.",
+    );
+    expect(studioUiDensityLabel("full", () => "All tools")).toBe("All tools");
   });
 
   it("folds AI in standard work but honors reference tools users explicitly expose", () => {
