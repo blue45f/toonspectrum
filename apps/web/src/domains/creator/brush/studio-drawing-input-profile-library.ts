@@ -192,7 +192,7 @@ export function createStudioDrawingInputProfileLibraryRepository(
 
   return Object.freeze({
     load,
-    saveProfile(input) {
+    saveProfile(input: StudioDrawingInputCustomProfileInput) {
       return runExclusive(async () => {
         const current = await load();
         const name = normalizeStudioDrawingInputProfileName(input.name);
@@ -222,7 +222,7 @@ export function createStudioDrawingInputProfileLibraryRepository(
         return next;
       });
     },
-    deleteProfile(id) {
+    deleteProfile(id: string) {
       return runExclusive(async () => {
         const current = await load();
         const normalizedId = boundedId(id);

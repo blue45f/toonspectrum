@@ -338,6 +338,7 @@ export class AdminMembersService {
         email: users.email,
         role: users.role,
         status: users.status,
+        mergedIntoUserId: users.mergedIntoUserId,
         suspendedAt: users.suspendedAt,
         suspensionReason: users.suspensionReason,
         deletedAt: users.deletedAt,
