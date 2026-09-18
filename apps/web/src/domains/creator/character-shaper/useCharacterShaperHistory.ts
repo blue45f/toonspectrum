@@ -19,6 +19,8 @@ import type { CharacterShaperHistoryState } from "./character-shaper-ui-contract
 
 /** Maximum number of undo steps kept per dialog session (brief §4). */
 export const CHARACTER_SHAPER_HISTORY_LIMIT = 60;
+/** Whole-host snapshots can grow as the character model evolves, so count alone is not a memory budget. */
+export const CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES = 16 * 1024 * 1024;
 
 /** How many labels the summary bar tooltip shows. */
 export const CHARACTER_SHAPER_HISTORY_LABEL_PREVIEW = 5;
@@ -41,16 +43,43 @@ export function createCharacterShaperHistory<TSnapshot>(): CharacterShaperHistor
   return { past: [], future: [] };
 }
 
-/** Appends one step and drops the oldest entries beyond the bound. A push clears the redo stack. */
+export function estimateCharacterShaperHistoryEntryBytes<TSnapshot>(
+  entry: CharacterShaperHistoryEntry<TSnapshot>,
+): number {
+  try {
+    const serialized = JSON.stringify(entry.snapshot);
+    return Math.max(64, entry.label.length * 2 + (serialized?.length ?? 0) * 2 + 64);
+  } catch {
+    return CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES + 1;
+  }
+}
+
+export function trimCharacterShaperHistoryEntries<TSnapshot>(
+  entries: readonly CharacterShaperHistoryEntry<TSnapshot>[],
+  maxEntries = CHARACTER_SHAPER_HISTORY_LIMIT,
+  maxEstimatedBytes = CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES,
+): readonly CharacterShaperHistoryEntry<TSnapshot>[] {
+  if (maxEntries <= 0 || maxEstimatedBytes <= 0 || entries.length === 0) return [];
+  const kept: CharacterShaperHistoryEntry<TSnapshot>[] = [];
+  let retainedBytes = 0;
+  for (let index = entries.length - 1; index >= 0 && kept.length < maxEntries; index -= 1) {
+    const entry = entries[index];
+    if (!entry) continue;
+    const estimatedBytes = estimateCharacterShaperHistoryEntryBytes(entry);
+    if (estimatedBytes > maxEstimatedBytes || retainedBytes + estimatedBytes > maxEstimatedBytes) break;
+    kept.unshift(entry);
+    retainedBytes += estimatedBytes;
+  }
+  return kept;
+}
+
+/** Appends one step and drops the oldest entries beyond the count/byte bounds. A push clears redo. */
 export function pushCharacterShaperHistory<TSnapshot>(
   stack: CharacterShaperHistoryStack<TSnapshot>,
   entry: CharacterShaperHistoryEntry<TSnapshot>,
 ): CharacterShaperHistoryStack<TSnapshot> {
-  const past = [...stack.past, entry];
   return {
-    past: past.length > CHARACTER_SHAPER_HISTORY_LIMIT
-      ? past.slice(past.length - CHARACTER_SHAPER_HISTORY_LIMIT)
-      : past,
+    past: trimCharacterShaperHistoryEntries([...stack.past, entry]),
     future: [],
   };
 }
@@ -75,7 +104,10 @@ export function undoCharacterShaperHistory<TSnapshot>(
   return {
     stack: {
       past: stack.past.slice(0, -1),
-      future: [...stack.future, { label: entry.label, snapshot: current }],
+      future: trimCharacterShaperHistoryEntries([
+        ...stack.future,
+        { label: entry.label, snapshot: current },
+      ]),
     },
     restore: entry.snapshot,
     label: entry.label,
@@ -91,7 +123,10 @@ export function redoCharacterShaperHistory<TSnapshot>(
   if (!entry) return { stack, restore: null, label: null };
   return {
     stack: {
-      past: [...stack.past, { label: entry.label, snapshot: current }],
+      past: trimCharacterShaperHistoryEntries([
+        ...stack.past,
+        { label: entry.label, snapshot: current },
+      ]),
       future: stack.future.slice(0, -1),
     },
     restore: entry.snapshot,

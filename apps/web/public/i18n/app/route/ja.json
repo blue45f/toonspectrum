@@ -42,5 +42,6 @@
   "route.fortune": "性格占い",
   "route.me": "私のプロフィール",
   "route.pencafeSuffix": "ファンカフェ",
-  "route.create": "クリエイターボード"
+  "route.create": "クリエイターボード",
+  "route.creatorSupport": "Creator Support"
 }

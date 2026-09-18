@@ -4,20 +4,25 @@ import { BackendCapabilitiesModule } from "./infrastructure/backend-capabilities
 import { ApiHttpInfrastructureModule } from "./runtime/api-http-infrastructure.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { BusinessInquiryModule } from "./modules/business-inquiry/business-inquiry.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
 import { CommunityModule } from "./modules/community/community.module";
 import { CreatorModule } from "./modules/creator/creator.module";
+import { CreatorSupportModule } from "./modules/creator-support/creator-support.module";
 import { CreatorMarketplaceModule } from "./modules/creator-marketplace/creator-marketplace.module";
+import { CreatorIntelligenceModule } from "./modules/creator-intelligence/creator-intelligence.module";
 import { CreatorResourcesModule } from "./modules/creator-resources/creator-resources.module";
 import { FeedbackModule } from "./modules/feedback/feedback.module";
 import { FortuneModule } from "./modules/fortune/fortune.module";
 import { HealthModule } from "./modules/health/health.module";
 import { LegalModule } from "./modules/legal/legal.module";
+import { LearningModule } from "./modules/learning/learning.module";
 import { MeModule } from "./modules/me/me.module";
 import { MessagingModule } from "./modules/messaging/messaging.module";
 import { OgModule } from "./modules/og/og.module";
 import { PersonalCloudModule } from "./modules/personal-cloud/personal-cloud.module";
 import { ProductionCollaborationModule } from "./modules/production-collaboration/production-collaboration.module";
+import { SupporterPaymentModule } from "./modules/supporter-payment/supporter-payment.module";
 import { StudioAiModule } from "./modules/studio-ai/studio-ai.module";
 import { StudioMusicModule } from "./modules/studio-music/studio-music.module";
 import { StudioProjectGraphModule } from "./modules/studio-project-graph/studio-project-graph.module";
@@ -41,8 +46,12 @@ const studioRealtimeTicketModule =
     AdminModule,
     TrafficAnalyticsModule,
     FeedbackModule,
+    BusinessInquiryModule,
+    SupporterPaymentModule,
     CreatorMarketplaceModule,
+    CreatorIntelligenceModule,
     CreatorModule,
+    CreatorSupportModule,
     ProductionCollaborationModule,
     CreatorResourcesModule,
     ...(studioRealtimeTicketModule
@@ -50,6 +59,7 @@ const studioRealtimeTicketModule =
       : []),
     HealthModule,
     LegalModule,
+    LearningModule,
     FortuneModule,
     StudioAiModule,
     StudioMusicModule,

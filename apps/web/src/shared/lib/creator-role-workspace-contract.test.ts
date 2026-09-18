@@ -7,6 +7,7 @@ import {
   creatorRoleChecklist,
   creatorRoleNotificationSettings,
   creatorRoleStudioWorkspace,
+  creatorWorkspaceStudioUiMode,
   isCreatorRoleProjectKey,
   normalizeCreatorRoleWorkspacePreference,
   rankCreatorRoleWork,
@@ -48,6 +49,7 @@ describe("creator role workspace contract", () => {
       notificationPreset: "balanced",
       notificationOverrides: {},
       usageGoals: ["team-production"],
+      workspaceMode: "creator",
       capacity: {
         weeklyCapacityHours: 168,
         currentAssignedHours: 0,
@@ -101,11 +103,15 @@ describe("creator role workspace contract", () => {
     expect(creatorDetailedRoleLens("lettering")).toBe("lettering");
     expect(creatorDetailedRoleLens("reviewer")).toBe("review");
     expect(creatorDetailedRoleLens("producer")).toBe("production");
+    expect(creatorDetailedRoleLens("educator")).toBe("story");
 
     expect(creatorRoleStudioWorkspace("line-art")).toBe("lineart");
     expect(creatorRoleStudioWorkspace("color")).toBe("coloring");
     expect(creatorRoleStudioWorkspace("three-d")).toBe("pose-3d");
     expect(creatorRoleStudioWorkspace("producer")).toBe("publish");
+    expect(creatorWorkspaceStudioUiMode("guided")).toBe("basic");
+    expect(creatorWorkspaceStudioUiMode("creator")).toBe("standard");
+    expect(creatorWorkspaceStudioUiMode("production")).toBe("full");
   });
 
   it("builds role-aware notification, checklist and AI defaults", () => {

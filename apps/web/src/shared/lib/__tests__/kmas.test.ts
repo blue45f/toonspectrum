@@ -1,9 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  clearKmasLookupCacheForTests,
+  enrichTitleWithKmas,
   getKmasBookAndWebtoonProxyResponse,
   kmasItemToTitle,
   kmasItems,
+  kmasLookupCacheDiagnostics,
   mergeKmasItemIntoTitle,
   type KmasBookAndWebtoonResponse,
 } from "../../../../../../apps/api/src/server/kmas";
@@ -21,6 +24,23 @@ const sampleItem = {
   ageGradCdNm: "전체연령",
   imageDownloadUrl: "https://www.kmas.or.kr:443/common/file/atchmnflDownload.ajax?fileImageId=82e7c463",
 };
+
+function existingTitle(title: string): Title {
+  return {
+    id: `test-${title}`, slug: `test-${title}`, type: "webtoon", title, author: "테스트 작가",
+    genres: ["드라마"], tags: [], synopsis: "기존 줄거리",
+    cover: ["oklch(0.45 0.14 35)", "oklch(0.28 0.1 75)"],
+    status: "ongoing", ageRating: "all", releaseYear: 2024,
+    availability: [{ platformId: "kmas", pricing: "free" }],
+    stats: { views: 1, likes: 1, bookmarks: 1, ratingAvg: 4.2, ratingCount: 10,
+      ratingDist: [1, 1, 2, 3, 3], rankDelta: 0, trendingScore: 50, completionRate: 70, bingeIndex: 70 },
+  };
+}
+
+afterEach(() => {
+  clearKmasLookupCacheForTests();
+  vi.useRealTimers();
+});
 
 describe("kmas integration helpers", () => {
   it("실제 KMAS 응답 구조인 최상위 itemList를 읽는다", () => {
@@ -153,4 +173,65 @@ describe("kmas integration helpers", () => {
     expect(existing.coverImage).toBe("/api/cover?u=https%3A%2F%2Fimage-comic.pstatic.net%2Fwebtoon%2F2.jpg");
     expect(existing.synopsis).toBe(sampleItem.outline);
   });
+
+  it("lookup cache를 LRU entry 상한으로 제한한다", async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      const title = url.searchParams.get("title") ?? "";
+      calls.push(title);
+      return new Response(JSON.stringify({
+        result: { resultState: "success" },
+        itemList: [{
+          prdctNm: title,
+          title,
+          sntncWritrNm: "테스트 작가",
+          imageDownloadUrl: `https://www.kmas.or.kr/common/file/${encodeURIComponent(title)}.png`,
+        }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+    const env = {
+      KMAS_PRV_KEY: "test-key",
+      KMAS_LOOKUP_CACHE_MAX_ENTRIES: "2",
+      KMAS_LOOKUP_CACHE_MAX_BYTES: "1048576",
+    };
+
+    try {
+      await enrichTitleWithKmas(existingTitle("A"), env);
+      await enrichTitleWithKmas(existingTitle("B"), env);
+      await enrichTitleWithKmas(existingTitle("A"), env); // refresh A in LRU order
+      await enrichTitleWithKmas(existingTitle("C"), env); // evicts B
+      await enrichTitleWithKmas(existingTitle("B"), env); // must fetch B again
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(calls).toEqual(["A", "B", "C", "B"]);
+    expect(kmasLookupCacheDiagnostics().entries).toBeLessThanOrEqual(2);
+  });
+
+  it("lookup cache byte budget가 너무 작으면 항목을 retained 하지 않는다", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const title = new URL(String(input)).searchParams.get("title") ?? "";
+      return new Response(JSON.stringify({
+        result: { resultState: "success" },
+        itemList: [{ prdctNm: title, title, sntncWritrNm: "테스트 작가", outline: "x".repeat(1000) }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+
+    try {
+      await enrichTitleWithKmas(existingTitle("byte-budget"), {
+        KMAS_PRV_KEY: "test-key",
+        KMAS_LOOKUP_CACHE_MAX_ENTRIES: "10",
+        KMAS_LOOKUP_CACHE_MAX_BYTES: "128",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(kmasLookupCacheDiagnostics()).toEqual({ entries: 0, estimatedBytes: 0 });
+  });
+
 });

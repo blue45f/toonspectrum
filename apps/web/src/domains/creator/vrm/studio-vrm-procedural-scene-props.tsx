@@ -951,6 +951,8 @@ const PROP_COMPONENTS: Record<string, FC<{ scale: number }>> = {
   rainbow: PropRainbow, bubbles: PropBubbles, leaves: PropLeaves, feather: PropFeather,
 };
 
+export const SCENE_PROP_RENDERABLE_IDS = new Set(Object.keys(PROP_COMPONENTS));
+
 export const DEFAULT_BONE_OFFSETS: Record<string, Partial<Record<VRMHumanBoneName, Partial<PropAttachmentConfig>>>> = {
   sword: {
     rightHand: { offsetX: 0.05, offsetY: 0.12, offsetZ: -0.05, rotX: 70, rotY: 0, rotZ: -20, scale: 0.75 },

@@ -31,6 +31,7 @@ import type { TrackingOptions } from "../vrm/studio-vrm-webcam-tracking";
 import type { StudioVrmPhotoPoseApplyPayload, StudioVrmPhotoPoseHandoff } from "../vrm/StudioVrmPhotoPoseScanner";
 import type { DragEvent as ReactDragEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
 type DrawerMode = CharacterShaperReferenceDrawerProps["mode"];
@@ -115,20 +116,7 @@ function ToggleRow({
       )}
     >
       <span className="min-w-0 truncate">{label}</span>
-      <span
-        aria-hidden
-        className={cn(
-          "grid h-6 w-10 shrink-0 items-center rounded-full border px-0.5",
-          checked ? "border-accent bg-accent" : "border-line bg-raised",
-        )}
-      >
-        <span
-          className={cn(
-            "size-5 rounded-full transition-transform motion-reduce:transition-none",
-            checked ? "translate-x-4 bg-on-accent" : "bg-fg-3",
-          )}
-        />
-      </span>
+      <SwitchIndicator checked={checked} />
     </button>
   );
 }

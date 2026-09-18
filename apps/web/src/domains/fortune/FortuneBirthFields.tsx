@@ -4,7 +4,9 @@ import type { FortuneBirthInput } from "@toonspectrum/core/fortune";
 interface Props { label: string; value: FortuneBirthInput; onChange: (value: FortuneBirthInput) => void }
 export function FortuneBirthFields({ label, value, onChange }: Props) {
   const id = useId();
+  const completed = 1 + Number(Boolean(value.date)) + Number(Boolean(value.time));
   return <fieldset className="fo-birth"><legend>{label}</legend>
+    <div className="fo-birth-oracle"><span aria-hidden="true">☾</span><div><strong>나를 이루는 시간의 좌표</strong><p>달력 기준과 생년월일, 알고 있다면 출생시간까지 이어 주세요.</p></div><div className="fo-birth-progress" aria-label={`입력 단서 ${completed}/3`}><i data-active="true" /><i data-active={Boolean(value.date)} /><i data-active={Boolean(value.time)} /></div></div>
     <div className="fo-fields">
       <label htmlFor={`${id}-calendar`}>달력 기준<select id={`${id}-calendar`} value={value.calendar ?? "solar"} onChange={(e) => onChange({ ...value, calendar: e.target.value === "lunar" ? "lunar" : "solar", leapMonth: false })}><option value="solar">양력</option><option value="lunar">음력 (한국)</option></select></label>
       <label htmlFor={`${id}-date`}>생년월일<input id={`${id}-date`} type="text" autoComplete="off" placeholder="1990-06-15" maxLength={10} required pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" value={value.date} aria-describedby={`${id}-help`} onChange={(e) => onChange({ ...value, date: e.target.value })} /></label>

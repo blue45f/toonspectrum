@@ -40,7 +40,7 @@ describe("StudioHelpCenterHost", () => {
     const dialog = await openHelp({ section: "terminology" });
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(screen.getByRole("heading", { level: 2 }).textContent).toContain(
-      "CSP · Photoshop 용어 사전",
+      "다른 앱 용어 사전",
     );
   });
 

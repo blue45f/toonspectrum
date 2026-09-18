@@ -20,6 +20,7 @@ import type {
 export function useCreatorRoleWorkspace(
   projectKey: string,
   fallbackProfile?: CreatorRoleProfile | null,
+  enabled = true,
 ) {
   const subscribe = useCallback(
     (listener: () => void) => subscribeCreatorRoleWorkspace(projectKey, listener),
@@ -32,18 +33,21 @@ export function useCreatorRoleWorkspace(
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   useEffect(() => {
+    if (!enabled) return;
     void loadCreatorRoleWorkspace(projectKey, fallbackProfile);
-  }, [fallbackProfile, projectKey]);
+  }, [enabled, fallbackProfile, projectKey]);
 
   const save = useCallback(
-    (document: CreatorRoleWorkspacePreference) => (
-      persistCreatorRoleWorkspace(projectKey, document)
-    ),
-    [projectKey],
+    (document: CreatorRoleWorkspacePreference) => enabled
+      ? persistCreatorRoleWorkspace(projectKey, document)
+      : Promise.resolve(getCreatorRoleWorkspaceStoreState(projectKey)),
+    [enabled, projectKey],
   );
   const reload = useCallback(
-    () => loadCreatorRoleWorkspace(projectKey, fallbackProfile, true),
-    [fallbackProfile, projectKey],
+    () => enabled
+      ? loadCreatorRoleWorkspace(projectKey, fallbackProfile, true)
+      : Promise.resolve(getCreatorRoleWorkspaceStoreState(projectKey)),
+    [enabled, fallbackProfile, projectKey],
   );
 
   return useMemo(() => ({

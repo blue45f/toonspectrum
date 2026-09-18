@@ -541,7 +541,10 @@ export function createStudioBg3dModelImportActions(
           if (attachment) storageModelIdByAttachmentIdRef.current.delete(attachment.id);
           const cacheEntry = modelRootCacheRef.current.get(id);
           modelRootCacheRef.current.delete(id);
-          if (cacheEntry) requestAnimationFrame(() => cacheEntry.dispose());
+          // The scene/persistence mutation is already committed at this point. A background tab
+          // may throttle requestAnimationFrame indefinitely, retaining large GPU resources, so
+          // release the detached cache entry at the next microtask boundary instead.
+          if (cacheEntry) queueMicrotask(() => cacheEntry.dispose());
           setSelectedIds((current) => new Set(
             [...current].filter((entityId) => !plan.removedEntityIds.has(entityId)),
           ));

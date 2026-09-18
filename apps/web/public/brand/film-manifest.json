@@ -25,5 +25,18 @@
       "sha256": "e394484a23dff67abb8886facee36c7da9e988684163c1c657cbd4ff8bb4fa29"
     }
   },
-  "sourceCommit": "055d4518edb8393e93a5a152a29547b19292552f"
+  "sourceCommit": "local",
+  "routeHeader": {
+    "src": "/brand/toonstudio-route-header.mp4",
+    "width": 1920,
+    "height": 768,
+    "bytes": 8605495,
+    "sha256": "f44e6db02e7e1a9a5cd87f9c15cf20fc24b4559692fe97de6fe61dafc56203cd"
+  },
+  "routeHeaderPosters": {
+    "0": { "src": "/brand/toonstudio-route-header-0.jpg", "width": 1920, "height": 768, "bytes": 174525, "sha256": "f1e6b9cb576caddb39735aa49b5c41fa31e3bb6eb05357dce37833407cadc57f" },
+    "6": { "src": "/brand/toonstudio-route-header-6.jpg", "width": 1920, "height": 768, "bytes": 177074, "sha256": "6dea08fe14925ca3908f39fc1f6f1dc39c139eea7bd8d88d3a51234648481735" },
+    "12": { "src": "/brand/toonstudio-route-header-12.jpg", "width": 1920, "height": 768, "bytes": 176166, "sha256": "8330af0d97bdef0155a2cf2e089700d785874d0d565bc2838f566a5e3b40d693" },
+    "18": { "src": "/brand/toonstudio-route-header-18.jpg", "width": 1920, "height": 768, "bytes": 169390, "sha256": "dccecb9671b0ec34efb0c11b5389f0e25e4f886aadd51ad7fe1fbf4713249784" }
+  }
 }

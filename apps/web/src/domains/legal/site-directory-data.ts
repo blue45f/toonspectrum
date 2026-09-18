@@ -350,6 +350,7 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
       en: "Understand ToonStudio through its film, workflow and engineering story",
     },
     items: [
+      destination("/product-tour", "툰스튜디오 전체 제품 투어", "ToonStudio full product tour", "8분 24초 장편 영상과 실제 제품 화면으로 전체 제작 흐름 이해", "Understand the full production journey through an 8m 24s tour and real product screens"),
       destination("/brand-film", "툰스튜디오 홍보영상", "ToonStudio brand film", "24초 브랜드 필름으로 핵심 제작 경험 빠르게 보기", "Watch the 24-second brand film for a quick product overview"),
       destination("/about", "서비스 소개", "About ToonStudio", "기능과 운영 원칙", "Features and operating principles"),
       destination(

@@ -7,7 +7,7 @@ on:
         required: true
         default: all
         type: choice
-        options: [all, landscape, portrait, square]
+        options: [all, landscape, portrait, square, header]
 permissions:
   contents: read
 concurrency:

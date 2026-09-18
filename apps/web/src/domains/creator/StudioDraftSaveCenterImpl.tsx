@@ -559,7 +559,7 @@ export function StudioDraftSaveCenter({
         "pointer-events-auto fixed right-[max(0.75rem,env(safe-area-inset-right))] lg:z-[58]",
         open ? "z-[58]" : "z-[52]",
         anchorAtBottom
-          ? "bottom-[calc(6.25rem+env(safe-area-inset-bottom))]"
+          ? "bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+4.25rem)]"
           : "top-[calc(5.25rem+env(safe-area-inset-top))]",
       )}
     >

@@ -16,17 +16,64 @@ import type {
 
 import { cn } from "@/shared/lib/utils";
 
-const THREE_POSTER_CACHE = new Map<string, string>();
+interface ThreePosterCacheEntry {
+  readonly value: string;
+  readonly estimatedBytes: number;
+}
+
+const THREE_POSTER_CACHE = new Map<string, ThreePosterCacheEntry>();
 const THREE_POSTER_CACHE_LIMIT = 96;
+const THREE_POSTER_CACHE_MAX_BYTES = 12 * 1024 * 1024;
+let threePosterCacheBytes = 0;
+
+function readThreePoster(key: string): string | null {
+  const entry = THREE_POSTER_CACHE.get(key);
+  if (!entry) return null;
+  THREE_POSTER_CACHE.delete(key);
+  THREE_POSTER_CACHE.set(key, entry);
+  return entry.value;
+}
 
 function cacheThreePoster(key: string, value: string): void {
-  if (THREE_POSTER_CACHE.has(key)) THREE_POSTER_CACHE.delete(key);
-  THREE_POSTER_CACHE.set(key, value);
-  while (THREE_POSTER_CACHE.size > THREE_POSTER_CACHE_LIMIT) {
+  const existing = THREE_POSTER_CACHE.get(key);
+  if (existing) {
+    THREE_POSTER_CACHE.delete(key);
+    threePosterCacheBytes = Math.max(0, threePosterCacheBytes - existing.estimatedBytes);
+  }
+  const estimatedBytes = value.length * 2;
+  if (estimatedBytes > THREE_POSTER_CACHE_MAX_BYTES) return;
+  THREE_POSTER_CACHE.set(key, { value, estimatedBytes });
+  threePosterCacheBytes += estimatedBytes;
+  while (
+    THREE_POSTER_CACHE.size > THREE_POSTER_CACHE_LIMIT
+    || threePosterCacheBytes > THREE_POSTER_CACHE_MAX_BYTES
+  ) {
     const oldest = THREE_POSTER_CACHE.keys().next().value as string | undefined;
     if (!oldest) break;
+    const removed = THREE_POSTER_CACHE.get(oldest);
     THREE_POSTER_CACHE.delete(oldest);
+    if (removed) threePosterCacheBytes = Math.max(0, threePosterCacheBytes - removed.estimatedBytes);
   }
+}
+
+function canvasToDataUrlAsync(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality?: number,
+): Promise<string> {
+  if (typeof canvas.toBlob !== "function") return Promise.resolve(canvas.toDataURL(type, quality));
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("3D preview poster encoding failed"));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error ?? new Error("3D preview poster read failed"));
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.readAsDataURL(blob);
+    }, type, quality);
+  });
 }
 
 function disposeMaterial(material: Material): void {
@@ -199,12 +246,11 @@ function ThreePreview({
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const active = useIntersectionActivation(hostRef, mode === "interactive");
-  const cachedPoster = mode === "thumbnail"
-    ? THREE_POSTER_CACHE.get(preview.cacheKey) ?? null
-    : null;
+  const cachedPoster = mode === "thumbnail" ? readThreePoster(preview.cacheKey) : null;
   const [poster, setPoster] = useState<string | null>(cachedPoster);
   const [scrubbing, setScrubbing] = useState(false);
   const thumbnailRotationRef = useRef(Math.PI / 5);
+  const wakeRendererRef = useRef<(() => void) | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">(
     cachedPoster ? "ready" : "idle",
   );
@@ -228,6 +274,8 @@ function ThreePreview({
     let cleanObject: Object3D | null = null;
     let renderer: import("three").WebGLRenderer | null = null;
     let controls: import("three/examples/jsm/controls/OrbitControls.js").OrbitControls | null = null;
+    let visibilityCleanup: (() => void) | null = null;
+    let controlsChangeCleanup: (() => void) | null = null;
 
     async function start(): Promise<void> {
       setState("loading");
@@ -270,39 +318,61 @@ function ThreePreview({
         rim.position.set(-radius * 2, radius * 1.3, -radius * 1.5);
         scene.add(rim);
 
-        const render = () => {
+        const resize = () => {
           if (!renderer) return;
           const width = Math.max(1, host.clientWidth || (mode === "thumbnail" ? 280 : 420));
           const height = Math.max(1, host.clientHeight || (mode === "thumbnail" ? 210 : 360));
           renderer.setSize(width, height, false);
           camera.aspect = width / height;
           camera.updateProjectionMatrix();
+        };
+        const renderFrame = () => {
+          if (!renderer || document.visibilityState === "hidden") return;
+          if (mode === "thumbnail") object.rotation.y = thumbnailRotationRef.current;
+          if (controls) {
+            controls.autoRotate = autoRotateRef.current;
+            controls.update();
+          }
           renderer.render(scene, camera);
         };
+        const requestRender = () => {
+          if (cancelled || !renderer || frame !== 0 || document.visibilityState === "hidden") return;
+          frame = requestAnimationFrame(() => {
+            frame = 0;
+            renderFrame();
+            if (mode === "interactive" && controls && autoRotateRef.current) requestRender();
+          });
+        };
+        const onVisibilityChange = () => {
+          if (document.visibilityState !== "hidden") {
+            resize();
+            requestRender();
+          }
+        };
+        document.addEventListener("visibilitychange", onVisibilityChange);
+        visibilityCleanup = () => document.removeEventListener("visibilitychange", onVisibilityChange);
+        wakeRendererRef.current = requestRender;
+        resizeObserver = typeof ResizeObserver === "undefined"
+          ? null
+          : new ResizeObserver(() => {
+            resize();
+            requestRender();
+          });
+        resizeObserver?.observe(host);
+        resize();
 
         if (mode === "thumbnail") {
           if (!poster) {
-            render();
-            const nextPoster = renderer.domElement.toDataURL("image/webp", 0.86);
+            renderFrame();
+            const nextPoster = await canvasToDataUrlAsync(renderer.domElement, "image/webp", 0.86);
+            if (cancelled) return;
             cacheThreePoster(preview.cacheKey, nextPoster);
-            if (!cancelled) {
-              setPoster(nextPoster);
-              setState("ready");
-            }
+            setPoster(nextPoster);
+            setState("ready");
             return;
           }
-          const animateThumbnail = () => {
-            if (cancelled || !renderer) return;
-            object.rotation.y = thumbnailRotationRef.current;
-            render();
-            frame = requestAnimationFrame(animateThumbnail);
-          };
-          resizeObserver = typeof ResizeObserver === "undefined"
-            ? null
-            : new ResizeObserver(render);
-          resizeObserver?.observe(host);
           setState("ready");
-          animateThumbnail();
+          requestRender();
           return;
         }
 
@@ -316,20 +386,11 @@ function ThreePreview({
         controls.maxDistance = radius * 8;
         controls.autoRotateSpeed = 1.25;
         controls.target.set(0, 0, 0);
+        controlsChangeCleanup = () => controls?.removeEventListener("change", requestRender);
+        controls.addEventListener("change", requestRender);
         controls.update();
-        const animate = () => {
-          if (cancelled || !renderer || !controls) return;
-          controls.autoRotate = autoRotateRef.current;
-          controls.update();
-          render();
-          frame = requestAnimationFrame(animate);
-        };
-        animate();
-        resizeObserver = typeof ResizeObserver === "undefined"
-          ? null
-          : new ResizeObserver(render);
-        resizeObserver?.observe(host);
         setState("ready");
+        requestRender();
       } catch {
         if (!cancelled) setState("error");
       }
@@ -339,6 +400,9 @@ function ThreePreview({
     return () => {
       cancelled = true;
       cancelAnimationFrame(frame);
+      wakeRendererRef.current = null;
+      visibilityCleanup?.();
+      controlsChangeCleanup?.();
       resizeObserver?.disconnect();
       controls?.dispose();
       if (cleanObject) disposeObject(cleanObject);
@@ -365,6 +429,7 @@ function ThreePreview({
           ? (event.clientX - bounds.left) / bounds.width
           : 0.5;
         thumbnailRotationRef.current = (progress * Math.PI * 2) - Math.PI;
+        wakeRendererRef.current?.();
       } : undefined}
       data-studio-three-preview={preview.cacheKey}
       data-preview-mode={mode}
@@ -405,7 +470,12 @@ function ThreePreview({
       {mode === "interactive" && state === "ready" ? (
         <button
           type="button"
-          onClick={() => setAutoRotate((value) => !value)}
+          onClick={() => {
+            const next = !autoRotateRef.current;
+            autoRotateRef.current = next;
+            setAutoRotate(next);
+            wakeRendererRef.current?.();
+          }}
           aria-pressed={autoRotate}
           className="absolute bottom-3 right-3 inline-flex min-h-10 items-center gap-1.5 rounded-full border border-white/70 bg-white/85 px-3 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:border-white/10 dark:bg-black/55 dark:text-white"
         >

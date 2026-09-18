@@ -1,11 +1,12 @@
 /**
- * Select tool options strip — Photoshop / CSP-style context actions when elements are selected.
- * Icon-first commercial chrome; labels live in title/aria.
+ * Selection context strip. The same bottom lane is shared with drawing controls so selection
+ * replaces the current tool context instead of creating another persistent row.
  */
 import {
   ArrowDownToLine,
   ArrowUpToLine,
   Copy,
+  Ellipsis,
   Lock,
   LockOpen,
   MessageSquareText,
@@ -27,7 +28,7 @@ import type {
   StudioToolHintPreviewVariant,
 } from "./studio-tool-hint-preview-kind";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
-import type { ReactElement } from "react";
+import type { CSSProperties, ReactElement } from "react";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -43,6 +44,10 @@ export interface StudioSelectOptionsBarProps {
   onEditText?: () => void;
   onFitBubble?: () => void;
   onToggleLock?: () => void;
+  /** Float in the shared desktop context-bar lane instead of consuming document flow. */
+  docked?: boolean;
+  /** Desktop chrome that the bottom context bar must not cover. */
+  dockInsets?: Readonly<{ left: number; right: number }>;
   className?: string;
 }
 
@@ -71,7 +76,7 @@ function Action({
 }): ReactElement {
   return (
     <StudioToolHintTarget
-      preferredSide="bottom"
+      preferredSide="top"
       hint={{
         id: `selection-action-${id}`,
         title: label,
@@ -87,13 +92,13 @@ function Action({
         aria-label={label}
         className={cn(
           showLabel
-            ? "inline-flex h-11 items-center gap-1.5 rounded-xl border px-2.5 sm:h-8"
-            : "grid size-11 place-items-center rounded-xl border sm:size-8",
+            ? "inline-flex h-9 w-full items-center gap-2 rounded-lg border px-2.5"
+            : "grid size-9 place-items-center rounded-lg border",
           STUDIO_EASE,
           STUDIO_FOCUS_RING,
           danger
             ? "border-bad/35 bg-bad/10 text-bad hover:bg-bad/15"
-            : "border-line/70 bg-card/95 text-fg-2 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.05)] hover:border-line hover:bg-raised hover:text-fg"
+            : "border-line/70 bg-card/95 text-fg-2 hover:border-line hover:bg-raised hover:text-fg"
         )}
       >
         <Icon size={14} strokeWidth={1.75} aria-hidden />
@@ -115,20 +120,36 @@ export function StudioSelectOptionsBar({
   onEditText,
   onFitBubble,
   onToggleLock,
+  docked = false,
+  dockInsets = { left: 56, right: 56 },
   className,
 }: StudioSelectOptionsBarProps): ReactElement | null {
   if (selectionCount <= 0) return null;
   const badgeText = studioSelectionBadgeText(selectionCount, selectionLabel);
   const countChip = studioSelectionCountChip(selectionCount);
+  const safeDockLeft = Math.max(0, Math.round(dockInsets.left));
+  const safeDockRight = Math.max(0, Math.round(dockInsets.right));
+  const dockStyle: CSSProperties | undefined = docked
+    ? {
+        left: `clamp(10.75rem, calc(${safeDockLeft}px + (100vw - ${safeDockLeft + safeDockRight}px) / 2), calc(100vw - 10.75rem))`,
+        maxWidth: `min(calc(100vw - ${safeDockLeft + safeDockRight + 24}px), calc(100vw - 1.5rem), 56rem)`,
+      }
+    : undefined;
+
   return (
     <div
       role="toolbar"
       aria-label="선택 옵션"
       data-studio-select-options="true"
+      data-studio-context-kind="selection"
+      data-studio-context-bar="true"
       data-studio-icon-first="true"
+      style={dockStyle}
       className={cn(
-        "relative z-[40] flex h-11 min-h-11 shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-line px-2.5",
-        "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "flex h-12 min-h-12 flex-nowrap items-center gap-1.5 overflow-visible px-2",
+        docked
+          ? "pointer-events-auto fixed bottom-3 z-[41] hidden -translate-x-1/2 rounded-xl border border-line bg-panel/95 shadow-[0_18px_48px_oklch(0.06_0.01_70/0.58)] backdrop-blur-md lg:flex"
+          : "relative z-[40] shrink-0 overflow-x-auto border-b border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className
       )}
     >
@@ -136,15 +157,11 @@ export function StudioSelectOptionsBar({
         data-studio-selection-badge="true"
         title={selectionCount > 1 ? `${selectionCount}개 선택` : badgeText}
         className={cn(
-          "mr-0.5 inline-flex max-w-[12rem] items-center gap-1.5 truncate rounded-xl border border-accent/35",
-          "bg-[linear-gradient(135deg,oklch(0.72_0.185_42/0.16),oklch(0.2_0.01_66/0.55))] px-2 py-1",
-          "text-[0.68rem] font-bold tracking-tight text-fg shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.08)]"
+          "mr-0.5 inline-flex max-w-[11rem] items-center gap-1.5 truncate rounded-lg border border-accent/30",
+          "bg-accent-soft/50 px-2 py-1 text-[0.68rem] font-bold tracking-tight text-fg"
         )}
       >
-        <span
-          aria-hidden
-          className="grid size-6 shrink-0 place-items-center rounded-md bg-accent text-on-accent"
-        >
+        <span aria-hidden className="grid size-6 shrink-0 place-items-center rounded-md bg-accent text-on-accent">
           {selectionCount > 1 ? (
             <span className="text-[0.58rem] font-black tabular-nums">{countChip}</span>
           ) : (
@@ -157,83 +174,100 @@ export function StudioSelectOptionsBar({
           <span className="sr-only">{selectionCount}개 선택</span>
         )}
       </span>
+
       {textEditLabel && onEditText ? (
         <Action
           id="edit-text"
           icon={MessageSquareText}
           label={textEditLabel}
-          description="선택한 레터링을 캔버스 위에서 바로 수정합니다. 기본 문구는 곧바로 덮어쓸 수 있어요."
+          description="선택한 레터링을 캔버스 위에서 바로 수정합니다."
           preview="text"
           tip="T를 눌러도 선택한 말풍선이나 글자를 즉시 편집할 수 있어요."
           showLabel
           onClick={onEditText}
         />
       ) : null}
-      {onFitBubble ? (
+
+      <Action
+        id="duplicate"
+        icon={Copy}
+        label="복제"
+        description="선택한 요소를 같은 위치에 복제합니다."
+        preview="layer-duplicate"
+        onClick={onDuplicate}
+      />
+
+      {onToggleLock ? (
         <Action
-          id="fit-bubble"
-          icon={ScanText}
-          label="텍스트 맞춤"
-          description="대사 길이에 맞춰 말풍선 높이를 자동으로 조절합니다."
-          preview="bubble"
-          previewVariant="fit-text"
-          tip="긴 대사를 붙여넣은 뒤 한 번 눌러 여백을 정돈하세요."
-          onClick={onFitBubble}
+          id={locked ? "unlock" : "lock"}
+          icon={locked ? LockOpen : Lock}
+          label={locked ? "잠금 해제" : "잠금"}
+          description={locked ? "선택 요소의 잠금을 풉니다." : "선택 요소를 고정해 실수 편집을 막습니다."}
+          preview="layer-lock"
+          onClick={onToggleLock}
         />
       ) : null}
-      <div className="studio-opt-cluster flex shrink-0 items-center gap-0.5">
-        <Action
-          id="duplicate"
-          icon={Copy}
-          label="복제"
-          description="선택한 요소를 같은 위치에 복제해 즉시 이동하거나 변형할 수 있게 합니다."
-          preview="layer-duplicate"
-          tip="복제 직후 방향키로 살짝 이동하면 원본과 겹치지 않게 배치할 수 있어요."
-          onClick={onDuplicate}
-        />
-        <Action
-          id="bring-front"
-          icon={ArrowUpToLine}
-          label="맨 앞"
-          description="선택한 요소를 현재 페이지의 가장 앞쪽으로 올립니다."
-          preview="layer-reorder-front"
-          tip="말풍선과 효과음처럼 항상 보여야 하는 요소를 정리할 때 유용해요."
-          onClick={onBringFront}
-        />
-        <Action
-          id="send-back"
-          icon={ArrowDownToLine}
-          label="맨 뒤"
-          description="선택한 요소를 현재 페이지의 가장 뒤쪽으로 보냅니다."
-          preview="layer-reorder-back"
-          tip="배경이나 톤 소재를 다른 모든 요소 뒤로 정리할 때 사용하세요."
-          onClick={onSendBack}
-        />
-        {onToggleLock ? (
-          <Action
-            id={locked ? "unlock" : "lock"}
-            icon={locked ? LockOpen : Lock}
-            label={locked ? "잠금 해제" : "잠금"}
-            description={
-              locked
-                ? "선택 요소의 잠금을 풀어 다시 이동·변형·편집할 수 있게 합니다."
-                : "선택 요소를 고정해 실수로 이동하거나 편집하지 않도록 보호합니다."
-            }
-            preview="layer-lock"
-            onClick={onToggleLock}
-          />
-        ) : null}
-      </div>
+
       <Action
         id="delete"
         icon={Trash2}
         label="삭제"
-        description="현재 선택한 요소를 페이지에서 제거합니다. 실행취소로 되돌릴 수 있어요."
+        description="현재 선택한 요소를 제거합니다. 실행취소로 되돌릴 수 있어요."
         preview="layer-delete"
-        tip="여러 요소를 선택했다면 모두 한 번에 삭제됩니다."
         danger
         onClick={onDelete}
       />
+
+      <details className="group relative shrink-0" data-studio-selection-overflow="true">
+        <summary
+          aria-label="선택 더보기"
+          className={cn(
+            "grid size-9 cursor-pointer list-none place-items-center rounded-lg border border-line bg-card text-fg-3 marker:hidden hover:bg-raised hover:text-fg",
+            STUDIO_EASE,
+            STUDIO_FOCUS_RING,
+            "[&::-webkit-details-marker]:hidden"
+          )}
+        >
+          <Ellipsis size={15} aria-hidden />
+        </summary>
+        <div
+          className={cn(
+            "absolute right-0 z-[60] flex w-40 flex-col gap-1 rounded-xl border border-line bg-panel/98 p-1.5 shadow-2xl backdrop-blur-md",
+            docked ? "bottom-[calc(100%+0.5rem)]" : "top-[calc(100%+0.5rem)]"
+          )}
+        >
+          <Action
+            id="bring-front"
+            icon={ArrowUpToLine}
+            label="맨 앞"
+            description="선택한 요소를 현재 페이지의 가장 앞쪽으로 올립니다."
+            preview="layer-reorder-front"
+            showLabel
+            onClick={onBringFront}
+          />
+          <Action
+            id="send-back"
+            icon={ArrowDownToLine}
+            label="맨 뒤"
+            description="선택한 요소를 현재 페이지의 가장 뒤쪽으로 보냅니다."
+            preview="layer-reorder-back"
+            showLabel
+            onClick={onSendBack}
+          />
+          {onFitBubble ? (
+            <Action
+              id="fit-bubble"
+              icon={ScanText}
+              label="텍스트 맞춤"
+              description="대사 길이에 맞춰 말풍선 높이를 자동으로 조절합니다."
+              preview="bubble"
+              previewVariant="fit-text"
+              showLabel
+              onClick={onFitBubble}
+            />
+          ) : null}
+        </div>
+      </details>
     </div>
   );
 }
