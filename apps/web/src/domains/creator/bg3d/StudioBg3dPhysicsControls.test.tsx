@@ -232,7 +232,9 @@ describe("Studio BG3D physics transaction boundary", () => {
     expect(background3dSource).toContain("const sourcePrimitives = sourceSnapshot.primitives");
     expect(background3dSource).toContain("const sourceCustomModels = sourceSnapshot.customModels");
     expect(background3dSource).toContain("const sourceDocument = sourceSnapshot.document");
-    expect(background3dSource).toContain("createStudioBg3dPhysicsSessionSourceToken({");
+    expect(background3dSource).toContain(
+      "createStudioBg3dPhysicsSessionSourceToken(sourceSnapshot)",
+    );
     expect(background3dSource.match(/isStudioBg3dPhysicsSessionSourceCurrent\(/g)?.length ?? 0)
       .toBeGreaterThanOrEqual(2);
     expect(background3dSource).toContain("readonly sourceToken: string;");

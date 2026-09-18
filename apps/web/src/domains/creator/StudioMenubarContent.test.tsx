@@ -580,13 +580,13 @@ describe("StudioMenubarContent", () => {
     }
 
     expect(screen.getByRole("button", { name: "프로젝트 센터" }).className)
-      .toContain("min-w-11");
+      .toContain("min-w-[44px]");
     // 페이지·다운로드는 하단 도크의 드로잉 행이 소유한다 — 메뉴바 사본은 모바일에서 숨긴다.
     for (const name of [/페이지 목록/u, /현재 페이지$/u]) {
       const duplicate = screen.getByRole("button", { name, hidden: true });
       expect(duplicate.className).toContain("hidden");
     }
-    expect(screen.getByRole("button", { name: "내보내기 옵션" }).className).toContain("min-w-11");
+    expect(screen.getByRole("button", { name: "내보내기 옵션" }).className).toContain("min-w-[44px]");
   });
 
   it("switches the mobile immersive coach from entering to exiting", () => {

@@ -469,11 +469,7 @@ export function attachStudioBg3dEditorPhysicsHost(h) {
     const sourcePrimitives = sourceSnapshot.primitives;
     const sourceCustomModels = sourceSnapshot.customModels;
     const sourceDocument = sourceSnapshot.document;
-    const sourceToken = createStudioBg3dPhysicsSessionSourceToken({
-      primitives: sourcePrimitives,
-      customModels: sourceCustomModels,
-      document: sourceDocument,
-    });
+    const sourceToken = createStudioBg3dPhysicsSessionSourceToken(sourceSnapshot);
     if (!sourceToken) {
       setPhysicsError("현재 장면 상태를 물리 세션과 원자적으로 연결하지 못했습니다.");
       transitionPhysicsPhase("error");

@@ -109,13 +109,13 @@ function dependencyMap(input: {
     "object-id": Object.freeze([]),
     "material-id": Object.freeze([]),
     shadow: Object.freeze([]),
-    ao: Object.freeze(["depth", "normal"]),
+    ao: Object.freeze(["depth", "normal"] as const),
     emission: Object.freeze([]),
     velocity: Object.freeze([]),
-    "fx-overlay": Object.freeze(["depth", "normal", "object-id"]),
+    "fx-overlay": Object.freeze(["depth", "normal", "object-id"] as const),
     beauty: Object.freeze(beautyDependencies),
-    line: Object.freeze(["depth", "normal", "object-id", "material-id"]),
-    tone: Object.freeze(["beauty", "shadow", "ao"]),
+    line: Object.freeze(["depth", "normal", "object-id", "material-id"] as const),
+    tone: Object.freeze(["beauty", "shadow", "ao"] as const),
   });
 }
 

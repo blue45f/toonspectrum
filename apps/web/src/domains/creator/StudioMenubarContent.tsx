@@ -1761,7 +1761,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 className={buttonClass({
                   size: "sm",
                   variant: "quiet",
-                  // `min-w-11`은 셰브론을 접는 폭에서도 44px 터치 타깃을 지킨다
+                  // `min-w-[44px]`은 셰브론을 접는 폭에서도 44px 터치 타깃을 지킨다
                   // (`verify:studio-mobile-top`은 메뉴바 컨트롤의 가로·세로 모두 하드 체크).
                   className: "min-h-11 min-w-[44px] shrink-0 gap-1.5 whitespace-nowrap",
                 })}

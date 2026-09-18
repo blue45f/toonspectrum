@@ -297,6 +297,11 @@ describe("StudioBrushLibrarySheet", () => {
     expect(html).toContain("w-[8.5rem] flex-none");
     expect(html).toContain("min-h-11 min-w-11");
     expect(html).toContain("shrink-0 border-t");
+    expect(sheetSource).toContain(
+      'sticky ? "sticky top-0 z-20" : "relative z-0"',
+    );
+    expect(sheetSource).toContain("sticky={embedded}");
+    expect(sheetSource.match(/if \(embedded\) setFocusedBrushId\(item\.id\)/g)).toHaveLength(2);
     expect(html).toContain('data-studio-brush-stroke-details="true"');
     expect(html).toContain("[@media(max-height:32rem)]:hidden");
   });

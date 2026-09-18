@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createStudioLinked3dRenderPageFixture } from "../studio-linked-3d-render-test-fixture";
+import type { El } from "../studio-element-model";
 import {
   projectStudioScene3dLinkedLayerEdit,
   resolveStudioScene3dLinkedLayerRoundTrip,
@@ -8,7 +9,8 @@ import {
 
 function roundTrip() {
   const page = createStudioLinked3dRenderPageFixture();
-  const bundleId = page.elements[0]?.bg3dLtBundleId;
+  const element = page.elements[0] as Extract<El, { type: "image" }> | undefined;
+  const bundleId = element?.bg3dLtBundleId;
   if (!bundleId || !page.shared3dStage || !page.linked3dRender) {
     throw new Error("Linked 3D fixture is incomplete.");
   }
@@ -70,7 +72,7 @@ describe("Studio Scene3D linked layer bridge", () => {
 
   it("fails closed when the Canvas pass receipt and active shot diverge", () => {
     const page = createStudioLinked3dRenderPageFixture("page-diverged");
-    const element = page.elements[0];
+    const element = page.elements[0] as Extract<El, { type: "image" }> | undefined;
     if (!element?.bg3dLtBundleId || !element.bg3dScene || !page.shared3dStage) {
       throw new Error("Linked 3D fixture is incomplete.");
     }

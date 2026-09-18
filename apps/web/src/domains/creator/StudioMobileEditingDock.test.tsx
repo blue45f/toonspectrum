@@ -832,6 +832,7 @@ describe("StudioMobileEditingDock", () => {
     );
 
     const sheet = screen.getByRole("dialog", { name: "브러시 설정" });
+    expect(sheet.className).toContain("scroll-pt-14");
     const livingInk = within(sheet).getByRole("region", {
       name: "수채 번짐 빠른 도구",
     });

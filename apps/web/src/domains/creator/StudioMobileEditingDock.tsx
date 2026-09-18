@@ -1042,7 +1042,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             data-studio-mobile-sheet={mobileSheet === "draw" ? "draw" : undefined}
             data-studio-sheet-snap={drawSheetSnap}
             className={cn(
-              "fixed inset-x-0 z-[54] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-[transform,opacity,height,max-height] duration-300 ease-out motion-reduce:transition-none lg:hidden",
+              "fixed inset-x-0 z-[54] mx-auto max-w-[34rem] scroll-pt-14 overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-[transform,opacity,height,max-height] duration-300 ease-out motion-reduce:transition-none lg:hidden",
               drawSettingsVisible
                 ? "pointer-events-auto translate-y-0 opacity-100"
                 : "pointer-events-none translate-y-3 opacity-0"

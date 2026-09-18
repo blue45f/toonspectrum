@@ -780,6 +780,7 @@ interface StudioBrushProfileCardProps {
   item: StudioBrushCatalogItem;
   active: boolean;
   compact: boolean;
+  sticky: boolean;
   operation: StudioToolOperation;
   viewMode: StudioBrushCatalogViewMode;
 }
@@ -788,6 +789,7 @@ function StudioBrushProfileCard({
   item,
   active,
   compact,
+  sticky,
   operation,
   viewMode,
 }: StudioBrushProfileCardProps): ReactElement {
@@ -804,7 +806,8 @@ function StudioBrushProfileCard({
       data-studio-brush-profile-card={item.id}
       data-studio-brush-engine-family={profile.engineFamilyId}
       className={cn(
-        "sticky top-0 z-20 mb-2 overflow-hidden rounded-xl border border-line bg-panel/95 p-2 shadow-[0_7px_18px_oklch(0.12_0.02_70/0.18)] backdrop-blur",
+        "mb-2 overflow-hidden rounded-xl border border-line bg-panel/95 p-2 shadow-[0_7px_18px_oklch(0.12_0.02_70/0.18)] backdrop-blur",
+        sticky ? "sticky top-0 z-20" : "relative z-0",
         compact && "p-1.5",
       )}
     >
@@ -1584,6 +1587,7 @@ export function StudioBrushLibrarySheet({
             item={inspectedCatalogItem}
             active={inspectedCatalogItem.id === activeBrushId}
             compact={compact}
+            sticky={embedded}
             operation={operation}
             viewMode={viewMode}
           />
@@ -1661,11 +1665,11 @@ export function StudioBrushLibrarySheet({
                   <button
                     type="button"
                     onPointerEnter={() => {
-                      setFocusedBrushId(item.id);
+                      if (embedded) setFocusedBrushId(item.id);
                       void preloadStudioBrushCatalogSelection(item.id).catch(() => undefined);
                     }}
                     onFocus={() => {
-                      setFocusedBrushId(item.id);
+                      if (embedded) setFocusedBrushId(item.id);
                       void preloadStudioBrushCatalogSelection(item.id).catch(() => undefined);
                     }}
                     onClick={() => void selectCatalogItem(item)}

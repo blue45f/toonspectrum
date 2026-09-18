@@ -37,6 +37,7 @@ const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
 const LANGUAGE_KEY = "toonspectrum-lang";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
+  "/api/health/ready",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
   "/api/analytics/traffic/page-view",
