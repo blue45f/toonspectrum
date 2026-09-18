@@ -526,13 +526,6 @@ export function formatI18nTemplate(
   });
 }
 
-/**
- * Compatibility name used by Studio shell surfaces migrated in parallel with useBilingual.
- * Keep one implementation so those surfaces share locale and runtime translation behavior.
- */
-export function useBilingualLocalizer(scope: string): (ko: string, en: string) => string {
-  return useBilingual(scope);
-}
 /** Subscribe legacy-migrated surfaces to both locale and async translation bundle changes. */
 export function useBilingualI18nRevision(): void {
   useI18n((state) => state.lang);
