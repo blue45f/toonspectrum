@@ -125,6 +125,7 @@ const STATUS_TONE: Record<MemberStatus, string> = {
   active: "bg-good/15 text-good",
   suspended: "bg-warn/15 text-warn",
   deleted: "bg-bad/15 text-bad",
+  merged: "bg-cool/15 text-cool",
 };
 
 const formatDate = (value: string | null) =>
@@ -239,6 +240,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
     active: t("admin.members.statusActive"),
     suspended: t("admin.members.statusSuspended"),
     deleted: t("admin.members.statusDeleted"),
+    merged: t("admin.members.statusMerged"),
   };
 
   useEffect(() => {
@@ -284,7 +286,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
         setMembers(items);
         setMeta(response.meta);
         const visibleIds = new Set(items.filter(
-          (member) => canManageMembers && member.id !== selfId && member.status !== "deleted",
+          (member) => canManageMembers && member.id !== selfId && member.status !== "deleted" && member.status !== "merged",
         ).map((member) => member.id));
         setSelectedIds((current) => new Set(
           [...current].filter((id) => canManageMembers && visibleIds.has(id)),
@@ -320,7 +322,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
     () =>
       members
         .filter(
-          (member) => canManageMembers && member.id !== selfId && member.status !== "deleted",
+          (member) => canManageMembers && member.id !== selfId && member.status !== "deleted" && member.status !== "merged",
         )
         .map((member) => member.id),
     [canManageMembers, members, selfId],
@@ -343,7 +345,9 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
   const openAction = (action: PendingAction) => {
     if (!canManageMembers || actionLock.current || loading || refreshing) return;
     if (action.kind !== "bulk" && (
-      action.member.id === selfId || action.member.status === "deleted"
+      action.member.id === selfId
+      || action.member.status === "deleted"
+      || action.member.status === "merged"
     )) return;
     if (action.kind === "bulk" && (
       action.memberIds.length === 0 || action.memberIds.length > 200 ||
@@ -783,7 +787,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
             <tbody>
               {members.map((member) => {
                 const isSelf = member.id === selfId;
-                const selectable = canManageMembers && !actionBusy && !refreshing && !isSelf && member.status !== "deleted";
+                const selectable = canManageMembers && !actionBusy && !refreshing && !isSelf && member.status !== "deleted" && member.status !== "merged";
                 return (
                   <tr
                     key={member.id}
@@ -873,7 +877,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                         <select
                           id={`role-${member.id}`}
                           value={member.role}
-                          disabled={!canManageMembers || actionBusy || refreshing || isSelf || member.status === "deleted"}
+                          disabled={!canManageMembers || actionBusy || refreshing || isSelf || member.status === "deleted" || member.status === "merged"}
                           onChange={(event) =>
                             openAction({
                               kind: "role",
@@ -916,7 +920,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                                 status: "suspended",
                               })
                             }
-                            disabled={!canManageMembers || actionBusy || refreshing || isSelf || member.status === "deleted"}
+                            disabled={!canManageMembers || actionBusy || refreshing || isSelf || member.status === "deleted" || member.status === "merged"}
                             className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-line px-2 text-[0.68rem] text-fg-2 transition-colors hover:border-warn/45 hover:text-warn disabled:opacity-45"
                           >
                             <Ban size={11} />
@@ -927,7 +931,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                         <button
                           type="button"
                           onClick={() => openAction({ kind: "delete", member })}
-                          disabled={!canManageMembers || actionBusy || refreshing || isSelf || member.status === "deleted"}
+                          disabled={!canManageMembers || actionBusy || refreshing || isSelf || member.status === "deleted" || member.status === "merged"}
                           className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-bad/30 px-2 text-[0.68rem] text-bad transition-colors hover:bg-bad/10 disabled:opacity-45"
                         >
                           <Trash2 size={11} />

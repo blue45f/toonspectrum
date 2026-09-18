@@ -1,11 +1,12 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 
 import { EMPTY_CREATOR_ROLE_PROFILE } from "../../../web/src/shared/lib/creator-role-contract";
 import { accounts, db, dbClient, sessions, users } from "../db";
 
 import { getSessionUserCached, invalidateSessionUser } from "./session";
 
-export type UserAccountStatus = "active" | "suspended" | "deleted";
+export type UserAccountStatus = "active" | "suspended" | "deleted" | "merged";
+export type MutableUserAccountStatus = Exclude<UserAccountStatus, "merged">;
 
 export interface UserLifecycleRow {
   id: string;
@@ -14,6 +15,7 @@ export interface UserLifecycleRow {
   suspendedAt?: Date | null;
   suspensionReason?: string | null;
   deletedAt?: Date | null;
+  mergedIntoUserId?: string | null;
 }
 
 let lifecycleSchemaReady: Promise<void> | null = null;
@@ -31,6 +33,7 @@ async function assertUserLifecycleSchema(): Promise<void> {
       "image",
       "role",
       "status",
+      "mergedIntoUserId",
       "sessionVersion",
       "suspendedAt",
       "suspensionReason",
@@ -59,7 +62,11 @@ export async function ensureUserLifecycleSchema(): Promise<void> {
 
 export function normalizeUserAccountStatus(value: unknown): UserAccountStatus {
   const normalized = String(value ?? "").trim().toLowerCase();
-  if (normalized === "suspended" || normalized === "deleted") return normalized;
+  if (
+    normalized === "suspended"
+    || normalized === "deleted"
+    || normalized === "merged"
+  ) return normalized;
   return "active";
 }
 
@@ -73,6 +80,7 @@ export function getUserAuthBlock(row: { status?: string | null } | null | undefi
   if (!row) return "사용자 정보를 확인할 수 없습니다.";
   const status = normalizeUserAccountStatus(row.status);
   if (status === "deleted") return "탈퇴한 계정입니다.";
+  if (status === "merged") return "다른 계정으로 통합된 계정입니다.";
   if (status === "suspended") return "정지된 계정입니다. 운영팀에 문의해 주세요.";
   return null;
 }
@@ -145,7 +153,7 @@ export async function softDeleteUserAccount(
       creatorRoleProfile: EMPTY_CREATOR_ROLE_PROFILE,
       regionSettings: null,
     })
-    .where(eq(users.id, userId))
+    .where(and(eq(users.id, userId), ne(users.status, "merged")))
     .returning({
       id: users.id,
       status: users.status,
@@ -166,7 +174,7 @@ export async function softDeleteUserAccount(
 
 export async function setUserLifecycleStatus(
   userId: string,
-  status: UserAccountStatus,
+  status: MutableUserAccountStatus,
   reason: string = ""
 ): Promise<UserLifecycleRow | null> {
   if (status === "deleted") return softDeleteUserAccount(userId, reason);
@@ -190,7 +198,7 @@ export async function setUserLifecycleStatus(
   const [row] = await db
     .update(users)
     .set(patch)
-    .where(eq(users.id, userId))
+    .where(and(eq(users.id, userId), ne(users.status, "merged")))
     .returning({
       id: users.id,
       status: users.status,

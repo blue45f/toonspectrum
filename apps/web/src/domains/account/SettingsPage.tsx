@@ -2,6 +2,7 @@ import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, D
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { AccountMergeSettings } from "./AccountMergeSettings";
 import { ConnectedAccountsSettings } from "./ConnectedAccountsSettings";
 import { LibraryBackupImport } from "./LibraryBackupImport";
 import { detectBrowserRegionSettings, planRegionSettingsSync, readLocalRegionSettings, writeLocalRegionSettings } from "./region-settings-client";
@@ -511,6 +512,9 @@ export function SettingsPage() {
           </Link>
         </Row>
         <ConnectedAccountsSettings
+          userId={typeof userId === "string" && userId ? userId : null}
+        />
+        <AccountMergeSettings
           userId={typeof userId === "string" && userId ? userId : null}
         />
       </section>

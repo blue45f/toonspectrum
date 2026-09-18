@@ -18,6 +18,7 @@ export const HEALTH_READINESS_QUERY_TIMEOUT_MS = 3_000;
  */
 export const REQUIRED_DATABASE_RELATIONS = [
   "account",
+  "account_merge",
   "admin_announcements",
   "admin_audit_logs",
   "admin_banned_words",
