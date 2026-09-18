@@ -286,9 +286,10 @@ export function MembershipPolicyPage() {
               <ShieldCheck className="text-accent" size={22} aria-hidden />
               <h2 className="mt-4 text-xl font-black text-fg">Studio Credit은 멤버십 포함분으로 운영합니다</h2>
               <p className="mt-3 text-sm leading-6 text-fg-2">
-                AI·서버 렌더처럼 비용이 큰 작업에는 Studio Credit을 사용합니다. 매월 멤버십에
-                포함된 크레딧이 지급되며 다음 월로 이월되지 않습니다. 플랜 승급 시에는 해당 월
-                목표량과의 차액만 추가 지급됩니다. 현재는 실제 결제나 추가 크레딧 구매를 받지 않습니다.
+                매월 멤버십에 포함된 Studio Credit이 지급되며 다음 월로 이월되지 않습니다.
+                플랜 승급 시에는 해당 월 목표량과의 차액만 추가 지급됩니다. 현재 운영 중인 개인
+                API 키·개인 Creator Runtime·브라우저 로컬 작업에는 차감하지 않으며, 향후 플랫폼
+                비용형 AI·서버 렌더 기능이 활성화될 때만 사용합니다. 추가 구매는 현재 비활성입니다.
               </p>
             </article>
             <article className="rounded-3xl border border-line bg-panel p-6">
