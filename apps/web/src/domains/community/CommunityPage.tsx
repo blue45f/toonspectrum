@@ -1,4 +1,4 @@
-import { ArrowRight, MessageCircle, UsersRound } from "lucide-react";
+import { ArrowRight, CalendarDays, MessageCircle, UsersRound } from "lucide-react";
 import { Navigate, useParams } from "react-router-dom";
 
 import { CommunityScopeDirectory } from "./components/community-scope-directory";
@@ -37,6 +37,7 @@ export function CommunityPage() {
         <div className="flex flex-wrap gap-3">
           <Link href="/showcase" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-accent px-5 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2">창작자 갤러리<ArrowRight size={16} aria-hidden="true" /></Link>
           <Link href="/collaborate" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-line-strong px-5 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"><MessageCircle size={16} aria-hidden="true" />웹툰 구인·의뢰</Link>
+          <Link href="/community/events" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-line-strong px-5 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"><CalendarDays size={16} aria-hidden="true" />이벤트 게시판</Link>
         </div>
       </PublicStoryHero>
       <section className="mt-8 rounded-2xl border border-line bg-panel/60 p-6" aria-labelledby="community-promotion-title"><h2 id="community-promotion-title" className="text-xl font-bold">아마추어 작가의 첫 연재, 새로운 웹툰의 첫 독자</h2><p className="mt-3 text-sm leading-relaxed text-fg-2">작품 소개·홍보 영상·제작 과정을 공개하고 응원과 피드백을 나눠요. 홍보 게시물은 전용 공간에서 모아볼 수 있습니다.</p><div className="mt-4 flex flex-wrap gap-5 text-sm font-semibold text-accent"><Link href="/community/promote?stage=amateur">아마추어 작가 찾기 →</Link><Link href="/community/promote?kind=trailer">트레일러 상영관 →</Link><Link href="/community/promote/new">내 작품 소개하기 →</Link></div></section>
