@@ -137,6 +137,31 @@ describe("P2P huddle consent and delivery", () => {
     expect(controller.snapshot().camera).toBe(false); controller.close();
     expect(microphone.stop).toHaveBeenCalledOnce(); expect(screen.stop).toHaveBeenCalledOnce();
   });
+  it("switches mobile camera facing without overlapping video tracks", async () => {
+    const front = track("video");
+    const rear = track("video");
+    let request = 0;
+    const getUserMedia = vi.fn(async () => stream([request++ === 0 ? front : rear]));
+    const { controller } = single({ getUserMedia });
+
+    await controller.setVideo("camera", "user");
+    expect(controller.snapshot().cameraFacing).toBe("user");
+    expect(front.stop).not.toHaveBeenCalled();
+
+    await controller.setVideo("camera", "environment");
+    expect(front.stop).toHaveBeenCalledOnce();
+    expect(rear.stop).not.toHaveBeenCalled();
+    expect(controller.snapshot().cameraFacing).toBe("environment");
+    expect(getUserMedia).toHaveBeenLastCalledWith({
+      video: {
+        width: { ideal: 640, max: 1280 },
+        height: { ideal: 360, max: 720 },
+        frameRate: { ideal: 15, max: 24 },
+        facingMode: { ideal: "environment" },
+      },
+      audio: false,
+    });
+  });
   it("does not activate capture for a viewer or after closing", async () => {
     const getUserMedia = vi.fn();
     const { controller } = single({ getUserMedia }, "viewer");
