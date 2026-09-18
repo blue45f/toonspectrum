@@ -103,7 +103,6 @@ describe("PwaInstallNudge", () => {
       name: "툰스튜디오를 앱처럼 열어보세요",
     });
     expect(nudge.getAttribute("data-surface")).toBe("home");
-    expect(screen.getByText("툰스튜디오 앱 열기")).not.toBeNull();
   });
 
   it.each(["/market", "/market/assets"])(

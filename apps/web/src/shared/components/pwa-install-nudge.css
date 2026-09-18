@@ -1,24 +1,20 @@
 .pwa-install-nudge {
   --pwa-install-top: calc(var(--site-header-height, 4.25rem) + clamp(0.55rem, 1.2vw, 0.9rem));
-  --pwa-install-inline-gap: clamp(1rem, 1.6vw, 1.25rem);
-  --pwa-install-mobile-nav-offset: 5.75rem;
-  position: fixed; z-index: 70; isolation: isolate; box-sizing: border-box;
+  position: fixed; z-index: 70; isolation: isolate;
   top: max(var(--pwa-install-top), calc(env(safe-area-inset-top) + 0.75rem));
-  right: max(var(--pwa-install-inline-gap), env(safe-area-inset-right));
-  width: min(22rem, calc(100dvw - var(--pwa-install-inline-gap) - var(--pwa-install-inline-gap) - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  right: max(0.75rem, env(safe-area-inset-right));
+  width: min(23rem, calc(100dvw - 1.5rem - env(safe-area-inset-left) - env(safe-area-inset-right)));
   max-height: min(30rem, calc(100dvh - var(--pwa-install-top) - 1rem - env(safe-area-inset-bottom)));
-  overflow-x: clip; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: auto;
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;
   padding: 0.875rem; border: 1px solid var(--color-line-strong); border-radius: 1rem;
   background: color-mix(in oklch, var(--color-panel) 96%, transparent); color: var(--color-fg);
-  box-shadow: 0 1.1rem 2.8rem -1.55rem color-mix(in oklch, var(--color-fg) 38%, transparent);
+  box-shadow: 0 1.25rem 3.5rem -1.75rem color-mix(in oklch, var(--color-fg) 42%, transparent);
   backdrop-filter: blur(18px); animation: pwa-install-nudge-enter 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .pwa-install-nudge__body { display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); gap: 0.75rem; min-width: 0; padding-right: 2.65rem; }
 .pwa-install-nudge__icon { display: grid; width: 2.75rem; height: 2.75rem; place-items: center; border: 1px solid color-mix(in oklch, var(--color-accent) 38%, var(--color-line)); border-radius: 0.75rem; background: var(--color-accent-soft); color: var(--color-accent); }
 .pwa-install-nudge__copy { min-width: 0; }
 .pwa-install-nudge__title { display: block; color: var(--color-fg); font-size: 0.875rem; line-height: 1.45; overflow-wrap: anywhere; text-wrap: balance; }
-.pwa-install-nudge__title-full { display: block; }
-.pwa-install-nudge__title-compact { display: none; }
 .pwa-install-nudge__description { margin-top: 0.3rem; color: var(--color-fg-3); font-size: 0.75rem; line-height: 1.65; overflow-wrap: anywhere; text-wrap: pretty; }
 .pwa-install-nudge__close { position: absolute; top: 0.5rem; right: 0.5rem; display: grid; width: 2.75rem; height: 2.75rem; place-items: center; border-radius: 0.75rem; color: var(--color-fg-3); transition: background-color 160ms ease, color 160ms ease; }
 .pwa-install-nudge__action { display: inline-flex; min-height: 2.75rem; align-items: center; justify-content: center; gap: 0.45rem; margin: 0.75rem 0 0 3.5rem; padding: 0.6rem 0.9rem; border-radius: 0.75rem; background: var(--color-fg); color: var(--color-canvas); font-size: 0.75rem; font-weight: 750; transition: translate 160ms ease, background-color 160ms ease; }
@@ -28,27 +24,14 @@
 @keyframes pwa-install-nudge-enter { from { opacity: 0; translate: 0 -0.5rem; } to { opacity: 1; translate: 0 0; } }
 @keyframes pwa-install-nudge-enter-up { from { opacity: 0; translate: 0 0.65rem; } to { opacity: 1; translate: 0 0; } }
 @media (max-width: 640px) {
-  .pwa-install-nudge { left: max(var(--pwa-install-inline-gap), env(safe-area-inset-left)); right: max(var(--pwa-install-inline-gap), env(safe-area-inset-right)); width: auto; max-height: calc(100dvh - var(--pwa-install-top) - var(--pwa-install-inline-gap) - env(safe-area-inset-bottom)); }
-  .pwa-install-nudge[data-surface="home"] { top: auto; bottom: calc(var(--pwa-install-mobile-nav-offset) + env(safe-area-inset-bottom)); max-height: calc(100dvh - var(--site-header-height, 4.25rem) - var(--pwa-install-mobile-nav-offset) - var(--pwa-install-inline-gap) - env(safe-area-inset-top) - env(safe-area-inset-bottom)); animation-name: pwa-install-nudge-enter-up; }
+  .pwa-install-nudge { left: max(0.75rem, env(safe-area-inset-left)); right: max(0.75rem, env(safe-area-inset-right)); width: auto; max-height: calc(100dvh - var(--pwa-install-top) - 0.75rem - env(safe-area-inset-bottom)); }
+  .pwa-install-nudge[data-surface="home"] { top: auto; bottom: calc(4.5rem + env(safe-area-inset-bottom)); max-height: calc(100dvh - var(--site-header-height, 4.25rem) - 6rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)); animation-name: pwa-install-nudge-enter-up; }
   .pwa-install-nudge__action { width: calc(100% - 3.5rem); }
 }
 @media (max-width: 360px) {
   .pwa-install-nudge__body { grid-template-columns: minmax(0, 1fr); padding-right: 2.65rem; }
   .pwa-install-nudge__icon { display: none; }
   .pwa-install-nudge__action { width: 100%; margin-left: 0; }
-}
-@media (max-width: 640px) and (max-height: 640px) {
-  .pwa-install-nudge[data-surface="home"] {
-    display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 0.5rem;
-    max-height: none; overflow: hidden; padding: 0.55rem;
-  }
-  .pwa-install-nudge[data-surface="home"] .pwa-install-nudge__body { display: block; min-width: 0; padding: 0; }
-  .pwa-install-nudge[data-surface="home"] :is(.pwa-install-nudge__icon, .pwa-install-nudge__description) { display: none; }
-  .pwa-install-nudge[data-surface="home"] .pwa-install-nudge__title { display: block; overflow: visible; text-overflow: clip; white-space: normal; }
-  .pwa-install-nudge[data-surface="home"] .pwa-install-nudge__title-full { display: none; }
-  .pwa-install-nudge[data-surface="home"] .pwa-install-nudge__title-compact { display: block; white-space: nowrap; }
-  .pwa-install-nudge[data-surface="home"] .pwa-install-nudge__action { width: auto; min-width: 5rem; margin: 0; padding-inline: 0.75rem; }
-  .pwa-install-nudge[data-surface="home"] .pwa-install-nudge__close { position: static; width: 2.5rem; height: 2.5rem; }
 }
 :root[data-design-theme="contrast"] .pwa-install-nudge { border-width: 2px; background: var(--color-panel); box-shadow: none; backdrop-filter: none; }
 :root[data-design-theme="contrast"] .pwa-install-nudge__icon { border-width: 2px; border-color: var(--color-line-strong); background: var(--color-card); }

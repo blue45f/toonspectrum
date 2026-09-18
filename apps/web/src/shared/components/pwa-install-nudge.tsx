@@ -24,6 +24,8 @@ import {
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("pwa-install-nudge", ko, en);
 
+import "./pwa-install-nudge.css";
+
 const INSTALL_NUDGE_SESSION_KEY = "toonstudio:pwa-install-nudge-dismissed";
 
 function readInstallNudgeDismissal(): boolean {
@@ -74,17 +76,14 @@ export function PwaInstallNudge() {
       aria-describedby="pwa-install-nudge-description"
       className="pwa-install-nudge"
       data-pwa-install-nudge="true"
-      data-surface={pathname === "/" ? translateCurrentStaticSourceText("shared.components.pwa.install.nudge", "en", "home") : translateCurrentStaticSourceText("shared.components.pwa.install.nudge", "en", "route")}
+      data-surface={pathname === "/" ? "home" : "route"}
     >
       <div className="pwa-install-nudge__body">
         <span className="pwa-install-nudge__icon" aria-hidden="true">
           <Download size={18} />
         </span>
         <div className="pwa-install-nudge__copy">
-          <strong className="pwa-install-nudge__title" aria-hidden="true">
-            <span className="pwa-install-nudge__title-full">{title}</span>
-            <span className="pwa-install-nudge__title-compact">{compactTitle}</span>
-          </strong>
+          <strong className="pwa-install-nudge__title">{title}</strong>
           <p id="pwa-install-nudge-description" className="pwa-install-nudge__description">
             {description}
           </p>
