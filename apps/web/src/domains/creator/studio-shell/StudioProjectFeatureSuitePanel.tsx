@@ -1,9 +1,7 @@
 import {
-  formatI18nTemplate,
-  getCurrentUiLocale,
-  translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  useBilingual,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   BarChart3,
@@ -26,7 +24,7 @@ import { planStudioAutomationRecipe } from "../studio-automation-recipe";
 import { auditStudioPresentation } from "../studio-presentation-layout";
 import { analyzeStudioProductionPipeline, type StudioProductionTaskStatus } from "../studio-production-pipeline";
 import { analyzeStudioStoryContinuity } from "../studio-story-bible";
-import { planStudioStoryboard, type StudioStoryBeatKind } from "../studio-storyboard-planner";
+import { planStudioStoryboard, type StudioStoryBeat, type StudioStoryBeatKind } from "../studio-storyboard-planner";
 import { planStudioTemplateApplication } from "../studio-template-system";
 import { buildStudioMotionSchedule, planStudioVoiceRegeneration } from "../studio-voice-motion";
 import {
@@ -36,12 +34,10 @@ import {
 } from "../studio-webtoon-3d-render";
 import { analyzeStudioWebtoonQuality } from "../studio-webtoon-quality";
 import type { StudioProjectSection } from "../studio-project-views";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
+import { StudioStoryDevelopmentPanel } from "./StudioStoryDevelopmentPanel";
 import { useStudioProjectFeatureSuite } from "./useStudioProjectFeatureSuite";
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
 
@@ -146,8 +142,7 @@ function OverviewSuite({
   readonly locale: "ko" | "en";
   readonly view: string;
 }) {
-  const l = useBilingualLocalizer("studioFeatureSuite.overview");
-  const language = useI18n((state) => state.lang);
+  const bt = useBilingual("studioFeatureSuite.overview");
   const suite = useStudioProjectFeatureSuite(projectId, locale);
   const state = suite.state;
   const report = useMemo(
@@ -225,7 +220,7 @@ function StorySuite({
   readonly locale: "ko" | "en";
   readonly view: string;
 }) {
-  const l = useBilingualLocalizer("studioFeatureSuite.story");
+  const bt = useBilingual("studioFeatureSuite.story");
   const suite = useStudioProjectFeatureSuite(projectId, locale);
   const workspace = useStudioProjectWorkspace(projectId, locale);
   const state = suite.state;
@@ -281,8 +276,37 @@ function StorySuite({
   const showPlanner = ["overview", "episodes", "script"].includes(view);
   const showContinuity = ["overview", "characters", "world", "timeline", "relations", "references"].includes(view);
 
+  const applyAdaptationBeats = (beats: readonly StudioStoryBeat[], mode: "replace" | "append") => {
+    suite.update((current) => {
+      if (mode === "replace") {
+        return {
+          ...current,
+          storyBeats: beats.map((beat, order) => ({ ...beat, order })),
+        };
+      }
+      const stamp = Date.now().toString(36);
+      const sceneIds = new Map<string, string>();
+      const appended = beats.map((beat, index) => {
+        const sceneId = sceneIds.get(beat.sceneId)
+          ?? `adaptation-scene:${stamp}:${sceneIds.size + 1}`;
+        sceneIds.set(beat.sceneId, sceneId);
+        return {
+          ...beat,
+          id: `adaptation-beat:${stamp}:${index + 1}`,
+          sceneId,
+          order: current.storyBeats.length + index,
+        };
+      });
+      return { ...current, storyBeats: [...current.storyBeats, ...appended] };
+    });
+  };
+
   return (
-    <div className="grid gap-5 xl:grid-cols-2">
+    <div className="space-y-5">
+      {showPlanner ? (
+        <StudioStoryDevelopmentPanel projectId={projectId} onApplyBeats={applyAdaptationBeats} />
+      ) : null}
+      <div className="grid gap-5 xl:grid-cols-2">
       {showPlanner ? (
         <FeatureCard
           icon={FileText}
@@ -362,12 +386,13 @@ function StorySuite({
           ))}
         </FeatureCard>
       ) : null}
+      </div>
     </div>
   );
 }
 
 function ProductionPipeline({ projectId, locale }: { readonly projectId: string; readonly locale: string }) {
-  const l = useBilingualLocalizer("studioFeatureSuite.production");
+  const bt = useBilingual("studioFeatureSuite.production");
   const workspace = useStudioProjectWorkspace(projectId, locale);
   const workspaceState = workspace.state;
   const report = useMemo(
@@ -422,7 +447,7 @@ function ProductionPipeline({ projectId, locale }: { readonly projectId: string;
 }
 
 function QualityPanel({ projectId, locale }: { readonly projectId: string; readonly locale: string }) {
-  const l = useBilingualLocalizer("studioFeatureSuite.quality");
+  const bt = useBilingual("studioFeatureSuite.quality");
   const suite = useStudioProjectFeatureSuite(projectId, locale);
   const state = suite.state;
   const report = useMemo(
@@ -491,7 +516,7 @@ function QualityPanel({ projectId, locale }: { readonly projectId: string; reado
 }
 
 function RenderAndMotionPanel({ projectId, locale }: { readonly projectId: string; readonly locale: string }) {
-  const l = useBilingualLocalizer("studioFeatureSuite.render");
+  const bt = useBilingual("studioFeatureSuite.render");
   const suite = useStudioProjectFeatureSuite(projectId, locale);
   const state = suite.state;
   const renderPlan = useMemo(
@@ -564,7 +589,7 @@ function RenderAndMotionPanel({ projectId, locale }: { readonly projectId: strin
           })}
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <Metric label={bt("상태", "Status")} value={statusLabel(renderPlan.status, locale)} />
+          <Metric label={bt("상태", "Status")} value={statusLabel(renderPlan.status, bt)} />
           <Metric label={bt("미리보기", "Preview mode")} value={renderPlan.mode} />
           <Metric label={bt("생성 레이어", "Layers")} value={renderPlan.layers.length} />
         </div>
@@ -597,7 +622,7 @@ function RenderAndMotionPanel({ projectId, locale }: { readonly projectId: strin
 }
 
 function DesignTemplatePanel({ projectId, locale }: { readonly projectId: string; readonly locale: string }) {
-  const l = useBilingualLocalizer("studioFeatureSuite.design");
+  const bt = useBilingual("studioFeatureSuite.design");
   const suite = useStudioProjectFeatureSuite(projectId, locale);
   const state = suite.state;
   const templatePlan = useMemo(
@@ -641,9 +666,9 @@ function DesignTemplatePanel({ projectId, locale }: { readonly projectId: string
         <input value={title} onChange={(event) => updateTitle(event.target.value)} className={`${FIELD_CLASS} mt-2`} />
       </label>
       <div className="mt-4 grid gap-3 sm:grid-cols-4">
-        <Metric label={bt("템플릿", "Template")} value={statusLabel(templatePlan.status, locale)} />
+        <Metric label={bt("템플릿", "Template")} value={statusLabel(templatePlan.status, bt)} />
         <Metric label={bt("빈 슬롯", "Missing slots")} value={templatePlan.missingSlotIds.length} />
-        <Metric label={bt("발표 검사", "Presentation")} value={statusLabel(presentation.status, locale)} />
+        <Metric label={bt("발표 검사", "Presentation")} value={statusLabel(presentation.status, bt)} />
         <Metric label={bt("권장 배치", "Suggested layout")} value={Object.values(presentation.recommendedLayoutBySlide)[0] ?? "-"} />
       </div>
       {[...templatePlan.findings, ...presentation.findings].slice(0, 5).map((finding, index) => (
@@ -656,7 +681,7 @@ function DesignTemplatePanel({ projectId, locale }: { readonly projectId: string
 }
 
 function AutomationPanel({ projectId, locale }: { readonly projectId: string; readonly locale: string }) {
-  const l = useBilingualLocalizer("studioFeatureSuite.automation");
+  const bt = useBilingual("studioFeatureSuite.automation");
   const suite = useStudioProjectFeatureSuite(projectId, locale);
   const state = suite.state;
   const plan = useMemo(() => state

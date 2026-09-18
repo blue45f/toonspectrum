@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   Check,
@@ -22,6 +21,7 @@ import {
   emitShareEvent,
   isShareCancellation,
   nativeShare,
+  nativeShareForChannel,
   shareTargetUrl,
   shareText,
   withShareAttribution,
@@ -33,6 +33,7 @@ import {
   shareWithKakao,
 } from "@/shared/lib/kakao-share";
 import { useT } from "@/shared/lib/i18n";
+import { translateCurrentStaticSourceText, useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 type Notice =
@@ -111,9 +112,10 @@ function shareHost(url: string): string {
 
 export function ShareDialog({ payload, trigger, defaultOpen = false }: ShareDialogProps) {
   const t = useT();
+  const bt = useBilingual("ShareDialog.appTargets");
   const [open, setOpen] = useState(defaultOpen);
   const [notice, setNotice] = useState<Notice>(null);
-  const [busy, setBusy] = useState<"native" | "kakao" | "qr" | null>(null);
+  const [busy, setBusy] = useState<"native" | "kakao" | "instagram" | "tiktok" | "qr" | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrVisible, setQrVisible] = useState(false);
   const kakaoConfigured = isKakaoShareConfigured();
@@ -159,6 +161,37 @@ export function ShareDialog({ payload, trigger, defaultOpen = false }: ShareDial
     } catch {
       emitShareEvent("kakao", "failed", payload);
       setNotice({ kind: "error", message: t("share.status.kakaoFailed") });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runAppShare(channel: "instagram" | "tiktok") {
+    if (busy) return;
+    setBusy(channel);
+    setNotice(null);
+    try {
+      if (canNativeShare(payload)) {
+        await nativeShareForChannel(channel, payload);
+        emitShareEvent(channel, "completed", payload);
+        setNotice({ kind: "success", message: bt("시스템 공유에서 원하는 앱을 선택하세요.", "Choose the app from the system share sheet.") });
+      } else {
+        const copied = await copyShareLink(payload, channel);
+        emitShareEvent(channel, copied ? "completed" : "failed", payload);
+        setNotice({
+          kind: copied ? "success" : "error",
+          message: copied
+            ? bt("공유 링크를 복사했습니다. 앱에서 붙여 넣어 게시하세요.", "Link copied. Paste it into the app to publish.")
+            : t("share.status.copyFailed"),
+        });
+      }
+    } catch (error) {
+      if (isShareCancellation(error)) {
+        emitShareEvent(channel, "cancelled", payload);
+      } else {
+        emitShareEvent(channel, "failed", payload);
+        setNotice({ kind: "error", message: t("share.status.failed") });
+      }
     } finally {
       setBusy(null);
     }
@@ -306,6 +339,27 @@ export function ShareDialog({ payload, trigger, defaultOpen = false }: ShareDial
                 {t("share.social.kakao")}
               </button>
             )}
+            {(["instagram", "tiktok"] as const).map((channel) => (
+              <button
+                key={channel}
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void runAppShare(channel)}
+                className={CHANNEL_CLASS}
+              >
+                <span className={cn(
+                  "grid size-9 place-items-center rounded-full text-sm font-black text-white",
+                  channel === "instagram"
+                    ? "bg-gradient-to-br from-fuchsia-500 via-rose-500 to-amber-400"
+                    : "bg-black",
+                )}>
+                  {busy === channel
+                    ? <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+                    : channel === "instagram" ? "◎" : "♪"}
+                </span>
+                {channel === "instagram" ? "Instagram" : "TikTok"}
+              </button>
+            ))}
             {LINK_CHANNELS.map((option) => {
               const email = option.channel === "email";
               return (
@@ -399,8 +453,10 @@ export function ShareDialog({ payload, trigger, defaultOpen = false }: ShareDial
 
           <p className="mt-4 text-center text-[0.68rem] leading-relaxed text-fg-3">
             {nativeAvailable
-              ? t("share.nativeHint")
-              : t("share.desktopHint")}
+              ? bt("Instagram·TikTok은 시스템 공유 시트에서 앱을 선택합니다. 브라우저는 특정 앱을 강제로 지정하지 않습니다.", "For Instagram and TikTok, choose the app from the system share sheet; browsers cannot force a specific target app.")
+              : bt("Instagram·TikTok 직접 호출이 지원되지 않는 환경에서는 링크를 복사해 앱에서 붙여 넣습니다.", "When direct app sharing is unavailable, the link is copied so you can paste it into Instagram or TikTok.")}
+            {" · "}
+            {nativeAvailable ? t("share.nativeHint") : t("share.desktopHint")}
           </p>
         </Dialog.Content>
       </Dialog.Portal>

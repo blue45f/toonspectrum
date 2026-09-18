@@ -2,6 +2,8 @@ import { STUDIO_PROJECT_NAVIGATION } from "./studio-product-ia";
 
 export const STUDIO_ROUTE_IDS = [
   "home",
+  "support",
+  "environment",
   "new",
   "import",
   "templates",
@@ -81,6 +83,8 @@ function route(
 
 export const STUDIO_ROUTE_REGISTRY: readonly StudioRouteRegistration[] = Object.freeze([
   route("home", "/studio", "studio", "none", "내 작업", "My work", ["/creator-hub"]),
+  route("support", "/studio/support", "reference", "none", "작가 지원", "Creator support"),
+  route("environment", "/studio/environment", "reference", "none", "사용 환경", "Environment guide"),
   route("new", "/studio/new", "studio", "none", "새로 만들기", "Create new", ["/make"]),
   route("import", "/studio/import", "studio", "none", "가져오기", "Import"),
   route("templates", "/studio/templates", "studio", "none", "템플릿", "Templates"),

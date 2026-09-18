@@ -22,7 +22,9 @@ import {
   StudioAssetHubPage,
   StudioBrushLabPage,
   StudioCharacterConversionPage,
+  StudioCreatorSupportPage,
   StudioDocumentWorkspaceRoute,
+  StudioEnvironmentGuidePage,
   StudioHomePage,
   StudioImportPage,
   StudioImmersiveHubPage,
@@ -51,6 +53,8 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-ecosystem-viewer", path: studioRoutePath("ecosystem-viewer"), element: <CreatorEcosystemViewerPage /> },
   // Canonical ToonStudio front door. Exact routes intentionally precede the editor wildcard.
   { id: "creator-studio-home", path: studioRoutePath("home"), element: <StudioHomeEntryRoute home={<StudioHomePage />} legacy={<StudioRouter />} /> },
+  { id: "creator-studio-support", path: studioRoutePath("support"), element: <StudioCreatorSupportPage /> },
+  { id: "creator-studio-environment", path: studioRoutePath("environment"), element: <StudioEnvironmentGuidePage /> },
   { id: "creator-studio-generative", path: studioRoutePath("generate"), element: <StudioGenerativePage /> },
   { id: "creator-studio-toolchain", path: studioRoutePath("toolchain"), element: <StudioProductionToolchainPage /> },
   { id: "creator-studio-engines", path: studioRoutePath("engines"), element: <StudioEngineCenterPage /> },

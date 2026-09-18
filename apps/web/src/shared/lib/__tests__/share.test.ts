@@ -49,6 +49,12 @@ describe("share URL normalization", () => {
   it("공유 문구의 연속 공백과 줄바꿈을 정리한다", () => {
     expect(shareText(payload)).toBe("여러 줄의 소개");
   });
+
+  it.each(["instagram", "tiktok"] as const)("%s 앱 공유에도 채널별 UTM을 붙인다", (channel) => {
+    const attributed = new URL(withShareAttribution(payload.url, channel));
+    expect(attributed.searchParams.get("utm_source")).toBe(channel);
+    expect(attributed.searchParams.get("utm_medium")).toBe("social");
+  });
 });
 
 describe("share channel targets", () => {
