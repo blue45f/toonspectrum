@@ -23,19 +23,18 @@ interface StudioP2pVirtualStudioProps {
   onNearbyChange: (sessionIds: string[]) => void;
 }
 
-const activityLabels: Record<StudioP2pSpaceActivity, string> = {
-  available: "대화 가능",
-  focused: "집중 작업",
-  reviewing: "리뷰 중",
-  away: "잠시 자리 비움",
-};
-
 function activityLabel(activity: StudioP2pSpaceActivity): string {
-  return translateCurrentStaticSourceText(
-    "domains.creator.live.huddle.StudioP2pVirtualStudio",
-    "ko",
-    activityLabels[activity],
-  );
+  const scope = "domains.creator.live.huddle.StudioP2pVirtualStudio";
+  switch (activity) {
+    case "focused":
+      return translateCurrentStaticSourceText(scope, "ko", "집중 작업");
+    case "reviewing":
+      return translateCurrentStaticSourceText(scope, "ko", "리뷰 중");
+    case "away":
+      return translateCurrentStaticSourceText(scope, "ko", "잠시 자리 비움");
+    default:
+      return translateCurrentStaticSourceText(scope, "ko", "대화 가능");
+  }
 }
 
 export function StudioP2pVirtualStudio({
