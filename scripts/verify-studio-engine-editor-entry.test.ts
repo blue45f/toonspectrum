@@ -38,23 +38,14 @@ describe("production engine verifier entry", () => {
     expect(job).not.toContain("continue-on-error");
     expect(job).not.toContain("|| true");
   });
-
-  it("executes each engine regression exactly once through the mandatory CI shard runner", () => {
+  it("executes each engine regression exactly once through the mandatory manifest runner", () => {
     const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
     const staticJob = workflow.split("  static:")[1]?.split("  serial:")[0] ?? "";
-    const manifest = readFileSync(
-      new URL("ci-required-vitest-targets.txt", import.meta.url),
+    const targets = readFileSync(
+      new URL("./ci-required-vitest-targets.txt", import.meta.url),
       "utf8",
-    )
-      .split(/\r?\n/u)
-      .map((line) => line.trim())
-      .filter(Boolean);
-    const shardRunner = 'node scripts/ci-core-regression-shards.mjs "${{ matrix.shard }}"';
-
-    expect(staticJob).toContain("- studio-foundation");
-    expect(staticJob.split(shardRunner)).toHaveLength(2);
-    expect(staticJob).not.toContain("continue-on-error");
-
+    ).trim().split(/\r?\n/u);
+    expect(staticJob.match(/node scripts\/run-core-vitest\.mjs/gu)).toHaveLength(1);
     for (const target of [
       "scripts/verify-studio-engine-editor-entry.test.ts",
       "scripts/verify-studio-hokusai-live-integration.test.ts",
@@ -63,8 +54,8 @@ describe("production engine verifier entry", () => {
       "scripts/verify-studio-hybrid-dcc-opfs-race.test.ts",
     ]) {
       expect(
-        manifest.filter((entry) => entry === target),
-        `${target} must remain registered exactly once in the mandatory shard manifest`,
+        targets.filter((candidate) => candidate === target),
+        `${target} must remain mandatory without duplicate execution`,
       ).toHaveLength(1);
     }
   });

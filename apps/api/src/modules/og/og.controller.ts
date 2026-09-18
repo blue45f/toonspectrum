@@ -1,4 +1,4 @@
-import { Controller, Get, Headers, Query, Res } from "@nestjs/common";
+import { Controller, Get, Headers, Inject, Query, Res } from "@nestjs/common";
 
 import { getAuthorData } from "../../../../../packages/core/src/server";
 import { getFanPost } from "../../server/community";
@@ -12,6 +12,7 @@ import { CollaborationRepository } from "../collaboration/collaboration.reposito
 import { CreatorMarketplaceService } from "../creator-marketplace/creator-marketplace.service";
 import { PromotionService } from "../promotion/promotion.service";
 import { renderOgPage } from "./og-page";
+import { PUBLIC_SHARE_OG_READERS } from "./og-readers";
 
 import type { Response } from "express";
 
@@ -20,7 +21,10 @@ export class OgController {
   private readonly collaboration = new CollaborationRepository();
   private readonly promotion = new PromotionService();
 
-  constructor(private readonly marketplace: CreatorMarketplaceService) {}
+  constructor(
+    @Inject(CreatorMarketplaceService)
+    private readonly marketplace: CreatorMarketplaceService,
+  ) {}
 
   @Get("og")
   async render(
@@ -33,14 +37,7 @@ export class OgController {
       userAgent,
       canonicalHost: process.env.CANONICAL_HOST,
       readers: {
-        readAuthor: (name) => getAuthorData(encodeURIComponent(name)),
-        readCreatorProfile: (userId) => getCreatorPublicProfile(userId),
-        readCreatorWork: (identifier) => getWork(identifier),
-        readCreatorSeries: (identifier) => getSeries(identifier),
-        readCommunityPost: (identifier) => getFanPost(identifier),
-        readCommunityCafe: (slug) => getGovernedCafeBySlug(slug, null),
-        readCollaboration: (identifier) => this.collaboration.get(identifier),
-        readPromotion: (identifier) => this.promotion.accessible(identifier),
+        ...PUBLIC_SHARE_OG_READERS,
         readMarketResource: (identifier) => this.marketplace.getById(identifier),
       },
     });

@@ -1,8 +1,12 @@
+import { generateKeyPairSync, sign as signPayload } from "node:crypto";
+
 import { afterEach, describe, it, expect, vi } from "vitest";
 
 import {
+  appleNonceForState,
   buildAuthorizeUrl,
   canAutoLinkOAuthEmail,
+  createAppleClientSecret,
   createPkceCodeChallenge,
   handleOAuthCallback,
   isAuthorizationCodeFlowConfigured,
@@ -13,7 +17,9 @@ import {
   isOAuthProvider,
   providerMode,
   listAuthProviders,
+  parseAppleUserName,
   selectGitHubVerifiedEmail,
+  verifyAppleIdentityToken,
 } from "../../../../../../apps/api/src/server/oauth";
 
 afterEach(() => {
@@ -85,8 +91,9 @@ describe("OAuth signed state (CSRF 방어)", () => {
 });
 
 describe("OAuth provider 유틸", () => {
-  it("isOAuthProvider는 google/kakao/naver/github만 허용하고 폐기된 Toss 인증은 거부", () => {
+  it("isOAuthProvider는 google/apple/kakao/naver/github만 허용하고 폐기된 Toss 인증은 거부", () => {
     expect(isOAuthProvider("google")).toBe(true);
+    expect(isOAuthProvider("apple")).toBe(true);
     expect(isOAuthProvider("kakao")).toBe(true);
     expect(isOAuthProvider("naver")).toBe(true);
     expect(isOAuthProvider("github")).toBe(true);
@@ -96,11 +103,17 @@ describe("OAuth provider 유틸", () => {
 
   it("자격 증명이 없는 공급자는 운영과 기본 개발 환경에서 안전하게 비활성화한다", () => {
     expect(providerMode("google")).toBe("disabled");
+    expect(providerMode("apple")).toBe("disabled");
     expect(providerMode("github")).toBe("disabled");
     expect(providerMode("kakao")).toBe("disabled");
     expect(providerMode("naver")).toBe("disabled");
     const list = listAuthProviders();
     expect(list.google.mode).toBe("disabled");
+    expect(list.apple).toMatchObject({
+      mode: "disabled",
+      reason: "missing-credentials",
+      redirectAvailable: false,
+    });
     expect(list.github).toMatchObject({
       mode: "disabled",
       reason: "missing-credentials",
@@ -147,6 +160,73 @@ describe("OAuth provider 유틸", () => {
       "https://www.toonstudio.cloud/api/auth/oauth/google/callback",
     );
     expect(url.searchParams.get("state")).toBe("signed-state");
+  });
+
+  it("Apple OAuth는 Services ID·form_post·nonce와 ES256 client-secret을 사용한다", () => {
+    const { privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
+    vi.stubEnv("APPLE_SERVICE_ID", "cloud.toonstudio.web");
+    vi.stubEnv("APPLE_TEAM_ID", "TEAMID1234");
+    vi.stubEnv("APPLE_KEY_ID", "KEYID12345");
+    vi.stubEnv("APPLE_PRIVATE_KEY", privateKey.export({ type: "pkcs8", format: "pem" }).toString());
+    vi.stubEnv("OAUTH_REDIRECT_BASE_URL", "https://www.toonstudio.cloud");
+
+    expect(providerMode("apple")).toBe("oauth");
+    expect(isAuthorizationCodeFlowConfigured("apple")).toBe(true);
+    const url = new URL(buildAuthorizeUrl("apple", "apple-state")!);
+    expect(url.origin).toBe("https://appleid.apple.com");
+    expect(url.pathname).toBe("/auth/authorize");
+    expect(url.searchParams.get("redirect_uri")).toBe(
+      "https://www.toonstudio.cloud/api/auth/oauth/apple/callback",
+    );
+    expect(url.searchParams.get("response_mode")).toBe("form_post");
+    expect(url.searchParams.get("scope")).toBe("name email");
+    expect(url.searchParams.get("nonce")).toBe(appleNonceForState("apple-state"));
+
+    const secret = createAppleClientSecret(1_800_000_000_000);
+    const [, payloadPart] = secret.split(".");
+    const payload = JSON.parse(Buffer.from(payloadPart, "base64url").toString("utf8"));
+    expect(payload).toMatchObject({
+      iss: "TEAMID1234",
+      aud: "https://appleid.apple.com",
+      sub: "cloud.toonstudio.web",
+    });
+  });
+
+  it("Apple ID token은 JWKS 서명·issuer·audience·nonce를 모두 검증한다", async () => {
+    const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    vi.stubEnv("APPLE_SERVICE_ID", "cloud.toonstudio.web");
+    const state = "apple-browser-bound-state";
+    const now = 1_800_000_000_000;
+    const headerPart = Buffer.from(JSON.stringify({ alg: "RS256", kid: "APPLEKEY01" })).toString("base64url");
+    const payloadPart = Buffer.from(JSON.stringify({
+      iss: "https://appleid.apple.com",
+      aud: "cloud.toonstudio.web",
+      sub: "apple-team-user-123",
+      iat: Math.floor(now / 1000) - 10,
+      exp: Math.floor(now / 1000) + 300,
+      nonce: appleNonceForState(state),
+      email: "PRIVATE@privaterelay.appleid.com",
+      email_verified: "true",
+    })).toString("base64url");
+    const signingInput = `${headerPart}.${payloadPart}`;
+    const signature = signPayload(
+      "RSA-SHA256",
+      Buffer.from(signingInput, "ascii"),
+      privateKey,
+    ).toString("base64url");
+    const jwk = publicKey.export({ format: "jwk" });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({
+      keys: [{ ...jwk, kid: "APPLEKEY01", alg: "RS256", use: "sig" }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+
+    await expect(verifyAppleIdentityToken(`${signingInput}.${signature}`, state, now)).resolves.toMatchObject({
+      providerAccountId: "apple-team-user-123",
+      email: "private@privaterelay.appleid.com",
+      emailVerified: true,
+    });
+    expect(parseAppleUserName(JSON.stringify({
+      name: { firstName: " Hee ", lastName: " Jun\u0000Kim " },
+    }))).toBe("Hee Jun Kim");
   });
 
   it("GitHub OAuth는 최소 이메일 범위·PKCE와 정확한 callback을 사용한다", () => {
@@ -245,6 +325,7 @@ describe("OAuth provider 유틸", () => {
     expect(canAutoLinkOAuthEmail("naver", true)).toBe(false);
     expect(canAutoLinkOAuthEmail("naver", false)).toBe(false);
     expect(canAutoLinkOAuthEmail("google", true)).toBe(false);
+    expect(canAutoLinkOAuthEmail("apple", true)).toBe(false);
     expect(canAutoLinkOAuthEmail("kakao", true)).toBe(false);
     expect(canAutoLinkOAuthEmail("github", true)).toBe(false);
   });

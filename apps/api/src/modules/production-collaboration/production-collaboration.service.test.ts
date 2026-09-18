@@ -358,6 +358,106 @@ describe("ProductionCollaborationService", () => {
     expect(submissionResult.aggregate.auditEvents.at(-1)?.action).toBe("upsert-submission");
   });
 
+  it("binds an approved Studio revision to the production deliverable and episode", async () => {
+    const visualRevision = {
+      id: "studio-thumbnail-r2",
+      lineage: "visual" as const,
+      revision: 2,
+      digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      createdAt: at,
+    };
+    const ownerAssignmentId = "assignment:party-owner:producer";
+    const current: ProductionProjectAggregate = {
+      ...aggregate(),
+      episodes: [{
+        id: "episode-collaboration-12",
+        projectId: "project-1",
+        episodeId: "episode-12",
+        revision: 0,
+        state: "thumbnail-joint-review",
+        narrativeRevisionRef: null,
+        visualRevisionRef: null,
+        integratedRevisionRef: null,
+        activeHandoffId: null,
+        openBlockerCount: 0,
+        storyLockApproved: true,
+        thumbnailLockApproved: false,
+        jointProofApproved: false,
+        creditPreflightPassed: false,
+        publicationPreflightPassed: false,
+        updatedAt: at,
+      }],
+      deliverables: [{
+        id: "deliverable-thumbnail-12",
+        projectId: "project-1",
+        scope: episodeScope("project-1", "episode-12"),
+        type: "thumbnail",
+        expectedFormat: "studio-document",
+        completionCriteria: ["전체 컷 배치"],
+        currentSubmissionId: "submission-thumbnail-12-r2",
+        approvedSubmissionId: "submission-thumbnail-12-r2",
+      }],
+      submissions: [{
+        id: "submission-thumbnail-12-r2",
+        projectId: "project-1",
+        deliverableId: "deliverable-thumbnail-12",
+        revisionRef: visualRevision,
+        submittedByAssignmentId: ownerAssignmentId,
+        submittedAt: at,
+        status: "approved",
+        inputRevisionRefs: [],
+        evidenceRefs: ["approval-thumbnail-12-r2"],
+      }],
+      studioRevisionLinks: [],
+    };
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current, {
+      view: true,
+      comment: true,
+      edit: true,
+      manage: true,
+      owner: true,
+      role: "owner",
+    }));
+
+    const result = await service().executeCommand("owner-1", "project-1", {
+      expectedRevision: 0,
+      mutationId: "99999999-9999-4999-8999-999999999999",
+      command: {
+        type: "upsert-studio-revision-link",
+        link: {
+          id: "studio-link-thumbnail-12-r2",
+          projectId: "project-1",
+          workId: "work-1",
+          episodeId: "episode-12",
+          studioDocumentRef: "document-thumbnail-12",
+          documentRole: "thumbnail",
+          studioRevisionRef: visualRevision,
+          deliverableId: "deliverable-thumbnail-12",
+          submissionId: "submission-thumbnail-12-r2",
+          linkedByAssignmentId: ownerAssignmentId,
+          status: "approved",
+          linkedAt: at,
+          approvedAt: at,
+        },
+      },
+    });
+
+    expect(result.aggregate.studioRevisionLinks).toHaveLength(1);
+    expect(result.aggregate.episodes[0]?.visualRevisionRef).toEqual(visualRevision);
+    expect(result.derived).toMatchObject({
+      coverage: {
+        approvedRoles: ["thumbnail"],
+        pendingRoles: [],
+        missingRoles: [],
+      },
+    });
+    expect(result.aggregate.auditEvents.at(-1)).toMatchObject({
+      action: "upsert-studio-revision-link",
+      targetType: "studio-revision-link",
+      targetId: "studio-link-thumbnail-12-r2",
+    });
+  });
+
   it("archives immutable procurement scope revisions behind an Addendum", async () => {
     const revision = {
       id: "story-r1",
@@ -909,6 +1009,131 @@ describe("ProductionCollaborationService", () => {
     expect(result.counts.inProgress).toBe(1);
   });
 
+  it("rejects a guarded task batch when a task changed after the recovery preview", async () => {
+    const base = aggregate();
+    const task = {
+      id: "task-guarded",
+      projectId: base.projectId,
+      scope: { kind: "project" as const, id: base.projectId, ancestors: [] },
+      processKey: "line-art",
+      title: "선화",
+      status: "in-progress" as const,
+      assignmentIds: [],
+      reviewerAssignmentIds: [],
+      inputRevisionRefs: [],
+      outputDeliverableIds: [],
+      dependencyTaskIds: [],
+      dueAt: "2026-09-20T00:00:00.000Z",
+      estimateHours: { optimistic: 4, likely: 6, pessimistic: 8 },
+      completionCriteria: ["완료"],
+      sourceAgreementMilestoneId: null,
+    };
+    const current: ProductionProjectAggregate = { ...base, tasks: [task] };
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current, {
+      view: true,
+      comment: true,
+      edit: true,
+      manage: true,
+      owner: true,
+      role: "owner",
+    }));
+
+    await expect(service().executeCommand("owner-1", base.projectId, {
+      expectedRevision: 0,
+      mutationId: "13131313-1313-4313-8313-131313131313",
+      command: {
+        type: "upsert-task-batch",
+        tasks: [{ ...task, dueAt: "2026-09-22T00:00:00.000Z" }],
+        expectedTasks: [{ ...task, status: "ready" }],
+      },
+    })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it("persists automation tasks, notifications and rule state in one aggregate revision", async () => {
+    const current = aggregate();
+    const assignmentId = current.assignments[0]!.id;
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current, {
+      view: true,
+      comment: true,
+      edit: true,
+      manage: true,
+      owner: true,
+      role: "owner",
+    }));
+    const task = {
+      id: "automation-task:atomic",
+      projectId: current.projectId,
+      scope: { kind: "project" as const, id: current.projectId, ancestors: [] },
+      processKey: "producer-follow-up",
+      title: "지연 원인 확인",
+      status: "ready" as const,
+      assignmentIds: [assignmentId],
+      reviewerAssignmentIds: [],
+      inputRevisionRefs: [],
+      outputDeliverableIds: [],
+      dependencyTaskIds: [],
+      dueAt: "2026-09-17T13:00:00.000Z",
+      estimateHours: { optimistic: 1, likely: 2, pessimistic: 4 },
+      completionCriteria: ["원인 확인"],
+      sourceAgreementMilestoneId: null,
+    };
+    const notification = {
+      id: "automation-notification:atomic",
+      projectId: current.projectId,
+      assignmentId,
+      type: "automation" as const,
+      title: "지연 조치",
+      body: "마감이 지났습니다.",
+      href: `/production/projects/${current.projectId}/control`,
+      urgency: "critical" as const,
+      sourceType: "automation:rule:task",
+      sourceId: task.id,
+      status: "unread" as const,
+      createdAt: at,
+      readAt: null,
+    };
+    const rule = {
+      id: "automation-rule-atomic",
+      projectId: current.projectId,
+      name: "지연 조치",
+      trigger: "due-passed" as const,
+      conditions: [],
+      actions: [{
+        type: "notify" as const,
+        assignmentIds: [assignmentId],
+        urgency: "critical" as const,
+        message: "마감이 지났습니다.",
+      }],
+      failurePolicy: "require-review" as const,
+      enabled: true,
+      revision: 2,
+      lastEvaluatedAt: at,
+      createdByAssignmentId: assignmentId,
+      updatedAt: at,
+    };
+
+    const result = await service().executeCommand("owner-1", current.projectId, {
+      expectedRevision: 0,
+      mutationId: "14141414-1414-4414-8414-141414141414",
+      command: {
+        type: "apply-automation-execution",
+        tasks: [task],
+        notifications: [notification],
+        evaluatedRules: [rule],
+      },
+    });
+
+    expect(result.aggregate).toMatchObject({ revision: 1 });
+    expect(result.aggregate.tasks).toEqual([task]);
+    expect(result.aggregate.notifications).toEqual([notification]);
+    expect(result.aggregate.automationRules).toEqual([rule]);
+    expect(result.derived).toEqual({
+      taskCount: 1,
+      notificationCount: 1,
+      evaluatedRuleCount: 1,
+    });
+  });
+
   it("projects only token-scoped immutable submissions to an external reviewer", async () => {
     const current = aggregateWithExternalReview();
     repository.getPublicProject.mockResolvedValue(current);
@@ -931,6 +1156,10 @@ describe("ProductionCollaborationService", () => {
         deliverable: { type: "integrated-webtoon" },
       }],
     });
+    expect(result.submissions[0]).toMatchObject({
+      evidenceRefs: [],
+      protectedEvidenceCount: 1,
+    });
     expect(result).not.toHaveProperty("assignments");
     expect(result).not.toHaveProperty("externalReviewAccesses");
   });
@@ -942,9 +1171,9 @@ describe("ProductionCollaborationService", () => {
     const result = await service().submitExternalReview(
       current.projectId,
       "external-review-1",
-      externalReviewToken,
       {
         responseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        token: externalReviewToken,
         reviewerName: "외부 편집자",
         decision: "request-changes",
         note: "마지막 컷 식자를 수정해 주세요.",
@@ -984,9 +1213,9 @@ describe("ProductionCollaborationService", () => {
     const result = await service().submitExternalReview(
       current.projectId,
       "external-review-1",
-      externalReviewToken,
       {
         responseId: existing.id,
+        token: externalReviewToken,
         reviewerName: existing.reviewerName,
         decision: existing.decision,
         note: existing.note,
@@ -994,6 +1223,55 @@ describe("ProductionCollaborationService", () => {
     );
 
     expect(result.review.responses).toEqual([existing]);
+  });
+
+  it("rejects an active token that does not include view permission", async () => {
+    const base = aggregateWithExternalReview();
+    const current: ProductionProjectAggregate = {
+      ...base,
+      externalReviewAccesses: base.externalReviewAccesses.map((access) => ({
+        ...access,
+        permissions: ["comment"],
+      })),
+    };
+    repository.getPublicProject.mockResolvedValue(current);
+
+    await expect(service().getExternalReview(
+      current.projectId,
+      "external-review-1",
+      externalReviewToken,
+    )).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("rate limits response floods while preserving append-only review history", async () => {
+    const base = aggregateWithExternalReview();
+    const now = Date.now();
+    const current: ProductionProjectAggregate = {
+      ...base,
+      externalReviewAccesses: base.externalReviewAccesses.map((access) => ({
+        ...access,
+        responses: Array.from({ length: 60 }, (_, index) => ({
+          id: `response-flood-${index}`,
+          reviewerName: "외부 검수자",
+          decision: "comment" as const,
+          note: `응답 ${index}`,
+          createdAt: new Date(now - index * 1_000).toISOString(),
+        })),
+      })),
+    };
+    repository.mutatePublicReview.mockImplementation(async (input) => input.mutate(current));
+
+    await expect(service().submitExternalReview(
+      current.projectId,
+      "external-review-1",
+      externalReviewToken,
+      {
+        responseId: "15151515-1515-4515-8515-151515151515",
+        reviewerName: "외부 검수자",
+        decision: "comment",
+        note: "추가 응답",
+      },
+    )).rejects.toMatchObject({ status: 429 });
   });
 
   it("rejects invalid or expired public review tokens without revealing link existence", async () => {
@@ -1005,99 +1283,6 @@ describe("ProductionCollaborationService", () => {
       "external-review-1",
       "b".repeat(64),
     )).rejects.toMatchObject({ status: 404 });
-  });
-
-  it("audits risk response transitions and requires manage capability for approval", async () => {
-    const base = aggregate();
-    const ownerAssignmentId = base.assignments[0]!.id;
-    const current: ProductionProjectAggregate = {
-      ...base,
-      risks: [{
-        id: "risk-test",
-        projectId: "project-1",
-        revision: 1,
-        scope: { kind: "project", id: "project-1", ancestors: [] },
-        category: "schedule",
-        source: "manual",
-        signalIds: [],
-        title: "게시 일정 위험",
-        description: "후행 작업 지연 가능성이 있습니다.",
-        probability: 3,
-        impact: 4,
-        exposureScore: 12,
-        severity: "warning",
-        priorityScore: 48,
-        ownerAssignmentId,
-        causeCodes: ["manual"],
-        earlySignals: [],
-        mitigation: "작업을 분할합니다.",
-        contingency: "게시 일정을 조정합니다.",
-        trigger: "직접 등록",
-        affectedTaskIds: [],
-        affectedEpisodeIds: [],
-        affectedMilestoneIds: [],
-        baselineDueAt: null,
-        forecastDueAt: null,
-        varianceHours: null,
-        status: "open",
-        dueAt: null,
-        responseDueAt: null,
-        nextReviewAt: null,
-        acceptedReason: null,
-        dismissedReason: null,
-        resolutionSummary: null,
-        detectedAt: at,
-        lastEvaluatedAt: at,
-        occurredAt: null,
-        resolvedAt: null,
-        closedAt: null,
-        createdAt: at,
-        updatedAt: at,
-      }],
-      riskResponses: [{
-        id: "risk-response-test",
-        projectId: "project-1",
-        riskId: "risk-test",
-        strategy: "mitigate",
-        actionType: "split-task",
-        title: "작업 분할",
-        description: "선화 작업을 나눕니다.",
-        ownerAssignmentId,
-        dueAt: null,
-        linkedTaskId: null,
-        linkedChangeRequestId: null,
-        linkedChangeOrderId: null,
-        expectedEffect: "예상 지연 감소",
-        actualEffect: null,
-        status: "proposed",
-        createdAt: at,
-        completedAt: null,
-      }],
-    };
-    repository.mutateProject.mockImplementation(async (input) => {
-      expect(input.requiredCapability).toBe("manage");
-      return input.mutate(current, {
-        view: true, comment: true, edit: true, manage: true, owner: true, role: "owner",
-      });
-    });
-
-    const result = await service().executeCommand("owner-1", "project-1", {
-      expectedRevision: 0,
-      mutationId: "13131313-1313-4313-8313-131313131313",
-      command: {
-        type: "transition-risk-response",
-        responseId: "risk-response-test",
-        toStatus: "approved",
-        actualEffect: null,
-      },
-    });
-
-    expect(result.aggregate.riskResponses[0]?.status).toBe("approved");
-    expect(result.aggregate.auditEvents.at(-1)).toMatchObject({
-      action: "transition-risk-response",
-      targetType: "risk-response",
-      targetId: "risk-response-test",
-    });
   });
 
 });

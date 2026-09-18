@@ -530,6 +530,7 @@ export function AuthModal({
             || providers.kakao
             || providers.google
             || providers.naver
+            || providers.apple
             || providers.github) && (
             <>
               <div className="my-4 flex items-center gap-3 text-[0.7rem] text-fg-3">
@@ -598,6 +599,16 @@ export function AuthModal({
                     className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#03C75A] text-sm font-semibold text-white transition-opacity hover:opacity-90"
                   >
                     {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "네이버로 계속하기")}{providers.naver.mode === "demo" && <DemoTag dark />}
+                  </button>
+                )}
+                {providers.apple && (
+                  <button
+                    type="button"
+                    onClick={() => signIn("apple")}
+                    className="flex h-11 items-center justify-center gap-2 rounded-xl border border-line-strong bg-black text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                  >
+                    <span className="text-lg leading-none" aria-hidden="true"></span>
+                    Apple로 계속하기
                   </button>
                 )}
                 {providers.github && (

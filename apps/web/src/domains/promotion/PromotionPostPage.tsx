@@ -9,7 +9,7 @@ import {
   PenLine,
   Share2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import {
@@ -33,13 +33,17 @@ import {
 import { getApiErrorMessage } from "@/infrastructure/api";
 import { promotionClient } from "@/infrastructure/promotion-client";
 import { ThreadedCommentSection } from "@/shared/components/comments/threaded-comment-section";
-import { ShareDialog } from "@/shared/components/share-dialog";
 import {
   canSharePromotionPost,
   compactPublicShareDescription,
   publicShareImageUrl,
 } from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
+
+const ShareDialog = lazy(async () => {
+  const module = await import("@/shared/components/share-dialog");
+  return { default: module.ShareDialog };
+});
 
 export function PromotionPostPage() {
   const { id = "" } = useParams();
@@ -229,20 +233,23 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
                 {post.saved ? translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "저장됨") : translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "작품 저장")}
               </button>
               {shareable ? (
-                <ShareDialog
-                  payload={{
-                    title: shareTitle,
-                    text: shareDescription,
-                    url: sharePath,
-                    imageUrl: shareImage,
-                    buttonLabel: "소개 보기",
-                  }}
-                  trigger={
-                    <button className="pc-button" type="button">
-                      <Share2 size={16} aria-hidden />
-                      {translateCurrentStaticSourceText("domains.promotion.PromotionPostPage", "ko", "게시물 공유")}</button>
-                  }
-                />
+                <Suspense fallback={null}>
+                  <ShareDialog
+                    payload={{
+                      title: shareTitle,
+                      text: shareDescription,
+                      url: sharePath,
+                      imageUrl: shareImage,
+                      buttonLabel: "소개 보기",
+                    }}
+                    trigger={
+                      <button className="pc-button" type="button">
+                        <Share2 size={16} aria-hidden />
+                        게시물 공유
+                      </button>
+                    }
+                  />
+                </Suspense>
               ) : null}
             </div>
 

@@ -357,6 +357,7 @@ describe("bootstrap SQL and repository contract", () => {
 
   test("redacts raw URLs, decoded passwords and encoded password forms", () => {
     const url =
+      // secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic redaction fixture
       "postgresql://migrator:p%40ssword@db.example.test/app?sslmode=verify-full";
     const redacted = redactDatabaseSecrets(
       `failed for ${url}; password=p@ssword; encoded=p%40ssword`,

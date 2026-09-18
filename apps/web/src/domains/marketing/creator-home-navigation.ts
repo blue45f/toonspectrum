@@ -9,8 +9,6 @@ export const CREATOR_HOME_SECTIONS = [
 const EXPERIENCE_SECTIONS = [
   { id: "creator-start", headingId: "creator-toolkit-title", ko: "바로 시작", en: "Start here" },
   { id: "creator-flow", headingId: "creator-process-title", ko: "전체 제작 흐름", en: "Full workflow" },
-  { id: "creator-principles", headingId: "creator-principles-title", ko: "창작자 원칙", en: "Creator principles" },
-  { id: "creator-principles-title", headingId: "creator-principles-title", ko: "창작자 원칙", en: "Creator principles" },
   { id: "creator-support", headingId: "creator-support-title", ko: "소재·협업·도움", en: "Assets, people & help" },
 ] as const;
 

@@ -1,6 +1,7 @@
 import {
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
   PreconditionFailedException,
@@ -10,7 +11,6 @@ import {
 import type {
   CommitStudioRevision,
   CreateCompatibilityReport,
-  CreateStudioExternalFileBinding,
   CreateStudioArtifact,
   CreateStudioProjectGraph,
   CreateStudioReview,
@@ -19,9 +19,7 @@ import type {
   ResolveStudioReviewComment,
   RestoreStudioRevision,
   RegisterStudioBlob,
-  UpdateStudioExternalFileBinding,
 } from "./studio-project-graph.dto";
-import { StudioExternalFileBindingRepository } from "./studio-external-file-binding.repository";
 import {
   StudioBlobMetadataConflictError,
   StudioBlobNotReadyError,
@@ -38,7 +36,9 @@ import {
 @Injectable()
 export class StudioProjectGraphService {
   constructor(
+    @Inject(StudioProjectGraphRepository)
     private readonly repository: StudioProjectGraphRepository,
+    @Inject(StudioExternalFileBindingRepository)
     private readonly externalBindings: StudioExternalFileBindingRepository,
   ) {}
 
@@ -246,30 +246,6 @@ export class StudioProjectGraphService {
   ) {
     return this.execute(() =>
       this.repository.createCompatibilityReport(actorUserId, projectId, input));
-  }
-
-  listExternalFileBindings(actorUserId: string, artifactId: string) {
-    return this.execute(() => this.externalBindings.list(actorUserId, artifactId));
-  }
-
-  createExternalFileBinding(
-    actorUserId: string,
-    artifactId: string,
-    input: CreateStudioExternalFileBinding,
-  ) {
-    return this.execute(() => this.externalBindings.create(actorUserId, artifactId, input));
-  }
-
-  updateExternalFileBinding(
-    actorUserId: string,
-    bindingId: string,
-    input: UpdateStudioExternalFileBinding,
-  ) {
-    return this.execute(() => this.externalBindings.update(actorUserId, bindingId, input));
-  }
-
-  removeExternalFileBinding(actorUserId: string, bindingId: string) {
-    return this.execute(() => this.externalBindings.remove(actorUserId, bindingId));
   }
 
   approveCompatibilityReport(actorUserId: string, reportId: string) {

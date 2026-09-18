@@ -22,7 +22,6 @@ const WEBGPU: StudioScene3dDeviceCapabilities = Object.freeze({
 function document(transparentBackground = false) {
   return projectStudioBg3dDocumentToScene3d({
     documentId: "npr-test",
-    viewportAspectRatio: 1,
     source: {
       ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
       output: {

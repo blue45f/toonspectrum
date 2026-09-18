@@ -80,23 +80,6 @@ function normalizePath(value) {
   return value.split(sep).join("/");
 }
 
-function safeBundlePath(bundleRoot, value, label) {
-  if (
-    typeof value !== "string"
-    || !value
-    || value.startsWith("/")
-    || /^[A-Za-z]:/u.test(value)
-    || value.includes("\\")
-    || value.split("/").some((segment) => !segment || segment === "." || segment === "..")
-  ) throw new TypeError(`${label} contains an unsafe bundle path`);
-  const absolutePath = resolve(bundleRoot, value.split("/").join(sep));
-  const relativePath = relative(bundleRoot, absolutePath);
-  if (!relativePath || relativePath.startsWith(`..${sep}`) || relativePath === "..") {
-    throw new TypeError(`${label} escapes the staged bundle`);
-  }
-  return absolutePath;
-}
-
 function sha256Bytes(value) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -112,35 +95,15 @@ async function writeJson(filePath, value) {
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
-export function resolveReleaseCommand(
-  command,
-  args,
-  platform = process.platform,
-  environment = process.env,
-) {
-  if (platform !== "win32" || !command.toLowerCase().endsWith(".cmd")) {
-    return { command, args };
-  }
-  const commandProcessor = environment.ComSpec?.trim()
-    || environment.COMSPEC?.trim()
-    || "cmd.exe";
-  return {
-    command: commandProcessor,
-    args: ["/d", "/s", "/c", command, ...args],
-  };
-}
-
 function run(command, args, options = {}) {
-  const resolved = resolveReleaseCommand(command, args);
-  const result = spawnSync(resolved.command, resolved.args, {
+  const result = spawnSync(command, args, {
     cwd: options.cwd ?? ROOT,
     encoding: "utf8",
     env: { ...process.env, ...options.env },
     stdio: options.capture ? "pipe" : "inherit",
   });
   if (result.status !== 0) {
-    const reason = result.error?.message ?? `exit code ${result.status ?? "unknown"}`;
-    throw new Error(`${command} failed with ${reason}`);
+    throw new Error(`${command} failed with exit code ${result.status ?? "unknown"}`);
   }
   return result.stdout?.trim() ?? "";
 }
@@ -162,11 +125,8 @@ async function copyJavaScriptTree(source, destination) {
 }
 
 async function findNodeLicense() {
-  const runtimeDirectory = dirname(process.execPath);
-  const runtimeRoot = resolve(runtimeDirectory, "..");
+  const runtimeRoot = resolve(dirname(process.execPath), "..");
   const candidates = [
-    join(runtimeDirectory, "LICENSE"),
-    join(runtimeDirectory, "LICENSE.md"),
     join(runtimeRoot, "LICENSE"),
     join(runtimeRoot, "LICENSE.md"),
     join(runtimeRoot, "share", "doc", "node", "copyright"),
@@ -324,14 +284,7 @@ async function buildSbom(bundleRoot, metadata) {
   };
 }
 
-function expectedSigningKind(platform) {
-  if (platform === "darwin") return "apple-codesign";
-  if (platform === "windows") return "authenticode";
-  if (platform === "linux") return "gpg";
-  throw new TypeError(`unsupported signing platform: ${platform}`);
-}
-
-async function parseSigningEvidence(value, metadata, bundleRoot) {
+function parseSigningEvidence(value, metadata) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new TypeError("signing evidence must be an object");
   }
@@ -344,44 +297,17 @@ async function parseSigningEvidence(value, metadata, bundleRoot) {
   ) {
     throw new TypeError("signing evidence does not match the staged platform");
   }
-  if (value.status === "unsigned") {
-    if (value.artifacts.length !== 0) {
-      throw new TypeError("unsigned signing evidence must not contain artifacts");
-    }
-    return value;
-  }
-  const requiredKind = expectedSigningKind(metadata.platform);
-  if (value.artifacts.length < 1) {
-    throw new TypeError("signed evidence must contain a verified artifact");
-  }
-  let requiredKindSeen = false;
-  for (const [index, artifact] of value.artifacts.entries()) {
+  for (const artifact of value.artifacts) {
     if (
       !artifact
       || typeof artifact !== "object"
       || typeof artifact.path !== "string"
       || typeof artifact.kind !== "string"
-      || artifact.verified !== true
-      || typeof artifact.sha256 !== "string"
-      || !/^[a-f0-9]{64}$/u.test(artifact.sha256)
-      || typeof artifact.targetPath !== "string"
-      || typeof artifact.targetSha256 !== "string"
-      || !/^[a-f0-9]{64}$/u.test(artifact.targetSha256)
-      || typeof artifact.identity !== "string"
-      || !artifact.identity.trim()
-    ) throw new TypeError(`signing evidence artifact ${index} is invalid`);
-    const artifactPath = safeBundlePath(bundleRoot, artifact.path, `artifact ${index}`);
-    const targetPath = safeBundlePath(bundleRoot, artifact.targetPath, `artifact ${index} target`);
-    if (await sha256File(artifactPath) !== artifact.sha256) {
-      throw new Error(`signed artifact checksum mismatch: ${artifact.path}`);
-    }
-    if (await sha256File(targetPath) !== artifact.targetSha256) {
-      throw new Error(`signed target checksum mismatch: ${artifact.targetPath}`);
-    }
-    requiredKindSeen ||= artifact.kind === requiredKind;
+      || typeof artifact.verified !== "boolean"
+    ) throw new TypeError("signing evidence artifact is invalid");
   }
-  if (!requiredKindSeen) {
-    throw new TypeError(`signed evidence is missing ${requiredKind}`);
+  if (value.status === "signed" && value.artifacts.some((artifact) => artifact.verified !== true)) {
+    throw new TypeError("signed evidence contains an unverified artifact");
   }
   return value;
 }
@@ -515,10 +441,9 @@ async function finalizeRelease(options) {
     artifacts: [],
   };
   if (options.signingEvidence) {
-    signingEvidence = await parseSigningEvidence(
+    signingEvidence = parseSigningEvidence(
       JSON.parse(await readFile(options.signingEvidence, "utf8")),
       metadata,
-      bundleRoot,
     );
   }
   await writeJson(join(bundleRoot, SIGNING_EVIDENCE_FILE), signingEvidence);

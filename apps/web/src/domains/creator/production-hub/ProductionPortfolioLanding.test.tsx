@@ -4,7 +4,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ProductionLandingPage } from "./ProductionLandingPage";
+import { ProductionLandingPage } from "./ProductionHubPage";
 
 import { useApp } from "@/shared/lib/store";
 
@@ -13,8 +13,8 @@ const api = vi.hoisted(() => ({
   getProductionPersonalInbox: vi.fn(),
 }));
 
-vi.mock("./production-dashboard-api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./production-dashboard-api")>();
+vi.mock("./production-api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./production-api")>();
   return {
     ...actual,
     listProductionProjects: (...args: unknown[]) => api.listProductionProjects(...args),

@@ -29,7 +29,7 @@ import Link from "@/compat/router-link";
 import {
   clearCreatorLaunchPlan,
   clearCreatorRecentDestinations,
-  creatorDestinationDescription,
+  creatorRecentDestinationDescription,
   creatorDestinationLabel,
   formatCreatorRelativeTime,
   getCreatorContinuityServerSnapshot,
@@ -233,9 +233,9 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
               <>
                 <ul>
                   {continuity.recent.slice(0, 3).map((item) => (
-                    <li key={item.id}>
+                    <li key={`${item.id}:${item.href}`}>
                       <Link href={item.href} onClick={() => rememberHref(item.href)}>
-                        <span><strong>{creatorDestinationLabel(item.id, locale)}</strong><small>{creatorDestinationDescription(item.id, locale)}</small></span>
+                        <span><strong>{creatorDestinationLabel(item.id, locale)}</strong><small>{creatorRecentDestinationDescription(item, locale)}</small></span>
                         <span className="clp-recent-meta">{now > 0 ? formatCreatorRelativeTime(item.visitedAt, locale, now) : ""}<ArrowRight size={15} aria-hidden="true" /></span>
                       </Link>
                     </li>

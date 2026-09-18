@@ -2,7 +2,6 @@ import {
   serializeStudioBg3dSceneDocument,
   type StudioBg3dSceneDocument,
 } from "../bg3d/studio-bg3d-scene-document";
-import { isStudioLinked3dPassRevisionForScene } from "../studio-linked-3d-pass-transaction";
 import {
   parseStudioLinked3dRenderDocument,
   validateStudioLinked3dRenderDocumentAgainstPage,
@@ -28,7 +27,6 @@ export type StudioScene3dLinkedLayerBridgeFailureCode =
   | "missing-link"
   | "page-cross-reference-invalid"
   | "missing-canonical-scene"
-  | "missing-viewport-aspect-ratio"
   | "scene-revision-diverged"
   | "shot-mismatch";
 
@@ -93,6 +91,17 @@ export function resolveStudioScene3dLinkedLayerRoundTrip(input: {
   }
   const link = pageDocument.links.find(({ bundleId }) => bundleId === input.bundleId);
   if (!link) return failure("missing-link", "선택한 3D bundle의 연결 정보를 찾지 못했습니다.");
+  const crossReference = validateStudioLinked3dRenderDocumentAgainstPage({
+    value: pageDocument,
+    elements: input.elements,
+    shared3dStage: input.shared3dStage,
+  });
+  if (!crossReference.ok) {
+    return failure(
+      "page-cross-reference-invalid",
+      "Canvas 레이어·3D Stage·pass receipt 교차참조가 일치하지 않습니다.",
+    );
+  }
   const scene = canonicalSceneForBundle(input.elements, input.bundleId);
   if (!scene) {
     return failure(
@@ -106,44 +115,10 @@ export function resolveStudioScene3dLinkedLayerRoundTrip(input: {
       "Canvas에 연결된 Shot과 SceneDocument의 활성 Shot이 다릅니다.",
     );
   }
-  if (!isStudioLinked3dPassRevisionForScene(link.passRevision, scene)) {
+  if (link.passRevision.sceneHash !== link.passRevision.sourceHash) {
     return failure(
       "scene-revision-diverged",
       "저장된 line pass가 다른 SceneDocument revision을 가리킵니다.",
-    );
-  }
-  const crossReference = validateStudioLinked3dRenderDocumentAgainstPage({
-    value: pageDocument,
-    elements: input.elements,
-    shared3dStage: input.shared3dStage,
-  });
-  if (!crossReference.ok) {
-    return failure(
-      "page-cross-reference-invalid",
-      `Canvas 레이어·3D Stage·pass receipt 교차참조가 일치하지 않습니다: ${crossReference.code}`,
-    );
-  }
-  const layer = input.elements.find((element) =>
-    element.type === "image"
-    && element.bg3dLtBundleId === input.bundleId
-    && element.bg3dLtRole === "main-line");
-  const layerAspectRatio = typeof layer?.width === "number"
-    && Number.isFinite(layer.width)
-    && layer.width > 0
-    && typeof layer.height === "number"
-    && Number.isFinite(layer.height)
-    && layer.height > 0
-    ? layer.width / layer.height
-    : undefined;
-  const viewportAspectRatio = scene.output.exportAspectRatio ?? layerAspectRatio;
-  if (
-    typeof viewportAspectRatio !== "number"
-    || !Number.isFinite(viewportAspectRatio)
-    || viewportAspectRatio <= 0
-  ) {
-    return failure(
-      "missing-viewport-aspect-ratio",
-      "Linked 3D 레이어에서 자동 출력 비율을 복원할 수 없습니다.",
     );
   }
   const sharedSceneSession = createStudioShared3dSceneSessionForStage(
@@ -155,7 +130,7 @@ export function resolveStudioScene3dLinkedLayerRoundTrip(input: {
     authorityId: input.authorityId ?? `linked3d:${input.bundleId}`,
     bg3d: scene,
     sharedSceneSession,
-    viewportAspectRatio,
+    viewportAspectRatio: scene.output.exportAspectRatio,
     revision: link.passRevision.revision,
   });
   return Object.freeze({

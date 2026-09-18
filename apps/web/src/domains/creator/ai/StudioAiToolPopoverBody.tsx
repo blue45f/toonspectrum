@@ -361,7 +361,7 @@ export function StudioAiToolPopoverBody({
                         aria-label={lt("서버 텍스트 AI 제공자", "studio.aiToolPopover.serverTextAiProviderAria")}
                       >
                         <option value="auto">{lt("자동 전환", "studio.aiToolPopover.serverProviderAuto")}</option>
-                        {(serverAiStatus?.providers.length
+                        {(serverAiStatus?.providers?.length
                           ? serverAiStatus.providers
                           : [
                               { id: "gemini" as const, label: "Gemini 무료", configured: false, model: "" },

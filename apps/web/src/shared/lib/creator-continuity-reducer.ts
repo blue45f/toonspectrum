@@ -21,13 +21,13 @@ export function addCreatorDestinationInState(
   if (!destination) return state;
   const next = {
     id: destination.id,
-    href: safeCreatorDestinationHref(destination, search),
+    href: safeCreatorDestinationHref(destination, pathname, search),
     visitedAt: now,
   } as const;
   return freezeCreatorContinuity({
     version: CREATOR_CONTINUITY_VERSION,
     plan: state.plan,
-    recent: [next, ...state.recent.filter((item) => item.id !== next.id)]
+    recent: [next, ...state.recent.filter((item) => (next.id === "studio" ? item.href !== next.href : item.id !== next.id))]
       .slice(0, CREATOR_CONTINUITY_MAX_RECENT),
   });
 }

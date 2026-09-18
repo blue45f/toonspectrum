@@ -1,13 +1,10 @@
 import {
-  translateLocaleBranchForLocale,
+  translateBilingualValueForActiveLocale,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ENGINEERING_DEEP_DIVE_CHAPTERS,
   ENGINEERING_DEEP_DIVE_GUIDES,
 } from "./engineering-story-deep-dive-content";
-import {
-  translateBilingualValueForActiveLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("engineering-story-content", ko, en);
@@ -254,16 +251,16 @@ export const ENGINEERING_CHAPTERS = [
     eyebrow: "04 · AUTHENTICATION",
     title: { ko: "로그인은 공급자보다 세션 경계가 먼저", en: "Session boundaries before provider logos" },
     thesis: {
-      ko: "Google, Kakao, Naver와 GitHub는 서버형 Authorization Code 흐름으로 연결하고 공급자 토큰을 제품 세션과 분리합니다.",
-      en: "Google, Kakao, Naver and GitHub use a server-side authorization-code flow, separated from the product session.",
+      ko: "Google·Apple·Kakao·Naver·GitHub는 GIS ID token 또는 서버형 Authorization Code처럼 공급자별 검증 흐름을 사용하고, 공급자 토큰을 제품 세션과 분리합니다.",
+      en: "Google, Apple, Kakao, Naver and GitHub use provider-specific verification flows such as GIS identity tokens or server-side authorization codes, separated from the product session.",
     },
     problem: {
       ko: "브라우저에 client secret이나 장기 토큰을 두거나 공급자 토큰을 그대로 앱 세션으로 사용하면 회수와 계정 병합이 어려워집니다.",
       en: "Browser secrets, long-lived tokens or provider tokens used as app sessions make revocation and account linking difficult.",
     },
     decision: {
-      ko: "state, PKCE, 최소 scope, 서버 callback 검증과 HttpOnly 자체 세션을 기본 계약으로 둡니다.",
-      en: "state, PKCE, minimal scopes, server callback validation and an HttpOnly first-party session form the base contract.",
+      ko: "state, 공급자별 PKCE·nonce, 최소 scope, 서버 callback 검증과 HttpOnly 자체 세션을 기본 계약으로 둡니다.",
+      en: "state, provider-specific PKCE or nonce protection, minimal scopes, server callback validation and an HttpOnly first-party session form the base contract.",
     },
     userValue: {
       ko: "사용자는 연결된 계정을 확인하고 연결 해제와 탈퇴 범위를 이해할 수 있습니다.",
@@ -273,7 +270,7 @@ export const ENGINEERING_CHAPTERS = [
       ko: "공급자 콘솔 등록과 검수가 필요하며 Toss 인증은 일반 웹 OAuth와 다른 제품·보안 범위로 현재 허용 목록에서 제외합니다.",
       en: "Provider registration and review are required; Toss authentication remains outside the allowlist because its product and security scope differs from general web OAuth.",
     },
-    technologies: ["OAuth 2.0", "Authorization Code", "PKCE", "HttpOnly session", "CSRF state"],
+    technologies: ["OAuth 2.0", "OpenID Connect", "Authorization Code", "PKCE", "nonce", "HttpOnly session", "CSRF state"],
     evidence: [
       evidence("code", "apps/web/src/domains/auth", "로그인 UI와 공급자 경계", "Login UI and provider boundary"),
       evidence("code", "apps/api/src", "서버 callback과 세션 소유", "Server callback and session ownership"),
@@ -712,11 +709,11 @@ export const ENGINEERING_GUIDES = [
       ko: "브라우저에 secret이나 장기 토큰을 남기지 않고 공급자 계정과 제품 세션을 분리합니다.",
       en: "Separate provider identity from the product session without browser secrets or long-lived tokens.",
     },
-    outcome: { ko: "Google·Kakao·Naver·GitHub 어댑터를 같은 계약으로 운영", en: "Operate Google, Kakao, Naver and GitHub adapters under one contract" },
+    outcome: { ko: "Google·Apple·Kakao·Naver·GitHub 어댑터를 같은 계약으로 운영", en: "Operate Google, Apple, Kakao, Naver and GitHub adapters under one contract" },
     steps: [
       { ko: "공급자 콘솔에서 앱과 정확한 callback URI를 등록합니다.", en: "Register the app and exact callback URI with each provider." },
-      { ko: "서버에서 state, PKCE verifier와 짧은 로그인 시도를 생성합니다.", en: "Create state, PKCE verifier and a short-lived login attempt on the server." },
-      { ko: "callback에서 state와 code를 검증한 뒤 최소 프로필만 읽습니다.", en: "Validate state and code at callback, then read only the minimal profile." },
+      { ko: "서버에서 state와 공급자별 재전송 방지 값(PKCE·nonce)을 생성합니다.", en: "Create state and provider-specific replay protection such as PKCE or nonce on the server." },
+      { ko: "callback에서 state·code·ID token을 공급자 계약에 맞게 검증한 뒤 최소 프로필만 읽습니다.", en: "Validate state, code and identity tokens according to each provider contract, then read only the minimal profile." },
       { ko: "공급자 토큰과 분리된 HttpOnly 제품 세션을 발급합니다.", en: "Issue an HttpOnly product session separate from provider tokens." },
       { ko: "연결 해제, 탈퇴와 계정 병합 테스트를 추가합니다.", en: "Add unlinking, deletion and account-linking tests." },
     ],
@@ -725,7 +722,7 @@ export const ENGINEERING_GUIDES = [
       { ko: "최소 scope와 callback allowlist", en: "Minimal scopes and callback allowlist" },
       { ko: "실패 callback과 중복 계정 처리", en: "Failure callbacks and duplicate-account handling" },
     ],
-    code: "GET /auth/:provider/start\nGET /auth/:provider/callback\nPOST /auth/session/logout\nDELETE /auth/connections/:provider",
+    code: "GET /api/auth/oauth/:provider/start\nGET|POST /api/auth/oauth/:provider/callback\nPOST /api/auth/logout\nDELETE /api/auth/accounts/:provider",
   },
   {
     id: "cloud-storage",

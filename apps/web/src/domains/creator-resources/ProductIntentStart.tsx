@@ -18,7 +18,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "@/compat/router-link";
 import { WorkflowTrustBadge } from "@/shared/components/WorkflowTrustBadge";
 import {
-  creatorDestinationDescription,
+  creatorRecentDestinationDescription,
   creatorDestinationLabel,
   formatCreatorRelativeTime,
   getCreatorContinuityServerSnapshot,
@@ -146,19 +146,18 @@ export function ProductIntentStart() {
           })}
         </nav>
       </div>
-
-      <aside className="cf-intent-side">
-        <Link className="cf-intent-film" href="/product-tour">
-          <span className="cf-intent-film-media" aria-hidden="true">
-            <img src="/brand/production-os-hero.svg" alt="" loading="lazy" decoding="async" />
-            <span className="cf-intent-film-play"><PlayCircle size={28} /></span>
-          </span>
-          <span className="cf-intent-film-copy">
-            <small>{copy.filmLabel}</small>
-            <strong>{copy.watch}</strong>
-            <span>{copy.watchBody}</span>
-          </span>
-          <ArrowRight size={17} aria-hidden="true" />
+      <aside>
+        <p><Clock3 size={16} aria-hidden="true" />{copy.recent}</p>
+        <Link className="cf-recent-card" href={recent?.href ?? "/studio/projects"}>
+          <strong>{recent ? creatorDestinationLabel(recent.id, locale) : copy.fallback}</strong>
+          <span>{recent ? creatorRecentDestinationDescription(recent, locale) : copy.fallbackBody}</span>
+          {recent && now > 0 ? <small>{formatCreatorRelativeTime(recent.visitedAt, locale, now)}</small> : null}
+          {recent ? <WorkflowTrustBadge state="resume-ready" locale={locale} className="w-fit" /> : null}
+          <ArrowRight size={18} aria-hidden="true" />
+        </Link>
+        <Link className="cf-link" href="/studio/projects">
+          {copy.all}
+          <ArrowRight size={15} aria-hidden="true" />
         </Link>
 
         <div className="cf-intent-recent">

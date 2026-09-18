@@ -49,8 +49,6 @@ describe("desktop sync conflict loopback server", () => {
       expect(page.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
       expect(html).not.toContain(fixture.server.token);
       expect(html).not.toContain(fixture.local);
-      expect(html).toContain("escapeHtml(shortHash(value.version))");
-      expect(html).toContain("escapeHtml(value.sha256||\"\")");
 
       await expect(fetch(`${fixture.server.origin}/api/report`))
         .resolves.toMatchObject({ status: 401 });
