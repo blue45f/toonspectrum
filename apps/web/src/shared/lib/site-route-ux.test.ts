@@ -24,7 +24,7 @@ describe("site route UX contracts", () => {
     ]) {
       const contract = resolveSiteRouteUxContract(path);
       expect(contract.canonicalPath).toMatch(/^\//u);
-      expect(contract.pagePurpose).toMatch(/^legacyUi\./u);
+      expect(contract.pagePurpose).toMatch(/^legacyUi\.siteRouteUx\./u);
       expect(contract.helpPath).toMatch(/^\/help/u);
       expect(contract.audiences.length).toBeGreaterThan(0);
     }

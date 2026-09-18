@@ -306,12 +306,12 @@ function translateParallelNode(
  * Localizes a legacy `COPY = { ko: {...}, en: {...} }` tree without rewriting its authored data.
  * Every string leaf is registered as an i18n source and resolved through the active global locale.
  */
-export function translateParallelBilingualCopy<const T extends StringTree>(
+export function translateParallelBilingualCopy<const TKo extends StringTree, const TEn extends StringTree>(
   t: TranslationResolver,
   scope: string,
-  branches: Readonly<{ readonly ko: T; readonly en: TranslatedStringTree<T> }>,
-): TranslatedStringTree<T> {
-  return translateParallelNode(t, scope, branches.ko, branches.en as StringTree, []) as TranslatedStringTree<T>;
+  branches: Readonly<{ readonly ko: TKo; readonly en: TEn }>,
+): TKo {
+  return translateParallelNode(t, scope, branches.ko, branches.en, []) as TKo;
 }
 
 export function formatI18nTemplate(
