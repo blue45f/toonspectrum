@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 // 대사 번역(BYOK) 패널 — 캔버스의 말풍선·텍스트 요소를 사용자의 API 키로 다른 언어로 일괄
 // 번역한다. draft prop 유무로 두 화면을 자동 전환한다: (A) 생성 화면(대상 언어·용어집 입력 →
 // 번역 생성), (B) 검토·적용 화면(원문/번역 나란히, 손으로 고친 뒤 적용). 순수 계산은
@@ -40,6 +44,7 @@ import {
   type StudioLocalizationQaDimensionSection,
 } from "./StudioLocalizationQaReport";
 
+import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
 import { cx } from "@/shared/lib/cx";
 
 /**
@@ -309,21 +314,20 @@ export function StudioDialogueTranslatePanel({
 
   return (
     <section
-      aria-label="대사 번역"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "대사 번역")}
       className="absolute right-3 top-3 z-40 flex max-h-[calc(100%-5rem)] w-[min(22rem,calc(100%-1.5rem))] flex-col overflow-hidden rounded-xl border border-line bg-panel/95 shadow-xl backdrop-blur"
     >
       <div className="flex items-center justify-between gap-2 border-b border-line/60 px-3 py-2">
         <p className="flex items-center gap-1.5 text-xs font-bold text-fg">
           <Languages size={13} className="text-accent" aria-hidden />
-          대사 번역
-          <span className="font-medium text-fg-4">· {providerLabel}</span>
+          {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "대사 번역")}<span className="font-medium text-fg-4">· {providerLabel}</span>
         </p>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => setQaVisible(!qaVisible)}
             aria-pressed={qaVisible}
-            title="현지화 QA — 말풍선 넘침·영문 레터링 문체·MQM 품질 점수"
+            title={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "현지화 QA — 말풍선 넘침·영문 레터링 문체·MQM 품질 점수")}
             className={cx(
               "inline-flex items-center gap-1 rounded-lg border px-2 text-[0.62rem] font-semibold transition-colors",
               qaVisible
@@ -334,12 +338,11 @@ export function StudioDialogueTranslatePanel({
             )}
           >
             <ScanText size={12} aria-hidden />
-            현지화 QA
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "현지화 QA")}</button>
           <button
             type="button"
             onClick={onClose}
-            aria-label="대사 번역 닫기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "대사 번역 닫기")}
             className="grid size-6 place-items-center rounded-lg border border-line text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             <X size={13} />
@@ -355,8 +358,7 @@ export function StudioDialogueTranslatePanel({
           aria-pressed={activeLocale === SOURCE_LOCALE}
           className={localeChipClass(activeLocale === SOURCE_LOCALE)}
         >
-          원문
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "원문")}</button>
         {availableLocales.map((code) => {
           const coverage = coverageFor(code);
           const pct = coverage.total > 0 ? Math.round((coverage.translated / coverage.total) * 100) : 0;
@@ -366,7 +368,7 @@ export function StudioDialogueTranslatePanel({
               type="button"
               onClick={() => onSwitchLocale(code)}
               aria-pressed={activeLocale === code}
-              title={`${localeLabel(code)} · ${coverage.translated}/${coverage.total} 번역됨`}
+              title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "{v0} · {v1}/{v2} 번역됨"), { v0: String(localeLabel(code)), v1: String(coverage.translated), v2: String(coverage.total) })}
               className={localeChipClass(activeLocale === code)}
             >
               {localeLabel(code)} <span className="opacity-70">{pct}%</span>
@@ -374,7 +376,7 @@ export function StudioDialogueTranslatePanel({
           );
         })}
         {availableLocales.length === 0 && (
-          <span className="text-[0.62rem] text-fg-4">아직 번역된 언어가 없어요.</span>
+          <span className="text-[0.62rem] text-fg-4">{translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "아직 번역된 언어가 없어요.")}</span>
         )}
       </div>
 
@@ -382,13 +384,12 @@ export function StudioDialogueTranslatePanel({
         // ── C. 현지화 QA 화면 ─────────────────────────────────────────────
         <div className="flex min-h-0 flex-1 flex-col">
           <p className="border-b border-line/60 px-3 py-1.5 text-[0.62rem] text-fg-3">
-            검사 대상: <span className="font-medium text-fg-2">{qaTargetLabel}</span>
+            {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "검사 대상: ")}<span className="font-medium text-fg-2">{qaTargetLabel}</span>
           </p>
           {qaSnapshot === null ? (
             <p role="status" className="flex items-center gap-1.5 px-3 py-4 text-[0.66rem] text-fg-3">
               <Loader2 size={11} className="animate-spin text-accent motion-reduce:animate-none" aria-hidden />
-              검사 준비 중…
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "검사 준비 중…")}</p>
           ) : (
             <StudioLocalizationQaReport
               report={qaSnapshot.report}
@@ -397,7 +398,7 @@ export function StudioDialogueTranslatePanel({
               stale={qaStale}
               onRerun={runQa}
               {...(qaJumpAvailable ? { onSelectCue: revealQaCue } : {})}
-              jumpLabel={draft ? "초안에서 고치기" : "캔버스에서 선택"}
+              jumpLabel={draft ? translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "초안에서 고치기") : translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "캔버스에서 선택")}
             />
           )}
         </div>
@@ -406,8 +407,7 @@ export function StudioDialogueTranslatePanel({
         <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-2.5">
           <div className="space-y-1">
             <label className="block text-[0.66rem] font-medium text-fg-3" htmlFor="dialogue-translate-target">
-              대상 언어
-            </label>
+              {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "대상 언어")}</label>
             {isPresetTarget ? (
               <select
                 id="dialogue-translate-target"
@@ -423,7 +423,7 @@ export function StudioDialogueTranslatePanel({
                     {p.label}
                   </option>
                 ))}
-                <option value={CUSTOM_LOCALE_OPTION}>직접 입력…</option>
+                <option value={CUSTOM_LOCALE_OPTION}>{translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "직접 입력…")}</option>
               </select>
             ) : (
               <div className="flex items-center gap-1.5">
@@ -431,8 +431,8 @@ export function StudioDialogueTranslatePanel({
                   type="text"
                   value={targetLocale}
                   onChange={(e) => onTargetLocaleChange(e.target.value)}
-                  placeholder="언어 코드 또는 이름(예: pt-BR, 베트남어)"
-                  aria-label="대상 언어(직접 입력)"
+                  placeholder={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "언어 코드 또는 이름(예: pt-BR, 베트남어)")}
+                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "대상 언어(직접 입력)")}
                   className={inputClass}
                 />
                 <button
@@ -440,44 +440,42 @@ export function StudioDialogueTranslatePanel({
                   onClick={() => onTargetLocaleChange(DIALOGUE_LOCALE_PRESETS[0].code)}
                   className="shrink-0 whitespace-nowrap text-[0.62rem] font-medium text-accent hover:underline"
                 >
-                  목록에서 선택
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "목록에서 선택")}</button>
               </div>
             )}
           </div>
 
           <div className="space-y-1">
             <label className="block text-[0.66rem] font-medium text-fg-3" htmlFor="dialogue-translate-glossary">
-              용어집(선택)
-            </label>
+              {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "용어집(선택)")}</label>
             <textarea
               id="dialogue-translate-glossary"
               value={glossary}
               onChange={(e) => onGlossaryChange(e.target.value)}
-              placeholder={'예: 주인공 이름은 항상 "Yuna"로 번역해줘'}
+              placeholder={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "예: 주인공 이름은 항상 \"Yuna\"로 번역해줘")}
               rows={3}
               className={cx(inputClass, "resize-y leading-snug")}
             />
           </div>
 
-          {!configured && (
-            <p className="rounded-lg border border-dashed border-line px-2 py-2 text-[0.66rem] leading-relaxed text-fg-4">
-              로그인하면 자동 무료 AI를 먼저 사용합니다. 사용할 수 있는 무료 경로가 없으면 통합 AI 설정에서 개인 무료 키 또는 로컬 AI를 연결하세요.
-            </p>
-          )}
-          {error && (
-            <p
-              role="alert"
-              className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-1.5 text-[0.66rem] leading-relaxed text-bad"
-            >
-              {error}
-            </p>
-          )}
+          {!configured ? (
+            <AiRecoveryNotice
+              code="not_configured"
+              message={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "번역 초안은 유지됩니다. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요.")}
+              compact
+            />
+          ) : null}
+          {error ? (
+            <AiRecoveryNotice
+              message={error}
+              onRetry={canGenerate ? onGenerate : undefined}
+              compact
+            />
+          ) : null}
           {busy && progress && (
             <p role="status" className="flex items-center gap-1.5 text-[0.66rem] text-fg-3">
               <Loader2 size={11} className="animate-spin text-accent" aria-hidden />
-              {progress.done}/{progress.total} 청크 처리 중…
-            </p>
+              {progress.done}/{progress.total} {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "청크 처리 중…")}</p>
           )}
 
           <button
@@ -490,10 +488,9 @@ export function StudioDialogueTranslatePanel({
             )}
           >
             {busy ? <Loader2 size={12} className="animate-spin" aria-hidden /> : <Globe2 size={12} aria-hidden />}
-            번역 생성
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "번역 생성")}</button>
           {items.length === 0 && (
-            <p className="text-center text-[0.62rem] text-fg-4">번역할 말풍선·텍스트가 없어요.</p>
+            <p className="text-center text-[0.62rem] text-fg-4">{translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "번역할 말풍선·텍스트가 없어요.")}</p>
           )}
         </div>
       ) : (
@@ -502,31 +499,28 @@ export function StudioDialogueTranslatePanel({
           <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2.5">
             {grouped.length === 0 ? (
               <p className="rounded-lg border border-dashed border-line px-2 py-4 text-center text-[0.66rem] leading-relaxed text-fg-4">
-                생성된 번역이 없어요.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "생성된 번역이 없어요.")}</p>
             ) : (
               <div className="space-y-2.5">
                 {grouped.map((group) => (
-                  <section key={group.pageId} aria-label={`${group.pageIndex + 1}페이지 번역`}>
+                  <section key={group.pageId} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "{v0}페이지 번역"), { v0: String(group.pageIndex + 1) })}>
                     <p className="mb-1 text-[0.62rem] font-semibold uppercase tracking-wide text-fg-3">
-                      {group.pageIndex + 1}페이지
-                    </p>
+                      {group.pageIndex + 1}{translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "페이지")}</p>
                     <ul className="space-y-1.5">
                       {group.items.map((entry) => (
                         <li key={entry.id} className="rounded-lg border border-line bg-card/45 p-1.5">
                           <div className="mb-1 flex min-w-0 items-center gap-1.5">
                             <p className="min-w-0 flex-1 truncate text-[0.64rem] text-fg-4" title={entry.text}>
-                              원문: {entry.text}
+                              {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "원문: ")}{entry.text}
                             </p>
                             <button
                               type="button"
                               onClick={() => setMemoryEntry(entry)}
                               className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-line bg-panel px-2 text-[0.62rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                              title="이 대사와 유사한 검토·승인 번역을 찾거나 현재 번역을 로컬 메모리에 저장"
+                              title={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "이 대사와 유사한 검토·승인 번역을 찾거나 현재 번역을 로컬 메모리에 저장")}
                             >
                               <BookOpenCheck size={12} aria-hidden />
-                              메모리
-                            </button>
+                              {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "메모리")}</button>
                           </div>
                           <textarea
                             ref={(node) => {
@@ -536,7 +530,7 @@ export function StudioDialogueTranslatePanel({
                             value={draft.get(entry.id) ?? entry.text}
                             onChange={(e) => onDraftChange(entry.id, e.target.value)}
                             rows={Math.min(4, Math.max(1, (draft.get(entry.id) ?? entry.text).split("\n").length))}
-                            aria-label={`${group.pageIndex + 1}페이지 대사 번역 수정`}
+                            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "{v0}페이지 대사 번역 수정"), { v0: String(group.pageIndex + 1) })}
                             className={cx(inputClass, "resize-y py-1 leading-snug")}
                           />
                         </li>
@@ -553,15 +547,13 @@ export function StudioDialogueTranslatePanel({
               onClick={onDiscardDraft}
               className="flex-1 rounded-lg border border-line bg-card py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised"
             >
-              취소
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "취소")}</button>
             <button
               type="button"
               onClick={onApplyDraft}
               className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-accent py-1.5 text-xs font-semibold text-on-accent transition-colors hover:opacity-90"
             >
-              <Check size={12} aria-hidden /> 적용
-            </button>
+              <Check size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "적용")}</button>
           </div>
         </>
       )}
@@ -573,8 +565,7 @@ export function StudioDialogueTranslatePanel({
                 role="status"
                 className="grid min-h-40 place-items-center text-xs text-fg-3"
               >
-                번역 메모리를 여는 중…
-              </div>
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "번역 메모리를 여는 중…")}</div>
             }
           >
             <StudioDialogueTranslationMemoryPanel

@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -127,7 +128,7 @@ export function StudioWorkspaceNavigator() {
   return (
     <>
       <nav
-        aria-label="작업 영역 바로가기"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceNavigator", "ko", "작업 영역 바로가기")}
         aria-keyshortcuts="F6 Shift+F6"
         data-studio-skip-nav="true"
         data-studio-workspace-navigator="true"
@@ -140,8 +141,7 @@ export function StudioWorkspaceNavigator() {
               data-studio-skip-link="true"
               onClick={() => focusLandmark(id)}
             >
-              {label}로 이동
-            </button>
+              {label}{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceNavigator", "ko", "로 이동")}</button>
           ))}
         </div>
       </nav>

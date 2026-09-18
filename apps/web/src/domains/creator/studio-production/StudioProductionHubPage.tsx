@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -93,10 +94,9 @@ export function StudioProductionHubPage(props: {
     return (
       <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 sm:px-6">
         <section className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6" role="alert">
-          <h1 className="text-lg font-black">검토 링크를 확인할 수 없습니다</h1>
+          <h1 className="text-lg font-black">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPage", "ko", "검토 링크를 확인할 수 없습니다")}</h1>
           <p className="mt-2 text-sm leading-relaxed text-fg-2">
-            토큰이 없거나 중복됐거나 작품 범위 파라미터와 충돌합니다. 원고와 권한은 변경하지 않았습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPage", "ko", "토큰이 없거나 중복됐거나 작품 범위 파라미터와 충돌합니다. 원고와 권한은 변경하지 않았습니다.")}</p>
         </section>
       </div>
     );
@@ -115,7 +115,7 @@ export function StudioProductionHubPage(props: {
   return (
     <PreserveLinkQueryParams params={preserveDemo ? { demo: "1" } : {}}>
       {props.surface === "review" ? (
-        <h1 className="sr-only">검토 및 승인</h1>
+        <h1 className="sr-only">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPage", "ko", "검토 및 승인")}</h1>
       ) : null}
       <StudioProductionHubPageV2 {...props} />
     </PreserveLinkQueryParams>

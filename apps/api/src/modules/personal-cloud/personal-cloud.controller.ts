@@ -8,6 +8,7 @@ import {
   Headers,
   HttpCode,
   HttpException,
+  Inject,
   Logger,
   Param,
   Post,
@@ -74,7 +75,10 @@ function callbackUrl(input: {
 export class PersonalCloudController {
   private readonly logger = new Logger(PersonalCloudController.name);
 
-  constructor(private readonly service: PersonalCloudService) {}
+  constructor(
+    @Inject(PersonalCloudService)
+    private readonly service: PersonalCloudService,
+  ) {}
 
   private boundary(error: unknown): never {
     if (error instanceof PersonalCloudServiceError) {

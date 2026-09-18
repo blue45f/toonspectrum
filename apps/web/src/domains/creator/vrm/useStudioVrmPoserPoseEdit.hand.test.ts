@@ -13,7 +13,7 @@ vi.mock("react", async (importOriginal) => {
   return {
     ...actual,
     useEffect: vi.fn(),
-    useRef: vi.fn((initialValue: unknown) => ({ current: initialValue })),
+    useRef: <T,>(initial: T) => ({ current: initial }),
   };
 });
 

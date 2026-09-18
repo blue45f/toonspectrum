@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   CheckCircle2,
   CircleAlert,
@@ -114,18 +118,16 @@ export function StudioProjectHealthSummary({
               className="flex items-center gap-1.5 text-sm font-bold text-fg"
             >
               <ShieldCheck size={15} className="text-accent" aria-hidden />
-              프로젝트 건강 진단
-            </h3>
+              {translateCurrentStaticSourceText("domains.creator.StudioProjectHealthSummary", "ko", "프로젝트 건강 진단")}</h3>
             <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.65rem] font-semibold text-fg-3">
-              로컬 규칙 v{result.rulesetVersion}
+              {translateCurrentStaticSourceText("domains.creator.StudioProjectHealthSummary", "ko", "로컬 규칙 v")}{result.rulesetVersion}
             </span>
           </div>
           <p className="mt-0.5 max-w-[70ch] text-xs leading-relaxed text-fg-3">
-            문서 구조·검토 상태·연결된 사전검사만 결정론적으로 확인합니다. 원고는 업로드하지 않아요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioProjectHealthSummary", "ko", "문서 구조·검토 상태·연결된 사전검사만 결정론적으로 확인합니다. 원고는 업로드하지 않아요.")}</p>
         </div>
         <span
-          className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[0.68rem] font-semibold ${status.className}`}
+          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProjectHealthSummary", "en", "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[0.68rem] font-semibold {v0}"), { v0: String(status.className) })}
         >
           <StatusIcon size={11} aria-hidden />
           {status.label}
@@ -136,35 +138,32 @@ export function StudioProjectHealthSummary({
         <div className="min-w-40 flex-1">
           <div className="flex items-center justify-between gap-3 text-[0.68rem]">
             <span className="font-semibold text-fg-2">
-              {result.passedRuleCount}/{result.checkedRuleCount} 규칙 통과
-            </span>
+              {result.passedRuleCount}/{result.checkedRuleCount} {translateCurrentStaticSourceText("domains.creator.StudioProjectHealthSummary", "ko", "규칙 통과")}</span>
             <span className="font-display tabular-nums text-fg-3">
               {passedPercent}%
             </span>
           </div>
           <div
             role="progressbar"
-            aria-label="프로젝트 건강 규칙 통과율"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioProjectHealthSummary", "ko", "프로젝트 건강 규칙 통과율")}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={passedPercent}
             className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-raised"
           >
             <span
-              className={`block h-full rounded-full ${
-                result.status === "blocked"
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProjectHealthSummary", "en", "block h-full rounded-full {v0}"), { v0: String(result.status === "blocked"
                   ? "bg-bad"
                   : result.status === "needs-attention"
                     ? "bg-warn"
-                    : "bg-good"
-              }`}
+                    : "bg-good") })}
               style={{ width: `${passedPercent}%` }}
             />
           </div>
         </div>
         <div
           className="flex divide-x divide-line rounded-lg border border-line bg-card/35"
-          aria-label="프로젝트 건강 이슈 요약"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioProjectHealthSummary", "ko", "프로젝트 건강 이슈 요약")}
         >
           {issueSummary.map(({ label, count, className }) => (
             <span
@@ -172,7 +171,7 @@ export function StudioProjectHealthSummary({
               className="inline-flex min-w-16 items-center justify-center gap-1 px-2 py-1.5 text-[0.65rem] text-fg-3"
             >
               {label}
-              <strong className={`font-display tabular-nums ${className}`}>
+              <strong className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProjectHealthSummary", "en", "font-display tabular-nums {v0}"), { v0: String(className) })}>
                 {count}
               </strong>
             </span>
@@ -183,8 +182,7 @@ export function StudioProjectHealthSummary({
       {result.issues.length === 0 ? (
         <p className="mt-3 flex items-start gap-2 border-t border-line pt-3 text-xs leading-relaxed text-good">
           <CheckCircle2 size={14} className="mt-0.5 shrink-0" aria-hidden />
-          현재 로컬 진단 범위에서 즉시 조치할 문제를 찾지 못했습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioProjectHealthSummary", "ko", "현재 로컬 진단 범위에서 즉시 조치할 문제를 찾지 못했습니다.")}</p>
       ) : (
         <ul className="mt-3 divide-y divide-line border-y border-line">
           {result.issues.map((issue) => {
@@ -194,7 +192,7 @@ export function StudioProjectHealthSummary({
               <li key={issue.code} className="flex items-start gap-2.5 py-3">
                 <SeverityIcon
                   size={15}
-                  className={`mt-0.5 shrink-0 ${severity.className}`}
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProjectHealthSummary", "en", "mt-0.5 shrink-0 {v0}"), { v0: String(severity.className) })}
                   aria-hidden
                 />
                 <div className="min-w-0 flex-1">
@@ -205,13 +203,13 @@ export function StudioProjectHealthSummary({
                     <span className="rounded-full bg-raised px-1.5 py-0.5 text-[0.62rem] font-semibold text-fg-3">
                       {CATEGORY_LABELS[issue.category]}
                     </span>
-                    <span className={`sr-only`}>{severity.label}</span>
+                    <span className={translateCurrentStaticSourceText("domains.creator.StudioProjectHealthSummary", "en", "sr-only")}>{severity.label}</span>
                   </div>
                   <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
                     {issue.message}
                   </p>
                   <p className="mt-1 text-[0.68rem] font-medium leading-relaxed text-fg-2">
-                    다음 조치 · {issue.action}
+                    {translateCurrentStaticSourceText("domains.creator.StudioProjectHealthSummary", "ko", "다음 조치 · ")}{issue.action}
                   </p>
                 </div>
               </li>
@@ -222,8 +220,7 @@ export function StudioProjectHealthSummary({
 
       {result.issues.length > 1 && (
         <p className="mt-2 text-[0.65rem] leading-relaxed text-fg-3">
-          규칙은 서로 다른 위험 관점을 보여주므로 같은 페이지가 여러 항목에 포함될 수 있습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioProjectHealthSummary", "ko", "규칙은 서로 다른 위험 관점을 보여주므로 같은 페이지가 여러 항목에 포함될 수 있습니다.")}</p>
       )}
     </section>
   );

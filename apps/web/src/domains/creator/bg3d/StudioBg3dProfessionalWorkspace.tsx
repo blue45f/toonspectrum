@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex --
  * A focusable WAI-ARIA separator is the prescribed interaction model for resizing adjacent panes.
  */
@@ -26,6 +30,8 @@ import {
   type StudioBg3dWorkspacePanel,
   type StudioBg3dWorkspacePresetId,
 } from "./studio-bg3d-professional-workspace-layout";
+
+import type { StudioBg3dExperienceMode } from "./StudioBackground3DTypes";
 
 interface StudioBg3dProfessionalWorkspaceProps {
   readonly outliner: ReactNode;

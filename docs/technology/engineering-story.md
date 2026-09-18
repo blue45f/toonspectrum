@@ -20,6 +20,7 @@ The same story is reused for:
 | `/about/technology` | summary hub, status counts and entry points |
 | `/about/technology/story` | 15-chapter problem → decision → evidence narrative |
 | `/about/technology/guides` | reusable implementation sequences and completion checks |
+| `/about/technology/field-notes` | workers, PWA, free-first AI/infrastructure, Blender/3D, Open APIs and troubleshooting |
 | `/about/technology/deck` | investor, seminar and study presentation modes |
 | `/about/technology/videos` | Remotion storyboard, formats and review workflow |
 | `/about/technology/licenses` | code, asset, provider and AI rights layers |
@@ -44,13 +45,14 @@ Each chapter must contain at least one evidence path and at least two reuse step
 
 ## Content ownership
 
-The typed source of truth is:
+The typed sources of truth are:
 
 ```text
 apps/web/src/domains/legal/technology/engineering-story-content.ts
+apps/web/src/domains/legal/technology/engineering-field-notes-content.ts
 ```
 
-It owns chapters, guides, status metadata, license families and video format identifiers. Pages render from that data instead of maintaining separate claims.
+The first owns chapters, implementation guides, status metadata, license families and video format identifiers. The second owns field notes, Open API adapters, troubleshooting cases, official references and reference-product adoption boundaries. Pages render from those records instead of maintaining separate claims.
 
 When adding a chapter:
 
@@ -62,9 +64,35 @@ When adding a chapter:
 6. select the least promotional accurate status;
 7. update tests if the chapter count or video contract changes.
 
+## Engineering field notes
+
+`/about/technology/field-notes` captures implementation lessons that are useful beyond ToonStudio but too detailed for the 15-chapter public narrative.
+
+It currently covers:
+
+- task-specific Web Worker protocols, transferables, cancellation, poisoned WASM workers and main-thread commit authority;
+- PWA installation, request-class cache strategies, precache manifests, controlled activation and reload-loop recovery;
+- browser-local ONNX/MediaPipe contracts, exact free-model allowlists, BYOK boundaries, quota ledgers, idempotency receipts and ambiguous AI failure handling;
+- static-first and scale-to-zero infrastructure, hard application budgets and manually approved immutable releases;
+- an allowlisted Blender MCP facade, headless DCC pipelines and digest-bound asset packages;
+- a product-owned Scene3D document with Three WebGPU/WebGL2 as the primary runtime and lazy specialist engines;
+- provider-specific Open API schema, rights, provenance, host and failure gates;
+- AI-assisted engineering boundaries and real troubleshooting cases written as symptom → root cause → fix → prevention.
+
+Every field note must include:
+
+1. an accurate status;
+2. the problem and the chosen reusable pattern;
+3. a product-authority boundary;
+4. at least four adoption steps;
+5. existing repository evidence;
+6. official references with a review date.
+
+Open API entries never equate public access with redistribution permission. Reference-product entries distinguish applied workflow patterns, specialist tools, reference-only quality bars, planned evaluations and products deliberately not adopted.
+
 ## Authentication wording
 
-The current provider allowlist is Google, Kakao, Naver and GitHub. Toss is not described as excluded merely because it is paid. Its product scope, review process and security operating model differ from a general web OAuth adapter. Provider policy and pricing must be rechecked at implementation time.
+The current provider allowlist is Google, Apple, Kakao, Naver and GitHub. Toss is not described as excluded merely because it is paid. Its product scope, review process and security operating model differ from a general web OAuth adapter. Provider policy and pricing must be rechecked at implementation time.
 
 Public examples may contain environment variable names, but never client secrets, API keys, private endpoints, user identifiers or operations credentials.
 
@@ -119,6 +147,7 @@ The focused checks are:
 ```bash
 pnpm exec vitest run \
   apps/web/src/domains/legal/technology/engineering-story-content.test.ts \
+  apps/web/src/domains/legal/technology/engineering-field-notes-content.test.ts \
   apps/web/src/domains/legal/technology/EngineeringStoryPage.test.tsx \
   apps/web/src/app/routes/groups/about-routes.test.tsx \
   scripts/technology-story-film.test.mjs

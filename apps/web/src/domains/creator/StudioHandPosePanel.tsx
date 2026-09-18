@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio 핸드 포즈 스캐너 패널(Hand Pose Scanner Panel).
  *
@@ -6,7 +10,7 @@
  * 각 손가락 Flex(0~1) 및 Spread(-1~1) 슬라이더로 세밀하게 미세 조정 가능.
  */
 
-import { Hand, RotateCcw, Video } from "lucide-react";
+import { CircleStop, RotateCcw, Video } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -85,17 +89,16 @@ export function StudioHandPosePanel({
   return (
     <div className="space-y-3">
       <StudioSectionHeader
-        title="손 포즈 스캐너"
-        description="프리셋을 선택하거나 웹캠으로 손 동작을 인식하세요."
+        title={translateCurrentStaticSourceText("domains.creator.StudioHandPosePanel", "ko", "손 포즈 스캐너")}
+        description={translateCurrentStaticSourceText("domains.creator.StudioHandPosePanel", "ko", "프리셋을 선택하거나 웹캠으로 손 동작을 인식하세요.")}
         action={
           <button
             type="button"
             onClick={handleReset}
             className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })}
-            title="손 포즈 초기화"
+            title={translateCurrentStaticSourceText("domains.creator.StudioHandPosePanel", "ko", "손 포즈 초기화")}
           >
-            <RotateCcw size={13} aria-hidden /> 초기화
-          </button>
+            <RotateCcw size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioHandPosePanel", "ko", "초기화")}</button>
         }
       />
 
@@ -110,20 +113,20 @@ export function StudioHandPosePanel({
         })}
       >
         {webcamActive ? (
-          <Hand size={13} aria-hidden />
+          <CircleStop size={13} aria-hidden />
         ) : (
           <Video size={13} aria-hidden />
         )}
-        {webcamActive ? "🔴 손 인식 중지" : "✋ 웹캠 손 인식 시작"}
+        {webcamActive ? translateCurrentStaticSourceText("domains.creator.StudioHandPosePanel", "ko", "손 인식 중지") : translateCurrentStaticSourceText("domains.creator.StudioHandPosePanel", "ko", "웹캠 손 인식 시작")}
       </button>
 
       {/* 프리셋 칩 */}
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="손 포즈 프리셋">
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioHandPosePanel", "ko", "손 포즈 프리셋")}>
         {STUDIO_HAND_PRESETS.map((preset) => (
           <StudioPanelChip
             key={preset.id}
             onClick={() => handlePresetApply(preset.id)}
-            title={`${preset.label} 프리셋 적용`}
+            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHandPosePanel", "ko", "{v0} 프리셋 적용"), { v0: String(preset.label) })}
           >
             {preset.label}
           </StudioPanelChip>
@@ -132,7 +135,7 @@ export function StudioHandPosePanel({
 
       {/* 손가락별 세부 조절 */}
       <div className="space-y-1">
-        <span className="text-xs font-semibold text-fg-2">손가락별 세부 조절</span>
+        <span className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioHandPosePanel", "ko", "손가락별 세부 조절")}</span>
         {FINGER_KEYS.map((finger) => (
           <div key={finger} className="space-y-1">
             <button
@@ -144,14 +147,13 @@ export function StudioHandPosePanel({
             >
               <span>{FINGER_LABELS[finger]}</span>
               <span className="text-[0.65rem] tabular-nums text-fg-3">
-                flex={handPose[finger].flex.toFixed(2)} spread=
-                {handPose[finger].spread.toFixed(2)}
+                {translateCurrentStaticSourceText("domains.creator.StudioHandPosePanel", "en", "flex=")}{handPose[finger].flex.toFixed(2)} {translateCurrentStaticSourceText("domains.creator.StudioHandPosePanel", "en", "spread=")}{handPose[finger].spread.toFixed(2)}
               </span>
             </button>
             {expanded === finger ? (
               <div className="space-y-1 pl-2">
                 <StudioSliderRow
-                  label="굽힘"
+                  label={translateCurrentStaticSourceText("domains.creator.StudioHandPosePanel", "ko", "굽힘")}
                   min={0}
                   max={100}
                   step={1}
@@ -160,7 +162,7 @@ export function StudioHandPosePanel({
                   readout={`${Math.round(handPose[finger].flex * 100)}%`}
                 />
                 <StudioSliderRow
-                  label="벌림"
+                  label={translateCurrentStaticSourceText("domains.creator.StudioHandPosePanel", "ko", "벌림")}
                   min={-100}
                   max={100}
                   step={1}

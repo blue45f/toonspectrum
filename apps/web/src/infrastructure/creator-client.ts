@@ -1007,7 +1007,7 @@ export async function markSharedAssetUsed(id: string): Promise<void> {
 }
 
 // ── 연재 시리즈(코미코 베스트도전 스타일) ──────────────────────────────
-export type SeriesStatus = "ongoing" | "completed";
+export type SeriesStatus = "ongoing" | "hiatus" | "completed";
 export type SeriesSort = "recent" | "likes" | "views";
 
 export interface SeriesSummary {

@@ -6,10 +6,43 @@ import {
   parseSiteBgmManifest,
   readSiteBgmPreferences,
   resolveSiteBgmExperience,
+  resolveSiteOstTrackIndex,
   writeSiteBgmExpanded,
   writeSiteBgmFollowRoute,
-  writeSiteBgmSource,
+  writeSiteBgmIntensity,
+  writeSiteBgmStyle,
+  writeSiteBgmVocals,
+  type SiteOstTrack,
 } from "./site-background-music";
+
+function originalTrack(overrides: Partial<SiteOstTrack> = {}): SiteOstTrack {
+  return {
+    id: "draw-your-world-vocal",
+    src: "/audio/original/draw-your-world-vocal.mp3",
+    title: "Draw Your World",
+    artist: "ToonSpectrum Original",
+    role: "opening",
+    origin: "original",
+    vocalMode: "vocal",
+    language: "ko",
+    summary: "툰스펙트럼 오리지널 오프닝",
+    license: "Eleven Music original generation; commercial use subject to reviewed Music Terms",
+    creditUrl: "https://elevenlabs.io/eleven-music-model-specific-terms",
+    profiles: ["animation", "cinematic"],
+    intensity: "epic",
+    durationMs: 210_000,
+    bpm: 154,
+    provider: "elevenlabs",
+    model: "music_v2_5",
+    sha256: "a".repeat(64),
+    generatedAt: "2026-09-18T00:00:00.000Z",
+    provenance: "c2pa-requested",
+    c2paRequested: true,
+    status: "published",
+    songId: "song_123",
+    ...overrides,
+  };
+}
 
 describe("site background music policy", () => {
   beforeEach(() => localStorage.clear());
@@ -30,11 +63,6 @@ describe("site background music policy", () => {
     ["/studio/bg3d", "story", "worldbuilding"],
     ["/studio/assets", "market", "funky"],
     ["/about", "healing", "healing_walk"],
-    ["/title/romance-1", "catalog", "worldbuilding"],
-    ["/author/kim", "catalog", "worldbuilding"],
-    ["/compare", "discovery", "library_night"],
-    ["/references", "learning", "library_night"],
-    ["/research/assets", "market", "funky"],
     ["/showcase/challenges", "playful", "happy"],
     ["/studio/p/project-1/story", "story", "worldbuilding"],
     ["/studio/p/project-1/production", "production", "synthwave"],
@@ -63,56 +91,72 @@ describe("site background music policy", () => {
     expect(experience.suspensionReason.length).toBeGreaterThan(10);
   });
 
-  it("persists source, automatic page following and panel state", () => {
+  it("uses style, intensity and vocal preference when selecting an original", () => {
+    const experience = resolveSiteBgmExperience("/");
+    const tracks = [
+      originalTrack({ id: "opening-instrumental", src: "/audio/original/opening-instrumental.mp3", vocalMode: "instrumental", profiles: ["cinematic"], intensity: "normal" }),
+      originalTrack({ id: "opening-vocal", src: "/audio/original/opening-vocal.mp3", vocalMode: "vocal", profiles: ["animation"], intensity: "epic" }),
+      originalTrack({ id: "ending-vocal", src: "/audio/original/ending-vocal.mp3", role: "ending", vocalMode: "vocal", profiles: ["animation"], intensity: "epic" }),
+    ];
+    expect(resolveSiteOstTrackIndex(tracks, experience, { style: "animation", intensity: "epic", vocals: "vocal" })).toBe(1);
+    expect(resolveSiteOstTrackIndex(tracks, experience, { style: "cinematic", intensity: "normal", vocals: "instrumental" })).toBe(0);
+  });
+
+  it("prefers instrumental music automatically on long-form creator routes", () => {
+    const experience = resolveSiteBgmExperience("/studio/projects");
+    const tracks = [
+      originalTrack({ id: "creator-vocal", src: "/audio/original/creator-vocal.mp3", role: "creator", vocalMode: "vocal", profiles: ["webtoon"], intensity: "normal" }),
+      originalTrack({ id: "creator-instrumental", src: "/audio/original/creator-instrumental.mp3", role: "creator", vocalMode: "instrumental", profiles: ["webtoon"], intensity: "normal" }),
+    ];
+    expect(resolveSiteOstTrackIndex(tracks, experience)).toBe(1);
+  });
+
+  it("persists adaptive OST preferences", () => {
     expect(readSiteBgmPreferences()).toEqual({
-      source: "page-theme",
       followRoute: true,
       expanded: false,
+      style: "auto",
+      intensity: "normal",
+      vocals: "auto",
     });
-    writeSiteBgmSource("vocal-ost");
     writeSiteBgmFollowRoute(false);
     writeSiteBgmExpanded(true);
+    writeSiteBgmStyle("cinematic");
+    writeSiteBgmIntensity("epic");
+    writeSiteBgmVocals("instrumental");
     expect(readSiteBgmPreferences()).toEqual({
-      source: "vocal-ost",
       followRoute: false,
       expanded: true,
+      style: "cinematic",
+      intensity: "epic",
+      vocals: "instrumental",
     });
   });
 
-  it("accepts only bounded same-origin audio entries with explicit provenance", () => {
+  it("accepts only reviewed original assets with production provenance", () => {
+    const good = originalTrack();
+    const aceStep = originalTrack({
+      id: "ace-step-original",
+      src: "/audio/original/ace-step-original.mp3",
+      provider: "ace-step",
+      model: "acestep-v15-turbo",
+      provenance: "local-generation-recorded",
+      c2paRequested: undefined,
+      generatorRevision: "b".repeat(40),
+      songId: undefined,
+    });
     const tracks = parseSiteBgmManifest({
       tracks: [
-        {
-          src: "/audio/theme.mp3",
-          title: "Theme",
-          artist: "Artist",
-          license: "Approved license",
-          creditUrl: "https://example.com/credit",
-        },
-        {
-          src: "https://untrusted.example/theme.mp3",
-          title: "External",
-          artist: "Artist",
-          license: "Unknown",
-          creditUrl: "https://example.com/credit",
-        },
-        {
-          src: "/audio/missing-credit.mp3",
-          title: "No credit",
-          artist: "Artist",
-          license: "License",
-          creditUrl: "javascript:alert(1)",
-        },
+        good,
+        aceStep,
+        { ...good, id: "legacy-ref", src: "/audio/legacy.mp3", origin: "licensed-reference" },
+        { ...good, id: "external", src: "https://untrusted.example/theme.mp3" },
+        { ...good, id: "missing-integrity", sha256: "bad" },
+        { ...good, id: "not-c2pa", c2paRequested: false },
+        { ...aceStep, id: "missing-revision", generatorRevision: "bad" },
+        { ...good, id: "draft", status: "draft" },
       ],
     });
-    expect(tracks).toEqual([
-      {
-        src: "/audio/theme.mp3",
-        title: "Theme",
-        artist: "Artist",
-        license: "Approved license",
-        creditUrl: "https://example.com/credit",
-      },
-    ]);
+    expect(tracks).toEqual([good, aceStep]);
   });
 });

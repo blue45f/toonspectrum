@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Application Settings modal — tabs:
  * General · Shortcuts · Mouse · Touch · Toolbar · Grids · Other
@@ -279,7 +283,7 @@ export function StudioAppSettingsPanel({
                     ? "bg-accent-soft text-accent ring-1 ring-accent/20"
                     : "text-fg-2 hover:bg-raised hover:text-fg"
                 )}
-                aria-current={tab === id ? "page" : undefined}
+                aria-current={tab === id ? translateCurrentStaticSourceText("domains.creator.StudioAppSettingsEditor", "en", "page") : undefined}
               >
                 {studioAppSettingsTabLabel(id, t)}
               </button>
@@ -620,8 +624,8 @@ export function StudioAppSettingsPanel({
                   </label>
                 </div>
                 <div className="grid min-h-0 gap-3 sm:grid-cols-2">
-                  <section className="flex min-h-0 flex-col rounded-xl border border-line bg-card/20 p-2" aria-labelledby={`${titleId}-toolbar-visible`}>
-                    <p id={`${titleId}-toolbar-visible`} className="mb-2 flex items-center justify-between gap-2 px-1 text-[0.66rem] font-semibold text-fg-3">
+                  <section className="flex min-h-0 flex-col rounded-xl border border-line bg-card/20 p-2" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAppSettingsEditor", "en", "{v0}-toolbar-visible"), { v0: String(titleId) })}>
+                    <p id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAppSettingsEditor", "en", "{v0}-toolbar-visible"), { v0: String(titleId) })} className="mb-2 flex items-center justify-between gap-2 px-1 text-[0.66rem] font-semibold text-fg-3">
                       <span>{t("studio.settings.toolbar.visibleLabel")}</span>
                       <span className="tabular-nums">{visibleMatches.length}</span>
                     </p>
@@ -687,8 +691,8 @@ export function StudioAppSettingsPanel({
                       ) : null}
                     </ul>
                   </section>
-                  <section className="flex min-h-0 flex-col rounded-xl border border-line border-dashed bg-card/10 p-2" aria-labelledby={`${titleId}-toolbar-hidden`}>
-                    <p id={`${titleId}-toolbar-hidden`} className="mb-2 flex items-center justify-between gap-2 px-1 text-[0.66rem] font-semibold text-fg-3">
+                  <section className="flex min-h-0 flex-col rounded-xl border border-line border-dashed bg-card/10 p-2" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAppSettingsEditor", "en", "{v0}-toolbar-hidden"), { v0: String(titleId) })}>
+                    <p id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAppSettingsEditor", "en", "{v0}-toolbar-hidden"), { v0: String(titleId) })} className="mb-2 flex items-center justify-between gap-2 px-1 text-[0.66rem] font-semibold text-fg-3">
                       <span>{t("studio.settings.toolbar.hiddenLabel")}</span>
                       <span className="tabular-nums">{hiddenMatches.length}</span>
                     </p>
@@ -934,8 +938,7 @@ export function StudioAppSettingsPanel({
                 className="text-[0.68rem] text-fg-3"
                 data-studio-app-settings-persistence="loading"
               >
-                SQLite/OPFS에서 설정을 확인하는 중입니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioAppSettingsEditor", "ko", "SQLite/OPFS에서 설정을 확인하는 중입니다.")}</p>
             ) : (
               <p className="text-[0.68rem] text-fg-3">
                 {t("studio.settings.other.persistenceSaved")}

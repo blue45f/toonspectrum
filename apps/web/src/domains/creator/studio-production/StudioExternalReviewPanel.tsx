@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   CheckCircle2,
   Download,
@@ -133,8 +137,7 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
     return (
       <div className="flex min-h-72 items-center justify-center rounded-2xl border border-line bg-card" role="status">
         <Loader2 className="mr-2 size-5 animate-spin text-accent" aria-hidden="true" />
-        검토 원고를 불러오는 중입니다.
-      </div>
+        {translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "검토 원고를 불러오는 중입니다.")}</div>
     );
   }
 
@@ -142,11 +145,10 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
     return (
       <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6" role="alert">
         <AlertTriangle className="size-8 text-red-600" aria-hidden="true" />
-        <h2 className="mt-3 text-base font-black">검토 원고를 열 수 없습니다</h2>
+        <h2 className="mt-3 text-base font-black">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "검토 원고를 열 수 없습니다")}</h2>
         <p className="mt-1 text-sm text-fg-2">{state.message}</p>
         <button type="button" className={cn(buttonClass({ variant: "outline", size: "sm" }), "mt-4")} onClick={() => void load()}>
-          다시 시도
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "다시 시도")}</button>
       </div>
     );
   }
@@ -159,7 +161,7 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
         <header className="mb-5 border-b border-line pb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-accent">External review</p>
+              <p className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "en", "External review")}</p>
               <h1 className="mt-1 text-xl font-black tracking-tight">{snapshot.work.title}</h1>
               {snapshot.work.description ? (
                 <p className="mt-2 max-w-3xl text-sm leading-relaxed text-fg-2">{snapshot.work.description}</p>
@@ -167,10 +169,10 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
               <span className="rounded-full border border-line bg-panel px-2 py-1">
-                {commenter ? "댓글·승인 가능" : "열람 전용"}
+                {commenter ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "댓글·승인 가능") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "열람 전용")}
               </span>
               <span className="rounded-full border border-line bg-panel px-2 py-1">
-                만료 {new Date(snapshot.link.expiresAt).toLocaleString("ko-KR")}
+                {translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "만료 ")}{new Date(snapshot.link.expiresAt).toLocaleString("ko-KR")}
               </span>
             </div>
           </div>
@@ -178,14 +180,13 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
 
         {snapshot.work.pages.length === 0 ? (
           <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-fg-2">
-            이 링크에 공개된 렌더 페이지가 없습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "이 링크에 공개된 렌더 페이지가 없습니다.")}</p>
         ) : (
           <div className="space-y-5">
             {snapshot.work.pages.map((page, index) => (
-              <article key={page.id} id={`review-page-${page.id}`} className="scroll-mt-28">
+              <article key={page.id} id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "en", "review-page-{v0}"), { v0: String(page.id) })} className="scroll-mt-28">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-fg-2">
-                  <span className="font-bold">{index + 1}페이지 · {page.id}</span>
+                  <span className="font-bold">{index + 1}{translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "페이지 · ")}{page.id}</span>
                   {snapshot.link.allowDownload ? (
                     <a
                       href={page.source}
@@ -193,16 +194,15 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
                       className={buttonClass({ variant: "quiet", size: "sm" })}
                     >
                       <Download className="size-4" aria-hidden="true" />
-                      다운로드
-                    </a>
+                      {translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "다운로드")}</a>
                   ) : null}
                 </div>
                 <div className="relative overflow-hidden rounded-xl border border-line bg-black/5">
                   <img
                     src={page.source}
-                    alt={`${snapshot.work.title} ${index + 1}페이지`}
+                    alt={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "{v0} {v1}페이지"), { v0: String(snapshot.work.title), v1: String(index + 1) })}
                     className="block h-auto w-full"
-                    loading={index > 1 ? "lazy" : "eager"}
+                    loading={index > 1 ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "en", "lazy") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "en", "eager")}
                     draggable={false}
                   />
                   {commenter ? (
@@ -217,15 +217,15 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
                         setSelectedAnchor({ pageId: page.id, x: 0.5, y: 0.5 });
                         setNotice("키보드 입력으로 페이지 중앙을 선택했습니다.");
                       }}
-                      aria-label={`${index + 1}페이지에서 검토 의견 위치 선택`}
+                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "{v0}페이지에서 검토 의견 위치 선택"), { v0: String(index + 1) })}
                     >
-                      <span className="sr-only">페이지를 클릭해 댓글 위치를 선택합니다.</span>
+                      <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "페이지를 클릭해 댓글 위치를 선택합니다.")}</span>
                     </button>
                   ) : null}
                   {(groupedFeedback.get(page.id) ?? []).map((feedback, feedbackIndex) => (
                     feedback.anchor?.x !== undefined && feedback.anchor.y !== undefined ? (
                       <span
-                        key={`marker-${feedback.id}`}
+                        key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "en", "marker-{v0}"), { v0: String(feedback.id) })}
                         className="pointer-events-none absolute z-20 grid size-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-accent text-[0.6875rem] font-black text-on-accent shadow-lg"
                         style={{
                           left: `${feedback.anchor.x * 100}%`,
@@ -253,8 +253,7 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
                       aria-hidden="true"
                     >
                       <span className="-rotate-12 select-none whitespace-nowrap text-2xl font-black uppercase tracking-[0.3em] text-black/15 dark:text-white/15 sm:text-4xl">
-                        Toon Studio Review
-                      </span>
+                        {translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "en", "Toon Studio Review")}</span>
                     </div>
                   ) : null}
                 </div>
@@ -275,17 +274,15 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
         <section className="rounded-2xl border border-line bg-card p-4">
           <div className="flex items-center gap-2">
             <MessageSquare className="size-5 text-accent" aria-hidden="true" />
-            <h2 className="text-sm font-black">검토 의견</h2>
+            <h2 className="text-sm font-black">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "검토 의견")}</h2>
           </div>
           {!commenter ? (
             <p className="mt-3 rounded-xl border border-line bg-panel p-3 text-xs leading-relaxed text-fg-2">
-              이 링크는 열람 전용입니다. 의견을 남기려면 댓글 권한이 있는 링크를 요청하세요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "이 링크는 열람 전용입니다. 의견을 남기려면 댓글 권한이 있는 링크를 요청하세요.")}</p>
           ) : (
             <div className="mt-3 space-y-3">
               <label className="grid gap-1.5 text-xs font-semibold text-fg-2">
-                검토자 이름
-                <input
+                {translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "검토자 이름")}<input
                   className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                   value={reviewerName}
                   onChange={(event) => setReviewerName(event.currentTarget.value)}
@@ -294,20 +291,18 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
                 />
               </label>
               <label className="grid gap-1.5 text-xs font-semibold text-fg-2">
-                의견 종류
-                <select
+                {translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "의견 종류")}<select
                   className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                   value={kind}
                   onChange={(event) => setKind(event.currentTarget.value as typeof kind)}
                 >
-                  <option value="comment">댓글</option>
-                  <option value="approve">승인</option>
-                  <option value="reject">반려</option>
+                  <option value="comment">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "댓글")}</option>
+                  <option value="approve">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "승인")}</option>
+                  <option value="reject">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "반려")}</option>
                 </select>
               </label>
               <label className="grid gap-1.5 text-xs font-semibold text-fg-2">
-                대상 페이지
-                <select
+                {translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "대상 페이지")}<select
                   className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                   value={pageId}
                   onChange={(event) => {
@@ -316,34 +311,33 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
                     setSelectedAnchor((current) => current?.pageId === nextPageId ? current : null);
                   }}
                 >
-                  <option value="">프로젝트 전체</option>
+                  <option value="">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "프로젝트 전체")}</option>
                   {snapshot.work.pages.map((page, index) => (
-                    <option key={page.id} value={page.id}>{index + 1}페이지</option>
+                    <option key={page.id} value={page.id}>{index + 1}{translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "페이지")}</option>
                   ))}
                 </select>
               </label>
               {selectedAnchor?.pageId === pageId ? (
                 <div className="flex items-center justify-between gap-2 rounded-xl border border-accent/30 bg-accent-soft p-3 text-xs">
                   <span>
-                    위치 {Math.round(selectedAnchor.x * 100)}% · {Math.round(selectedAnchor.y * 100)}%
+                    {translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "위치 ")}{Math.round(selectedAnchor.x * 100)}% · {Math.round(selectedAnchor.y * 100)}%
                   </span>
                   <button
                     type="button"
                     className={buttonClass({ variant: "quiet", size: "sm" })}
                     onClick={() => setSelectedAnchor(null)}
                   >
-                    페이지 전체로 변경
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "페이지 전체로 변경")}</button>
                 </div>
               ) : null}
               <label className="grid gap-1.5 text-xs font-semibold text-fg-2">
-                {kind === "reject" ? "반려 사유" : "의견"}
+                {kind === "reject" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "반려 사유") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "의견")}
                 <textarea
                   className="min-h-28 rounded-xl border border-line bg-panel p-3 text-sm text-fg"
                   value={body}
                   onChange={(event) => setBody(event.currentTarget.value)}
                   maxLength={4_000}
-                  placeholder={kind === "approve" ? "선택 사항" : "구체적인 수정 또는 검토 의견을 입력하세요."}
+                  placeholder={kind === "approve" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "선택 사항") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "구체적인 수정 또는 검토 의견을 입력하세요.")}
                 />
               </label>
               <button
@@ -353,7 +347,7 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
                 disabled={submitting}
               >
                 <Send className="size-4" aria-hidden="true" />
-                {submitting ? "저장 중" : "의견 저장"}
+                {submitting ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "저장 중") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "의견 저장")}
               </button>
             </div>
           )}
@@ -366,7 +360,7 @@ export function StudioExternalReviewPanel({ token }: StudioExternalReviewPanelPr
 
         {(groupedFeedback.get("project") ?? []).length > 0 ? (
           <section className="rounded-2xl border border-line bg-card p-4">
-            <h2 className="text-sm font-black">프로젝트 전체 의견</h2>
+            <h2 className="text-sm font-black">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "프로젝트 전체 의견")}</h2>
             <div className="mt-3 space-y-2">
               {(groupedFeedback.get("project") ?? []).map((item) => (
                 <FeedbackItem key={item.id} feedback={item} />
@@ -401,11 +395,11 @@ function FeedbackItem({ feedback }: { readonly feedback: StudioExternalReviewFee
       </div>
       {feedback.anchor?.x !== undefined && feedback.anchor.y !== undefined ? (
         <p className="mt-1 text-[0.6875rem] font-semibold text-accent">
-          위치 {Math.round(feedback.anchor.x * 100)}% · {Math.round(feedback.anchor.y * 100)}%
+          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "위치 ")}{Math.round(feedback.anchor.x * 100)}% · {Math.round(feedback.anchor.y * 100)}%
         </p>
       ) : null}
       <p className="mt-2 whitespace-pre-wrap leading-relaxed text-fg-2">
-        {feedback.body || (feedback.kind === "approve" ? "승인" : "")}
+        {feedback.body || (feedback.kind === "approve" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioExternalReviewPanel", "ko", "승인") : "")}
       </p>
     </article>
   );

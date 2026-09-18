@@ -5,7 +5,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SearchPage } from "./SearchPage";
 
-vi.mock("@/shared/lib/i18n", () => ({ useT: () => (key: string) => key }));
+vi.mock("@/shared/lib/i18n", () => ({
+  useI18n: (selector: (state: { lang: string }) => unknown) => selector({ lang: "en" }),
+  useT: () => (key: string) => key,
+}));
 vi.mock("@/shared/components/search-explorer", async () => {
   const { useState } = await import("react");
   return {

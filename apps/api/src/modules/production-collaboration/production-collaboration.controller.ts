@@ -5,6 +5,7 @@ import {
   Get,
   Header,
   Headers,
+  Inject,
   NotFoundException,
   Param,
   Post,
@@ -20,6 +21,8 @@ import {
   ProductionExternalReviewQueryDto,
   ProductionProjectByWorkParamsDto,
   ProductionProjectParamsDto,
+  ProductionRiskParamsDto,
+  ProductionRiskQueryDto,
   SubmitProductionExternalReviewDto,
 } from "./production-collaboration.dto";
 import { ProductionCollaborationService } from "./production-collaboration.service";
@@ -30,9 +33,31 @@ function authenticatedProductionUserId(userId: string | undefined): string {
 }
 
 const EXTERNAL_REVIEW_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,512}$/u;
+const BEARER_SCHEME = "bearer";
+
+function isHttpWhitespace(characterCode: number): boolean {
+  return characterCode === 0x20 || characterCode === 0x09;
+}
+
+function bearerExternalReviewToken(authorization: string | undefined): string | undefined {
+  if (!authorization || authorization.length <= BEARER_SCHEME.length) return undefined;
+  if (authorization.slice(0, BEARER_SCHEME.length).toLowerCase() !== BEARER_SCHEME) {
+    return undefined;
+  }
+  if (!isHttpWhitespace(authorization.charCodeAt(BEARER_SCHEME.length))) return undefined;
+
+  let tokenStart = BEARER_SCHEME.length + 1;
+  while (
+    tokenStart < authorization.length &&
+    isHttpWhitespace(authorization.charCodeAt(tokenStart))
+  ) {
+    tokenStart += 1;
+  }
+  return authorization.slice(tokenStart).trim();
+}
 
 function externalReviewToken(authorization: string | undefined, fallback: string | undefined): string {
-  const bearer = /^Bearer\s+(.+)$/iu.exec(authorization ?? "")?.[1]?.trim();
+  const bearer = bearerExternalReviewToken(authorization);
   const token = bearer || fallback?.trim() || "";
   if (!EXTERNAL_REVIEW_TOKEN_PATTERN.test(token)) {
     throw new NotFoundException("유효한 외부 검수 링크를 찾을 수 없습니다.");
@@ -42,7 +67,10 @@ function externalReviewToken(authorization: string | undefined, fallback: string
 
 @Controller("/production")
 export class ProductionCollaborationController {
-  constructor(private readonly service: ProductionCollaborationService) {}
+  constructor(
+    @Inject(ProductionCollaborationService)
+    private readonly service: ProductionCollaborationService,
+  ) {}
 
   @Post("/projects")
   @Header("Cache-Control", "private, no-store, max-age=0")
@@ -64,6 +92,28 @@ export class ProductionCollaborationController {
   @Header("Cache-Control", "private, no-store, max-age=0")
   getPersonalInbox(@Headers("x-user-id") userId?: string) {
     return this.service.getPersonalInbox(authenticatedProductionUserId(userId));
+  }
+
+  @Get("/projects/:projectId/risks")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  getRisks(
+    @Param(new ZodValidationPipe(ProductionProjectParamsDto))
+    params: ProductionProjectParamsDto,
+    @Query(new ZodValidationPipe(ProductionRiskQueryDto))
+    query: ProductionRiskQueryDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.getRisks(authenticatedProductionUserId(userId), params.projectId, query);
+  }
+
+  @Get("/projects/:projectId/risks/:riskId")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  getRisk(
+    @Param(new ZodValidationPipe(ProductionRiskParamsDto))
+    params: ProductionRiskParamsDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.getRisk(authenticatedProductionUserId(userId), params.projectId, params.riskId);
   }
 
   @Get("/projects/:projectId")

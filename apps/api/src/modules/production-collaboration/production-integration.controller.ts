@@ -7,6 +7,7 @@ import {
   Get,
   Header,
   Headers,
+  Inject,
   Param,
   Post,
   Query,
@@ -50,9 +51,14 @@ function parseDocumensoMetadata(raw: unknown) {
     if (error instanceof BadRequestException) throw error;
     throw new BadRequestException("서명 요청 metadata가 올바르지 않습니다.");
   }
-}@Controller("/production")
+}
+
+@Controller("/production")
 export class ProductionIntegrationController {
-  constructor(private readonly service: ProductionIntegrationService) {}
+  constructor(
+    @Inject(ProductionIntegrationService)
+    private readonly service: ProductionIntegrationService,
+  ) {}
 
   @Get("/projects/:projectId/integrations/capabilities")
   @Header("Cache-Control", "private, no-store, max-age=0")

@@ -335,6 +335,7 @@ export class IndexedCloudDesktopSyncRemote implements DesktopSyncRemote {
         const uploaded = await this.provider.uploadFile({
           relativePath: DESKTOP_CLOUD_INDEX_PATH,
           bytes: canonicalIndexBytes(next),
+          sourceSha256: sha256Bytes(canonicalIndexBytes(next)),
           expected: this.indexObject,
           signal,
         });
@@ -458,6 +459,7 @@ export class IndexedCloudDesktopSyncRemote implements DesktopSyncRemote {
     const uploaded = await this.provider.uploadFile({
       relativePath: path,
       bytes,
+      sourceSha256: input.sha256,
       expected: current,
     });
     if (

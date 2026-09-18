@@ -1,3 +1,4 @@
+import { translateBilingualValueForLocale } from "@/shared/lib/i18n-bilingual-copy";
 const KO = {
   common: {
     all: "전체",
@@ -259,5 +260,5 @@ const EN = {
 export type AdminAdvancedCopy = typeof KO;
 
 export function getAdminAdvancedCopy(locale: string): AdminAdvancedCopy {
-  return locale.toLowerCase().startsWith("ko") ? KO : (EN as unknown as AdminAdvancedCopy);
+  return translateBilingualValueForLocale(locale, "domains.admin.adminAdvancedCopy", KO, EN as unknown as AdminAdvancedCopy);
 }

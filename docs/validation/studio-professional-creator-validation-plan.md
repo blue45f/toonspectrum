@@ -67,6 +67,8 @@ External sessions start only after `pnpm run verify:studio-reference-projects` p
 
 The gate records evidence hashes and explicitly leaves `professionalReplacementClaimAllowed=false`. Passing it is a prerequisite, not a substitute, for signed participant evidence.
 
+Before participant sessions, `pnpm run verify:studio-operational-validation` must also pass. That gate verifies bounded performance planning, committed historical soak evidence and its leak negative control, deterministic failure recovery, file round-trip contracts, accessibility, CSP and dependency-security policy. Its receipt keeps current-commit long soak, physical device/browser faults and professional replacement claims disabled.
+
 ## 7. 실행 패키지와 제출 형식
 
 검증 운영자는 다음 순서로 실행한다.

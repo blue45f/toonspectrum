@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * AI 웹툰 생성 슈퍼 스위트 — 생성형 도구 5종을 한 컴패니언 창에 모은 모달.
  *
@@ -171,7 +175,7 @@ function StudioCopyTextButton({
     <button
       type="button"
       onClick={() => onCopy(copyKey, text)}
-      aria-label={`${label} 복사`}
+      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "{v0} 복사"), { v0: String(label) })}
       className={cn(
         "inline-flex shrink-0 items-center gap-1 rounded-lg border px-2.5 text-[0.62rem] font-bold",
         STUDIO_EASE,
@@ -185,7 +189,7 @@ function StudioCopyTextButton({
       )}
     >
       <Icon size={12} aria-hidden />
-      <span>{copied ? "복사됨" : failed ? "복사 실패" : "복사"}</span>
+      <span>{copied ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "복사됨") : failed ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "복사 실패") : translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "복사")}</span>
     </button>
   );
 }
@@ -198,7 +202,7 @@ function StudioAiSuiteInputNeeded({
   readonly icon: ReactElement;
   readonly description: string;
 }): ReactElement {
-  return <StudioEmptyState icon={icon} title="입력이 더 필요해요" description={description} />;
+  return <StudioEmptyState icon={icon} title={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "입력이 더 필요해요")} description={description} />;
 }
 
 export interface StudioAiSuperSuiteModalProps {
@@ -400,19 +404,16 @@ export function StudioAiSuperSuiteModal({
             />
             <div className="min-w-0">
               <h2 id={titleId} className="text-sm font-bold tracking-tight text-fg">
-                AI 웹툰 생성 슈퍼 스위트 (Webtoon AI Super Suite)
-              </h2>
+                {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "AI 웹툰 생성 슈퍼 스위트 (Webtoon AI Super Suite)")}</h2>
               <p id={descriptionId} className="text-[0.68rem] leading-relaxed text-fg-3">
-                네이버 툰필터 화풍 변환 · CSP 음영 어시스트 · 프롬프트 증강 · TooNat 콘티 디렉터 ·
-                투닝 감정 말풍선
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "네이버 툰필터 화풍 변환 · CSP 음영 어시스트 · 프롬프트 증강 · TooNat 콘티 디렉터 · 투닝 감정 말풍선")}</p>
             </div>
           </div>
           <button
             type="button"
             data-autofocus="true"
             onClick={onClose}
-            aria-label="슈퍼 스위트 닫기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "슈퍼 스위트 닫기")}
             className={cn(
               "inline-flex min-w-11 shrink-0 items-center justify-center rounded-lg px-2 text-fg-3",
               STUDIO_EASE,
@@ -433,7 +434,7 @@ export function StudioAiSuperSuiteModal({
             onSelect={(id) =>
               setActiveTab(pickStudioWorkbenchOption(id, AI_SUPER_SUITE_TAB_IDS, "style-filter"))
             }
-            ariaLabel="AI 슈퍼 스위트 도구"
+            ariaLabel={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "AI 슈퍼 스위트 도구")}
             idPrefix={idPrefix}
           />
         </div>
@@ -492,29 +493,26 @@ export function StudioAiSuperSuiteModal({
               {/* Concept Input */}
               <div className={PANEL_CARD_CLASS}>
                 <label
-                  htmlFor={`${idPrefix}-concept`}
+                  htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-concept"), { v0: String(idPrefix) })}
                   className="text-[0.72rem] font-bold text-fg"
                 >
-                  원하는 장면 아이디어 입력:
-                </label>
+                  {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "원하는 장면 아이디어 입력:")}</label>
                 <input
-                  id={`${idPrefix}-concept`}
+                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-concept"), { v0: String(idPrefix) })}
                   type="text"
                   value={userConceptPrompt}
                   onChange={(e) => setUserConceptPrompt(e.target.value)}
-                  placeholder="예: 주인공이 거대한 용을 마주하고 선다..."
+                  placeholder={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "예: 주인공이 거대한 용을 마주하고 선다...")}
                   aria-invalid={!conceptReady}
-                  aria-describedby={conceptReady ? undefined : `${idPrefix}-concept-error`}
+                  aria-describedby={conceptReady ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-concept-error"), { v0: String(idPrefix) })}
                   className={cn(TEXT_FIELD_CLASS, STUDIO_TOUCH_TARGET)}
                 />
                 {!conceptReady && (
                   <p
-                    id={`${idPrefix}-concept-error`}
+                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-concept-error"), { v0: String(idPrefix) })}
                     className="rounded-md border border-bad/35 bg-bad/10 px-2 py-1 text-[0.65rem] font-semibold text-bad"
                   >
-                    장면 아이디어를 {MIN_IDEA_LENGTH}자 이상 적어 주세요. 지금은 화풍 키워드만 남아
-                    생성기에 그대로 넣을 수 없어요.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "장면 아이디어를 ")}{MIN_IDEA_LENGTH}{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "자 이상 적어 주세요. 지금은 화풍 키워드만 남아 생성기에 그대로 넣을 수 없어요.")}</p>
                 )}
               </div>
 
@@ -523,11 +521,10 @@ export function StudioAiSuperSuiteModal({
                 <div className="flex flex-col gap-2 rounded-xl border border-accent/40 bg-accent-soft p-3.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-[0.75rem] font-bold text-accent">
-                      생성형 AI 최종 합성 프롬프트
-                    </span>
+                      {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "생성형 AI 최종 합성 프롬프트")}</span>
                     <StudioCopyTextButton
                       copyKey="style-positive"
-                      label="포지티브 프롬프트"
+                      label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "포지티브 프롬프트")}
                       text={compiledStylePrompt.positivePrompt}
                       statusFor={clipboard.statusFor}
                       onCopy={clipboard.copy}
@@ -539,10 +536,10 @@ export function StudioAiSuperSuiteModal({
 
                   <div className="mt-2 border-t border-line/50 pt-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-[0.68rem] font-bold text-fg-3">네거티브 프롬프트:</span>
+                      <span className="text-[0.68rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "네거티브 프롬프트:")}</span>
                       <StudioCopyTextButton
                         copyKey="style-negative"
-                        label="네거티브 프롬프트"
+                        label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "네거티브 프롬프트")}
                         text={compiledStylePrompt.negativePrompt}
                         statusFor={clipboard.statusFor}
                         onCopy={clipboard.copy}
@@ -561,23 +558,23 @@ export function StudioAiSuperSuiteModal({
                   */}
                   <dl className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg bg-card/70 p-2 font-mono text-[0.62rem] text-fg-2 sm:grid-cols-4">
                     <div className="flex justify-between gap-1">
-                      <dt className="text-fg-3">디노이즈</dt>
+                      <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "디노이즈")}</dt>
                       <dd className="font-bold">{compiledStylePrompt.denoiseStrength}</dd>
                     </div>
                     <div className="flex justify-between gap-1">
-                      <dt className="text-fg-3">선 두께</dt>
+                      <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "선 두께")}</dt>
                       <dd className="font-bold">
                         {compiledStylePrompt.recommendedSettings.lineFactor}
                       </dd>
                     </div>
                     <div className="flex justify-between gap-1">
-                      <dt className="text-fg-3">대비</dt>
+                      <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "대비")}</dt>
                       <dd className="font-bold">
                         {compiledStylePrompt.recommendedSettings.contrast}
                       </dd>
                     </div>
                     <div className="flex justify-between gap-1">
-                      <dt className="text-fg-3">채도</dt>
+                      <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "채도")}</dt>
                       <dd className="font-bold">
                         {compiledStylePrompt.recommendedSettings.saturation}
                       </dd>
@@ -611,14 +608,14 @@ export function StudioAiSuperSuiteModal({
                         <Sparkles className="size-3.5" aria-hidden />
                         <span>
                           {onApplyPromptRecipe
-                            ? "전체 화풍 레시피를 배경 생성기로 전송"
-                            : "포지티브 프롬프트만 배경/캐릭터 생성기로 전송"}
+                            ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "전체 화풍 레시피를 배경 생성기로 전송")
+                            : translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "포지티브 프롬프트만 배경/캐릭터 생성기로 전송")}
                         </span>
                       </button>
                       <p className="text-[0.62rem] leading-relaxed text-fg-3">
                         {onApplyPromptRecipe
-                          ? "포지티브·네거티브·디노이즈·선 두께·대비·채도를 제공자 호환 프롬프트로 보존해 전달해요."
-                          : "현재 연결은 포지티브 프롬프트만 전달해요. 나머지 값은 위에서 복사해 주세요."}
+                          ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "포지티브·네거티브·디노이즈·선 두께·대비·채도를 제공자 호환 프롬프트로 보존해 전달해요.")
+                          : translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "현재 연결은 포지티브 프롬프트만 전달해요. 나머지 값은 위에서 복사해 주세요.")}
                       </p>
                     </>
                   )}
@@ -626,7 +623,7 @@ export function StudioAiSuperSuiteModal({
               ) : (
                 <StudioAiSuiteInputNeeded
                   icon={<Palette size={20} aria-hidden />}
-                  description="장면 아이디어를 적으면 선택한 화풍의 최종 합성 프롬프트를 만들어 드려요."
+                  description={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "장면 아이디어를 적으면 선택한 화풍의 최종 합성 프롬프트를 만들어 드려요.")}
                 />
               )}
             </div>
@@ -640,14 +637,14 @@ export function StudioAiSuperSuiteModal({
                 <div className={PANEL_CARD_CLASS}>
                   <div
                     className="flex items-center gap-1.5 text-[0.75rem] font-bold"
-                    id={`${idPrefix}-light-direction`}
+                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-light-direction"), { v0: String(idPrefix) })}
                   >
                     <Compass className="size-4 text-accent" aria-hidden />
-                    <span>가상 광원 방향 (Light Direction)</span>
+                    <span>{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "가상 광원 방향 (Light Direction)")}</span>
                   </div>
                   <div
                     role="group"
-                    aria-labelledby={`${idPrefix}-light-direction`}
+                    aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-light-direction"), { v0: String(idPrefix) })}
                     className="grid grid-cols-3 gap-1.5 text-center text-[0.68rem] font-bold"
                   >
                     {LIGHT_DIRECTION_BUTTONS.map((btn) => {
@@ -677,17 +674,16 @@ export function StudioAiSuperSuiteModal({
 
                 {/* Light Parameters */}
                 <div className="flex flex-col gap-3 rounded-xl border border-line bg-card/60 p-3">
-                  <span className="text-[0.75rem] font-bold">광원 파라미터 조절</span>
+                  <span className="text-[0.75rem] font-bold">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "광원 파라미터 조절")}</span>
 
                   <div className="flex flex-col gap-1">
                     <div className="flex justify-between text-[0.68rem]">
-                      <label htmlFor={`${idPrefix}-intensity`} className="text-fg-3">
-                        빛 강도:
-                      </label>
+                      <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-intensity"), { v0: String(idPrefix) })} className="text-fg-3">
+                        {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "빛 강도:")}</label>
                       <span className="font-mono font-bold tabular-nums">{lightIntensity}%</span>
                     </div>
                     <input
-                      id={`${idPrefix}-intensity`}
+                      id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-intensity"), { v0: String(idPrefix) })}
                       type="range"
                       min={20}
                       max={100}
@@ -698,12 +694,11 @@ export function StudioAiSuperSuiteModal({
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <span id={`${idPrefix}-ambient`} className="text-[0.68rem] text-fg-3">
-                      환경광 색온도:
-                    </span>
+                    <span id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-ambient"), { v0: String(idPrefix) })} className="text-[0.68rem] text-fg-3">
+                      {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "환경광 색온도:")}</span>
                     <div
                       role="group"
-                      aria-labelledby={`${idPrefix}-ambient`}
+                      aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-ambient"), { v0: String(idPrefix) })}
                       className="grid grid-cols-2 gap-1 text-[0.65rem] font-bold sm:grid-cols-4 lg:grid-cols-2"
                     >
                       {AMBIENT_TEMPERATURE_BUTTONS.map((temp) => {
@@ -744,18 +739,18 @@ export function StudioAiSuperSuiteModal({
                       onChange={(e) => setEnableRim(e.target.checked)}
                       className="size-4 accent-accent"
                     />
-                    <span>외곽선 림라이트 (Rim Light) 강조 활성화</span>
+                    <span>{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "외곽선 림라이트 (Rim Light) 강조 활성화")}</span>
                   </label>
                 </div>
               </div>
 
               {/* Shading Vector & Swatches Result */}
               <div className="flex flex-col gap-2 rounded-xl border border-line bg-card/60 p-3.5">
-                <span className="text-[0.75rem] font-bold">계산된 셀 음영 벡터 &amp; 컬러 스펙</span>
+                <span className="text-[0.75rem] font-bold">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "계산된 셀 음영 벡터 &amp; 컬러 스펙")}</span>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <div className="flex flex-col items-center rounded-lg border border-line bg-card p-2 text-center">
                     <span className="text-[0.62rem] text-fg-3">
-                      1차 셀 음영 (투명도 {computedShading.shadow1Opacity})
+                      {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "1차 셀 음영 (투명도 ")}{computedShading.shadow1Opacity})
                     </span>
                     <div
                       aria-hidden
@@ -769,7 +764,7 @@ export function StudioAiSuperSuiteModal({
 
                   <div className="flex flex-col items-center rounded-lg border border-line bg-card p-2 text-center">
                     <span className="text-[0.62rem] text-fg-3">
-                      2차 딥 음영 (투명도 {computedShading.shadow2Opacity})
+                      {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "2차 딥 음영 (투명도 ")}{computedShading.shadow2Opacity})
                     </span>
                     <div
                       aria-hidden
@@ -782,7 +777,7 @@ export function StudioAiSuperSuiteModal({
                   </div>
 
                   <div className="flex flex-col items-center rounded-lg border border-line bg-card p-2 text-center">
-                    <span className="text-[0.62rem] text-fg-3">림라이트 컬러</span>
+                    <span className="text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "림라이트 컬러")}</span>
                     {/*
                       값이 없으면 색을 지어내지 않는다. 예전의 흰색 hex 폴백은 흰 림라이트가
                       계산된 것처럼 보여서, 바로 아래 "없음" 글자와 정면으로 어긋났다.
@@ -800,7 +795,7 @@ export function StudioAiSuperSuiteModal({
                       />
                     )}
                     <span className="font-mono text-[0.62rem] font-bold">
-                      {computedShading.rimLightColorHex ?? "없음"}
+                      {computedShading.rimLightColorHex ?? translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "없음")}
                     </span>
                   </div>
                 </div>
@@ -818,50 +813,46 @@ export function StudioAiSuperSuiteModal({
               <div className={PANEL_CARD_CLASS}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <label
-                    htmlFor={`${idPrefix}-raw-prompt`}
+                    htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-raw-prompt"), { v0: String(idPrefix) })}
                     className="text-[0.75rem] font-bold text-fg"
                   >
-                    자연어 아이디어 입력
-                  </label>
+                    {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "자연어 아이디어 입력")}</label>
                   <span className="rounded bg-accent-soft px-2 py-0.5 text-[0.62rem] font-bold text-accent">
-                    {genreHint === "" ? "감지된 장르" : "지정 장르"}:{" "}
+                    {genreHint === "" ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "감지된 장르") : translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "지정 장르")}:{" "}
                     {enhancedResult.detectedGenre.toUpperCase()}
                   </span>
                 </div>
                 <textarea
-                  id={`${idPrefix}-raw-prompt`}
+                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-raw-prompt"), { v0: String(idPrefix) })}
                   rows={3}
                   value={rawPromptInput}
                   onChange={(e) => setRawPromptInput(e.target.value)}
-                  placeholder="아이디어를 입력하세요 (예: 빗속에서 마법 지팡이를 들고 결의에 찬 표정으로 서 있는 주인공)..."
+                  placeholder={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "아이디어를 입력하세요 (예: 빗속에서 마법 지팡이를 들고 결의에 찬 표정으로 서 있는 주인공)...")}
                   aria-invalid={!rawPromptReady}
-                  aria-describedby={rawPromptReady ? undefined : `${idPrefix}-raw-prompt-error`}
+                  aria-describedby={rawPromptReady ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-raw-prompt-error"), { v0: String(idPrefix) })}
                   className={cn(TEXT_FIELD_CLASS, "resize-none")}
                 />
                 {!rawPromptReady && (
                   <p
-                    id={`${idPrefix}-raw-prompt-error`}
+                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-raw-prompt-error"), { v0: String(idPrefix) })}
                     className="rounded-md border border-bad/35 bg-bad/10 px-2 py-1 text-[0.65rem] font-semibold text-bad"
                   >
-                    아이디어를 {MIN_IDEA_LENGTH}자 이상 적어 주세요. 지금은 장르 키워드만 남아
-                    증강할 원문이 없어요.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "아이디어를 ")}{MIN_IDEA_LENGTH}{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "자 이상 적어 주세요. 지금은 장르 키워드만 남아 증강할 원문이 없어요.")}</p>
                 )}
 
                 <div className="flex flex-col gap-1">
-                  <span id={`${idPrefix}-genre`} className="text-[0.68rem] text-fg-3">
-                    장르 힌트 (자동 감지를 덮어씁니다):
-                  </span>
+                  <span id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-genre"), { v0: String(idPrefix) })} className="text-[0.68rem] text-fg-3">
+                    {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "장르 힌트 (자동 감지를 덮어씁니다):")}</span>
                   <div
                     role="group"
-                    aria-labelledby={`${idPrefix}-genre`}
+                    aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-genre"), { v0: String(idPrefix) })}
                     className="grid grid-cols-2 gap-1 text-[0.65rem] font-bold sm:grid-cols-3 lg:grid-cols-6"
                   >
                     {GENRE_HINT_CHOICES.map((choice) => {
                       const isSelected = genreHint === choice.id;
                       return (
                         <button
-                          key={choice.id === "" ? "auto" : choice.id}
+                          key={choice.id === "" ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "auto") : choice.id}
                           type="button"
                           aria-pressed={isSelected}
                           onClick={() => setGenreHint(choice.id)}
@@ -888,11 +879,10 @@ export function StudioAiSuperSuiteModal({
                   <div>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-[0.75rem] font-bold text-accent">
-                        증강된 포지티브 프롬프트
-                      </span>
+                        {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "증강된 포지티브 프롬프트")}</span>
                       <StudioCopyTextButton
                         copyKey="enhanced-positive"
-                        label="증강된 포지티브 프롬프트"
+                        label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "증강된 포지티브 프롬프트")}
                         text={enhancedResult.enhancedPositivePrompt}
                         statusFor={clipboard.statusFor}
                         onCopy={clipboard.copy}
@@ -906,11 +896,10 @@ export function StudioAiSuperSuiteModal({
                   <div className="border-t border-line/40 pt-2.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-[0.75rem] font-bold text-fg-3">
-                        작화 붕괴 방지 네거티브 프롬프트
-                      </span>
+                        {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "작화 붕괴 방지 네거티브 프롬프트")}</span>
                       <StudioCopyTextButton
                         copyKey="enhanced-negative"
-                        label="네거티브 프롬프트"
+                        label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "네거티브 프롬프트")}
                         text={enhancedResult.recommendedNegativePrompt}
                         statusFor={clipboard.statusFor}
                         onCopy={clipboard.copy}
@@ -925,7 +914,7 @@ export function StudioAiSuperSuiteModal({
               ) : (
                 <StudioAiSuiteInputNeeded
                   icon={<Zap size={20} aria-hidden />}
-                  description="원문 아이디어가 있어야 장르 키워드와 품질 앵커를 얹을 수 있어요."
+                  description={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "원문 아이디어가 있어야 장르 키워드와 품질 앵커를 얹을 수 있어요.")}
                 />
               )}
             </div>
@@ -936,28 +925,26 @@ export function StudioAiSuperSuiteModal({
             <div className="flex flex-col gap-4">
               <div className={PANEL_CARD_CLASS}>
                 <label
-                  htmlFor={`${idPrefix}-script`}
+                  htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-script"), { v0: String(idPrefix) })}
                   className="text-[0.75rem] font-bold text-fg"
                 >
-                  대본 / 시나리오 줄글 입력
-                </label>
+                  {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "대본 / 시나리오 줄글 입력")}</label>
                 <textarea
-                  id={`${idPrefix}-script`}
+                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-script"), { v0: String(idPrefix) })}
                   rows={4}
                   value={scriptInput}
                   onChange={(e) => setScriptInput(e.target.value)}
-                  placeholder="한 줄이 한 컷이 됩니다. 장면을 줄바꿈으로 나눠 적어 주세요."
+                  placeholder={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "한 줄이 한 컷이 됩니다. 장면을 줄바꿈으로 나눠 적어 주세요.")}
                   aria-invalid={!scriptReady}
-                  aria-describedby={scriptReady ? undefined : `${idPrefix}-script-error`}
+                  aria-describedby={scriptReady ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-script-error"), { v0: String(idPrefix) })}
                   className={cn(TEXT_FIELD_CLASS, "resize-none font-mono")}
                 />
                 {!scriptReady && (
                   <p
-                    id={`${idPrefix}-script-error`}
+                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-script-error"), { v0: String(idPrefix) })}
                     className="rounded-md border border-bad/35 bg-bad/10 px-2 py-1 text-[0.65rem] font-semibold text-bad"
                   >
-                    대본이 비어 있어요. 컷으로 나눌 문장을 한 줄 이상 적어 주세요.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "대본이 비어 있어요. 컷으로 나눌 문장을 한 줄 이상 적어 주세요.")}</p>
                 )}
               </div>
 
@@ -966,11 +953,9 @@ export function StudioAiSuperSuiteModal({
                 <div className={PANEL_CARD_CLASS}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-[0.75rem] font-bold">
-                      자동 생성된 컷별 콘티 ({storyboardResult.totalCuts}개 컷)
-                    </span>
+                      {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "자동 생성된 컷별 콘티 (")}{storyboardResult.totalCuts}{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "개 컷)")}</span>
                     <span className="font-mono text-[0.65rem] text-fg-3">
-                      예상 모바일 완독: 약 {storyboardResult.estimatedEpisodeReadingSec}초
-                    </span>
+                      {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "예상 모바일 완독: 약 ")}{storyboardResult.estimatedEpisodeReadingSec}{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "초")}</span>
                   </div>
 
                   <ol className="flex list-none flex-col gap-2 p-0">
@@ -982,18 +967,18 @@ export function StudioAiSuperSuiteModal({
                         <div className="flex flex-wrap items-center justify-between gap-1.5">
                           <div className="flex flex-wrap items-center gap-1.5 font-bold">
                             <span className="rounded bg-accent-soft px-1.5 py-0.5 text-accent">
-                              컷 #{cut.cutNumber}
+                              {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "컷 #")}{cut.cutNumber}
                             </span>
                             <span className="rounded bg-raised px-1.5 py-0.5 text-fg-2">
                               {cut.shotScale} · {cut.cameraAngle}
                             </span>
                             <span className="rounded bg-good/10 px-1.5 py-0.5 text-good">
-                              감정: {cut.emotion}
+                              {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "감정: ")}{cut.emotion}
                             </span>
                           </div>
                           {cut.suggestedSfx && (
                             <span className="rounded bg-accent-soft px-2 py-0.5 font-black text-accent">
-                              효과음: {cut.suggestedSfx}
+                              {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "효과음: ")}{cut.suggestedSfx}
                             </span>
                           )}
                         </div>
@@ -1001,11 +986,10 @@ export function StudioAiSuperSuiteModal({
                         <p className="text-fg">{cut.summary}</p>
                         {cut.dialogue && (
                           <p className="border-l-2 border-accent pl-2 font-semibold text-accent">
-                            대사: &ldquo;{cut.dialogue}&rdquo;
-                          </p>
+                            {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "대사: &ldquo;")}{cut.dialogue}{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "&rdquo;")}</p>
                         )}
                         <p className="text-[0.62rem] text-fg-3">
-                          배경 프롬프트: {cut.backgroundPrompt}
+                          {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "배경 프롬프트: ")}{cut.backgroundPrompt}
                         </p>
                       </li>
                     ))}
@@ -1014,7 +998,7 @@ export function StudioAiSuperSuiteModal({
               ) : (
                 <StudioAiSuiteInputNeeded
                   icon={<Clapperboard size={20} aria-hidden />}
-                  description="대본 한 줄이 한 컷이 됩니다. 문장을 적으면 샷 사이즈·앵글·효과음을 배정해 드려요."
+                  description={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "대본 한 줄이 한 컷이 됩니다. 문장을 적으면 샷 사이즈·앵글·효과음을 배정해 드려요.")}
                 />
               )}
             </div>
@@ -1025,28 +1009,26 @@ export function StudioAiSuperSuiteModal({
             <div className="flex flex-col gap-4">
               <div className={PANEL_CARD_CLASS}>
                 <label
-                  htmlFor={`${idPrefix}-dialogue`}
+                  htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-dialogue"), { v0: String(idPrefix) })}
                   className="text-[0.75rem] font-bold text-fg"
                 >
-                  대사 문장 입력 및 감정 테스트
-                </label>
+                  {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "대사 문장 입력 및 감정 테스트")}</label>
                 <input
-                  id={`${idPrefix}-dialogue`}
+                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-dialogue"), { v0: String(idPrefix) })}
                   type="text"
                   value={testDialogue}
                   onChange={(e) => setTestDialogue(e.target.value)}
-                  placeholder="예: 닥쳐! 절대 용서 못 해!!"
+                  placeholder={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "예: 닥쳐! 절대 용서 못 해!!")}
                   aria-invalid={!dialogueReady}
-                  aria-describedby={dialogueReady ? undefined : `${idPrefix}-dialogue-error`}
+                  aria-describedby={dialogueReady ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-dialogue-error"), { v0: String(idPrefix) })}
                   className={cn(TEXT_FIELD_CLASS, STUDIO_TOUCH_TARGET)}
                 />
                 {!dialogueReady && (
                   <p
-                    id={`${idPrefix}-dialogue-error`}
+                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "en", "{v0}-dialogue-error"), { v0: String(idPrefix) })}
                     className="rounded-md border border-bad/35 bg-bad/10 px-2 py-1 text-[0.65rem] font-semibold text-bad"
                   >
-                    대사를 입력해 주세요. 빈 문장에는 감정이 없어 기본 말풍선만 나옵니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "대사를 입력해 주세요. 빈 문장에는 감정이 없어 기본 말풍선만 나옵니다.")}</p>
                 )}
               </div>
 
@@ -1055,11 +1037,11 @@ export function StudioAiSuperSuiteModal({
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-line bg-card/80 p-4 text-center shadow-inner sm:p-8">
                   <div className="flex flex-wrap items-center justify-center gap-2">
                     <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-bold text-accent">
-                      감정 분석: {bubbleRecommendation.detectedEmotion} (신뢰도{" "}
+                      {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "감정 분석: ")}{bubbleRecommendation.detectedEmotion} {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "(신뢰도")}{" "}
                       {bubbleRecommendation.confidenceScore}%)
                     </span>
                     <span className="rounded-full bg-raised px-3 py-1 text-xs font-bold text-fg">
-                      추천 말풍선: {bubbleRecommendation.recommendedBubbleShape}
+                      {translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "추천 말풍선: ")}{bubbleRecommendation.recommendedBubbleShape}
                     </span>
                   </div>
 
@@ -1085,15 +1067,15 @@ export function StudioAiSuperSuiteModal({
                   </div>
 
                   <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-[0.68rem] text-fg-3">
-                    <span>선 두께: {bubbleRecommendation.strokeWidthPx}px</span>
-                    <span>폰트 굵기: {bubbleRecommendation.recommendedFontWeight}</span>
-                    <span>아이콘: {bubbleRecommendation.suggestedEmoteIcon}</span>
+                    <span>{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "선 두께: ")}{bubbleRecommendation.strokeWidthPx}px</span>
+                    <span>{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "폰트 굵기: ")}{bubbleRecommendation.recommendedFontWeight}</span>
+                    <span>{translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "아이콘: ")}{bubbleRecommendation.suggestedEmoteIcon}</span>
                   </div>
                 </div>
               ) : (
                 <StudioAiSuiteInputNeeded
                   icon={<MessageCircle size={20} aria-hidden />}
-                  description="대사를 입력하면 감정을 읽고 말풍선 모양·선 두께·폰트 굵기를 추천해 드려요."
+                  description={translateCurrentStaticSourceText("domains.creator.ai.StudioAiSuperSuiteModal", "ko", "대사를 입력하면 감정을 읽고 말풍선 모양·선 두께·폰트 굵기를 추천해 드려요.")}
                 />
               )}
             </div>

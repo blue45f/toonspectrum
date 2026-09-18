@@ -75,7 +75,7 @@ describe("StudioWebtoonAssistantModal — shell", () => {
     expect(document.body.style.overflow).toBe("hidden");
   });
 
-  it("keeps the whole canvas content and 6 feature tabs reachable", () => {
+  it("keeps the whole canvas content and 7 feature tabs reachable", () => {
     render(<StudioWebtoonAssistantModal open onClose={() => {}} />);
 
     expect(screen.getByText(/웹툰 창작 보조 센터/)).toBeTruthy();
@@ -87,6 +87,7 @@ describe("StudioWebtoonAssistantModal — shell", () => {
       "피부/그림자 컬러 조화",
       "마감 & 포커스플로우",
       "인체 크로키 & 구도 가이드",
+      "배우면서 만들기",
     ]);
     // 플랫폼 라벨은 스펙 모듈이 단일 출처다 — 여기서 문자열을 다시 적지 않는다.
     for (const spec of Object.values(WEBTOON_PLATFORM_SPECS)) {
@@ -121,7 +122,7 @@ describe("StudioWebtoonAssistantModal — shell", () => {
       /\b(?:bg|text|border|ring|outline|fill|stroke|from|via|to|decoration|shadow)-(?:emerald|amber|rose|slate|zinc|gray|neutral|stone|sky|indigo|red|green|yellow|blue|violet)-\d/;
     render(<StudioWebtoonAssistantModal open onClose={() => {}} />);
 
-    // 여섯 탭을 모두 렌더해 본다 — 비활성 탭의 마크업은 검사 범위 밖으로 새기 쉽다.
+    // 일곱 탭을 모두 렌더해 본다 — 비활성 탭의 마크업은 검사 범위 밖으로 새기 쉽다.
     for (const tab of screen.getAllByRole("tab")) {
       fireEvent.click(tab);
       const markup = screen.getByTestId("studio-webtoon-assistant-modal").outerHTML;
@@ -153,6 +154,7 @@ describe("StudioWebtoonAssistantModal — tab accessibility", () => {
       "-1",
       "-1",
       "-1",
+      "-1",
     ]);
   });
 
@@ -166,12 +168,31 @@ describe("StudioWebtoonAssistantModal — tab accessibility", () => {
     expect(screen.getByText("페이싱 건강도 점수")).toBeTruthy();
   });
 
+  it("recommends Academy material from the previously used assistant tool", () => {
+    render(<StudioWebtoonAssistantModal open onClose={() => {}} />);
+
+    const tabs = screen.getAllByRole("tab");
+    fireEvent.click(tabs[1]);
+    fireEvent.click(tabs[6]);
+
+    expect(screen.getByTestId("studio-contextual-learning-panel")).toBeTruthy();
+    expect(screen.getByText("스크롤 · 콘티 연출")).toBeTruthy();
+    expect(screen.getByText("지금 바로 도움이 되는 강좌와 자료")).toBeTruthy();
+    const libraryLink = screen.getByRole("link", { name: /전체 자료 보기/u });
+    expect(libraryLink.getAttribute("href")).toContain("/learn/resources?step=storyboard");
+  });
+
   it("labels fixture-derived analyses as sample data", () => {
     render(<StudioWebtoonAssistantModal open onClose={() => {}} />);
     expect(screen.getByText(/샘플 보호 영역 3곳 기준 예시/)).toBeTruthy();
 
     fireEvent.click(screen.getAllByRole("tab")[1]);
-    expect(screen.getByText(/샘플 컷 5개 기준 예시/)).toBeTruthy();
+    expect(screen.getByText(/실제 원고 컷 1개 분석/)).toBeTruthy();
+    expect(screen.getByText(/실제 컷 위치와 컷 안의 대사 요소/)).toBeTruthy();
+
+    rerender(<StudioWebtoonAssistantModal open onClose={() => {}} />);
+    fireEvent.click(screen.getAllByRole("tab")[0]);
+    expect(screen.getByText(/현재 원고에서 컷을 찾지 못함/)).toBeTruthy();
   });
 });
 

@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Application settings control center.
  *
@@ -390,7 +391,7 @@ export function StudioAppSettingsPanel({
                   ? "border-bad/30 bg-bad/5 text-bad"
                   : "border-good/30 bg-good/5 text-good",
               )}
-              role={notice.tone === "error" ? "alert" : "status"}
+              role={notice.tone === "error" ? translateCurrentStaticSourceText("domains.creator.StudioAppSettingsPanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioAppSettingsPanel", "en", "status")}
             >
               {notice.message}
             </p>

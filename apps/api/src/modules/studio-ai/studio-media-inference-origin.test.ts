@@ -12,6 +12,7 @@ describe("managed cloud media inference origin", () => {
       "https://localhost:8188/",
       "https://192.168.1.50/",
       "https://runtime.local/",
+      // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
       "https://user:secret@gpu-runtime.example.com/",
       "https://gpu-runtime.example.com/path",
       "https://gpu-runtime.example.com/?token=secret",

@@ -358,6 +358,106 @@ describe("ProductionCollaborationService", () => {
     expect(submissionResult.aggregate.auditEvents.at(-1)?.action).toBe("upsert-submission");
   });
 
+  it("binds an approved Studio revision to the production deliverable and episode", async () => {
+    const visualRevision = {
+      id: "studio-thumbnail-r2",
+      lineage: "visual" as const,
+      revision: 2,
+      digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      createdAt: at,
+    };
+    const ownerAssignmentId = "assignment:party-owner:producer";
+    const current: ProductionProjectAggregate = {
+      ...aggregate(),
+      episodes: [{
+        id: "episode-collaboration-12",
+        projectId: "project-1",
+        episodeId: "episode-12",
+        revision: 0,
+        state: "thumbnail-joint-review",
+        narrativeRevisionRef: null,
+        visualRevisionRef: null,
+        integratedRevisionRef: null,
+        activeHandoffId: null,
+        openBlockerCount: 0,
+        storyLockApproved: true,
+        thumbnailLockApproved: false,
+        jointProofApproved: false,
+        creditPreflightPassed: false,
+        publicationPreflightPassed: false,
+        updatedAt: at,
+      }],
+      deliverables: [{
+        id: "deliverable-thumbnail-12",
+        projectId: "project-1",
+        scope: episodeScope("project-1", "episode-12"),
+        type: "thumbnail",
+        expectedFormat: "studio-document",
+        completionCriteria: ["전체 컷 배치"],
+        currentSubmissionId: "submission-thumbnail-12-r2",
+        approvedSubmissionId: "submission-thumbnail-12-r2",
+      }],
+      submissions: [{
+        id: "submission-thumbnail-12-r2",
+        projectId: "project-1",
+        deliverableId: "deliverable-thumbnail-12",
+        revisionRef: visualRevision,
+        submittedByAssignmentId: ownerAssignmentId,
+        submittedAt: at,
+        status: "approved",
+        inputRevisionRefs: [],
+        evidenceRefs: ["approval-thumbnail-12-r2"],
+      }],
+      studioRevisionLinks: [],
+    };
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current, {
+      view: true,
+      comment: true,
+      edit: true,
+      manage: true,
+      owner: true,
+      role: "owner",
+    }));
+
+    const result = await service().executeCommand("owner-1", "project-1", {
+      expectedRevision: 0,
+      mutationId: "99999999-9999-4999-8999-999999999999",
+      command: {
+        type: "upsert-studio-revision-link",
+        link: {
+          id: "studio-link-thumbnail-12-r2",
+          projectId: "project-1",
+          workId: "work-1",
+          episodeId: "episode-12",
+          studioDocumentRef: "document-thumbnail-12",
+          documentRole: "thumbnail",
+          studioRevisionRef: visualRevision,
+          deliverableId: "deliverable-thumbnail-12",
+          submissionId: "submission-thumbnail-12-r2",
+          linkedByAssignmentId: ownerAssignmentId,
+          status: "approved",
+          linkedAt: at,
+          approvedAt: at,
+        },
+      },
+    });
+
+    expect(result.aggregate.studioRevisionLinks).toHaveLength(1);
+    expect(result.aggregate.episodes[0]?.visualRevisionRef).toEqual(visualRevision);
+    expect(result.derived).toMatchObject({
+      coverage: {
+        approvedRoles: ["thumbnail"],
+        pendingRoles: [],
+        missingRoles: [],
+      },
+    });
+    expect(result.aggregate.auditEvents.at(-1)).toMatchObject({
+      action: "upsert-studio-revision-link",
+      targetType: "studio-revision-link",
+      targetId: "studio-link-thumbnail-12-r2",
+    });
+  });
+
   it("archives immutable procurement scope revisions behind an Addendum", async () => {
     const revision = {
       id: "story-r1",
@@ -1005,6 +1105,99 @@ describe("ProductionCollaborationService", () => {
       "external-review-1",
       "b".repeat(64),
     )).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("audits risk response transitions and requires manage capability for approval", async () => {
+    const base = aggregate();
+    const ownerAssignmentId = base.assignments[0]!.id;
+    const current: ProductionProjectAggregate = {
+      ...base,
+      risks: [{
+        id: "risk-test",
+        projectId: "project-1",
+        revision: 1,
+        scope: { kind: "project", id: "project-1", ancestors: [] },
+        category: "schedule",
+        source: "manual",
+        signalIds: [],
+        title: "게시 일정 위험",
+        description: "후행 작업 지연 가능성이 있습니다.",
+        probability: 3,
+        impact: 4,
+        exposureScore: 12,
+        severity: "warning",
+        priorityScore: 48,
+        ownerAssignmentId,
+        causeCodes: ["manual"],
+        earlySignals: [],
+        mitigation: "작업을 분할합니다.",
+        contingency: "게시 일정을 조정합니다.",
+        trigger: "직접 등록",
+        affectedTaskIds: [],
+        affectedEpisodeIds: [],
+        affectedMilestoneIds: [],
+        baselineDueAt: null,
+        forecastDueAt: null,
+        varianceHours: null,
+        status: "open",
+        dueAt: null,
+        responseDueAt: null,
+        nextReviewAt: null,
+        acceptedReason: null,
+        dismissedReason: null,
+        resolutionSummary: null,
+        detectedAt: at,
+        lastEvaluatedAt: at,
+        occurredAt: null,
+        resolvedAt: null,
+        closedAt: null,
+        createdAt: at,
+        updatedAt: at,
+      }],
+      riskResponses: [{
+        id: "risk-response-test",
+        projectId: "project-1",
+        riskId: "risk-test",
+        strategy: "mitigate",
+        actionType: "split-task",
+        title: "작업 분할",
+        description: "선화 작업을 나눕니다.",
+        ownerAssignmentId,
+        dueAt: null,
+        linkedTaskId: null,
+        linkedChangeRequestId: null,
+        linkedChangeOrderId: null,
+        expectedEffect: "예상 지연 감소",
+        actualEffect: null,
+        status: "proposed",
+        createdAt: at,
+        completedAt: null,
+      }],
+    };
+    repository.mutateProject.mockImplementation(async (input) => {
+      expect(input.requiredCapability).toBe("manage");
+      return input.mutate(current, {
+        view: true, comment: true, edit: true, manage: true, owner: true, role: "owner",
+      });
+    });
+
+    const result = await service().executeCommand("owner-1", "project-1", {
+      expectedRevision: 0,
+      mutationId: "13131313-1313-4313-8313-131313131313",
+      command: {
+        type: "transition-risk-response",
+        responseId: "risk-response-test",
+        toStatus: "approved",
+        actualEffect: null,
+      },
+    });
+
+    expect(result.aggregate.riskResponses[0]?.status).toBe("approved");
+    expect(result.aggregate.auditEvents.at(-1)).toMatchObject({
+      action: "transition-risk-response",
+      targetType: "risk-response",
+      targetId: "risk-response-test",
+    });
   });
 
 });

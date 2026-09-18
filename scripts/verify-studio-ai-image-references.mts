@@ -6,7 +6,7 @@
  * TOONSPECTRUM_VERIFY_ORIGIN reuses an existing preview; otherwise this owns a Vite preview.
  * TOONSPECTRUM_VERIFY_DIR controls evidence output. Optional TOONSPECTRUM_VERIFY_EXPECTED_SW and
  * TOONSPECTRUM_VERIFY_BUILD_DIR bind external runs to the expected immutable build artifact.
- * An owned static preview may lack Nest; only observed 502s from four optional guest APIs are
+ * An owned static preview may lack Nest; only observed 502s from explicitly allowlisted optional guest APIs are
  * classified as environment diagnostics. External origins require healthy APIs by default.
  */
 import assert from "node:assert/strict";
@@ -49,19 +49,28 @@ interface ScenarioReport {
 const output = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonspectrum-studio-ai-image-references");
 const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim().replace(/\/+$/u, "");
 const allowOptionalApi = !externalOrigin || process.env.TOONSPECTRUM_VERIFY_API_OPTIONAL === "1";
-const autosaveKey = studioAutosaveKey({});
+const initialAutosaveKey = studioAutosaveKey({});
 const guidanceLabel = "favicon-32 참조 지침";
 
 function message(error: unknown): string { return error instanceof Error ? error.stack ?? error.message : String(error); }
 function elements(document: SavedDocument | null) { return document?.pagesList.flatMap(page => page.elements) ?? []; }
 
-function optionalApi502(entry: Pick<HttpDiagnostic, "url" | "status">, origin: string): boolean {
-  if (!allowOptionalApi || entry.status !== 502) return false;
-  const url = new URL(entry.url);
+function optionalApiRequestUrl(value: string, origin: string): boolean {
+  if (!allowOptionalApi) return false;
+  const url = new URL(value);
   return url.origin === origin && (
-    ["/api/auth/session", "/api/kmas/merge-on-access", "/api/studio-ai/status"].includes(url.pathname)
+    [
+      "/api/auth/session",
+      "/api/health/ready",
+      "/api/kmas/merge-on-access",
+      "/api/studio-ai/status",
+    ].includes(url.pathname)
     || url.pathname.startsWith("/api/analytics/traffic/")
   );
+}
+
+function optionalApi502(entry: Pick<HttpDiagnostic, "url" | "status">, origin: string): boolean {
+  return entry.status === 502 && optionalApiRequestUrl(entry.url, origin);
 }
 
 function classifyDiagnostics(report: ScenarioReport, origin: string): void {
@@ -82,7 +91,13 @@ function classifyDiagnostics(report: ScenarioReport, origin: string): void {
     // Chromium can abort an unread body after receiving the optional API's 502 headers. The
     // status below belongs to this exact Request object, never another request with the same URL.
     const optionalResponse = optionalApi502({ url: entry.url, status: entry.responseStatus ?? 0 }, origin);
-    const expectedCancellation = (entry.cancellationScope !== null || optionalResponse) && entry.error.includes("ERR_ABORTED");
+    const optionalPreResponseAbort = entry.responseStatus === null
+      && optionalApiRequestUrl(entry.url, origin);
+    const expectedCancellation = (
+      entry.cancellationScope !== null
+      || optionalResponse
+      || optionalPreResponseAbort
+    ) && entry.error.includes("ERR_ABORTED");
     (expectedCancellation ? report.environment : report.errors).push(entry);
   }
 }
@@ -91,6 +106,7 @@ async function runScenario(browser: Browser, origin: string, scenario: Scenario)
   const directory = join(output, scenario);
   mkdirSync(directory, { recursive: true });
   const report: ScenarioReport = { scenario, status: "failed", steps: [], evidence: {}, http: [], console: [], requestFailures: [], environment: [], errors: [] };
+  let autosaveKey = initialAutosaveKey;
   let context: BrowserContext | undefined;
   let page: Page | undefined;
   let currentStep = "boot";
@@ -115,7 +131,20 @@ async function runScenario(browser: Browser, origin: string, scenario: Scenario)
     await installStudioInAppFirstRunState(activePage);
     await activePage.goto(`${origin}/studio`, { waitUntil: "domcontentloaded" });
     const viewport = activePage.locator('[data-studio-canvas-viewport="true"]').first();
-    await viewport.waitFor({ state: "visible", timeout: 30_000 });
+    try {
+      await viewport.waitFor({ state: "visible", timeout: 3_000 });
+    } catch {
+      await activePage.goto(`${origin}/studio/new`, { waitUntil: "domcontentloaded" });
+      const start = activePage.getByRole("button", { name: /웹툰 시작|Start Webtoon/u });
+      await start.waitFor({ state: "visible", timeout: 30_000 });
+      await start.click();
+      await activePage.waitForURL(/\/studio\/p\/[^/]+\/d\/[^?]+/u, { timeout: 30_000 });
+      const documentMatch = new URL(activePage.url()).pathname.match(/\/studio\/p\/[^/]+\/d\/([^/]+)/u);
+      if (documentMatch?.[1]) {
+        autosaveKey = studioAutosaveKey({ workId: decodeURIComponent(documentMatch[1]) });
+      }
+      await viewport.waitFor({ state: "visible", timeout: 30_000 });
+    }
     const redo = activePage.locator('button[data-studio-primary-action="redo"]:visible').first();
 
     async function read(): Promise<SavedDocument | null> {
@@ -156,14 +185,19 @@ async function runScenario(browser: Browser, origin: string, scenario: Scenario)
     async function scenarioDialog() {
       await menu("ai", "ai-assist");
       await activePage.getByRole("button", { name: /스토리 → 편집 가능한 컷/u }).click();
-      const dialog = activePage.getByRole("dialog", { name: "시나리오 자동 생성", exact: true });
+      const dialog = activePage.getByRole("dialog", {
+        name: /AI 코믹 디렉터|시나리오 자동 생성/u,
+      }).first();
       await dialog.waitFor();
-      const details = dialog.locator("details").filter({ hasText: "AI 이미지 참조 팩" });
-      if (await details.getAttribute("open") === null) await details.locator("summary").click();
+      await dialog
+        .locator('[data-studio-ai-image-reference-pack-editor="true"]')
+        .waitFor({ state: "visible" });
       return dialog;
     }
     async function closeScenario(): Promise<void> {
-      const dialog = activePage.getByRole("dialog", { name: "시나리오 자동 생성", exact: true });
+      const dialog = activePage.getByRole("dialog", {
+        name: /AI 코믹 디렉터|시나리오 자동 생성/u,
+      }).first();
       if (!await dialog.isVisible()) return;
       await dialog.getByRole("button", { name: "닫기", exact: true }).click();
       await dialog.waitFor({ state: "hidden" });

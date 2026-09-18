@@ -21,8 +21,9 @@ describe("studio shell floating integration", () => {
       .toContain("data-studio-shell-force-visible");
     expect(source("brush/StudioDrawOptionsBar.tsx"))
       .toContain('data-studio-draw-options-dock={docked ? "true" : undefined}');
-    expect(source("brush/StudioDrawingInputDeck.tsx"))
-      .toContain('data-studio-drawing-input-deck-trigger="true"');
+    // Device calibration remains available as a dedicated panel, but it is no longer a permanent
+    // canvas launcher. Drawing and selection share the canonical bottom context surface instead.
+    expect(source("StudioOptionsBars.tsx")).not.toContain("StudioDrawingInputDeck");
     expect(source("brush/StudioDrawingInputDeckPanel.tsx"))
       .toContain('data-studio-drawing-input-deck-panel="true"');
     expect(source("offline/StudioOfflinePanel.tsx"))
@@ -33,6 +34,26 @@ describe("studio shell floating integration", () => {
       .toContain('data-studio-shell-floating-target="workspace-arrangement"');
     expect(source("StudioWorkspaceArrangementControls.tsx"))
       .toContain('data-studio-shell-force-visible={arranging ? "true" : undefined}');
+    expect(source("studio-cuttoon-editor/studio-cuttoon-stage-pointers-down-draw.ts"))
+      .toContain('setStudioStrokeFocusActivity("canvas-stroke", true)');
+    expect(source("StudioCuttoonEditorHost.tsx"))
+      .toContain('setStudioStrokeFocusActivity("canvas-stroke", false)');
+    expect(source("live/huddle/StudioP2pHuddleLauncher.tsx"))
+      .toContain('strokeFocusPhase === "drawing"');
+  });
+
+  it("keeps phone floating status controls in separate lanes above the editing dock", () => {
+    const saveCenter = source("StudioDraftSaveCenterImpl.tsx");
+    const offline = source("offline/StudioOfflinePanel.tsx");
+    const huddle = source("live/huddle/StudioP2pHuddleLauncher.tsx");
+    const manager = source("studio-shell/StudioShellFloatingLayoutManager.tsx");
+    expect(saveCenter).toContain("var(--studio-canvas-bottom-inset,7rem)+4.25rem");
+    expect(offline).toContain("var(--studio-canvas-bottom-inset,7rem)+7.5rem");
+    expect(offline).toContain('!attentionRequired && "max-lg:hidden"');
+    expect(huddle).toContain("var(--studio-canvas-bottom-inset,5rem)+0.75rem");
+    expect(manager).toContain("var(--studio-canvas-bottom-inset,0px)+0.75rem");
+    expect(manager).toContain("보기 설정");
+    expect(manager).toContain("{visibleCount}개");
   });
 
   it("lazy-loads the durable manager inside the document lifetime boundary", () => {
@@ -66,21 +87,23 @@ describe("studio shell floating integration", () => {
 
     const provider = source("studio-shell/StudioShellFloatingLayoutProvider.tsx");
     expect(provider).not.toContain("navigator.storage");
-    expect(provider).toContain('event.pointerType !== "pen"');
-    expect(provider).toContain("focusModeActive");
-    expect(provider).toContain("setSurfaceMounted");
-    expect(provider).toContain("visibility.autoHideWhileDrawing || arranging");
-    const drawingAutoHide = source("studio-shell/studio-shell-drawing-auto-hide.ts");
-    expect(drawingAutoHide).toContain('[data-studio-canvas-viewport]');
+    expect(provider).toContain('"data-studio-shell-stroke-auto-hide"');
 
     const manager = source("studio-shell/StudioShellFloatingLayoutManager.tsx");
     expect(manager).toContain('aria-keyshortcuts="Control+Shift+L Meta+Shift+L"');
     expect(manager).toContain("z-[70]");
+    expect(manager).toContain("data-studio-shell-stroke-auto-hide");
+    expect(manager).toContain('data-studio-shell-force-visible="true"');
+    expect(manager).toContain("STUDIO_STROKE_FOCUS_SETTLE_MS");
     expect(manager).toContain("플랫폼 규격");
     expect(manager).toContain("펜으로 그리는 동안 자동 숨김");
     expect(manager).toContain("data-studio-shell-drawing-auto-hide-active");
     expect(manager).toContain("data-studio-shell-mounted-state");
     expect(manager).toContain("data-studio-shell-focus-mode");
     expect(manager).toContain("--studio-canvas-bottom-inset");
+    expect(manager).toContain("StudioDesktopFloatingSurface");
+    expect(manager).toContain("STUDIO_FLOATING_MENU_LAYOUTS.viewOptions");
+    expect(manager).toContain('data-studio-shell-view-options-panel');
+    expect(manager).toContain("useMediaQuery(STUDIO_DESKTOP_FLOATING_QUERY)");
   });
 });

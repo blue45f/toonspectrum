@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Skew Panel
  * 선택 요소(이미지/텍스트/스티커)의 자유 변형 "기울이기(Skew)" 인스펙터 —
@@ -40,17 +44,16 @@ export function StudioSkewPanel({
     <div className="space-y-2">
       {/* 헤더 + 항등 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">기울이기 (Skew)</p>
+        <p className="text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioSkewPanel", "ko", "기울이기 (Skew)")}</p>
         <button
           type="button"
           onClick={onReset}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title="기울임을 제거하고 원본으로 되돌립니다."
+          title={translateCurrentStaticSourceText("domains.creator.StudioSkewPanel", "ko", "기울임을 제거하고 원본으로 되돌립니다.")}
         >
           <RotateCcw className="size-3.5" />
-          원본으로
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioSkewPanel", "ko", "원본으로")}</button>
       </div>
 
       {/* 축별 슬라이더 + 스냅 각 칩 — 칩은 현재 각과 일치하면 눌림(aria-pressed) 상태로 표시. */}
@@ -73,7 +76,7 @@ export function StudioSkewPanel({
                   key={angle}
                   active={current === angle}
                   onClick={() => onPatch({ [key]: angle })}
-                  title={`${label}을 ${angle}°로 스냅합니다.`}
+                  title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSkewPanel", "ko", "{v0}을 {v1}°로 스냅합니다."), { v0: String(label), v1: String(angle) })}
                 >
                   {formatDeg(angle)}
                 </StudioToggleChip>

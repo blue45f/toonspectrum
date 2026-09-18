@@ -1,9 +1,18 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 
+import { StudioCompatibilityReportsPanel } from "../project-graph/StudioCompatibilityReportsPanel";
+import { StudioProjectGraphContextBar } from "../project-graph/StudioProjectGraphContextBar";
+import { StudioProjectVersionStackPanel } from "../project-graph/StudioProjectVersionStackPanel";
 import {
   resolveStudioProjectView,
   studioProjectDefaultView,
@@ -18,12 +27,13 @@ import { StudioProjectFeatureSuitePanel } from "./StudioProjectFeatureSuitePanel
 import { StudioReviewPanel } from "./StudioReviewPanel";
 import { StudioProductionToolchainPanel } from "../toolchain/StudioProductionToolchainPanel";
 import { StudioSeriesKitPanel } from "./StudioSeriesKitPanel";
+import { StudioWebtoonProductionCompanion } from "./StudioWebtoonProductionCompanion";
 import {
   StudioProjectShellPage,
   type StudioProjectSection,
 } from "./StudioProjectShellPage";
 
-type Locale = "ko" | "en";
+type Locale = string;
 
 const WEBTOON_ONBOARDING_PROFILE_PREFIX = "toonstudio:webtoon-onboarding:v1:";
 const LazyStudioWebtoonOnboardingPanel = lazy(async () => {
@@ -45,8 +55,9 @@ function StudioWebtoonOnboardingPanelSlot({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
+  const l = useBilingualLocalizer("studioProjectIntegrated.onboarding");
   const [enabled, setEnabled] = useState(() => hasStoredWebtoonOnboarding(projectId));
 
   useEffect(() => {
@@ -61,7 +72,7 @@ function StudioWebtoonOnboardingPanelSlot({
         <div
           className="min-h-28 animate-pulse rounded-3xl border border-accent/20 bg-accent-soft/15"
           aria-busy="true"
-          aria-label={locale === "ko" ? "제작 온보딩 불러오는 중" : "Loading production onboarding"}
+          aria-label={bt("제작 온보딩 불러오는 중", "Loading production onboarding")}
         />
       )}
     >
@@ -69,6 +80,11 @@ function StudioWebtoonOnboardingPanelSlot({
     </Suspense>
   );
 }
+
+const StudioCreatorIntelligencePanel = lazy(async () => {
+  const module = await import("../creator-intelligence/StudioCreatorIntelligencePanel");
+  return { default: module.StudioCreatorIntelligencePanel };
+});
 
 const StudioCompatibilityReportsPanel = lazy(async () => {
   const module = await import("../project-graph/StudioCompatibilityReportsPanel");
@@ -85,17 +101,18 @@ const StudioProjectVersionStackPanel = lazy(async () => {
   return { default: module.StudioProjectVersionStackPanel };
 });
 
-function ProjectGraphPanelFallback({ locale }: { readonly locale: Locale }) {
+function ProjectGraphPanelFallback({ locale }: { readonly locale: string }) {
+  const l = useBilingualLocalizer("studioProjectIntegrated.graphFallback");
   return (
     <div
       className="min-h-20 animate-pulse rounded-2xl border border-line bg-card/80"
       role="status"
-      aria-label={locale === "ko" ? "작품 버전 정보를 불러오는 중" : "Loading project version data"}
+      aria-label={bt("작품 버전 정보를 불러오는 중", "Loading project version data")}
     />
   );
 }
 
-function localeFromLanguage(language: string): Locale {
+function localeFromLanguage(language: string) {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
@@ -116,8 +133,9 @@ function SectionWorkflow({
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
+  useBilingualI18nRevision();
   const showDelivery = section === "export" || (section === "settings" && view === "archive");
 
   return (
@@ -128,6 +146,11 @@ function SectionWorkflow({
         view={view}
         locale={locale}
       />
+      {section === "overview" && view === "intelligence" ? (
+        <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
+          <StudioCreatorIntelligencePanel projectId={projectId} locale={locale} />
+        </Suspense>
+      ) : null}
       {section === "production" ? (
         <StudioProductionCocreatorBridgePanel projectId={projectId} locale={locale} />
       ) : null}
@@ -147,18 +170,14 @@ function SectionWorkflow({
         <StudioSeriesKitPanel projectId={projectId} locale={locale} />
       ) : null}
       {section === "review" && view === "versions" ? (
-        <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
-          <StudioProjectVersionStackPanel projectId={projectId} locale={locale} />
-        </Suspense>
+        <StudioProjectVersionStackPanel projectId={projectId} locale={locale} />
       ) : null}
       {section === "review" ? (
         <StudioReviewPanel projectId={projectId} locale={locale} />
       ) : null}
       {(section === "assets" && (view === "missing" || view === "rights"))
         || (section === "export" && view === "preflight") ? (
-          <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
-            <StudioCompatibilityReportsPanel projectId={projectId} locale={locale} />
-          </Suspense>
+          <StudioCompatibilityReportsPanel projectId={projectId} locale={locale} />
         ) : null}
       {section === "export" ? (
         <StudioExportPanel projectId={projectId} locale={locale} />
@@ -185,6 +204,7 @@ export function StudioProjectIntegratedPage({
 }: {
   readonly section: StudioProjectSection;
 }) {
+  const bt = useBilingual("StudioProjectIntegratedPage");
   const { projectId = "" } = useParams<{ projectId: string }>();
   const location = useLocation();
   const language = useI18n((state) => state.lang);
@@ -203,11 +223,7 @@ export function StudioProjectIntegratedPage({
       <StudioProjectShellPage section={section} />
       {decodedProjectId ? (
         <Container size="wide" className="-mt-3 space-y-5 pb-10 sm:-mt-5 sm:pb-14">
-          <StudioWebtoonOnboardingPanelSlot projectId={decodedProjectId} locale={locale} />
-          <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
-            <StudioProjectGraphContextBar projectId={decodedProjectId} locale={locale} />
-          </Suspense>
-
+          <StudioProjectGraphContextBar projectId={decodedProjectId} locale={locale} />
           <SectionWorkflow
             projectId={decodedProjectId}
             section={section}

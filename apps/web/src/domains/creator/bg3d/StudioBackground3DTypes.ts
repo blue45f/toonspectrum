@@ -71,6 +71,7 @@ export interface StudioBackground3DProps {
 
 export type TransformModeId = "translate" | "rotate" | "scale";
 export type TransformSpace = "local" | "world";
+export type StudioBg3dExperienceMode = "simple" | "pro";
 export type BgPanelTab = "shapes" | "templates" | "layers" | "view" | "lt" | "models";
 export type ViewEditorSection = "camera" | "physics" | "prosuite";
 export type LtEditorSection = "line" | "tone";

@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useState } from "react";
 
 import { cx } from "@/shared/lib/cx";
@@ -28,9 +29,9 @@ export function CoverImage({
     <img
       src={src}
       alt={alt}
-      loading={priority ? "eager" : "lazy"}
-      fetchPriority={priority ? "high" : undefined}
-      decoding={priority ? "sync" : "async"}
+      loading={priority ? translateCurrentStaticSourceText("shared.components.cover.image", "en", "eager") : translateCurrentStaticSourceText("shared.components.cover.image", "en", "lazy")}
+      fetchPriority={priority ? translateCurrentStaticSourceText("shared.components.cover.image", "en", "high") : undefined}
+      decoding={priority ? translateCurrentStaticSourceText("shared.components.cover.image", "en", "sync") : translateCurrentStaticSourceText("shared.components.cover.image", "en", "async")}
       onError={() => setFailed(true)}
       onLoad={() => setLoaded(true)}
       // 캐시된 이미지는 onLoad 가 핸들러 부착 전에 끝나 안 뜰 수 있다 → 마운트 시 complete 면 즉시 표시

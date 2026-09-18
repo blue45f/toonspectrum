@@ -111,10 +111,10 @@ export const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
       "캔버스 크기 · 문서 설정…",
       "웹툰 플랫폼 규격 가이드",
       "그리드",
-      "새 캔버스 · 범용·고화질 세로 웹툰 · 1080 × 8000px",
-      "새 캔버스 · 네이버 연재형 · 690 × 8000px",
-      "새 캔버스 · 카카오 연재형 · 720 × 8000px",
-      "새 캔버스 · WEBTOON Canvas형 · 800 × 8000px",
+      "현재 캔버스 · 범용·고화질 세로 웹툰 · 1080 × 8000px",
+      "현재 캔버스 · 네이버 연재형 · 690 × 8000px",
+      "현재 캔버스 · 카카오 연재형 · 720 × 8000px",
+      "현재 캔버스 · WEBTOON Canvas형 · 800 × 8000px",
       "스티키 노트",
     ],
   },
@@ -209,7 +209,7 @@ export const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
     caption: "도움말",
     items: [
       "명령 · 속성 통합 검색",
-      "CSP · Photoshop 용어 찾기",
+      "다른 앱 용어 찾기",
       "현재 도구 도움말",
       "도움말 홈 · 단계별 가이드",
       "단축키 · 기본 조작",
@@ -984,6 +984,69 @@ async function assertMenuDrivenPopovers(page: Page): Promise<string[]> {
   return failures;
 }
 
+async function assertCurrentCanvasPlatformResize(page: Page): Promise<string[]> {
+  const failures: string[] = [];
+  const canvasMenuTitle = presentedTitleFor("canvas");
+  const windowMenuTitle = presentedTitleFor("window");
+
+  const waitForHeight = async (height: number): Promise<boolean> =>
+    page
+      .locator(`span[aria-label="높이 ${height}px"]`)
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+
+  const applyPreset = async (itemId: string, expectedHeight: number): Promise<boolean> => {
+    await openMainMenuGroup(page, canvasMenuTitle);
+    const menu = page.locator(`[role="menu"][aria-label="${canvasMenuTitle}"]`);
+    await menu.locator(`[data-studio-menu-item-id="${itemId}"]`).click({ timeout: 4_000 });
+    return waitForHeight(expectedHeight);
+  };
+
+  try {
+    await closeFloatingUi(page);
+    await openMainMenuGroup(page, windowMenuTitle);
+    await page
+      .locator(`[role="menu"][aria-label="${windowMenuTitle}"]`)
+      .locator('[data-studio-menu-item-id="density-full"]')
+      .click({ timeout: 4_000 });
+    await page.waitForTimeout(150);
+
+    await openMainMenuGroup(page, canvasMenuTitle);
+    const menu = page.locator(`[role="menu"][aria-label="${canvasMenuTitle}"]`);
+    await menu
+      .locator('[data-studio-menu-item-id="canvas-settings"]')
+      .click({ timeout: 4_000 });
+    await page.locator("span[aria-label^=\"높이 \"][aria-label$=\"px\"]").first().waitFor({ state: "visible", timeout: 5_000 });
+
+    const drawingUrl = page.url();
+    if (!(await applyPreset("apply-webtoon-naver", 8_348))) {
+      failures.push("현재 드로잉에 네이버 690 × 8000 비율을 적용하지 못함");
+    }
+    if (page.url() !== drawingUrl) {
+      failures.push("플랫폼 규격 적용이 현재 드로잉을 유지하지 않고 다른 화면으로 이동함");
+    }
+    if (!(await applyPreset("apply-webtoon-kakao", 8_000))) {
+      failures.push("현재 드로잉에 카카오 720 × 8000 비율을 적용하지 못함");
+    }
+
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+z" : "Control+z");
+    if (!(await waitForHeight(8_348))) {
+      failures.push("플랫폼 규격 변경을 한 번의 실행취소로 복원하지 못함");
+    }
+
+    if (failures.length === 0) {
+      log("  current canvas platform resize ok: Naver → Kakao → undo");
+    }
+  } catch (err) {
+    failures.push(
+      `현재 캔버스 플랫폼 규격 변경: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    await page.keyboard.press("Escape").catch(() => undefined);
+  }
+  return failures;
+}
+
 async function assertWorkspaceDeviceEditor(page: Page): Promise<string[]> {
   const failures: string[] = [];
   try {
@@ -1136,8 +1199,58 @@ async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
       await drawingOptions.waitFor({ state: "visible", timeout: 3000 });
     }
 
+    const strokeFocusSwitch = dialog.getByRole("switch", {
+      name: "드로잉 중 자동 집중 끄기",
+    });
+    if (!(await strokeFocusSwitch.isVisible().catch(() => false))) {
+      failures.push("드로잉 중 자동 집중 설정 미노출");
+    }
+
     await dialog.getByRole("button", { name: "보기 설정 닫기" }).click();
-    if (failures.length === 0) log("  floating visibility + WYSIWYG layout ok");
+    const viewport = await page.locator('[data-studio-canvas-viewport="true"]').first().boundingBox();
+    if (!viewport) {
+      failures.push("자동 집중 검증용 캔버스를 찾지 못함");
+    } else {
+      const x = viewport.x + viewport.width * 0.48;
+      const y = viewport.y + viewport.height * 0.45;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      try {
+        await page.mouse.move(x + 28, y + 12, { steps: 4 });
+        await page.waitForFunction(() =>
+          document.documentElement.dataset.studioStrokeFocusPhase === "drawing",
+        );
+        const drawingState = await drawingOptions.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return {
+            opacity: style.opacity,
+            visibility: style.visibility,
+            pointerEvents: style.pointerEvents,
+          };
+        });
+        if (
+          drawingState.opacity !== "0"
+          || drawingState.visibility !== "hidden"
+          || drawingState.pointerEvents !== "none"
+        ) {
+          failures.push(`획 입력 중 플로팅 UI가 남음: ${JSON.stringify(drawingState)}`);
+        }
+        if (await launcher.isVisible()) failures.push("획 입력 중 보기 런처가 남음");
+      } finally {
+        await page.mouse.up();
+      }
+      await page.waitForFunction(() =>
+        document.documentElement.dataset.studioStrokeFocusPhase === "settling",
+      );
+      if (await drawingOptions.isVisible()) failures.push("연속 획 대기 중 UI가 너무 일찍 복원됨");
+      await page.waitForFunction(() =>
+        !document.documentElement.hasAttribute("data-studio-stroke-focus-phase"),
+      );
+      await drawingOptions.waitFor({ state: "visible", timeout: 3_000 });
+      await launcher.waitFor({ state: "visible", timeout: 3_000 });
+    }
+
+    if (failures.length === 0) log("  floating visibility + WYSIWYG layout + stroke focus ok");
   } catch (err) {
     failures.push(`플로팅 보기·배치: ${err instanceof Error ? err.message : String(err)}`);
     await page.keyboard.press("Escape").catch(() => undefined);
@@ -1222,6 +1335,7 @@ async function main() {
       ...(await assertReferenceWindowToggle(page)),
       ...(await assertRailTools(page)),
       ...(await assertMenuDrivenPopovers(page)),
+      ...(await assertCurrentCanvasPlatformResize(page)),
       ...(await assertWorkspaceDeviceEditor(page)),
       ...(await assertDrawOptionsBar(page)),
       ...(await assertFloatingLayoutManager(page)),
@@ -1229,7 +1343,7 @@ async function main() {
     ];
 
     if (failures.length === 0) {
-      log("PASS: canvas-first menus exposed (9 primary + AI action + sections + rail + popovers)");
+      log("PASS: canvas-first menus exposed (9 primary + AI action + current-canvas platform resize + rail + popovers)");
       exitCode = 0;
     } else {
       log(`FAIL (${failures.length}):`);
