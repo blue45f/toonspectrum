@@ -288,6 +288,7 @@ function StudioMobileFilterSelect({
         aria-label={`${filterTargetLabel} 필터를 사용할 수 없음`}
         aria-describedby={guidanceId}
         className={shellClassName}
+        style={{ minWidth: 56 }}
         title={guidance}
       >
         <WandSparkles size={16} aria-hidden />
@@ -302,6 +303,7 @@ function StudioMobileFilterSelect({
       data-studio-mobile-filter-select={placement}
       data-studio-mobile-filter-target={filterTargetLabel}
       className={shellClassName}
+      style={{ minWidth: 56 }}
       title={guidance}
     >
       <WandSparkles size={16} aria-hidden />
@@ -1876,6 +1878,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 onPointerDown={preloadStudioInspectorDrawingSurface}
                 onPointerEnter={preloadStudioInspectorDrawingSurface}
                 onClick={() => setWorkspaceDockExpanded((expanded) => !expanded)}
+                style={{ minWidth: 44 }}
                 className={cn(
                   "relative flex min-h-11 min-w-11 flex-none flex-col items-center justify-center gap-0.5 rounded-xl border border-line/70 bg-raised/75 px-1 text-[0.6rem] font-bold leading-none text-fg-2",
                   STUDIO_EASE,

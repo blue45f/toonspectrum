@@ -1455,6 +1455,7 @@ import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/compat/auth-session-store";
+
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("StudioCuttoonEditorHost", ko, en);
 
@@ -7213,7 +7214,7 @@ export function StudioCuttoonEditor({
     documentId: studioRoute.documentId,
     workspace: studioRoute.documentWorkspace,
     focus: params.get("focus"),
-    language: params.get("language") ?? studioLanguage,
+    language: params.get("language") ?? studioSaveLocale,
     sourceVersion: params.get("version"),
     resumeRequested: studioExactResumeRequested(location.search),
     hydrated: workHydrated,

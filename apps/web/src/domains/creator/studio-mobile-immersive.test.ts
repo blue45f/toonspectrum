@@ -93,7 +93,7 @@ describe("Studio mobile immersive preference", () => {
       'localizeText(t, "` · 캔버스만 보기", "studio.canvas.canvasOnlyModeShowCanvasOnly")',
     );
     expect(studioCanvasStageHudSource).toContain(
-      'className="min-h-11 min-w-11 rounded-full px-1.5 py-0.5',
+      "min-h-11 min-w-11",
     );
   });
 
@@ -149,8 +149,8 @@ describe("Studio mobile immersive preference", () => {
   });
 
   it("overlays one dock row by default and keeps its final canvas pixels scroll-reachable", () => {
-    expect(studioGlobalsSource).toContain("--studio-mobile-dock-compact-height: calc(3.5rem");
-    expect(studioGlobalsSource).toContain("--studio-mobile-dock-expanded-height: calc(7rem");
+    expect(studioGlobalsSource).toContain("--studio-mobile-dock-compact-height: calc(4rem");
+    expect(studioGlobalsSource).toContain("--studio-mobile-dock-expanded-height: calc(7.5rem");
     expect(studioGlobalsSource).toContain('data-studio-mobile-dock-expanded="false"');
     expect(studioGlobalsSource).toContain('[data-studio-mobile-canvas-workspace="true"]');
     expect(studioGlobalsSource).toContain("padding-bottom: 0 !important");

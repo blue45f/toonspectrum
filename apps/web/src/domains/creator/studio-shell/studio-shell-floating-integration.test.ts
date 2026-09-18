@@ -49,8 +49,9 @@ describe("studio shell floating integration", () => {
     const manager = source("studio-shell/StudioShellFloatingLayoutManager.tsx");
     expect(saveCenter).toContain("var(--studio-canvas-bottom-inset,7rem)+4.25rem");
     expect(offline).toContain("var(--studio-canvas-bottom-inset,7rem)+7.5rem");
-    expect(offline).toContain('!attentionRequired && "max-lg:hidden"');
-    expect(huddle).toContain("var(--studio-canvas-bottom-inset,5rem)+0.75rem");
+    expect(offline).toContain('const shouldShowPanel = connectivity.mode !== "online"');
+    expect(offline).toContain("if (!shouldShowPanel) return null;");
+    expect(huddle).toContain("var(--studio-canvas-bottom-inset,7rem)+4.25rem");
     expect(manager).toContain("var(--studio-canvas-bottom-inset,0px)+0.75rem");
     expect(manager).toContain("보기 설정");
     expect(manager).toContain("{visibleCount}개");
@@ -92,9 +93,9 @@ describe("studio shell floating integration", () => {
     const manager = source("studio-shell/StudioShellFloatingLayoutManager.tsx");
     expect(manager).toContain('aria-keyshortcuts="Control+Shift+L Meta+Shift+L"');
     expect(manager).toContain("z-[70]");
-    expect(manager).toContain("data-studio-shell-stroke-auto-hide");
-    expect(manager).toContain('data-studio-shell-force-visible="true"');
-    expect(manager).toContain("STUDIO_STROKE_FOCUS_SETTLE_MS");
+    expect(manager).toContain("drawingAutoHideRunning");
+    expect(manager).toContain("shell.autoHideWhileDrawing");
+    expect(manager).toContain("shell.drawingAutoHideActive");
     expect(manager).toContain("플랫폼 규격");
     expect(manager).toContain("펜으로 그리는 동안 자동 숨김");
     expect(manager).toContain("data-studio-shell-drawing-auto-hide-active");

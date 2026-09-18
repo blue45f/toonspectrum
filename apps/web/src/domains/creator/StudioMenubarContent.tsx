@@ -1678,6 +1678,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 onFocus={preloadStudioExportMenuPanel}
                 aria-expanded={exportMenuOpen}
                 aria-label="내보내기 옵션"
+                style={isMobile ? { minWidth: 44 } : undefined}
                 className={cn(
                   buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 min-w-11 px-1.5" }),
                   isMobile && "min-h-11 min-w-11"
@@ -1756,6 +1757,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 aria-haspopup="dialog"
                 aria-expanded={projectActionsOpen}
                 aria-controls="studio-project-actions-menu"
+                style={isMobile ? { minWidth: 44 } : undefined}
                 className={buttonClass({
                   size: "sm",
                   variant: "quiet",

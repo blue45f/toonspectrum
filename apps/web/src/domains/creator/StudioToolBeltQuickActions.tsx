@@ -91,6 +91,7 @@ export const StudioToolBeltQuickActions = memo(function StudioToolBeltQuickActio
           disabled={isUndoDisabled}
           className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40", buttonClass)}
           aria-label="실행취소"
+          style={{ minWidth: 44 }}
         >
           <Undo2
             size={STUDIO_ICON_SIZE.toolCompact}
@@ -120,6 +121,7 @@ export const StudioToolBeltQuickActions = memo(function StudioToolBeltQuickActio
           disabled={isRedoDisabled}
           className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40", buttonClass)}
           aria-label="다시실행"
+          style={{ minWidth: 44 }}
         >
           <Redo2
             size={STUDIO_ICON_SIZE.toolCompact}
@@ -139,6 +141,7 @@ export const StudioToolBeltQuickActions = memo(function StudioToolBeltQuickActio
           aria-pressed={historyPanelOpen}
           className={cn(toolBtn(historyPanelOpen), "h-8 px-1.5", buttonClass)}
           aria-label="작업 내역"
+          style={{ minWidth: 44 }}
         >
           <HistoryIcon
             size={STUDIO_ICON_SIZE.toolCompact}

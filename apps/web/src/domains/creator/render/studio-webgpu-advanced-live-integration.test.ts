@@ -69,16 +69,18 @@ describe("Studio advanced WebGPU live-ink integration", () => {
       page.indexOf("function onStageDown("),
     );
     expect(liveSurfaceStart).toContain("overlayCandidate");
+    expect(liveSurfaceStart).toContain("const selectedMedia = selectStudioLiveStrokeMedia(next, {");
+    const mediaSelection = source("../live/studio-live-stroke-media-selection.ts");
     for (const exclusiveSelection of [
       "const livingInkSelected =",
-      "const hokusaiSelected = !livingInkSelected",
-      "const stampSelected = !livingInkSelected",
-      "const wetMediaSelected = !livingInkSelected",
+      "const hokusaiSelected = !materialSelected && !livingInkSelected",
+      "const stampSelected = !materialSelected && !livingInkSelected",
+      "const wetMediaSelected = !materialSelected && !livingInkSelected",
       "const retainedMediaSelected = !livingInkSelected",
       "const dynamicSelected = !livingInkSelected",
       "const genericDirectSelected = !livingInkSelected",
     ]) {
-      expect(liveSurfaceStart).toContain(exclusiveSelection);
+      expect(mediaSelection).toContain(exclusiveSelection);
     }
     expect(page).toContain('destination: "transparent-overlay"');
     const gpuEligibilityStart = liveSurfaceStart.indexOf("const gpuStartEligible =");
@@ -87,7 +89,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
       liveSurfaceStart.indexOf("gpuLiveOperationOrderKeyRef.current =", gpuEligibilityStart),
     );
     expectInOrder(gpuEligibility, [
-      "gpuSelected",
+      'selectedMedia.kind === "webgpu"',
       'webGpuBackendRef.current === "webgpu"',
       "webGpuCanvasHandleRef.current?.isBackendAvailable() === true",
       "gpuLiveStrokePlannerRef.current !== null",
@@ -107,15 +109,22 @@ describe("Studio advanced WebGPU live-ink integration", () => {
       page.indexOf("function onStageDown("),
     );
     expectInOrder(liveSurfaceStart, [
-      "const gpuSelected = genericDirectSelected && studioLiveInkLaneSelectsGpu({",
+      "const selectedMedia = selectStudioLiveStrokeMedia(next, {",
       "explicitBackend: import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND",
       "hardwareReady:",
       "rolloutPrefersGpu:",
-      "const canvas2dSelected = genericDirectSelected && !gpuSelected",
+      "const gpuStartEligible =",
     ]);
-    // The style gate decides BEFORE the lane is entered, so this remains a selection rule rather
+    const mediaSelection = source("../live/studio-live-stroke-media-selection.ts");
+    expectInOrder(mediaSelection, [
+      "const genericDirectSelected =",
+      "const gpuSelected = genericDirectSelected && studioLiveInkLaneSelectsGpu({ ...input, element: next });",
+      'if (gpuSelected) return { kind: "webgpu" };',
+      'return { kind: genericDirectSelected ? "canvas2d" : "none" };',
+    ]);
+    // The style gate decides before the lane is entered, so this remains a selection rule rather
     // than a hand-over after a GPU failure — the refusal below still owns real GPU failures.
-    expect(liveSurfaceStart.indexOf("studioLiveInkLaneSelectsGpu({"))
+    expect(liveSurfaceStart.indexOf("selectStudioLiveStrokeMedia(next, {"))
       .toBeLessThan(liveSurfaceStart.indexOf("const gpuStartEligible ="));
     expect(liveSurfaceStart).toContain('rejectSelectedSurface(\n          "WebGPU 라이브 잉크"');
     // The rule itself lives next to the decision it mirrors.

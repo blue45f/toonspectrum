@@ -8,6 +8,7 @@ import { supportsRoutePurposeScene } from "./site-experience/site-experience-pol
 
 import { defineBilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { useI18n, useT } from "@/shared/lib/i18n";
+import { resolveProductLocale } from "@/shared/lib/product-identity";
 import { resolveSiteRouteExperience } from "@/shared/lib/site-route-experience";
 import { resolveSiteRouteVisual } from "@/shared/lib/site-route-visual";
 
@@ -77,9 +78,10 @@ export function SiteRouteExperienceBoundary({
   readonly children: ReactNode;
   readonly routeTitle: string;
 }) {
-  const { pathname, search } = useLocation();
   const t = useT();
-  const locale = useI18n((state) => state.lang.startsWith("ko") ? "ko" : "en");
+  const { pathname, search } = useLocation();
+  const language = useI18n((state) => state.lang);
+  const locale = resolveProductLocale(language);
   const experience = useMemo(
     () => resolveSiteRouteExperience(`${pathname}${search}`),
     [pathname, search],
