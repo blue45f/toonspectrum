@@ -83,6 +83,7 @@ test("coalesces parallel searches, caches, expires and rotates credentials", asy
   env.KMAS_PRV_KEY = "fixture-key-b"; await search(query); assert.equal(calls, 3);
 });
 test("rejects unapproved origins before fetch", async () => {
+  // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
   for (const base of ["http://www.kmas.or.kr", "https://evil.invalid", "https://user:pass@www.kmas.or.kr", "https://www.kmas.or.kr:8443"]) {
     const search = createKmasReferenceSearch({ env: { KMAS_PRV_KEY: "fixture", KMAS_BASE_URL: base }, fetcher: async () => { throw new Error("must not fetch"); } });
     await assert.rejects(search(query), failure("KMAS_NOT_CONFIGURED"));

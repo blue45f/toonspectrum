@@ -187,6 +187,36 @@ describe("studio automatic free AI client", () => {
     });
   });
 
+  it("keeps login-required distinct from free quota exhaustion", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json({
+      code: "FREE_AI_LOGIN_REQUIRED",
+      message: "자동 무료 AI를 사용하려면 로그인하세요.",
+    }, 401)));
+
+    await expect(completeStudioServerText(input())).resolves.toMatchObject({
+      ok: false,
+      code: "login_required",
+      error: expect.stringMatching(/로그인.*무료 AI/u),
+    });
+  });
+
+  it("uses an explicitly connected personal free key without forcing login", async () => {
+    configureFreeTextConnection();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      if (urlOf(request).pathname === "/api/studio-ai/chat") {
+        return json({ code: "FREE_AI_LOGIN_REQUIRED", message: "로그인 필요" }, 401);
+      }
+      return json({ choices: [{ message: { content: "개인 무료 결과" } }] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(completeStudioServerText(input())).resolves.toMatchObject({
+      ok: true,
+      data: { content: "개인 무료 결과", provider: "user" },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("uses a personal free key only after shared quota exhaustion", async () => {
     configureFreeTextConnection();
     const fetchMock = vi.fn(async (request: RequestInfo | URL, init?: RequestInit) => {
@@ -249,7 +279,7 @@ describe("studio automatic free AI client", () => {
     await expect(completeStudioServerText(input())).resolves.toMatchObject({
       ok: false,
       code: "free_exhausted",
-      error: expect.stringMatching(/개인 무료 API 키|사용할 수 없습니다/u),
+      error: expect.stringMatching(/무료.*한도.*소진|무료 AI.*소진/u),
     });
   });
 

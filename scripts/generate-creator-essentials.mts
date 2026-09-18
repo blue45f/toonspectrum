@@ -1,6 +1,6 @@
 /** Deterministic original geometry and comic construction assets; no external downloads. */
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 
 import { Document, NodeIO } from "@gltf-transform/core";
 import { BoxGeometry, CylinderGeometry, SphereGeometry, Matrix4, Quaternion, Vector3 } from "three";
@@ -23,9 +23,14 @@ function register(id: string, kind: string, label: Text, tags: string[], data: s
   const extension = kind.endsWith("3d") ? "glb" : "svg";
   const filename = `${id}.${extension}`;
   writeFileSync(new URL(filename, output), data);
-  if (preview) writeFileSync(new URL(`${id}.preview.svg`, output), preview);
+  const sourceTruthPropPreview = kind === "prop-3d" && Boolean(preview);
+  if (preview && !sourceTruthPropPreview) writeFileSync(new URL(`${id}.preview.svg`, output), preview);
+  const previewFilename = sourceTruthPropPreview ? `${id}.preview.png` : preview ? `${id}.preview.svg` : filename;
+  if (sourceTruthPropPreview && !existsSync(new URL(previewFilename, output))) {
+    throw new Error(`${id}: missing actual-GLB rendered preview. Run scripts/render-creator-essential-prop-thumbnails.py with Blender.`);
+  }
   const bytes = typeof data === "string" ? Buffer.from(data) : data;
-  assets.push({ id, kind, label, tags, url: `/creator-essentials/${filename}`, preview: `/creator-essentials/${preview ? `${id}.preview.svg` : filename}`, sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.byteLength, width, height });
+  assets.push({ id, kind, label, tags, url: `/creator-essentials/${filename}`, preview: `/creator-essentials/${previewFilename}`, sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.byteLength, width, height });
 }
 const part = (name: string, shape: Part["shape"], at: V3, size: V3, color = 0): Part => ({ name, shape, at, size, color });
 async function model(parts: Part[], name: string): Promise<Uint8Array> {
@@ -93,6 +98,36 @@ const poses: [string, Text, Joints][] = [
   ["crouching", { ko: "웅크리기 참고", en: "Crouching study" }, { hip: [0,0.5,0], neck: [0,0.95,0.22], head: [0,1.12,0.27], ls: [-0.22,0.89,0.2], rs: [0.22,0.89,0.2], le: [-0.32,0.59,0.25], re: [0.32,0.59,0.25], lw: [-0.2,0.31,0.4], rw: [0.2,0.31,0.4], lh: [-0.11,0.48,0], rh: [0.11,0.48,0], lk: [-0.26,0.37,0.32], rk: [0.26,0.37,0.32], la: [-0.23,0.08,0.02], ra: [0.23,0.08,0.02] }],
   ["arm-extension", { ko: "옆으로 팔 뻗기", en: "Side arm extension" }, { re: [0.53,1.41,0], rw: [0.86,1.48,0.08] }],
 ];
+function poseThumbnail(overrides: Joints, label: string, azimuth = 0.62, elevation = 0.22): string {
+  const joints = { ...neutral, ...overrides };
+  const view = new Vector3(Math.sin(azimuth), elevation, Math.cos(azimuth)).normalize();
+  const right = new Vector3(Math.cos(azimuth), 0, -Math.sin(azimuth));
+  const up = view.clone().cross(right).normalize();
+  const points = Object.values(joints).map((value) => new Vector3(...value));
+  const xs = points.map((point) => point.dot(right));
+  const ys = points.map((point) => point.dot(up));
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const scale = Math.min(310 / Math.max(0.55, maxX - minX), 350 / Math.max(1.3, maxY - minY));
+  const cx = (minX + maxX) / 2;
+  const project = (value: V3): [number, number] => {
+    const point = new Vector3(...value);
+    return [240 + (point.dot(right) - cx) * scale, 420 - (point.dot(up) - minY) * scale];
+  };
+  const line = (a: keyof Joints, b: keyof Joints, outer: number, inner: number) => {
+    const [ax, ay] = project(joints[a]!); const [bx, by] = project(joints[b]!);
+    return `<path d="M${ax.toFixed(1)} ${ay.toFixed(1)}L${bx.toFixed(1)} ${by.toFixed(1)}" stroke="#1d2a34" stroke-width="${outer}"/><path d="M${ax.toFixed(1)} ${ay.toFixed(1)}L${bx.toFixed(1)} ${by.toFixed(1)}" stroke="url(#body)" stroke-width="${inner}"/>`;
+  };
+  const [headX, headY] = project(joints.head!); const [hipX, hipY] = project(joints.hip!); const [neckX, neckY] = project(joints.neck!);
+  const front = [...joints.head!] as V3; front[2] += 0.14; const [frontX, frontY] = project(front);
+  const limb = [
+    line("lh", "lk", 22, 16), line("rh", "rk", 22, 16), line("lk", "la", 19, 13), line("rk", "ra", 19, 13),
+    line("ls", "le", 17, 11), line("rs", "re", 17, 11), line("le", "lw", 15, 9), line("re", "rw", 15, 9),
+  ].join("");
+  const jointsArt = ["ls","rs","le","re","lw","rw","lh","rh","lk","rk","la","ra"].map((key) => {
+    const [x, y] = project(joints[key]!); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.2" fill="#d98a5f" stroke="#1d2a34" stroke-width="2"/>`;
+  }).join("");
+  return svg(`<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fbf8f2"/><stop offset="1" stop-color="#e8eef2"/></linearGradient><linearGradient id="body" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#55788a"/><stop offset="1" stop-color="#2f5367"/></linearGradient><filter id="shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#18242d" flood-opacity=".18"/></filter></defs><rect width="480" height="480" rx="28" fill="url(#bg)"/><ellipse cx="240" cy="432" rx="108" ry="14" fill="#263944" opacity=".12"/><g stroke-linecap="round" stroke-linejoin="round" filter="url(#shadow)">${limb}<path d="M${hipX.toFixed(1)} ${hipY.toFixed(1)}L${neckX.toFixed(1)} ${neckY.toFixed(1)}" stroke="#1d2a34" stroke-width="52"/><path d="M${hipX.toFixed(1)} ${hipY.toFixed(1)}L${neckX.toFixed(1)} ${neckY.toFixed(1)}" stroke="url(#body)" stroke-width="43"/>${jointsArt}<ellipse cx="${headX.toFixed(1)}" cy="${headY.toFixed(1)}" rx="30" ry="36" fill="url(#body)" stroke="#1d2a34" stroke-width="4"/><circle cx="${frontX.toFixed(1)}" cy="${frontY.toFixed(1)}" r="5.5" fill="#e79a6e" stroke="#1d2a34" stroke-width="2"/></g><path d="M44 42H172" stroke="#263944" stroke-opacity=".15" stroke-width="2"/><text x="44" y="31" font-family="system-ui,sans-serif" font-size="15" font-weight="650" fill="#263944">${xml(label)}</text>`, label);
+}
 function mannequin(overrides: Joints): Part[] {
   const j = { ...neutral, ...overrides }; const torso = bone("rib-cage", j.hip!, j.neck!, 0.37, "sphere");
   torso.size[2] = 0.25;
@@ -179,9 +214,9 @@ function effectDrawing(id: string): string {
 }
 for (const [id,ko,en,tags] of effects) register(id,"effect-2d",{ko,en},tags.split(" "),svg(`<g fill="none" stroke="#243743" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">${effectDrawing(id)}</g>`,ko));
 for (const [id,label,overrides] of poses) {
-  const parts = mannequin(overrides); const poster = thumbnail(parts,label.ko);
+  const parts = mannequin(overrides); const poster = poseThumbnail(overrides,label.ko);
   register(`pose-${id}-3d`,"pose-3d",label,["character","pose","mannequin","캐릭터","포즈","데생"],await model(parts,label.en),poster);
-  const views = [0,Math.PI/2,0.62].map((angle,index) => thumbnail(parts,label.ko,angle,index<2 ? 0 : 0.25).replace("<svg ",`<svg x="${index*480}" y="36" `)).join("");
+  const views = [0,Math.PI/2,0.62].map((angle,index) => poseThumbnail(overrides,label.ko,angle,index<2 ? 0 : 0.2).replace("<svg ",`<svg x="${index*480}" y="36" `)).join("");
   const captions = ["FRONT","SIDE","THREE-QUARTER"].map((caption,index) => `<text x="${240+index*480}" y="536" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#243743">${caption}</text>`).join("");
   const sheet = svg(`<rect width="1440" height="550" fill="#f4f1eb"/><text x="24" y="25" font-family="sans-serif" font-size="18" fill="#243743">${xml(label.ko)} · ${xml(label.en)}</text>${views}${captions}`,label.ko,1440,550);
   register(`pose-${id}-2d`,"pose-2d",label,["character","pose","turnaround","캐릭터","포즈","3면도"],sheet,poster,1440,550);

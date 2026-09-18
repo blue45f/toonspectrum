@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   BookOpenCheck,
   CheckCircle2,
@@ -133,13 +137,11 @@ function StoryLinkEditor({
     >
       <div className="flex min-w-0 items-center gap-2">
         <span
-          className={`grid size-7 shrink-0 place-items-center rounded-md ${
-            stage === "seed"
+          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "grid size-7 shrink-0 place-items-center rounded-md {v0}"), { v0: String(stage === "seed"
               ? "bg-cool/12 text-cool"
               : stage === "payoff"
                 ? "bg-good/12 text-good"
-                : "bg-accent-soft text-accent"
-          }`}
+                : "bg-accent-soft text-accent") })}
         >
           {stage === "seed"
             ? <CircleDot size={13} aria-hidden />
@@ -154,7 +156,7 @@ function StoryLinkEditor({
         <button
           type="button"
           onClick={onRemove}
-          aria-label={`${heading} 연결 삭제`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "{v0} 연결 삭제"), { v0: String(heading) })}
           className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <Trash2 size={14} aria-hidden />
@@ -162,10 +164,9 @@ function StoryLinkEditor({
       </div>
 
       <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <label className={LABEL_CLASS} htmlFor={`${prefix}-episode`}>
-          회차
-          <input
-            id={`${prefix}-episode`}
+        <label className={LABEL_CLASS} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0}-episode"), { v0: String(prefix) })}>
+          {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "회차")}<input
+            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0}-episode"), { v0: String(prefix) })}
             type="number"
             min={1}
             inputMode="numeric"
@@ -178,10 +179,9 @@ function StoryLinkEditor({
             className={CONTROL_CLASS}
           />
         </label>
-        <label className={LABEL_CLASS} htmlFor={`${prefix}-scene`}>
-          장면 바이블
-          <select
-            id={`${prefix}-scene`}
+        <label className={LABEL_CLASS} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0}-scene"), { v0: String(prefix) })}>
+          {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "장면 바이블")}<select
+            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0}-scene"), { v0: String(prefix) })}
             value={link.sceneId ?? ""}
             onChange={(event) => {
               const sceneId = event.target.value;
@@ -190,7 +190,7 @@ function StoryLinkEditor({
             }}
             className={CONTROL_CLASS}
           >
-            <option value="">연결 안 함</option>
+            <option value="">{translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "연결 안 함")}</option>
             {sceneOptions.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.label}
@@ -198,59 +198,55 @@ function StoryLinkEditor({
             ))}
           </select>
         </label>
-        <label className={LABEL_CLASS} htmlFor={`${prefix}-page`}>
-          페이지 ID
-          <input
-            id={`${prefix}-page`}
+        <label className={LABEL_CLASS} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0}-page"), { v0: String(prefix) })}>
+          {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "페이지 ID")}<input
+            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0}-page"), { v0: String(prefix) })}
             type="text"
             value={link.pageId ?? ""}
-            placeholder="page-1"
+            placeholder={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "page-1")}
             onChange={(event) => {
               const pageId = event.target.value;
               const { pageId: _pageId, ...rest } = link;
               onChange(pageId ? { ...rest, pageId } : rest);
             }}
-            className={`${CONTROL_CLASS} font-mono text-xs`}
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0} font-mono text-xs"), { v0: String(CONTROL_CLASS) })}
           />
         </label>
-        <label className={LABEL_CLASS} htmlFor={`${prefix}-frame`}>
-          컷 ID
-          <input
-            id={`${prefix}-frame`}
+        <label className={LABEL_CLASS} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0}-frame"), { v0: String(prefix) })}>
+          {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "컷 ID")}<input
+            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0}-frame"), { v0: String(prefix) })}
             type="text"
             value={link.frameId ?? ""}
-            placeholder="frame-12"
+            placeholder={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "frame-12")}
             onChange={(event) => {
               const frameId = event.target.value;
               const { frameId: _frameId, ...rest } = link;
               onChange(frameId ? { ...rest, frameId } : rest);
             }}
-            className={`${CONTROL_CLASS} font-mono text-xs`}
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0} font-mono text-xs"), { v0: String(CONTROL_CLASS) })}
           />
         </label>
       </div>
 
       <div className="mt-2 grid gap-2 xl:grid-cols-2">
-        <label className={LABEL_CLASS} htmlFor={`${prefix}-label`}>
-          표시 이름
-          <input
-            id={`${prefix}-label`}
+        <label className={LABEL_CLASS} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0}-label"), { v0: String(prefix) })}>
+          {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "표시 이름")}<input
+            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0}-label"), { v0: String(prefix) })}
             type="text"
             maxLength={STUDIO_PROMISE_PAYOFF_MAX_LABEL_LENGTH}
             value={link.label}
-            placeholder="예: 7화 · 시계 문양 재등장"
+            placeholder={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "예: 7화 · 시계 문양 재등장")}
             onChange={(event) => onChange({ ...link, label: event.target.value })}
             className={CONTROL_CLASS}
           />
         </label>
-        <label className={LABEL_CLASS} htmlFor={`${prefix}-note`}>
-          장면에서 전달할 단서
-          <input
-            id={`${prefix}-note`}
+        <label className={LABEL_CLASS} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0}-note"), { v0: String(prefix) })}>
+          {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "장면에서 전달할 단서")}<input
+            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0}-note"), { v0: String(prefix) })}
             type="text"
             maxLength={STUDIO_PROMISE_PAYOFF_MAX_TEXT_LENGTH}
             value={link.note}
-            placeholder="독자가 무엇을 보고 기억해야 하는지"
+            placeholder={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "독자가 무엇을 보고 기억해야 하는지")}
             onChange={(event) => onChange({ ...link, note: event.target.value })}
             className={CONTROL_CLASS}
           />
@@ -370,20 +366,20 @@ export function StudioPromisePayoffLedgerPanel({
 
   return (
     <section
-      aria-label="약속과 회수 원장"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "약속과 회수 원장")}
       data-studio-promise-payoff-ledger="true"
       className="flex min-h-0 flex-1 flex-col"
     >
       <div className="grid shrink-0 grid-cols-2 border-b border-line bg-card/20 sm:grid-cols-4 xl:grid-cols-6">
         <div className="border-b border-r border-line px-3 py-2.5 sm:border-b-0">
-          <p className="text-[0.62rem] font-semibold text-fg-3">현재 작업</p>
+          <p className="text-[0.62rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "현재 작업")}</p>
           <label className="mt-0.5 flex items-center gap-1 text-sm font-bold text-fg">
-            <span className="sr-only">현재 작업 회차</span>
+            <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "현재 작업 회차")}</span>
             <input
               type="number"
               min={1}
               inputMode="numeric"
-              aria-label="현재 작업 회차"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "현재 작업 회차")}
               value={ledger.currentEpisode}
               onChange={(event) => {
                 const episode = parseEpisode(event.target.value, ledger.currentEpisode);
@@ -398,8 +394,7 @@ export function StudioPromisePayoffLedgerPanel({
               }}
               className="min-h-11 w-16 rounded border border-transparent bg-transparent px-1 py-0.5 text-right tabular-nums outline-none hover:border-line focus:border-accent"
             />
-            화
-          </label>
+            {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "화")}</label>
         </div>
         {[
           ["열린 약속", summary.unresolved, "text-fg"],
@@ -410,7 +405,7 @@ export function StudioPromisePayoffLedgerPanel({
         ].map(([label, count, tone]) => (
           <div key={label} className="border-b border-r border-line px-3 py-2.5 last:border-r-0 sm:border-b-0">
             <p className="text-[0.62rem] font-semibold text-fg-3">{label}</p>
-            <p className={`mt-0.5 text-sm font-bold tabular-nums ${tone}`}>{count}</p>
+            <p className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "mt-0.5 text-sm font-bold tabular-nums {v0}"), { v0: String(tone) })}>{count}</p>
           </div>
         ))}
       </div>
@@ -430,18 +425,18 @@ export function StudioPromisePayoffLedgerPanel({
                 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
                 aria-hidden
               />
-              <span className="sr-only">약속 원장 검색</span>
+              <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "약속 원장 검색")}</span>
               <input
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="제목·담당자·회차·컷 검색"
+                placeholder={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "제목·담당자·회차·컷 검색")}
                 className="min-h-11 w-full rounded-lg border border-line bg-panel py-2 pl-9 pr-3 text-xs text-fg outline-none placeholder:text-fg-3 hover:border-line-strong focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               />
             </label>
             <div
               role="tablist"
-              aria-label="약속 원장 필터"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "약속 원장 필터")}
               className="flex gap-1 overflow-x-auto pb-0.5"
             >
               {filters.map(([id, label]) => (
@@ -451,11 +446,9 @@ export function StudioPromisePayoffLedgerPanel({
                   role="tab"
                   aria-selected={filter === id}
                   onClick={() => setFilter(id)}
-                  className={`min-h-11 shrink-0 rounded-lg border px-3 text-[0.68rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                    filter === id
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "min-h-11 shrink-0 rounded-lg border px-3 text-[0.68rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(filter === id
                       ? "border-accent bg-accent text-on-accent"
-                      : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
-                  }`}
+                      : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
                 >
                   {label}
                 </button>
@@ -464,11 +457,10 @@ export function StudioPromisePayoffLedgerPanel({
             <button
               type="button"
               onClick={addEntry}
-              className={`${BUTTON_CLASS} w-full border-accent bg-accent text-on-accent hover:bg-accent-hover`}
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0} w-full border-accent bg-accent text-on-accent hover:bg-accent-hover"), { v0: String(BUTTON_CLASS) })}
             >
               <Plus size={14} aria-hidden />
-              새 약속 등록
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "새 약속 등록")}</button>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -478,16 +470,15 @@ export function StudioPromisePayoffLedgerPanel({
                   <BookOpenCheck size={22} className="mx-auto text-fg-3" aria-hidden />
                   <p className="mt-2 text-xs font-bold text-fg-2">
                     {ledger.entries.length === 0
-                      ? "첫 약속을 실제 컷과 연결하세요"
-                      : "조건에 맞는 약속이 없어요"}
+                      ? translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "첫 약속을 실제 컷과 연결하세요")
+                      : translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "조건에 맞는 약속이 없어요")}
                   </p>
                   <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-                    첫 등장, 중간 단서, 회수 장면을 한 원장에서 추적합니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "첫 등장, 중간 단서, 회수 장면을 한 원장에서 추적합니다.")}</p>
                 </div>
               </div>
             ) : (
-              <ol aria-label="약속 원장 항목" className="space-y-1">
+              <ol aria-label={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "약속 원장 항목")} className="space-y-1">
                 {visibleEntries.map((entry) => {
                   const selected = selectedEntry?.id === entry.id;
                   const entryWarnings = warnings.filter(({ entryId }) => entryId === entry.id);
@@ -495,26 +486,22 @@ export function StudioPromisePayoffLedgerPanel({
                     <li key={entry.id}>
                       <button
                         type="button"
-                        aria-current={selected ? "true" : undefined}
+                        aria-current={selected ? translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "true") : undefined}
                         onClick={() => {
                           setRequestedEntryId(entry.id);
                           setError(null);
                         }}
-                        className={`flex min-h-14 w-full items-start gap-2 border-l-2 px-2.5 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                          selected
+                        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "flex min-h-14 w-full items-start gap-2 border-l-2 px-2.5 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(selected
                             ? "border-l-accent bg-accent-soft/20"
-                            : "border-l-transparent hover:bg-raised"
-                        }`}
+                            : "border-l-transparent hover:bg-raised") })}
                       >
-                        <span className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-md ${
-                          selected ? "bg-accent text-on-accent" : "bg-raised text-fg-3"
-                        }`}>
+                        <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "mt-0.5 grid size-7 shrink-0 place-items-center rounded-md {v0}"), { v0: String(selected ? "bg-accent text-on-accent" : "bg-raised text-fg-3") })}>
                           <Flag size={13} aria-hidden />
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center gap-1.5">
                             <span className="truncate text-xs font-bold text-fg">
-                              {entry.title || "이름 없는 약속"}
+                              {entry.title || translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "이름 없는 약속")}
                             </span>
                             {entryWarnings.length > 0 && (
                               <span className="inline-flex shrink-0 items-center gap-0.5 text-[0.6rem] font-bold text-warn">
@@ -547,18 +534,16 @@ export function StudioPromisePayoffLedgerPanel({
                 <span className="mx-auto grid size-12 place-items-center rounded-lg border border-line bg-card text-fg-3">
                   <Target size={22} aria-hidden />
                 </span>
-                <h3 className="mt-3 text-sm font-bold text-fg">독자에게 건 약속을 잊지 마세요</h3>
+                <h3 className="mt-3 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "독자에게 건 약속을 잊지 마세요")}</h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-fg-3">
-                  복선·미스터리·퀘스트의 첫 장면과 중간 단서, 회수 컷을 연결하면 마감이 다가올 때 로컬 규칙이 알려 줍니다.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "복선·미스터리·퀘스트의 첫 장면과 중간 단서, 회수 컷을 연결하면 마감이 다가올 때 로컬 규칙이 알려 줍니다.")}</p>
                 <button
                   type="button"
                   onClick={addEntry}
                   className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   <Plus size={14} aria-hidden />
-                  첫 약속 등록
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "첫 약속 등록")}</button>
               </div>
             </div>
           ) : (
@@ -570,50 +555,46 @@ export function StudioPromisePayoffLedgerPanel({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="truncate text-base font-bold text-fg">
-                      {selectedEntry.title || "이름 없는 약속"}
+                      {selectedEntry.title || translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "이름 없는 약속")}
                     </h3>
                     <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.65rem] font-semibold text-fg-3">
                       {studioPromisePayoffKindLabel(selectedEntry.kind)}
                     </span>
-                    <span className={`rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold ${
-                      studioPromisePayoffDeadlineState(
+                    <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold {v0}"), { v0: String(studioPromisePayoffDeadlineState(
                         selectedEntry,
                         ledger.currentEpisode
                       ) === "overdue"
                         ? "border-bad/35 bg-bad/10 text-bad"
-                        : "border-line bg-card text-fg-3"
-                    }`}>
+                        : "border-line bg-card text-fg-3") })}>
                       {deadlineCopy(selectedEntry, ledger.currentEpisode)}
                     </span>
                   </div>
                   <p className="mt-1 truncate font-mono text-[0.62rem] text-fg-3">
-                    안정 ID · {selectedEntry.id}
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "안정 ID · ")}{selectedEntry.id}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={deleteEntry}
-                  className={`${BUTTON_CLASS} border-bad/30 bg-bad/10 text-bad hover:bg-bad/15`}
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0} border-bad/30 bg-bad/10 text-bad hover:bg-bad/15"), { v0: String(BUTTON_CLASS) })}
                 >
                   <Trash2 size={13} aria-hidden />
-                  삭제
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "삭제")}</button>
               </div>
 
               {selectedWarnings.length > 0 && (
-                <section aria-labelledby={`promise-${selectedEntry.id}-warnings`} className="border-b border-line py-4">
+                <section aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-warnings"), { v0: String(selectedEntry.id) })} className="border-b border-line py-4">
                   <h4
-                    id={`promise-${selectedEntry.id}-warnings`}
+                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-warnings"), { v0: String(selectedEntry.id) })}
                     className="flex items-center gap-1.5 text-xs font-bold text-warn"
                   >
                     <AlertTriangle size={13} aria-hidden />
-                    회수 검토 {selectedWarnings.length}건
-                  </h4>
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "회수 검토 ")}{selectedWarnings.length}{translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "건")}</h4>
                   <ul className="mt-2 space-y-1.5">
                     {selectedWarnings.map((warning) => (
                       <li
                         key={`${warning.code}:${warning.message}`}
-                        className={`border-l-2 px-2 py-1.5 text-[0.68rem] leading-relaxed ${warningTone(warning.severity)}`}
+                        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "border-l-2 px-2 py-1.5 text-[0.68rem] leading-relaxed {v0}"), { v0: String(warningTone(warning.severity)) })}
                       >
                         {warning.message}
                       </li>
@@ -622,57 +603,51 @@ export function StudioPromisePayoffLedgerPanel({
                 </section>
               )}
 
-              <section aria-labelledby={`promise-${selectedEntry.id}-identity`} className="py-4">
-                <h4 id={`promise-${selectedEntry.id}-identity`} className="text-xs font-bold text-fg">
-                  약속 정의
-                </h4>
+              <section aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-identity"), { v0: String(selectedEntry.id) })} className="py-4">
+                <h4 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-identity"), { v0: String(selectedEntry.id) })} className="text-xs font-bold text-fg">
+                  {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "약속 정의")}</h4>
                 <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                  이야기 의미만 기록하고 장면의 시각 기준은 기존 Production Bible 항목을 연결합니다.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "이야기 의미만 기록하고 장면의 시각 기준은 기존 Production Bible 항목을 연결합니다.")}</p>
                 <div className="mt-3 grid gap-3 xl:grid-cols-2">
-                  <label className={LABEL_CLASS} htmlFor={`promise-${selectedEntry.id}-title`}>
-                    제목
-                    <input
-                      id={`promise-${selectedEntry.id}-title`}
+                  <label className={LABEL_CLASS} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-title"), { v0: String(selectedEntry.id) })}>
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "제목")}<input
+                      id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-title"), { v0: String(selectedEntry.id) })}
                       type="text"
                       maxLength={STUDIO_PROMISE_PAYOFF_MAX_TITLE_LENGTH}
                       value={selectedEntry.title}
                       onChange={(event) => patchEntry({ title: event.target.value })}
-                      placeholder="예: 1화의 깨진 시계"
+                      placeholder={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "예: 1화의 깨진 시계")}
                       className={CONTROL_CLASS}
                     />
                   </label>
-                  <label className={LABEL_CLASS} htmlFor={`promise-${selectedEntry.id}-owner`}>
-                    담당 작가·편집자
-                    <input
-                      id={`promise-${selectedEntry.id}-owner`}
+                  <label className={LABEL_CLASS} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-owner"), { v0: String(selectedEntry.id) })}>
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "담당 작가·편집자")}<input
+                      id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-owner"), { v0: String(selectedEntry.id) })}
                       type="text"
                       maxLength={STUDIO_PROMISE_PAYOFF_MAX_OWNER_LENGTH}
                       value={selectedEntry.owner}
                       onChange={(event) => patchEntry({ owner: event.target.value })}
-                      placeholder="담당자 표시 이름"
+                      placeholder={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "담당자 표시 이름")}
                       className={CONTROL_CLASS}
                     />
                   </label>
                 </div>
-                <label className={`${LABEL_CLASS} mt-3`} htmlFor={`promise-${selectedEntry.id}-summary`}>
-                  독자에게 건 약속
-                  <textarea
-                    id={`promise-${selectedEntry.id}-summary`}
+                <label className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0} mt-3"), { v0: String(LABEL_CLASS) })} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-summary"), { v0: String(selectedEntry.id) })}>
+                  {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "독자에게 건 약속")}<textarea
+                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-summary"), { v0: String(selectedEntry.id) })}
                     rows={3}
                     maxLength={STUDIO_PROMISE_PAYOFF_MAX_TEXT_LENGTH}
                     value={selectedEntry.summary}
                     onChange={(event) => patchEntry({ summary: event.target.value })}
-                    placeholder="독자가 무엇을 궁금해하고, 회수 때 무엇을 이해해야 하는지"
-                    className={`${CONTROL_CLASS} resize-y`}
+                    placeholder={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "독자가 무엇을 궁금해하고, 회수 때 무엇을 이해해야 하는지")}
+                    className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0} resize-y"), { v0: String(CONTROL_CLASS) })}
                   />
                 </label>
 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <label className={LABEL_CLASS} htmlFor={`promise-${selectedEntry.id}-kind`}>
-                    유형
-                    <select
-                      id={`promise-${selectedEntry.id}-kind`}
+                  <label className={LABEL_CLASS} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-kind"), { v0: String(selectedEntry.id) })}>
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "유형")}<select
+                      id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-kind"), { v0: String(selectedEntry.id) })}
                       value={selectedEntry.kind}
                       onChange={(event) =>
                         patchEntry({
@@ -687,10 +662,9 @@ export function StudioPromisePayoffLedgerPanel({
                       ))}
                     </select>
                   </label>
-                  <label className={LABEL_CLASS} htmlFor={`promise-${selectedEntry.id}-status`}>
-                    진행 상태
-                    <select
-                      id={`promise-${selectedEntry.id}-status`}
+                  <label className={LABEL_CLASS} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-status"), { v0: String(selectedEntry.id) })}>
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "진행 상태")}<select
+                      id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-status"), { v0: String(selectedEntry.id) })}
                       value={selectedEntry.status}
                       onChange={(event) =>
                         patchEntry({
@@ -705,10 +679,9 @@ export function StudioPromisePayoffLedgerPanel({
                       ))}
                     </select>
                   </label>
-                  <label className={LABEL_CLASS} htmlFor={`promise-${selectedEntry.id}-urgency`}>
-                    긴급도
-                    <select
-                      id={`promise-${selectedEntry.id}-urgency`}
+                  <label className={LABEL_CLASS} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-urgency"), { v0: String(selectedEntry.id) })}>
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "긴급도")}<select
+                      id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-urgency"), { v0: String(selectedEntry.id) })}
                       value={selectedEntry.urgency}
                       onChange={(event) =>
                         patchEntry({
@@ -723,10 +696,9 @@ export function StudioPromisePayoffLedgerPanel({
                       ))}
                     </select>
                   </label>
-                  <label className={LABEL_CLASS} htmlFor={`promise-${selectedEntry.id}-due`}>
-                    회수 예정 회차
-                    <input
-                      id={`promise-${selectedEntry.id}-due`}
+                  <label className={LABEL_CLASS} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-due"), { v0: String(selectedEntry.id) })}>
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "회수 예정 회차")}<input
+                      id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-due"), { v0: String(selectedEntry.id) })}
                       type="number"
                       min={1}
                       inputMode="numeric"
@@ -740,17 +712,16 @@ export function StudioPromisePayoffLedgerPanel({
                               )
                             : null,
                         })}
-                      placeholder="미정"
+                      placeholder={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "미정")}
                       className={CONTROL_CLASS}
                     />
                   </label>
                 </div>
 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  <label className={LABEL_CLASS} htmlFor={`promise-${selectedEntry.id}-visibility`}>
-                    공개 범위
-                    <select
-                      id={`promise-${selectedEntry.id}-visibility`}
+                  <label className={LABEL_CLASS} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-visibility"), { v0: String(selectedEntry.id) })}>
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "공개 범위")}<select
+                      id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-visibility"), { v0: String(selectedEntry.id) })}
                       value={selectedEntry.visibility}
                       onChange={(event) =>
                         patchEntry({
@@ -765,10 +736,9 @@ export function StudioPromisePayoffLedgerPanel({
                       ))}
                     </select>
                   </label>
-                  <label className={LABEL_CLASS} htmlFor={`promise-${selectedEntry.id}-spoiler`}>
-                    스포일러 등급
-                    <select
-                      id={`promise-${selectedEntry.id}-spoiler`}
+                  <label className={LABEL_CLASS} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-spoiler"), { v0: String(selectedEntry.id) })}>
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "스포일러 등급")}<select
+                      id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-spoiler"), { v0: String(selectedEntry.id) })}
                       value={selectedEntry.spoilerLevel}
                       onChange={(event) =>
                         patchEntry({
@@ -785,51 +755,46 @@ export function StudioPromisePayoffLedgerPanel({
                   </label>
                   <div className="flex items-end gap-2 pb-0.5 text-[0.68rem] leading-relaxed text-fg-3">
                     <Eye size={14} className="shrink-0" aria-hidden />
-                    공개 범위와 스포일러 등급은 서버 권한이 아니라 로컬 편집 가이드입니다.
-                  </div>
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "공개 범위와 스포일러 등급은 서버 권한이 아니라 로컬 편집 가이드입니다.")}</div>
                 </div>
 
                 {selectedEntry.status === "intentional-non-payoff" && (
                   <label
-                    className={`${LABEL_CLASS} mt-3`}
-                    htmlFor={`promise-${selectedEntry.id}-non-payoff`}
+                    className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0} mt-3"), { v0: String(LABEL_CLASS) })}
+                    htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-non-payoff"), { v0: String(selectedEntry.id) })}
                   >
-                    의도적 미회수 사유
-                    <textarea
-                      id={`promise-${selectedEntry.id}-non-payoff`}
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "의도적 미회수 사유")}<textarea
+                      id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-non-payoff"), { v0: String(selectedEntry.id) })}
                       rows={2}
                       maxLength={STUDIO_PROMISE_PAYOFF_MAX_TEXT_LENGTH}
                       value={selectedEntry.intentionalNonPayoffReason}
                       onChange={(event) =>
                         patchEntry({ intentionalNonPayoffReason: event.target.value })}
-                      placeholder="열린 결말, 다음 시즌 이월 등 편집 판단의 근거"
-                      className={`${CONTROL_CLASS} resize-y`}
+                      placeholder={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "열린 결말, 다음 시즌 이월 등 편집 판단의 근거")}
+                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0} resize-y"), { v0: String(CONTROL_CLASS) })}
                     />
                   </label>
                 )}
               </section>
 
-              <section aria-labelledby={`promise-${selectedEntry.id}-links`} className="border-t border-line py-4">
+              <section aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-links"), { v0: String(selectedEntry.id) })} className="border-t border-line py-4">
                 <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
                   <div>
-                    <h4 id={`promise-${selectedEntry.id}-links`} className="text-xs font-bold text-fg">
-                      실제 에피소드·컷 연결
-                    </h4>
+                    <h4 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "promise-{v0}-links"), { v0: String(selectedEntry.id) })} className="text-xs font-bold text-fg">
+                      {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "실제 에피소드·컷 연결")}</h4>
                     <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                      약속 → 중간 단서 → 회수 순서를 실제 장면·페이지·컷 ID로 고정합니다.
-                    </p>
+                      {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "약속 → 중간 단서 → 회수 순서를 실제 장면·페이지·컷 ID로 고정합니다.")}</p>
                   </div>
                   <span className="inline-flex min-h-7 items-center gap-1 rounded-md border border-good/30 bg-good/10 px-2 text-[0.62rem] font-semibold text-good">
                     <Link2 size={11} aria-hidden />
-                    로컬 결정 규칙
-                  </span>
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "로컬 결정 규칙")}</span>
                 </div>
 
                 <div className="mt-3">
                   {selectedEntry.seed ? (
                     <StoryLinkEditor
                       stage="seed"
-                      heading="첫 약속"
+                      heading={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "첫 약속")}
                       link={selectedEntry.seed}
                       sceneOptions={sceneOptions}
                       onChange={(link) => setSingleLink("seed", link)}
@@ -839,18 +804,17 @@ export function StudioPromisePayoffLedgerPanel({
                     <button
                       type="button"
                       onClick={() => setSingleLink("seed", newLink("seed"))}
-                      className={`${BUTTON_CLASS} w-full border-dashed border-cool/45 bg-cool/5 text-cool hover:bg-cool/10`}
+                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0} w-full border-dashed border-cool/45 bg-cool/5 text-cool hover:bg-cool/10"), { v0: String(BUTTON_CLASS) })}
                     >
                       <CircleDot size={13} aria-hidden />
-                      첫 약속 회차·컷 연결
-                    </button>
+                      {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "첫 약속 회차·컷 연결")}</button>
                   )}
 
                   <div className="border-t border-line py-3">
                     <div className="flex min-w-0 items-center gap-2">
                       <Lightbulb size={14} className="text-accent" aria-hidden />
                       <p className="min-w-0 flex-1 text-xs font-bold text-fg">
-                        중간 단서 {selectedEntry.foreshadows.length}
+                        {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "중간 단서 ")}{selectedEntry.foreshadows.length}
                       </p>
                       <button
                         type="button"
@@ -869,22 +833,20 @@ export function StudioPromisePayoffLedgerPanel({
                                 ? "foreshadow"
                                 : selectedEntry.status,
                           })}
-                        className={`${BUTTON_CLASS} border-line bg-card text-fg-2 hover:bg-raised hover:text-fg`}
+                        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0} border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"), { v0: String(BUTTON_CLASS) })}
                       >
                         <Plus size={13} aria-hidden />
-                        단서 추가
-                      </button>
+                        {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "단서 추가")}</button>
                     </div>
                     {selectedEntry.foreshadows.length === 0 && (
                       <p className="mt-2 border-l-2 border-line px-3 py-2 text-[0.68rem] leading-relaxed text-fg-3">
-                        중간 단서가 없으면 장기 연재에서 첫 약속과 회수 사이의 맥락을 놓치기 쉽습니다.
-                      </p>
+                        {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "중간 단서가 없으면 장기 연재에서 첫 약속과 회수 사이의 맥락을 놓치기 쉽습니다.")}</p>
                     )}
                     {selectedEntry.foreshadows.map((link, index) => (
                       <StoryLinkEditor
                         key={link.id}
                         stage="foreshadow"
-                        heading={`중간 단서 ${index + 1}`}
+                        heading={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "중간 단서 {v0}"), { v0: String(index + 1) })}
                         link={link}
                         sceneOptions={sceneOptions}
                         onChange={patchForeshadow}
@@ -896,7 +858,7 @@ export function StudioPromisePayoffLedgerPanel({
                   {selectedEntry.payoff ? (
                     <StoryLinkEditor
                       stage="payoff"
-                      heading="회수 장면"
+                      heading={translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "회수 장면")}
                       link={selectedEntry.payoff}
                       sceneOptions={sceneOptions}
                       onChange={(link) => setSingleLink("payoff", link)}
@@ -906,23 +868,20 @@ export function StudioPromisePayoffLedgerPanel({
                     <button
                       type="button"
                       onClick={() => setSingleLink("payoff", newLink("payoff"))}
-                      className={`${BUTTON_CLASS} w-full border-dashed border-good/45 bg-good/5 text-good hover:bg-good/10`}
+                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "en", "{v0} w-full border-dashed border-good/45 bg-good/5 text-good hover:bg-good/10"), { v0: String(BUTTON_CLASS) })}
                     >
                       <Target size={13} aria-hidden />
-                      회수 예정 회차·컷 연결
-                    </button>
+                      {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "회수 예정 회차·컷 연결")}</button>
                   )}
                 </div>
               </section>
 
               <footer className="flex flex-wrap items-center gap-2 border-t border-line py-4 text-[0.68rem] leading-relaxed text-fg-3">
                 <Clock3 size={13} aria-hidden />
-                현재 회차와 회수 예정 회차만 비교하며 시간·네트워크·AI를 사용하지 않습니다.
-                {selectedEntry.status === "payoff" && (
+                {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "현재 회차와 회수 예정 회차만 비교하며 시간·네트워크·AI를 사용하지 않습니다.")}{selectedEntry.status === "payoff" && (
                   <span className="ml-auto inline-flex min-h-7 items-center gap-1 rounded-md border border-good/30 bg-good/10 px-2 font-semibold text-good">
                     <CheckCircle2 size={12} aria-hidden />
-                    회수 완료
-                  </span>
+                    {translateCurrentStaticSourceText("domains.creator.StudioPromisePayoffLedgerPanel", "ko", "회수 완료")}</span>
                 )}
               </footer>
             </div>

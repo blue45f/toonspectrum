@@ -37,6 +37,24 @@ describe("studio pro draw prefs", () => {
     });
   });
 
+  it("keeps text typography outside the brush-switch contract", () => {
+    const typography = { fontSize: 42, lineHeight: 1.45, letterSpacing: 0.02 };
+    const result = applyBrushPresetWithLocks(
+      { id: "watercolor", defaultWidth: 28, defaultOpacity: 0.62 },
+      { sizeLocked: false, opacityLocked: false },
+      { strokeWidth: 4, brushOpacity: 1, color: "#111827" },
+    );
+
+    expect(result).toEqual({
+      brushId: "watercolor",
+      strokeWidth: 28,
+      brushOpacity: 0.62,
+      color: "#111827",
+    });
+    expect(result).not.toHaveProperty("fontSize");
+    expect(typography).toEqual({ fontSize: 42, lineHeight: 1.45, letterSpacing: 0.02 });
+  });
+
   it("treats a special brush default color as preview metadata only", () => {
     expect(
       applyBrushPresetWithLocks(

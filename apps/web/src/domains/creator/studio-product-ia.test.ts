@@ -25,12 +25,9 @@ describe("ToonStudio final product IA", () => {
   });
 
   it("keeps the rendered Studio header aligned with the IA contract", () => {
-    expect(TOONSTUDIO_PRIMARY_NAVIGATION.map(({ id, href }) => ({ id, href }))).toEqual([
-      { id: "studio", href: "/studio" },
-      { id: "make", href: "/studio/new" },
-      { id: "studio-assets", href: "/studio/assets" },
-      { id: "learn", href: "/learn" },
-    ]);
+    expect(TOONSTUDIO_PRIMARY_NAVIGATION.map(({ id, href }) => ({ id, href }))).toEqual(
+      STUDIO_GLOBAL_NAVIGATION.map(({ id, href }) => ({ id, href })),
+    );
   });
 
   it("assigns exactly one primary surface to every capability", () => {
@@ -55,11 +52,18 @@ describe("ToonStudio final product IA", () => {
       "내 브러시",
     ]));
 
+    expect(editor?.label).toBe("브러시 스튜디오");
     expect(editor?.surfaces).toContainEqual({ id: "brush-editor", role: "primary" });
+    expect(editor?.surfaces).toContainEqual({ id: "brush-current-settings", role: "projection" });
+    expect(editor?.surfaces).toContainEqual({ id: "brush-studio", role: "projection" });
+    expect(editor?.surfaces).toContainEqual({ id: "brush-lab-v6", role: "legacy" });
     expect(editor?.surfaces).toContainEqual({ id: "brush-v5-diagnostic", role: "diagnostic" });
     expect(editor?.aliases).toEqual(expect.arrayContaining([
-      "브러시 스튜디오",
+      "현재 브러시 편집",
+      "새 브러시 만들기",
+      "브러시 설정",
       "브러시 연구실",
+      "브러시 제작실",
     ]));
   });
 

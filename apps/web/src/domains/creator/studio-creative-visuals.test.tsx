@@ -102,6 +102,10 @@ describe("studio creative visuals", () => {
     expect(meter).toContain('aria-valuemin="0"');
     expect(meter).toContain('aria-valuemax="100"');
     expect(meter).toContain('aria-valuenow="42"');
+    expect(meter).toContain("shrink-0");
+    expect(meter).toContain("whitespace-nowrap");
+    expect(meter).toContain("min-w-[2.25rem]");
+    expect(meter).toContain("text-right");
     expect(meter).toContain("42%");
     expect(meter).not.toContain('title="');
     expect(renderToStaticMarkup(<StudioPressureHudMeter ratio={null} />)).toBe("");

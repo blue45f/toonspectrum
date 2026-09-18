@@ -15,10 +15,10 @@ describe("actual marketplace source previews", () => {
     const html = renderToStaticMarkup(<MarketCc0AssetPreview record={record} />);
     expect(html).toContain(`data-market-cc0-preview="${asset.id}"`);
     expect(html).toContain(`/assets/studio/cc0-20260906/${asset.path}`);
-    expect(html).toContain("Poly Haven");
+    expect(html).toContain(asset.provider);
     expect(html).toContain("CC0");
     const compact = renderToStaticMarkup(<MarketCc0AssetPreview record={record} compact />);
-    expect(compact).toContain(`/assets/studio/cc0-20260906/${asset.previewPath}`);
+    expect(compact).toContain(`/assets/studio/cc0-20260906/${asset.previewPath ?? asset.path}`);
     expect(compact).not.toContain("<a ");
   });
   it("does not turn a wrong source or arbitrary entry index into a preview", () => {

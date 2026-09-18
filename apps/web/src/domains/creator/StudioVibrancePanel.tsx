@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Vibrance Panel
  * 선택된 이미지의 활기·채도(Vibrance/Saturation) 보정 인스펙터 — 원클릭 채도 프리셋 +
@@ -49,17 +50,16 @@ export function StudioVibrancePanel({
     <div className="space-y-2">
       {/* 헤더 + 항등 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">생동감 (Vibrance)</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioVibrancePanel", "ko", "생동감 (Vibrance)")}</p>
         <button
           type="button"
           onClick={onReset}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title="생동감 보정을 제거하고 원본 채도로 되돌립니다."
+          title={translateCurrentStaticSourceText("domains.creator.StudioVibrancePanel", "ko", "생동감 보정을 제거하고 원본 채도로 되돌립니다.")}
         >
           <RotateCcw className="size-3.5" />
-          원본으로
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioVibrancePanel", "ko", "원본으로")}</button>
       </div>
 
       {/* 원클릭 채도 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). */}

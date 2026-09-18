@@ -71,11 +71,12 @@ const BASE_STATE: StudioMainMenuBuilderState = {
 };
 
 describe("buildStudioBrushMenuItems", () => {
-  it("exposes pixel-art, silk and both simple/expert brush studio entries", () => {
+  it("exposes one Brush Studio product through compact edit and full create actions", () => {
     const ui = {
       togglePixelArtMode: vi.fn(),
       enableSilkSymmetry: vi.fn(),
       openBrushStudio: vi.fn(),
+      openBrushLab: vi.fn(),
     } as unknown as StudioMainMenuUiActions;
     const editor = {} as StudioMainMenuEditorActions;
     const items = buildStudioBrushMenuItems({
@@ -93,27 +94,32 @@ describe("buildStudioBrushMenuItems", () => {
     expect(pixel?.selectionRole).toBe("checkbox");
     expect(silk?.commandId).toBe("brush.silk-flow");
     expect(studio?.commandId).toBe("brush.studio");
-    expect(studio?.label).toBe("현재 브러시 세부 설정…");
+    expect(studio?.label).toBe("현재 브러시 편집…");
     expect(lab?.commandId).toBe("brush.lab");
     expect(lab?.searchActivation).toBe("execute");
-    expect(lab?.label).toBe("목적별 브러시 제작실…");
+    expect(lab?.label).toBe("새 브러시 만들기…");
 
     pixel?.onSelect();
     silk?.onSelect();
     studio?.onSelect();
+    lab?.onSelect();
     expect(ui.togglePixelArtMode).toHaveBeenCalledTimes(1);
     expect(ui.enableSilkSymmetry).toHaveBeenCalledTimes(1);
     expect(ui.openBrushStudio).toHaveBeenCalledTimes(1);
+    expect(ui.openBrushLab).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps work and remix context when opening the dedicated Brush Studio", () => {
-    expect(studioBrushLabHref("/studio")).toBe("/studio/brush-lab");
-    expect(studioBrushLabHref("/studio/canvas")).toBe("/studio/brush-lab");
+  it("keeps manuscript context on the canonical full Brush Studio route", () => {
+    expect(studioBrushLabHref("/studio")).toBe("/studio/assets/brushes/new");
+    expect(studioBrushLabHref("/studio/canvas")).toBe("/studio/assets/brushes/new");
     expect(studioBrushLabHref("/studio/work/work-42/canvas")).toBe(
-      "/studio/work/work-42/brush-lab",
+      "/studio/assets/brushes/new?context=work&workId=work-42",
     );
     expect(studioBrushLabHref("/studio/remix/source-7/canvas")).toBe(
-      "/studio/remix/source-7/brush-lab",
+      "/studio/assets/brushes/new?context=remix&sourceWorkId=source-7",
+    );
+    expect(studioBrushLabHref("/studio/p/project-1/d/page-3")).toBe(
+      "/studio/assets/brushes/new?context=document&documentId=page-3&projectId=project-1",
     );
   });
 

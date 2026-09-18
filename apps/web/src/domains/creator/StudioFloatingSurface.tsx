@@ -1,5 +1,11 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Check,
+  ChevronDown,
+  ChevronUp,
   GripHorizontal,
   Maximize2,
   Minimize2,
@@ -35,6 +41,7 @@ import {
   moveStudioFloatingSurfaceRect,
   normalizeStudioFloatingSurfaceLayout,
   resizeStudioFloatingSurfaceRectFromEdge,
+  resizeStudioFloatingSurfaceRectToPreset,
   resolveStudioFloatingSurfaceDock,
   resolveStudioFloatingSurfaceRect,
   setStudioFloatingSurfaceDock,
@@ -45,6 +52,7 @@ import {
   type StudioFloatingSurfaceLayout,
   type StudioFloatingSurfaceRect,
   type StudioFloatingSurfaceResizeEdge,
+  type StudioFloatingSurfaceSizePreset,
   type StudioFloatingSurfaceViewport,
 } from "./studio-floating-surface";
 import {
@@ -406,6 +414,22 @@ export const StudioFloatingSurface = forwardRef<
     ));
   };
 
+  const resizeToPreset = (preset: StudioFloatingSurfaceSizePreset): void => {
+    if (committedLayout.sizeLocked) return;
+    setMenuOpen(false);
+    setMinimized(false);
+    commitRect(
+      resizeStudioFloatingSurfaceRectToPreset(
+        committedRect,
+        preset,
+        viewport,
+        constraints,
+        normalizedDefault,
+      ),
+      committedLayout.dock,
+    );
+  };
+
   const resetLayout = (): void => {
     setMenuOpen(false);
     setMinimized(false);
@@ -694,11 +718,14 @@ export const StudioFloatingSurface = forwardRef<
       data-studio-floating-surface="true"
       data-studio-floating-surface-id={stackSurfaceId}
       data-dock={committedLayout.dock}
-      data-position-locked={committedLayout.positionLocked ? "true" : "false"}
-      data-size-locked={committedLayout.sizeLocked ? "true" : "false"}
-      data-minimized={minimized ? "true" : "false"}
-      data-dragging={dragging ? "true" : "false"}
-      data-resizing={resizing ? "true" : "false"}
+      data-position-locked={committedLayout.positionLocked ? translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "en", "false")}
+      data-size-locked={committedLayout.sizeLocked ? translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "en", "false")}
+      data-minimized={minimized ? translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "en", "false")}
+      data-studio-floating-size={
+        committedRect.width < 360 ? translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "en", "compact") : committedRect.width < 720 ? translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "en", "comfortable") : translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "en", "wide")
+      }
+      data-dragging={dragging ? translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "en", "false")}
+      data-resizing={resizing ? translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "en", "false")}
       className={cn(
         "pointer-events-auto fixed flex min-h-0 flex-col overflow-hidden rounded-xl border border-line bg-panel text-fg shadow-2xl",
         className,
@@ -712,7 +739,7 @@ export const StudioFloatingSurface = forwardRef<
         <button
           type="button"
           disabled={committedLayout.positionLocked}
-          aria-label={`${label} 이동`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "{v0} 이동"), { v0: String(label) })}
           aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight Alt+Home"
           data-studio-floating-surface-drag-handle="true"
           className={cn(
@@ -740,7 +767,7 @@ export const StudioFloatingSurface = forwardRef<
           <button
             type="button"
             aria-label={`${label} ${minimized ? "펼치기" : "접기"}`}
-            title={minimized ? "내용 펼치기" : "제목줄만 남기기"}
+            title={minimized ? translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "내용 펼치기") : translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "제목줄만 남기기")}
             aria-expanded={!minimized}
             className={cn(
               "inline-flex size-10 shrink-0 items-center justify-center text-fg-3 hover:bg-card hover:text-fg",
@@ -751,17 +778,32 @@ export const StudioFloatingSurface = forwardRef<
             onClick={() => setMinimized((value) => !value)}
           >
             {minimized
-              ? <Maximize2 size={15} aria-hidden />
-              : <Minimize2 size={15} aria-hidden />}
+              ? <ChevronDown size={15} aria-hidden />
+              : <ChevronUp size={15} aria-hidden />}
           </button>
         ) : null}
+        <button
+          type="button"
+          disabled={committedLayout.sizeLocked}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "{v0} 최대 크기"), { v0: String(label) })}
+          title={committedLayout.sizeLocked ? translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "크기 잠금을 해제한 뒤 확대할 수 있어요.") : translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "화면에 맞춰 최대 크기로 확대")}
+          className={cn(
+            "inline-flex size-10 shrink-0 items-center justify-center text-fg-3 hover:bg-card hover:text-fg disabled:cursor-not-allowed disabled:opacity-40",
+            STUDIO_TOUCH_TARGET,
+            STUDIO_EASE,
+            STUDIO_FOCUS_RING,
+          )}
+          onClick={() => resizeToPreset("maximum")}
+        >
+          <Maximize2 size={15} aria-hidden />
+        </button>
         <button
           ref={menuButtonRef}
           type="button"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
-          aria-label={`${label} 창 배치 메뉴`}
-          title="도킹·잠금·초기화"
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "{v0} 창 배치 메뉴"), { v0: String(label) })}
+          title={translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "도킹·크기·잠금·초기화")}
           className={cn(
             "inline-flex size-10 shrink-0 items-center justify-center text-fg-3 hover:bg-card hover:text-fg",
             menuOpen && "bg-accent-soft text-accent",
@@ -775,8 +817,8 @@ export const StudioFloatingSurface = forwardRef<
         </button>
         <button
           type="button"
-          aria-label={`${label} 닫기`}
-          title="닫기"
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "{v0} 닫기"), { v0: String(label) })}
+          title={translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "닫기")}
           className={cn(
             "inline-flex size-10 shrink-0 items-center justify-center text-fg-3 hover:bg-card hover:text-fg",
             STUDIO_TOUCH_TARGET,
@@ -793,7 +835,7 @@ export const StudioFloatingSurface = forwardRef<
         <div
           ref={menuRef}
           role="menu"
-          aria-label={`${label} 창 배치`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "{v0} 창 배치"), { v0: String(label) })}
           className="absolute right-1 top-11 z-30 max-h-[calc(100%-3rem)] w-[min(15.5rem,calc(100%-0.5rem))] overflow-y-auto rounded-xl border border-line-strong bg-panel p-1.5 shadow-2xl"
           onKeyDownCapture={(event) => {
             if (event.key !== "Escape") return;
@@ -804,8 +846,7 @@ export const StudioFloatingSurface = forwardRef<
           }}
         >
           <p className="px-2 py-1 text-[0.62rem] font-bold uppercase tracking-wider text-fg-3">
-            화면 가장자리
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "화면 가장자리")}</p>
           {dockChoices.map(({ dock, label: dockLabel, Icon, iconClassName }) => (
             <button
               key={dock}
@@ -832,6 +873,56 @@ export const StudioFloatingSurface = forwardRef<
             </button>
           ))}
           <div role="separator" className="mx-2 my-1 h-px bg-line" />
+          <p className="px-2 py-1 text-[0.62rem] font-bold uppercase tracking-wider text-fg-3">
+            {translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "창 크기")}</p>
+          <div className="grid grid-cols-3 gap-1 px-1 pb-1" role="group" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "{v0} 빠른 크기"), { v0: String(label) })}>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={committedLayout.sizeLocked}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "{v0} 최소 크기"), { v0: String(label) })}
+              title={translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "콘텐츠가 사용할 수 있는 최소 안전 크기")}
+              className={cn(
+                "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-fg-2 hover:border-accent/50 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-40",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+              )}
+              onClick={() => resizeToPreset("minimum")}
+            >
+              <Minimize2 size={14} aria-hidden />
+              {translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "최소")}</button>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={committedLayout.sizeLocked}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "{v0} 권장 크기"), { v0: String(label) })}
+              title={translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "이 패널의 콘텐츠에 맞춘 기본 권장 크기")}
+              className={cn(
+                "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-fg-2 hover:border-accent/50 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-40",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+              )}
+              onClick={() => resizeToPreset("default")}
+            >
+              <RotateCcw size={14} aria-hidden />
+              {translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "권장")}</button>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={committedLayout.sizeLocked}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "{v0} 최대 크기"), { v0: String(label) })}
+              title={translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "현재 화면과 패널 제한 안에서 최대 크기")}
+              className={cn(
+                "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-fg-2 hover:border-accent/50 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-40",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+              )}
+              onClick={() => resizeToPreset("maximum")}
+            >
+              <Maximize2 size={14} aria-hidden />
+              {translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "최대")}</button>
+          </div>
+          <div role="separator" className="mx-2 my-1 h-px bg-line" />
           <button
             type="button"
             role="menuitemcheckbox"
@@ -845,9 +936,9 @@ export const StudioFloatingSurface = forwardRef<
             onClick={() => toggleLock("position")}
           >
             <Pin size={15} aria-hidden className="shrink-0 text-accent" />
-            <span className="min-w-0 flex-1">위치 잠금</span>
+            <span className="min-w-0 flex-1">{translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "위치 잠금")}</span>
             <span className="text-[0.62rem] font-semibold text-fg-3">
-              {committedLayout.positionLocked ? "켬" : "끔"}
+              {committedLayout.positionLocked ? translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "켬") : translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "끔")}
             </span>
           </button>
           <button
@@ -863,9 +954,9 @@ export const StudioFloatingSurface = forwardRef<
             onClick={() => toggleLock("size")}
           >
             <Scaling size={15} aria-hidden className="shrink-0 text-accent" />
-            <span className="min-w-0 flex-1">크기 잠금</span>
+            <span className="min-w-0 flex-1">{translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "크기 잠금")}</span>
             <span className="text-[0.62rem] font-semibold text-fg-3">
-              {committedLayout.sizeLocked ? "켬" : "끔"}
+              {committedLayout.sizeLocked ? translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "켬") : translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "끔")}
             </span>
           </button>
           <div role="separator" className="mx-2 my-1 h-px bg-line" />
@@ -880,8 +971,7 @@ export const StudioFloatingSurface = forwardRef<
             onClick={resetLayout}
           >
             <RotateCcw size={15} aria-hidden className="shrink-0 text-accent" />
-            위치·크기·잠금 초기화
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "위치·크기·잠금 초기화")}</button>
           <button
             type="button"
             role="menuitem"
@@ -896,15 +986,18 @@ export const StudioFloatingSurface = forwardRef<
             }}
           >
             <RotateCcw size={15} aria-hidden className="shrink-0 text-fg-3" />
-            열린 창 모두 초기화
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioFloatingSurface", "ko", "열린 창 모두 초기화")}</button>
         </div>
       ) : null}
 
       <div
         hidden={minimized}
         inert={minimized ? true : undefined}
-        className={cn("min-h-0 flex-1", contentClassName)}
+        data-studio-floating-content="true"
+        className={cn(
+          "min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain [container-type:inline-size] [scrollbar-gutter:stable]",
+          contentClassName,
+        )}
       >
         {children}
       </div>

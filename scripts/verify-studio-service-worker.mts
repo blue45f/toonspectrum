@@ -23,6 +23,8 @@ import { extname, join, normalize, resolve } from "node:path";
 
 import { chromium, type Browser, type Page } from "playwright";
 
+import { STUDIO_SERVICE_WORKER_STATIC_CRITICAL_URLS } from "../apps/web/src/app/service-worker/studio-service-worker-precache-plan";
+
 import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
 
 const DIST = resolve(process.cwd(), "dist");
@@ -326,6 +328,23 @@ async function main(): Promise<void> {
     );
     const offline = await measureLoad(page);
     report.offline = offline;
+    const offlineStaticCritical = await page.evaluate(async (urls) =>
+      Promise.all(urls.map(async (url) => {
+        try {
+          const response = await fetch(url);
+          return { url, status: response.status, ok: response.ok };
+        } catch (error) {
+          return { url, status: 0, ok: false, error: String(error) };
+        }
+      })),
+    [...STUDIO_SERVICE_WORKER_STATIC_CRITICAL_URLS]);
+    report.offlineStaticCritical = offlineStaticCritical;
+    const unavailableStaticCritical = offlineStaticCritical.filter((entry) => !entry.ok);
+    check(
+      "offline shell and recovery dependencies stay available",
+      unavailableStaticCritical.length === 0,
+      unavailableStaticCritical.map((entry) => `${entry.url}:${entry.status}`).join(", "),
+    );
     check("studio renders with the network down", offlineMounted, `#root children>0=${offlineMounted}`);
     check(
       "offline studio keeps cross-origin isolation",

@@ -4,6 +4,8 @@ import {
   StudioDraftSaveCenter as StudioDraftSaveCenterImpl,
   type StudioDraftSaveCenterProps,
 } from "./StudioDraftSaveCenterImpl";
+import { StudioDraftOperationSyncAssistant } from "./StudioDraftOperationSyncAssistant";
+import { resolveStudioDraftServerRevision } from "./studio-draft-save-center-model";
 import {
   clearStudioDraftSaveOutbox,
   consumeRecentlyClearedStudioDraftSaveOutbox,
@@ -34,14 +36,26 @@ function resolveOutboxWorkId(props: StudioDraftSaveCenterProps): string | null {
   return null;
 }
 
+function resolveServerWorkId(props: StudioDraftSaveCenterProps): string | null {
+  for (const value of [props.workId, props.loadedWork?.id, props.sharedDocument?.workId]) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function safeCount(value: number | undefined): number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : 0;
+}
+
 /**
  * Reliability adapter around the existing save-center UI.
  *
  * The implementation remains the sole UX/state machine. This adapter only:
  * - keeps a just-cleared offline receipt until the real save Promise succeeds,
- * - coalesces repeated save requests while one is in flight, and
+ * - coalesces repeated save requests while one is in flight,
  * - holds automatic replay behind the existing sync barrier while a queued receipt
- *   is waiting for the current server revision query to finish.
+ *   is waiting for the current server revision query to finish, and
+ * - surfaces the existing CRDT outbox as an attention-only local/server sync assistant.
  */
 export function StudioDraftSaveCenter(props: StudioDraftSaveCenterProps) {
   const { onSaveDraft: saveDraft } = props;
@@ -62,6 +76,18 @@ export function StudioDraftSaveCenter(props: StudioDraftSaveCenterProps) {
     return subscribeStudioDraftSaveOutbox(({ workId: changedWorkId, entry }) => {
       if (changedWorkId === workId) setHasQueuedReceipt(entry !== null);
     });
+  }, [workId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || workId === null) return;
+    const onOnline = () => {
+      setHasQueuedReceipt(readStudioDraftSaveOutbox({
+        storage: outboxStorage(),
+        workId,
+      }) !== null);
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
   }, [workId]);
 
   const onSaveDraft = useCallback((): Promise<unknown> => {
@@ -117,12 +143,34 @@ export function StudioDraftSaveCenter(props: StudioDraftSaveCenterProps) {
     props.serverRevisionError,
     props.serverRevisionLoading,
   ]);
+  const serverRevision = resolveStudioDraftServerRevision([
+    props.serverCurrentRevision,
+    props.sharedDocument?.revision,
+    props.loadedWork?.revision,
+    ...(props.serverRevisions ?? []).map((entry) => entry.revision),
+  ]);
 
   return (
-    <StudioDraftSaveCenterImpl
-      {...props}
-      collaborationOperationSyncPending={effectiveCollaborationSyncPending}
-      onSaveDraft={onSaveDraft}
-    />
+    <>
+      <StudioDraftSaveCenterImpl
+        {...props}
+        collaborationOperationSyncPending={effectiveCollaborationSyncPending}
+        onSaveDraft={onSaveDraft}
+      />
+      <StudioDraftOperationSyncAssistant
+        serverRevision={serverRevision}
+        hasServerDocument={resolveServerWorkId(props) !== null}
+        localCheckpointCount={safeCount(props.localCheckpointCount)}
+        localRole={props.autosaveDocumentLeadership?.role ?? null}
+        collaborationSyncPending={effectiveCollaborationSyncPending}
+        hydrated={props.workHydrated ?? true}
+        hydrationFailed={props.workHydrationFailed ?? false}
+        saving={props.saving}
+        mobileImmersive={props.mobileImmersive}
+        canvasOnlyMode={props.canvasOnlyMode}
+        onOpenVersions={props.onOpenVersions}
+        onExportBackup={props.onExportBackup}
+      />
+    </>
   );
 }

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   BadRequestException,
   ConflictException,
@@ -31,10 +33,66 @@ function aggregate(): ProductionProjectAggregate {
   });
 }
 
+const externalReviewToken = "a".repeat(64);
+
+function aggregateWithExternalReview(): ProductionProjectAggregate {
+  const base = aggregate();
+  const assignmentId = base.assignments[0]!.id;
+  return {
+    ...base,
+    deliverables: [{
+      id: "deliverable-final",
+      projectId: base.projectId,
+      scope: episodeScope(base.projectId, "episode-1"),
+      type: "integrated-webtoon",
+      expectedFormat: "PNG sequence",
+      completionCriteria: ["오탈자 없음", "플랫폼 규격 통과"],
+      currentSubmissionId: "submission-final",
+      approvedSubmissionId: "submission-final",
+    }],
+    submissions: [{
+      id: "submission-final",
+      projectId: base.projectId,
+      deliverableId: "deliverable-final",
+      revisionRef: {
+        id: "revision-final",
+        lineage: "integrated",
+        revision: 1,
+        digest: `sha256:${"1".repeat(64)}`,
+        createdAt: at,
+      },
+      submittedByAssignmentId: assignmentId,
+      submittedAt: at,
+      status: "approved",
+      inputRevisionRefs: [],
+      evidenceRefs: ["https://example.test/review.png"],
+    }],
+    externalReviewAccesses: [{
+      id: "external-review-1",
+      projectId: base.projectId,
+      scope: episodeScope(base.projectId, "episode-1"),
+      label: "편집부 최종 검수",
+      tokenDigest: `sha256:${createHash("sha256").update(externalReviewToken).digest("hex")}`,
+      submissionIds: ["submission-final"],
+      permissions: ["view", "comment", "approve"],
+      watermark: true,
+      expiresAt: "2027-09-17T00:00:00.000Z",
+      status: "active",
+      createdByAssignmentId: assignmentId,
+      createdAt: at,
+      lastAccessedAt: null,
+      responses: [],
+    }],
+  };
+}
+
 const repository = {
   getProject: vi.fn(),
+  listProjects: vi.fn(),
+  getPublicProject: vi.fn(),
   getProjectByWork: vi.fn(),
   createProject: vi.fn(),
+  mutatePublicReview: vi.fn(),
   mutateProject: vi.fn(),
 };
 
@@ -638,6 +696,407 @@ describe("ProductionCollaborationService", () => {
       status: "active",
       scopePackageRevision: 1,
       totalAmountMinor: 800000,
+    });
+  });
+
+  it("creates a new episode, plan and dependency-safe deadline pipeline atomically", async () => {
+    const current = aggregate();
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current, {
+      view: true,
+      comment: true,
+      edit: true,
+      manage: true,
+      owner: true,
+      role: "owner",
+    }));
+    const episode = {
+      id: "episode-collaboration-14",
+      projectId: "project-1",
+      episodeId: "episode-14",
+      revision: 0,
+      state: "episode-planning" as const,
+      narrativeRevisionRef: null,
+      visualRevisionRef: null,
+      integratedRevisionRef: null,
+      activeHandoffId: null,
+      openBlockerCount: 0,
+      storyLockApproved: false,
+      thumbnailLockApproved: false,
+      jointProofApproved: false,
+      creditPreflightPassed: false,
+      publicationPreflightPassed: false,
+      updatedAt: at,
+    };
+    const episodePlan = {
+      id: "episode-plan-14",
+      projectId: "project-1",
+      seasonId: null,
+      episodeId: "episode-14",
+      episodeNumber: 14,
+      revision: 1,
+      status: "draft" as const,
+      title: "14화 새 출발",
+      logline: "새로운 사건이 시작된다.",
+      openingHook: "",
+      coreConflict: "",
+      turningPoints: [],
+      cliffhanger: "",
+      characterRefs: [],
+      locationRefs: [],
+      targetCutCount: 60,
+      targetScrollHeightPx: 80000,
+      dialogueDensity: "medium" as const,
+      difficulty: 3,
+      riskIds: [],
+      narrativeRevisionRef: null,
+      approvedByAssignmentIds: [],
+      createdAt: at,
+    };
+    const storyTask = {
+      id: "task-episode-14-story",
+      projectId: "project-1",
+      scope: episodeScope("project-1", "episode-14"),
+      processKey: "story",
+      title: "14화 대본 확정",
+      status: "draft" as const,
+      assignmentIds: [],
+      reviewerAssignmentIds: [],
+      inputRevisionRefs: [],
+      outputDeliverableIds: [],
+      dependencyTaskIds: [],
+      dueAt: "2026-10-01T09:00:00.000Z",
+      estimateHours: { optimistic: 6, likely: 10, pessimistic: 14 },
+      completionCriteria: ["대사 정본 고정"],
+      sourceAgreementMilestoneId: null,
+    };
+    const publicationTask = {
+      ...storyTask,
+      id: "task-episode-14-publication",
+      processKey: "publication",
+      title: "14화 게시 예약",
+      dependencyTaskIds: [storyTask.id],
+      dueAt: "2026-10-15T09:00:00.000Z",
+      estimateHours: { optimistic: 2, likely: 3, pessimistic: 5 },
+      completionCriteria: ["업로드 규격 검증"],
+    };
+    const result = await service().executeCommand("owner-1", "project-1", {
+      expectedRevision: 0,
+      mutationId: "12121212-1212-4212-8212-121212121212",
+      command: {
+        type: "upsert-episode-operations",
+        episodeId: episode.episodeId,
+        episode,
+        episodePlan,
+        tasks: [storyTask, publicationTask],
+      },
+    });
+    expect(result.aggregate).toMatchObject({ revision: 1 });
+    expect(result.aggregate.episodes).toHaveLength(1);
+    expect(result.aggregate.episodePlans).toHaveLength(1);
+    expect(result.aggregate.tasks).toHaveLength(2);
+    expect(result.derived).toEqual({
+      episodeId: "episode-14",
+      taskCount: 2,
+      releaseAt: "2026-10-15T09:00:00.000Z",
+    });
+    expect(result.aggregate.auditEvents.at(-1)).toMatchObject({
+      action: "upsert-episode-operations",
+      targetType: "episode-operations",
+      targetId: "episode-14",
+    });
+  });
+
+  it("returns a compact risk-sorted portfolio without exposing project aggregates", async () => {
+    const base = aggregate();
+    const current: ProductionProjectAggregate = {
+      ...base,
+      episodes: [{
+        id: "episode-1",
+        projectId: base.projectId,
+        episodeId: "episode-1",
+        revision: 1,
+        state: "publish-ready",
+        narrativeRevisionRef: null,
+        visualRevisionRef: null,
+        integratedRevisionRef: null,
+        activeHandoffId: null,
+        openBlockerCount: 0,
+        storyLockApproved: true,
+        thumbnailLockApproved: true,
+        jointProofApproved: true,
+        creditPreflightPassed: true,
+        publicationPreflightPassed: true,
+        updatedAt: at,
+      }],
+      tasks: [{
+        id: "publication-1",
+        projectId: base.projectId,
+        scope: episodeScope(base.projectId, "episode-1"),
+        processKey: "publication",
+        title: "1화 게시",
+        status: "blocked",
+        assignmentIds: [],
+        reviewerAssignmentIds: [],
+        inputRevisionRefs: [],
+        outputDeliverableIds: [],
+        dependencyTaskIds: [],
+        dueAt: "2026-09-16T00:00:00.000Z",
+        estimateHours: { optimistic: 1, likely: 2, pessimistic: 3 },
+        completionCriteria: ["게시"],
+        sourceAgreementMilestoneId: null,
+      }],
+    };
+    repository.listProjects.mockResolvedValue([{
+      aggregate: current,
+      access: { view: true, comment: true, edit: true, manage: true, owner: true, role: "owner" },
+    }]);
+
+    const result = await service().listProjects("owner-1");
+
+    expect(result.projects).toEqual([
+      expect.objectContaining({
+        projectId: "project-1",
+        title: "공동 창작 테스트",
+        activeEpisodeCount: 1,
+        readyBufferCount: 1,
+        blockedTaskCount: 1,
+        overdueTaskCount: 1,
+        unassignedTaskCount: 1,
+      }),
+    ]);
+    expect(result.projects[0]).not.toHaveProperty("tasks");
+    expect(result.projects[0]).not.toHaveProperty("aggregate");
+  });
+
+  it("combines the current user's work across projects into one personal inbox", async () => {
+    const base = aggregate();
+    const assignmentId = base.assignments[0]!.id;
+    const current: ProductionProjectAggregate = {
+      ...base,
+      tasks: [{
+        id: "task-my-work",
+        projectId: base.projectId,
+        scope: episodeScope(base.projectId, "episode-1"),
+        processKey: "line-art",
+        title: "내 선화 작업",
+        status: "in-progress",
+        assignmentIds: [assignmentId],
+        reviewerAssignmentIds: [],
+        inputRevisionRefs: [],
+        outputDeliverableIds: [],
+        dependencyTaskIds: [],
+        dueAt: "2026-09-17T09:00:00.000Z",
+        estimateHours: { optimistic: 4, likely: 6, pessimistic: 8 },
+        completionCriteria: ["완료"],
+        sourceAgreementMilestoneId: null,
+      }],
+    };
+    repository.listProjects.mockResolvedValue([{
+      aggregate: current,
+      access: { view: true, comment: true, edit: true, manage: true, owner: true, role: "owner" },
+    }]);
+
+    const result = await service().getPersonalInbox("owner-1");
+
+    expect(result.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        bucket: "inProgress",
+        projectId: "project-1",
+        taskId: "task-my-work",
+        taskTitle: "내 선화 작업",
+      }),
+    ]));
+    expect(result.counts.inProgress).toBe(1);
+  });
+
+  it("projects only token-scoped immutable submissions to an external reviewer", async () => {
+    const current = aggregateWithExternalReview();
+    repository.getPublicProject.mockResolvedValue(current);
+
+    const result = await service().getExternalReview(
+      current.projectId,
+      "external-review-1",
+      externalReviewToken,
+    );
+
+    expect(result).toMatchObject({
+      projectTitle: "공동 창작 테스트",
+      review: {
+        id: "external-review-1",
+        label: "편집부 최종 검수",
+        watermark: true,
+      },
+      submissions: [{
+        id: "submission-final",
+        deliverable: { type: "integrated-webtoon" },
+      }],
+    });
+    expect(result).not.toHaveProperty("assignments");
+    expect(result).not.toHaveProperty("externalReviewAccesses");
+  });
+
+  it("records an idempotent public review response without exposing the aggregate", async () => {
+    const current = aggregateWithExternalReview();
+    repository.mutatePublicReview.mockImplementation(async (input) => input.mutate(current));
+
+    const result = await service().submitExternalReview(
+      current.projectId,
+      "external-review-1",
+      externalReviewToken,
+      {
+        responseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        reviewerName: "외부 편집자",
+        decision: "request-changes",
+        note: "마지막 컷 식자를 수정해 주세요.",
+      },
+    );
+
+    expect(result).toMatchObject({
+      review: {
+        responses: [{
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          reviewerName: "외부 편집자",
+          decision: "request-changes",
+        }],
+      },
+    });
+    expect(result).not.toHaveProperty("aggregate");
+  });
+
+  it("accepts an exact retry of the same public review response idempotently", async () => {
+    const base = aggregateWithExternalReview();
+    const existing = {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      reviewerName: "외부 편집자",
+      decision: "approve" as const,
+      note: "최종 확인했습니다.",
+      createdAt: "2026-09-17T01:00:00.000Z",
+    };
+    const current: ProductionProjectAggregate = {
+      ...base,
+      externalReviewAccesses: base.externalReviewAccesses.map((access) => ({
+        ...access,
+        responses: [existing],
+      })),
+    };
+    repository.mutatePublicReview.mockImplementation(async (input) => input.mutate(current));
+
+    const result = await service().submitExternalReview(
+      current.projectId,
+      "external-review-1",
+      externalReviewToken,
+      {
+        responseId: existing.id,
+        reviewerName: existing.reviewerName,
+        decision: existing.decision,
+        note: existing.note,
+      },
+    );
+
+    expect(result.review.responses).toEqual([existing]);
+  });
+
+  it("rejects invalid or expired public review tokens without revealing link existence", async () => {
+    const current = aggregateWithExternalReview();
+    repository.getPublicProject.mockResolvedValue(current);
+
+    await expect(service().getExternalReview(
+      current.projectId,
+      "external-review-1",
+      "b".repeat(64),
+    )).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("audits risk response transitions and requires manage capability for approval", async () => {
+    const base = aggregate();
+    const ownerAssignmentId = base.assignments[0]!.id;
+    const current: ProductionProjectAggregate = {
+      ...base,
+      risks: [{
+        id: "risk-test",
+        projectId: "project-1",
+        revision: 1,
+        scope: { kind: "project", id: "project-1", ancestors: [] },
+        category: "schedule",
+        source: "manual",
+        signalIds: [],
+        title: "게시 일정 위험",
+        description: "후행 작업 지연 가능성이 있습니다.",
+        probability: 3,
+        impact: 4,
+        exposureScore: 12,
+        severity: "warning",
+        priorityScore: 48,
+        ownerAssignmentId,
+        causeCodes: ["manual"],
+        earlySignals: [],
+        mitigation: "작업을 분할합니다.",
+        contingency: "게시 일정을 조정합니다.",
+        trigger: "직접 등록",
+        affectedTaskIds: [],
+        affectedEpisodeIds: [],
+        affectedMilestoneIds: [],
+        baselineDueAt: null,
+        forecastDueAt: null,
+        varianceHours: null,
+        status: "open",
+        dueAt: null,
+        responseDueAt: null,
+        nextReviewAt: null,
+        acceptedReason: null,
+        dismissedReason: null,
+        resolutionSummary: null,
+        detectedAt: at,
+        lastEvaluatedAt: at,
+        occurredAt: null,
+        resolvedAt: null,
+        closedAt: null,
+        createdAt: at,
+        updatedAt: at,
+      }],
+      riskResponses: [{
+        id: "risk-response-test",
+        projectId: "project-1",
+        riskId: "risk-test",
+        strategy: "mitigate",
+        actionType: "split-task",
+        title: "작업 분할",
+        description: "선화 작업을 나눕니다.",
+        ownerAssignmentId,
+        dueAt: null,
+        linkedTaskId: null,
+        linkedChangeRequestId: null,
+        linkedChangeOrderId: null,
+        expectedEffect: "예상 지연 감소",
+        actualEffect: null,
+        status: "proposed",
+        createdAt: at,
+        completedAt: null,
+      }],
+    };
+    repository.mutateProject.mockImplementation(async (input) => {
+      expect(input.requiredCapability).toBe("manage");
+      return input.mutate(current, {
+        view: true, comment: true, edit: true, manage: true, owner: true, role: "owner",
+      });
+    });
+
+    const result = await service().executeCommand("owner-1", "project-1", {
+      expectedRevision: 0,
+      mutationId: "13131313-1313-4313-8313-131313131313",
+      command: {
+        type: "transition-risk-response",
+        responseId: "risk-response-test",
+        toStatus: "approved",
+        actualEffect: null,
+      },
+    });
+
+    expect(result.aggregate.riskResponses[0]?.status).toBe("approved");
+    expect(result.aggregate.auditEvents.at(-1)).toMatchObject({
+      action: "transition-risk-response",
+      targetType: "risk-response",
+      targetId: "risk-response-test",
     });
   });
 

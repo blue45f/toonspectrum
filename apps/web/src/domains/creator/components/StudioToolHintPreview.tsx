@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   useId,
   useSyncExternalStore,
   type ReactElement,
@@ -124,7 +128,7 @@ function useSystemReducedMotion(): boolean {
 function SelectionPreview({ animate }: { animate: boolean }): ReactElement {
   return (
     <>
-      <g data-preview-motion={animate ? "select" : undefined}>
+      <g data-preview-motion={animate ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "select") : undefined}>
         <path
           d="M66 29c14-7 35-4 44 9 7 10 4 24-8 31-13 8-34 5-42-7-7-10-4-26 6-33Z"
           fill={COLOR.accentSoft}
@@ -235,7 +239,7 @@ function InkPreview({ animate }: { animate: boolean }): ReactElement {
           />
         ) : null}
       </path>
-      <g transform={animate ? undefined : "translate(170 40) rotate(-18)"}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(170 40) rotate(-18)")}>
         <path
           d="M-7-13 7-13 5 7 0 14-5 7Z"
           fill={COLOR.fg2}
@@ -314,7 +318,7 @@ function ErasePreview({ animate }: { animate: boolean }): ReactElement {
         strokeWidth="1.5"
         opacity=".45"
       />
-      <g transform={animate ? undefined : "translate(108 54) rotate(-16)"}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(108 54) rotate(-16)")}>
         <rect
           x="-11"
           y="-8"
@@ -421,7 +425,7 @@ function SamplePreview({ animate }: { animate: boolean }): ReactElement {
           <animate attributeName="r" dur="2.7s" values="15; 15; 21; 15" keyTimes="0; .4; .62; 1" repeatCount="indefinite" />
         ) : null}
       </circle>
-      <g transform={animate ? undefined : "translate(113 36) rotate(-38)"}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(113 36) rotate(-38)")}>
         <path d="M-3-18h6V6h-6Z" fill={COLOR.fg2} stroke={COLOR.canvas} strokeWidth="1.5" />
         <path d="m-5 6 10 0-5 12Z" fill={COLOR.accent} stroke={COLOR.canvas} strokeLinejoin="round" strokeWidth="1.5" />
         <rect x="-7" y="-22" width="14" height="6" rx="2" fill={COLOR.raised} stroke={COLOR.fg2} strokeWidth="1.5" />
@@ -482,7 +486,7 @@ function ColorPalettePreview({
       .map((index) => builtInPalette.colors[index])
       .filter((color): color is string => color !== undefined);
     return (
-      <g data-preview-operation={`palette-${builtInPalette.id}`}>
+      <g data-preview-operation={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "palette-{v0}"), { v0: String(builtInPalette.id) })}>
         <rect x="35" y="13" width="146" height="78" rx="10" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="1.5" />
         <text x="46" y="29" fill={COLOR.fg} fontSize="9" fontWeight="800">
           {builtInPalette.label}
@@ -495,7 +499,7 @@ function ColorPalettePreview({
         </g>
         <g transform="translate(46 73)">
           {swatches.map((color, index) => (
-            <g key={`${color}-${index}`} transform={`translate(${index * 21} 0)`}>
+            <g key={`${color}-${index}`} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate({v0} 0)"), { v0: String(index * 21) })}>
               <rect width="17" height="11" rx="3" fill={color} stroke={index === 3 ? COLOR.fg : COLOR.lineStrong} strokeWidth={index === 3 ? "1.8" : "1"} />
               {index === 3 ? (
                 <rect width="17" height="11" rx="3" fill="none" stroke={COLOR.accent} opacity={animate ? ".28" : ".9"}>
@@ -599,7 +603,7 @@ function ColorPalettePreview({
               fontWeight="800"
               textAnchor="middle"
             >
-              {primaryColor ? "주" : "보조"}
+              {primaryColor ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "ko", "주") : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "ko", "보조")}
             </text>
           </>
         )}
@@ -629,7 +633,7 @@ function ColorPalettePreview({
       {paletteFamily ? (
         <>
           {["인물", "배경", "무드"].map((label, index) => (
-            <g key={label} transform={`translate(${45 + index * 48} 22)`}>
+            <g key={label} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate({v0} 22)"), { v0: String(45 + index * 48) })}>
               <rect
                 width="42"
                 height="16"
@@ -946,7 +950,7 @@ function DirectShapePreview({
         />
         <path
           d={shape.d}
-          fill={shape.fill ? COLOR.accentSoft : "none"}
+          fill={shape.fill ? COLOR.accentSoft : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "none")}
           stroke={COLOR.fg3}
           strokeWidth="5"
           opacity=".16"
@@ -954,7 +958,7 @@ function DirectShapePreview({
         {shapeKind === "line" ? (
           <path
             d={shape.d}
-            data-preview-operation={`shape-${shapeKind}`}
+            data-preview-operation={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "shape-{v0}"), { v0: String(shapeKind) })}
             fill="none"
             stroke={COLOR.accent}
             strokeDasharray={shape.dashLength}
@@ -974,13 +978,13 @@ function DirectShapePreview({
             ) : null}
           </path>
         ) : (
-          <g transform={`translate(${shape.startX} ${shape.startY})`}>
-            <g transform={animate ? "scale(.04 .04)" : "scale(1 1)"}>
-              <g transform={`translate(${-shape.startX} ${-shape.startY})`}>
+          <g transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate({v0} {v1})"), { v0: String(shape.startX), v1: String(shape.startY) })}>
+            <g transform={animate ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "scale(.04 .04)") : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "scale(1 1)")}>
+              <g transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate({v0} {v1})"), { v0: String(-shape.startX), v1: String(-shape.startY) })}>
                 <path
                   d={shape.d}
-                  data-preview-operation={`shape-${shapeKind}`}
-                  fill={shape.fill ? COLOR.accentSoft : "none"}
+                  data-preview-operation={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "shape-{v0}"), { v0: String(shapeKind) })}
+                  fill={shape.fill ? COLOR.accentSoft : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "none")}
                   stroke={COLOR.accent}
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -1016,7 +1020,7 @@ function DirectShapePreview({
           />
         ) : null}
         <g
-          transform={animate ? undefined : `translate(${shape.endX} ${shape.endY})`}
+          transform={animate ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate({v0} {v1})"), { v0: String(shape.endX), v1: String(shape.endY) })}
         >
           <path
             d="m0 0 7 18 4-7 7 6 4-4-7-6 7-4Z"
@@ -1062,7 +1066,7 @@ function DirectShapePreview({
           />
         ) : null}
       </path>
-      <g transform={animate ? undefined : "translate(110 71)"}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(110 71)")}>
         <path d="m0 0 7 18 4-7 7 6 4-4-7-6 7-4Z" fill={COLOR.fg} stroke={COLOR.canvas} strokeLinejoin="round" strokeWidth="2" />
         {animate ? (
           <animateMotion
@@ -1091,7 +1095,7 @@ function TextPreview({ animate, clipId }: { animate: boolean; clipId: string }):
         </clipPath>
       </defs>
       <rect x="42" y="20" width="120" height="61" rx="5" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeDasharray="4 3" />
-      <g clipPath={`url(#${clipId})`}>
+      <g clipPath={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "url(#{v0})"), { v0: String(clipId) })}>
         <text
           x="52"
           y="61"
@@ -1100,8 +1104,7 @@ function TextPreview({ animate, clipId }: { animate: boolean; clipId: string }):
           fontSize="29"
           fontWeight="750"
         >
-          웹툰
-        </text>
+          {translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "ko", "웹툰")}</text>
         <path d="M52 69h78" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="2" />
       </g>
       <rect x={animate ? "51" : "133"} y="31" width="2" height="37" rx="1" fill={COLOR.accent}>
@@ -1156,7 +1159,7 @@ function BubblePreview({ animate, variant }: { animate: boolean; variant: string
           strokeWidth="1.5"
           opacity=".42"
         />
-        <g transform={animate ? undefined : "translate(0 10) scale(1 .78)"}>
+        <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(0 10) scale(1 .78)")}>
           <path d="M48 25h120c8 0 14 6 14 14v35c0 8-6 14-14 14H101L82 99l5-11H48c-8 0-14-6-14-14V39c0-8 6-14 14-14Z" fill={COLOR.card} stroke={COLOR.accent} strokeWidth="2">
             {animate ? <animateTransform attributeName="transform" type="translate" dur="2.8s" values="0 0;0 10;0 10;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
           </path>
@@ -1175,7 +1178,7 @@ function BubblePreview({ animate, variant }: { animate: boolean; variant: string
         stroke={COLOR.lineStrong}
         strokeLinejoin="round"
         strokeWidth="2"
-        transform={animate ? undefined : "scale(1)"}
+        transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "scale(1)")}
       >
         {animate ? (
           <animateTransform
@@ -1215,7 +1218,7 @@ function BubblePreview({ animate, variant }: { animate: boolean; variant: string
 function ImagePreview({ animate }: { animate: boolean }): ReactElement {
   return (
     <>
-      <g data-preview-motion={animate ? "image" : undefined}>
+      <g data-preview-motion={animate ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "image") : undefined}>
         <rect x="49" y="17" width="108" height="69" rx="6" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2" />
         <circle cx="75" cy="39" r="8" fill={COLOR.accent} opacity=".92" />
         <path d="m54 76 28-28 18 17 14-13 38 24Z" fill={COLOR.cool} opacity=".58" />
@@ -1285,7 +1288,7 @@ function FilterEnginePreview({
     return <>{frame}<circle cx="108" cy="52" r="29" fill="none" stroke={COLOR.fg3} strokeWidth="8" /><path d="M108 23a29 29 0 0 1 25 15" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="8" /><path d="M133 38a29 29 0 0 1-2 31" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeWidth="8" /><circle cx="108" cy="52" r={animate ? "7" : "17"} fill={COLOR.accentSoft} stroke={COLOR.accent}>{animate ? <animate attributeName="r" dur="2.5s" values="7;18;18;7" keyTimes="0;.4;.72;1" repeatCount="indefinite" /> : null}</circle></>;
   }
   if (engine === "color-balance") {
-    return <>{frame}<path d="M57 64h102M108 36v39" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="2" /><g transform={animate ? undefined : "rotate(-8 108 64)"}><path d="M65 64h86" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="3" /><circle cx="70" cy="50" r="10" fill={COLOR.cool} /><circle cx="146" cy="50" r="10" fill={COLOR.accent} />{animate ? <animateTransform attributeName="transform" type="rotate" dur="2.8s" values="-8 108 64;8 108 64;8 108 64;-8 108 64" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</g></>;
+    return <>{frame}<path d="M57 64h102M108 36v39" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="2" /><g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "rotate(-8 108 64)")}><path d="M65 64h86" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="3" /><circle cx="70" cy="50" r="10" fill={COLOR.cool} /><circle cx="146" cy="50" r="10" fill={COLOR.accent} />{animate ? <animateTransform attributeName="transform" type="rotate" dur="2.8s" values="-8 108 64;8 108 64;8 108 64;-8 108 64" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</g></>;
   }
   if (engine === "channel-mixer") {
     return <>{frame}<circle cx="69" cy="38" r="12" fill={COLOR.accent} opacity=".8" /><circle cx="69" cy="66" r="12" fill={COLOR.cool} opacity=".8" /><circle cx="99" cy="52" r="12" fill={COLOR.fg2} opacity=".75" /><path d="M82 38 139 52M82 66l57-14M111 52h28" stroke={COLOR.fg2} strokeDasharray="5 4" strokeWidth="2" /><circle cx="150" cy="52" r={animate ? "10" : "17"} fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2">{animate ? <animate attributeName="r" dur="2.4s" values="9;18;18;9" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</circle></>;
@@ -1327,13 +1330,13 @@ function FilterPreview({ animate, clipId, variant }: { animate: boolean; clipId:
       <rect x="43" y="17" width="112" height="68" rx="6" fill={COLOR.raised} stroke={COLOR.lineStrong} />
       <circle cx="69" cy="38" r="8" fill={COLOR.fg3} />
       <path d="m47 78 30-29 20 18 14-14 40 25Z" fill={COLOR.fg3} opacity=".55" />
-      <g clipPath={`url(#${clipId})`}>
+      <g clipPath={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "url(#{v0})"), { v0: String(clipId) })}>
         <rect x="43" y="17" width="112" height="68" fill={COLOR.accentSoft} />
         <circle cx="69" cy="38" r="8" fill={COLOR.accent} />
         <path d="m47 78 30-29 20 18 14-14 40 25Z" fill={COLOR.cool} opacity=".78" />
         <path d="M47 78 77 49l20 18" fill="none" stroke={COLOR.fg} strokeLinecap="round" strokeWidth="2" />
       </g>
-      <g transform={animate ? undefined : "translate(155 0)"}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(155 0)")}>
         <path d="M0 13v76" stroke={COLOR.fg} strokeWidth="2" />
         <rect x="-5" y="42" width="10" height="18" rx="3" fill={COLOR.accent} stroke={COLOR.canvas} strokeWidth="2" />
         {animate ? (
@@ -1406,10 +1409,10 @@ function ZoomViewPreview({
           </clipPath>
         </defs>
         <rect x="31" y="14" width="154" height="76" rx="7" fill={COLOR.card} stroke={COLOR.lineStrong} strokeWidth="1.5" />
-        <g clipPath={`url(#${clipId})`}>
-          <g transform={animate ? undefined : "translate(43 -32.5)"}>
+        <g clipPath={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "url(#{v0})"), { v0: String(clipId) })}>
+          <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(43 -32.5)")}>
             {animate ? <animateTransform attributeName="transform" type="translate" dur="2.8s" values="83 19.5;43 -32.5;43 -32.5;83 19.5" keyTimes="0;.4;.74;1" repeatCount="indefinite" /> : null}
-            <g transform={animate ? undefined : "scale(2.6)"}>
+            <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "scale(2.6)")}>
               {animate ? <animateTransform attributeName="transform" type="scale" dur="2.8s" values="1;2.6;2.6;1" keyTimes="0;.4;.74;1" repeatCount="indefinite" /> : null}
               <rect width="50" height="65" rx="3" fill={COLOR.canvas} stroke={COLOR.accent} strokeWidth="1.5" />
               <circle cx="13" cy="14" r="5" fill={COLOR.cool} />
@@ -1427,7 +1430,7 @@ function ZoomViewPreview({
     return (
       <g data-preview-operation="reset-view">
         <path d="M108 13v78" stroke={COLOR.cool} strokeDasharray="3 4" strokeWidth="1.2" opacity=".55" />
-        <g transform={animate ? undefined : "rotate(0 108 52)"}>
+        <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "rotate(0 108 52)")}>
           <rect x="55" y="24" width="106" height="58" rx="5" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2" />
           <circle cx="79" cy="42" r="6" fill={COLOR.accent} />
           <path d="m62 73 24-22 17 14 14-11 36 19" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
@@ -1445,9 +1448,9 @@ function ZoomViewPreview({
   const zoomScaleValues = zoomOut ? "1;.75;.75;1" : ".75;1;1;.75";
   const staticScale = zoomOut ? .75 : 1;
   return (
-    <g data-preview-operation={zoomOut ? "zoom-out" : zoomIn ? "zoom-in" : "zoom-view"}>
+    <g data-preview-operation={zoomOut ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "zoom-out") : zoomIn ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "zoom-in") : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "zoom-view")}>
       <g transform="translate(104 52)">
-        <g transform={animate ? undefined : `scale(${staticScale})`}>
+        <g transform={animate ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "scale({v0})"), { v0: String(staticScale) })}>
           {animate ? <animateTransform attributeName="transform" type="scale" dur="2.8s" values={zoomScaleValues} keyTimes="0;.38;.72;1" repeatCount="indefinite" /> : null}
           <rect x="-56" y="-34" width="112" height="68" rx="5" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2" />
           <path d="M-32 15-13-6 3 8 17-3 39 16" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
@@ -1467,7 +1470,7 @@ function ViewHudPreview({ animate, variant }: { animate: boolean; variant: strin
   const operation = `${rotate ? "rotate" : "zoom"}-${close ? "close" : "open"}`;
   const collapsedTransform = "translate(0 27) scale(1 .18)";
   return (
-    <g data-preview-operation={`view-hud-${operation}`}>
+    <g data-preview-operation={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "view-hud-{v0}"), { v0: String(operation) })}>
       <rect x="93" y="81" width="30" height="14" rx="7" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="1.5" />
       {rotate ? (
         <path d="M102 88a7 7 0 0 1 12-4m0 0-1-5m1 5-5-1" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
@@ -1507,7 +1510,7 @@ function HistoryPreview({ animate }: { animate: boolean }): ReactElement {
   return (
     <>
       {[0, 1, 2].map((index) => (
-        <g key={index} transform={`translate(${70 + index * 16} ${21 + index * 8})`} opacity={index === 2 ? "1" : ".46"}>
+        <g key={index} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate({v0} {v1})"), { v0: String(70 + index * 16), v1: String(21 + index * 8) })} opacity={index === 2 ? "1" : ".46"}>
           <rect width="74" height="48" rx="5" fill={index === 2 ? COLOR.canvas : COLOR.raised} stroke={index === 2 ? COLOR.accent : COLOR.lineStrong} strokeWidth="1.5" />
           <circle cx="19" cy="18" r="6" fill={index === 2 ? COLOR.accent : COLOR.fg3} />
           <path d="M11 40 28 25l13 10 10-8 12 13" fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
@@ -1535,7 +1538,7 @@ function LayerPreview({ animate }: { animate: boolean }): ReactElement {
       <g transform="translate(42 4)">
         <path d="m66 18 58 20-58 20L8 38Z" fill={COLOR.raised} stroke={COLOR.lineStrong} strokeLinejoin="round" strokeWidth="1.5" opacity=".65" />
         <path d="m66 32 58 20-58 20L8 52Z" fill={COLOR.canvas} stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="1.5" opacity=".88" />
-        <g transform={animate ? undefined : "translate(0 -10)"}>
+        <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(0 -10)")}>
           <path d="m66 46 58 20-58 20L8 66Z" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="2" />
           <path d="m43 66 17-9 19 7 12-5 18 7-43 15Z" fill={COLOR.accent} opacity=".72" />
           {animate ? (
@@ -1579,13 +1582,13 @@ function TimelinePreview({ animate, variant }: { animate: boolean; variant: stri
           width="8"
           height="8"
           rx="1.2"
-          transform={`rotate(45 ${x} ${y})`}
+          transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "rotate(45 {v0} {v1})"), { v0: String(x), v1: String(y) })}
           fill={index === 3 ? COLOR.accent : COLOR.raised}
           stroke={index === 3 ? COLOR.accent : COLOR.fg2}
           strokeWidth="1.3"
         />
       ))}
-      <g transform={`translate(${playheadX} 0)`} data-preview-motion={animate ? "timeline" : undefined}>
+      <g transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate({v0} 0)"), { v0: String(playheadX) })} data-preview-motion={animate ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "timeline") : undefined}>
         <path d="m0 16-5-6h10Z" fill={COLOR.accent} />
         <path d="M0 16v70" stroke={COLOR.accent} strokeWidth="2" />
         {animate ? (
@@ -1617,7 +1620,7 @@ function KeyframePreview({ animate }: { animate: boolean }): ReactElement {
     <>
       <rect x="34" y="28" width="148" height="48" rx="7" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="1.4" />
       <path d="M34 52h148M73 28v48M111 28v48M149 28v48" stroke={COLOR.line} />
-      <g transform={animate ? undefined : "translate(73 52)"} data-preview-motion={animate ? "keyframe" : undefined}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(73 52)")} data-preview-motion={animate ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "keyframe") : undefined}>
         <rect x="-8" y="-8" width="16" height="16" rx="2" transform="rotate(45)" fill={COLOR.accent} stroke={COLOR.fg} strokeWidth="1.5" />
         {animate ? (
           <animateTransform
@@ -1645,7 +1648,7 @@ function FrameSequencePreview({ animate }: { animate: boolean }): ReactElement {
       {[0, 1, 2].map((index) => {
         const x = 35 + index * 54;
         return (
-          <g key={index} transform={`translate(${x} 24)`}>
+          <g key={index} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate({v0} 24)"), { v0: String(x) })}>
             <rect width="44" height="49" rx="5" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="1.4" />
             <circle cx={13 + index * 3} cy={15 + index * 2} r="6" fill={index === 2 ? COLOR.accent : COLOR.fg3} opacity={index === 2 ? ".85" : ".55"} />
             <path d={`M7 41 18 ${30 - index * 2}l8 6 10-9`} fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
@@ -1695,7 +1698,7 @@ function OnionSkinPreview({
   return (
     <>
       {figures.map((figure, index) => (
-        <g key={figure.x} transform={`translate(${figure.x} 20) rotate(${figure.angle} 0 36)`} fill="none" stroke={figure.color} strokeLinecap="round" strokeWidth="3" opacity={figure.opacity}>
+        <g key={figure.x} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate({v0} 20) rotate({v1} 0 36)"), { v0: String(figure.x), v1: String(figure.angle) })} fill="none" stroke={figure.color} strokeLinecap="round" strokeWidth="3" opacity={figure.opacity}>
           <circle cy="9" r="7" fill={COLOR.raised} strokeWidth="1.6" />
           <path d="M0 17v30M0 27l-15 14M0 27l16 11M0 47l-13 27M0 47l15 26" />
           {animate && index !== 1 ? (
@@ -1704,7 +1707,7 @@ function OnionSkinPreview({
         </g>
       ))}
       {previousCount || nextCount ? (
-        <g data-preview-operation={previousCount ? "previous-count" : "next-count"}>
+        <g data-preview-operation={previousCount ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "previous-count") : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "next-count")}>
           <circle cx={previousCount ? "64" : "152"} cy="84" r="12" fill={COLOR.canvas} stroke={COLOR.accent} strokeWidth="2" />
           <path
             d={previousCount ? "M69 77 61 84l8 7" : "m147 77 8 7-8 7"}
@@ -1740,7 +1743,7 @@ function OnionSkinPreview({
       ) : (
         <>
           <path d="M49 89h118" stroke={COLOR.lineStrong} strokeDasharray="4 4" />
-          <g transform={animate ? undefined : "translate(108 88)"} data-preview-operation="toggle">
+          <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(108 88)")} data-preview-operation="toggle">
             <circle r="5" fill={COLOR.accent} />
             {animate ? <animateMotion dur="2.4s" path="M79 88h58H79" repeatCount="indefinite" /> : null}
           </g>
@@ -1754,7 +1757,7 @@ function TimelapsePreview({ animate }: { animate: boolean }): ReactElement {
   return (
     <>
       {[0, 1, 2].map((index) => (
-        <g key={index} transform={`translate(${31 + index * 10} ${18 + index * 8})`} opacity={index === 2 ? "1" : ".5"}>
+        <g key={index} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate({v0} {v1})"), { v0: String(31 + index * 10), v1: String(18 + index * 8) })} opacity={index === 2 ? "1" : ".5"}>
           <rect width="82" height="57" rx="5" fill={COLOR.canvas} stroke={index === 2 ? COLOR.accent : COLOR.lineStrong} strokeWidth="1.4" />
           <path d={`M13 43c17-${10 + index * 3} 28 ${8 + index * 2} 48-${13 + index * 2} 8-7 14-6 21-2`} fill="none" stroke={index === 2 ? COLOR.accent : COLOR.fg3} strokeLinecap="round" strokeWidth="2.4" />
         </g>
@@ -1777,7 +1780,7 @@ function MotionFxPreview({ animate }: { animate: boolean }): ReactElement {
     <>
       <rect x="52" y="13" width="112" height="79" rx="7" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="1.4" />
       {[0, 1, 2].map((index) => (
-        <g key={index} transform={animate ? undefined : `translate(0 ${index * 23})`}>
+        <g key={index} transform={animate ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(0 {v0})"), { v0: String(index * 23) })}>
           <rect x="63" y="22" width="90" height="18" rx="4" fill={index === 1 ? COLOR.accentSoft : COLOR.raised} stroke={index === 1 ? COLOR.accent : COLOR.line} />
           <path d="M71 34 82 25l8 6 9-5 11 8" fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="1.6" />
           {animate ? (
@@ -1808,7 +1811,7 @@ function VideoExportPreview({ animate }: { animate: boolean }): ReactElement {
       <rect x="148" y="73" width={animate ? "8" : "30"} height="5" rx="2.5" fill={COLOR.accent}>
         {animate ? <animate attributeName="width" dur="2.8s" values="0;35;35;0" keyTimes="0;.58;.8;1" repeatCount="indefinite" /> : null}
       </rect>
-      <g transform={animate ? undefined : "translate(116 51)"}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(116 51)")}>
         <circle r="3.5" fill={COLOR.accent} />
         {animate ? <animateMotion dur="2.8s" path="M88 51H140" keyPoints="0;1;1;0" keyTimes="0;.58;.8;1" repeatCount="indefinite" /> : null}
       </g>
@@ -1845,8 +1848,8 @@ function TransformPreview({ animate }: { animate: boolean }): ReactElement {
   return (
     <>
       <rect x="48" y="20" width="120" height="66" rx="6" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
-      <g transform="translate(108 53)" data-preview-motion={animate ? "transform" : undefined}>
-        <g transform={animate ? undefined : "rotate(8) scale(1.08)"}>
+      <g transform="translate(108 53)" data-preview-motion={animate ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "transform") : undefined}>
+        <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "rotate(8) scale(1.08)")}>
           <rect x="-40" y="-21" width="80" height="42" rx="4" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />
           <path d="M-31 11-12-7 3 6 15-5 31 11" fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
           {animate ? (
@@ -1871,7 +1874,7 @@ function PanPreview({ animate }: { animate: boolean }): ReactElement {
   return (
     <>
       <rect x="41" y="16" width="134" height="74" rx="8" fill={COLOR.raised} stroke={COLOR.lineStrong} />
-      <g transform={animate ? undefined : "translate(9 -4)"} data-preview-motion={animate ? "pan" : undefined}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(9 -4)")} data-preview-motion={animate ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "pan") : undefined}>
         <rect x="59" y="27" width="88" height="52" rx="4" fill={COLOR.canvas} stroke={COLOR.fg2} />
         <circle cx="80" cy="43" r="6" fill={COLOR.accent} />
         <path d="m63 71 24-21 15 14 12-10 29 17" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
@@ -1967,7 +1970,7 @@ function SmudgePreview({ animate }: { animate: boolean }): ReactElement {
       <path d="M80 37c18 15 34-13 49 2M78 52c19 15 35-14 54 2M82 67c18 12 33-11 47 0" fill="none" stroke={COLOR.fg} strokeLinecap="round" strokeWidth="4" opacity=".78">
         {animate ? <animate attributeName="d" dur="2.4s" values="M80 37c18 15 34-13 49 2M78 52c19 15 35-14 54 2M82 67c18 12 33-11 47 0;M76 37c24-13 38 15 57 0M80 52c20-13 35 14 49 0M77 67c24-11 38 12 56 0;M80 37c18 15 34-13 49 2M78 52c19 15 35-14 54 2M82 67c18 12 33-11 47 0" repeatCount="indefinite" /> : null}
       </path>
-      <g transform={animate ? undefined : "translate(145 30)"}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(145 30)")}>
         <path d="m0 0 24 8-12 8Z" fill={COLOR.fg2} stroke={COLOR.canvas} strokeWidth="2" />
         {animate ? <animateMotion dur="2.4s" path="M145 30C119 70 91 27 68 64" repeatCount="indefinite" /> : null}
       </g>
@@ -2002,7 +2005,7 @@ function LassoFillPreview({ animate }: { animate: boolean }): ReactElement {
           </>
         ) : null}
       </path>
-      <g transform={animate ? undefined : "translate(57 67)"}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(57 67)")}>
         <path d="m0 0 8 19 4-8 7 7 4-4-7-7 8-4Z" fill={COLOR.fg} stroke={COLOR.canvas} strokeLinejoin="round" strokeWidth="2" />
         {animate ? <animateMotion dur="2.9s" path={path} keyPoints="0;1;1" keyTimes="0;.56;1" repeatCount="indefinite" /> : null}
       </g>
@@ -2045,9 +2048,9 @@ function RotateViewPreview({
       ? "0;90;90;0"
       : "-15;18;18;-15";
   return (
-    <g data-preview-operation={rotateLeft ? "rotate-left" : rotateRight ? "rotate-right" : "rotate-view"}>
+    <g data-preview-operation={rotateLeft ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "rotate-left") : rotateRight ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "rotate-right") : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "rotate-view")}>
       <g transform="translate(108 52)">
-        <g transform={animate ? undefined : `rotate(${endRotation})`}>
+        <g transform={animate ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "rotate({v0})"), { v0: String(endRotation) })}>
           <rect x="-46" y="-28" width="92" height="56" rx="5" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2" />
           <circle cx="-24" cy="-10" r="7" fill={COLOR.accent} />
           <path d="m-40 20 24-21L1 14l13-11 25 17" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
@@ -2081,10 +2084,10 @@ function FlipViewPreview({
   const startScale = restore ? "-1 1" : "1 1";
   const endScale = restore ? "1 1" : "-1 1";
   return (
-    <g data-preview-operation={restore ? "restore-view" : "flip-view"}>
+    <g data-preview-operation={restore ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "restore-view") : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "flip-view")}>
       <path d="M108 14v76" stroke={COLOR.cool} strokeDasharray="4 4" strokeWidth="1.5" />
       <g transform="translate(108 0)">
-        <g transform={animate ? `scale(${startScale})` : `scale(${endScale})`}>
+        <g transform={animate ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "scale({v0})"), { v0: String(startScale) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "scale({v0})"), { v0: String(endScale) })}>
           <g transform="translate(-108 0)">
             <rect x="50" y="23" width="116" height="61" rx="6" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2" />
             <circle cx="77" cy="43" r="8" fill={COLOR.accent} />
@@ -2180,7 +2183,7 @@ function ShapeFillPreview({
   const dropStart = disable ? ".9" : ".2";
   const dropEnd = disable ? ".2" : ".9";
   return (
-    <g data-preview-operation={disable ? "disable-shape-fill" : "enable-shape-fill"}>
+    <g data-preview-operation={disable ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "disable-shape-fill") : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "enable-shape-fill")}>
       <rect x="47" y="23" width="83" height="60" rx="8" fill={COLOR.canvas} stroke={COLOR.accent} strokeWidth="2.5" />
       <rect x="49.5" y="25.5" width="78" height="55" rx="5.5" fill={COLOR.accent} opacity={animate ? fillStart : fillEnd}>
         {animate ? <animate attributeName="opacity" dur="2.7s" values={`${fillStart};${fillEnd};${fillEnd};${fillStart}`} keyTimes="0;.35;.72;1" repeatCount="indefinite" /> : null}
@@ -2201,7 +2204,7 @@ function ReferencePreview({ animate }: { animate: boolean }): ReactElement {
     <>
       <rect x="35" y="18" width="91" height="69" rx="7" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
       <path d="m41 78 23-24 15 14 12-10 29 20" fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-      <g transform={animate ? undefined : "translate(0 -4)"}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(0 -4)")}>
         <rect x="118" y="12" width="65" height="78" rx="8" fill={COLOR.raised} stroke={COLOR.accent} strokeWidth="2" />
         <circle cx="139" cy="35" r="9" fill={COLOR.accent} opacity=".8" />
         <path d="M128 75c3-17 12-25 24-25s20 8 22 25" fill={COLOR.cool} opacity=".7" />
@@ -2220,7 +2223,7 @@ function HistoryStepPreview({ animate, direction }: { animate: boolean; directio
       {[0, 1, 2].map((index) => (
         <rect key={index} x={68 + index * 13} y={23 + index * 8} width="80" height="51" rx="6" fill={index === 2 ? COLOR.canvas : COLOR.raised} stroke={index === 2 ? COLOR.accent : COLOR.lineStrong} opacity={index === 2 ? "1" : ".48"} />
       ))}
-      <g transform={mirror ? "translate(216 0) scale(-1 1)" : undefined}>
+      <g transform={mirror ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(216 0) scale(-1 1)") : undefined}>
         <path d="M73 34H43l11-11M43 34l11 11" fill="none" stroke={COLOR.fg} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
         <path d="M43 34c0 27 19 43 49 43" fill="none" stroke={COLOR.accent} strokeDasharray="82" strokeDashoffset={animate ? "82" : "0"} strokeLinecap="round" strokeWidth="3">
           {animate ? <animate attributeName="stroke-dashoffset" dur="2.5s" values="82;0;0;82" keyTimes="0;.4;.72;1" repeatCount="indefinite" /> : null}
@@ -2252,26 +2255,26 @@ function LayerActionPreview({
         action === "visibility"
           ? batchVisibility
             ? hidden
-              ? "batch-hide"
-              : "batch-show"
+              ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "batch-hide")
+              : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "batch-show")
             : hidden
-              ? "hide"
+              ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "hide")
               : shown
-                ? "show"
-                : "visibility"
+                ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "show")
+                : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "visibility")
           : action === "lock"
             ? batchLock
               ? unlocked
-                ? "batch-unlock"
-                : "batch-lock"
+                ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "batch-unlock")
+                : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "batch-lock")
               : unlocked
-                ? "unlock"
-                : "lock"
+                ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "unlock")
+                : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "lock")
             : action === "merge"
               ? flattenVisible
-                ? "flatten-visible"
-                : "merge-selected"
-              : "actions"
+                ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "flatten-visible")
+                : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "merge-selected")
+              : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "actions")
       }
     >
       {[0, 1, 2].map((index) => (
@@ -2293,7 +2296,7 @@ function LayerActionPreview({
           {batchVisibility ? (
             <g>
               <rect x="166" y="87" width="26" height="14" rx="6" fill={COLOR.raised} stroke={COLOR.accent} strokeWidth="1.2" />
-              <text x="179" y="97" fill={COLOR.accent} fontSize="8" fontWeight="800" textAnchor="middle">ALL</text>
+              <text x="179" y="97" fill={COLOR.accent} fontSize="8" fontWeight="800" textAnchor="middle">{translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "ALL")}</text>
             </g>
           ) : null}
         </>
@@ -2301,7 +2304,7 @@ function LayerActionPreview({
       {action === "lock" ? (
         <>
           {(batchLock ? [28, 52, 76] : [52]).map((y) => (
-            <g key={y} transform={`translate(174 ${y})${batchLock ? " scale(.72)" : ""}`}>
+            <g key={y} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(174 {v0}){v1}"), { v0: String(y), v1: String(batchLock ? " scale(.72)" : "") })}>
               <rect x="-12" y="-2" width="24" height="20" rx="4" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />
               <path
                 d={unlocked ? "M-7-2v-7a7 7 0 0 1 12-5v7" : "M-7-2v-7a7 7 0 0 1 14 0v7"}
@@ -2326,7 +2329,7 @@ function LayerActionPreview({
           {batchLock ? (
             <g>
               <rect x="161" y="87" width="26" height="14" rx="6" fill={COLOR.raised} stroke={COLOR.accent} strokeWidth="1.2" />
-              <text x="174" y="97" fill={COLOR.accent} fontSize="8" fontWeight="800" textAnchor="middle">ALL</text>
+              <text x="174" y="97" fill={COLOR.accent} fontSize="8" fontWeight="800" textAnchor="middle">{translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "ALL")}</text>
             </g>
           ) : null}
         </>
@@ -2377,7 +2380,7 @@ function LayerSelectionActionPreview({
     return (
       <>
         <rect x="51" y="25" width="84" height="55" rx="7" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2" />
-        <g transform={animate ? undefined : "translate(31 -12)"}>
+        <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(31 -12)")}>
           <rect x="72" y="34" width="84" height="55" rx="7" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />
           <path d="M93 62h42M114 41v42" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="2.5" />
           {animate ? <animateTransform attributeName="transform" type="translate" dur="2.8s" values="0 0;31 -12;31 -12;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
@@ -2392,7 +2395,7 @@ function LayerSelectionActionPreview({
       {[0, 1, 2].map((index) => {
         const selected = index === (toFront ? 0 : 2);
         return (
-          <g key={index} transform={`translate(${58 + index * 25} ${22 + index * 14})`}>
+          <g key={index} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate({v0} {v1})"), { v0: String(58 + index * 25), v1: String(22 + index * 14) })}>
             <rect width="80" height="46" rx="6" fill={selected ? COLOR.accentSoft : COLOR.canvas} stroke={selected ? COLOR.accent : COLOR.lineStrong} strokeWidth="2" />
             {selected && animate ? (
               <animateTransform
@@ -2416,7 +2419,7 @@ function LayerSelectionActionPreview({
 function LineArtPreview({ animate, variant }: { animate: boolean; variant: string }): ReactElement {
   const disable = previewVariantMatches(variant, "disable");
   return (
-    <g data-preview-operation={disable ? "line-art-disable" : "line-art-enable"}>
+    <g data-preview-operation={disable ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "line-art-disable") : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "line-art-enable")}>
       <g opacity={animate ? (disable ? ".18" : "1") : disable ? "1" : ".18"}>
         <path d="m108 20 48 25-48 25-48-25Z" fill={COLOR.accent} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="2" />
         <path d="m60 45 48 25 48-25v34l-48 25-48-25Z" fill={COLOR.cool} fillOpacity=".72" stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
@@ -2431,7 +2434,7 @@ function LineArtPreview({ animate, variant }: { animate: boolean; variant: strin
         {animate ? <animate attributeName="opacity" dur="2.8s" values={disable ? "1;.15;.15;1" : ".15;1;1;.15"} keyTimes="0;.42;.76;1" repeatCount="indefinite" /> : null}
       </g>
       <rect x="143" y="15" width="42" height="17" rx="7" fill={COLOR.raised} stroke={disable ? COLOR.cool : COLOR.accent} strokeWidth="1.2" />
-      <text x="164" y="26.5" fill={disable ? COLOR.cool : COLOR.accent} fontSize="7.5" fontWeight="800" textAnchor="middle">{disable ? "COLOR" : "LINE"}</text>
+      <text x="164" y="26.5" fill={disable ? COLOR.cool : COLOR.accent} fontSize="7.5" fontWeight="800" textAnchor="middle">{disable ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "COLOR") : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "LINE")}</text>
     </g>
   );
 }
@@ -2463,8 +2466,8 @@ function FrameActionPreview({
       ))}
       {action === "capture" ? <><rect x="75" y="74" width="66" height="18" rx="6" fill={COLOR.raised} stroke={COLOR.fg2} /><circle cx="108" cy="83" r="6" fill={COLOR.accent}>{animate ? <animate attributeName="r" dur="1.5s" values="4;7;4" repeatCount="indefinite" /> : null}</circle></> : null}
       {action === "playback" ? <>{pausePlayback ? <path d="M94 76v20M108 76v20" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="4" /> : <path d="m93 76 17 10-17 10Z" fill={COLOR.accent} />}<path d="M55 88h104" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="2" /><circle cx={animate ? "58" : pausePlayback ? "118" : "145"} cy="88" r="5" fill={COLOR.accent}>{animate ? <animate attributeName="cx" dur="2.6s" values={pausePlayback ? "58;118;118;58" : "58;158;158;58"} keyTimes={pausePlayback ? "0;.3;.82;1" : "0;.68;.78;1"} repeatCount="indefinite" /> : null}</circle></> : null}
-      {action === "reorder" ? <path data-preview-operation={reorderPrevious ? "previous" : reorderNext ? "next" : "reorder"} d={reorderPrevious ? "M113 18H63m0 0 9-7m-9 7 9 7" : reorderNext ? "M103 18h50m0 0-9-7m9 7-9 7" : "M73 18h70m0 0-8-6m8 6-8 6M143 80H73m0 0 8-6m-8 6 8 6"} fill="none" stroke={COLOR.accent} strokeDasharray={animate ? "9 5" : undefined} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2">{animate ? <animate attributeName="stroke-dashoffset" dur="1.1s" values="0;-28" repeatCount="indefinite" /> : null}</path> : null}
-      {action === "duplicate" ? <g transform={animate ? undefined : "translate(0 0)"}><rect x="88" y="22" width="32" height="43" rx="5" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />{animate ? <animateTransform attributeName="transform" type="translate" dur="2.6s" values="0 0;40 6;40 6;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</g> : null}
+      {action === "reorder" ? <path data-preview-operation={reorderPrevious ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "previous") : reorderNext ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "next") : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "reorder")} d={reorderPrevious ? "M113 18H63m0 0 9-7m-9 7 9 7" : reorderNext ? "M103 18h50m0 0-9-7m9 7-9 7" : "M73 18h70m0 0-8-6m8 6-8 6M143 80H73m0 0 8-6m-8 6 8 6"} fill="none" stroke={COLOR.accent} strokeDasharray={animate ? "9 5" : undefined} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2">{animate ? <animate attributeName="stroke-dashoffset" dur="1.1s" values="0;-28" repeatCount="indefinite" /> : null}</path> : null}
+      {action === "duplicate" ? <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "translate(0 0)")}><rect x="88" y="22" width="32" height="43" rx="5" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />{animate ? <animateTransform attributeName="transform" type="translate" dur="2.6s" values="0 0;40 6;40 6;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</g> : null}
       {action === "delete" ? <path d="M94 78h28m-23 0 2 15h14l2-15m-14-5h10" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">{animate ? <animate attributeName="opacity" dur="1.4s" values=".35;1;.35" repeatCount="indefinite" /> : null}</path> : null}
     </>
   );
@@ -2506,7 +2509,7 @@ function renderPreview(
     case "shape-fill":
       return <ShapeFillPreview animate={animate} variant={variant} />;
     case "text":
-      return <TextPreview animate={animate} clipId={`${id}-text-clip`} />;
+      return <TextPreview animate={animate} clipId={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "{v0}-text-clip"), { v0: String(id) })} />;
     case "bubble":
       return <BubblePreview animate={animate} variant={variant} />;
     case "comment":
@@ -2516,7 +2519,7 @@ function renderPreview(
     case "reference":
       return <ReferencePreview animate={animate} />;
     case "filter":
-      return <FilterPreview animate={animate} clipId={`${id}-filter-clip`} variant={variant} />;
+      return <FilterPreview animate={animate} clipId={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "{v0}-filter-clip"), { v0: String(id) })} variant={variant} />;
     case "smudge":
       return <SmudgePreview animate={animate} />;
     case "liquify":
@@ -2564,7 +2567,7 @@ function renderPreview(
     case "brush-size":
       return <BrushSizePreview animate={animate} variant={variant} />;
     case "opacity":
-      return <OpacityPreview animate={animate} patternId={`${id}-opacity-checker`} variant={variant} />;
+      return <OpacityPreview animate={animate} patternId={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "{v0}-opacity-checker"), { v0: String(id) })} variant={variant} />;
     case "stabilizer":
       return <StabilizerPreview animate={animate} variant={variant} />;
     case "pressure":
@@ -2572,11 +2575,11 @@ function renderPreview(
     case "symmetry":
       return <SymmetryPreview animate={animate} variant={variant} />;
     case "zoom-view":
-      return <ZoomViewPreview animate={animate} variant={variant} clipId={`${id}-zoom-fit-clip`} />;
+      return <ZoomViewPreview animate={animate} variant={variant} clipId={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "{v0}-zoom-fit-clip"), { v0: String(id) })} />;
     case "view-hud":
       return <ViewHudPreview animate={animate} variant={variant} />;
     case "color-vision":
-      return <StudioColorVisionHintPreview animate={animate} variant={variant} filterId={`${id}-color-vision`} />;
+      return <StudioColorVisionHintPreview animate={animate} variant={variant} filterId={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "{v0}-color-vision"), { v0: String(id) })} />;
     case "dismiss":
       return <DismissPreview animate={animate} />;
     case "history":
@@ -2756,23 +2759,23 @@ export function StudioToolHintPreview({
       data-studio-tool-hint-preview={kind}
       data-preview-kind={kind}
       data-preview-variant={normalizedVariant}
-      data-motion={animate ? "animated" : "reduced"}
+      data-motion={animate ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "animated") : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "reduced")}
       viewBox="0 0 216 104"
       preserveAspectRatio="xMidYMid meet"
       className={["block h-auto w-full", className].filter(Boolean).join(" ")}
       focusable="false"
-      role={hasAccessibleName ? role ?? "img" : role}
+      role={hasAccessibleName ? role ?? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "img") : role}
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledBy}
       aria-hidden={hasAccessibleName ? ariaHidden : true}
     >
       <defs>
-        <pattern id={`${id}-ledger`} width="16" height="16" patternUnits="userSpaceOnUse">
+        <pattern id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "{v0}-ledger"), { v0: String(id) })} width="16" height="16" patternUnits="userSpaceOnUse">
           <path d="M16 0H0v16" fill="none" stroke={COLOR.line} strokeWidth=".7" opacity=".28" />
         </pattern>
       </defs>
       <rect x=".5" y=".5" width="215" height="103" rx="7.5" fill={COLOR.card} stroke={COLOR.line} />
-      <rect x="1" y="1" width="214" height="102" rx="7" fill={`url(#${id}-ledger)`} />
+      <rect x="1" y="1" width="214" height="102" rx="7" fill={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintPreview", "en", "url(#{v0}-ledger)"), { v0: String(id) })} />
       <path d="M16 88h184" stroke={COLOR.lineStrong} strokeWidth=".8" opacity=".42" />
       <circle cx="16" cy="88" r="2" fill={COLOR.accent} opacity=".72" />
       {renderPreview(kind, animate, id, normalizedVariant)}

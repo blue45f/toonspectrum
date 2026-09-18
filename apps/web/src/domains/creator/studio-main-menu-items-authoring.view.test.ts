@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
-import { buildStudioViewSurfaceMenuItems } from "./studio-main-menu-items-authoring";
+import {
+  STUDIO_SHELL_FLOATING_LAYOUT_OPEN_EVENT,
+  buildStudioViewSurfaceMenuItems,
+} from "./studio-main-menu-items-authoring";
 import {
   getStudioViewInspectionSnapshot,
   resetStudioViewInspectionStateForTests,
@@ -30,4 +33,22 @@ describe("studio view surface menu", () => {
     expect(openCanvasNavigator).toHaveBeenCalledOnce();
     expect(getStudioViewInspectionSnapshot().panelOpen).toBe(true);
   });
+  it("opens floating layout settings from the existing View menu", () => {
+    const target = new EventTarget();
+    vi.stubGlobal("window", target);
+    const opened = vi.fn();
+    target.addEventListener(STUDIO_SHELL_FLOATING_LAYOUT_OPEN_EVENT, opened, { once: true });
+    const item = buildStudioViewSurfaceMenuItems({
+      ui: {},
+    } as unknown as StudioMainMenuItemContext).find(
+      (candidate) => candidate.id === "floating-layout",
+    );
+
+    expect(item?.label).toBe("플로팅 UI · 배치 설정…");
+    item?.onSelect();
+
+    expect(opened).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
+
 });

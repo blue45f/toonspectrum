@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowLeft } from "lucide-react";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -18,9 +21,9 @@ export function StudioEditorReturnButton({
   return (
     <button
       type="button"
-      aria-label="이전 화면으로 돌아가기"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioEditorReturnButton", "ko", "이전 화면으로 돌아가기")}
       data-studio-editor-return={variant}
-      title="이전 화면으로 돌아가기"
+      title={translateCurrentStaticSourceText("domains.creator.StudioEditorReturnButton", "ko", "이전 화면으로 돌아가기")}
       onClick={onReturn}
       className={cn(
         buttonClass({ size: "sm", variant: "quiet" }),
@@ -35,9 +38,9 @@ export function StudioEditorReturnButton({
     >
       <ArrowLeft size={16} aria-hidden="true" />
       <span
-        className={canvasOnly ? undefined : variant === "lane" ? "hidden lg:inline" : "sr-only"}
+        className={canvasOnly ? undefined : variant === "lane" ? translateCurrentStaticSourceText("domains.creator.StudioEditorReturnButton", "en", "hidden lg:inline") : translateCurrentStaticSourceText("domains.creator.StudioEditorReturnButton", "en", "sr-only")}
       >
-        {canvasOnly ? "이전 화면" : "이전"}
+        {canvasOnly ? translateCurrentStaticSourceText("domains.creator.StudioEditorReturnButton", "ko", "이전 화면") : translateCurrentStaticSourceText("domains.creator.StudioEditorReturnButton", "ko", "이전")}
       </span>
     </button>
   );

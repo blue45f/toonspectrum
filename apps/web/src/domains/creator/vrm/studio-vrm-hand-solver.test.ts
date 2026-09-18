@@ -80,6 +80,39 @@ describe("studio-vrm-hand-solver", () => {
     expect(bones.rightThumbDistal[2]).toBeGreaterThan(0); // 우측 부호 +
   });
 
+  it("손바닥 평면에서 MCP 벌림과 엄지 CMC opposition을 복원한다", () => {
+    const hand = makeHand({
+      [HAND_LM.wrist]: [0, 0, 0],
+      [HAND_LM.indexMcp]: [-0.32, 1, 0],
+      [HAND_LM.indexPip]: [-0.48, 1.9, 0],
+      [HAND_LM.indexDip]: [-0.58, 2.8, 0],
+      [HAND_LM.indexTip]: [-0.64, 3.6, 0],
+      [HAND_LM.middleMcp]: [0, 1.05, 0],
+      [HAND_LM.middlePip]: [0, 2, 0],
+      [HAND_LM.middleDip]: [0, 2.9, 0],
+      [HAND_LM.middleTip]: [0, 3.7, 0],
+      [HAND_LM.ringMcp]: [0.28, 1, 0],
+      [HAND_LM.ringPip]: [0.36, 1.9, 0],
+      [HAND_LM.ringDip]: [0.42, 2.75, 0],
+      [HAND_LM.ringTip]: [0.46, 3.5, 0],
+      [HAND_LM.littleMcp]: [0.54, 0.88, 0],
+      [HAND_LM.littlePip]: [0.7, 1.68, 0],
+      [HAND_LM.littleDip]: [0.8, 2.38, 0],
+      [HAND_LM.littleTip]: [0.88, 3, 0],
+      [HAND_LM.thumbCmc]: [-0.38, 0.42, 0],
+      [HAND_LM.thumbMcp]: [-0.72, 0.78, 0.18],
+      [HAND_LM.thumbIp]: [-0.9, 1.02, 0.24],
+      [HAND_LM.thumbTip]: [-1.02, 1.22, 0.28],
+    });
+    const bones = solveHandToFingerBones(hand, "right");
+    expect(bones.rightIndexProximal[1]).toBeGreaterThan(0);
+    expect(bones.rightRingProximal[1]).toBeLessThan(0);
+    expect(bones.rightLittleProximal[1]).toBeLessThan(bones.rightRingProximal[1]);
+    expect(bones.rightThumbMetacarpal).toBeDefined();
+    expect(Math.abs(bones.rightThumbMetacarpal[1])).toBeGreaterThan(0.1);
+    expect(Math.abs(bones.rightThumbMetacarpal[0])).toBeGreaterThan(0.01);
+  });
+
   it("avatarSideForHand: HandLandmarker 라벨은 미러 기준 — 미러면 그대로, 비미러면 스왑", () => {
     // HandLandmarker handedness 는 셀카(미러) 입력을 가정해 분류되므로 Pose 의 해부학적 라벨과 반대다.
     // 미러(거울 따라하기): 라벨을 그대로 써야 팔(pose 솔버의 좌↔우 스왑 결과)과 같은 손에 손가락이 얹힌다.

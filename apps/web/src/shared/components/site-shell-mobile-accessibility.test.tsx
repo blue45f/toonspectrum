@@ -72,11 +72,18 @@ describe("mobile site shell accessibility", () => {
       </MemoryRouter>
     );
 
+    const primaryNavigation = container.querySelector<HTMLElement>('nav[aria-label="주요 메뉴"]');
+    expect(primaryNavigation?.querySelector('a[href="/about/technology"]')).toBeNull();
+    expect(primaryNavigation?.querySelector('a[data-navigation-entry="research"]')?.getAttribute("href")).toBe("/research");
+    expect(primaryNavigation?.querySelector('a[data-navigation-entry="market"]')?.getAttribute("href")).toBe("/market");
+
     const trigger = screen.getByRole("button", { name: "전체 메뉴" });
     trigger.focus();
     fireEvent.click(trigger);
 
     const dialog = await screen.findByRole("dialog", { name: "전체 메뉴" });
+    const technologyEntry = within(dialog).getByRole("link", { name: "제작 기술" });
+    expect(technologyEntry.getAttribute("href")).toBe("/about/technology");
     const close = within(dialog).getByRole("button", { name: "전체 메뉴 닫기" });
     await waitFor(() => expect(document.activeElement).toBe(close));
 
@@ -183,6 +190,7 @@ describe("mobile site shell accessibility", () => {
     );
 
     const footer = container.querySelector("footer");
+    expect(screen.queryByRole("link", { name: "제작 기술" })).toBeNull();
     expect(footer?.className).toContain(
       "pb-[calc(3.75rem+env(safe-area-inset-bottom))]"
     );

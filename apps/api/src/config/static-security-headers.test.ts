@@ -57,6 +57,9 @@ describe("provider-neutral static security headers", () => {
     expect(scripts).not.toContain("'unsafe-inline'");
     expect(scripts).toContain(inlineJsonLdHash());
 
+    const styles = directive(csp ?? "", "style-src");
+    expect(styles).toContain("https://accounts.google.com");
+
     const connections = directive(csp ?? "", "connect-src");
     const connectionTokens = connections.split(/\s+/);
     expect(connectionTokens).toContain("blob:");

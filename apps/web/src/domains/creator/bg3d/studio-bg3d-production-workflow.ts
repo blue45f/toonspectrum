@@ -214,8 +214,8 @@ function resolveNextAction(
   if (!batch) {
     return Object.freeze({
       kind: "none",
-      label: "출력 런타임 연결 대기",
-      description: "저장 컷은 준비됐지만 멀티패스 복구 런타임이 아직 연결되지 않았습니다.",
+      label: "출력 상태 준비 중",
+      description: "저장 컷을 출력 패널에서 열면 현재 문서의 멀티패스 복구 상태를 확인할 수 있습니다.",
     });
   }
   if (!batch.recoveryReady || batch.blockedReason) {

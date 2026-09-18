@@ -3,37 +3,12 @@ import { expect, test } from "@playwright/test";
 import { capturePageEvidence } from "./helpers/capture-page-evidence";
 
 const THEME_STORAGE_KEY = "toonspectrum-theme";
-const THEME_SCENES = {
-  aurora: { mode: "light", scene: "aurora", src: "/brand/theme-scenes/aurora-studio.svg" },
-  blossom: { mode: "light", scene: "blossom", src: "/brand/theme-scenes/blossom-studio.svg" },
-  starlight: { mode: "dark", scene: "starlight", src: "/brand/theme-scenes/starlight-studio.svg" },
-  dark: { mode: "dark", scene: "ink", src: "/brand/theme-scenes/ink-studio.svg" },
-  light: { mode: "light", scene: "paper", src: "/brand/theme-scenes/paper-studio.svg" },
-  graphite: { mode: "dark", scene: "graphite", src: "/brand/theme-scenes/graphite-studio.svg" },
-  midnight: { mode: "dark", scene: "midnight", src: "/brand/theme-scenes/midnight-studio.svg" },
-  sepia: { mode: "light", scene: "sepia", src: "/brand/theme-scenes/sepia-studio.svg" },
-  contrast: { mode: "dark", scene: "contrast", src: "/brand/theme-scenes/contrast-studio.svg" },
-} as const;
 
-type ThemePreference = keyof typeof THEME_SCENES;
-
-function themeEnvelope(preference: ThemePreference) {
+function themeEnvelope() {
   return JSON.stringify({
-    state: { preference, studioPreference: "inherit", theme: THEME_SCENES[preference].mode },
+    state: { preference: "light", studioPreference: "inherit", theme: "light" },
     version: 0,
   });
-}
-
-async function applyTheme(page: import("@playwright/test").Page, preference: ThemePreference) {
-  const serialized = themeEnvelope(preference);
-  await page.evaluate(({ key, value }) => {
-    localStorage.setItem(key, value);
-    window.dispatchEvent(new StorageEvent("storage", {
-      key,
-      newValue: value,
-      storageArea: localStorage,
-    }));
-  }, { key: THEME_STORAGE_KEY, value: serialized });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -41,7 +16,8 @@ test.beforeEach(async ({ page }) => {
     localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: language }, version: 0 }));
     localStorage.setItem(themeKey, theme);
     sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
-  }, { language: "ko", themeKey: THEME_STORAGE_KEY, theme: themeEnvelope("light") });
+  }, { language: "ko", themeKey: THEME_STORAGE_KEY, theme: themeEnvelope() });
+
   await page.route("**/api/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (/\/auth\/session$/u.test(pathname)) {
@@ -53,83 +29,133 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const width of [320, 390, 820, 1440]) {
-  test(`clarity home layout and keyboard navigation at ${width}px`, async ({ page }, testInfo) => {
+  test(`all-in-one home stays readable and unclipped at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
     await page.emulateMedia({ reducedMotion: "reduce" });
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
 
     await page.goto("/", { waitUntil: "domcontentloaded" });
-    const home = page.locator('[data-creator-experience="clarity-v1"]');
-    const heroArt = home.locator(".cf-home-preview .cf-theme-scene-image");
-    const collageArt = home.locator(".cf-theme-collage img");
+    const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
+    const primaryAction = home.locator('.cf-hero a.cf-primary[href="/studio/new"]');
     const startCards = home.locator(".cf-start-card");
 
     await expect(home).toBeVisible();
-    await expect(home).toHaveAttribute("data-theme-art", "light");
+    await expect(page).toHaveTitle(/기획부터 연재까지/u);
     await expect(page.locator("h1")).toHaveCount(1);
-    await expect(heroArt).toBeVisible();
-    await expect(heroArt).toHaveAttribute("data-art-asset", "paper");
-    await expect(heroArt).toHaveAttribute("src", THEME_SCENES.light.src);
-    await expect(collageArt).toHaveCount(2);
-    await expect(collageArt.first()).toHaveAttribute("srcset", /640w/u);
+    await expect(page.locator("h1")).toContainText("기획부터 연재까지");
+    await expect(home.locator(".cf-home-preview img")).toBeVisible();
+    await expect(home.locator(".cf-intent-visual-nav img")).toHaveCount(6);
+    await expect(home.locator(".cf-intent-film img")).toBeVisible();
+    await expect(home.locator(".cf-bridge-visual img")).toBeVisible();
+    await expect(home.locator(".cf-production-journey img")).toBeVisible();
     await expect(startCards).toHaveCount(4);
+    await expect(primaryAction).toBeVisible();
+
     await startCards.first().focus();
     await expect(startCards.first()).toBeFocused();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-    expect(await heroArt.evaluate((image) => getComputedStyle(image).animationName)).toBe("none");
 
-    const faq = home.locator(".cf-faq details").first();
-    const summary = faq.locator("summary");
-    await summary.focus();
-    await page.keyboard.press("Enter");
-    await expect(faq).toHaveAttribute("open", "");
+    const hasNoHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+    );
+    expect(hasNoHorizontalOverflow).toBe(true);
 
-    await capturePageEvidence(page, testInfo, `clarity-${width}`);
-    await applyTheme(page, "dark");
-    await expect(home).toHaveAttribute("data-theme-art", "dark");
-    await expect(heroArt).toHaveAttribute("data-art-asset", "ink");
-    await expect(heroArt).toHaveAttribute("src", THEME_SCENES.dark.src);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-    await capturePageEvidence(page, testInfo, `clarity-dark-${width}`);
+    if (width <= 820) {
+      const actionBox = await primaryAction.boundingBox();
+      expect(actionBox).not.toBeNull();
+      expect(actionBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+
+    await capturePageEvidence(page, testInfo, `all-in-one-home-${width}`);
     expect(pageErrors).toEqual([]);
   });
 }
 
-test("Korean home search opens the global command palette without losing the query", async ({ page }) => {
+test("task-first search opens the global command palette without losing the query", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "작품·도구·소재·도움말 검색" }).click();
+  await page.getByRole("button", { name: "프로젝트·컷·도구·소재를 바로 찾기" }).click();
   const search = page.getByPlaceholder(/작품 제목, 작가, 기능 명령/u);
   await expect(search).toBeVisible();
-  await search.fill("중세 갑옷");
-  await expect(search).toHaveValue("중세 갑옷");
+  await search.fill("비 오는 교실 배경");
+  await expect(search).toHaveValue("비 오는 교실 배경");
 });
 
-test("professional webtoon entry leads with creation and project continuity", async ({ page }) => {
+test("the front door exposes planning, 2D, 3D, assets, collaboration and publishing", async ({ page }) => {
   await page.goto("/");
-  const home = page.locator('[data-creator-experience="clarity-v1"]');
+  const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
+
   await expect(home.locator('.cf-hero a.cf-primary[href="/studio/new"]')).toBeVisible();
-  await expect(home.locator('.cf-hero a.cf-secondary[href="/studio/projects"]')).toBeVisible();
-  await expect(home.locator('.cf-start-card[href="/studio/new?kind=webtoon&template=webtoon-vertical"]')).toBeVisible();
-  await expect(home.locator('.cf-start-card[href="/studio/new?kind=webtoon&template=webtoon-four-cut"]')).toBeVisible();
-  await expect(home.locator('.cf-start-card[href="/studio/new?kind=illustration&template=illustration-portrait"]')).toBeVisible();
-  await expect(home.locator('.cf-start-card[href="/studio/assets/characters/new"]')).toBeVisible();
-  await expect(home.locator('.cf-intent nav a')).toHaveCount(7);
+  await expect(home.locator('.cf-hero a.cf-secondary[href="/production"]')).toBeVisible();
+  await expect(home.locator('.cf-start-card[href="/story-lab"]')).toBeVisible();
+  await expect(home.locator('.cf-start-card[href="/studio/new"]')).toBeVisible();
+  await expect(home.locator('.cf-start-card[href="/studio/bg3d"]')).toBeVisible();
+  await expect(home.locator('.cf-start-card[href="/studio/assets"]')).toBeVisible();
+  await expect(home.locator(".cf-intent nav a")).toHaveCount(6);
+  await expect(home).not.toContainText("그림은 익숙한 도구에서");
+  await expect(home).not.toContainText("기존 드로잉 도구 그대로");
 });
 
-test("all theme worlds swap imagery and reduced motion remains static", async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: "reduce" });
+test("section navigation keeps readable focus and browser history semantics", async ({ page }) => {
   await page.goto("/");
-  const home = page.locator('[data-creator-experience="clarity-v1"]');
-  const visual = home.locator(".cf-hero-visual");
-  const art = home.locator(".cf-home-preview .cf-theme-scene-image");
+  const processLink = page.locator('.cf-jump-nav a[href="#creator-flow"]');
+  await processLink.click();
+  await expect(page).toHaveURL(/#creator-flow$/u);
+  await expect(page.locator("#creator-process-title")).toBeFocused();
+  await expect(page.locator("#creator-process-title")).toContainText("모든 단계가 다음 작업으로");
+});
 
-  for (const [theme, expected] of Object.entries(THEME_SCENES) as [ThemePreference, (typeof THEME_SCENES)[ThemePreference]][]) {
-    await applyTheme(page, theme);
-    await expect(home).toHaveAttribute("data-theme-art", theme);
-    await expect(visual).toHaveAttribute("data-theme-layout", expected.scene);
-    await expect(art).toHaveAttribute("data-art-asset", expected.scene);
-    await expect(art).toHaveAttribute("src", expected.src);
-    expect(await art.evaluate((image) => getComputedStyle(image).animationName)).toBe("none");
-  }
+for (const width of [320, 390]) {
+  test(`Studio task-first entry stays readable and unclipped at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+
+    await page.goto("/studio", { waitUntil: "domcontentloaded" });
+
+    await expect(page.getByRole("heading", { name: "지금 무엇을 가지고 있나요?", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /아이디어만 있어요/u })).toBeVisible();
+    await expect(page.getByRole("link", { name: /대본이나 콘티가 있어요/u })).toBeVisible();
+    await expect(page.getByRole("link", { name: /그리던 파일이 있어요/u })).toBeVisible();
+    await expect(page.getByRole("link", { name: /팀 프로젝트를 시작해요/u })).toBeVisible();
+    await expect(page.getByRole("link", { name: /샘플로 먼저 둘러볼게요/u })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "웹툰 제작 전체 흐름" })).toBeVisible();
+    await expect(page.getByText("클라우드와 동기화됨", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("이 기기에 저장됨", { exact: true })).toBeVisible();
+
+    const hasNoHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+    );
+    expect(hasNoHorizontalOverflow).toBe(true);
+
+    await capturePageEvidence(page, testInfo, `studio-task-first-${width}`);
+    expect(pageErrors).toEqual([]);
+  });
+}
+
+test("new project flow explains a disabled start action and preserves the chosen setup", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 1000 });
+  await page.goto("/studio/new?kind=webtoon&template=webtoon-vertical", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("navigation", { name: "새 프로젝트 시작 단계" })).toBeVisible();
+  await expect(page.getByText("만들 작업 선택", { exact: true })).toBeVisible();
+  await expect(page.getByText("이름과 시작 형식", { exact: true })).toBeVisible();
+  await expect(page.getByText("자동 저장하며 시작", { exact: true })).toBeVisible();
+
+  const projectName = page.getByLabel("프로젝트 이름");
+  await projectName.fill("");
+  const startButton = page.locator('button[aria-describedby*="studio-create-disabled-reason"]');
+  await expect(startButton).toBeDisabled();
+  await expect(page.getByText("프로젝트 이름을 입력하면 자동 저장되는 작업공간을 시작할 수 있습니다.", { exact: true })).toBeVisible();
+
+  await projectName.fill("별빛 식당 1화");
+  await expect(startButton).toHaveCount(0);
+  await expect(page.getByText(/별빛 식당 1화/u)).toBeVisible();
+  await expect(page.getByText("이 기기에 저장됨", { exact: true }).first()).toBeVisible();
+
+  const hasNoHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+  );
+  expect(hasNoHorizontalOverflow).toBe(true);
+  await capturePageEvidence(page, testInfo, "studio-new-guided-320");
 });

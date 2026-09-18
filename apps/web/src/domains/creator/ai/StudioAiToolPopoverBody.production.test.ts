@@ -44,6 +44,16 @@ describe("StudioAiToolPopoverBody webtoon AI production wiring", () => {
     );
   });
 
+  it("keeps AI controls above the canvas and exposes truthful recovery entry points", () => {
+    expect(popover).toContain('data-studio-ai-pointer-shield="true"');
+    expect(popover).toContain("const textAiReady =");
+    expect(popover).toContain("serverLoginRequired");
+    expect(popover).toContain("configured={textAiReady}");
+    expect(popover).toContain('data-studio-ai-translation-launcher="true"');
+    expect(popover).toContain('data-studio-ai-localization-qa-launcher="true"');
+    expect(popover).toContain("<StudioAdvancedAiTools");
+  });
+
   it("hands the complete approved episode into the editable scenario production flow", () => {
     expect(popover).toContain("createStudioAiComicComposerHandoff(plan)");
     expect(popover).toContain("requestStudioAiComicComposerOpen(handoff)");

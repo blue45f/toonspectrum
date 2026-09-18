@@ -25,7 +25,7 @@ describe("StudioColorMatchPanel", () => {
   it("renders atmospheric presets correctly", () => {
     render(<StudioColorMatchPanel sourceImage={sampleSourceImage} />);
 
-    expect(screen.getByText("컬러 매치 (Color Match)")).toBeDefined();
+    expect(screen.getByText("색감 맞추기")).toBeDefined();
     for (const preset of COLOR_MATCH_PRESETS) {
       expect(screen.getByText(preset.name)).toBeDefined();
     }
@@ -48,7 +48,7 @@ describe("StudioColorMatchPanel", () => {
       />,
     );
 
-    const applyButton = screen.getByText("컬러 매치 적용");
+    const applyButton = screen.getByText("색감 적용");
     expect(applyButton).toBeDefined();
     fireEvent.click(applyButton);
 

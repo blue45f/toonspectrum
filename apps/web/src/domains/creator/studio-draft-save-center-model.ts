@@ -210,8 +210,8 @@ function serverSection(input: StudioDraftSaveCenterInput): StudioDraftSaveStatus
   if (input.collaborationLocked) {
     return {
       tone: "warning",
-      title: "서버 저장 권한 확인 필요",
-      detail: "잠금이 해제되면 서버에 저장할 수 있어요.",
+      title: "서버 초안 저장 잠김",
+      detail: "문서 잠금이 해제되면 서버 초안 저장을 다시 시도합니다. 공동 편집 동기화와 기기 복구는 별도 상태로 표시됩니다.",
     };
   }
 
@@ -330,9 +330,9 @@ export function resolveStudioDraftSaveCenter(
   } else if (input.collaborationLocked) {
     phase = "blocked";
     tone = "warning";
-    compactLabel = "저장 권한 확인";
-    headline = "문서 잠금으로 서버 저장이 멈췄어요";
-    detail = "저장 기록과 편집 권한을 확인한 뒤 다시 저장해 주세요.";
+    compactLabel = "서버 초안 잠김";
+    headline = "문서 잠금으로 서버 초안 저장을 멈췄어요";
+    detail = "서버 초안은 잠금이 풀릴 때까지 저장하지 않습니다. 공동 편집 동기화와 이 기기 복구 상태는 별도로 확인할 수 있어요.";
   } else if (input.metadataRequired) {
     phase = "metadata-required";
     tone = "warning";
@@ -420,7 +420,7 @@ export function resolveStudioDraftSaveCenter(
           : input.saving
             ? "저장 중"
             : input.collaborationLocked
-              ? "저장 권한 확인"
+              ? "서버 초안 잠김"
               : !input.hydrated
                 ? "원고 불러오는 중"
                 : !input.isOnline

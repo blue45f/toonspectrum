@@ -13,10 +13,10 @@
  */
 
 export const STUDIO_GLOBAL_NAVIGATION = [
-  { id: "work", label: "내 작업", href: "/studio" },
-  { id: "create", label: "새로 만들기", href: "/studio/new" },
-  { id: "assets", label: "소재", href: "/studio/assets" },
-  { id: "learn", label: "배우기", href: "/learn" },
+  { id: "production", label: "제작 관리", href: "/production" },
+  { id: "studio", label: "작업실", href: "/studio" },
+  { id: "studio-assets", label: "소재", href: "/studio/assets" },
+  { id: "publish", label: "연재", href: "/studio/publish" },
 ] as const;
 
 export const STUDIO_PROJECT_NAVIGATION = [
@@ -156,18 +156,26 @@ export const STUDIO_CAPABILITY_REGISTRY: readonly StudioCapabilityDefinition[] =
   },
   {
     id: "brush.editor",
-    label: "브러시 설정",
+    label: "브러시 스튜디오",
     owner: "brush",
     primaryRoute: "/studio/assets/brushes/:brushId/edit",
     maturity: "beta",
     surfaces: [
       { id: "brush-editor", role: "primary" },
       { id: "brush-current-settings", role: "projection" },
-      { id: "brush-studio", role: "legacy" },
+      { id: "brush-studio", role: "projection" },
       { id: "brush-lab-v6", role: "legacy" },
       { id: "brush-v5-diagnostic", role: "diagnostic" },
     ],
-    aliases: ["브러시 스튜디오", "브러시 연구실", "brush lab", "V6 작업대"],
+    aliases: [
+      "현재 브러시 편집",
+      "새 브러시 만들기",
+      "브러시 설정",
+      "브러시 연구실",
+      "브러시 제작실",
+      "brush lab",
+      "V6 작업대",
+    ],
   },
   {
     id: "review.workspace",

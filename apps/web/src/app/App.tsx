@@ -1,14 +1,11 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
 
-import { checkBrowserCompatibility, type BrowserCompatibilityResult } from "../compat/browser-check";
-import { BrowserCompatModal } from "../components/browser-compat-modal";
 import { ErrorBoundary } from "../components/error-boundary";
 import { apiPath } from "../infrastructure/api";
 
 import { AppShell } from "./AppShell";
-import { shouldPromptForBrowserCompatibility } from "./browser-compatibility-scope";
-import { dismissBrowserCompatibility, hasDismissedBrowserCompatibility } from "./public-site-storage";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";
 import { StudioRouterDocumentNavigationBoundary } from "./StudioRouterDocumentNavigationBoundary";
@@ -18,6 +15,7 @@ import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route"
 import { AppearanceBridge } from "@/shared/components/appearance/AppearanceBridge";
 import { SiteHeader } from "@/shared/components/site-header";
 import { withCsrfProtection } from "@/shared/lib/csrf";
+import { useI18n } from "@/shared/lib/i18n";
 import { useUi } from "@/shared/lib/ui-store";
 
 // Optional public-page settings must not join the Studio startup bundle.
@@ -41,6 +39,11 @@ const SiteFooter = lazy(() =>
     default: mod.SiteFooter,
   })),
 );
+const SiteBackgroundMusicPlayer = lazy(() =>
+  import("@/shared/components/SiteBackgroundMusicPlayer").then((mod) => ({
+    default: mod.SiteBackgroundMusicPlayer,
+  })),
+);
 const StudioBg3dRetainedOwnerHost = lazy(() =>
   import("../domains/creator/bg3d/StudioBg3dRetainedOwnerHost").then((mod) => ({
     default: mod.StudioBg3dRetainedOwnerHost,
@@ -49,6 +52,11 @@ const StudioBg3dRetainedOwnerHost = lazy(() =>
 const TrafficAnalyticsBridge = lazy(() =>
   import("./traffic-analytics/TrafficAnalyticsBridge").then((mod) => ({
     default: mod.TrafficAnalyticsBridge,
+  })),
+);
+const BrowserCompatibilityBridge = lazy(() =>
+  import("./BrowserCompatibilityBridge").then((mod) => ({
+    default: mod.BrowserCompatibilityBridge,
   })),
 );
 
@@ -179,7 +187,7 @@ function WebFloatingControls() {
         placement="bottom-right"
         showSound={false}
         showBgm={false}
-        className={hideOnMobile ? "max-md:hidden" : undefined}
+        className={hideOnMobile ? translateCurrentStaticSourceText("app.App", "en", "max-md:hidden") : undefined}
       />
     </Suspense>
   );
@@ -228,9 +236,9 @@ function SerifWebFontBridge() {
 
 function AppRuntime() {
   const { pathname } = useLocation();
-  const [compatResult, setCompatResult] =
-    useState<BrowserCompatibilityResult | null>(null);
-  const [showCompatModal, setShowCompatModal] = useState(false);
+  // Legacy bilingual bridges register translation sources during render. Subscribe at the app
+  // runtime boundary so completed machine-translation batches refresh every route, not only useT().
+  useI18n((state) => state.translationBundleRevision);
   // Route truth is available during the first render; the Zustand bridge runs later in an effect.
   const studioImmersive = isImmersiveMobileRoute(pathname);
   const adminChrome = isAdminPath(pathname);
@@ -238,22 +246,6 @@ function AppRuntime() {
   const publicExperience = !isStudioRoutePathname(pathname) && !adminChrome;
 
   useKmasEntryMerge(!adminChrome);
-
-  useEffect(() => {
-    setCompatResult(checkBrowserCompatibility());
-  }, []);
-
-  useEffect(() => {
-    if (!compatResult) return;
-    const shouldOpen = shouldPromptForBrowserCompatibility(pathname, compatResult)
-      && !hasDismissedBrowserCompatibility();
-    setShowCompatModal(shouldOpen);
-  }, [compatResult, pathname]);
-
-  const handleCloseCompatModal = () => {
-    setShowCompatModal(false);
-    dismissBrowserCompatibility();
-  };
 
   return (
     <>
@@ -276,10 +268,10 @@ function AppRuntime() {
         showGlobalOverlays={!adminChrome}
         mainClassName={
           studioImmersive
-            ? "min-h-0 h-[100dvh] overflow-hidden outline-none pb-0"
+            ? translateCurrentStaticSourceText("app.App", "en", "min-h-0 h-[100dvh] overflow-hidden outline-none pb-0")
             : adminChrome
-              ? "min-h-[100dvh] outline-none"
-              : "min-h-screen pb-20 outline-none md:pb-0"
+              ? translateCurrentStaticSourceText("app.App", "en", "min-h-[100dvh] outline-none")
+              : translateCurrentStaticSourceText("app.App", "en", "min-h-screen pb-20 outline-none md:pb-0")
         }
         chromeOverlay={
           <>
@@ -288,18 +280,19 @@ function AppRuntime() {
                 <StudioBg3dRetainedOwnerHost />
               </Suspense>
             </ErrorBoundary>
+            <Suspense fallback={null}>
+              <SiteBackgroundMusicPlayer suspended={isolatedChrome} />
+            </Suspense>
             {!isolatedChrome ? (
               <>
                 <DeferredBackToTop />
                 <DeskCloudHost />
               </>
             ) : null}
-            {!adminChrome && compatResult ? (
-              <BrowserCompatModal
-                isOpen={showCompatModal}
-                onClose={handleCloseCompatModal}
-                missingFeatures={compatResult.missingFeatures}
-              />
+            {!adminChrome ? (
+              <Suspense fallback={null}>
+                <BrowserCompatibilityBridge pathname={pathname} />
+              </Suspense>
             ) : null}
           </>
         }

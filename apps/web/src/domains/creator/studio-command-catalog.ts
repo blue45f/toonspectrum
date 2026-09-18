@@ -11,6 +11,8 @@ import {
   STUDIO_MENU_ITEM_INVENTORY as BASE_MENU_INVENTORY,
 } from "./studio-command-catalog-base";
 
+import { STUDIO_BRUSH_LABELS } from "./brush/studio-brush-product-model";
+
 import type { StudioCommandCatalogEntry, StudioCommandSource } from "./studio-command-catalog-base";
 import type { CommandId } from "@toonspectrum/studio-command-registry";
 
@@ -31,6 +33,7 @@ export type {
 
 const MANUAL_MENU_ID = "help/user-manual";
 const BRUSH_LAB_MENU_ID = "brush/brush-lab";
+const FLOATING_LAYOUT_MENU_ID = "view/floating-layout";
 const TRANSPARENT_COLOR_COMMAND_ID: CommandId = "color.toggle-transparent";
 const TRANSPARENT_COLOR_SHORTCUT = "Shift+C";
 const BRUSH_STUDIO_COMMAND_ID: CommandId = "brush.studio";
@@ -62,22 +65,23 @@ const NORMALIZED_BASE_CATALOG: readonly StudioCommandCatalogEntry[] = Object.fre
         labels: Object.freeze([
           {
             locale: "ko",
-            label: "현재 브러시 세부 설정",
-            description: "현재 선택한 브러시의 펜촉·필압·도장·입력·엔진 조합을 편집합니다.",
+            label: STUDIO_BRUSH_LABELS.editCurrent,
+            description: "캔버스를 떠나지 않고 현재 브러시의 펜촉·필압·도장·입력·엔진 조합을 빠르게 편집합니다.",
           },
           {
             locale: "en",
-            label: "Current brush settings",
-            description: "Edit the selected brush tip, pressure, stamp, input, and engine settings.",
+            label: "Edit current brush",
+            description: "Quickly edit the selected brush tip, pressure, stamp, input, and engine settings without leaving the canvas.",
           },
         ]),
         aliases: Object.freeze([
           ...entry.aliases,
           { vendor: "toonstudio", locale: "ko", term: "브러시 스튜디오" } as const,
           { vendor: "toonstudio", locale: "ko", term: "브러시 상세 설정" } as const,
+          { vendor: "toonstudio", locale: "ko", term: "현재 브러시 세부 설정" } as const,
           { vendor: "toonstudio", locale: "en", term: "Brush Studio" } as const,
         ]),
-        note: "The in-editor Brush Studio edits the current brush; the dedicated brush.lab command owns guided brush authoring.",
+        note: "Compact and full editing are two depths of one Brush Studio product, not separate products.",
       });
     }
 
@@ -105,26 +109,59 @@ const BRUSH_LAB_COMMAND: StudioCommandCatalogEntry = {
   id: "brush.lab",
   category: "brush",
   labels: [
-    { locale: "ko", label: "목적별 브러시 제작실", description: "원하는 획을 먼저 고르고 실제로 시험한 뒤 재질·물리·패턴·전문 엔진까지 조정합니다." },
-    { locale: "en", label: "Guided Brush Studio", description: "Start from the desired stroke, test it live, then refine material, physics, pattern, and expert engines." },
+    { locale: "ko", label: STUDIO_BRUSH_LABELS.create, description: "시작 브러시를 고르고 실제로 시험한 뒤 재질·물리·패턴·전문 엔진까지 전체 편집합니다." },
+    { locale: "en", label: "Create a new brush", description: "Choose a starting brush, test it live, then refine material, physics, pattern, and expert engines in the full Brush Studio." },
   ],
   aliases: [
+    { vendor: "toonstudio", locale: "ko", term: "목적별 브러시 제작실" },
     { vendor: "toonstudio", locale: "ko", term: "브러시 연구실" },
     { vendor: "toonstudio", locale: "ko", term: "브러시 제작실" },
     { vendor: "toonstudio", locale: "en", term: "Brush Studio V6" },
   ],
   helpNodeId: "help/brush/lab",
   origins: [{ source: "menu", nativeId: BRUSH_LAB_MENU_ID, status: "wired" }],
-  note: "Navigation command to the dedicated Brush Studio V6 workspace while preserving work/remix context.",
+  note: "Navigation command to the canonical full Brush Studio while preserving manuscript context; former lab names remain search aliases only.",
+};
+
+const FLOATING_LAYOUT_COMMAND: StudioCommandCatalogEntry = {
+  id: "view.floating-layout",
+  category: "view",
+  labels: [
+    {
+      locale: "ko",
+      label: "플로팅 UI · 배치 설정",
+      description: "플로팅 요소의 표시, 위치, 크기, 잠금과 작업공간 프리셋을 편집합니다.",
+    },
+    {
+      locale: "en",
+      label: "Floating UI · layout settings",
+      description: "Edit visibility, position, size, locking, and workspace presets for floating surfaces.",
+    },
+  ],
+  aliases: [
+    { vendor: "toonstudio", locale: "ko", term: "작업공간 편집" },
+    { vendor: "toonstudio", locale: "ko", term: "플로팅 요소 배치" },
+    { vendor: "toonstudio", locale: "en", term: "workspace layout" },
+  ],
+  helpNodeId: "help/view/floating-layout",
+  origins: [{ source: "menu", nativeId: FLOATING_LAYOUT_MENU_ID, status: "wired" }],
 };
 
 export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
-  Object.freeze([...NORMALIZED_BASE_CATALOG, MANUAL_COMMAND, BRUSH_LAB_COMMAND]);
+  Object.freeze([
+    ...NORMALIZED_BASE_CATALOG,
+    MANUAL_COMMAND,
+    BRUSH_LAB_COMMAND,
+    FLOATING_LAYOUT_COMMAND,
+  ]);
 
 export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   ...BASE_MENU_INVENTORY.flatMap((id) => {
     if (id === "help/current-tool") return [id, MANUAL_MENU_ID];
     if (id === "brush/brush-studio") return [id, BRUSH_LAB_MENU_ID];
+    if (id === "view/production-insights") {
+      return [id, FLOATING_LAYOUT_MENU_ID];
+    }
     return [id];
   }),
 ]);
@@ -133,7 +170,7 @@ export const STUDIO_COMMAND_SOURCES = Object.freeze({
   ...BASE_SOURCES,
   menu: {
     ...BASE_SOURCES.menu,
-    measuredCount: BASE_SOURCES.menu.measuredCount + 2,
+    measuredCount: BASE_SOURCES.menu.measuredCount + 3,
   },
 });
 
@@ -159,10 +196,15 @@ export function findCatalogEntriesBySource(
   if (source !== "menu") return entries;
   if (nativeId === MANUAL_MENU_ID) return [...entries, MANUAL_COMMAND];
   if (nativeId === BRUSH_LAB_MENU_ID) return [...entries, BRUSH_LAB_COMMAND];
+  if (nativeId === FLOATING_LAYOUT_MENU_ID) {
+    return [...entries, FLOATING_LAYOUT_COMMAND];
+  }
   return entries;
 }
 
 export function catalogNativeIds(source: StudioCommandSource): string[] {
   const ids = baseNativeIds(source);
-  return source === "menu" ? [...ids, MANUAL_MENU_ID, BRUSH_LAB_MENU_ID] : ids;
+  return source === "menu"
+    ? [...ids, MANUAL_MENU_ID, BRUSH_LAB_MENU_ID, FLOATING_LAYOUT_MENU_ID]
+    : ids;
 }

@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { ProductionLandingPage } from "./ProductionLandingPage";
 import {
   ProductionEpisodeRoomPage,
-  ProductionLandingPage,
   ProductionProjectPage,
 } from "./ProductionHubPage";
 
@@ -33,8 +33,12 @@ describe("webtoon production collaboration UI", () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("밤의 우편배달부");
+    expect(screen.getByRole("heading", { name: "프로젝트 운영 조종석" })).toBeTruthy();
     expect(screen.getByText("막힌 질문")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /episode-12/u }).getAttribute("href"))
+    expect(screen.getByRole("heading", { name: "오늘의 운영 판단" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "회차 공정 매트릭스" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "팀 작업량" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /12화.*돌아온 봉투/u }).getAttribute("href"))
       .toBe("/production/projects/sample-project/episodes/episode-12");
     expect(screen.getByText(/수정할 수 없는 기록/u)).toBeTruthy();
   });
@@ -203,6 +207,32 @@ describe("webtoon production collaboration UI", () => {
     expect(screen.getByText("캐릭터·선화")).toBeTruthy();
     expect(screen.getAllByText("배경·3D").length).toBeGreaterThan(0);
     expect(screen.getByText("입력: 선화 + 배경")).toBeTruthy();
+  });
+
+  it("operates episode deadlines, standard stages and episode-scoped music from one surface", async () => {
+    render(
+      <MemoryRouter initialEntries={["/production/projects/sample-project/episodes"]}>
+        <Routes>
+          <Route path="/production/projects/:projectId/episodes" element={<ProductionProjectPage surface="episodes" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("heading", { name: "연재·회차 운영실" })).toBeTruthy();
+    expect(screen.getByText("준비 버퍼")).toBeTruthy();
+    expect(screen.getByText("오늘의 운영 판단")).toBeTruthy();
+
+    const episode12 = screen.getByRole("article", { name: "12화 연재 운영" });
+    expect(within(episode12).getByRole("link", { name: "회차 음악" }).getAttribute("href"))
+      .toBe("/studio/assets/audio?workId=sample-work&episodeId=episode-12");
+
+    const episode13 = screen.getByRole("article", { name: "13화 연재 운영" });
+    const deadline = within(episode13).getByLabelText("13화 게시 마감") as HTMLInputElement;
+    expect(deadline.value).toBe("");
+    expect(within(episode13).getByText("표준 공정 8개 미등록")).toBeTruthy();
+    fireEvent.change(deadline, { target: { value: "2026-10-02T18:00" } });
+    fireEvent.click(within(episode13).getByRole("button", { name: "표준 공정 구성" }));
+    await waitFor(() => expect(screen.getByText("저장됨")).toBeTruthy());
+    await waitFor(() => expect(within(screen.getByRole("article", { name: "13화 연재 운영" })).queryByText("표준 공정 8개 미등록")).toBeNull());
   });
 
 });

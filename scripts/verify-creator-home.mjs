@@ -10,7 +10,22 @@ const output = "artifacts/creator-home";
 mkdirSync(output, { recursive: true });
 const results = [];
 const manifest = JSON.parse(readFileSync("apps/web/public/brand/film-manifest.json", "utf8"));
-for (const [format, entry] of Object.entries(manifest.assets)) {
+assert.deepEqual(
+  [manifest.routeHeader?.width, manifest.routeHeader?.height],
+  [1920, 768],
+  "Route-header film must keep its high-resolution wide composition",
+);
+for (const startSeconds of [0, 6, 12, 18]) {
+  const poster = manifest.routeHeaderPosters?.[String(startSeconds)];
+  assert(poster, `Missing route-header poster for ${startSeconds}s`);
+  const posterPath = `apps/web/public${poster.src}`;
+  assert.equal(createHash("sha256").update(readFileSync(posterPath)).digest("hex"), poster.sha256);
+  const probe = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_streams", "-of", "json", posterPath], { encoding: "utf8" }));
+  const image = probe.streams.find((stream) => stream.codec_type === "video");
+  assert.deepEqual([image.width, image.height], [1920, 768]);
+}
+const renderedFilms = { ...manifest.assets, header: manifest.routeHeader };
+for (const [format, entry] of Object.entries(renderedFilms)) {
   const path = `apps/web/public${entry.src}`;
   assert.equal(createHash("sha256").update(readFileSync(path)).digest("hex"), entry.sha256);
   const probe = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", path], { encoding: "utf8" }));
@@ -18,6 +33,10 @@ for (const [format, entry] of Object.entries(manifest.assets)) {
   assert.equal(video.width, entry.width);
   assert.equal(video.height, entry.height);
   assert.equal(video.codec_name, "h264");
+  if (format === "header") {
+    assert.equal(probe.streams.some((stream) => stream.codec_type === "audio"), false, "Route-header film must not waste bitrate on a silent audio track");
+    assert(Number(video.bit_rate) >= 1_500_000, `Route-header bitrate regressed: ${video.bit_rate}`);
+  }
   assert(Math.abs(Number(probe.format.duration) - 24) < 0.1);
   execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-ss", "20", "-i", path, "-frames:v", "1", `${output}/film-${format}-20s.png`]);
   results.push({ check: `render-${format}`, dimensions: [video.width, video.height], duration: probe.format.duration, sha256: entry.sha256 });
@@ -64,29 +83,28 @@ try {
     assert.equal(await page.locator("video").count(), 0, "Video must not mount before a user gesture");
     assert.equal(videoRequests.length, 0, "Video must not download before a user gesture");
     const brand = locale === "ko" ? "툰스튜디오" : "ToonStudio";
-    await page.waitForFunction((name) => document.title.includes(name), brand);
+    await page.waitForFunction((brandName) => document.title.includes(brandName), brand);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `Horizontal page overflow: ${name}`);
     const headlineBounds = await page.locator("#creator-hero-title").boundingBox();
     assert(
       headlineBounds && headlineBounds.x >= 0 && headlineBounds.x + headlineBounds.width <= width + 1,
       `Clipped headline: ${name}`,
     );
-    await expect(page.locator('.cf-hero .cf-primary[href="/production"]')).toBeVisible();
-    await expect(page.locator('.cf-hero .cf-secondary[href="/studio/new"]')).toBeVisible();
+    await expect(page.locator('.cf-hero .cf-primary[href="/studio/new"]')).toBeVisible();
+    await expect(page.locator('.cf-hero .cf-secondary[href="/production"]')).toBeVisible();
     await expect(page.locator('.cf-hero-links a[href="/studio/projects"]')).toBeVisible();
     await expect(page.locator(".cf-start-card")).toHaveCount(4);
     await expect(page.locator(".cf-flow li a")).toHaveCount(6);
     await expect(page.locator(".cf-support-grid a")).toHaveCount(3);
+    await expect(page.locator(".cf-intent nav a")).toHaveCount(6);
     await expect(page.locator('.cf-production-preview img[src="/brand/production-os-hero.svg"]')).toHaveCount(1);
     await expect(page.locator('.cf-bridge-visual img[src="/brand/production-os-workspace.svg"]')).toHaveCount(1);
     await expect(page.locator('.cf-production-journey img[src="/brand/production-os-journey.svg"]')).toHaveCount(1);
     const heroImage = page.locator('.cf-production-preview img[src="/brand/production-os-hero.svg"]');
     await expect.poll(() => heroImage.evaluate((image) => image.complete && image.naturalWidth > 0), {
-      message: "The above-the-fold production preview must load",
+      message: "The above-the-fold all-in-one preview must load",
     }).toBe(true);
 
-    // The existing shell intentionally defers its footer. Exercise scroll, wait for its
-    // real lazy-loaded content, and only then capture the complete document.
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     const footer = page.locator('footer[data-site-chrome="footer"]');
     await footer.waitFor({ state: "visible", timeout: 30000 });

@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "studio-publishing-lifecycle-v1",
+  "title": "ToonStudio self-publishing lifecycle certification",
+  "claimPolicy": {
+    "automatedSelfPublishingReadinessAllowed": true,
+    "directExternalPlatformPublishingClaimAllowed": false,
+    "externalPlatformPackageReadinessAllowed": true,
+    "reason": "The suite certifies ToonStudio release governance, reader policy, series lifecycle, analytics import, and upload-ready packages. It does not operate third-party publisher accounts."
+  },
+  "lanes": [
+    {
+      "id": "release-governance",
+      "title": "Release approval, scheduling and replacement",
+      "outcome": "Only approved immutable releases can publish; scheduled promotion, replacement, collaboration policy, and unpublish remain auditable.",
+      "evidence": [
+        "apps/api/src/server/creator/publication.test.ts",
+        "apps/api/src/server/creator/publication-api.test.ts",
+        "apps/api/src/modules/creator/creator-publication-collaboration.repository.test.ts",
+        "apps/web/src/shared/lib/creator-publication-contract.test.ts",
+        "apps/web/src/shared/lib/creator-publication-republish.test.ts"
+      ]
+    },
+    {
+      "id": "reader-policy",
+      "title": "Reader visibility and community policy",
+      "outcome": "Public, link-only and private publication policies control reader access, comments, remix and public metadata consistently.",
+      "evidence": [
+        "apps/web/src/domains/creator/creator-publication-reader.test.ts",
+        "apps/web/src/domains/creator/creator-publication-page-meta.test.tsx",
+        "apps/web/src/shared/lib/creator-community-publication-contract.test.ts"
+      ]
+    },
+    {
+      "id": "platform-packages",
+      "title": "Generic, WEBTOON and Tapas delivery packages",
+      "outcome": "Destination packages are deterministic, privacy-safe, policy-versioned, finalized with hashes, and checked against committed goldens.",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-publication-preflight.test.ts",
+        "apps/web/src/domains/creator/studio-publish-package.test.ts",
+        "apps/web/src/domains/creator/studio-publish-package-renderer.test.ts",
+        "scripts/verify-studio-publish-package-goldens.test.ts"
+      ]
+    },
+    {
+      "id": "series-lifecycle",
+      "title": "Ongoing, hiatus and completed series",
+      "outcome": "Creators can pause and resume a series without losing episodes or allowing invalid lifecycle states.",
+      "evidence": [
+        "apps/api/src/server/creator/community-contract.test.ts",
+        "apps/web/src/domains/creator/creator-community-ui.series-lifecycle.test.tsx"
+      ]
+    },
+    {
+      "id": "publication-analytics",
+      "title": "Privacy-preserving publication analytics",
+      "outcome": "User-supplied CSV and manual observations are bounded, normalized and compared locally without claiming remote platform telemetry.",
+      "evidence": [
+        "apps/web/src/domains/creator/studio-publication-analytics.test.ts",
+        "apps/web/src/domains/creator/studio-publication-analytics-loader.test.ts"
+      ]
+    }
+  ]
+}

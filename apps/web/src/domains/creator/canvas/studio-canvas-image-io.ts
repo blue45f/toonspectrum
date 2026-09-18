@@ -1,4 +1,5 @@
 import { isAnimatedGifDataUrl, isGifFile } from "../studio-gif-element";
+import { MAX_ANIM_FRAMES, type StudioAnimFrame } from "../studio-frame-animation";
 import {
   inspectStudioUploadSourceImage,
   selectStudioUploadDecodedPixelLimit,
@@ -173,13 +174,84 @@ export function readGifFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("이미지 프레임을 직렬화하지 못했습니다."));
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function materializeDecodedFrameAsPng(
+  image: import("../studio-webcodecs-image-decode").DecodedImageFrameLike,
+): Promise<string> {
+  const width = Math.max(1, Math.round(image.displayWidth));
+  const height = Math.max(1, Math.round(image.displayHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("애니메이션 프레임용 캔버스를 만들지 못했습니다.");
+  context.drawImage(image as unknown as CanvasImageSource, 0, 0, width, height);
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((value) => value ? resolve(value) : reject(new Error("애니메이션 프레임을 PNG로 저장하지 못했습니다.")), "image/png");
+  });
+  return blobToDataUrl(blob);
+}
+
+async function decodeAnimatedImageFileForCanvas(file: File): Promise<{
+  src: string; width: number; height: number; isAnimatedGif: false;
+  frames?: StudioAnimFrame[]; frameFps?: number; frameLoop?: boolean;
+}> {
+  const runtime = await import("../studio-webcodecs-image-decode");
+  const mimeType = file.type.trim().toLowerCase();
+  if (!runtime.isAnimatedImageDecodeSupported() || !runtime.isAnimatedImageDecodeMime(mimeType)) {
+    const converted = await downscaleImageFile(file);
+    return { ...converted, isAnimatedGif: false };
+  }
+  const Decoder = globalThis.ImageDecoder;
+  if (typeof Decoder === "undefined") {
+    const converted = await downscaleImageFile(file);
+    return { ...converted, isAnimatedGif: false };
+  }
+  const decoded = await runtime.startAnimatedImageDecode<string>({
+    data: new Uint8Array(await file.arrayBuffer()),
+    mimeType,
+    maxFrames: MAX_ANIM_FRAMES,
+    deps: {
+      createDecoder: ({ data, type }) => new Decoder({ data, type }),
+      materialize: (image) => materializeDecodedFrameAsPng(image),
+      yieldToUi: () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
+    },
+  }).done;
+  assertStudioCanvasDecodedImageSize(decoded.width, decoded.height, studioCanvasDecodedPixelLimit());
+  if (!decoded.animated || decoded.frames.length <= 1) {
+    const src = decoded.frames[0];
+    if (!src) throw new Error("이미지에서 표시 가능한 프레임을 찾지 못했습니다.");
+    return { src, width: decoded.width, height: decoded.height, isAnimatedGif: false };
+  }
+  const nonce = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`; // NOSONAR -- local ids only
+  const frames: StudioAnimFrame[] = decoded.frames.map((src, index) => ({
+    id: `imported-frame-${nonce}-${index}`, src, durationMs: decoded.plan.frames[index]?.durationMs,
+  }));
+  return {
+    src: frames[0]!.src, width: decoded.width, height: decoded.height, isAnimatedGif: false, frames,
+    frameFps: decoded.plan.suggestedFps,
+    frameLoop: decoded.plan.loopForever || decoded.plan.loopCount > 1,
+  };
+}
+
 // 이미지 업로드 통합 진입점 — GIF가 아니면 기존 downscaleImageFile 그대로, GIF인데 정적(GCE
 // 없음)이어도 손실이 없으므로 마찬가지로 downscaleImageFile(용량 최적화 혜택을 그대로 받는다).
 // 진짜 애니메이션 GIF일 때만 캔버스 왕복 없이 원본 바이트를 그대로 보존한다. onPickImage가
 // 우선 사용한다.
 export async function loadImageFileForCanvas(
   file: File
-): Promise<{ src: string; width: number; height: number; isAnimatedGif: boolean }> {
+): Promise<{
+  src: string; width: number; height: number; isAnimatedGif: boolean;
+  frames?: StudioAnimFrame[]; frameFps?: number; frameLoop?: boolean;
+}> {
   const maximumPixels = studioCanvasDecodedPixelLimit();
   if (!Number.isSafeInteger(file.size) || file.size < 1) {
     throw new Error("이미지 파일이 비어 있거나 크기를 확인할 수 없습니다.");
@@ -190,7 +262,17 @@ export async function loadImageFileForCanvas(
     throw new Error("이미지 원본이 12MB를 초과합니다. 먼저 크기를 줄여 주세요.");
   }
   if (!isGifFile(file)) {
+    const mimeType = file.type.trim().toLowerCase();
+    // The strict upload header parser intentionally recognizes only JPEG/PNG/WebP. AVIF/APNG
+    // therefore use the browser decoder as the format authority, then pass the decoded dimensions
+    // through the same active pixel budget before any frame is admitted to the document.
+    if (mimeType === "image/avif" || mimeType === "image/apng") {
+      return decodeAnimatedImageFileForCanvas(file);
+    }
     await inspectStudioUploadSourceImage(file, maximumPixels);
+    if (mimeType === "image/png" || mimeType === "image/webp") {
+      return decodeAnimatedImageFileForCanvas(file);
+    }
     const r = await downscaleImageFile(file);
     return { ...r, isAnimatedGif: false };
   }

@@ -123,7 +123,7 @@ test("account pages never receive promotional onward cards", async ({ page }) =>
   }
 });
 
-test("theme artwork, contrast surfaces and reduced motion remain functional", async ({ page }, testInfo) => {
+test("all-in-one home keeps contrast surfaces, reduced motion and responsive bounds", async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     localStorage.setItem("toonspectrum-theme", JSON.stringify({
       state: { preference: "light", studioPreference: "inherit", theme: "light" },
@@ -133,15 +133,15 @@ test("theme artwork, contrast surfaces and reduced motion remain functional", as
   await page.setViewportSize({ width: 320, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  const home = page.locator('[data-creator-experience="clarity-v1"]');
-  const artwork = home.locator(".cf-home-preview .cf-theme-scene-image");
-  const collageArtwork = home.locator(".cf-theme-collage img");
-  await expect(home).toHaveAttribute("data-theme-art", "light");
-  await expect(artwork).toHaveAttribute("data-art-asset", "paper");
-  await expect(artwork).toHaveAttribute("src", "/brand/theme-scenes/paper-studio.svg");
-  await expect(collageArtwork).toHaveCount(2);
-  await expect(collageArtwork.first()).toHaveAttribute("srcset", /640w/u);
-  expect(await artwork.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+  const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
+  const heroArtwork = home.locator(".cf-home-preview img");
+  await expect(home).toBeVisible();
+  await expect(heroArtwork).toBeVisible();
+  await expect(home.locator(".cf-intent-visual-nav img")).toHaveCount(6);
+  await expect(home.locator(".cf-intent-film img")).toBeVisible();
+  await expect(home.locator(".cf-bridge-visual img")).toBeVisible();
+  await expect(home.locator(".cf-production-journey img")).toBeVisible();
+  await expect(home.locator("h1")).toContainText("기획부터 연재까지");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBe(true);
   await capturePageEvidence(page, testInfo, "home-320-light");
 
@@ -157,10 +157,9 @@ test("theme artwork, contrast surfaces and reduced motion remain functional", as
       storageArea: localStorage,
     }));
   }, dark);
-  await expect(home).toHaveAttribute("data-theme-art", "dark");
-  await expect(artwork).toHaveAttribute("data-art-asset", "ink");
-  await expect(artwork).toHaveAttribute("src", "/brand/theme-scenes/ink-studio.svg");
-  expect(await artwork.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+  await expect(home).toBeVisible();
+  await expect(heroArtwork).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBe(true);
   await capturePageEvidence(page, testInfo, "home-320-dark");
 });
 
@@ -186,7 +185,6 @@ test("directory search supports real navigation, a shared query, Back and recove
   await expect(page.locator("#sitemap-extended-title")).toBeVisible();
 });
 
-
 test("evidence snapshots terminate when an infinite feed grows at the fold", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 900 });
   await page.setContent('<main id="feed" style="height:2400px;background:linear-gradient(white,gray)"><h1>Growing feed</h1></main>');
@@ -210,7 +208,6 @@ test("evidence snapshots terminate when an infinite feed grows at the fold", asy
   expect(coverage.observedDocumentHeight).toBeGreaterThan(coverage.height);
   expect(coverage.grewDuringCapture).toBe(true);
 });
-
 
 test("long-page evidence covers every vertical region without changing the viewport or losing scroll", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 900 });

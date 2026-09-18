@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ListFilter, MousePointer2 } from "lucide-react";
 import { useId, useState } from "react";
 
@@ -38,7 +42,7 @@ export function StudioSelectionMatchingPanel({
 
   return (
     <section
-      aria-label="같은 항목 선택"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionMatchingPanel", "ko", "같은 항목 선택")}
       data-studio-selection-matching-panel="true"
       data-inspector-section="selection.matching"
       data-inspector-section-open="true"
@@ -55,20 +59,18 @@ export function StudioSelectionMatchingPanel({
           <ListFilter size={14} strokeWidth={1.8} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-extrabold tracking-tight text-fg">같은 항목 선택</p>
+          <p className="text-xs font-extrabold tracking-tight text-fg">{translateCurrentStaticSourceText("domains.creator.StudioSelectionMatchingPanel", "ko", "같은 항목 선택")}</p>
           <p className="mt-0.5 text-[0.6875rem] font-medium leading-relaxed text-fg-3">
-            현재 페이지의 표시 레이어에서 같은 속성을 한 번에 찾습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioSelectionMatchingPanel", "ko", "현재 페이지의 표시 레이어에서 같은 속성을 한 번에 찾습니다.")}</p>
         </div>
       </div>
 
       <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">
         <label htmlFor={selectId} className="sr-only">
-          같은 항목 선택 기준
-        </label>
+          {translateCurrentStaticSourceText("domains.creator.StudioSelectionMatchingPanel", "ko", "같은 항목 선택 기준")}</label>
         <select
           id={selectId}
-          aria-label="같은 항목 선택 기준"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionMatchingPanel", "ko", "같은 항목 선택 기준")}
           aria-describedby={descriptionId}
           data-inspector-control-id="selection.matching.criterion"
           data-inspector-priority="contextual"
@@ -84,14 +86,13 @@ export function StudioSelectionMatchingPanel({
         >
           {options.map((option) => (
             <option key={option.criterion} value={option.criterion}>
-              {option.label} · {option.count}개
-            </option>
+              {option.label} · {option.count}{translateCurrentStaticSourceText("domains.creator.StudioSelectionMatchingPanel", "ko", "개")}</option>
           ))}
         </select>
         <button
           type="button"
           onClick={() => onSelect(activeOption.criterion)}
-          aria-label={`${activeOption.label} ${activeOption.count}개 전체 선택`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionMatchingPanel", "ko", "{v0} {v1}개 전체 선택"), { v0: String(activeOption.label), v1: String(activeOption.count) })}
           aria-describedby={descriptionId}
           data-studio-select-matching-action={activeOption.criterion}
           data-inspector-control-id="selection.matching.select"
@@ -103,8 +104,7 @@ export function StudioSelectionMatchingPanel({
           })}
         >
           <MousePointer2 size={14} aria-hidden />
-          전체 선택
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioSelectionMatchingPanel", "ko", "전체 선택")}</button>
       </div>
 
       <p

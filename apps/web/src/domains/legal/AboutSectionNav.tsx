@@ -1,9 +1,19 @@
-import { Layers, Sparkles, Wrench } from "lucide-react";
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import { Layers, Scale, Sparkles, Wrench } from "lucide-react";
 
 import Link from "@/compat/router-link";
 import { usePathname } from "@/compat/navigation";
 import { cx } from "@/shared/lib/cx";
-import { useI18n } from "@/shared/lib/i18n";
+
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("AboutSectionNav", ko, en);
 
 const ABOUT_ITEMS = [
   {
@@ -42,37 +52,52 @@ const ABOUT_ITEMS = [
       description: "Technology behind the browser studio",
     },
   },
+  {
+    href: "/about/principles",
+    icon: Scale,
+    ko: {
+      label: "제품 원칙",
+      description: "창작 흐름·권리·AI·접근성 기준",
+    },
+    en: {
+      label: "Product principles",
+      description: "Creative flow, rights, AI and accessibility",
+    },
+  },
 ] as const;
 
 interface AboutSectionNavProps {
   readonly className?: string;
 }
 
-/** Keep the service, workflow and technology introductions discoverable as one product story. */
+/** Keep service, workflow, technology and product principles discoverable as one product story. */
 export function AboutSectionNav({ className }: AboutSectionNavProps) {
+  useBilingualI18nRevision();
   const pathname = usePathname();
-  const language = useI18n((state) => state.lang);
-  const locale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+
+
 
   return (
     <nav
-      aria-label={locale === "ko" ? "ToonStudio 소개 메뉴" : "ToonStudio introduction"}
+      aria-label={bi("ToonStudio 소개 메뉴", "ToonStudio introduction")}
       className={cx(
         "rounded-3xl border border-line/70 bg-panel/70 p-2 shadow-sm backdrop-blur-xl",
         className,
       )}
     >
-      <div className="grid gap-1 md:grid-cols-3">
+      <div className="grid gap-1 sm:grid-cols-2 xl:grid-cols-4">
         {ABOUT_ITEMS.map((item) => {
           const Icon = item.icon;
-          const copy = item[locale];
-          const active = pathname === item.href;
+          const copy = bi((item).ko, (item).en);
+          const exact = pathname === item.href;
+          const descendant = item.href === "/about/technology" && pathname.startsWith("/about/technology/");
+          const active = exact || descendant;
 
           return (
             <Link
               key={item.href}
               href={item.href}
-              aria-current={active ? "page" : undefined}
+              aria-current={exact ? translateCurrentStaticSourceText("domains.legal.AboutSectionNav", "en", "page") : descendant ? translateCurrentStaticSourceText("domains.legal.AboutSectionNav", "en", "location") : undefined}
               className={cx(
                 "group flex min-h-20 items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-all duration-200",
                 active

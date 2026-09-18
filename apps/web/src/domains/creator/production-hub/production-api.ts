@@ -22,8 +22,16 @@ import type {
   ProductionAgreement,
   ProductionDispute,
   ProductionInvoice,
+  ProductionOperationsRecord,
   ProductionProjectAggregate,
   ProductionRisk,
+  ProductionRiskPolicy,
+  ProductionRiskResponse,
+  ProductionRiskResponseStatus,
+  ProductionRiskSignal,
+  ProductionRiskAssessment,
+  ProductionRiskStatus,
+  ProductionTaskForecast,
   ProjectBrief,
   ProductionTask,
   ReviewDecision,
@@ -33,11 +41,14 @@ import type {
   SeriesMaster,
   RightsInterest,
   RoleAssignment,
+  ScheduleBaseline,
   ScopePackage,
   Submission,
   StoryToArtHandoffPackage,
   CollaborationParty,
 } from "@toonspectrum/core/production";
+
+import type { ProductionProjectAccess } from "./production-dashboard-api";
 
 import { api, apiPath } from "@/infrastructure/api";
 
@@ -62,14 +73,7 @@ export type ProductionCommercialRecord =
   | { readonly kind: "payment"; readonly value: PaymentRecord }
   | { readonly kind: "dispute"; readonly value: ProductionDispute };
 
-export interface ProductionProjectAccess {
-  readonly view: boolean;
-  readonly comment: boolean;
-  readonly edit: boolean;
-  readonly manage: boolean;
-  readonly owner: boolean;
-  readonly role: "owner" | "admin" | "editor" | "commenter" | "viewer" | null;
-}
+export type { ProductionProjectAccess } from "./production-dashboard-api";
 
 export interface ProductionProjectRecord {
   readonly aggregate: ProductionProjectAggregate;
@@ -102,6 +106,16 @@ export type ProductionClientCommand =
   | { readonly type: "upsert-review-policy"; readonly policy: ReviewPolicy }
   | { readonly type: "record-review-decision"; readonly policyId: string; readonly decision: ReviewDecision }
   | { readonly type: "upsert-task"; readonly task: ProductionTask }
+  | { readonly type: "upsert-task-batch"; readonly tasks: readonly ProductionTask[] }
+  | { readonly type: "upsert-operations-record"; readonly record: ProductionOperationsRecord }
+  | { readonly type: "apply-schedule-scenario"; readonly baseline: ScheduleBaseline; readonly tasks: readonly ProductionTask[] }
+  | {
+      readonly type: "upsert-episode-operations";
+      readonly episodeId: string;
+      readonly episode?: EpisodeCollaboration;
+      readonly episodePlan?: EpisodePlan;
+      readonly tasks: readonly ProductionTask[];
+    }
   | {
       readonly type: "upsert-change-request";
       readonly request: ChangeRequest;
@@ -130,7 +144,15 @@ export type ProductionClientCommand =
       readonly requiredApproverAssignmentIds?: readonly string[];
     }
   | { readonly type: "upsert-rights-interest"; readonly interest: RightsInterest }
-  | { readonly type: "upsert-compensation-plan"; readonly plan: CompensationPlan };
+  | { readonly type: "upsert-compensation-plan"; readonly plan: CompensationPlan }
+  | { readonly type: "upsert-risk"; readonly risk: ProductionRisk }
+  | { readonly type: "transition-risk"; readonly riskId: string; readonly toStatus: ProductionRiskStatus; readonly reason: string; readonly expectedRiskRevision: number }
+  | { readonly type: "upsert-risk-response"; readonly response: ProductionRiskResponse }
+  | { readonly type: "transition-risk-response"; readonly responseId: string; readonly toStatus: ProductionRiskResponseStatus; readonly actualEffect: string | null }
+  | { readonly type: "suppress-risk-signal"; readonly signalId: string; readonly reason: string; readonly suppressedByAssignmentId: string; readonly expiresAt: string | null }
+  | { readonly type: "update-risk-policy"; readonly policy: ProductionRiskPolicy }
+  | { readonly type: "evaluate-risks" }
+  | { readonly type: "rebaseline-task"; readonly taskId: string; readonly newDueAt: string; readonly reason: string; readonly sourceChangeRequestId: string | null };
 
 function mutationId(): string {
   return globalThis.crypto?.randomUUID?.()
@@ -143,6 +165,46 @@ export function getProductionProject(projectId: string): Promise<ProductionProje
 
 export function getProductionProjectByWork(workId: string): Promise<ProductionProjectRecord> {
   return api.get(`/production/works/${encodeURIComponent(workId)}/project`);
+}
+
+export interface ProductionRiskListResponse {
+  readonly summary: {
+    readonly critical: number;
+    readonly high: number;
+    readonly warning: number;
+    readonly actualOverdue: number;
+    readonly forecastSlip: number;
+    readonly blocked: number;
+    readonly affectedEpisodeCount: number;
+  };
+  readonly items: readonly {
+    readonly risk: ProductionRisk;
+    readonly signal: ProductionRiskSignal | null;
+    readonly responseCount: number;
+  }[];
+  readonly nextCursor: string | null;
+  readonly evaluatedAt: string;
+}
+
+export function getProductionRisks(
+  projectId: string,
+  params?: Record<string, string | number | undefined>,
+): Promise<ProductionRiskListResponse> {
+  return api.get(`/production/projects/${encodeURIComponent(projectId)}/risks`, { params });
+}
+
+export function getProductionRisk(
+  projectId: string,
+  riskId: string,
+): Promise<{
+  readonly risk: ProductionRisk;
+  readonly signal: ProductionRiskSignal | null;
+  readonly responses: readonly ProductionRiskResponse[];
+  readonly assessment: ProductionRiskAssessment | null;
+  readonly taskForecasts: readonly ProductionTaskForecast[];
+  readonly evaluatedAt: string;
+}> {
+  return api.get(`/production/projects/${encodeURIComponent(projectId)}/risks/${encodeURIComponent(riskId)}`);
 }
 
 export function createProductionProject(input: {
@@ -178,6 +240,76 @@ export function executeProductionCommand(
     mutationId: mutationId(),
     command,
   });
+}
+
+export interface ProductionExternalReviewView {
+  readonly projectId: string;
+  readonly projectTitle: string;
+  readonly review: {
+    readonly id: string;
+    readonly label: string;
+    readonly watermark: boolean;
+    readonly permissions: readonly ("view" | "comment" | "approve" | "download")[];
+    readonly expiresAt: string;
+    readonly responses: readonly {
+      readonly id: string;
+      readonly reviewerName: string;
+      readonly decision: "comment" | "approve" | "request-changes";
+      readonly note: string;
+      readonly createdAt: string;
+    }[];
+  };
+  readonly submissions: readonly {
+    readonly id: string;
+    readonly status: string;
+    readonly submittedAt: string;
+    readonly revisionRef: {
+      readonly id: string;
+      readonly lineage: "narrative" | "visual" | "integrated";
+      readonly revision: number;
+      readonly digest: string;
+      readonly createdAt: string;
+    };
+    readonly evidenceRefs: readonly string[];
+    readonly deliverable: {
+      readonly id: string;
+      readonly type: string;
+      readonly expectedFormat: string;
+      readonly completionCriteria: readonly string[];
+    } | null;
+  }[];
+}
+
+function externalReviewAuthorization(token: string): { readonly headers: Readonly<Record<string, string>> } {
+  return { headers: { Authorization: `Bearer ${token}` } };
+}
+
+export function getProductionExternalReview(
+  projectId: string,
+  reviewId: string,
+  token: string,
+): Promise<ProductionExternalReviewView> {
+  return api.get(
+    `/production/public-reviews/${encodeURIComponent(projectId)}/${encodeURIComponent(reviewId)}`,
+    externalReviewAuthorization(token),
+  );
+}
+
+export function submitProductionExternalReview(
+  projectId: string,
+  reviewId: string,
+  input: {
+    readonly token: string;
+    readonly reviewerName: string;
+    readonly decision: "comment" | "approve" | "request-changes";
+    readonly note: string;
+  },
+): Promise<ProductionExternalReviewView> {
+  const { token, ...review } = input;
+  return api.post(`/production/public-reviews/${encodeURIComponent(projectId)}/${encodeURIComponent(reviewId)}/responses`, {
+    responseId: mutationId(),
+    ...review,
+  }, externalReviewAuthorization(token));
 }
 
 export type ProductionGoogleDriveArtifact =

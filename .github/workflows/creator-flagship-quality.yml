@@ -3,11 +3,34 @@ name: Creator flagship quality
 on:
   pull_request:
     paths:
+      - 'apps/web/index.html'
+      - 'apps/web/public/llms.txt'
+      - 'apps/web/public/**/*.webmanifest'
+      - 'apps/web/public/i18n/app/footer/**'
+      - 'apps/web/src/app/routes/AppRouter.tsx'
+      - 'apps/web/src/app/routes/groups/creator-route-pages.ts'
+      - 'apps/web/src/app/routes/route-fallback.tsx'
       - 'apps/web/src/domains/marketing/**'
       - 'apps/web/src/domains/creator-resources/**'
+      - 'apps/web/src/domains/creator/studio-shell/StudioDeferredSaveProjectCreatePage*'
+      - 'apps/web/src/domains/creator/studio-shell/StudioFrontDoorPages*'
+      - 'apps/web/src/domains/creator/studio-shell/StudioNewIntegratedPage*'
+      - 'apps/web/src/domains/creator/studio-shell/StudioProjectLibraryManagementPage*'
+      - 'apps/web/src/domains/creator/studio-shell/StudioProjectStartPanel*'
+      - 'apps/web/src/domains/creator/studio-shell/StudioTaskFlow*'
       - 'apps/web/src/domains/creator/studio-launch-mode.ts'
       - 'apps/web/src/domains/creator/studio-cuttoon-editor/runtime/useStudioPreferencesRuntime.ts'
+      - 'apps/web/src/shared/components/SiteRouteExperienceBoundary*'
+      - 'apps/web/src/shared/components/WorkflowTrustBadge*'
+      - 'apps/web/src/shared/lib/product-identity*'
+      - 'apps/web/src/shared/lib/site-route-ux*'
+      - 'apps/web/src/shared/lib/site-route-experience*'
+      - 'apps/web/src/shared/lib/workflow-trust*'
       - 'apps/api/src/modules/creator-resources/**'
+      - 'config/http-response-headers.json'
+      - 'scripts/cloudflare-static-rules.mjs'
+      - 'scripts/cloudflare-static-rules.test.mjs'
+      - 'deploy/cloudflare-static/src/index.ts'
       - 'packages/core/**'
       - 'tests/creator-flagship-contracts.test.ts'
       - 'tools/verify-creator-flagship.mjs'
@@ -40,14 +63,24 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Deterministic language, storage and mode contracts
         run: node tools/verify-creator-flagship.mjs
-      - name: React and navigation regressions
+      - name: React, product identity and navigation regressions
         run: >-
           pnpm exec vitest run
           tests/creator-flagship-contracts.test.ts
           apps/web/src/domains/creator-resources/open-creation.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioDeferredSaveProjectCreatePage.contract.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioFrontDoorPages.contract.test.ts
+          apps/web/src/domains/creator/studio-shell/StudioTaskFlow.contract.test.ts
           apps/web/src/domains/marketing/CreatorReferenceSearch.test.tsx
           apps/web/src/domains/marketing/CreatorHomeExperience.test.ts
           apps/web/src/domains/marketing/creator-home-navigation.test.ts
+          apps/web/src/shared/lib/product-identity.test.ts
+          apps/web/src/shared/lib/site-route-ux.test.ts
+          apps/web/src/shared/lib/site-route-experience.test.ts
+          apps/web/src/shared/lib/workflow-trust.test.ts
+          scripts/cloudflare-static-rules.test.mjs
+      - name: Response policy generation contract
+        run: node scripts/cloudflare-static-rules.mjs --check
       - name: Full application typecheck
         run: pnpm run typecheck
       - name: Production bundle and CSP

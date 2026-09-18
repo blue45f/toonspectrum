@@ -1,7 +1,7 @@
 {
   "name": "툰스튜디오 · ToonStudio",
   "short_name": "툰스튜디오",
-  "description": "아이디어를 첫 장면으로. 드로잉·컷툰·3D·리서치를 잇는 브라우저 창작 공간.",
+  "description": "기획부터 연재까지. 대본·콘티·2D·3D·소재·파일·협업·검수를 하나의 프로젝트에서 연결하는 올인원 웹툰 제작 스튜디오.",
   "lang": "ko-KR",
   "categories": [
     "productivity",
@@ -53,28 +53,28 @@
   ],
   "shortcuts": [
     {
-      "name": "창작 스튜디오",
-      "short_name": "스튜디오",
-      "description": "브러시·레이어·필터가 있는 창작 작업 공간",
+      "name": "새 작품 시작",
+      "short_name": "새 작품",
+      "description": "아이디어·대본·기존 원고에서 새 웹툰 프로젝트 시작",
+      "url": "/studio/new"
+    },
+    {
+      "name": "2D 스튜디오",
+      "short_name": "2D 작업",
+      "description": "브러시·레이어·컷·말풍선으로 웹툰 원고 제작",
       "url": "/studio"
     },
     {
-      "name": "컷툰 만들기",
-      "short_name": "컷툰",
-      "description": "컷과 말풍선으로 이야기를 구성하는 작업 공간",
-      "url": "/studio/comic"
+      "name": "3D 배경 만들기",
+      "short_name": "3D 작업",
+      "description": "웹툰 컷에 사용할 배경·소품·카메라 장면 제작",
+      "url": "/studio/bg3d"
     },
     {
-      "name": "캐릭터 셰이퍼",
-      "short_name": "캐릭터",
-      "description": "캐릭터 비율·표정·포즈와 구도를 준비하는 도구",
-      "url": "/shaper"
-    },
-    {
-      "name": "창작 리서치 데스크",
-      "short_name": "리서치",
-      "description": "작품·판본·공개 자료와 출처를 한곳에 정리",
-      "url": "/research"
+      "name": "검토·연재 준비",
+      "short_name": "연재 준비",
+      "description": "승인본의 규격·권리를 검사하고 게시본 준비",
+      "url": "/studio/publish"
     }
   ],
   "screenshots": [
@@ -83,14 +83,14 @@
       "sizes": "1280x820",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "툰스튜디오 창작 홈 — 아이디어에서 작업까지 (데스크톱)"
+      "label": "툰스튜디오 올인원 웹툰 제작 홈 (데스크톱)"
     },
     {
       "src": "/screenshot-narrow.png",
       "sizes": "585x1266",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "툰스튜디오 창작 홈 — 빠른 시작과 최근 흐름 (모바일)"
+      "label": "툰스튜디오 올인원 웹툰 제작 홈 (모바일)"
     }
   ]
 }
