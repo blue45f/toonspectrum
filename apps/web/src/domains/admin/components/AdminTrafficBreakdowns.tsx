@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Activity,
   BarChart3,
@@ -41,7 +40,8 @@ export function TrafficMetricCard({
         {live ? (
           <span className="inline-flex items-center gap-1 rounded-full border border-good/30 px-2 py-0.5 text-[0.65rem] font-semibold text-good">
             <span className="size-1.5 animate-pulse rounded-full bg-good" />
-            {translateCurrentStaticSourceText("domains.admin.components.AdminTrafficBreakdowns", "en", "LIVE")}</span>
+            LIVE
+          </span>
         ) : null}
       </div>
       <p className="mt-4 text-xs font-medium text-fg-3">{label}</p>

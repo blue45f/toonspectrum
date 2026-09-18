@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Selective HSL Panel
  * 선택된 이미지의 선택 색상(HSL) 보정 인스펙터 — 원클릭 색감 프리셋 +
@@ -72,16 +71,17 @@ export function StudioSelectiveHslPanel({
     <div className="space-y-2">
       {/* 헤더 + 항등 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioSelectiveHslPanel", "ko", "선택 색상 (HSL)")}</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">선택 색상 (HSL)</p>
         <button
           type="button"
           onClick={onReset}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.StudioSelectiveHslPanel", "ko", "선택 색상 보정을 제거하고 원본 색상으로 되돌립니다.")}
+          title="선택 색상 보정을 제거하고 원본 색상으로 되돌립니다."
         >
           <RotateCcw className="size-3.5" />
-          {translateCurrentStaticSourceText("domains.creator.StudioSelectiveHslPanel", "ko", "원본으로")}</button>
+          원본으로
+        </button>
       </div>
 
       {/* 원클릭 색감 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). */}

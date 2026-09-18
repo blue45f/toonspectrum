@@ -1,6 +1,3 @@
-import {
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import type {
   StudioDocumentKind,
   StudioDocumentWorkspace,
@@ -300,7 +297,7 @@ export function resolveStudioRuntimeMode(
   }
 }
 
-export function studioModeLabel(profile: StudioModeProfile, locale: string): string {
+export function studioModeLabel(profile: StudioModeProfile, locale: "ko" | "en"): string {
   const labels: Readonly<Record<StudioProjectKind, StudioModeCopy>> = {
     webtoon: copy("웹툰", "Webtoon"),
     illustration: copy("일러스트", "Illustration"),
@@ -311,5 +308,5 @@ export function studioModeLabel(profile: StudioModeProfile, locale: string): str
     "three-d": copy("3D 장면", "3D scene"),
     animation: copy("애니메이션·모션", "Animation & motion"),
   };
-  return translateLocaleBranchForLocale(locale, "domains.creator.studio.mode.profile", labels[profile.id]);
+  return labels[profile.id][locale];
 }

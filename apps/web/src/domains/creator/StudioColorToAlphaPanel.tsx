@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Color to Alpha Panel
  * 선택된 이미지의 색상 투명화(Color to Alpha) 인스펙터 — 원클릭 배경색 프리셋 +
@@ -54,16 +53,18 @@ export function StudioColorToAlphaPanel({
       {/* 헤더 + 항등 복귀 */}
       <div className="flex items-center justify-between gap-2">
         <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
-          {translateCurrentStaticSourceText("domains.creator.StudioColorToAlphaPanel", "ko", "색상 투명화 (Color to Alpha)")}</p>
+          색상 투명화 (Color to Alpha)
+        </p>
         <button
           type="button"
           onClick={onReset}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.StudioColorToAlphaPanel", "ko", "색상 투명화를 제거하고 원본으로 되돌립니다.")}
+          title="색상 투명화를 제거하고 원본으로 되돌립니다."
         >
           <RotateCcw className="size-3.5" />
-          {translateCurrentStaticSourceText("domains.creator.StudioColorToAlphaPanel", "ko", "원본으로")}</button>
+          원본으로
+        </button>
       </div>
 
       {/* 원클릭 배경색 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). 스와치는 프리셋 키 색으로 칠한다. */}
@@ -84,7 +85,8 @@ export function StudioColorToAlphaPanel({
           화면의 실제 픽셀을 직접 샘플링(feature-detect, 지원 브라우저에서만 렌더). */}
       <div className="flex items-center gap-2">
         <label className="flex items-center gap-2 text-xs text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioColorToAlphaPanel", "ko", "키 색상")}<input
+          키 색상
+          <input
             type="color"
             value={value.keyColor}
             onChange={(e) => onPatch({ keyColor: e.target.value })}
@@ -94,8 +96,8 @@ export function StudioColorToAlphaPanel({
         {eyeDropperCtor && (
           <button
             type="button"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorToAlphaPanel", "ko", "스포이드로 키 색상 추출")}
-            title={translateCurrentStaticSourceText("domains.creator.StudioColorToAlphaPanel", "ko", "스포이드로 화면에서 키 색상을 추출합니다.")}
+            aria-label="스포이드로 키 색상 추출"
+            title="스포이드로 화면에서 키 색상을 추출합니다."
             onClick={() => {
               const ed = new eyeDropperCtor();
               ed.open()
@@ -111,7 +113,7 @@ export function StudioColorToAlphaPanel({
 
       {/* 강도(strength) 슬라이더 — 범위는 COLOR_TO_ALPHA_STRENGTH_RANGE에서. 0이면 항등. */}
       <StudioSliderRow
-        label={translateCurrentStaticSourceText("domains.creator.StudioColorToAlphaPanel", "ko", "강도 (Strength)")}
+        label="강도 (Strength)"
         min={COLOR_TO_ALPHA_STRENGTH_RANGE.min}
         max={COLOR_TO_ALPHA_STRENGTH_RANGE.max}
         step={COLOR_TO_ALPHA_STRENGTH_RANGE.step}
@@ -122,7 +124,9 @@ export function StudioColorToAlphaPanel({
 
       {/* 안내 문구 */}
       <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
-        {translateCurrentStaticSourceText("domains.creator.StudioColorToAlphaPanel", "ko", "키 색상과 정확히 같은 픽셀은 완전히 투명해지고, 비슷할수록 부분 투명해져 스캔 원고 가장자리의 앤티앨리어싱이 자연스럽게 유지돼요. 흰 종이 배경을 지울 때 특히 유용합니다.")}</p>
+        키 색상과 정확히 같은 픽셀은 완전히 투명해지고, 비슷할수록 부분 투명해져 스캔 원고 가장자리의
+        앤티앨리어싱이 자연스럽게 유지돼요. 흰 종이 배경을 지울 때 특히 유용합니다.
+      </p>
     </div>
   );
 }

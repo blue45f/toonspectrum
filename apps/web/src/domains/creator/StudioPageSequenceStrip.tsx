@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Page Sequence Strip — 캔버스 하단에서 페이지를 빠르게 오가는 탐색 전용 필름스트립.
  *
@@ -61,7 +57,7 @@ export function StudioPageSequenceStrip({
 
   return (
     <nav
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageSequenceStrip", "ko", "페이지 시퀀스")}
+      aria-label="페이지 시퀀스"
       data-studio-page-sequence-strip="true"
       className={cn(
         "absolute inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-40",
@@ -70,7 +66,7 @@ export function StudioPageSequenceStrip({
         "lg:flex"
       )}
     >
-      <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioPageSequenceStrip", "ko", "총 ")}{pages.length}{translateCurrentStaticSourceText("domains.creator.StudioPageSequenceStrip", "ko", "페이지")}</span>
+      <span className="sr-only">총 {pages.length}페이지</span>
 
       <div
         aria-hidden="true"
@@ -80,8 +76,8 @@ export function StudioPageSequenceStrip({
           <Files size={15} aria-hidden />
         </span>
         <span className="min-w-0">
-          <span className="block text-[0.65rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioPageSequenceStrip", "ko", "시퀀스")}</span>
-          <span className="block text-[0.625rem] tabular-nums text-fg-3">{pages.length}{translateCurrentStaticSourceText("domains.creator.StudioPageSequenceStrip", "ko", "페이지")}</span>
+          <span className="block text-[0.65rem] font-bold text-fg-2">시퀀스</span>
+          <span className="block text-[0.625rem] tabular-nums text-fg-3">{pages.length}페이지</span>
         </span>
       </div>
 
@@ -95,7 +91,8 @@ export function StudioPageSequenceStrip({
               role="status"
               className="flex h-[4.75rem] min-w-44 items-center justify-center rounded-xl border border-dashed border-line bg-card/55 px-4 text-center text-xs text-fg-3"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioPageSequenceStrip", "ko", "페이지가 아직 없어요.")}</li>
+              페이지가 아직 없어요.
+            </li>
           ) : null}
 
           {pages.map((page, index) => {
@@ -110,8 +107,8 @@ export function StudioPageSequenceStrip({
                   }}
                   type="button"
                   data-studio-page-sequence-item="true"
-                  aria-current={active ? translateCurrentStaticSourceText("domains.creator.StudioPageSequenceStrip", "en", "page") : undefined}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPageSequenceStrip", "ko", "{v0}번 페이지, {v1}{v2}"), { v0: String(index + 1), v1: String(label), v2: String(active ? ", 현재 페이지" : "") })}
+                  aria-current={active ? "page" : undefined}
+                  aria-label={`${index + 1}번 페이지, ${label}${active ? ", 현재 페이지" : ""}`}
                   title={`${index + 1}. ${label}`}
                   onClick={() => onSelectPage(page.id)}
                   className={cn(
@@ -155,7 +152,7 @@ export function StudioPageSequenceStrip({
                           active ? "bg-accent" : "bg-transparent"
                         )}
                       />
-                      {translateCurrentStaticSourceText("domains.creator.StudioPageSequenceStrip", "ko", "페이지 ")}{index + 1}
+                      페이지 {index + 1}
                     </span>
                     <span className="mt-1 line-clamp-2 text-xs font-semibold leading-tight text-fg [overflow-wrap:anywhere]">
                       {label}
@@ -171,7 +168,7 @@ export function StudioPageSequenceStrip({
               <button
                 type="button"
                 data-studio-page-sequence-add="true"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageSequenceStrip", "ko", "새 페이지 추가")}
+                aria-label="새 페이지 추가"
                 onClick={onAddPage}
                 className={cn(
                   "flex h-[4.75rem] w-24 min-h-11 min-w-11 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line bg-card/55 px-2 text-xs font-semibold text-fg-2",
@@ -180,7 +177,8 @@ export function StudioPageSequenceStrip({
                 )}
               >
                 <Plus size={17} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioPageSequenceStrip", "ko", "페이지 추가")}</button>
+                페이지 추가
+              </button>
             </li>
           ) : null}
         </ol>
@@ -190,8 +188,8 @@ export function StudioPageSequenceStrip({
         <button
           type="button"
           data-studio-page-sequence-close="true"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageSequenceStrip", "ko", "페이지 시퀀스 닫기")}
-          title={translateCurrentStaticSourceText("domains.creator.StudioPageSequenceStrip", "ko", "페이지 시퀀스 닫기")}
+          aria-label="페이지 시퀀스 닫기"
+          title="페이지 시퀀스 닫기"
           onClick={onClose}
           className={cn(
             "grid size-11 min-h-11 min-w-11 place-items-center rounded-xl border border-line bg-card text-fg-3",

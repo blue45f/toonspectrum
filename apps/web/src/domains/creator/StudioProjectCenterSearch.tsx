@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Clock3,
   CornerDownLeft,
   Search,
@@ -64,7 +60,8 @@ function StudioProjectCenterFileControlHost({
               data-studio-file-control-center-loading="true"
               className="mt-2 rounded-2xl border border-line bg-canvas/55 px-4 py-5 text-center text-[0.66rem] text-fg-3"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "파일 제어 센터를 불러오는 중…")}</div>
+              파일 제어 센터를 불러오는 중…
+            </div>
           )}
         >
           <StudioFileControlCenter />
@@ -768,8 +765,8 @@ export function StudioProjectCenterSearch(): ReactElement {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onSearchKeyDown}
-            placeholder={translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "도구·목적 검색 · /")}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "프로젝트 센터 도구 검색")}
+            placeholder="도구·목적 검색 · /"
+            aria-label="프로젝트 센터 도구 검색"
             aria-controls={resultMode ? resultListId : undefined}
             className="min-w-0 flex-1 bg-transparent text-[0.75rem] text-fg outline-none placeholder:text-fg-3"
           />
@@ -789,7 +786,7 @@ export function StudioProjectCenterSearch(): ReactElement {
                 setQuery("");
                 inputRef.current?.focus({ preventScroll: true });
               }}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "프로젝트 센터 검색 초기화")}
+              aria-label="프로젝트 센터 검색 초기화"
               className="grid size-8 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <X size={14} aria-hidden />
@@ -803,7 +800,7 @@ export function StudioProjectCenterSearch(): ReactElement {
 
         <div
           role="group"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "프로젝트 센터 보기 범위")}
+          aria-label="프로젝트 센터 보기 범위"
           className="mt-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]"
         >
           <button
@@ -823,7 +820,7 @@ export function StudioProjectCenterSearch(): ReactElement {
                 : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
             )}
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "전체 ")}{actions.length}
+            전체 {actions.length}
           </button>
           <button
             type="button"
@@ -842,7 +839,7 @@ export function StudioProjectCenterSearch(): ReactElement {
                 : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
             )}
           >
-            <Star size={11} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "즐겨찾기 ")}{favoriteActions.length}
+            <Star size={11} aria-hidden /> 즐겨찾기 {favoriteActions.length}
           </button>
           <button
             type="button"
@@ -861,7 +858,7 @@ export function StudioProjectCenterSearch(): ReactElement {
                 : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
             )}
           >
-            <Clock3 size={11} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "최근 ")}{recentActions.length}
+            <Clock3 size={11} aria-hidden /> 최근 {recentActions.length}
           </button>
           {fileControlHost ? (
             <button
@@ -881,7 +878,8 @@ export function StudioProjectCenterSearch(): ReactElement {
                   : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "파일 제어")}</button>
+              파일 제어
+            </button>
           ) : null}
           {sections.map((section) => (
             <button
@@ -917,7 +915,8 @@ export function StudioProjectCenterSearch(): ReactElement {
             {favoriteActions.length > 0 ? (
               <div className="min-w-0">
                 <p className="px-1 text-[0.56rem] font-black uppercase tracking-[0.13em] text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "즐겨찾기")}</p>
+                  즐겨찾기
+                </p>
                 <div className="mt-1 flex gap-1 overflow-x-auto">
                   {favoriteActions.slice(0, 3).map((action) => (
                     <button
@@ -938,7 +937,8 @@ export function StudioProjectCenterSearch(): ReactElement {
             {recentActions.length > 0 ? (
               <div className="min-w-0">
                 <p className="px-1 text-[0.56rem] font-black uppercase tracking-[0.13em] text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "최근 사용")}</p>
+                  최근 사용
+                </p>
                 <div className="mt-1 flex gap-1 overflow-x-auto">
                   {recentActions.slice(0, 3).map((action) => (
                     <button
@@ -963,13 +963,13 @@ export function StudioProjectCenterSearch(): ReactElement {
           <div
             id={resultListId}
             role="region"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "프로젝트 센터 결과")}
+            aria-label="프로젝트 센터 결과"
             className="mt-2 rounded-xl border border-line bg-canvas/75 shadow-lg"
           >
             {visibleResults.length > 0 ? (
               <div
                 role="list"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "프로젝트 센터 검색 결과")}
+                aria-label="프로젝트 센터 검색 결과"
                 data-project-center-search-results="true"
                 className="max-h-[min(48vh,28rem)] overflow-y-auto p-1.5"
               >
@@ -981,7 +981,7 @@ export function StudioProjectCenterSearch(): ReactElement {
                       key={action.key}
                       role="listitem"
                       data-project-center-search-result="true"
-                      data-active={active ? translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "en", "false")}
+                      data-active={active ? "true" : "false"}
                       className={cn(
                         "grid grid-cols-[minmax(0,1fr)_2.5rem] items-stretch rounded-lg border transition-colors",
                         active
@@ -1016,14 +1016,14 @@ export function StudioProjectCenterSearch(): ReactElement {
                         data-project-keep-open
                         data-project-center-control="true"
                         aria-pressed={favorite}
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "{v0} 즐겨찾기 {v1}"), { v0: String(action.label), v1: String(favorite ? "해제" : "추가") })}
+                        aria-label={`${action.label} 즐겨찾기 ${favorite ? "해제" : "추가"}`}
                         onClick={() => toggleFavorite(action)}
                         className="grid place-items-center rounded-r-lg text-fg-3 hover:bg-card hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
                       >
                         <Star
                           size={15}
                           aria-hidden
-                          className={favorite ? translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "en", "fill-current text-accent") : undefined}
+                          className={favorite ? "fill-current text-accent" : undefined}
                         />
                       </button>
                     </div>
@@ -1048,7 +1048,8 @@ export function StudioProjectCenterSearch(): ReactElement {
                     }}
                     className="min-h-9 rounded-lg border border-line bg-card px-3 text-[0.7rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
-                    {translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "전체 도구 보기")}</button>
+                    전체 도구 보기
+                  </button>
                 )}
               />
             )}
@@ -1056,14 +1057,15 @@ export function StudioProjectCenterSearch(): ReactElement {
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line/70 px-3 py-2 text-[0.56rem] text-fg-3">
                 <span>
                   {rankedActions.length > RESULT_LIMIT
-                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "상위 {v0}개 표시 · 검색어를 더 구체화하세요."), { v0: String(RESULT_LIMIT) })
-                    : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "{v0}개 결과"), { v0: String(rankedActions.length) })}
+                    ? `상위 ${RESULT_LIMIT}개 표시 · 검색어를 더 구체화하세요.`
+                    : `${rankedActions.length}개 결과`}
                 </span>
                 <span className="inline-flex items-center gap-2">
-                  <span>{translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "↑↓ 이동")}</span>
+                  <span>↑↓ 이동</span>
                   <span className="inline-flex items-center gap-1">
-                    <CornerDownLeft size={10} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "실행")}</span>
-                  <span>{translateCurrentStaticSourceText("domains.creator.StudioProjectCenterSearch", "ko", "Alt+P 즐겨찾기")}</span>
+                    <CornerDownLeft size={10} aria-hidden /> 실행
+                  </span>
+                  <span>Alt+P 즐겨찾기</span>
                 </span>
               </div>
             ) : null}

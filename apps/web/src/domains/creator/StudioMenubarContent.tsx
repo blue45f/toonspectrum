@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Bookmark,
   Box,
   Camera,
@@ -495,7 +491,7 @@ function StudioMenubarCommandBar({
         <button
           type="button"
           onClick={onToggleHistoryPanel}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "작업 내역")}
+          aria-label="작업 내역"
           aria-pressed={historyPanelOpen}
           className={buttonClass({
             size: "sm",
@@ -816,7 +812,7 @@ function StudioMenubarOverflowMenu({
           aria-haspopup="menu"
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "가려진 메뉴 {v0}개"), { v0: String(groups.length) })}
+          aria-label={`가려진 메뉴 ${groups.length}개`}
           onClick={() => (open ? closeMenu(true) : openMenu())}
           onKeyDown={(event) => {
             if (event.key !== "ArrowDown" || open) return;
@@ -838,7 +834,7 @@ function StudioMenubarOverflowMenu({
               ref={panelRef}
               id={panelId}
               role="menu"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "가려진 메뉴")}
+              aria-label="가려진 메뉴"
               tabIndex={-1}
               data-studio-menubar-overflow-panel="true"
               data-studio-shortcut-boundary="true"
@@ -1426,9 +1422,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           >
           <h1
             className="min-w-0 max-w-[8rem] truncate text-[0.8125rem] font-semibold tracking-tight text-fg xl:max-w-[16rem]"
-            title={title.trim() || translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "무제")}
+            title={title.trim() || "무제"}
           >
-            {title.trim() || translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "무제")}
+            {title.trim() || "무제"}
           </h1>
           <span className="hidden shrink-0 rounded-md border border-line/60 bg-canvas/40 px-1.5 py-0.5 text-[0.62rem] font-medium tabular-nums text-fg-3 sm:inline">
             {activePageLabel}
@@ -1436,7 +1432,8 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           <AppearanceTrigger scope="studio" showLabel className="shrink-0" />
           {displayLinkedTitleId ? (
             <span className="hidden rounded-full border border-accent/30 bg-accent-soft/40 px-1.5 py-0.5 text-[0.6rem] font-semibold text-accent sm:inline">
-              {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "링크됨")}</span>
+              링크됨
+            </span>
           ) : null}
           {workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
             <StudioWorkspaceMenuGate
@@ -1450,7 +1447,8 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             />
           ) : (
             <span role="status" className="inline-flex min-h-8 items-center text-[0.65rem] text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "전환 중…")}</span>
+              전환 중…
+            </span>
           )}
           {workspaceSyncNotice && workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
             <span
@@ -1480,7 +1478,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               mobileImmersive && "!hidden"
             )}
             role="group"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "삽입 바로가기")}
+            aria-label="삽입 바로가기"
           >
           <StudioToolHintTarget hint={MENUBAR_HINTS.assets} preferredSide="bottom">
             <button
@@ -1492,7 +1490,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               onPointerEnter={preloadStudioAssetToolPopoverBody}
               onPointerDown={preloadStudioAssetToolPopoverBody}
               onFocus={preloadStudioAssetToolPopoverBody}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "템플릿·에셋")}
+              aria-label="템플릿·에셋"
               aria-haspopup="menu"
               aria-expanded={activeToolbarGroup === "assetGroup"}
               className={cn(
@@ -1501,13 +1499,14 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               )}
             >
               <Folder size={14} aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "템플릿·에셋")}</button>
+              템플릿·에셋
+            </button>
           </StudioToolHintTarget>
           <StudioToolHintTarget hint={MENUBAR_HINTS.bubbles} preferredSide="bottom">
             <button
               type="button"
               onClick={() => setMenu(menu === "bubble" ? null : "bubble")}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "말풍선")}
+              aria-label="말풍선"
               aria-haspopup="menu"
               aria-expanded={menu === "bubble"}
               className={cn(
@@ -1516,7 +1515,8 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               )}
             >
               <MessageCircle size={14} aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "말풍선")}</button>
+              말풍선
+            </button>
           </StudioToolHintTarget>
           </div>
           <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line xl:block" />
@@ -1526,7 +1526,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           <span
             aria-hidden
             data-studio-menubar-overflow-cue="true"
-            data-overflowing={laneOverflow.scrollable ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "en", "false")}
+            data-overflowing={laneOverflow.scrollable ? "true" : "false"}
             className={cn(
               "pointer-events-none sticky right-0 -mr-2 h-8 w-4 shrink-0 self-center bg-gradient-to-l from-panel to-transparent transition-opacity motion-reduce:transition-none",
               laneOverflow.scrollable ? "opacity-100" : "opacity-0"
@@ -1556,7 +1556,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             <Suspense fallback={null}>
               <StudioMainMenu
                 groups={actionStudioMainMenuGroups}
-                ariaLabel={actionStudioMainMenuGroups[0]?.label ?? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "AI 도우미")}
+                ariaLabel={actionStudioMainMenuGroups[0]?.label ?? "AI 도우미"}
                 surface="action"
                 className={cn("shrink-0", mobileImmersive && "hidden")}
               />
@@ -1573,8 +1573,8 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 aria-pressed={mobileImmersive}
                 aria-label={
                   mobileImmersive
-                    ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "전체 화면 드로잉 종료")
-                    : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "전체 화면 드로잉")
+                    ? "전체 화면 드로잉 종료"
+                    : "전체 화면 드로잉"
                 }
                 data-studio-mobile-app-mode
                 className={cn(
@@ -1600,19 +1600,19 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   <Maximize2 size={15} aria-hidden />
                 )}
                 <span className="max-[429px]:sr-only">
-                  {mobileImmersive ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "종료") : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "전체화면")}
+                  {mobileImmersive ? "종료" : "전체화면"}
                 </span>
               </button>
             </StudioToolHintTarget>
           ) : null}
           {mobileImmersive ? (
             <>
-              <h1 className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "드로잉 전체화면")}</h1>
+              <h1 className="sr-only">드로잉 전체화면</h1>
               {/* 몰입 필은 콘텐츠 폭 기반의 컴팩트 플로팅 컨트롤이라 시각적 제목 자리가 없다
                   (기존 flex-1 스팬은 항상 0폭으로 짜부라지며 게시하기 버튼만 잘랐다).
                   문서 맥락은 보조기술에만 그대로 전달한다. */}
               <span className="sr-only">
-                {title.trim() || translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "무제")} · {activePageLabel}
+                {title.trim() || "무제"} · {activePageLabel}
               </span>
             </>
           ) : null}
@@ -1626,7 +1626,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 onClick={() => togglePageSequence()}
                 data-studio-primary-action="pages"
                 aria-pressed={pageSequenceOpen}
-                aria-label={pageSequenceOpen ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "페이지 목록 닫기") : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "페이지 목록 열기")}
+                aria-label={pageSequenceOpen ? "페이지 목록 닫기" : "페이지 목록 열기"}
                 className={cn(
                   buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 min-w-11 shrink-0 gap-1.5" }),
                   // 모바일에서는 하단 도크의 드로잉 행이 같은 '페이지' 버튼을 이미 갖는다. 메뉴바 사본까지
@@ -1635,7 +1635,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 )}
               >
                 <Files size={14} aria-hidden />
-                <span className="max-xl:sr-only">{translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "페이지")}</span>
+                <span className="max-xl:sr-only">페이지</span>
               </button>
             </StudioToolHintTarget>
           ) : null}
@@ -1649,7 +1649,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 type="button"
                 onClick={() => handleDownload()}
                 data-studio-primary-action="export"
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "다운로드 {v0}× {v1}{v2} · 현재 페이지"), { v0: String(exportScale), v1: String(exportFormat.toUpperCase()), v2: String(exportTransparent && exportFormat === "png" ? " · 투명" : "") })}
+                aria-label={`다운로드 ${exportScale}× ${exportFormat.toUpperCase()}${exportTransparent && exportFormat === "png" ? " · 투명" : ""} · 현재 페이지`}
                 className={cn(
                   buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 min-w-11 shrink-0 whitespace-nowrap gap-1.5 pr-2" }),
                   // 모바일 도크의 '내보내기' 가 같은 핸들러다. 메뉴바에는 배율·포맷을 고르는
@@ -1657,11 +1657,11 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   isMobile && "hidden"
                 )}
               >
-                <Download size={14} aria-hidden /> <span className="max-xl:sr-only">{translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "다운로드")}</span>
+                <Download size={14} aria-hidden /> <span className="max-xl:sr-only">다운로드</span>
                 {" "}
                 <span className="text-[10px] font-semibold tabular-nums text-fg-3 max-xl:hidden">
                   {exportScale}× {exportFormat.toUpperCase()}
-                  {exportTransparent && exportFormat === "png" ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", " · 투명") : null}
+                  {exportTransparent && exportFormat === "png" ? " · 투명" : null}
                 </span>
               </button>
             </StudioToolHintTarget>
@@ -1677,7 +1677,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 onMouseEnter={preloadStudioExportMenuPanel}
                 onFocus={preloadStudioExportMenuPanel}
                 aria-expanded={exportMenuOpen}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "내보내기 옵션")}
+                aria-label="내보내기 옵션"
                 className={cn(
                   buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 min-w-11 px-1.5" }),
                   isMobile && "min-h-11 min-w-11"
@@ -1701,7 +1701,8 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                         data-studio-export-menu-panel="true"
                         className="fixed inset-x-2 top-12 z-[100] max-h-[calc(100dvh-4rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 text-xs text-fg-3 shadow-2xl sm:inset-x-auto sm:right-3 sm:w-72"
                       >
-                        {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "내보내기 옵션을 여는 중...")}</div>
+                        내보내기 옵션을 여는 중...
+                      </div>
                     }
                   >
                     <StudioExportMenuPanel
@@ -1751,7 +1752,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   setExportMenuOpen(false);
                   setProjectActionsOpen((open) => !open);
                 }}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "프로젝트 센터")}
+                aria-label="프로젝트 센터"
                 aria-haspopup="dialog"
                 aria-expanded={projectActionsOpen}
                 aria-controls="studio-project-actions-menu"
@@ -1763,7 +1764,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   className: "min-h-11 min-w-11 shrink-0 gap-1.5 whitespace-nowrap",
                 })}
               >
-                <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">{translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "프로젝트 센터")}</span>
+                <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트 센터</span>
                 {/* 320px 창모드 메뉴바는 [전체 화면 드로잉][프로젝트][초안 저장][게시하기]로
                     320px를 5px 넘겨 `overflow-hidden` 레인이 게시 버튼을 잘랐다
                     (`verify:studio-mobile-top`의 하드 실패). 셰브론은 순수 장식이고
@@ -1787,42 +1788,42 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 <div className="sticky top-0 z-20 col-span-full -mx-2.5 -mt-2.5 border-b border-line/70 bg-panel/95 px-3 pb-3 pt-2.5 backdrop-blur-xl">
                   <div className={cn("flex items-start justify-between gap-3", !isMobile && "hidden")}>
                     <span className="min-w-0">
-                      <span className="block text-sm font-bold tracking-tight text-fg">{translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "프로젝트 센터")}</span>
-                      <span className="mt-0.5 block text-[0.67rem] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "백업 · 기획 · 제작 · 검수 · 게시")}</span>
+                      <span className="block text-sm font-bold tracking-tight text-fg">프로젝트 센터</span>
+                      <span className="mt-0.5 block text-[0.67rem] leading-relaxed text-fg-3">백업 · 기획 · 제작 · 검수 · 게시</span>
                     </span>
                     <button
                       type="button"
                       data-project-center-control="true"
                       onClick={() => setProjectActionsOpen(false)}
-                      aria-label={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "프로젝트 센터 닫기")}
+                      aria-label="프로젝트 센터 닫기"
                       className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     >
                       <X size={17} aria-hidden />
                     </button>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "프로젝트 요약")}>
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label="프로젝트 요약">
                     <span className="rounded-full border border-line/70 bg-canvas/55 px-2 py-1 text-[0.62rem] font-semibold tabular-nums text-fg-2">
-                      {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "페이지 ")}{pageCount}
+                      페이지 {pageCount}
                     </span>
                     <span className="rounded-full border border-line/70 bg-canvas/55 px-2 py-1 text-[0.62rem] font-semibold text-fg-2">
-                      {workId ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "게시 연결됨") : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "로컬 초안")}
+                      {workId ? "게시 연결됨" : "로컬 초안"}
                     </span>
                     <span className="rounded-full border border-line/70 bg-canvas/55 px-2 py-1 text-[0.62rem] font-semibold text-fg-2">
                       {sharedDocument
                         ? sharedDocument.role === "owner"
-                          ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "공유 · 소유자")
+                          ? "공유 · 소유자"
                           : sharedDocument.role === "editor"
-                            ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "공유 · 편집자")
-                            : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "공유 · 보기")
-                        : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "개인 작업")}
+                            ? "공유 · 편집자"
+                            : "공유 · 보기"
+                        : "개인 작업"}
                     </span>
                   </div>
                   <AppearanceTrigger scope="studio" showLabel className="mt-2" />
                   <StudioProjectCenterSearch />
                 </div>
                 <StudioProjectCenterSection
-                  title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "내보내기 · 백업")}
-                  description={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "현재 페이지부터 전체 프로젝트, 장기 보관용 아카이브까지 관리합니다.")}
+                  title="내보내기 · 백업"
+                  description="현재 페이지부터 전체 프로젝트, 장기 보관용 아카이브까지 관리합니다."
                 />
           {pageCount > 1 && (
             <button
@@ -1833,12 +1834,14 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 variant: "quiet",
                 className: "shrink-0 whitespace-nowrap gap-1.5 bg-accent/10 text-accent hover:bg-accent/20 border-accent/25 border",
               })}
-              title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "모든 페이지를 긴 세로 스크롤 웹툰으로 이어 붙여 다운로드 (내보내기 옵션의 배율·포맷 적용)")}
+              title="모든 페이지를 긴 세로 스크롤 웹툰으로 이어 붙여 다운로드 (내보내기 옵션의 배율·포맷 적용)"
             >
-              <Download size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "웹툰 연합 스크롤")}</button>
+              <Download size={14} /> 웹툰 연합 스크롤
+            </button>
           )}
-          <button type="button" onClick={handleExportProject} className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" })} title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "빠른 가독형 백업입니다. 로컬 3D 모델 GLB는 포함되지 않으므로 다른 기기 이동·장기 보관에는 아카이브 백업을 사용하세요.")}>
-            <Download size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "백업 (.json)")}</button>
+          <button type="button" onClick={handleExportProject} className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" })} title="빠른 가독형 백업입니다. 로컬 3D 모델 GLB는 포함되지 않으므로 다른 기기 이동·장기 보관에는 아카이브 백업을 사용하세요.">
+            <Download size={14} /> 백업 (.json)
+          </button>
           <button
             type="button"
             onClick={() => void handleExportProjectArchive()}
@@ -1849,13 +1852,14 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               variant: "quiet",
               className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-wait disabled:opacity-60",
             })}
-            title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "프로젝트 JSON과 이미지·마스크를 SHA-256 중복 제거·무결성 검증형 단일 archive로 저장")}
+            title="프로젝트 JSON과 이미지·마스크를 SHA-256 중복 제거·무결성 검증형 단일 archive로 저장"
           >
             {projectArchiveBusy ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
-            {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "아카이브 백업")}</button>
+            아카이브 백업
+          </button>
           <StudioProjectCenterSection
-            title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "기획 · 제작")}
-            description={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "스토리, 캐릭터, 장면, 자동화와 2D·3D 제작 도구를 엽니다.")}
+            title="기획 · 제작"
+            description="스토리, 캐릭터, 장면, 자동화와 2D·3D 제작 도구를 엽니다."
           />
           <button
             type="button"
@@ -1866,9 +1870,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               variant: "quiet",
               className: "min-h-11 min-w-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
             })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "한 줄 기획부터 시놉시스·비트·장면·컷·대사까지 한 흐름으로 설계하고 AI 초안을 검토")}
+            title={collaborationDocumentLocked ? collaborationLockMessage() : "한 줄 기획부터 시놉시스·비트·장면·컷·대사까지 한 흐름으로 설계하고 AI 초안을 검토"}
           >
-            <Clapperboard size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "en", "Writer Room")}{studioWriterRoomHasContent(writerRoom) ? (
+            <Clapperboard size={14} /> Writer Room
+            {studioWriterRoomHasContent(writerRoom) ? (
               <span className="rounded-full bg-accent-soft px-1.5 text-[0.65rem] font-bold text-accent">
                 {Object.values(writerRoom.completion).filter(Boolean).length}/7
               </span>
@@ -1882,9 +1887,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               variant: "quiet",
               className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5",
             })}
-            title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "AI 작업의 공급자·모델·상태·토큰 사용량을 확인하고 공개 가능한 요약만 내보내기")}
+            title="AI 작업의 공급자·모델·상태·토큰 사용량을 확인하고 공개 가능한 요약만 내보내기"
           >
-            <ClipboardCheck size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "AI 작업 이력")}{aiProvenance.operations.length > 0 ? (
+            <ClipboardCheck size={14} /> AI 작업 이력
+            {aiProvenance.operations.length > 0 ? (
               <span className="rounded-full bg-cool/10 px-1.5 text-[0.65rem] font-bold text-cool">
                 {aiProvenance.operations.length}
               </span>
@@ -1898,9 +1904,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               variant: "quiet",
               className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5",
             })}
-            title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "페이지·컷의 무음 타이밍, 전환, 카메라 팬·줌과 대사·효과음 큐를 브라우저에서 검수")}
+            title="페이지·컷의 무음 타이밍, 전환, 카메라 팬·줌과 대사·효과음 큐를 브라우저에서 검수"
           >
-            <PlaySquare size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "애니매틱")}</button>
+            <PlaySquare size={14} /> 애니매틱
+          </button>
           <button
             type="button"
             onClick={() => setAssetRightsAuditOpen(true)}
@@ -1909,9 +1916,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               variant: "quiet",
               className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5",
             })}
-            title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "현재 작품에 실제 배치된 에셋의 출처·사용권·페이지 위치를 게시 전에 로컬에서 점검")}
+            title="현재 작품에 실제 배치된 에셋의 출처·사용권·페이지 위치를 게시 전에 로컬에서 점검"
           >
-            <ShieldCheck size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "에셋 권리 감사")}</button>
+            <ShieldCheck size={14} /> 에셋 권리 감사
+          </button>
           <button
             type="button"
             onClick={() => setCharacterBibleOpen(true)}
@@ -1921,9 +1929,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               variant: "quiet",
               className: "min-h-11 min-w-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
             })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "캐릭터 외형·의상·말투·관계와 AI 고정 제약을 문서에 저장")}
+            title={collaborationDocumentLocked ? collaborationLockMessage() : "캐릭터 외형·의상·말투·관계와 AI 고정 제약을 문서에 저장"}
           >
-            <Bookmark size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "캐릭터 바이블")}{characterBible.characters.length > 0 ? (
+            <Bookmark size={14} /> 캐릭터 바이블
+            {characterBible.characters.length > 0 ? (
               <span className="rounded-full bg-accent-soft px-1.5 text-[0.65rem] font-bold text-accent">
                 {characterBible.characters.length}
               </span>
@@ -1941,10 +1950,11 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             title={
               collaborationDocumentLocked
                 ? collaborationLockMessage()
-                : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "반복 등장하는 장면·장소·소품의 안정 ID, 빛·색·참고 에셋 연결을 로컬 바이블로 관리")
+                : "반복 등장하는 장면·장소·소품의 안정 ID, 빛·색·참고 에셋 연결을 로컬 바이블로 관리"
             }
           >
-            <MapPinned size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "제작 바이블")}</button>
+            <MapPinned size={14} /> 제작 바이블
+          </button>
           <button
             type="button"
             onClick={() => setHybridDccOpen(true)}
@@ -1957,14 +1967,15 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             title={
               collaborationDocumentLocked
                 ? collaborationLockMessage()
-                : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "하이브리드 2D·3D DCC: 메시 편집, 불리언, 샷·잉크, CAD/스컬프/클로스, .toon3d")
+                : "하이브리드 2D·3D DCC: 메시 편집, 불리언, 샷·잉크, CAD/스컬프/클로스, .toon3d"
             }
             data-studio-hybrid-dcc-open="true"
           >
-            <Box size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "en", "Hybrid DCC")}</button>
+            <Box size={14} /> Hybrid DCC
+          </button>
           <StudioProjectCenterSection
-            title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "버전 · 가져오기")}
-            description={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "복구 지점을 만들고 외부 문서와 프로젝트 백업을 안전하게 가져옵니다.")}
+            title="버전 · 가져오기"
+            description="복구 지점을 만들고 외부 문서와 프로젝트 백업을 안전하게 가져옵니다."
           />
           <button
             type="button"
@@ -1974,9 +1985,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               variant: "quiet",
               className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5",
             })}
-            title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "현재 페이지 전체를 이름과 태그가 있는 개인 장면으로 보관하거나 이전 장면을 다시 적용")}
+            title="현재 페이지 전체를 이름과 태그가 있는 개인 장면으로 보관하거나 이전 장면을 다시 적용"
           >
-            <Camera size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "장면 스냅샷")}</button>
+            <Camera size={14} /> 장면 스냅샷
+          </button>
           <button
             type="button"
             onClick={() => setCheckpointPanelOpen(true)}
@@ -1985,9 +1997,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               variant: "quiet",
               className: "shrink-0 whitespace-nowrap gap-1.5",
             })}
-            title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "현재 문서를 이름 있는 복구 지점으로 브라우저에 저장하거나 이전 시점을 복원")}
+            title="현재 문서를 이름 있는 복구 지점으로 브라우저에 저장하거나 이전 시점을 복원"
           >
-            <HistoryIcon size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "버전")}</button>
+            <HistoryIcon size={14} /> 버전
+          </button>
           <button
             type="button"
             onClick={() => void openAutoActions()}
@@ -1997,18 +2010,20 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               variant: "quiet",
               className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
             })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "허용된 반복 편집 명령을 현재·선택·전체 페이지에 dry run 후 한 번의 실행취소 단계로 적용")}
+            title={collaborationDocumentLocked ? collaborationLockMessage() : "허용된 반복 편집 명령을 현재·선택·전체 페이지에 dry run 후 한 번의 실행취소 단계로 적용"}
           >
-            <WandSparkles size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "en", "Auto Actions")}</button>
+            <WandSparkles size={14} /> Auto Actions
+          </button>
           <button
             type="button"
             data-project-keep-open
             onClick={() => projectImportInputRef.current?.click()}
             disabled={collaborationDocumentLocked}
             className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 min-w-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "빠른 .json 백업을 복구합니다. 포함되지 않은 로컬 3D 모델은 원래 기기의 검증 라이브러리에 있어야 합니다.")}
+            title={collaborationDocumentLocked ? collaborationLockMessage() : "빠른 .json 백업을 복구합니다. 포함되지 않은 로컬 3D 모델은 원래 기기의 검증 라이브러리에 있어야 합니다."}
           >
-            <Upload size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "복구 (.json)")}</button>
+            <Upload size={14} /> 복구 (.json)
+          </button>
           <button
             type="button"
             data-project-keep-open
@@ -2023,9 +2038,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               projectArchiveBusy && "cursor-wait opacity-60",
               collaborationDocumentLocked && "cursor-not-allowed opacity-50"
             )}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "무결성 검증형 .toonproject.zip에서 프로젝트와 포함 자산을 복구")}
+            title={collaborationDocumentLocked ? collaborationLockMessage() : "무결성 검증형 .toonproject.zip에서 프로젝트와 포함 자산을 복구"}
           >
-            <Upload size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "아카이브 복구")}</button>
+            <Upload size={14} /> 아카이브 복구
+          </button>
           {projectArchiveStatus ? (
             <span
               role="status"
@@ -2055,10 +2071,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               psdImportBusy && "border-warn/30 bg-warn/10 text-warn",
               collaborationDocumentLocked && !psdImportBusy && "cursor-not-allowed opacity-50"
             )}
-            title={psdImportBusy ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "현재 PSD 검사를 취소합니다. 기존 문서는 변경하지 않습니다.") : collaborationDocumentLocked ? collaborationLockMessage() : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "포토샵(.psd) 파일의 레이어를 이미지 요소로 가져와요(래스터 평탄화, 편집 가능한 텍스트/조정 레이어는 재현되지 않음)")}
+            title={psdImportBusy ? "현재 PSD 검사를 취소합니다. 기존 문서는 변경하지 않습니다." : collaborationDocumentLocked ? collaborationLockMessage() : "포토샵(.psd) 파일의 레이어를 이미지 요소로 가져와요(래스터 평탄화, 편집 가능한 텍스트/조정 레이어는 재현되지 않음)"}
           >
             {psdImportBusy ? <X size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
-            {psdImportBusy ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "PSD 검사 취소") : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "PSD 가져오기")}
+            {psdImportBusy ? "PSD 검사 취소" : "PSD 가져오기"}
           </button>
           {psdImportStatus && (
             <span
@@ -2097,16 +2113,16 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               collaborationDocumentLocked
                 ? collaborationLockMessage()
                 : interchangeImportBusy
-                  ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "현재 OpenRaster/CBZ/WILL v1 안전 검사를 취소합니다.")
+                  ? "현재 OpenRaster/CBZ/WILL v1 안전 검사를 취소합니다."
                   : psdImportBusy
-                    ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "PSD 문서 검사가 끝난 뒤 사용할 수 있습니다.")
-                  : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "OpenRaster 레이어, CBZ 페이지 또는 bounded WILL v1 선을 안전 검사하고 손실 미리보기 후 가져옵니다. WILL은 Wacom 공식 SDK·인증 파일 호환을 보증하지 않습니다.")
+                    ? "PSD 문서 검사가 끝난 뒤 사용할 수 있습니다."
+                  : "OpenRaster 레이어, CBZ 페이지 또는 bounded WILL v1 선을 안전 검사하고 손실 미리보기 후 가져옵니다. WILL은 Wacom 공식 SDK·인증 파일 호환을 보증하지 않습니다."
             }
           >
             {interchangeImportBusy
               ? <X size={14} aria-hidden />
               : <Files size={14} aria-hidden />}
-            {interchangeImportBusy ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "문서 검사 취소") : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "en", "ORA · CBZ · WILL")}
+            {interchangeImportBusy ? "문서 검사 취소" : "ORA · CBZ · WILL"}
           </button>
           {interchangeImportStatus ? (
             <span
@@ -2124,8 +2140,8 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             </span>
           ) : null}
           <StudioProjectCenterSection
-            title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "연출 · 게시 · 검수")}
-            description={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "연출, 운영, 게시 패키지와 품질 검사를 출고 흐름으로 이어갑니다.")}
+            title="연출 · 게시 · 검수"
+            description="연출, 운영, 게시 패키지와 품질 검사를 출고 흐름으로 이어갑니다."
           />
           {sharedDocument?.role === "owner" || loadedWork ? (
             <button
@@ -2133,10 +2149,11 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               onClick={() => void openOwnerFxPanel()}
               disabled={fxPanelLoading}
               className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-wait disabled:opacity-60" })}
-              title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "이미 게시된 이 작품의 배경음악·스크롤 모션·컷별 애니메이션 연출을 설정합니다")}
+              title="이미 게시된 이 작품의 배경음악·스크롤 모션·컷별 애니메이션 연출을 설정합니다"
             >
               {fxPanelLoading ? <Loader2 size={14} className="animate-spin" /> : <Music4 size={14} />}
-              {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "애니메이션 연출")}</button>
+              애니메이션 연출
+            </button>
           ) : null}
           <button
             type="button"
@@ -2146,9 +2163,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               variant: "quiet",
               className: "shrink-0 whitespace-nowrap gap-1.5",
             })}
-            title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "현재 문서 구조에서 제작 분량·검토·AI 에셋·미해결 항목을 계산")}
+            title="현재 문서 구조에서 제작 분량·검토·AI 에셋·미해결 항목을 계산"
           >
-            <GanttChartSquare size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "제작 인사이트")}</button>
+            <GanttChartSquare size={14} /> 제작 인사이트
+          </button>
           <button
             type="button"
             onClick={() => setPublicationOperationsOpen(true)}
@@ -2158,9 +2176,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               variant: "quiet",
               className: "min-h-11 min-w-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
             })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "외부 자동 게시 없이 릴리스 일정과 직접 가져온 성과 기록을 관리")}
+            title={collaborationDocumentLocked ? collaborationLockMessage() : "외부 자동 게시 없이 릴리스 일정과 직접 가져온 성과 기록을 관리"}
           >
-            <Package size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "연재 운영")}</button>
+            <Package size={14} /> 연재 운영
+          </button>
           <button
             type="button"
             onClick={() => setPublishPreflightOpen(true)}
@@ -2169,9 +2188,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               variant: "quiet",
               className: "shrink-0 whitespace-nowrap gap-1.5",
             })}
-            title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "WEBTOON·Tapas·일반 게시 패키지의 구조와 AI 사용 고지를 미리 검사")}
+            title="WEBTOON·Tapas·일반 게시 패키지의 구조와 AI 사용 고지를 미리 검사"
           >
-            <ShieldCheck size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "게시 사전검사")}</button>
+            <ShieldCheck size={14} /> 게시 사전검사
+          </button>
           <button
             type="button"
             onClick={() => setPublishPackageOpen(true)}
@@ -2180,9 +2200,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               variant: "quiet",
               className: "shrink-0 whitespace-nowrap gap-1.5",
             })}
-            title={translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "WEBTOON·Tapas·범용 목적지별 이미지 분할·썸네일·크레딧·검증 매니페스트를 계획")}
+            title="WEBTOON·Tapas·범용 목적지별 이미지 분할·썸네일·크레딧·검증 매니페스트를 계획"
           >
-            <Package size={14} /> {translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "게시 패키지")}</button>
+            <Package size={14} /> 게시 패키지
+          </button>
           {/* 벨트 전용이던 검수·미리보기 7종의 정본 진입점. 벨트 호스트는 전 뷰포트에서
               display:none이라 여기가 유일한 포인터 경로다(StudioProjectReviewActions 주석). */}
           <StudioProjectReviewActions
@@ -2216,7 +2237,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               collaborationDocumentLocked
                 ? collaborationLockMessage()
                 : saving
-                  ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "현재 저장 작업이 끝난 뒤 다시 시도하세요.")
+                  ? "현재 저장 작업이 끝난 뒤 다시 시도하세요."
                   : undefined
             }
             preferredSide="bottom"
@@ -2225,7 +2246,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               type="button"
               onClick={() => handleSave("draft")}
               disabled={saving || collaborationDocumentLocked}
-              aria-label={sharedDocument && sharedDocument.role !== "owner" ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "공동 저장") : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "초안 저장")}
+              aria-label={sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "초안 저장"}
               className={cn(
                 buttonClass({
                   size: "sm",
@@ -2243,7 +2264,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 <Save size={14} className="hidden max-[429px]:block" aria-hidden />
               )}
               <span className="max-[429px]:sr-only">
-                {sharedDocument && sharedDocument.role !== "owner" ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "공동 저장") : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "초안 저장")}
+                {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "초안 저장"}
               </span>
             </button>
           </StudioToolHintTarget>
@@ -2258,7 +2279,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 collaborationDocumentLocked
                   ? collaborationLockMessage()
                   : saving
-                    ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "현재 저장 작업이 끝난 뒤 다시 시도하세요.")
+                    ? "현재 저장 작업이 끝난 뒤 다시 시도하세요."
                     : undefined
               }
               preferredSide="bottom"
@@ -2268,7 +2289,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 data-testid="studio-publish"
                 onClick={() => handleSave("published")}
                 disabled={saving || collaborationDocumentLocked}
-                aria-label={workId ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "공개 수정") : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "게시하기")}
+                aria-label={workId ? "공개 수정" : "게시하기"}
                 className={cn(
                   buttonClass({
                     size: "sm",
@@ -2286,7 +2307,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   <Send size={14} className="hidden max-[429px]:block" aria-hidden />
                 )}
                 <span className="max-[429px]:sr-only">
-                  {workId ? translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "공개 수정") : translateCurrentStaticSourceText("domains.creator.StudioMenubarContent", "ko", "게시하기")}
+                  {workId ? "공개 수정" : "게시하기"}
                 </span>
               </button>
             </StudioToolHintTarget>

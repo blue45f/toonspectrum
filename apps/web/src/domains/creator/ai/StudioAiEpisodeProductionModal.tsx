@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Episode production director — one preflight surface for script, continuity,
  * generation batching and QA. The planner is deterministic; applying a prompt
@@ -167,10 +163,10 @@ function CopyAction({
         STUDIO_TOUCH_TARGET,
         failed && "border-bad/35 text-bad"
       )}
-      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "{v0} 복사"), { v0: String(label) })}
+      aria-label={`${label} 복사`}
     >
       <Icon size={14} aria-hidden />
-      <span>{copied ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "복사됨") : failed ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "복사 실패") : label}</span>
+      <span>{copied ? "복사됨" : failed ? "복사 실패" : label}</span>
     </button>
   );
 }
@@ -336,18 +332,22 @@ export function StudioAiEpisodeProductionModal({
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 id={titleId} className="text-sm font-black tracking-tight text-fg sm:text-base">
-                  {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "회차 AI 프로덕션 디렉터")}</h2>
+                  회차 AI 프로덕션 디렉터
+                </h2>
                 <span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-[0.6rem] font-bold text-accent">
-                  {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "생성 전 품질 게이트")}</span>
+                  생성 전 품질 게이트
+                </span>
               </div>
               <p id={descriptionId} className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "대본을 장면·컷으로 묶고 캐릭터·의상·장소·광원을 잠근 뒤, 생성 비용이 발생하기 전에 연속성·대사·카메라 문제를 찾습니다.")}</p>
+                대본을 장면·컷으로 묶고 캐릭터·의상·장소·광원을 잠근 뒤, 생성 비용이 발생하기 전에
+                연속성·대사·카메라 문제를 찾습니다.
+              </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "회차 AI 프로덕션 디렉터 닫기")}
+            aria-label="회차 AI 프로덕션 디렉터 닫기"
             className={cn(
               "inline-flex min-w-11 shrink-0 items-center justify-center rounded-lg px-2 text-fg-3 hover:bg-card hover:text-fg",
               STUDIO_EASE,
@@ -360,24 +360,24 @@ export function StudioAiEpisodeProductionModal({
         </header>
 
         <div className="shrink-0 border-b border-line bg-panel px-3 py-2.5 sm:px-4">
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "회차 AI 제작 단계")}>
-            <StepCard number={1} title={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "대본")} description={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "{v0}장면 · {v1}컷"), { v0: String(plan.scenes.length), v1: String(plan.totalCuts) })} active />
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label="회차 AI 제작 단계">
+            <StepCard number={1} title="대본" description={`${plan.scenes.length}장면 · ${plan.totalCuts}컷`} active />
             <StepCard
               number={2}
-              title={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "연속성 잠금")}
-              description={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "{v0}개 기준 활성"), { v0: String(STUDIO_AI_CONTINUITY_LOCK_IDS.filter((id) => locks[id]).length) })}
+              title="연속성 잠금"
+              description={`${STUDIO_AI_CONTINUITY_LOCK_IDS.filter((id) => locks[id]).length}개 기준 활성`}
               active={plan.anchors.characters.length > 0}
             />
             <StepCard
               number={3}
-              title={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "생성 묶음")}
-              description={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "{v0}배치 · {v1}결과"), { v0: String(plan.batchCount), v1: String(plan.projectedOutputCount) })}
+              title="생성 묶음"
+              description={`${plan.batchCount}배치 · ${plan.projectedOutputCount}결과`}
               active={plan.batchCount > 0}
             />
             <StepCard
               number={4}
-              title={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "품질 QA")}
-              description={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "준비도 {v0}점"), { v0: String(plan.scores.readiness) })}
+              title="품질 QA"
+              description={`준비도 ${plan.scores.readiness}점`}
               active={!hasBlocker && plan.totalCuts > 0}
             />
           </div>
@@ -385,28 +385,32 @@ export function StudioAiEpisodeProductionModal({
 
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto overscroll-contain lg:grid-cols-[minmax(0,1.08fr)_minmax(22rem,0.92fr)] lg:overflow-hidden">
           <div className="space-y-3 p-3 sm:p-4 lg:overflow-y-auto lg:overscroll-contain">
-            <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-script-heading"), { v0: String(idPrefix) })}>
+            <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={`${idPrefix}-script-heading`}>
               <div className="flex flex-wrap items-end justify-between gap-2">
                 <div>
-                  <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-script-heading"), { v0: String(idPrefix) })} className="flex items-center gap-1.5 text-xs font-black text-fg">
+                  <h3 id={`${idPrefix}-script-heading`} className="flex items-center gap-1.5 text-xs font-black text-fg">
                     <Clapperboard size={14} className="text-accent" aria-hidden />
-                    {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "1. 회차 대본")}</h3>
+                    1. 회차 대본
+                  </h3>
                   <p className="mt-0.5 text-[0.62rem] text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "‘장면 1: 장소’ 제목과 줄바꿈을 사용하면 생성 실패 범위를 작게 나눌 수 있어요.")}</p>
+                    ‘장면 1: 장소’ 제목과 줄바꿈을 사용하면 생성 실패 범위를 작게 나눌 수 있어요.
+                  </p>
                 </div>
-                <span className="text-[0.62rem] tabular-nums text-fg-3">{script.length.toLocaleString()} {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "/ 6,000자")}</span>
+                <span className="text-[0.62rem] tabular-nums text-fg-3">{script.length.toLocaleString()} / 6,000자</span>
               </div>
-              <label className="mt-3 block text-[0.65rem] font-bold text-fg-2" htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-episode-title"), { v0: String(idPrefix) })}>
-                {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "회차명")}</label>
+              <label className="mt-3 block text-[0.65rem] font-bold text-fg-2" htmlFor={`${idPrefix}-episode-title`}>
+                회차명
+              </label>
               <input
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-episode-title"), { v0: String(idPrefix) })}
+                id={`${idPrefix}-episode-title`}
                 value={episodeTitle}
                 onChange={(event) => setEpisodeTitle(event.target.value.slice(0, 80))}
                 className={cn(FIELD_CLASS, "mt-1")}
-                placeholder={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "예: 푸른 보석 12화")}
+                placeholder="예: 푸른 보석 12화"
               />
               <label className="mt-3 block text-[0.65rem] font-bold text-fg-2" htmlFor={scriptId}>
-                {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "대본 원문")}</label>
+                대본 원문
+              </label>
               <textarea
                 id={scriptId}
                 data-autofocus="true"
@@ -414,16 +418,17 @@ export function StudioAiEpisodeProductionModal({
                 onChange={(event) => setScript(event.target.value.slice(0, 6000))}
                 rows={11}
                 className={cn(FIELD_CLASS, "mt-1 min-h-52 resize-y font-mono text-[0.68rem]")}
-                placeholder={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "장면 제목, 행동, 대사를 입력하세요.")}
+                placeholder="장면 제목, 행동, 대사를 입력하세요."
                 aria-invalid={script.trim().length === 0}
               />
             </section>
 
-            <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-generation-heading"), { v0: String(idPrefix) })}>
-              <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-generation-heading"), { v0: String(idPrefix) })} className="flex items-center gap-1.5 text-xs font-black text-fg">
+            <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={`${idPrefix}-generation-heading`}>
+              <h3 id={`${idPrefix}-generation-heading`} className="flex items-center gap-1.5 text-xs font-black text-fg">
                 <Layers3 size={14} className="text-accent" aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "2. 생성 전략")}</h3>
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "생성 품질 모드")}>
+                2. 생성 전략
+              </h3>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="생성 품질 모드">
                 {MODE_OPTIONS.map((option) => {
                   const selected = option.id === mode;
                   return (
@@ -450,10 +455,10 @@ export function StudioAiEpisodeProductionModal({
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-raised/45 p-2.5">
                 <div>
-                  <p className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "컷당 후보 수")}</p>
-                  <p className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "후보가 많을수록 선택 폭과 상대 작업량이 함께 늘어요.")}</p>
+                  <p className="text-xs font-bold text-fg">컷당 후보 수</p>
+                  <p className="text-[0.6rem] text-fg-3">후보가 많을수록 선택 폭과 상대 작업량이 함께 늘어요.</p>
                 </div>
-                <div className="inline-flex rounded-lg border border-line bg-card p-1" role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "컷당 후보 수")}>
+                <div className="inline-flex rounded-lg border border-line bg-card p-1" role="radiogroup" aria-label="컷당 후보 수">
                   {VARIANT_OPTIONS.map((value) => (
                     <button
                       key={value}
@@ -475,14 +480,16 @@ export function StudioAiEpisodeProductionModal({
               </div>
             </section>
 
-            <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-continuity-heading"), { v0: String(idPrefix) })}>
+            <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={`${idPrefix}-continuity-heading`}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-continuity-heading"), { v0: String(idPrefix) })} className="flex items-center gap-1.5 text-xs font-black text-fg">
+                  <h3 id={`${idPrefix}-continuity-heading`} className="flex items-center gap-1.5 text-xs font-black text-fg">
                     <Lock size={14} className="text-accent" aria-hidden />
-                    {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "3. 프로덕션 바이블 잠금")}</h3>
+                    3. 프로덕션 바이블 잠금
+                  </h3>
                   <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "켜진 기준은 모든 장면·후보 프롬프트에 영수증처럼 반복 주입됩니다.")}</p>
+                    켜진 기준은 모든 장면·후보 프롬프트에 영수증처럼 반복 주입됩니다.
+                  </p>
                 </div>
               </div>
               <div className="mt-3 space-y-2">
@@ -491,13 +498,14 @@ export function StudioAiEpisodeProductionModal({
                   return (
                     <div key={id} className="rounded-xl border border-line bg-raised/35 p-2.5">
                       <div className="flex items-center justify-between gap-2">
-                        <label className="text-xs font-bold text-fg" htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-{v1}-anchor"), { v0: String(idPrefix), v1: String(id) })}>
-                          {LOCK_LABELS[id]} {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "기준")}</label>
+                        <label className="text-xs font-bold text-fg" htmlFor={`${idPrefix}-${id}-anchor`}>
+                          {LOCK_LABELS[id]} 기준
+                        </label>
                         <button
                           type="button"
                           role="switch"
                           aria-checked={locks[id]}
-                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "{v0} 연속성 잠금 {v1}"), { v0: String(LOCK_LABELS[id]), v1: String(locks[id] ? "끄기" : "켜기") })}
+                          aria-label={`${LOCK_LABELS[id]} 연속성 잠금 ${locks[id] ? "끄기" : "켜기"}`}
                           onClick={() => toggleLock(id)}
                           className={cn(
                             "inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-2.5 text-[0.62rem] font-bold",
@@ -509,11 +517,11 @@ export function StudioAiEpisodeProductionModal({
                           )}
                         >
                           {locks[id] ? <CheckCircle2 size={13} aria-hidden /> : <Lock size={13} aria-hidden />}
-                          {locks[id] ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "잠금 켬") : translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "잠금 끔")}
+                          {locks[id] ? "잠금 켬" : "잠금 끔"}
                         </button>
                       </div>
                       <input
-                        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-{v1}-anchor"), { v0: String(idPrefix), v1: String(id) })}
+                        id={`${idPrefix}-${id}-anchor`}
                         value={anchors[anchorKey]}
                         onChange={(event) => updateAnchor(anchorKey, event.target.value)}
                         disabled={!locks[id]}
@@ -527,29 +535,30 @@ export function StudioAiEpisodeProductionModal({
             </section>
           </div>
 
-          <aside className="space-y-3 border-t border-line bg-card/25 p-3 sm:p-4 lg:overflow-y-auto lg:overscroll-contain lg:border-l lg:border-t-0" aria-label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "AI 생성 품질 검사 결과")}>
+          <aside className="space-y-3 border-t border-line bg-card/25 p-3 sm:p-4 lg:overflow-y-auto lg:overscroll-contain lg:border-l lg:border-t-0" aria-label="AI 생성 품질 검사 결과">
             {plan.totalCuts === 0 ? (
               <div className={cn(CARD_CLASS, "p-4")}>
                 <StudioEmptyState
                   icon={<Clapperboard size={22} aria-hidden />}
-                  title={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "대본을 입력하면 제작 계획을 만들어요")}
-                  description={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "장면·컷·연속성 기준을 분석한 뒤 생성 묶음과 수정 우선순위를 보여줍니다.")}
+                  title="대본을 입력하면 제작 계획을 만들어요"
+                  description="장면·컷·연속성 기준을 분석한 뒤 생성 묶음과 수정 우선순위를 보여줍니다."
                 />
               </div>
             ) : (
               <>
-                <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-score-heading"), { v0: String(idPrefix) })}>
+                <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={`${idPrefix}-score-heading`}>
                   <div className="flex items-center justify-between gap-2">
-                    <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-score-heading"), { v0: String(idPrefix) })} className="flex items-center gap-1.5 text-xs font-black text-fg">
+                    <h3 id={`${idPrefix}-score-heading`} className="flex items-center gap-1.5 text-xs font-black text-fg">
                       <ClipboardCheck size={14} className="text-accent" aria-hidden />
-                      {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "품질 게이트")}</h3>
+                      품질 게이트
+                    </h3>
                     <span
                       className={cn(
                         "rounded-full border border-line bg-raised px-2 py-1 text-[0.62rem] font-black tabular-nums",
                         scoreTone(plan.scores.readiness)
                       )}
                     >
-                      {hasBlocker ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "수정 필요") : translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "생성 가능")}
+                      {hasBlocker ? "수정 필요" : "생성 가능"}
                     </span>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2">
@@ -564,24 +573,25 @@ export function StudioAiEpisodeProductionModal({
                     ))}
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-2 text-[0.62rem] sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-lg bg-raised/55 p-2"><span className="block text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "장면")}</span><strong className="text-fg">{plan.scenes.length}</strong></div>
-                    <div className="rounded-lg bg-raised/55 p-2"><span className="block text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "컷")}</span><strong className="text-fg">{plan.totalCuts}</strong></div>
-                    <div className="rounded-lg bg-raised/55 p-2"><span className="block text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "배치")}</span><strong className="text-fg">{plan.batchCount}</strong></div>
-                    <div className="rounded-lg bg-raised/55 p-2"><span className="block text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "상대 작업량")}</span><strong className="text-fg">{plan.generationWorkUnits}</strong></div>
+                    <div className="rounded-lg bg-raised/55 p-2"><span className="block text-fg-3">장면</span><strong className="text-fg">{plan.scenes.length}</strong></div>
+                    <div className="rounded-lg bg-raised/55 p-2"><span className="block text-fg-3">컷</span><strong className="text-fg">{plan.totalCuts}</strong></div>
+                    <div className="rounded-lg bg-raised/55 p-2"><span className="block text-fg-3">배치</span><strong className="text-fg">{plan.batchCount}</strong></div>
+                    <div className="rounded-lg bg-raised/55 p-2"><span className="block text-fg-3">상대 작업량</span><strong className="text-fg">{plan.generationWorkUnits}</strong></div>
                   </div>
                 </section>
 
-                <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-issues-heading"), { v0: String(idPrefix) })}>
+                <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={`${idPrefix}-issues-heading`}>
                   <div className="flex items-center justify-between gap-2">
-                    <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-issues-heading"), { v0: String(idPrefix) })} className="flex items-center gap-1.5 text-xs font-black text-fg">
+                    <h3 id={`${idPrefix}-issues-heading`} className="flex items-center gap-1.5 text-xs font-black text-fg">
                       <AlertTriangle size={14} className="text-warn" aria-hidden />
-                      {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "생성 전 수정 항목")}</h3>
-                    <span className="text-[0.62rem] font-bold text-fg-3">{plan.issues.length}{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "건")}</span>
+                      생성 전 수정 항목
+                    </h3>
+                    <span className="text-[0.62rem] font-bold text-fg-3">{plan.issues.length}건</span>
                   </div>
                   {plan.issues.length === 0 ? (
                     <div className="mt-3 flex items-start gap-2 rounded-xl border border-good/30 bg-good/10 p-3 text-xs text-good" role="status">
                       <CheckCircle2 size={15} className="mt-0.5 shrink-0" aria-hidden />
-                      <p className="leading-relaxed">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "차단·주의 항목이 없습니다. 첫 생성 묶음을 기존 구도 도구로 넘겨 후속 작업을 이어갈 수 있어요.")}</p>
+                      <p className="leading-relaxed">차단·주의 항목이 없습니다. 첫 생성 묶음을 기존 구도 도구로 넘겨 후속 작업을 이어갈 수 있어요.</p>
                     </div>
                   ) : (
                     <div className="mt-3 space-y-2">
@@ -597,7 +607,7 @@ export function StudioAiEpisodeProductionModal({
                             </span>
                           </div>
                           <p className="mt-2 border-t border-line/70 pt-2 text-[0.6rem] leading-relaxed text-fg-2">
-                            <strong>{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "수정:")}</strong> {issue.resolution}
+                            <strong>수정:</strong> {issue.resolution}
                           </p>
                         </article>
                       ))}
@@ -605,26 +615,27 @@ export function StudioAiEpisodeProductionModal({
                   )}
                 </section>
 
-                <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-batches-heading"), { v0: String(idPrefix) })}>
+                <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={`${idPrefix}-batches-heading`}>
                   <div className="flex items-center justify-between gap-2">
-                    <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "en", "{v0}-batches-heading"), { v0: String(idPrefix) })} className="flex items-center gap-1.5 text-xs font-black text-fg">
+                    <h3 id={`${idPrefix}-batches-heading`} className="flex items-center gap-1.5 text-xs font-black text-fg">
                       <Layers3 size={14} className="text-accent" aria-hidden />
-                      {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "생성 묶음")}</h3>
-                    <span className="text-[0.62rem] font-bold text-fg-3">{plan.modeLabel} {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "· 컷당 ")}{plan.variants}{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "개")}</span>
+                      생성 묶음
+                    </h3>
+                    <span className="text-[0.62rem] font-bold text-fg-3">{plan.modeLabel} · 컷당 {plan.variants}개</span>
                   </div>
                   <div className="mt-3 space-y-2">
                     {plan.batches.map((batch, index) => (
                       <details key={batch.id} className="group rounded-xl border border-line bg-raised/40" open={index === 0}>
                         <summary className={cn("flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-3 py-2", STUDIO_FOCUS_RING)}>
                           <span className="min-w-0">
-                            <strong className="block truncate text-xs text-fg">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "배치 ")}{batch.order} · {batch.sceneTitle}</strong>
-                            <span className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "컷 ")}{batch.cutNumbers.join(", ")} {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "· 결과 ")}{batch.outputCount}{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "개")}</span>
+                            <strong className="block truncate text-xs text-fg">배치 {batch.order} · {batch.sceneTitle}</strong>
+                            <span className="text-[0.6rem] text-fg-3">컷 {batch.cutNumbers.join(", ")} · 결과 {batch.outputCount}개</span>
                           </span>
-                          <span className="text-[0.6rem] font-bold text-accent group-open:hidden">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "열기")}</span>
-                          <span className="hidden text-[0.6rem] font-bold text-accent group-open:inline">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "접기")}</span>
+                          <span className="text-[0.6rem] font-bold text-accent group-open:hidden">열기</span>
+                          <span className="hidden text-[0.6rem] font-bold text-accent group-open:inline">접기</span>
                         </summary>
                         <div className="border-t border-line p-2.5">
-                          <p className="text-[0.6rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "연속성 영수증")}</p>
+                          <p className="text-[0.6rem] font-bold text-fg-2">연속성 영수증</p>
                           <ul className="mt-1 space-y-1 text-[0.6rem] leading-relaxed text-fg-3">
                             {batch.continuityReceipt.map((entry) => <li key={entry}>• {entry}</li>)}
                           </ul>
@@ -643,18 +654,19 @@ export function StudioAiEpisodeProductionModal({
           <p className="sr-only" aria-live="polite">{copyStatusMessage}</p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-[0.6rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "예상 결과 ")}{plan.projectedOutputCount}{translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "개 · 작업량은 제공자별 시간·금액이 아닌 상대 비교 단위입니다.")}</p>
+              예상 결과 {plan.projectedOutputCount}개 · 작업량은 제공자별 시간·금액이 아닌 상대 비교 단위입니다.
+            </p>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
               <CopyAction
                 copyKey="episode-master-prompt"
-                label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "마스터 프롬프트")}
+                label="마스터 프롬프트"
                 text={plan.masterPrompt}
                 statusFor={clipboard.statusFor}
                 onCopy={clipboard.copy}
               />
               <CopyAction
                 copyKey="episode-manifest"
-                label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "제작 매니페스트")}
+                label="제작 매니페스트"
                 text={plan.manifestJson}
                 statusFor={clipboard.statusFor}
                 onCopy={clipboard.copy}
@@ -677,7 +689,7 @@ export function StudioAiEpisodeProductionModal({
                   )}
                 >
                   <WandSparkles size={14} aria-hidden />
-                  {onApplyPlan ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "편집 가능한 컷 제작으로 넘기기") : translateCurrentStaticSourceText("domains.creator.ai.StudioAiEpisodeProductionModal", "ko", "첫 배치를 구도 도구에 적용")}
+                  {onApplyPlan ? "편집 가능한 컷 제작으로 넘기기" : "첫 배치를 구도 도구에 적용"}
                 </button>
               ) : null}
             </div>

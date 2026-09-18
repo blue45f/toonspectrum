@@ -1,7 +1,4 @@
 import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Check,
   Download,
   Heart,
@@ -65,7 +62,7 @@ export function MarketDetailStickyBar({
 
   return (
     <aside
-      aria-label={translateCurrentStaticSourceText("domains.market.components.MarketDetailStickyBar", "ko", "에셋 빠른 실행 바")}
+      aria-label="에셋 빠른 실행 바"
       className={cn(
         "fixed bottom-0 inset-x-0 z-40 border-t border-line/80 bg-card/90 backdrop-blur-md px-4 py-2.5 shadow-xl",
         "animate-in slide-in-from-bottom-3 duration-200",
@@ -97,7 +94,7 @@ export function MarketDetailStickyBar({
           <button
             type="button"
             onClick={() => toggleWishlist(record)}
-            aria-label={wishlisted ? translateCurrentStaticSourceText("domains.market.components.MarketDetailStickyBar", "ko", "찜 해제") : translateCurrentStaticSourceText("domains.market.components.MarketDetailStickyBar", "ko", "찜하기")}
+            aria-label={wishlisted ? "찜 해제" : "찜하기"}
             className={buttonClass({
               variant: "outline",
               size: "sm",
@@ -111,12 +108,13 @@ export function MarketDetailStickyBar({
               className={cn("size-4", wishlisted && "fill-warn text-warn")}
               aria-hidden="true"
             />
-            <span className="hidden sm:inline">{wishlisted ? translateCurrentStaticSourceText("domains.market.components.MarketDetailStickyBar", "ko", "찜함") : translateCurrentStaticSourceText("domains.market.components.MarketDetailStickyBar", "ko", "찜하기")}</span>
+            <span className="hidden sm:inline">{wishlisted ? "찜함" : "찜하기"}</span>
           </button>
 
           {acquired ? (
             <span className="hidden sm:inline-flex items-center gap-1 rounded-lg bg-good/15 px-3 py-1.5 text-xs font-semibold text-good">
-              <Check className="size-3.5" /> {translateCurrentStaticSourceText("domains.market.components.MarketDetailStickyBar", "ko", "소장 중")}</span>
+              <Check className="size-3.5" /> 소장 중
+            </span>
           ) : (
             <button
               type="button"
@@ -142,7 +140,7 @@ export function MarketDetailStickyBar({
           >
             <StudioActionIcon className="size-3.5" aria-hidden="true" />
             <span className="hidden md:inline">{studioHandoff.actionLabel}</span>
-            <span className="md:hidden">{translateCurrentStaticSourceText("domains.market.components.MarketDetailStickyBar", "en", "Studio")}</span>
+            <span className="md:hidden">Studio</span>
           </Link>
         </div>
       </div>

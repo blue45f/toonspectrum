@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { GripVertical } from "lucide-react";
 import { useId } from "react";
 
@@ -28,9 +24,9 @@ export function StudioPanelResizeHandle({
         {...handleProps}
         aria-label={label}
         aria-describedby={helpId}
-        title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPanelResizeHandle", "ko", "{v0} · 현재 {v1}px · 드래그 / 더블클릭·더블탭·Enter(기본) / ←→"), { v0: String(label), v1: String(handleProps["aria-valuenow"]) })}
+        title={`${label} · 현재 ${handleProps["aria-valuenow"]}px · 드래그 / 더블클릭·더블탭·Enter(기본) / ←→`}
         data-studio-panel-resizer="true"
-        data-dragging={dragging ? translateCurrentStaticSourceText("domains.creator.StudioPanelResizeHandle", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioPanelResizeHandle", "en", "false")}
+        data-dragging={dragging ? "true" : "false"}
         className={cn(
           "group relative hidden w-3 shrink-0 touch-none cursor-col-resize select-none items-center justify-center self-stretch border-x border-line/35 bg-panel/35 transition-[background-color,border-color] motion-reduce:transition-none lg:flex",
           "before:absolute before:inset-y-0 before:left-1/2 before:w-6 before:-translate-x-1/2 before:content-['']",
@@ -57,7 +53,8 @@ export function StudioPanelResizeHandle({
         id={helpId}
         className="sr-only"
       >
-        {translateCurrentStaticSourceText("domains.creator.StudioPanelResizeHandle", "ko", "좌우 방향키로 조금씩 조절하고 Home과 End로 최소·최대 너비를 선택할 수 있습니다. Enter를 누르거나 더블클릭·더블탭하면 기본 너비로 돌아갑니다.")}</span>
+        좌우 방향키로 조금씩 조절하고 Home과 End로 최소·최대 너비를 선택할 수 있습니다. Enter를 누르거나 더블클릭·더블탭하면 기본 너비로 돌아갑니다.
+      </span>
     </>
   );
 }

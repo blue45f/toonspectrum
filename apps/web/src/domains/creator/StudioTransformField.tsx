@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useId, useState } from "react";
 
 import {
@@ -93,7 +90,7 @@ export function StudioTransformField({
           disabled={disabled}
           title={inputHint}
           value={draft ?? (mixed ? "" : formatStudioTransformFieldValue(settled))}
-          placeholder={mixed ? translateCurrentStaticSourceText("domains.creator.StudioTransformField", "ko", "혼합") : undefined}
+          placeholder={mixed ? "혼합" : undefined}
           aria-label={label}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : undefined}
@@ -145,7 +142,8 @@ export function StudioTransformField({
       </span>
       {invalid ? (
         <span id={errorId} role="alert" className="text-[0.625rem] font-medium leading-tight text-danger">
-          {translateCurrentStaticSourceText("domains.creator.StudioTransformField", "ko", "숫자 또는 안전한 수식을 입력해 주세요.")}</span>
+          숫자 또는 안전한 수식을 입력해 주세요.
+        </span>
       ) : null}
     </label>
   );

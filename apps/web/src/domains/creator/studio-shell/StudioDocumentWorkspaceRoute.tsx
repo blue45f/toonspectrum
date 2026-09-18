@@ -1,7 +1,3 @@
-import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { Navigate, useLocation } from "react-router-dom";
 

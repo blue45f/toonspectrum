@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { adjustStudioBrushSize } from "./brush/studio-draw-ux";
 
 import { cn } from "@/shared/lib/utils";
@@ -42,15 +38,15 @@ export function StudioBrushSizePresetGrid({
         : "border-line bg-card text-fg-2 hover:bg-raised"
     );
   return (
-    <div className="space-y-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioBrushSizePresetGrid", "ko", "브러시 크기 프리셋")}>
+    <div className="space-y-1" role="group" aria-label="브러시 크기 프리셋">
       <div className="grid grid-cols-6 gap-1">
         {presetSizes.map((size) => (
           <button
             key={size}
             type="button"
             aria-pressed={activeSize === size}
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioBrushSizePresetGrid", "ko", "브러시 크기 {v0}px"), { v0: String(size) })}
-            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioBrushSizePresetGrid", "en", "{v0}px"), { v0: String(size) })}
+            aria-label={`브러시 크기 ${size}px`}
+            title={`${size}px`}
             onClick={() => onCommit(size)}
             className={sizeButtonClass(activeSize === size)}
           >
@@ -60,15 +56,15 @@ export function StudioBrushSizePresetGrid({
       </div>
       {recentOnly.length > 0 && (
         <div className="flex items-center gap-1">
-          <span className="text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioBrushSizePresetGrid", "ko", "최근")}</span>
+          <span className="text-[0.62rem] text-fg-3">최근</span>
           <span className="flex flex-wrap gap-1">
             {recentOnly.map((size) => (
               <button
                 key={size}
                 type="button"
                 aria-pressed={activeSize === size}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioBrushSizePresetGrid", "ko", "최근 브러시 크기 {v0}px"), { v0: String(size) })}
-                title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioBrushSizePresetGrid", "en", "{v0}px"), { v0: String(size) })}
+                aria-label={`최근 브러시 크기 ${size}px`}
+                title={`${size}px`}
                 onClick={() => onCommit(size)}
                 className={sizeButtonClass(activeSize === size)}
               >

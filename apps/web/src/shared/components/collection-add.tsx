@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { FolderHeart, Check, Plus } from "lucide-react";
 import { useState } from "react";
 
@@ -35,12 +34,12 @@ export function CollectionAdd({ titleId }: { titleId: string }) {
         )}
       >
         <FolderHeart size={16} />
-        {translateCurrentStaticSourceText("shared.components.collection.add", "ko", "컬렉션에 담기")}{inCount > 0 ? ` (${inCount})` : ""}
+        컬렉션에 담기{inCount > 0 ? ` (${inCount})` : ""}
       </button>
 
       {open && (
         <>
-          <button className="fixed inset-0 z-10" aria-label={translateCurrentStaticSourceText("shared.components.collection.add", "ko", "닫기")} onClick={() => setOpen(false)} />
+          <button className="fixed inset-0 z-10" aria-label="닫기" onClick={() => setOpen(false)} />
           <div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-xl border border-line-strong bg-panel p-2 shadow-xl shadow-[oklch(0.1_0.02_70/0.42)]">
             <div className="max-h-52 overflow-y-auto">
               {collections.map((c) => {
@@ -62,8 +61,8 @@ export function CollectionAdd({ titleId }: { titleId: string }) {
               <input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                aria-label={translateCurrentStaticSourceText("shared.components.collection.add", "ko", "새 컬렉션 이름")}
-                placeholder={translateCurrentStaticSourceText("shared.components.collection.add", "ko", "새 컬렉션")}
+                aria-label="새 컬렉션 이름"
+                placeholder="새 컬렉션"
                 maxLength={MAX_COLLECTION_NAME_LENGTH}
                 className="h-8 flex-1 rounded-lg border border-line bg-canvas px-2.5 text-sm outline-none focus:border-accent/50"
                 onKeyDown={(e) => {

@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   Building2,
   CloudSun,
@@ -59,17 +55,19 @@ function SceneIngredients({ theme }: { theme: DailyTheme }) {
   return (
     <section id="scene-ingredients" className="scroll-mt-28 space-y-4" aria-labelledby="scene-ingredients-title">
       <div>
-        <p className="text-xs font-bold tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "en", "SCENE INGREDIENTS")}</p>
+        <p className="text-xs font-bold tracking-[0.14em] text-accent">SCENE INGREDIENTS</p>
         <h2 id="scene-ingredients-title" className="mt-1 text-2xl font-bold text-fg">
-          {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "장면을 움직이는 네 가지 감각")}</h2>
+          장면을 움직이는 네 가지 감각
+        </h2>
         <p className="mt-2 max-w-3xl text-sm leading-7 text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "사물·공간·빛·소리를 따로 읽은 뒤, 5컷 안에서 하나씩 공개해 정보의 순서를 설계하세요.")}</p>
+          사물·공간·빛·소리를 따로 읽은 뒤, 5컷 안에서 하나씩 공개해 정보의 순서를 설계하세요.
+        </p>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "오늘의 장면 재료")}>
-        <IngredientCard index="01" icon={PackageSearch} eyebrow="OBJECT" title={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "오늘의 사물")} body={theme.object} />
-        <IngredientCard index="02" icon={Building2} eyebrow="PLACE" title={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "오늘의 공간")} body={theme.place} />
-        <IngredientCard index="03" icon={CloudSun} eyebrow="LIGHT" title={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "오늘의 빛")} body={theme.light} />
-        <IngredientCard index="04" icon={Volume2} eyebrow="SOUND" title={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "오늘의 소리")} body={theme.sound.join(" · ")} />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="오늘의 장면 재료">
+        <IngredientCard index="01" icon={PackageSearch} eyebrow="OBJECT" title="오늘의 사물" body={theme.object} />
+        <IngredientCard index="02" icon={Building2} eyebrow="PLACE" title="오늘의 공간" body={theme.place} />
+        <IngredientCard index="03" icon={CloudSun} eyebrow="LIGHT" title="오늘의 빛" body={theme.light} />
+        <IngredientCard index="04" icon={Volume2} eyebrow="SOUND" title="오늘의 소리" body={theme.sound.join(" · ")} />
       </div>
     </section>
   );
@@ -102,23 +100,23 @@ function MissionAndProgress({
             <PanelsTopLeft size={20} aria-hidden="true" />
           </span>
           <div>
-            <p className="text-xs font-bold tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "en", "FIVE-PANEL MISSION")}</p>
-            <h2 className="mt-2 text-2xl font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "오늘의 5컷 미션")}</h2>
+            <p className="text-xs font-bold tracking-[0.14em] text-accent">FIVE-PANEL MISSION</p>
+            <h2 className="mt-2 text-2xl font-bold text-fg">오늘의 5컷 미션</h2>
             <p className="mt-4 text-base leading-8 text-fg-2">{theme.mission}</p>
           </div>
         </div>
         <div className="mt-6 grid gap-3 border-t border-accent/20 pt-5 sm:grid-cols-3">
           <div>
-            <span className="text-xs font-bold text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "시간")}</span>
-            <p className="mt-1 text-sm font-semibold text-fg">{sessionPreset.minutes}{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "분")}</p>
+            <span className="text-xs font-bold text-accent">시간</span>
+            <p className="mt-1 text-sm font-semibold text-fg">{sessionPreset.minutes}분</p>
           </div>
           <div>
-            <span className="text-xs font-bold text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "연출")}</span>
+            <span className="text-xs font-bold text-accent">연출</span>
             <p className="mt-1 text-sm font-semibold text-fg">{mode.label}</p>
           </div>
           <div>
-            <span className="text-xs font-bold text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "핵심 제약")}</span>
-            <p className="mt-1 text-sm font-semibold leading-6 text-fg">#{theme.moods[0]}{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "을 직접 설명하지 않기")}</p>
+            <span className="text-xs font-bold text-accent">핵심 제약</span>
+            <p className="mt-1 text-sm font-semibold leading-6 text-fg">#{theme.moods[0]}을 직접 설명하지 않기</p>
           </div>
         </div>
       </article>
@@ -130,17 +128,18 @@ function MissionAndProgress({
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-bold tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "en", "CREATION LOOP")}</p>
+            <p className="text-xs font-bold tracking-[0.14em] text-accent">CREATION LOOP</p>
             <h2 id="progress-title" className="mt-2 text-2xl font-bold text-fg">
-              {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "오늘의 진행률")}</h2>
-            <p className="mt-2 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "다음 단계 · ")}{nextStepLabel}</p>
+              오늘의 진행률
+            </h2>
+            <p className="mt-2 text-xs text-fg-3">다음 단계 · {nextStepLabel}</p>
           </div>
           <strong className="font-display text-3xl tabular-nums text-fg">{progressPercent}%</strong>
         </div>
         <div
           className="mt-4 h-2 overflow-hidden rounded-full bg-canvas"
           role="progressbar"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "{v0} 창작 진행률"), { v0: String(day.iso) })}
+          aria-label={`${day.iso} 창작 진행률`}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={progressPercent}
@@ -181,7 +180,8 @@ function MissionAndProgress({
             className="mt-4 rounded-xl border border-good/30 bg-good/10 p-4 text-sm font-semibold leading-6 text-good"
             role="status"
           >
-            {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "오늘의 루프를 완주했습니다. 첫 컷과 마지막 컷의 변화만 다시 확인하고 Studio에서 다음 장면으로 이어가세요.")}</p>
+            오늘의 루프를 완주했습니다. 첫 컷과 마지막 컷의 변화만 다시 확인하고 Studio에서 다음 장면으로 이어가세요.
+          </p>
         )}
       </article>
     </section>
@@ -201,14 +201,17 @@ function Storyboard({
     <section id="storyboard" className="scroll-mt-28 space-y-4" aria-labelledby="storyboard-title">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-bold tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "en", "STORY BEATS")}</p>
+          <p className="text-xs font-bold tracking-[0.14em] text-accent">STORY BEATS</p>
           <h2 id="storyboard-title" className="mt-1 text-2xl font-bold text-fg">
-            {mode.label}{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "용 5컷 비트 보드")}</h2>
+            {mode.label}용 5컷 비트 보드
+          </h2>
           <p className="mt-2 max-w-3xl text-sm leading-7 text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "정답이 아니라 첫 썸네일을 빠르게 만들기 위한 연출 발판입니다. 각 문장을 화면 안의 정보 순서로 번역하세요.")}</p>
+            정답이 아니라 첫 썸네일을 빠르게 만들기 위한 연출 발판입니다. 각 문장을 화면 안의 정보 순서로 번역하세요.
+          </p>
         </div>
         <button type="button" className={ACTION_BUTTON} onClick={onCopyBrief}>
-          <Copy size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowCreationBoard", "ko", "5컷 포함 브리프 복사")}</button>
+          <Copy size={15} aria-hidden="true" /> 5컷 포함 브리프 복사
+        </button>
       </div>
       <ol className="grid gap-3 lg:grid-cols-5">
         {storyBeats.map((beat, index) => (

@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Sigma, ArrowUpRight } from "lucide-react";
 
 import type { Title } from "@/shared/lib/types";
@@ -30,15 +29,16 @@ export function ScoreBreakdown({
               <Sigma size={16} />
             </span>
             <div>
-              <p className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("shared.components.score.breakdown", "ko", "이 작품의 ")}{meta.label} {translateCurrentStaticSourceText("shared.components.score.breakdown", "ko", "지표")}</p>
-              <p className="text-[0.72rem] text-fg-3">{translateCurrentStaticSourceText("shared.components.score.breakdown", "ko", "점수에 기여한 요인을 그대로 공개합니다")}</p>
+              <p className="text-sm font-bold text-fg">이 작품의 {meta.label} 지표</p>
+              <p className="text-[0.72rem] text-fg-3">점수에 기여한 요인을 그대로 공개합니다</p>
             </div>
           </div>
           <Link
             href="/guide"
             className="inline-flex shrink-0 items-center gap-1 text-[0.72rem] font-medium text-accent hover:underline"
           >
-            {translateCurrentStaticSourceText("shared.components.score.breakdown", "ko", "산정 방식")}<ArrowUpRight size={12} />
+            산정 방식
+            <ArrowUpRight size={12} />
           </Link>
         </div>
         <dl className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -53,7 +53,7 @@ export function ScoreBreakdown({
           ))}
         </dl>
         <p className="mt-3 font-mono text-[0.7rem] leading-relaxed text-fg-3">
-          <span className="eyebrow mr-1.5 text-[0.58rem] text-accent">{translateCurrentStaticSourceText("shared.components.score.breakdown", "ko", "산식")}</span>
+          <span className="eyebrow mr-1.5 text-[0.58rem] text-accent">산식</span>
           {meta.formula}
         </p>
       </div>

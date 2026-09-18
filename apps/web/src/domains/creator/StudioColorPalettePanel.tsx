@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Check, Copy, Loader2, Palette, Sparkles, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -113,10 +109,11 @@ export function StudioColorPalettePanel({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-sm font-semibold text-fg-1">
           {busy ? <Loader2 size={15} className="animate-spin text-accent" /> : <Palette size={15} className="text-accent" />}
-          <span>{translateCurrentStaticSourceText("domains.creator.StudioColorPalettePanel", "ko", "이미지 주요 색상")}</span>
+          <span>이미지 주요 색상</span>
           {colors.length > 0 && (
             <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[0.62rem] font-bold text-accent">
-              {colors.length}{translateCurrentStaticSourceText("domains.creator.StudioColorPalettePanel", "ko", "색")}</span>
+              {colors.length}색
+            </span>
           )}
         </div>
 
@@ -127,11 +124,14 @@ export function StudioColorPalettePanel({
               key={cnt}
               type="button"
               onClick={() => setSampleCount(cnt)}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorPalettePanel", "en", "rounded-md px-2 py-0.5 font-medium transition-all {v0}"), { v0: String(sampleCount === cnt
+              className={`rounded-md px-2 py-0.5 font-medium transition-all ${
+                sampleCount === cnt
                   ? "bg-accent text-on-accent font-semibold shadow-sm"
-                  : "text-fg-3 hover:text-fg-1") })}
+                  : "text-fg-3 hover:text-fg-1"
+              }`}
             >
-              {cnt}{translateCurrentStaticSourceText("domains.creator.StudioColorPalettePanel", "ko", "색")}</button>
+              {cnt}색
+            </button>
           ))}
         </div>
       </div>
@@ -139,9 +139,9 @@ export function StudioColorPalettePanel({
       {error ? (
         <p className="text-xs text-bad">{error}</p>
       ) : busy ? (
-        <p className="text-[0.7rem] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioColorPalettePanel", "ko", "이미지의 고유 배색을 분석하는 중…")}</p>
+        <p className="text-[0.7rem] leading-relaxed text-fg-3">이미지의 고유 배색을 분석하는 중…</p>
       ) : colors.length === 0 ? (
-        <p className="text-[0.7rem] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioColorPalettePanel", "ko", "추출할 색이 없어요(투명 이미지).")}</p>
+        <p className="text-[0.7rem] leading-relaxed text-fg-3">추출할 색이 없어요(투명 이미지).</p>
       ) : (
         <>
           {/* Gradient Banner Preview */}
@@ -190,7 +190,7 @@ export function StudioColorPalettePanel({
                     ) : null}
                   </span>
                   <span className="font-mono text-[0.62rem] text-fg-3 group-hover:text-fg-1 tracking-tight">
-                    {isCopied ? translateCurrentStaticSourceText("domains.creator.StudioColorPalettePanel", "ko", "복사됨") : copyFailed ? translateCurrentStaticSourceText("domains.creator.StudioColorPalettePanel", "ko", "복사 실패") : hex}
+                    {isCopied ? "복사됨" : copyFailed ? "복사 실패" : hex}
                   </span>
                 </button>
               );
@@ -231,10 +231,10 @@ export function StudioColorPalettePanel({
               )}
               <span aria-live="polite">
                 {copyAllStatus === "copied"
-                  ? translateCurrentStaticSourceText("domains.creator.StudioColorPalettePanel", "ko", "전체 복사됨")
+                  ? "전체 복사됨"
                   : copyAllStatus === "failed"
-                    ? translateCurrentStaticSourceText("domains.creator.StudioColorPalettePanel", "ko", "전체 복사 실패")
-                    : translateCurrentStaticSourceText("domains.creator.StudioColorPalettePanel", "ko", "전체 복사")}
+                    ? "전체 복사 실패"
+                    : "전체 복사"}
               </span>
             </button>
           </div>
@@ -243,7 +243,8 @@ export function StudioColorPalettePanel({
 
       {!error && (
         <p className="text-[0.65rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioColorPalettePanel", "ko", "100% 브라우저 클라이언트에서 고속 추출돼 서버 비용이 없습니다. 스와치를 클릭하면 즉시 주 색으로 적용되고 클립보드에 복사됩니다.")}</p>
+          100% 브라우저 클라이언트에서 고속 추출돼 서버 비용이 없습니다. 스와치를 클릭하면 즉시 주 색으로 적용되고 클립보드에 복사됩니다.
+        </p>
       )}
     </div>
   );

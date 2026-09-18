@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   BookOpen,
   ClipboardCheck,
@@ -303,14 +299,16 @@ export function StudioProductionOperationsPanel({
       <section className="rounded-2xl border border-line bg-card p-4">
         <div className="flex items-center gap-2">
           <BookOpen className="size-5 text-accent" aria-hidden="true" />
-          <h2 className="text-sm font-black">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "에피소드·시퀀스·장면·페이지 구조")}</h2>
+          <h2 className="text-sm font-black">에피소드·시퀀스·장면·페이지 구조</h2>
         </div>
         <p className="mt-1 text-xs leading-relaxed text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "원고 페이지 순서와 별도로 제작 책임과 인계를 묶는 상위 구조입니다. 페이지 노드는 편집기의 안정적인 페이지 ID를 참조합니다.")}</p>
+          원고 페이지 순서와 별도로 제작 책임과 인계를 묶는 상위 구조입니다. 페이지 노드는 편집기의 안정적인 페이지 ID를 참조합니다.
+        </p>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "종류")}<select
+            종류
+            <select
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={hierarchyKind}
               onChange={(event) => {
@@ -325,24 +323,26 @@ export function StudioProductionOperationsPanel({
             </select>
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2 sm:col-span-1 xl:col-span-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "이름")}<input
+            이름
+            <input
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={hierarchyTitle}
               onChange={(event) => setHierarchyTitle(event.currentTarget.value)}
               maxLength={240}
-              placeholder={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "{v0} 이름"), { v0: String(HIERARCHY_LABELS[hierarchyKind]) })}
+              placeholder={`${HIERARCHY_LABELS[hierarchyKind]} 이름`}
               disabled={!canEdit}
             />
           </label>
           {parentKinds(hierarchyKind).length > 0 ? (
             <label className="grid gap-1 text-xs font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "부모")}<select
+              부모
+              <select
                 className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                 value={parentId}
                 onChange={(event) => setParentId(event.currentTarget.value)}
                 disabled={!canEdit}
               >
-                <option value="">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "선택")}</option>
+                <option value="">선택</option>
                 {allowedParents.map((node) => (
                   <option key={node.id} value={node.id}>{node.title}</option>
                 ))}
@@ -351,12 +351,13 @@ export function StudioProductionOperationsPanel({
           ) : <span aria-hidden="true" />}
           {hierarchyKind === "page" ? (
             <label className="grid gap-1 text-xs font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "페이지 ID")}<input
+              페이지 ID
+              <input
                 className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                 value={pageId}
                 onChange={(event) => setPageId(event.currentTarget.value)}
                 maxLength={160}
-                placeholder={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "en", "page-id")}
+                placeholder="page-id"
                 disabled={!canEdit}
               />
             </label>
@@ -368,7 +369,8 @@ export function StudioProductionOperationsPanel({
               disabled={!canEdit || !hierarchyTitle.trim() || (parentKinds(hierarchyKind).length > 0 && !parentId)}
             >
               <Plus className="size-4" aria-hidden="true" />
-              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "추가")}</button>
+              추가
+            </button>
           )}
         </div>
         {hierarchyKind === "page" ? (
@@ -379,12 +381,14 @@ export function StudioProductionOperationsPanel({
             disabled={!canEdit || !hierarchyTitle.trim() || !parentId || !pageId.trim()}
           >
             <Plus className="size-4" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "페이지 연결")}</button>
+            페이지 연결
+          </button>
         ) : null}
 
         {orderedHierarchy.length === 0 ? (
           <p className="mt-4 rounded-xl border border-dashed border-line p-5 text-center text-xs text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "아직 제작 구조가 없습니다. 에피소드부터 추가하세요.")}</p>
+            아직 제작 구조가 없습니다. 에피소드부터 추가하세요.
+          </p>
         ) : (
           <div className="mt-4 space-y-1">
             {orderedHierarchy.map(({ node, depth }) => {
@@ -411,8 +415,8 @@ export function StudioProductionOperationsPanel({
                     className={buttonClass({ variant: "quiet", size: "icon" })}
                     onClick={() => removeHierarchy(node.id)}
                     disabled={!canEdit || referenced}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "{v0} 삭제"), { v0: String(node.title) })}
-                    title={referenced ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "하위 항목 또는 제작 데이터가 연결되어 삭제할 수 없습니다.") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "삭제")}
+                    aria-label={`${node.title} 삭제`}
+                    title={referenced ? "하위 항목 또는 제작 데이터가 연결되어 삭제할 수 없습니다." : "삭제"}
                   >
                     <Trash2 className="size-4" aria-hidden="true" />
                   </button>
@@ -426,13 +430,15 @@ export function StudioProductionOperationsPanel({
       <section className="rounded-2xl border border-line bg-card p-4">
         <div className="flex items-center gap-2">
           <Users className="size-5 text-accent" aria-hidden="true" />
-          <h2 className="text-sm font-black">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "제작 역할 배정")}</h2>
+          <h2 className="text-sm font-black">제작 역할 배정</h2>
         </div>
         <p className="mt-1 text-xs leading-relaxed text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "제작 직무는 소유자·편집·댓글·보기 같은 협업 권한과 별도입니다. 실제 팀원을 연결한 뒤 프로젝트 전체 또는 장면별 책임을 배정하세요.")}</p>
+          제작 직무는 소유자·편집·댓글·보기 같은 협업 권한과 별도입니다. 실제 팀원을 연결한 뒤 프로젝트 전체 또는 장면별 책임을 배정하세요.
+        </p>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "대상 팀원")}<select
+            대상 팀원
+            <select
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={memberSelection}
               onChange={(event) => {
@@ -444,11 +450,11 @@ export function StudioProductionOperationsPanel({
               }}
               disabled={!canManageRoles}
             >
-              <option value={MANUAL_MEMBER_SELECTION}>{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "이름 직접 입력")}</option>
+              <option value={MANUAL_MEMBER_SELECTION}>이름 직접 입력</option>
               {roleCandidates.map((candidate) => (
                 <option key={candidate.memberId} value={candidate.memberId}>
                   {candidate.displayName}
-                  {candidate.isCurrentUser ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", " (나)") : ""}
+                  {candidate.isCurrentUser ? " (나)" : ""}
                   {candidate.accessRole
                     ? ` · ${ACCESS_ROLE_LABELS[candidate.accessRole] ?? candidate.accessRole}`
                     : ""}
@@ -457,17 +463,19 @@ export function StudioProductionOperationsPanel({
             </select>
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "표시 이름")}<input
+            표시 이름
+            <input
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg disabled:opacity-70"
               value={selectedCandidate?.displayName ?? memberName}
               onChange={(event) => setMemberName(event.currentTarget.value)}
               maxLength={240}
-              placeholder={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "담당자 이름")}
+              placeholder="담당자 이름"
               disabled={!canManageRoles || Boolean(selectedCandidate)}
             />
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "제작 직무")}<select
+            제작 직무
+            <select
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={memberRole}
               onChange={(event) => setMemberRole(event.currentTarget.value as ProductionRole)}
@@ -479,13 +487,14 @@ export function StudioProductionOperationsPanel({
             </select>
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "적용 범위")}<select
+            적용 범위
+            <select
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={memberScope}
               onChange={(event) => setMemberScope(event.currentTarget.value)}
               disabled={!canManageRoles}
             >
-              <option value="">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "프로젝트 전체")}</option>
+              <option value="">프로젝트 전체</option>
               {orderedHierarchy.map(({ node, depth }) => (
                 <option key={node.id} value={node.id}>
                   {`${"· ".repeat(Math.min(depth, 4))}${node.title}`}
@@ -500,22 +509,23 @@ export function StudioProductionOperationsPanel({
             disabled={!canManageRoles || !selectedDisplayName}
           >
             <Plus className="size-4" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "역할 배정")}</button>
+            역할 배정
+          </button>
         </div>
 
         {selectedCandidate ? (
           <div className="mt-3 rounded-xl border border-line bg-panel/60 p-3 text-xs text-fg-2">
             <p>
-              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "협업 권한: ")}<strong className="text-fg">
+              협업 권한: <strong className="text-fg">
                 {selectedCandidate.accessRole
                   ? ACCESS_ROLE_LABELS[selectedCandidate.accessRole] ?? selectedCandidate.accessRole
-                  : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "별도 권한 없음")}
+                  : "별도 권한 없음"}
               </strong>
-              <span className="ml-2 text-fg-3">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "제작 직무를 배정해도 이 권한은 바뀌지 않습니다.")}</span>
+              <span className="ml-2 text-fg-3">제작 직무를 배정해도 이 권한은 바뀌지 않습니다.</span>
             </p>
             {recommendedRoles.length > 0 ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="font-bold text-accent">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "프로필 추천")}</span>
+                <span className="font-bold text-accent">프로필 추천</span>
                 {recommendedRoles.map((role) => (
                   <button
                     key={role}
@@ -540,7 +550,8 @@ export function StudioProductionOperationsPanel({
 
         {workspace.roleAssignments.length === 0 ? (
           <p className="mt-4 rounded-xl border border-dashed border-line p-5 text-center text-xs text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "아직 제작 역할이 배정되지 않았습니다.")}</p>
+            아직 제작 역할이 배정되지 않았습니다.
+          </p>
         ) : (
           <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {workspace.roleAssignments.map((assignment) => {
@@ -560,14 +571,14 @@ export function StudioProductionOperationsPanel({
                       </p>
                       {linkedCandidate ? (
                         <p className="mt-1 truncate text-[0.6875rem] text-fg-3">
-                          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "협업 권한 · ")}{linkedCandidate.accessRole
+                          협업 권한 · {linkedCandidate.accessRole
                             ? ACCESS_ROLE_LABELS[linkedCandidate.accessRole] ?? linkedCandidate.accessRole
-                            : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "별도 권한 없음")}
+                            : "별도 권한 없음"}
                         </p>
                       ) : assignment.memberId ? (
-                        <p className="mt-1 truncate text-[0.6875rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "연결된 팀 멤버")}</p>
+                        <p className="mt-1 truncate text-[0.6875rem] text-fg-3">연결된 팀 멤버</p>
                       ) : (
-                        <p className="mt-1 truncate text-[0.6875rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "직접 입력한 담당자")}</p>
+                        <p className="mt-1 truncate text-[0.6875rem] text-fg-3">직접 입력한 담당자</p>
                       )}
                       <p className="mt-1 truncate text-xs text-fg-3">{scope}</p>
                     </div>
@@ -576,7 +587,7 @@ export function StudioProductionOperationsPanel({
                       className={buttonClass({ variant: "quiet", size: "icon" })}
                       onClick={() => removeRoleAssignment(assignment.id)}
                       disabled={!canManageRoles}
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "{v0} 역할 해제"), { v0: String(assignment.displayName) })}
+                      aria-label={`${assignment.displayName} 역할 해제`}
                     >
                       <Trash2 className="size-4" aria-hidden="true" />
                     </button>
@@ -591,19 +602,21 @@ export function StudioProductionOperationsPanel({
       <section className="rounded-2xl border border-line bg-card p-4">
         <div className="flex items-center gap-2">
           <ClipboardCheck className="size-5 text-accent" aria-hidden="true" />
-          <h2 className="text-sm font-black">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "스토리→작화 인계 브리프")}</h2>
+          <h2 className="text-sm font-black">스토리→작화 인계 브리프</h2>
         </div>
         <p className="mt-1 text-xs leading-relaxed text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "장면 목적·감정선·변경 금지 필드를 명시해 대사와 캐릭터 연속성을 보존합니다.")}</p>
+          장면 목적·감정선·변경 금지 필드를 명시해 대사와 캐릭터 연속성을 보존합니다.
+        </p>
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "대상 장면/범위")}<select
+            대상 장면/범위
+            <select
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={handoffNodeId}
               onChange={(event) => setHandoffNodeId(event.currentTarget.value)}
               disabled={!canEdit}
             >
-              <option value="">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "선택")}</option>
+              <option value="">선택</option>
               {orderedHierarchy.map(({ node, depth }) => (
                 <option key={node.id} value={node.id}>
                   {`${"· ".repeat(Math.min(depth, 4))}${node.title}`}
@@ -612,7 +625,8 @@ export function StudioProductionOperationsPanel({
             </select>
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "보내는 역할")}<select
+            보내는 역할
+            <select
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={handoffFrom}
               onChange={(event) => setHandoffFrom(event.currentTarget.value as ProductionRole)}
@@ -627,7 +641,8 @@ export function StudioProductionOperationsPanel({
             <ArrowRight className="size-5 text-fg-3" />
           </div>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "받는 역할")}<select
+            받는 역할
+            <select
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={handoffTo}
               onChange={(event) => setHandoffTo(event.currentTarget.value as ProductionRole)}
@@ -639,7 +654,8 @@ export function StudioProductionOperationsPanel({
             </select>
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "장면 목적")}<textarea
+            장면 목적
+            <textarea
               className="min-h-24 rounded-xl border border-line bg-panel p-3 text-sm text-fg"
               value={handoffPurpose}
               onChange={(event) => setHandoffPurpose(event.currentTarget.value)}
@@ -648,7 +664,8 @@ export function StudioProductionOperationsPanel({
             />
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "감정선")}<textarea
+            감정선
+            <textarea
               className="min-h-24 rounded-xl border border-line bg-panel p-3 text-sm text-fg"
               value={handoffEmotion}
               onChange={(event) => setHandoffEmotion(event.currentTarget.value)}
@@ -657,59 +674,64 @@ export function StudioProductionOperationsPanel({
             />
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2 xl:col-span-4">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "반드시 보여야 할 요소 · 한 줄에 하나")}<textarea
+            반드시 보여야 할 요소 · 한 줄에 하나
+            <textarea
               className="min-h-24 rounded-xl border border-line bg-panel p-3 text-sm text-fg"
               value={handoffMustShow}
               onChange={(event) => setHandoffMustShow(event.currentTarget.value)}
               maxLength={12_000}
-              placeholder={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "핵심 소품\n표정 또는 행동\n장소 표식")}
+              placeholder={"핵심 소품\n표정 또는 행동\n장소 표식"}
               disabled={!canEdit}
             />
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "연속성 메모 · 한 줄에 하나")}<textarea
+            연속성 메모 · 한 줄에 하나
+            <textarea
               className="min-h-24 rounded-xl border border-line bg-panel p-3 text-sm text-fg"
               value={handoffContinuity}
               onChange={(event) => setHandoffContinuity(event.currentTarget.value)}
               maxLength={12_000}
-              placeholder={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "이전 장면 의상 유지\n오른손에 소품 유지")}
+              placeholder={"이전 장면 의상 유지\n오른손에 소품 유지"}
               disabled={!canEdit}
             />
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "인수 완료 기준 · 한 줄에 하나")}<textarea
+            인수 완료 기준 · 한 줄에 하나
+            <textarea
               className="min-h-24 rounded-xl border border-line bg-panel p-3 text-sm text-fg"
               value={handoffAcceptance}
               onChange={(event) => setHandoffAcceptance(event.currentTarget.value)}
               maxLength={12_000}
-              placeholder={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "대사와 컷 번호 일치\n캐릭터 바이블 검수 완료")}
+              placeholder={"대사와 컷 번호 일치\n캐릭터 바이블 검수 완료"}
               disabled={!canEdit}
             />
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "작성자")}<input
+            작성자
+            <input
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={handoffCreator}
               onChange={(event) => setHandoffCreator(event.currentTarget.value)}
               maxLength={240}
-              placeholder={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "스토리 작가")}
+              placeholder="스토리 작가"
               disabled={!canEdit}
             />
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "인수자")}<input
+            인수자
+            <input
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={handoffAssignee}
               onChange={(event) => setHandoffAssignee(event.currentTarget.value)}
               maxLength={240}
-              placeholder={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "작화 작가")}
+              placeholder="작화 작가"
               disabled={!canEdit}
             />
           </label>
         </div>
 
         <fieldset className="mt-3 rounded-xl border border-line p-3" disabled={!canEdit}>
-          <legend className="px-1 text-xs font-bold">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "변경 전 승인 필요 항목")}</legend>
+          <legend className="px-1 text-xs font-bold">변경 전 승인 필요 항목</legend>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {STUDIO_PRODUCTION_AUTHORITY_FIELDS.map((field) => (
               <label key={field} className="flex min-h-10 items-center gap-2 rounded-lg border border-line px-3 text-xs">
@@ -731,10 +753,12 @@ export function StudioProductionOperationsPanel({
           disabled={!canEdit || !handoffNodeId || handoffFrom === handoffTo}
         >
           <Plus className="size-4" aria-hidden="true" />
-          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "인계 브리프 추가")}</button>
+          인계 브리프 추가
+        </button>
         {workspace.handoffs.length === 0 ? (
           <p className="mt-4 rounded-xl border border-dashed border-line p-5 text-center text-xs text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "아직 인계 브리프가 없습니다.")}</p>
+            아직 인계 브리프가 없습니다.
+          </p>
         ) : (
           <div className="mt-4 space-y-2">
             {workspace.handoffs.map((handoff) => {
@@ -744,38 +768,38 @@ export function StudioProductionOperationsPanel({
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-sm font-bold">{scope?.title ?? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "알 수 없는 범위")}</h3>
+                        <h3 className="text-sm font-bold">{scope?.title ?? "알 수 없는 범위"}</h3>
                         <span className="rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-[0.6875rem] font-bold text-accent">
                           {ROLE_LABELS[handoff.fromRole]} → {ROLE_LABELS[handoff.toRole]}
                         </span>
                       </div>
                       <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-fg-2">
-                        {handoff.scenePurpose || translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "장면 목적 미입력")}
+                        {handoff.scenePurpose || "장면 목적 미입력"}
                       </p>
                       {handoff.emotionalBeat ? (
-                        <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "감정선: ")}{handoff.emotionalBeat}</p>
+                        <p className="mt-1 text-xs text-fg-3">감정선: {handoff.emotionalBeat}</p>
                       ) : null}
                       <p className="mt-1 text-xs text-fg-3">
-                        {handoff.createdBy || translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "작성자 미정")} → {handoff.assignedTo || translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "인수자 미정")}
+                        {handoff.createdBy || "작성자 미정"} → {handoff.assignedTo || "인수자 미정"}
                       </p>
                       {handoff.mustShow.length > 0 ? (
                         <p className="mt-2 text-xs text-fg-2">
-                          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "필수 연출: ")}{handoff.mustShow.join(" · ")}
+                          필수 연출: {handoff.mustShow.join(" · ")}
                         </p>
                       ) : null}
                       {handoff.continuityNotes.length > 0 ? (
                         <p className="mt-1 text-xs text-fg-2">
-                          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "연속성: ")}{handoff.continuityNotes.join(" · ")}
+                          연속성: {handoff.continuityNotes.join(" · ")}
                         </p>
                       ) : null}
                       {handoff.acceptanceCriteria.length > 0 ? (
                         <p className="mt-1 text-xs text-fg-2">
-                          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "완료 기준: ")}{handoff.acceptanceCriteria.join(" · ")}
+                          완료 기준: {handoff.acceptanceCriteria.join(" · ")}
                         </p>
                       ) : null}
                       {handoff.lockedFields.length > 0 ? (
                         <p className="mt-2 text-xs text-fg-2">
-                          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "승인 필요: ")}{handoff.lockedFields.map((field) => AUTHORITY_LABELS[field]).join(" · ")}
+                          승인 필요: {handoff.lockedFields.map((field) => AUTHORITY_LABELS[field]).join(" · ")}
                         </p>
                       ) : null}
                     </div>
@@ -788,7 +812,7 @@ export function StudioProductionOperationsPanel({
                           event.currentTarget.value as ProductionHandoffStatus,
                         )}
                         disabled={!canEdit}
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "{v0} 상태"), { v0: String(scope?.title ?? "인계") })}
+                        aria-label={`${scope?.title ?? "인계"} 상태`}
                       >
                         {STUDIO_PRODUCTION_HANDOFF_STATUSES.map((status) => (
                           <option key={status} value={status}>{HANDOFF_LABELS[status]}</option>
@@ -799,7 +823,7 @@ export function StudioProductionOperationsPanel({
                         className={buttonClass({ variant: "quiet", size: "icon" })}
                         onClick={() => removeHandoff(handoff.id)}
                         disabled={!canEdit}
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionOperationsPanel", "ko", "{v0} 삭제"), { v0: String(scope?.title ?? "인계") })}
+                        aria-label={`${scope?.title ?? "인계"} 삭제`}
                       >
                         <Trash2 className="size-4" aria-hidden="true" />
                       </button>

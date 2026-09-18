@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Node Edit Panel
  * 벡터 스트로크(프리핸드 펜) 노드 편집 인스펙터 — 모드 토글 + 이동/굵기/스무딩 하위 도구.
@@ -76,15 +73,15 @@ export function StudioNodeEditPanel({
     <div className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5">
       {/* 헤더 + 모드 토글 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "노드 편집")}</p>
+        <p className="text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">노드 편집</p>
         <StudioToggleChip
           active={active}
           onClick={onToggle}
-          title={active ? translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "노드 편집을 끕니다.") : translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "노드 편집을 켜고 선 위의 점을 조절합니다.")}
+          title={active ? "노드 편집을 끕니다." : "노드 편집을 켜고 선 위의 점을 조절합니다."}
         >
           <span className="inline-flex items-center gap-1">
             <Spline className="size-3" aria-hidden />
-            {active ? translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "노드 편집 중") : translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "노드 편집 시작")}
+            {active ? "노드 편집 중" : "노드 편집 시작"}
           </span>
         </StudioToggleChip>
       </div>
@@ -93,7 +90,8 @@ export function StudioNodeEditPanel({
         <>
           {/* 하위 도구 — 이동 | 굵기(필압 굵기를 표현하지 않는 브러시면 비활성) | 스무딩 */}
           <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "도구")}<span className="flex flex-wrap items-center justify-end gap-1.5">
+            도구
+            <span className="flex flex-wrap items-center justify-end gap-1.5">
               {NODE_EDIT_TOOLS.map((t) => {
                 const disabled = t.id === "width" && !widthModeSupported;
                 return (
@@ -117,7 +115,8 @@ export function StudioNodeEditPanel({
 
           {tool === "smooth" && (
             <label className={PANEL_LABEL_ROW}>
-              {translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "스무딩 강도")}<span className="flex items-center gap-1.5">
+              스무딩 강도
+              <span className="flex items-center gap-1.5">
                 <input
                   type="range"
                   min={0}
@@ -126,7 +125,7 @@ export function StudioNodeEditPanel({
                   value={smoothStrength}
                   onChange={(e) => onSmoothStrengthChange(Number(e.target.value))}
                   className={PANEL_RANGE_CLASS}
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "스무딩 강도")}
+                  aria-label="스무딩 강도"
                 />
                 <span className={PANEL_READOUT_CLASS}>
                   {smoothStrength.toFixed(2)}
@@ -137,45 +136,55 @@ export function StudioNodeEditPanel({
 
           {!widthModeSupported && (
             <p className="text-[0.68rem] text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "이 브러시는 필압 굵기를 표현하지 않아 &apos;굵기&apos; 모드가 화면에 반영되지 않습니다. 펜·G펜·마커 브러시에서 사용하세요.")}</p>
+              이 브러시는 필압 굵기를 표현하지 않아 &apos;굵기&apos; 모드가 화면에 반영되지 않습니다.
+              펜·G펜·마커 브러시에서 사용하세요.
+            </p>
           )}
 
           {/* 사용법 힌트 — 편집할 점이 부족하면 대신 안내 */}
           {handleCount < 2 ? (
             <p role="status" className="text-[0.72rem] text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "편집할 점이 부족합니다.")}</p>
+              편집할 점이 부족합니다.
+            </p>
           ) : (
             <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
-              {translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "핸들을 끌어 선의 모양을 바꾸고, 굵기 모드에서는 위아래로 끌어 필압을 조절합니다. 편집은 즉시 반영되며 ⌘Z로 되돌릴 수 있습니다.")}</p>
+              핸들을 끌어 선의 모양을 바꾸고, 굵기 모드에서는 위아래로 끌어 필압을 조절합니다. 편집은
+              즉시 반영되며 ⌘Z로 되돌릴 수 있습니다.
+            </p>
           )}
           {tool === "smooth" && handleCount >= 2 && (
             <p className="text-[0.68rem] text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "핸들을 고른 뒤 위로 끌면 더 부드럽게, 아래로 끌면 원본에 가깝게 다듬어집니다. 슬라이더는 다음 드래그의 시작 강도를 정합니다.")}</p>
+              핸들을 고른 뒤 위로 끌면 더 부드럽게, 아래로 끌면 원본에 가깝게 다듬어집니다. 슬라이더는
+              다음 드래그의 시작 강도를 정합니다.
+            </p>
           )}
         </>
       ) : (
         <p className="text-[0.72rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "노드 편집을 시작하면 선 위에 조절 핸들이 나타납니다. 점을 옮기거나 굵기를 조절해 보세요.")}</p>
+          노드 편집을 시작하면 선 위에 조절 핸들이 나타납니다. 점을 옮기거나 굵기를 조절해 보세요.
+        </p>
       )}
 
       {onRefine ? (
         <section
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "경로 정리")}
+          aria-label="경로 정리"
           aria-busy={refinementBusy}
           className="space-y-2 border-t border-line/70 pt-2"
         >
           <div className="flex items-center justify-between gap-2">
             <p className="flex items-center gap-1.5 text-[0.68rem] font-semibold uppercase tracking-wider text-fg-3">
               {refinementBusy ? <Loader2 className="size-3 animate-spin text-accent" aria-hidden /> : null}
-              {translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "경로 정리")}</p>
+              경로 정리
+            </p>
             {refinementBusy && onCancelRefinement ? (
               <button
                 type="button"
                 onClick={onCancelRefinement}
                 className={PANEL_CHIP_CLASS}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "경로 정리 취소")}
+                aria-label="경로 정리 취소"
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "취소")}</button>
+                취소
+              </button>
             ) : null}
           </div>
           <div className="grid grid-cols-2 gap-1.5">
@@ -184,17 +193,19 @@ export function StudioNodeEditPanel({
               disabled={refinementDisabled}
               onClick={() => onRefine("simplify")}
               className={PANEL_CHIP_CLASS}
-              title={refinementUnavailableReason ?? translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "불필요한 점을 줄여 경로를 가볍게 만듭니다.")}
+              title={refinementUnavailableReason ?? "불필요한 점을 줄여 경로를 가볍게 만듭니다."}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "단순화")}</button>
+              단순화
+            </button>
             <button
               type="button"
               disabled={refinementDisabled}
               onClick={() => onRefine("smooth")}
               className={PANEL_CHIP_CLASS}
-              title={refinementUnavailableReason ?? translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "경로의 꺾임을 자연스러운 곡선으로 다듬습니다.")}
+              title={refinementUnavailableReason ?? "경로의 꺾임을 자연스러운 곡선으로 다듬습니다."}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "부드럽게")}</button>
+              부드럽게
+            </button>
           </div>
           <p
             className="text-[0.7rem] leading-relaxed text-fg-3"
@@ -212,18 +223,20 @@ export function StudioNodeEditPanel({
                 PANEL_CHIP_CLASS,
                 "min-h-11 w-full justify-center gap-1.5 pointer-coarse:min-h-11",
               )}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "선화 선택하기")}
+              aria-label="선화 선택하기"
               aria-describedby="studio-node-refinement-selection-help"
             >
               <MousePointer2 className="size-3.5" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "선화 선택하기")}</button>
+              선화 선택하기
+            </button>
           ) : null}
           {refinementUnavailableReason && onRequestSelectStroke && !refinementBusy ? (
             <p
               id="studio-node-refinement-selection-help"
               className="text-[0.65rem] leading-relaxed text-fg-3"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioNodeEditPanel", "ko", "선택 도구로 전환합니다. Esc를 누르면 선택을 취소할 수 있어요.")}</p>
+              선택 도구로 전환합니다. Esc를 누르면 선택을 취소할 수 있어요.
+            </p>
           ) : null}
         </section>
       ) : null}

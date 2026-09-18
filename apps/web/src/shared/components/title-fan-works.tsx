@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Heart, MessageCircle, Palette, PenLine } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -31,8 +27,8 @@ export function TitleFanWorks({ titleId }: { titleId: string }) {
   return (
     <Section
       eyebrow="FAN CREATION"
-      title={translateCurrentStaticSourceText("shared.components.title.fan.works", "ko", "팬 창작")}
-      desc={translateCurrentStaticSourceText("shared.components.title.fan.works", "ko", "이 작품을 좋아하는 사람들이 창작 스튜디오로 만든 팬 창작물이에요.")}
+      title="팬 창작"
+      desc="이 작품을 좋아하는 사람들이 창작 스튜디오로 만든 팬 창작물이에요."
       action={{ label: "이 웹툰으로 창작하기", href: studioHref }}
       className="mt-14"
     >
@@ -48,15 +44,15 @@ export function TitleFanWorks({ titleId }: { titleId: string }) {
           className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-line bg-card/30 px-6 py-10 text-center transition-colors hover:border-accent/50"
         >
           <Palette size={24} className="text-accent" />
-          <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("shared.components.title.fan.works", "ko", "아직 팬 창작물이 없어요.")}</p>
-          <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("shared.components.title.fan.works", "ko", "스튜디오로 이 웹툰의 첫 팬 창작물을 만들어보세요.")}</p>
+          <p className="text-sm font-medium text-fg">아직 팬 창작물이 없어요.</p>
+          <p className="text-xs text-fg-3">스튜디오로 이 웹툰의 첫 팬 창작물을 만들어보세요.</p>
         </Link>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {works.map((work) => (
             <Link
               key={work.id}
-              href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.title.fan.works", "en", "/create/{v0}"), { v0: String(work.id) })}
+              href={`/create/${work.id}`}
               className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-panel/30 transition-colors hover:border-line-strong"
             >
               <div className="relative aspect-[3/4] overflow-hidden bg-raised/40">

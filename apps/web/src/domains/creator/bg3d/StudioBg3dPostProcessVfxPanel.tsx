@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Aperture, Sparkles, Sun, Palette } from "lucide-react";
 import React, { useState } from "react";
 
@@ -44,25 +40,27 @@ export function StudioBg3dPostProcessVfxPanel({
       <div className="flex items-center justify-between border-b border-line pb-2">
         <div className="flex items-center gap-1.5 font-bold text-fg">
           <Aperture className="size-4 text-accent" />
-          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "ko", "렌즈 VFX & 시네마틱 후가공 (PostFX)")}</span>
+          <span>렌즈 VFX & 시네마틱 후가공 (PostFX)</span>
         </div>
         <span className="rounded bg-accent/15 px-1.5 py-0.5 font-mono text-[0.68rem] text-accent font-semibold">
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "en", "LUT: ")}{config.colorGrading}
+          LUT: {config.colorGrading}
         </span>
       </div>
 
       {/* Color Grading Presets */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-[0.68rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "ko", "컬러 그레이딩 무드 (Color LUT)")}</span>
+        <span className="text-[0.68rem] font-medium text-fg-3">컬러 그레이딩 무드 (Color LUT)</span>
         <div className="grid grid-cols-2 gap-1.5">
           {COLOR_GRADING_PRESETS.map((lut) => (
             <button
               key={lut.id}
               type="button"
               onClick={() => handleLutSelect(lut.id)}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "en", "flex flex-col items-start rounded-lg border p-2 text-left transition-all {v0}"), { v0: String(config.colorGrading === lut.id
+              className={`flex flex-col items-start rounded-lg border p-2 text-left transition-all ${
+                config.colorGrading === lut.id
                   ? "border-accent bg-accent/10 font-bold text-accent shadow-sm"
-                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
+                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+              }`}
             >
               <div className="flex items-center gap-1">
                 <Palette className="size-3 text-accent" />
@@ -79,23 +77,25 @@ export function StudioBg3dPostProcessVfxPanel({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 font-bold text-fg">
             <Aperture className="size-3.5 text-accent" />
-            <span className="text-[0.7rem]">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "ko", "카메라 피사계 심도 (DoF Bokeh)")}</span>
+            <span className="text-[0.7rem]">카메라 피사계 심도 (DoF Bokeh)</span>
           </div>
           <button
             type="button"
             onClick={handleToggleDof}
-            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "en", "rounded px-2 py-0.5 font-mono text-[0.65rem] font-bold transition-all {v0}"), { v0: String(config.dof.enabled
+            className={`rounded px-2 py-0.5 font-mono text-[0.65rem] font-bold transition-all ${
+              config.dof.enabled
                 ? "bg-accent text-accent-fg"
-                : "border border-line bg-raised text-fg-2 hover:text-fg") })}
+                : "border border-line bg-raised text-fg-2 hover:text-fg"
+            }`}
           >
-            {config.dof.enabled ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "ko", "활성화 ON") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "ko", "비활성 OFF")}
+            {config.dof.enabled ? "활성화 ON" : "비활성 OFF"}
           </button>
         </div>
 
         {config.dof.enabled && (
           <div className="flex flex-col gap-1.5 pt-1 border-t border-line/60">
             <div className="flex items-center justify-between">
-              <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "ko", "초점 거리 (Focus Dist):")}</span>
+              <span className="text-[0.68rem] text-fg-2">초점 거리 (Focus Dist):</span>
               <div className="flex items-center gap-2">
                 <input
                   type="range"
@@ -120,7 +120,7 @@ export function StudioBg3dPostProcessVfxPanel({
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "ko", "조리개 수치 (Aperture):")}</span>
+              <span className="text-[0.68rem] text-fg-2">조리개 수치 (Aperture):</span>
               <div className="flex items-center gap-1">
                 {[1.4, 2.8, 4.0, 8.0].map((f) => (
                   <button
@@ -131,9 +131,11 @@ export function StudioBg3dPostProcessVfxPanel({
                       setConfig(next);
                       onApplyPostProcessConfig?.(next);
                     }}
-                    className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "en", "rounded px-1.5 py-0.5 font-mono text-[0.65rem] font-bold {v0}"), { v0: String(config.dof.fStop === f
+                    className={`rounded px-1.5 py-0.5 font-mono text-[0.65rem] font-bold ${
+                      config.dof.fStop === f
                         ? "bg-accent text-accent-fg"
-                        : "border border-line bg-raised text-fg-2 hover:text-fg") })}
+                        : "border border-line bg-raised text-fg-2 hover:text-fg"
+                    }`}
                   >
                     f/{f}
                   </button>
@@ -149,22 +151,24 @@ export function StudioBg3dPostProcessVfxPanel({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 font-bold text-fg">
             <Sun className="size-3.5 text-accent" />
-            <span className="text-[0.7rem]">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "ko", "발광 블룸 글로우 (Bloom Glow)")}</span>
+            <span className="text-[0.7rem]">발광 블룸 글로우 (Bloom Glow)</span>
           </div>
           <button
             type="button"
             onClick={handleToggleBloom}
-            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "en", "rounded px-2 py-0.5 font-mono text-[0.65rem] font-bold transition-all {v0}"), { v0: String(config.bloom.enabled
+            className={`rounded px-2 py-0.5 font-mono text-[0.65rem] font-bold transition-all ${
+              config.bloom.enabled
                 ? "bg-accent text-accent-fg"
-                : "border border-line bg-raised text-fg-2 hover:text-fg") })}
+                : "border border-line bg-raised text-fg-2 hover:text-fg"
+            }`}
           >
-            {config.bloom.enabled ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "ko", "활성화 ON") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "ko", "비활성 OFF")}
+            {config.bloom.enabled ? "활성화 ON" : "비활성 OFF"}
           </button>
         </div>
 
         {config.bloom.enabled && (
           <div className="flex items-center justify-between pt-1 border-t border-line/60">
-            <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "ko", "글로우 강도:")}</span>
+            <span className="text-[0.68rem] text-fg-2">글로우 강도:</span>
             <div className="flex items-center gap-2">
               <input
                 type="range"
@@ -196,7 +200,7 @@ export function StudioBg3dPostProcessVfxPanel({
         className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90"
       >
         <Sparkles className="size-3.5" />
-        <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dPostProcessVfxPanel", "ko", "3D 뷰포트에 렌즈 PostFX 적용")}</span>
+        <span>3D 뷰포트에 렌즈 PostFX 적용</span>
       </button>
     </div>
   );

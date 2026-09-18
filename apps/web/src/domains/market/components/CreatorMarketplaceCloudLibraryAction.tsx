@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Archive, ArchiveRestore, Cloud, LoaderCircle, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -324,7 +321,8 @@ export function CreatorMarketplaceCloudLibraryAction({
     return (
       <div role="status" className="rounded-lg border border-line bg-panel px-3 py-2.5 text-xs text-fg-2">
         <LoaderCircle className="mr-1.5 inline h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-        {translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceCloudLibraryAction", "ko", "계정 라이브러리 세션 확인 중")}</div>
+        계정 라이브러리 세션 확인 중
+      </div>
     );
   }
 
@@ -333,10 +331,12 @@ export function CreatorMarketplaceCloudLibraryAction({
       <div className="rounded-lg border border-line bg-panel px-3 py-2.5 text-left">
         <p className="flex items-center gap-1.5 text-xs font-semibold text-fg">
           <Cloud className="h-3.5 w-3.5 text-fg-3" aria-hidden="true" />
-          {translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceCloudLibraryAction", "ko", "로그인 후 계정 라이브러리 사용")}</p>
+          로그인 후 계정 라이브러리 사용
+        </p>
         {!compact ? (
           <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceCloudLibraryAction", "ko", "계정 라이브러리는 기기별 설치와 별개이며, 로그인한 계정에서만 동기화됩니다.")}</p>
+            계정 라이브러리는 기기별 설치와 별개이며, 로그인한 계정에서만 동기화됩니다.
+          </p>
         ) : null}
       </div>
     );
@@ -362,15 +362,16 @@ export function CreatorMarketplaceCloudLibraryAction({
         <Cloud className="h-3.5 w-3.5 text-cool" aria-hidden="true" />
         {!effective
           ? loadState === "loading"
-            ? translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceCloudLibraryAction", "ko", "계정 라이브러리 확인 중")
-            : translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceCloudLibraryAction", "ko", "계정 라이브러리에 없음")
+            ? "계정 라이브러리 확인 중"
+            : "계정 라이브러리에 없음"
           : effective.membership === "active"
-            ? translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceCloudLibraryAction", "ko", "계정 라이브러리 · 활성")
-            : translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceCloudLibraryAction", "ko", "계정 라이브러리 · 보관됨")}
+            ? "계정 라이브러리 · 활성"
+            : "계정 라이브러리 · 보관됨"}
       </p>
       {item && !compact ? (
         <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-          {catalogStatus(item)}{translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceCloudLibraryAction", "ko", ". 이 표시는 계정 이력이며 현재 기기의 설치 증명이 아닙니다.")}</p>
+          {catalogStatus(item)}. 이 표시는 계정 이력이며 현재 기기의 설치 증명이 아닙니다.
+        </p>
       ) : acquisitionTarget?.state === "unavailable" && !compact ? (
         <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
           {{
@@ -383,10 +384,12 @@ export function CreatorMarketplaceCloudLibraryAction({
         && acquisitionTarget.currentHead.id !== record.id
         && !compact ? (
         <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceCloudLibraryAction", "ko", "선택한 릴리스는 과거 버전입니다. 계정 라이브러리에는 현재 v")}{acquisitionTarget.currentHead.resourceVersion}{translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceCloudLibraryAction", "ko", "을 추가합니다.")}</p>
+          선택한 릴리스는 과거 버전입니다. 계정 라이브러리에는 현재 v{acquisitionTarget.currentHead.resourceVersion}을 추가합니다.
+        </p>
       ) : !compact ? (
         <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceCloudLibraryAction", "ko", "계정 멤버십과 이 기기·브라우저의 실제 설치는 서로 독립적으로 관리됩니다.")}</p>
+          계정 멤버십과 이 기기·브라우저의 실제 설치는 서로 독립적으로 관리됩니다.
+        </p>
       ) : null}
       {error ? (
         <div role="alert" className="mt-2 rounded-md border border-bad/25 bg-bad/10 px-2 py-1.5 text-[0.68rem] leading-relaxed text-bad">
@@ -398,7 +401,8 @@ export function CreatorMarketplaceCloudLibraryAction({
             className="ml-1 inline-flex min-h-8 items-center gap-1 rounded px-1.5 font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80"
           >
             <RefreshCw className="h-3 w-3" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceCloudLibraryAction", "ko", "다시 확인")}</button>
+            다시 확인
+          </button>
         </div>
       ) : null}
       {message ? (
@@ -428,9 +432,9 @@ export function CreatorMarketplaceCloudLibraryAction({
           <ActionIcon className="h-3.5 w-3.5" aria-hidden="true" />
         )}
         {pending
-          ? translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceCloudLibraryAction", "ko", "계정 라이브러리 변경 중")
+          ? "계정 라이브러리 변경 중"
           : loadState === "loading"
-            ? translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceCloudLibraryAction", "ko", "계정 라이브러리 확인 중")
+            ? "계정 라이브러리 확인 중"
             : actionLabel}
       </button>
     </div>

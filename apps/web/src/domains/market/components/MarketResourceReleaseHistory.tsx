@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { formatMarketDate } from "../models/market-kind";
@@ -163,14 +159,16 @@ export function MarketResourceReleaseHistory({ resourceId }: MarketResourceRelea
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 id="market-release-history-heading" className="text-sm font-semibold text-fg">
-            {translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "ko", "버전 및 릴리스 노트")}</h2>
+            버전 및 릴리스 노트
+          </h2>
           <p className="mt-1 text-xs leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "ko", "현재 공개 상태인 같은 패키지 릴리스만 표시합니다.")}</p>
+            현재 공개 상태인 같은 패키지 릴리스만 표시합니다.
+          </p>
         </div>
       </div>
 
       {state.status === "loading" ? (
-        <p role="status" className="mt-4 text-sm text-fg-2">{translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "ko", "릴리스 이력을 불러오는 중…")}</p>
+        <p role="status" className="mt-4 text-sm text-fg-2">릴리스 이력을 불러오는 중…</p>
       ) : null}
 
       {state.status === "error" ? (
@@ -181,7 +179,8 @@ export function MarketResourceReleaseHistory({ resourceId }: MarketResourceRelea
             onClick={() => setRetryGeneration((value) => value + 1)}
             className={buttonClass({ variant: "outline", size: "sm", className: "mt-3 min-h-11" })}
           >
-            {translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "ko", "다시 시도")}</button>
+            다시 시도
+          </button>
         </div>
       ) : null}
 
@@ -189,30 +188,34 @@ export function MarketResourceReleaseHistory({ resourceId }: MarketResourceRelea
         <>
           {!state.page.anchor.listed ? (
             <p role="status" className="mt-4 rounded-lg border border-warn/40 bg-warn/10 p-3 text-xs leading-relaxed text-fg-2">
-              {translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "ko", "선택한 v")}{state.page.anchor.resourceVersion} {translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "ko", "릴리스는 현재 목록에서 내려갔습니다. 아래에는 지금 공개적으로 열 수 있는 릴리스만 표시합니다.")}</p>
+              선택한 v{state.page.anchor.resourceVersion} 릴리스는 현재 목록에서 내려갔습니다.
+              아래에는 지금 공개적으로 열 수 있는 릴리스만 표시합니다.
+            </p>
           ) : null}
 
           {state.page.items.length === 0 ? (
             <p className="mt-4 rounded-lg bg-panel p-3 text-sm text-fg-2">
-              {translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "ko", "현재 공개된 이전 릴리스가 없습니다.")}</p>
+              현재 공개된 이전 릴리스가 없습니다.
+            </p>
           ) : (
             <ol className="mt-4 space-y-2">
               {state.page.items.map((item) => (
                 <li
                   key={item.id}
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "en", "rounded-lg border p-3 {v0}"), { v0: String(item.selected ? "border-accent bg-accent/5" : "border-line bg-panel") })}
+                  className={`rounded-lg border p-3 ${item.selected ? "border-accent bg-accent/5" : "border-line bg-panel"}`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
-                        href={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "en", "/market/resource/{v0}"), { v0: String(item.id) })}
+                        href={`/market/resource/${item.id}`}
                         className="inline-flex min-h-11 items-center font-semibold text-fg underline decoration-line-strong underline-offset-2 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80"
                       >
                         v{item.resourceVersion}
                       </Link>
                       {item.selected ? (
                         <span className="rounded bg-accent px-2 py-0.5 text-[0.68rem] font-semibold text-on-accent">
-                          {translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "ko", "선택한 릴리스")}</span>
+                          선택한 릴리스
+                        </span>
                       ) : null}
                     </div>
                     <span className="text-xs text-fg-3">
@@ -221,10 +224,10 @@ export function MarketResourceReleaseHistory({ resourceId }: MarketResourceRelea
                   </div>
                   <p className="mt-1 text-sm font-medium text-fg">{item.name}</p>
                   <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-fg-2">
-                    {item.releaseNotes ?? translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "ko", "릴리스 노트 없음")}
+                    {item.releaseNotes ?? "릴리스 노트 없음"}
                   </p>
                   <p className="mt-1 text-[0.68rem] text-fg-3">
-                    {translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "ko", "최소 Studio v")}{item.minimumStudioVersion}
+                    최소 Studio v{item.minimumStudioVersion}
                   </p>
                 </li>
               ))}
@@ -241,7 +244,7 @@ export function MarketResourceReleaseHistory({ resourceId }: MarketResourceRelea
               disabled={loadingMore}
               className={buttonClass({ variant: "outline", size: "sm", className: "mt-3 min-h-11 w-full" })}
             >
-              {loadingMore ? translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "ko", "더 불러오는 중…") : loadMoreError ? translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "ko", "다시 불러오기") : translateCurrentStaticSourceText("domains.market.components.MarketResourceReleaseHistory", "ko", "이전 릴리스 더 보기")}
+              {loadingMore ? "더 불러오는 중…" : loadMoreError ? "다시 불러오기" : "이전 릴리스 더 보기"}
             </button>
           ) : null}
         </>

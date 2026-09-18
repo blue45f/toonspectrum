@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
@@ -286,12 +285,13 @@ export function IntroSplash({ once = true }: IntroSplashProps = {}) {
         </div>
 
         <h1 className={styles.splashTitle}>
-          {translateCurrentStaticSourceText("shared.components.IntroSplash", "en", "TOON")}<span className={styles.accentText}>{translateCurrentStaticSourceText("shared.components.IntroSplash", "en", "SPECTRUM")}</span>
+          TOON<span className={styles.accentText}>SPECTRUM</span>
         </h1>
         <div className={styles.splashLine} />
         <span className={styles.splashSubtitle}>
-          {translateCurrentStaticSourceText("shared.components.IntroSplash", "en", "WEBTOON CATALOG & CREATOR STUDIO")}</span>
-        <span className={styles.betaBadge}>{translateCurrentStaticSourceText("shared.components.IntroSplash", "en", "Beta Service")}</span>
+          WEBTOON CATALOG & CREATOR STUDIO
+        </span>
+        <span className={styles.betaBadge}>Beta Service</span>
       </div>
     </div>
   );

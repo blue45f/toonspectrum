@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Thin Studio UI surface for Hybrid DCC workspace (product exposure).
  * Pure workspace kernels drive state; this panel is the React shell only.
@@ -1002,22 +998,23 @@ export function StudioHybridDccPanel({
       className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto bg-canvas/35 p-3 text-sm [&>*]:shrink-0 sm:p-4"
       data-studio-hybrid-dcc-panel="true"
       data-workbench-mode={workbenchMode}
-      aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "전문 3D 제작 작업 공간")}
+      aria-label="전문 3D 제작 작업 공간"
     >
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="font-semibold tracking-tight text-fg">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "전문 3D 제작 스튜디오")}</h3>
+          <h3 className="font-semibold tracking-tight text-fg">전문 3D 제작 스튜디오</h3>
           <p className="mt-0.5 text-xs text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "편집 가능한 3D 원본 → 안전한 미리보기·내보내기 → 웹툰 컷과 선화")}</p>
+            편집 가능한 3D 원본 → 안전한 미리보기·내보내기 → 웹툰 컷과 선화
+          </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-1.5 text-[11px]">
           {persistenceStatus ? (
             <span
               className={persistenceStatus === "saved"
-                ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "rounded-full border border-good/35 bg-good/10 px-2 py-1 text-good")
+                ? "rounded-full border border-good/35 bg-good/10 px-2 py-1 text-good"
                 : persistenceStatus === "error"
-                  ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "rounded-full border border-warn/45 bg-warn/10 px-2 py-1 text-warn")
-                  : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "rounded-full border border-line bg-panel px-2 py-1 text-fg-2")}
+                  ? "rounded-full border border-warn/45 bg-warn/10 px-2 py-1 text-warn"
+                  : "rounded-full border border-line bg-panel px-2 py-1 text-fg-2"}
               role="status"
               data-studio-hybrid-dcc-persistence={persistenceStatus}
               data-studio-hybrid-dcc-persistence-sequence={persistenceReceipt?.sequence}
@@ -1033,7 +1030,7 @@ export function StudioHybridDccPanel({
             type="button"
             className="min-h-11 rounded-lg border border-line bg-card px-3 font-semibold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
             disabled={busy || ws.session.undoStack.length === 0}
-            aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "마지막 3D 편집 되돌리기")}
+            aria-label="마지막 3D 편집 되돌리기"
             onClick={() => {
               void run("되돌리기", () => {
                 const workspace = workspaceUndo(ws);
@@ -1047,12 +1044,13 @@ export function StudioHybridDccPanel({
               });
             }}
           >
-            {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "↶ 되돌리기")}</button>
+            ↶ 되돌리기
+          </button>
           <button
             type="button"
             className="min-h-11 rounded-lg border border-line bg-card px-3 font-semibold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
             disabled={busy || ws.session.redoStack.length === 0}
-            aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "되돌린 3D 편집 다시 실행")}
+            aria-label="되돌린 3D 편집 다시 실행"
             onClick={() => {
               void run("다시 실행", () => {
                 const workspace = workspaceRedo(ws);
@@ -1066,18 +1064,22 @@ export function StudioHybridDccPanel({
               });
             }}
           >
-            {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "↷ 다시 실행")}</button>
+            ↷ 다시 실행
+          </button>
           <span className="rounded-full border border-good/35 bg-good/10 px-2 py-1 text-good">
-            {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "편집 원본 보호")}</span>
+            편집 원본 보호
+          </span>
           <span className="rounded-full border border-line bg-panel px-2 py-1 text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "오브젝트 ")}{authorityRecords.length}{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "개")}</span>
+            오브젝트 {authorityRecords.length}개
+          </span>
           <span className="rounded-full border border-line bg-panel px-2 py-1 text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "컷 ")}{ws.bridge.shots.length}{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "개")}</span>
+            컷 {ws.bridge.shots.length}개
+          </span>
         </div>
       </header>
       <nav
         className="flex max-w-full gap-1 overflow-x-auto rounded-xl border border-line bg-panel p-1"
-        aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "DCC 작업 모드")}
+        aria-label="DCC 작업 모드"
       >
         {STUDIO_HYBRID_DCC_WORKBENCH_MODES.map((mode) => (
           <button
@@ -1087,8 +1089,8 @@ export function StudioHybridDccPanel({
             aria-pressed={workbenchMode === mode.id}
             className={
               workbenchMode === mode.id
-                ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "min-h-11 shrink-0 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent")
-                : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "min-h-11 shrink-0 rounded-lg px-3 text-xs font-medium text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent")
+                ? "min-h-11 shrink-0 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                : "min-h-11 shrink-0 rounded-lg px-3 text-xs font-medium text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             }
             onClick={() => changeWorkbenchMode(mode.id)}
           >
@@ -1126,12 +1128,13 @@ export function StudioHybridDccPanel({
             </p>
           </div>
           <span className="rounded-full border border-line bg-raised px-2 py-1 text-[10px] text-fg-2">
-            {quickTools.length}{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "개 추천 도구")}</span>
+            {quickTools.length}개 추천 도구
+          </span>
         </div>
         {workbenchMode === "sculpt" ? (
           <div
             role="radiogroup"
-            aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "조형 브러시 종류")}
+            aria-label="조형 브러시 종류"
             className="mt-3 flex flex-wrap gap-1.5 rounded-xl border border-line/70 bg-canvas/35 p-2"
           >
             {(Object.keys(SCULPT_BRUSH_LABELS) as readonly StudioSculptBrushKind[]).map((kind) => (
@@ -1141,9 +1144,11 @@ export function StudioHybridDccPanel({
                 role="radio"
                 aria-checked={sculptBrushKind === kind}
                 onClick={() => setSculptBrushKind(kind)}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "min-h-9 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(sculptBrushKind === kind
+                className={`min-h-9 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                  sculptBrushKind === kind
                     ? "border-accent bg-accent-soft text-accent"
-                    : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
+                    : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+                }`}
               >
                 {SCULPT_BRUSH_LABELS[kind]}
               </button>
@@ -1152,17 +1157,19 @@ export function StudioHybridDccPanel({
               type="button"
               aria-pressed={sculptDig}
               onClick={() => setSculptDig((current) => !current)}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "min-h-9 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(sculptDig
+              className={`min-h-9 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                sculptDig
                   ? "border-warn bg-warn/10 text-warn"
-                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
+                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+              }`}
             >
-              {sculptDig ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "깎기 모드 ON") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "깎기 모드 OFF")}
+              {sculptDig ? "깎기 모드 ON" : "깎기 모드 OFF"}
             </button>
           </div>
         ) : null}
         <div
           className="mt-3 grid gap-2 max-sm:-mx-1 max-sm:flex max-sm:snap-x max-sm:overflow-x-auto max-sm:px-1 max-sm:pb-1 sm:grid-cols-2 xl:grid-cols-4"
-          aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "추천 3D 도구")}
+          aria-label="추천 3D 도구"
         >
           {quickTools.map((tool) => {
             const disabled = busy || tool.disabled || (tool.requiresAsset && !ws.activeAssetId);
@@ -1173,11 +1180,11 @@ export function StudioHybridDccPanel({
                 disabled={disabled}
                 onClick={tool.onClick}
                 className={tool.primary
-                  ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "group min-h-28 rounded-xl border border-accent/55 bg-accent-soft p-3 text-left shadow-sm transition-colors hover:bg-accent/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none max-sm:min-w-[82%] max-sm:snap-start")
-                  : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "group min-h-28 rounded-xl border border-line bg-card p-3 text-left transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none max-sm:min-w-[82%] max-sm:snap-start")}
+                  ? "group min-h-28 rounded-xl border border-accent/55 bg-accent-soft p-3 text-left shadow-sm transition-colors hover:bg-accent/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none max-sm:min-w-[82%] max-sm:snap-start"
+                  : "group min-h-28 rounded-xl border border-line bg-card p-3 text-left transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none max-sm:min-w-[82%] max-sm:snap-start"}
               >
                 <span className="flex items-start justify-between gap-2">
-                  <span className={tool.primary ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "font-semibold text-accent") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "font-semibold text-fg")}>
+                  <span className={tool.primary ? "font-semibold text-accent" : "font-semibold text-fg"}>
                     {tool.label}
                   </span>
                   <span className="shrink-0 rounded bg-raised px-1.5 py-0.5 font-mono text-[9px] text-fg-3">
@@ -1189,7 +1196,8 @@ export function StudioHybridDccPanel({
                 </span>
                 {tool.requiresAsset && !ws.activeAssetId ? (
                   <span className="mt-2 block text-[10px] font-medium text-warn">
-                    {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "먼저 오브젝트를 선택하세요")}</span>
+                    먼저 오브젝트를 선택하세요
+                  </span>
                 ) : null}
               </button>
             );
@@ -1197,9 +1205,9 @@ export function StudioHybridDccPanel({
         </div>
       </section>
       <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(180px,220px)_minmax(0,1fr)_minmax(220px,280px)]">
-        <aside className="order-2 min-w-0 rounded-2xl border border-line bg-panel p-2 xl:order-1" aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "DCC 아웃라이너")}>
+        <aside className="order-2 min-w-0 rounded-2xl border border-line bg-panel p-2 xl:order-1" aria-label="DCC 아웃라이너">
           <div className="flex items-center justify-between gap-2 px-2 py-1.5">
-            <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-2">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "장면 오브젝트")}</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-2">장면 오브젝트</h4>
             <span className="text-[10px] tabular-nums text-fg-3">{authorityRecords.length}</span>
           </div>
           <div className="max-h-none space-y-1 overflow-visible xl:max-h-[31rem] xl:overflow-y-auto">
@@ -1211,8 +1219,8 @@ export function StudioHybridDccPanel({
                 <div
                   key={record.assetId}
                   className={selected
-                    ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "flex min-h-11 w-full items-stretch rounded-lg border border-accent/45 bg-accent-soft text-accent")
-                    : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "flex min-h-11 w-full items-stretch rounded-lg border border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg")}
+                    ? "flex min-h-11 w-full items-stretch rounded-lg border border-accent/45 bg-accent-soft text-accent"
+                    : "flex min-h-11 w-full items-stretch rounded-lg border border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg"}
                 >
                   <button
                     type="button"
@@ -1225,14 +1233,14 @@ export function StudioHybridDccPanel({
                       {friendlyHybridDccAssetName(record.assetId, recordIndex)}
                     </span>
                     <span className="block truncate text-[10px] opacity-70">
-                      {record.assetId} {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "· 버전 ")}{record.revision}
+                      {record.assetId} · 버전 {record.revision}
                     </span>
                   </button>
                   <button
                     type="button"
                     disabled={busy}
                     aria-label={`${record.assetId} ${visible ? "숨기기" : "보이기"}`}
-                    title={visible ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "뷰포트에서 잠시 숨기기") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "뷰포트에 다시 보이기")}
+                    title={visible ? "뷰포트에서 잠시 숨기기" : "뷰포트에 다시 보이기"}
                     className="min-h-11 min-w-14 shrink-0 border-l border-current/15 px-2 text-[10px] font-semibold opacity-75 hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35"
                     onClick={() => {
                       try {
@@ -1243,13 +1251,14 @@ export function StudioHybridDccPanel({
                       }
                     }}
                   >
-                    {visible ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "표시 중") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "숨김")}
+                    {visible ? "표시 중" : "숨김"}
                   </button>
                 </div>
               );
             }) : (
               <p className="rounded-lg border border-dashed border-line px-3 py-6 text-center text-xs leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "큐브 또는 정밀 솔리드를 만들면 편집 가능한 오브젝트가 여기에 표시됩니다.")}</p>
+                큐브 또는 정밀 솔리드를 만들면 편집 가능한 오브젝트가 여기에 표시됩니다.
+              </p>
             )}
           </div>
         </aside>
@@ -1291,9 +1300,9 @@ export function StudioHybridDccPanel({
           />
         </div>
 
-        <aside className="order-3 min-w-0 rounded-2xl border border-line bg-panel p-3" aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "DCC 인스펙터")}>
+        <aside className="order-3 min-w-0 rounded-2xl border border-line bg-panel p-3" aria-label="DCC 인스펙터">
           <div className="flex items-center justify-between gap-2 border-b border-line pb-2">
-            <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-2">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "선택 정보")}</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-2">선택 정보</h4>
             <span className="rounded-md bg-raised px-1.5 py-0.5 text-[10px] text-fg-3">
               {STUDIO_HYBRID_DCC_WORKBENCH_MODES.find(({ id }) => id === workbenchMode)?.label}
             </span>
@@ -1312,34 +1321,34 @@ export function StudioHybridDccPanel({
               >
                 <p className="font-semibold text-accent">
                   {componentSelection.mode === "object"
-                    ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "오브젝트 편집")
+                    ? "오브젝트 편집"
                     : componentSelection.mode === "vertex"
-                      ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "꼭짓점 {v0}개 선택"), { v0: String(componentSelection.elementIds.length) })
+                      ? `꼭짓점 ${componentSelection.elementIds.length}개 선택`
                       : componentSelection.mode === "edge"
-                        ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "모서리 {v0}개 선택"), { v0: String(componentSelection.elementIds.length) })
-                        : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "면 {v0}개 선택"), { v0: String(componentSelection.elementIds.length) })}
+                        ? `모서리 ${componentSelection.elementIds.length}개 선택`
+                        : `면 ${componentSelection.elementIds.length}개 선택`}
                 </p>
                 <p className="mt-0.5 text-[10px] text-fg-3">
                   {componentSelection.mode === "object"
-                    ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "위치·회전·크기를 바꾸거나 1·2·3 키로 메시 요소 편집을 시작하세요.")
-                    : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "3D 화면에서 클릭해 선택합니다. Shift 추가 · Ctrl 전환 · Alt 빼기")}
+                    ? "위치·회전·크기를 바꾸거나 1·2·3 키로 메시 요소 편집을 시작하세요."
+                    : "3D 화면에서 클릭해 선택합니다. Shift 추가 · Ctrl 전환 · Alt 빼기"}
                 </p>
               </div>
               <dl className="grid grid-cols-2 gap-1.5 text-xs">
                 <div className="rounded-lg bg-raised p-2">
-                  <dt className="text-[10px] text-fg-3">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "꼭짓점")}</dt>
+                  <dt className="text-[10px] text-fg-3">꼭짓점</dt>
                   <dd className="mt-0.5 font-semibold tabular-nums text-fg">{activeRecord.mesh.vertices.length}</dd>
                 </div>
                 <div className="rounded-lg bg-raised p-2">
-                  <dt className="text-[10px] text-fg-3">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "면")}</dt>
+                  <dt className="text-[10px] text-fg-3">면</dt>
                   <dd className="mt-0.5 font-semibold tabular-nums text-fg">{activeRecord.mesh.faces.length}</dd>
                 </div>
                 <div className="rounded-lg bg-raised p-2">
-                  <dt className="text-[10px] text-fg-3">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "방향 모서리")}</dt>
+                  <dt className="text-[10px] text-fg-3">방향 모서리</dt>
                   <dd className="mt-0.5 font-semibold tabular-nums text-fg">{activeRecord.mesh.halfEdges.length}</dd>
                 </div>
                 <div className="rounded-lg bg-raised p-2">
-                  <dt className="text-[10px] text-fg-3">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "편집 버전")}</dt>
+                  <dt className="text-[10px] text-fg-3">편집 버전</dt>
                   <dd className="mt-0.5 font-semibold tabular-nums text-fg">{activeRecord.revision}</dd>
                 </div>
               </dl>
@@ -1350,9 +1359,11 @@ export function StudioHybridDccPanel({
                   disabled={busy}
                 >
                   <legend className="px-1 text-[10px] font-semibold uppercase tracking-wide text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "위치 · 회전 · 크기")}</legend>
+                    위치 · 회전 · 크기
+                  </legend>
                   <p className="mb-2 text-[10px] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "기즈모로 움직이거나 숫자를 입력하세요. Enter 또는 포커스 이동 시 한 번의 되돌리기 명령으로 저장됩니다.")}</p>
+                    기즈모로 움직이거나 숫자를 입력하세요. Enter 또는 포커스 이동 시 한 번의 되돌리기 명령으로 저장됩니다.
+                  </p>
                   {([
                     { key: "position", label: "위치", unit: "m", step: 0.1 },
                     { key: "rotationEulerRad", label: "회전", unit: "°", step: 1 },
@@ -1371,10 +1382,10 @@ export function StudioHybridDccPanel({
                           return (
                             <label key={axisLabel} className="relative">
                               <span className={axisLabel === "X"
-                                ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-bad")
+                                ? "absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-bad"
                                 : axisLabel === "Y"
-                                  ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-good")
-                                  : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-accent")}>
+                                  ? "absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-good"
+                                  : "absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-accent"}>
                                 {axisLabel}
                               </span>
                               <input
@@ -1401,15 +1412,16 @@ export function StudioHybridDccPanel({
                 </fieldset>
               ) : null}
               <div className="rounded-lg border border-line p-2 text-[11px] leading-relaxed text-fg-2">
-                <p>{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "권리: ")}{activeRights ? `${activeRights.license} · ${activeRights.creator}` : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "미확인")}</p>
-                <p>{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "UV: ")}{ws.lastUvMap?.mode ?? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "미생성")}</p>
-                <p>{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "화면용 메시: ")}{activeRecord.renderCache ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "비파괴 결과 표시 중") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "원본 직접 표시")}</p>
+                <p>권리: {activeRights ? `${activeRights.license} · ${activeRights.creator}` : "미확인"}</p>
+                <p>UV: {ws.lastUvMap?.mode ?? "미생성"}</p>
+                <p>화면용 메시: {activeRecord.renderCache ? "비파괴 결과 표시 중" : "원본 직접 표시"}</p>
               </div>
             </div>
           ) : (
             <div className="grid min-h-52 place-items-center text-center">
               <p className="max-w-48 text-xs leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "3D 화면이나 장면 목록에서 오브젝트를 선택하면 원본 메시와 변형 상태를 보여 줍니다.")}</p>
+                3D 화면이나 장면 목록에서 오브젝트를 선택하면 원본 메시와 변형 상태를 보여 줍니다.
+              </p>
             </div>
           )}
         </aside>
@@ -1449,7 +1461,8 @@ export function StudioHybridDccPanel({
 
       <details className="rounded-2xl border border-line bg-panel">
         <summary className="flex min-h-11 cursor-pointer select-none items-center px-3 py-2.5 text-xs font-semibold text-fg-2 marker:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "전문가용 전체 엔진 도구 · 이름과 동작을 알고 있을 때 펼치기")}</summary>
+          전문가용 전체 엔진 도구 · 이름과 동작을 알고 있을 때 펼치기
+        </summary>
         <div className="flex flex-wrap gap-2 border-t border-line p-3 [&>button]:min-h-11 [&>button]:border-line [&>button]:bg-card [&>button]:text-fg-2 [&>button]:hover:bg-raised [&>button]:hover:text-fg [&>button]:focus-visible:outline [&>button]:focus-visible:outline-2 [&>button]:focus-visible:outline-offset-2 [&>button]:focus-visible:outline-accent">
         <button
           type="button"
@@ -1457,35 +1470,40 @@ export function StudioHybridDccPanel({
           disabled={busy}
           onClick={() => run("Add cube", () => workspaceAddUnitCube(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Add cube")}</button>
+          Add cube
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy}
           onClick={() => run("Geo sphere", () => workspaceAddGeoNodesPrimitive(ws, "sphere"))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Geo sphere")}</button>
+          Geo sphere
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy}
           onClick={() => run("Geo starter", () => workspaceAddGeoNodesStarter(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Geo starter")}</button>
+          Geo starter
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
           onClick={() => runModifier("Solidify 변형 추가", () => workspaceAddActiveModifier(ws, "solidify"))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Solidify")}</button>
+          Solidify
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy}
           onClick={() => run("CAD revolve", () => workspaceCadRevolve(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "CAD revolve")}</button>
+          CAD revolve
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1493,7 +1511,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="opennurbs-sphere"
           onClick={() => run("openNURBS sphere", () => workspaceOpenNurbsSphere(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "openNURBS sphere")}</button>
+          openNURBS sphere
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1501,7 +1520,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="ifc-city"
           onClick={() => run("IFC city", () => workspaceImportIfcCity(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "IFC city")}</button>
+          IFC city
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1509,7 +1529,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-box"
           onClick={() => run("OCCT box", () => workspaceOcctBox(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT box")}</button>
+          OCCT box
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1517,7 +1538,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-cut"
           onClick={() => run("OCCT cut", () => workspaceOcctBooleanCut(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT boolean")}</button>
+          OCCT boolean
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1525,7 +1547,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-revolve"
           onClick={() => run("OCCT revolve", () => workspaceOcctRevolve(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT revolve")}</button>
+          OCCT revolve
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1533,7 +1556,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-sphere"
           onClick={() => run("OCCT sphere", () => workspaceOcctSphere(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT sphere")}</button>
+          OCCT sphere
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1541,7 +1565,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-torus"
           onClick={() => run("OCCT torus", () => workspaceOcctTorus(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT torus")}</button>
+          OCCT torus
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1549,7 +1574,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-pipe"
           onClick={() => run("OCCT pipe", () => workspaceOcctPipe(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT pipe")}</button>
+          OCCT pipe
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1557,7 +1583,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-mirror"
           onClick={() => run("OCCT mirror", () => workspaceOcctMirror(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT mirror")}</button>
+          OCCT mirror
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1565,7 +1592,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-thick"
           onClick={() => run("OCCT thick shell", () => workspaceOcctThickShell(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT thick")}</button>
+          OCCT thick
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1573,7 +1601,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-wedge"
           onClick={() => run("OCCT wedge", () => workspaceOcctWedge(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT wedge")}</button>
+          OCCT wedge
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1581,7 +1610,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-offset"
           onClick={() => run("OCCT offset", () => workspaceOcctOffsetShape(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT offset")}</button>
+          OCCT offset
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1589,7 +1619,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-fillet2d"
           onClick={() => run("OCCT fillet2d extrude", () => workspaceOcctFillet2dExtrude(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT fillet2d")}</button>
+          OCCT fillet2d
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1597,7 +1628,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-pipeshell"
           onClick={() => run("OCCT pipe shell", () => workspaceOcctPipeShell(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT pipe shell")}</button>
+          OCCT pipe shell
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1605,7 +1637,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-section"
           onClick={() => run("OCCT section", () => workspaceOcctSection(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT section")}</button>
+          OCCT section
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1613,7 +1646,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-dprism"
           onClick={() => run("OCCT draft prism", () => workspaceOcctDraftPrism(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT draft prism")}</button>
+          OCCT draft prism
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1621,7 +1655,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-pattern"
           onClick={() => run("OCCT linear pattern", () => workspaceOcctLinearPattern(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT pattern")}</button>
+          OCCT pattern
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1629,7 +1664,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-circular"
           onClick={() => run("OCCT circular pattern", () => workspaceOcctCircularPattern(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT circular")}</button>
+          OCCT circular
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1637,7 +1673,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-step"
           onClick={() => run("OCCT STEP round-trip", () => workspaceOcctStepRoundTrip(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT STEP")}</button>
+          OCCT STEP
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1653,7 +1690,8 @@ export function StudioHybridDccPanel({
             })
           }
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Boolean 2 assets")}</button>
+          Boolean 2 assets
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1661,7 +1699,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-fillet"
           onClick={() => run("OCCT fillet", () => workspaceOcctFillet(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT fillet")}</button>
+          OCCT fillet
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1669,7 +1708,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="occt-loft"
           onClick={() => run("OCCT loft", () => workspaceOcctLoft(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "OCCT loft")}</button>
+          OCCT loft
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1677,7 +1717,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="manifold-boolean"
           onClick={() => run("Manifold boolean", () => workspaceManifoldBooleanActive(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Manifold boolean")}</button>
+          Manifold boolean
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1685,7 +1726,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="dynatopo"
           onClick={() => run("Dynatopo", () => workspaceDynatopoActive(ws, "refine"))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Dynatopo")}</button>
+          Dynatopo
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1693,14 +1735,16 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="retopo"
           onClick={() => run("Retopo", () => workspaceRetopoActive(ws, 8))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Retopo")}</button>
+          Retopo
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
           onClick={() => run("Export OBJ", () => workspaceExportActiveMesh(ws, "obj"))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Export OBJ")}</button>
+          Export OBJ
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1715,14 +1759,16 @@ export function StudioHybridDccPanel({
             })
           }
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Full engines")}</button>
+          Full engines
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
           onClick={() => run("Decimate", () => workspaceDecimateActive(ws, 0.5))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Decimate")}</button>
+          Decimate
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1730,7 +1776,8 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="orient-outward"
           onClick={() => run("Orient outward", () => workspaceOrientOutwardActive(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Orient outward")}</button>
+          Orient outward
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1742,128 +1789,146 @@ export function StudioHybridDccPanel({
               : workspaceExtrudeActive(ws, 0.25, faceIds);
           })}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Extrude")}</button>
+          Extrude
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
           onClick={() => run("Knife", () => workspaceKnifeActive(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Knife")}</button>
+          Knife
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
           onClick={() => run("Boolean", () => workspaceBooleanDifference(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Boolean −")}</button>
+          Boolean −
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
           onClick={() => runModifier("Mirror 변형 추가", () => workspaceAddActiveModifier(ws, "mirror"))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Mirror")}</button>
+          Mirror
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
           onClick={() => run("Subdiv", () => workspaceSubdivideActive(ws, 1))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Subdiv")}</button>
+          Subdiv
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
           onClick={() => runModifier("Array 변형 추가", () => workspaceAddActiveModifier(ws, "array"))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Array")}</button>
+          Array
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy}
           onClick={() => run("BOM", () => workspaceRebuildBom(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "BOM")}</button>
+          BOM
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
           onClick={() => run("UV", () => workspaceUvUnwrapActive(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "UV unwrap")}</button>
+          UV unwrap
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
-          title={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "검증된 전문 Sculpt provider 연결 전의 voxel-lite 실험 기능")}
+          title="검증된 전문 Sculpt provider 연결 전의 voxel-lite 실험 기능"
           onClick={() => run("Sculpt", () => workspaceSculptActive(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "Sculpt · voxel-lite 실험")}</button>
+          Sculpt · voxel-lite 실험
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy}
           onClick={() => run("CAD prop", () => workspaceCadProp(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "CAD prop")}</button>
+          CAD prop
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
-          title={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "1/120초 고정 스텝 · 구조/굽힘/봉제/충돌을 계산하는 XPBD v2")}
+          title="1/120초 고정 스텝 · 구조/굽힘/봉제/충돌을 계산하는 XPBD v2"
           onClick={() => run("천 시뮬레이션", () => workspaceClothStep(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "천 시뮬레이션 1스텝")}</button>
+          천 시뮬레이션 1스텝
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy}
           onClick={() => run("Collab join", () => workspaceCollabJoin(ws, "peer-local", "Artist"))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Collab")}</button>
+          Collab
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy}
           onClick={() => run("8 shots", () => workspaceEnsureShots(ws, 8))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "8 shots")}</button>
+          8 shots
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy}
           onClick={() => run("Artist ink", () => workspaceAddArtistInk(ws, "shot-1"))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Artist ink")}</button>
+          Artist ink
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy}
           onClick={() => run("Room", () => workspaceLoadEditableRoomPreset(ws, "classroom"))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Room")}</button>
+          Room
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy}
           onClick={() => fileRef.current?.click()}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Import mesh…")}</button>
+          Import mesh…
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy}
           onClick={() => run("Undo", () => workspaceUndo(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Undo")}</button>
+          Undo
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy}
           onClick={() => run("Redo", () => workspaceRedo(ws))}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Redo")}</button>
+          Redo
+        </button>
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1875,7 +1940,8 @@ export function StudioHybridDccPanel({
             );
           }}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "Export .toon3d")}</button>
+          Export .toon3d
+        </button>
         <button
           type="button"
           className="rounded border border-accent/60 bg-accent px-3 py-1 font-medium text-on-accent shadow-sm hover:bg-accent-2 disabled:opacity-50"
@@ -1883,19 +1949,20 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="open-bg3d"
           onClick={() => void openInBackground3d()}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "3D 배경 · 컷 편집기로 열기")}</button>
+          3D 배경 · 컷 편집기로 열기
+        </button>
       </div>
       </details>
       <footer className="sticky bottom-0 z-10 min-w-0 rounded-xl border border-line bg-panel/95 px-3 py-2 shadow-lg backdrop-blur [overflow-wrap:anywhere]">
         <p className="min-w-0 break-words text-xs text-fg [overflow-wrap:anywhere]" data-studio-hybrid-dcc-log="true" aria-live="polite">
-          {busy ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "작업 처리 중… ") : ""}{log}
+          {busy ? "작업 처리 중… " : ""}{log}
         </p>
         <p
           className="mt-1 min-w-0 break-words text-[10px] text-fg-3 [overflow-wrap:anywhere]"
           data-studio-hybrid-dcc-stats="true"
           data-studio-hybrid-dcc-state-hash={ws.session.state.stateHash}
           data-assets={Object.keys(ws.session.state.geometry.records).length}
-          data-active={ws.activeAssetId ?? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "en", "none")}
+          data-active={ws.activeAssetId ?? "none"}
           data-shots={ws.bridge.shots.length}
           data-ink={ws.bridge.artistCorrections.deltas.length}
           data-uv={ws.lastUvMap?.mode ?? ""}
@@ -1908,7 +1975,8 @@ export function StudioHybridDccPanel({
           data-dynatopo-faces={ws.lastDynatopo?.facesAfter ?? 0}
           data-retopo-faces={ws.lastRetopo?.facesAfter ?? 0}
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "상태 점검 · 오류 ")}{diag.errorCount}{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "개 · 경고 ")}{diag.warningCount}{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "개 · 선택 ")}{ws.activeAssetId ?? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "없음")} {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "· 오브젝트 ")}{authorityRecords.length}{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPanel", "ko", "개")}</p>
+          상태 점검 · 오류 {diag.errorCount}개 · 경고 {diag.warningCount}개 · 선택 {ws.activeAssetId ?? "없음"} · 오브젝트 {authorityRecords.length}개
+        </p>
       </footer>
     </section>
   );

@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { AlertTriangle, LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent, type ReactElement } from "react";
 
@@ -115,7 +114,8 @@ export function StudioImportHandoffHost(props: StudioImportHandoffHostProps): Re
         className="mx-3 mt-2 flex shrink-0 items-center gap-2 rounded-xl border border-warning/35 bg-warning-soft/20 px-3 py-2 text-xs font-medium text-warning"
       >
         <LoaderCircle size={15} className="animate-spin" aria-hidden="true" />
-        {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioImportHandoffHost", "ko", "기존 가져오기 작업이 끝나면 ")}{status.fileName} {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioImportHandoffHost", "ko", "파일을 이어서 처리합니다.")}</div>
+        기존 가져오기 작업이 끝나면 {status.fileName} 파일을 이어서 처리합니다.
+      </div>
     );
   }
   return (

@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { isPressureWidthBrush, type NodeEditTool } from "./studio-node-edit";
 import {
   StudioHokusaiNaturalMediaInspectorMount,
@@ -65,7 +64,7 @@ export function StudioInspectorFreehandPathControls({
       <div className="mt-2.5 border-t border-line/40 pt-2.5">
         <StudioNodeEditPanel
           active={nodeEditTool !== null}
-          tool={nodeEditTool ?? translateCurrentStaticSourceText("domains.creator.StudioInspectorFreehandPathControls", "en", "move")}
+          tool={nodeEditTool ?? "move"}
           handleCount={nodeEditHandleCount}
           widthModeSupported={isPressureWidthBrush(selected.brush, selected.mode)}
           smoothStrength={nodeSmoothStrength}

@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import Autoplay from "embla-carousel-autoplay";
 import useEmblaCarousel from "embla-carousel-react";
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
@@ -74,7 +70,7 @@ export function HeroBanner({ items }: { items: Title[] }) {
       className="group relative"
       role="group"
       aria-roledescription="carousel"
-      aria-label={translateCurrentStaticSourceText("shared.components.hero.banner", "ko", "이 주의 추천 작품")}
+      aria-label="이 주의 추천 작품"
       onFocus={onFocusEnter}
       onBlur={onFocusLeave}
     >
@@ -94,7 +90,7 @@ export function HeroBanner({ items }: { items: Title[] }) {
         <>
           <button
             type="button"
-            aria-label={translateCurrentStaticSourceText("shared.components.hero.banner", "ko", "이전 추천작")}
+            aria-label="이전 추천작"
             onClick={() => emblaApi?.scrollPrev()}
             className="absolute left-2 top-1/2 hidden -translate-y-1/2 place-items-center rounded-full border border-line-strong bg-panel/95 p-1.5 text-fg-2 transition-colors hover:bg-raised hover:text-fg sm:grid"
           >
@@ -102,7 +98,7 @@ export function HeroBanner({ items }: { items: Title[] }) {
           </button>
           <button
             type="button"
-            aria-label={translateCurrentStaticSourceText("shared.components.hero.banner", "ko", "다음 추천작")}
+            aria-label="다음 추천작"
             onClick={() => emblaApi?.scrollNext()}
             className="absolute right-2 top-1/2 hidden -translate-y-1/2 place-items-center rounded-full border border-line-strong bg-panel/95 p-1.5 text-fg-2 transition-colors hover:bg-raised hover:text-fg sm:grid"
           >
@@ -120,16 +116,18 @@ export function HeroBanner({ items }: { items: Title[] }) {
               <button
                 key={t.id}
                 type="button"
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.hero.banner", "ko", "{v0}번째 추천작 보기"), { v0: String(i + 1) })}
+                aria-label={`${i + 1}번째 추천작 보기`}
                 aria-current={i === selected}
                 onClick={() => emblaApi?.scrollTo(i)}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.hero.banner", "en", "h-1.5 rounded-full transition-all {v0}"), { v0: String(i === selected ? "w-5 bg-accent" : "w-1.5 bg-line hover:bg-line-strong") })}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === selected ? "w-5 bg-accent" : "w-1.5 bg-line hover:bg-line-strong"
+                }`}
               />
             ))}
             <button
               type="button"
               onClick={toggleAutoplay}
-              aria-label={isPlaying ? translateCurrentStaticSourceText("shared.components.hero.banner", "ko", "자동 재생 멈춤") : translateCurrentStaticSourceText("shared.components.hero.banner", "ko", "자동 재생 시작")}
+              aria-label={isPlaying ? "자동 재생 멈춤" : "자동 재생 시작"}
               aria-pressed={!isPlaying}
               className="absolute right-0 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-fg-3 transition-colors hover:text-fg focus-visible:text-fg"
             >

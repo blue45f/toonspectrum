@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { X } from "lucide-react";
 import {
   Suspense,
@@ -418,7 +415,7 @@ function StudioReferencePanelLoadingFallback() {
   return (
     <div
       role="status"
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioLazyPanelStack", "ko", "레퍼런스 캔버스 불러오는 중")}
+      aria-label="레퍼런스 캔버스 불러오는 중"
       aria-live="polite"
       data-studio-reference-panel-loading="true"
       className="fixed right-3 top-20 z-[70] flex min-h-24 w-[min(300px,calc(100vw-1.5rem))] items-center gap-3 rounded-xl border border-line bg-panel px-4 py-3 shadow-[0_12px_36px_oklch(0.05_0.01_70/0.4)]"
@@ -430,9 +427,10 @@ function StudioReferencePanelLoadingFallback() {
         <span className="size-2 rounded-full bg-accent motion-safe:animate-pulse" />
       </span>
       <span className="min-w-0">
-        <span className="block text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioLazyPanelStack", "ko", "레퍼런스 캔버스")}</span>
+        <span className="block text-xs font-bold text-fg">레퍼런스 캔버스</span>
         <span className="mt-0.5 block text-[0.7rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioLazyPanelStack", "ko", "자유 보드와 저장된 배치를 준비하고 있어요…")}</span>
+          자유 보드와 저장된 배치를 준비하고 있어요…
+        </span>
       </span>
     </div>
   );
@@ -757,7 +755,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
       <Suspense fallback={null}>
         {teamPanelOpen ? (
           <StudioTeamPanel
-            key={studioAuthUserId ?? translateCurrentStaticSourceText("domains.creator.StudioLazyPanelStack", "en", "guest")}
+            key={studioAuthUserId ?? "guest"}
             open
             authScopeKey={studioAuthUserId}
             draftCollaboration={draftCollaboration}
@@ -1104,11 +1102,11 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         >
           <div className="flex max-h-full w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]">
             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
-              <h2 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioLazyPanelStack", "ko", "애니메이션 연출")}</h2>
+              <h2 className="text-sm font-bold text-fg">애니메이션 연출</h2>
               <button
                 type="button"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioLazyPanelStack", "ko", "닫기")}
-                title={translateCurrentStaticSourceText("domains.creator.StudioLazyPanelStack", "ko", "닫기")}
+                aria-label="닫기"
+                title="닫기"
                 className="grid size-8 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent"
                 onClick={() => setFxPanelOpen(false)}
               >
@@ -1116,7 +1114,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-              <Suspense fallback={<div className="py-8 text-center text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioLazyPanelStack", "ko", "불러오는 중…")}</div>}>
+              <Suspense fallback={<div className="py-8 text-center text-xs text-fg-3">불러오는 중…</div>}>
                 <WorkFxPanel
                   work={loadedWork}
                   onUpdated={(doc, revision) => {

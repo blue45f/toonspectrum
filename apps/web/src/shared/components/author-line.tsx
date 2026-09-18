@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 
 function authorPageHref(name: string): string {
@@ -24,7 +20,7 @@ function Names({ raw }: { raw: string }) {
             <Link
               href={authorPageHref(n)}
               className="inline-flex items-center gap-0.5 underline-offset-2 transition-colors hover:text-accent hover:underline"
-              title={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.author.line", "ko", "{v0} 작가 페이지"), { v0: String(n) })}
+              title={`${n} 작가 페이지`}
             >
               {n}
             </Link>
@@ -48,10 +44,10 @@ export function AuthorLine({
   const showArtist = artist && artist !== author;
   return (
     <p className="mt-2 text-sm text-fg-2">
-      {translateCurrentStaticSourceText("shared.components.author.line", "ko", "글 ")}<Names raw={author} />
+      글 <Names raw={author} />
       {showArtist && (
         <>
-          {" · "}{translateCurrentStaticSourceText("shared.components.author.line", "ko", "그림 ")}<Names raw={artist} />
+          {" · "}그림 <Names raw={artist} />
         </>
       )}
       <span className="text-fg-3"> · {year}</span>

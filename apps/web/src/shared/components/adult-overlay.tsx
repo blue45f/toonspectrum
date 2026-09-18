@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { ShieldAlert } from "lucide-react";
 
 import { useApp, useHydrated } from "@/shared/lib/store";
@@ -27,7 +26,7 @@ export function AdultOverlay({ compact = false, hasCover = true }: { compact?: b
       }}
     >
       <ShieldAlert className="text-bad" size={compact ? 16 : 24} />
-      {!compact && <span className="text-xs font-bold text-[oklch(0.95_0.01_85/0.9)]">{translateCurrentStaticSourceText("shared.components.adult.overlay", "ko", "19세 이상")}</span>}
+      {!compact && <span className="text-xs font-bold text-[oklch(0.95_0.01_85/0.9)]">19세 이상</span>}
       {showButton && (
         <button
           onClick={(e) => {
@@ -37,7 +36,8 @@ export function AdultOverlay({ compact = false, hasCover = true }: { compact?: b
           }}
           className="mt-0.5 rounded-lg border border-[oklch(0.95_0.01_85/0.24)] bg-[oklch(0.95_0.01_85/0.1)] px-2.5 py-1 text-[0.7rem] font-medium text-[oklch(0.95_0.01_85)] transition-colors hover:bg-[oklch(0.95_0.01_85/0.18)]"
         >
-          {translateCurrentStaticSourceText("shared.components.adult.overlay", "ko", "연령 확인")}</button>
+          연령 확인
+        </button>
       )}
       {compact && <span className="text-[0.55rem] font-semibold text-[oklch(0.95_0.01_85/0.8)]">19+</span>}
     </div>

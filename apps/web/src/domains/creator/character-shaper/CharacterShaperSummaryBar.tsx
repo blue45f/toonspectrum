@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Character Shaper — summary bar: title + model picker, style summary, palette swatches, changed
  * count, undo/redo, hold-to-compare, reset-to-baseline (confirm), save variant (named), 고급 편집
@@ -57,15 +53,15 @@ const SAVED_NOTICE_MS = 3200;
 
 function PaletteSwatches({ colors, compact }: { readonly colors: CharacterRecipeColors; readonly compact: boolean }) {
   return (
-    <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "팔레트")} className="flex shrink-0 items-center gap-1">
+    <div role="group" aria-label="팔레트" className="flex shrink-0 items-center gap-1">
       {SWATCHES.map((swatch) => {
         const color = colors[swatch.key];
         return (
           <span
             key={swatch.key}
             role="img"
-            aria-label={color ? `${swatch.label} ${color}` : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "{v0} 색 없음"), { v0: String(swatch.label) })}
-            title={color ? `${swatch.label} ${color}` : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "{v0} · 색 없음"), { v0: String(swatch.label) })}
+            aria-label={color ? `${swatch.label} ${color}` : `${swatch.label} 색 없음`}
+            title={color ? `${swatch.label} ${color}` : `${swatch.label} · 색 없음`}
             className={cn(
               "block rounded-full border",
               compact ? "size-3.5" : "size-4",
@@ -225,7 +221,8 @@ export function CharacterShaperSummaryBar({
   const modelPicker = entries.length > 0 ? (
     <div className="relative shrink-0">
       <label htmlFor={selectId} className="sr-only">
-        {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "모델")}</label>
+        모델
+      </label>
       <select
         id={selectId}
         value={activeModelId ?? ""}
@@ -242,7 +239,7 @@ export function CharacterShaperSummaryBar({
         )}
       >
         {activeModelId === null || !entries.some((entry) => entry.id === activeModelId) ? (
-          <option value="">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "모델 없음")}</option>
+          <option value="">모델 없음</option>
         ) : null}
         {entries.map((entry) => (
           <option key={entry.id} value={entry.id}>
@@ -257,15 +254,19 @@ export function CharacterShaperSummaryBar({
   const resetPanel: ReactNode = (
     <div role="group" aria-labelledby={resetTitleId} className="flex flex-col gap-2">
       <p id={resetTitleId} className="text-sm font-bold text-fg">
-        {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "처음 상태로 되돌릴까요?")}</p>
+        처음 상태로 되돌릴까요?
+      </p>
       <p className="text-[0.72rem] leading-relaxed text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "이 세션에서 바꾼 슬롯 ")}{changedCount}{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "개를 열었을 때 상태로 되돌립니다.")}</p>
+        이 세션에서 바꾼 슬롯 {changedCount}개를 열었을 때 상태로 되돌립니다.
+      </p>
       <div className="flex justify-end gap-2">
         <button type="button" className={TEXT_BUTTON} onClick={() => closePopover(true)}>
-          {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "취소")}</button>
+          취소
+        </button>
         <button type="button" className={PRIMARY_BUTTON} onClick={confirmReset}>
           <RotateCcw size={14} aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "되돌리기")}</button>
+          되돌리기
+        </button>
       </div>
     </div>
   );
@@ -279,7 +280,8 @@ export function CharacterShaperSummaryBar({
       }}
     >
       <label htmlFor={saveInputId} className="text-sm font-bold text-fg">
-        {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "변형 이름")}</label>
+        변형 이름
+      </label>
       <input
         id={saveInputId}
         type="text"
@@ -291,26 +293,28 @@ export function CharacterShaperSummaryBar({
           "h-11 w-full rounded-lg border border-line bg-panel px-3 text-[0.8rem] text-fg placeholder:text-fg-3",
           STUDIO_FOCUS_RING,
         )}
-        placeholder={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "예: 교복 · 보브 버전")}
+        placeholder="예: 교복 · 보브 버전"
       />
-      <p className="text-[0.7rem] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "전체 상태(조형·의상·포즈·표정)를 이 기기의 라이브러리에 저장합니다.")}</p>
+      <p className="text-[0.7rem] leading-relaxed text-fg-3">전체 상태(조형·의상·포즈·표정)를 이 기기의 라이브러리에 저장합니다.</p>
       <div className="flex justify-end gap-2">
         <button type="button" className={TEXT_BUTTON} onClick={() => closePopover(true)}>
-          {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "취소")}</button>
+          취소
+        </button>
         <button type="submit" className={PRIMARY_BUTTON} disabled={saveName.trim().length === 0}>
           <Save size={14} aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "저장")}</button>
+          저장
+        </button>
       </div>
     </form>
   );
 
   const undoRedo = (
-    <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "편집 기록")} className="flex shrink-0 items-center gap-1">
+    <div role="group" aria-label="편집 기록" className="flex shrink-0 items-center gap-1">
       <button
         type="button"
-        aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "실행 취소")}
+        aria-label="실행 취소"
         aria-keyshortcuts="Meta+Z Control+Z"
-        title={recentLabel && binding.history.canUndo ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "실행 취소: {v0} (⌘Z)"), { v0: String(recentLabel) }) : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "실행 취소 (⌘Z)")}
+        title={recentLabel && binding.history.canUndo ? `실행 취소: ${recentLabel} (⌘Z)` : "실행 취소 (⌘Z)"}
         disabled={!binding.history.canUndo}
         onClick={() => binding.undo()}
         className={ICON_BUTTON}
@@ -319,9 +323,9 @@ export function CharacterShaperSummaryBar({
       </button>
       <button
         type="button"
-        aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "다시 실행")}
+        aria-label="다시 실행"
         aria-keyshortcuts="Meta+Shift+Z Control+Shift+Z"
-        title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "다시 실행 (⇧⌘Z)")}
+        title="다시 실행 (⇧⌘Z)"
         disabled={!binding.history.canRedo}
         onClick={() => binding.redo()}
         className={ICON_BUTTON}
@@ -335,8 +339,8 @@ export function CharacterShaperSummaryBar({
     <button
       type="button"
       aria-pressed={binding.compareActive}
-      aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "기준 상태와 비교 (누르고 있기)")}
-      title={canCompare ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "누르고 있는 동안 열었을 때 상태를 보여줍니다") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "바꾼 슬롯이 없어 비교할 내용이 없습니다")}
+      aria-label="기준 상태와 비교 (누르고 있기)"
+      title={canCompare ? "누르고 있는 동안 열었을 때 상태를 보여줍니다" : "바꾼 슬롯이 없어 비교할 내용이 없습니다"}
       disabled={!canCompare}
       data-character-shaper-compare="true"
       onPointerDown={handleComparePointerDown}
@@ -353,7 +357,7 @@ export function CharacterShaperSummaryBar({
       )}
     >
       <Eye size={16} aria-hidden />
-      {compact ? null : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "비교")}
+      {compact ? null : "비교"}
     </button>
   );
 
@@ -365,7 +369,7 @@ export function CharacterShaperSummaryBar({
         changedCount > 0 ? "border-accent/40 bg-accent-soft text-accent" : "border-line bg-raised/80 text-fg-3",
       )}
     >
-      {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "변경 ")}{changedCount}
+      변경 {changedCount}
     </span>
   );
 
@@ -376,20 +380,21 @@ export function CharacterShaperSummaryBar({
     >
       <div className="flex min-w-0 flex-1 items-center gap-2 max-[380px]:basis-full sm:gap-3">
         <div className="min-w-0">
-          <p className="truncate text-[0.62rem] font-semibold tracking-wide text-accent">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "캐릭터 워크숍")}</p>
+          <p className="truncate text-[0.62rem] font-semibold tracking-wide text-accent">캐릭터 워크숍</p>
           <h2 id={titleId} className="truncate text-[0.95rem] font-bold tracking-tight text-fg sm:text-base">
-            {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "캐릭터 셰이퍼")}</h2>
+            캐릭터 셰이퍼
+          </h2>
           <p id={descriptionId} className="sr-only">
-            {formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "{v0} · {v1} · 바꾼 슬롯 {v2}개. 프리셋 카드를 눌러 바로 적용하고, 사진·웹캠으로 포즈를 잡고, 표면에 직접 그립니다."), { v0: String(modelName ?? "모델 없음"), v1: String(styleText), v2: String(changedCount) })}
+            {`${modelName ?? "모델 없음"} · ${styleText} · 바꾼 슬롯 ${changedCount}개. 프리셋 카드를 눌러 바로 적용하고, 사진·웹캠으로 포즈를 잡고, 표면에 직접 그립니다.`}
           </p>
         </div>
         {compact ? (
-          <span className="min-w-0 truncate text-[0.72rem] text-fg-3" title={modelName ?? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "모델 없음")}>
-            {modelName ?? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "모델 없음")}
+          <span className="min-w-0 truncate text-[0.72rem] text-fg-3" title={modelName ?? "모델 없음"}>
+            {modelName ?? "모델 없음"}
           </span>
         ) : (
           <>
-            {modelPicker ?? <span className="text-[0.75rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "모델 없음")}</span>}
+            {modelPicker ?? <span className="text-[0.75rem] text-fg-3">모델 없음</span>}
             <span aria-hidden className="h-6 w-px shrink-0 bg-line" />
             <span className="min-w-0 truncate text-[0.75rem] font-medium text-fg-2" title={summary.lines.join("\n")}>
               {styleText}
@@ -407,10 +412,10 @@ export function CharacterShaperSummaryBar({
           <div className="relative">
             <button
               type="button"
-              aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "더 보기")}
+              aria-label="더 보기"
               aria-haspopup="dialog"
               aria-expanded={popover === "more"}
-              title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "되돌리기 · 저장 · 고급 편집")}
+              title="되돌리기 · 저장 · 고급 편집"
               onClick={(event) => openPopover("more", event.currentTarget)}
               className={cn(ICON_BUTTON, popover === "more" && "border-accent/60 bg-accent-soft text-accent")}
             >
@@ -424,43 +429,46 @@ export function CharacterShaperSummaryBar({
                 type="button"
                 aria-haspopup="dialog"
                 aria-expanded={popover === "reset"}
-                title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "열었을 때 상태로 되돌리기")}
+                title="열었을 때 상태로 되돌리기"
                 disabled={changedCount === 0}
                 onClick={(event) => openPopover("reset", event.currentTarget)}
                 className={TEXT_BUTTON}
               >
                 <RotateCcw size={14} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "되돌리기")}</button>
+                되돌리기
+              </button>
             </div>
             <div className="relative">
               <button
                 type="button"
                 aria-haspopup="dialog"
                 aria-expanded={popover === "save"}
-                title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "현재 캐릭터를 이름 붙여 저장")}
+                title="현재 캐릭터를 이름 붙여 저장"
                 disabled={loading || h.status === "empty"}
                 onClick={(event) => openPopover("save", event.currentTarget)}
                 className={TEXT_BUTTON}
               >
                 <Save size={14} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "저장")}</button>
+                저장
+              </button>
             </div>
             <button
               type="button"
               aria-pressed={advanced}
-              title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "원래 3D 캐릭터 빌더(모든 슬라이더·탭)로 전환")}
+              title="원래 3D 캐릭터 빌더(모든 슬라이더·탭)로 전환"
               onClick={onToggleAdvanced}
               className={cn(TEXT_BUTTON, advanced && "border-accent/60 bg-accent-soft text-accent")}
             >
               <SlidersHorizontal size={14} aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "고급 편집")}</button>
+              고급 편집
+            </button>
           </>
         )}
         <button
           ref={h.closeButtonRef}
           type="button"
-          aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "닫기")}
-          title={capturing ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "캡처가 끝난 뒤 닫을 수 있습니다.") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "닫기 (Esc)")}
+          aria-label="닫기"
+          title={capturing ? "캡처가 끝난 뒤 닫을 수 있습니다." : "닫기 (Esc)"}
           disabled={capturing}
           onClick={onClose}
           className={ICON_BUTTON}
@@ -477,7 +485,7 @@ export function CharacterShaperSummaryBar({
             savedConfirmed ? "border-good/40 bg-panel text-good" : "border-line bg-panel text-fg-3",
           )}
         >
-          {savedConfirmed ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "저장됨 · {v0}"), { v0: String(savedNotice) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "저장 요청됨 · {v0}"), { v0: String(savedNotice) })}
+          {savedConfirmed ? `저장됨 · ${savedNotice}` : `저장 요청됨 · ${savedNotice}`}
         </p>
       ) : null}
 
@@ -485,7 +493,7 @@ export function CharacterShaperSummaryBar({
         <div
           ref={popoverRef}
           role="dialog"
-          aria-label={popover === "reset" ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "처음 상태로 되돌리기") : popover === "save" ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "변형 저장") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "더 보기")}
+          aria-label={popover === "reset" ? "처음 상태로 되돌리기" : popover === "save" ? "변형 저장" : "더 보기"}
           data-character-shaper-popover={popover}
           className={cn(
             "absolute top-full z-40 mt-1 w-80 max-w-[calc(100%-1rem)] rounded-2xl border border-line bg-card p-3 shadow-[0_18px_48px_oklch(0.05_0.01_70/0.5)]",
@@ -506,7 +514,7 @@ export function CharacterShaperSummaryBar({
                 {changedCount > 0 ? (
                   resetPanel
                 ) : (
-                  <p className="text-[0.72rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "아직 바꾼 슬롯이 없습니다.")}</p>
+                  <p className="text-[0.72rem] text-fg-3">아직 바꾼 슬롯이 없습니다.</p>
                 )}
               </div>
               <div className="border-t border-line pt-3">{savePanel}</div>
@@ -520,7 +528,8 @@ export function CharacterShaperSummaryBar({
                 className={cn(TEXT_BUTTON, "justify-center", advanced && "border-accent/60 bg-accent-soft text-accent")}
               >
                 <SlidersHorizontal size={14} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSummaryBar", "ko", "고급 편집")}</button>
+                고급 편집
+              </button>
             </div>
           ) : null}
         </div>

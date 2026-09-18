@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Character Shaper — reference drawer: 참고 이미지 AI 추천 · 사진 포즈 · 웹캠.
  *
@@ -314,17 +310,19 @@ export function CharacterShaperReferenceDrawer({
           dragActive ? "border-accent bg-accent-soft/40" : "border-line bg-card/50",
         )}
       >
-        <p className="text-[0.74rem] font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "참고 이미지에서 색 뽑기")}</p>
+        <p className="text-[0.74rem] font-bold text-fg">참고 이미지에서 색 뽑기</p>
         <p className="mt-1 text-[0.66rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "이미지를 끌어다 놓거나 파일을 골라 주세요. 96px로 줄여 기기 안에서만 색을 계산합니다.")}</p>
+          이미지를 끌어다 놓거나 파일을 골라 주세요. 96px로 줄여 기기 안에서만 색을 계산합니다.
+        </p>
         <button type="button" className={cn(BUTTON, "mt-2")} onClick={() => fileInputRef.current?.click()}>
           <ImagePlus size={14} aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "이미지 고르기")}</button>
+          이미지 고르기
+        </button>
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "참고 이미지 선택")}
+          aria-label="참고 이미지 선택"
           className="sr-only"
           onChange={(event) => {
             const file = event.currentTarget.files?.[0];
@@ -340,7 +338,8 @@ export function CharacterShaperReferenceDrawer({
         {palette.status === "reading" ? (
           <p role="status" className="mt-1 inline-flex items-center gap-1 text-[0.66rem] font-semibold text-accent">
             <LoaderCircle size={12} aria-hidden className="animate-spin motion-reduce:animate-none" />
-            {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "색을 뽑는 중")}</p>
+            색을 뽑는 중
+          </p>
         ) : null}
         {palette.status === "error" && palette.message ? (
           <p role="alert" className="mt-1 text-[0.66rem] font-semibold text-bad">
@@ -358,14 +357,15 @@ export function CharacterShaperReferenceDrawer({
             }}
           >
             <PersonStanding size={14} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "이 사진에서 포즈도 읽기")}</button>
+            이 사진에서 포즈도 읽기
+          </button>
         ) : null}
       </div>
 
       {palette.status === "ready" && palette.palette ? (
-        <section aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "뽑아낸 팔레트")} className="rounded-2xl border border-line bg-card/60 p-3">
-          <h3 className="text-[0.74rem] font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "뽑아낸 팔레트")}</h3>
-          <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "팔레트 색 고르기")} className="mt-2 flex flex-wrap gap-1">
+        <section aria-label="뽑아낸 팔레트" className="rounded-2xl border border-line bg-card/60 p-3">
+          <h3 className="text-[0.74rem] font-bold text-fg">뽑아낸 팔레트</h3>
+          <div role="group" aria-label="팔레트 색 고르기" className="mt-2 flex flex-wrap gap-1">
             {palette.palette.swatches.map((color) => {
               const active = activeSwatch === color;
               return (
@@ -373,7 +373,7 @@ export function CharacterShaperReferenceDrawer({
                   key={color}
                   type="button"
                   aria-pressed={active}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "색 {v0} 고르기"), { v0: String(color.toUpperCase()) })}
+                  aria-label={`색 ${color.toUpperCase()} 고르기`}
                   title={color.toUpperCase()}
                   onClick={() => setSelectedColor(color)}
                   className={cn(
@@ -402,7 +402,7 @@ export function CharacterShaperReferenceDrawer({
                       <span className="tabular-nums">{row.color.toUpperCase()}</span>
                     </>
                   ) : (
-                    translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "찾지 못했습니다")
+                    "찾지 못했습니다"
                   )}
                 </dd>
               </div>
@@ -416,7 +416,7 @@ export function CharacterShaperReferenceDrawer({
                 disabled={activeSwatch === null || target.blockedReason !== null}
                 title={
                   target.blockedReason
-                  ?? (activeSwatch ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "{v0}을(를) {v1} 적용"), { v0: String(activeSwatch.toUpperCase()), v1: String(target.label.replace("으로", "")) }) : undefined)
+                  ?? (activeSwatch ? `${activeSwatch.toUpperCase()}을(를) ${target.label.replace("으로", "")} 적용` : undefined)
                 }
                 onClick={() => {
                   if (activeSwatch === null || target.blockedReason !== null) return;
@@ -430,7 +430,7 @@ export function CharacterShaperReferenceDrawer({
               </button>
             ))}
           </div>
-          <p role="status" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "팔레트 적용 결과")} className="mt-1 min-h-4 text-[0.64rem] leading-relaxed text-fg-3">
+          <p role="status" aria-label="팔레트 적용 결과" className="mt-1 min-h-4 text-[0.64rem] leading-relaxed text-fg-3">
             {applied ?? ""}
           </p>
         </section>
@@ -438,7 +438,7 @@ export function CharacterShaperReferenceDrawer({
 
       <StudioVrmAvatarReferenceRecommendationsPanel
         catalogue={catalogue?.catalogue ?? null}
-        catalogueStatus={catalogue?.status ?? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "en", "idle")}
+        catalogueStatus={catalogue?.status ?? "idle"}
         catalogueUnavailableReason={
           catalogue?.status === "unavailable"
             ? studioVrmAvatarReferenceCatalogueDiagnosticMessage(catalogue.diagnosticCode ?? null)
@@ -498,11 +498,14 @@ export function CharacterShaperReferenceDrawer({
     <div className="space-y-3">
       {!h.vrm ? (
         <p className="rounded-xl border border-dashed border-line bg-card/50 px-3 py-3 text-[0.68rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "모델을 먼저 불러오면 웹캠으로 표정과 머리 각도를 옮길 수 있습니다.")}</p>
+          모델을 먼저 불러오면 웹캠으로 표정과 머리 각도를 옮길 수 있습니다.
+        </p>
       ) : (
         <>
           <p className="text-[0.68rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "카메라 영상은 기기 안에서만 분석되고 어디에도 보내지 않습니다. 원하는 순간에 &ldquo;표정 굳히기&rdquo;를 누르면 현재 표정과 머리 각도가 모델에 남습니다.")}</p>
+            카메라 영상은 기기 안에서만 분석되고 어디에도 보내지 않습니다. 원하는 순간에 &ldquo;표정 굳히기&rdquo;를 누르면
+            현재 표정과 머리 각도가 모델에 남습니다.
+          </p>
 
           {webcamActive ? (
             <div className="relative overflow-hidden rounded-xl border border-line bg-canvas">
@@ -511,7 +514,7 @@ export function CharacterShaperReferenceDrawer({
                 autoPlay
                 playsInline
                 muted
-                aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "웹캠 미리 보기")}
+                aria-label="웹캠 미리 보기"
                 className={cn("aspect-video w-full object-cover", tracking.mirrorMode ? "scale-x-[-1]" : "")}
               />
               <p
@@ -522,7 +525,7 @@ export function CharacterShaperReferenceDrawer({
                   aria-hidden
                   className={cn("size-1.5 rounded-full", faceDetected ? "bg-good" : "bg-warn")}
                 />
-                {faceDetected ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "얼굴 감지됨") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "얼굴을 찾는 중")}
+                {faceDetected ? "얼굴 감지됨" : "얼굴을 찾는 중"}
               </p>
             </div>
           ) : null}
@@ -530,7 +533,8 @@ export function CharacterShaperReferenceDrawer({
           {webcamLoading ? (
             <p role="status" className="inline-flex items-center gap-1.5 text-[0.68rem] font-semibold text-accent">
               <LoaderCircle size={13} aria-hidden className="animate-spin motion-reduce:animate-none" />
-              {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "카메라와 트래킹 모델을 준비하는 중")}</p>
+              카메라와 트래킹 모델을 준비하는 중
+            </p>
           ) : null}
 
           {webcamError ? (
@@ -542,9 +546,10 @@ export function CharacterShaperReferenceDrawer({
 
           {showConsent && !webcamActive ? (
             <div className="rounded-xl border border-accent/35 bg-accent-soft/40 p-3">
-              <p className="text-[0.72rem] font-bold text-accent">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "카메라 권한이 필요합니다")}</p>
+              <p className="text-[0.72rem] font-bold text-accent">카메라 권한이 필요합니다</p>
               <p className="mt-1 text-[0.66rem] leading-relaxed text-fg-2">
-                {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "영상은 브라우저 밖으로 나가지 않습니다. 이 탭을 닫으면 동의도 함께 사라집니다.")}</p>
+                영상은 브라우저 밖으로 나가지 않습니다. 이 탭을 닫으면 동의도 함께 사라집니다.
+              </p>
               <div className="mt-2 flex gap-1.5">
                 <button
                   type="button"
@@ -556,9 +561,11 @@ export function CharacterShaperReferenceDrawer({
                     h.setWebcamActive?.(true);
                   }}
                 >
-                  {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "동의하고 카메라 켜기")}</button>
+                  동의하고 카메라 켜기
+                </button>
                 <button type="button" className={BUTTON} onClick={() => h.setShowConsent?.(false)}>
-                  {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "취소")}</button>
+                  취소
+                </button>
               </div>
             </div>
           ) : null}
@@ -573,18 +580,19 @@ export function CharacterShaperReferenceDrawer({
                 onClick={() => (webcamActive ? h.setWebcamActive?.(false) : startWebcam())}
               >
                 {webcamActive ? <VideoOff size={14} aria-hidden /> : <Video size={14} aria-hidden />}
-                {webcamActive ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "트래킹 중지") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "트래킹 시작")}
+                {webcamActive ? "트래킹 중지" : "트래킹 시작"}
               </button>
               {webcamActive ? (
                 <button
                   type="button"
                   className={cn(PRIMARY_BUTTON, "flex-1")}
                   disabled={!faceDetected}
-                  title={faceDetected ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "지금 표정과 머리 각도를 모델에 남깁니다") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "얼굴이 보일 때 사용할 수 있습니다")}
+                  title={faceDetected ? "지금 표정과 머리 각도를 모델에 남깁니다" : "얼굴이 보일 때 사용할 수 있습니다"}
                   onClick={() => h.handleCapturePose?.()}
                 >
                   <Snowflake size={14} aria-hidden />
-                  {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "표정 굳히기")}</button>
+                  표정 굳히기
+                </button>
               ) : null}
             </div>
           ) : null}
@@ -592,22 +600,22 @@ export function CharacterShaperReferenceDrawer({
           {webcamActive ? (
             <div className="space-y-1.5">
               <ToggleRow
-                label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "거울 모드 (좌우 반전)")}
+                label="거울 모드 (좌우 반전)"
                 checked={Boolean(tracking.mirrorMode)}
                 onToggle={(next) => setTracking({ mirrorMode: next })}
               />
               <ToggleRow
-                label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "손가락 추적 (다시 시작할 때 적용)")}
+                label="손가락 추적 (다시 시작할 때 적용)"
                 checked={Boolean(tracking.fingerTracking)}
                 onToggle={(next) => setTracking({ fingerTracking: next })}
               />
               <ToggleRow
-                label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "표정 정리 (한 번에 한 감정만)")}
+                label="표정 정리 (한 번에 한 감정만)"
                 checked={tracking.resolveExpressionConflicts !== false}
                 onToggle={(next) => setTracking({ resolveExpressionConflicts: next })}
               />
               <ToggleRow
-                label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "시선 고정 (정면 보기)")}
+                label="시선 고정 (정면 보기)"
                 checked={Boolean(tracking.gazeLock)}
                 onToggle={(next) => setTracking({ gazeLock: next })}
               />
@@ -617,7 +625,8 @@ export function CharacterShaperReferenceDrawer({
       )}
       <p className="flex items-start gap-1.5 rounded-lg border border-line bg-card/50 px-2.5 py-2 text-[0.64rem] leading-relaxed text-fg-3">
         <Info size={13} aria-hidden className="mt-0.5 shrink-0" />
-        {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "MediaPipe 얼굴·손 랜드마커 · 기기 내 처리 · 업로드 없음")}</p>
+        MediaPipe 얼굴·손 랜드마커 · 기기 내 처리 · 업로드 없음
+      </p>
     </div>
   );
 
@@ -627,12 +636,12 @@ export function CharacterShaperReferenceDrawer({
     <div className="flex h-full min-h-0 flex-col" data-character-shaper-drawer-body={mode}>
       <div className="flex shrink-0 items-start justify-between gap-2 border-b border-line px-3 py-2.5">
         <div className="min-w-0">
-          <p className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "참고 도구")}</p>
+          <p className="text-sm font-bold text-fg">참고 도구</p>
           <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3">{activeTab?.hint}</p>
         </div>
         <button
           type="button"
-          aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "참고 도구 닫기")}
+          aria-label="참고 도구 닫기"
           onClick={onClose}
           className={cn(
             "grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2",
@@ -644,7 +653,7 @@ export function CharacterShaperReferenceDrawer({
         </button>
       </div>
 
-      <div role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "ko", "참고 도구")} className="flex shrink-0 gap-1 border-b border-line px-2 py-1.5">
+      <div role="tablist" aria-label="참고 도구" className="flex shrink-0 gap-1 border-b border-line px-2 py-1.5">
         {TABS.map((tab) => {
           const active = tab.id === mode;
           return (
@@ -657,7 +666,7 @@ export function CharacterShaperReferenceDrawer({
               type="button"
               role="tab"
               aria-selected={active}
-              aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "en", "{v0}-panel"), { v0: String(tabsId) })}
+              aria-controls={`${tabsId}-panel`}
               tabIndex={active ? 0 : -1}
               title={tab.hint}
               onClick={() => onModeChange(tab.id)}
@@ -675,7 +684,7 @@ export function CharacterShaperReferenceDrawer({
       </div>
 
       <div
-        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperReferenceDrawer", "en", "{v0}-panel"), { v0: String(tabsId) })}
+        id={`${tabsId}-panel`}
         role="tabpanel"
         aria-labelledby={`${tabsId}-${mode}`}
         tabIndex={-1}

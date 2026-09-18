@@ -1,22 +1,12 @@
-import {
-  ArrowRight,
-  BookOpen,
-  Brush,
-  Clapperboard,
-  Rocket,
-  formatI18nTemplate,
-  motion,
-  translateCurrentStaticSourceText,
-  translateParallelBilingualCopy,
-  type BilingualText,
-  type LucideIcon } from "lucide-react";
-import { AnimatePresence,
-  useReducedMotion } from "motion/react";
+import { ArrowRight, BookOpen, Brush, Clapperboard, Rocket, type LucideIcon } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 
 import Link from "@/compat/router-link";
 import {
   translateBilingualText,
+  translateParallelBilingualCopy,
+  type BilingualText,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { useT } from "@/shared/lib/i18n";
 
@@ -183,7 +173,7 @@ export function BrandFilmStoryboard() {
           </AnimatePresence>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
-              key={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.BrandFilmStoryboard", "en", "{v0}-detail"), { v0: String(active.id) })}
+              key={`${active.id}-detail`}
               className="brand-film-storyboard__detail"
               initial={reducedMotion ? false : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}

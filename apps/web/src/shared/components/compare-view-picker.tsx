@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -52,7 +49,7 @@ export function Picker({
         <button
           onClick={onClear}
           className="absolute right-2 top-2 z-10 grid size-7 place-items-center rounded-lg border border-[oklch(0.95_0.01_85/0.22)] bg-[oklch(0.16_0.01_70/0.58)] text-[oklch(0.95_0.01_85/0.82)] backdrop-blur-md transition-colors hover:text-fg"
-          aria-label={translateCurrentStaticSourceText("shared.components.compare.view.picker", "ko", "교체")}
+          aria-label="교체"
         >
           <X size={14} />
         </button>
@@ -79,15 +76,15 @@ export function Picker({
               setLoading(true);
             }
           }}
-          placeholder={translateCurrentStaticSourceText("shared.components.compare.view.picker", "ko", "작품 검색")}
-          aria-label={translateCurrentStaticSourceText("shared.components.compare.view.picker", "ko", "작품 검색")}
+          placeholder="작품 검색"
+          aria-label="작품 검색"
           className="h-11 flex-1 bg-transparent text-sm outline-none placeholder:text-fg-3"
         />
       </div>
       <div className="max-h-72 overflow-y-auto p-1.5" aria-busy={loading}>
         {results.length === 0 ? (
           <p className="px-2 py-8 text-center text-xs text-fg-3">
-            {loading ? translateCurrentStaticSourceText("shared.components.compare.view.picker", "ko", "검색 중") : q.trim() ? translateCurrentStaticSourceText("shared.components.compare.view.picker", "ko", "결과 없음") : translateCurrentStaticSourceText("shared.components.compare.view.picker", "ko", "비교할 작품을 검색하세요")}
+            {loading ? "검색 중" : q.trim() ? "결과 없음" : "비교할 작품을 검색하세요"}
           </p>
         ) : (
           results.map((t) => (

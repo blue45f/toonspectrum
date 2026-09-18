@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { RotateCw, Search, ScanLine } from "lucide-react";
 import { memo } from "react";
 
@@ -78,8 +77,8 @@ export const StudioLeftToolRailViewToolsCluster = memo(function StudioLeftToolRa
         <StudioRailToolButton
           data-studio-rail-tool-id="zoom-fit"
           icon={ScanLine}
-          label={translateCurrentStaticSourceText("domains.creator.StudioLeftToolRailViewToolsCluster", "ko", "너비에 맞춤 (Home)")}
-          description={translateCurrentStaticSourceText("domains.creator.StudioLeftToolRailViewToolsCluster", "ko", "캔버스 폭에 맞춰 확대·축소합니다.")}
+          label="너비에 맞춤 (Home)"
+          description="캔버스 폭에 맞춰 확대·축소합니다."
           hintPreview="zoom-view"
           hintPreviewVariant="fit-width"
           disabled={viewTransformSuppressed}

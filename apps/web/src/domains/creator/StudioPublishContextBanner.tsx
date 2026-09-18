@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { BookOpen, Layers, Trophy, X } from "lucide-react";
 
 import { cn } from "@/shared/lib/utils";
@@ -35,12 +32,14 @@ export function StudioPublishContextBanner({
       <div className="min-w-0 flex-1">
         {series && (
           <p>
-            <span className="font-semibold text-accent">{series.title}</span> {translateCurrentStaticSourceText("domains.creator.StudioPublishContextBanner", "ko", "시리즈의")}{" "}
-            <span className="numeral font-bold">{series.nextEpisodeNo}{translateCurrentStaticSourceText("domains.creator.StudioPublishContextBanner", "ko", "화")}</span>{translateCurrentStaticSourceText("domains.creator.StudioPublishContextBanner", "ko", "로 게시됩니다.")}</p>
+            <span className="font-semibold text-accent">{series.title}</span> 시리즈의{" "}
+            <span className="numeral font-bold">{series.nextEpisodeNo}화</span>로 게시됩니다.
+          </p>
         )}
         {challenge && (
-          <p className={series ? translateCurrentStaticSourceText("domains.creator.StudioPublishContextBanner", "en", "mt-1") : undefined}>
-            {translateCurrentStaticSourceText("domains.creator.StudioPublishContextBanner", "ko", "챌린지 ")}<span className="font-semibold text-accent">{challenge.title}</span>{translateCurrentStaticSourceText("domains.creator.StudioPublishContextBanner", "ko", "에 참여합니다.")}{challenge.theme ? (
+          <p className={series ? "mt-1" : undefined}>
+            챌린지 <span className="font-semibold text-accent">{challenge.title}</span>에 참여합니다.
+            {challenge.theme ? (
               <span className="mt-0.5 block text-xs leading-relaxed text-fg-3">{challenge.theme}</span>
             ) : null}
           </p>
@@ -51,14 +50,15 @@ export function StudioPublishContextBanner({
           type="button"
           onClick={onDismiss}
           className="grid size-7 shrink-0 place-items-center rounded-lg border border-line text-fg-3 transition-colors hover:bg-raised hover:text-fg"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPublishContextBanner", "ko", "게시 맥락 닫기")}
+          aria-label="게시 맥락 닫기"
         >
           <X size={14} />
         </button>
       )}
       <span className="flex w-full items-center gap-1 text-[0.7rem] text-fg-3 sm:w-auto sm:ml-auto">
         <BookOpen size={11} />
-        {translateCurrentStaticSourceText("domains.creator.StudioPublishContextBanner", "ko", "게시 시 자동 연결 · 설정 변경은 게시 후에도 가능")}</span>
+        게시 시 자동 연결 · 설정 변경은 게시 후에도 가능
+      </span>
     </div>
   );
 }

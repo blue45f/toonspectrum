@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   BrainCircuit,
   Check,
   ClipboardCheck,
@@ -119,15 +115,18 @@ export function StudioBg3dProductionIntentPanel() {
             className="flex items-center gap-1.5 text-[0.7rem] font-bold text-fg"
           >
             <Sparkles className="size-3.5 text-accent" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionIntentPanel", "ko", "전체 제작 프리셋")}</h3>
+            전체 제작 프리셋
+          </h3>
           <p className="mt-1 text-[0.57rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionIntentPanel", "ko", "컷 선택·현재 LT에 맞는 패스·PSD·콘택트 시트·선화·배경 알파를 작업 목적에 맞춰 함께 설정합니다.")}</p>
+            컷 선택·현재 LT에 맞는 패스·PSD·콘택트 시트·선화·배경 알파를 작업 목적에 맞춰 함께 설정합니다.
+          </p>
         </div>
         <span className="rounded-full border border-good/40 bg-good/10 px-2 py-1 text-[0.52rem] font-bold text-good">
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionIntentPanel", "ko", "자동 출력 안 함")}</span>
+          자동 출력 안 함
+        </span>
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionIntentPanel", "ko", "3D 전체 제작 프리셋")}>
+      <div className="mt-2 grid grid-cols-2 gap-1.5" role="group" aria-label="3D 전체 제작 프리셋">
         {STUDIO_BG3D_PRODUCTION_INTENTS.map((intent) => {
           const selected = activeIntent === intent.id;
           return (
@@ -138,9 +137,11 @@ export function StudioBg3dProductionIntentPanel() {
               aria-pressed={selected}
               title={intent.description}
               onClick={() => applyIntent(intent.id)}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionIntentPanel", "en", "flex min-h-12 items-start gap-2 rounded-xl border px-2.5 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 {v0}"), { v0: String(selected
+              className={`flex min-h-12 items-start gap-2 rounded-xl border px-2.5 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 ${
+                selected
                   ? "border-accent/55 bg-accent-soft text-accent"
-                  : "border-line bg-panel text-fg-2 hover:bg-raised hover:text-fg") })}
+                  : "border-line bg-panel text-fg-2 hover:bg-raised hover:text-fg"
+              }`}
             >
               <span className="mt-0.5 shrink-0">
                 {selected ? <Check className="size-3.5" aria-hidden /> : <IntentIcon id={intent.id} />}
@@ -164,7 +165,8 @@ export function StudioBg3dProductionIntentPanel() {
             </p>
           ) : runtime.productionShots.length === 0 ? (
             <p className="text-[0.54rem] leading-relaxed text-warn">
-              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionIntentPanel", "ko", "프리셋 설정은 미리 적용됩니다. 현재 장면을 컷으로 저장하면 배치 선택 단계가 이어집니다.")}</p>
+              프리셋 설정은 미리 적용됩니다. 현재 장면을 컷으로 저장하면 배치 선택 단계가 이어집니다.
+            </p>
           ) : null}
         </div>
         {previousState ? (
@@ -175,7 +177,8 @@ export function StudioBg3dProductionIntentPanel() {
             className="flex min-h-10 shrink-0 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-2.5 text-[0.56rem] font-bold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
           >
             <Undo2 className="size-3" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionIntentPanel", "ko", "이전 설정 복원")}</button>
+            이전 설정 복원
+          </button>
         ) : null}
       </div>
     </section>

@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 // "3D 배경" 템플릿 탭의 방 만들기(파라메트릭 블로킹) 패널 — SketchUp처럼 치수·오프닝·가구를
 // 수치로 조정해 방 한 칸을 절차 생성한다. 프레젠테이션 전용(무상태): 스펙 상태와 "추가" 액션은
 // 모두 부모(StudioBackground3D.tsx)가 소유한다 — StudioBg3dSceneTemplatePanel과 같은 계약.
@@ -68,9 +64,11 @@ export function StudioBg3dRoomBuilderPanel({
   return (
     <div>
       <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "바닥과 벽 4면, 문·창 오프닝, 가구를 수치로 조정해 방 한 칸을 만듭니다. 씬 템플릿과 달리 추가하기 전에 크기와 배치를 자유롭게 바꿀 수 있어요.")}</p>
+        바닥과 벽 4면, 문·창 오프닝, 가구를 수치로 조정해 방 한 칸을 만듭니다. 씬 템플릿과 달리
+        추가하기 전에 크기와 배치를 자유롭게 바꿀 수 있어요.
+      </p>
 
-      <div className="mb-3 flex flex-wrap gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "방 프리셋")}>
+      <div className="mb-3 flex flex-wrap gap-1.5" role="group" aria-label="방 프리셋">
         {STUDIO_BG3D_ROOM_PRESETS.map((preset) => (
           <button
             key={preset.id}
@@ -88,7 +86,7 @@ export function StudioBg3dRoomBuilderPanel({
       <div className="rounded-xl border border-line bg-card/70 px-3 py-2">
         <LtRangeControl
           id="bg3d-room-width"
-          label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "가로 폭")}
+          label="가로 폭"
           min={limits.minWidth}
           max={limits.maxWidth}
           step={0.5}
@@ -99,7 +97,7 @@ export function StudioBg3dRoomBuilderPanel({
         />
         <LtRangeControl
           id="bg3d-room-depth"
-          label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "세로 깊이")}
+          label="세로 깊이"
           min={limits.minDepth}
           max={limits.maxDepth}
           step={0.5}
@@ -110,7 +108,7 @@ export function StudioBg3dRoomBuilderPanel({
         />
         <LtRangeControl
           id="bg3d-room-wall-height"
-          label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "벽 높이")}
+          label="벽 높이"
           min={limits.minWallHeight}
           max={limits.maxWallHeight}
           step={0.1}
@@ -121,20 +119,21 @@ export function StudioBg3dRoomBuilderPanel({
         />
         <LtRangeControl
           id="bg3d-room-wall-thickness"
-          label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "벽 두께")}
+          label="벽 두께"
           min={limits.minWallThickness}
           max={limits.maxWallThickness}
           step={0.01}
           value={spec.wallThickness}
-          valueText={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "en", "{v0}cm"), { v0: String(Math.round(spec.wallThickness * 100)) })}
+          valueText={`${Math.round(spec.wallThickness * 100)}cm`}
           disabled={disabled}
           onChange={(wallThickness) => onSpecChange({ ...spec, wallThickness })}
         />
         <div className="grid grid-cols-2 gap-2 pt-2">
           <label className="flex items-center justify-between gap-2 text-[0.68rem] font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "바닥색")}<input
+            바닥색
+            <input
               type="color"
-              aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "방 바닥색")}
+              aria-label="방 바닥색"
               value={spec.floorColor}
               disabled={disabled}
               onChange={(event) => onSpecChange({ ...spec, floorColor: event.target.value })}
@@ -142,9 +141,10 @@ export function StudioBg3dRoomBuilderPanel({
             />
           </label>
           <label className="flex items-center justify-between gap-2 text-[0.68rem] font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "벽색")}<input
+            벽색
+            <input
               type="color"
-              aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "방 벽색")}
+              aria-label="방 벽색"
               value={spec.wallColor}
               disabled={disabled}
               onChange={(event) => onSpecChange({ ...spec, wallColor: event.target.value })}
@@ -158,7 +158,8 @@ export function StudioBg3dRoomBuilderPanel({
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <h4 className="flex items-center gap-1.5 text-xs font-bold text-fg">
             <DoorOpen size={13} className="text-accent" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "문 · 창 오프닝")}</h4>
+            문 · 창 오프닝
+          </h4>
           <span className="flex gap-1">
             <button
               type="button"
@@ -172,7 +173,8 @@ export function StudioBg3dRoomBuilderPanel({
                 ],
               })}
             >
-              <Plus size={12} aria-hidden />{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "문")}</button>
+              <Plus size={12} aria-hidden />문
+            </button>
             <button
               type="button"
               disabled={disabled || spec.openings.length >= limits.maxOpenings}
@@ -185,12 +187,14 @@ export function StudioBg3dRoomBuilderPanel({
                 ],
               })}
             >
-              <Plus size={12} aria-hidden />{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "창")}</button>
+              <Plus size={12} aria-hidden />창
+            </button>
           </span>
         </div>
         {spec.openings.length === 0 ? (
           <p className="py-1 text-[0.66rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "아직 오프닝이 없어요. 문·창을 추가하면 벽이 자동으로 갈라집니다.")}</p>
+            아직 오프닝이 없어요. 문·창을 추가하면 벽이 자동으로 갈라집니다.
+          </p>
         ) : (
           <ul className="space-y-2">
             {spec.openings.map((opening, index) => (
@@ -205,10 +209,10 @@ export function StudioBg3dRoomBuilderPanel({
                       opening.type === "door" ? "bg-accent-soft text-accent" : "bg-raised text-fg-2",
                     )}
                   >
-                    {opening.type === "door" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "문") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "창")}
+                    {opening.type === "door" ? "문" : "창"}
                   </span>
                   <select
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "오프닝 {v0} 벽 선택"), { v0: String(index + 1) })}
+                    aria-label={`오프닝 ${index + 1} 벽 선택`}
                     className={SELECT_INPUT}
                     value={opening.wall}
                     disabled={disabled}
@@ -222,7 +226,7 @@ export function StudioBg3dRoomBuilderPanel({
                   </select>
                   <button
                     type="button"
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "오프닝 {v0} 삭제"), { v0: String(index + 1) })}
+                    aria-label={`오프닝 ${index + 1} 삭제`}
                     disabled={disabled}
                     className="grid size-8 shrink-0 place-items-center rounded-md border border-line text-fg-3 hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
                     onClick={() => onSpecChange({
@@ -235,9 +239,10 @@ export function StudioBg3dRoomBuilderPanel({
                 </div>
                 <div className={cx("grid gap-1.5", opening.type === "window" ? "grid-cols-4" : "grid-cols-3")}>
                   <label className="min-w-0 text-[0.62rem] font-semibold text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "위치")}<input
+                    위치
+                    <input
                       type="number"
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "오프닝 {v0} 위치 오프셋(m)"), { v0: String(index + 1) })}
+                      aria-label={`오프닝 ${index + 1} 위치 오프셋(m)`}
                       step={0.1}
                       value={opening.centerOffset}
                       disabled={disabled}
@@ -247,9 +252,10 @@ export function StudioBg3dRoomBuilderPanel({
                     />
                   </label>
                   <label className="min-w-0 text-[0.62rem] font-semibold text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "폭")}<input
+                    폭
+                    <input
                       type="number"
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "오프닝 {v0} 폭(m)"), { v0: String(index + 1) })}
+                      aria-label={`오프닝 ${index + 1} 폭(m)`}
                       step={0.1}
                       min={0.3}
                       value={opening.width}
@@ -260,9 +266,10 @@ export function StudioBg3dRoomBuilderPanel({
                     />
                   </label>
                   <label className="min-w-0 text-[0.62rem] font-semibold text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "높이")}<input
+                    높이
+                    <input
                       type="number"
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "오프닝 {v0} 높이(m)"), { v0: String(index + 1) })}
+                      aria-label={`오프닝 ${index + 1} 높이(m)`}
                       step={0.1}
                       min={0.2}
                       value={opening.height}
@@ -274,9 +281,10 @@ export function StudioBg3dRoomBuilderPanel({
                   </label>
                   {opening.type === "window" ? (
                     <label className="min-w-0 text-[0.62rem] font-semibold text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "창턱")}<input
+                      창턱
+                      <input
                         type="number"
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "오프닝 {v0} 창턱 높이(m)"), { v0: String(index + 1) })}
+                        aria-label={`오프닝 ${index + 1} 창턱 높이(m)`}
                         step={0.1}
                         min={0.1}
                         value={opening.sillHeight}
@@ -298,9 +306,10 @@ export function StudioBg3dRoomBuilderPanel({
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <h4 className="flex items-center gap-1.5 text-xs font-bold text-fg">
             <Home size={13} className="text-accent" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "가구 · 구조물")}</h4>
+            가구 · 구조물
+          </h4>
           <select
-            aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "가구 추가")}
+            aria-label="가구 추가"
             className={cx(SELECT_INPUT, "w-auto")}
             value=""
             disabled={disabled || spec.furniture.length >= limits.maxFurniture}
@@ -313,7 +322,7 @@ export function StudioBg3dRoomBuilderPanel({
               });
             }}
           >
-            <option value="">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "+ 추가…")}</option>
+            <option value="">+ 추가…</option>
             {STUDIO_BG3D_ROOM_FURNITURE_KINDS.map((kind) => (
               <option key={kind} value={kind}>{STUDIO_BG3D_ROOM_FURNITURE_LABELS[kind]}</option>
             ))}
@@ -321,7 +330,8 @@ export function StudioBg3dRoomBuilderPanel({
         </div>
         {spec.furniture.length === 0 ? (
           <p className="py-1 text-[0.66rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "테이블·의자·침대·책장·기둥·계단을 방 좌표(m)로 배치할 수 있어요.")}</p>
+            테이블·의자·침대·책장·기둥·계단을 방 좌표(m)로 배치할 수 있어요.
+          </p>
         ) : (
           <ul className="space-y-1.5">
             {spec.furniture.map((item, index) => (
@@ -333,7 +343,7 @@ export function StudioBg3dRoomBuilderPanel({
                   X
                   <input
                     type="number"
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "{v0} {v1} X 좌표(m)"), { v0: String(STUDIO_BG3D_ROOM_FURNITURE_LABELS[item.kind]), v1: String(index + 1) })}
+                    aria-label={`${STUDIO_BG3D_ROOM_FURNITURE_LABELS[item.kind]} ${index + 1} X 좌표(m)`}
                     step={0.1}
                     value={item.x}
                     disabled={disabled}
@@ -348,7 +358,7 @@ export function StudioBg3dRoomBuilderPanel({
                   Z
                   <input
                     type="number"
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "{v0} {v1} Z 좌표(m)"), { v0: String(STUDIO_BG3D_ROOM_FURNITURE_LABELS[item.kind]), v1: String(index + 1) })}
+                    aria-label={`${STUDIO_BG3D_ROOM_FURNITURE_LABELS[item.kind]} ${index + 1} Z 좌표(m)`}
                     step={0.1}
                     value={item.z}
                     disabled={disabled}
@@ -360,8 +370,9 @@ export function StudioBg3dRoomBuilderPanel({
                   />
                 </label>
                 <label className="min-w-0 text-[0.62rem] font-semibold text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "방향")}<select
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "{v0} {v1} 방향"), { v0: String(STUDIO_BG3D_ROOM_FURNITURE_LABELS[item.kind]), v1: String(index + 1) })}
+                  방향
+                  <select
+                    aria-label={`${STUDIO_BG3D_ROOM_FURNITURE_LABELS[item.kind]} ${index + 1} 방향`}
                     className={SELECT_INPUT}
                     value={String(item.yawDeg)}
                     disabled={disabled}
@@ -380,7 +391,7 @@ export function StudioBg3dRoomBuilderPanel({
                 </label>
                 <button
                   type="button"
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "{v0} {v1} 삭제"), { v0: String(STUDIO_BG3D_ROOM_FURNITURE_LABELS[item.kind]), v1: String(index + 1) })}
+                  aria-label={`${STUDIO_BG3D_ROOM_FURNITURE_LABELS[item.kind]} ${index + 1} 삭제`}
                   disabled={disabled}
                   className="grid size-8 shrink-0 place-items-center rounded-md border border-line text-fg-3 hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
                   onClick={() => onSpecChange({
@@ -403,9 +414,12 @@ export function StudioBg3dRoomBuilderPanel({
         onClick={onInsert}
       >
         <Plus size={14} aria-hidden />
-        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "방 추가 · 오브젝트 ")}{partCount}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "개")}</button>
+        방 추가 · 오브젝트 {partCount}개
+      </button>
       <p className="mt-1.5 text-[0.64rem] leading-relaxed text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dRoomBuilderPanel", "ko", "추가된 방은 일반 도형으로 저장되어 각 벽·가구를 따로 선택해 다듬을 수 있고, Ctrl+Z 한 번에 방 전체가 되돌아갑니다.")}</p>
+        추가된 방은 일반 도형으로 저장되어 각 벽·가구를 따로 선택해 다듬을 수 있고, Ctrl+Z 한 번에
+        방 전체가 되돌아갑니다.
+      </p>
     </div>
   );
 }

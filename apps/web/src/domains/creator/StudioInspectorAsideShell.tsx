@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ChevronRight,
   Loader2,
   Move,
@@ -207,7 +203,7 @@ export function StudioInspectorAsideShell({
     <StudioDetachablePanelSlot
       detached={desktopDetached && visibleRightPanelOpen}
       surfaceId="inspector"
-      label={translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "작업 패널")}
+      label="작업 패널"
       defaultLayout={DEFAULT_STUDIO_INSPECTOR_FLOATING_LAYOUT}
       minWidth={400}
       minHeight={520}
@@ -219,14 +215,14 @@ export function StudioInspectorAsideShell({
         <aside
           id="studio-inspector"
           ref={propsSheetRef}
-          role={isMobile ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "en", "dialog") : translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "en", "region")}
+          role={isMobile ? "dialog" : "region"}
           aria-modal={isMobile && mobileSheet === "props" ? true : undefined}
           data-studio-sheet-id="props"
-          data-studio-panel-detached={desktopDetached ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "en", "true") : undefined}
-          data-studio-mobile-sheet={isMobile && mobileSheet === "props" ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "en", "true") : undefined}
+          data-studio-panel-detached={desktopDetached ? "true" : undefined}
+          data-studio-mobile-sheet={isMobile && mobileSheet === "props" ? "true" : undefined}
           data-studio-sheet-snap={isMobile ? mobileInspectorSnap : undefined}
-          data-popup-kind={isMobile && mobileSheet === "props" ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "en", "sheet") : undefined}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "작업 패널")}
+          data-popup-kind={isMobile && mobileSheet === "props" ? "sheet" : undefined}
+          aria-label="작업 패널"
           tabIndex={-1}
           inert={isMobile && mobileSheet !== "props" ? true : undefined}
           className={cn(
@@ -276,23 +272,23 @@ export function StudioInspectorAsideShell({
                     type="button"
                     onClick={() => setInspectorDetached(!detached)}
                     aria-label={detached
-                      ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "작업 패널을 오른쪽 패널에 붙이기")
-                      : translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "작업 패널을 창으로 분리")}
+                      ? "작업 패널을 오른쪽 패널에 붙이기"
+                      : "작업 패널을 창으로 분리"}
                     aria-pressed={desktopDetached}
                     className="inline-flex min-h-11 min-w-11 items-center gap-1 rounded px-2 text-[0.65rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                    title={detached ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "오른쪽 패널에 붙이기") : translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "자유 배치 창으로 분리")}
+                    title={detached ? "오른쪽 패널에 붙이기" : "자유 배치 창으로 분리"}
                   >
                     {detached ? <PanelRight size={12} aria-hidden /> : <Move size={12} aria-hidden />}
-                    {detached ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "붙이기") : translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "분리")}
+                    {detached ? "붙이기" : "분리"}
                   </button>
                   <button
                     type="button"
                     onClick={() => setRightPanelOpen(false)}
-                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "작업 패널 접기")}
+                    aria-label="작업 패널 접기"
                     className="inline-flex min-h-11 min-w-11 items-center gap-0.5 rounded px-1.5 text-[0.65rem] text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                    title={translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "작업 패널 접기")}
+                    title="작업 패널 접기"
                   >
-                    {translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "접기 ")}<ChevronRight size={12} aria-hidden />
+                    접기 <ChevronRight size={12} aria-hidden />
                   </button>
                 </div>
               )
@@ -381,11 +377,11 @@ export function StudioInspectorAsideShell({
             imageToolsStatusDescription={activeImageRasterPolicy?.description}
             imageToolsStatusTone={
               activeImageRasterPolicy?.state === "ready"
-                ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "en", "good")
+                ? "good"
                 : activeImageRasterPolicy?.selectable
-                  ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "en", "accent")
+                  ? "accent"
                   : activeImageRasterPolicy
-                    ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "en", "warn")
+                    ? "warn"
                     : undefined
             }
             layerCount={elements.length}
@@ -394,7 +390,7 @@ export function StudioInspectorAsideShell({
               <StudioMobileSheetHandle
                 active={isMobile && mobileSheet === "props"}
                 kind="props"
-                label={translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "작업 패널")}
+                label="작업 패널"
                 onDismiss={() => setMobileSheet(null)}
                 onSnapChange={setMobileInspectorSnap}
                 sheetRef={propsSheetRef}
@@ -524,10 +520,10 @@ export function StudioInspectorAsideShell({
             id={tabA11y.primary.layers.panelId}
             // 분할 모드에서는 탭패널이 아니라 대상 탭 아래 붙는 보조 영역이다 — 탭패널로 두면
             // 선택되지 않은 탭이 패널을 하나 더 가리키게 된다.
-            role={layersSplitWithProperties ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "en", "region") : translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "en", "tabpanel")}
+            role={layersSplitWithProperties ? "region" : "tabpanel"}
             aria-labelledby={layersSplitWithProperties ? undefined : tabA11y.primary.layers.tabId}
-            aria-label={layersSplitWithProperties ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "레이어") : undefined}
-            data-studio-inspector-layers-split={layersSplitWithProperties ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "en", "true") : undefined}
+            aria-label={layersSplitWithProperties ? "레이어" : undefined}
+            data-studio-inspector-layers-split={layersSplitWithProperties ? "true" : undefined}
             hidden={!layersPaneMounted}
             className={cn(
               "flex shrink-0 flex-col gap-2",
@@ -557,7 +553,8 @@ export function StudioInspectorAsideShell({
                             className="animate-spin motion-reduce:animate-none"
                             aria-hidden
                           />
-                          {translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "레이어 탐색기 불러오는 중")}</span>
+                          레이어 탐색기 불러오는 중
+                        </span>
                       </div>
                     }
                   >
@@ -627,12 +624,12 @@ export function StudioInspectorAsideShell({
             }
             className="rounded-xl border border-line bg-panel/40 p-3"
           >
-            <p className="mb-2 text-xs font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "미니맵 / 네비게이터")}</p>
+            <p className="mb-2 text-xs font-semibold text-fg-3 uppercase tracking-wider">미니맵 / 네비게이터</p>
             <div className="flex justify-center bg-canvas/30 rounded-xl p-2 border border-line/50">
               <div
                 role="button"
                 tabIndex={0}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "ko", "미니맵: 클릭하거나 끌어서 캔버스 이동, 방향키로 스크롤")}
+                aria-label="미니맵: 클릭하거나 끌어서 캔버스 이동, 방향키로 스크롤"
                 onClick={onMinimapClick}
                 // Figma/Procreate식 드래그 스크럽: 포인터를 잡은 채 끌면 뷰포트가 연속으로 따라온다.
                 onPointerDown={(e) => {
@@ -673,7 +670,7 @@ export function StudioInspectorAsideShell({
 
                   return (
                     <div
-                      key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideShell", "en", "mini-{v0}"), { v0: String(el.id) })}
+                      key={`mini-${el.id}`}
                       className={cn("absolute rounded-sm pointer-events-none", colorClass)}
                       style={{
                         left: `${pctX}%`,

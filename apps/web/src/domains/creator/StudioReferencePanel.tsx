@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   Check,
   ExternalLink,
@@ -1341,7 +1337,7 @@ export function StudioReferencePanel({
   return (
     <div
       role="region"
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "레퍼런스 캔버스")}
+      aria-label="레퍼런스 캔버스"
       data-studio-reference-preferences-authority={preferencesAuthority}
       data-studio-reference-canvas="true"
       tabIndex={-1}
@@ -1353,7 +1349,7 @@ export function StudioReferencePanel({
         type="file"
         multiple
         accept={STUDIO_REFERENCE_IMPORT_ACCEPT}
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "참고 이미지 파일 선택")}
+        aria-label="참고 이미지 파일 선택"
         className="sr-only"
         disabled={addingAssetId !== null || importingFiles || importingRemote || atItemLimit}
         onChange={(event) => {
@@ -1373,8 +1369,8 @@ export function StudioReferencePanel({
             <Images size={15} aria-hidden />
           </span>
           <span className="min-w-0">
-            <strong className="block truncate text-[0.72rem]">{translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "레퍼런스 캔버스")}</strong>
-            <span className="block truncate text-[0.54rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "자유 배치 · 겹침 비교 · 색상 추출")}</span>
+            <strong className="block truncate text-[0.72rem]">레퍼런스 캔버스</strong>
+            <span className="block truncate text-[0.54rem] font-medium text-fg-3">자유 배치 · 겹침 비교 · 색상 추출</span>
           </span>
           <span className="rounded-full border border-line bg-panel/70 px-1.5 py-0.5 text-[0.56rem] font-semibold tabular-nums text-fg-3 backdrop-blur-sm">
             {document.items.length}/{STUDIO_REFERENCE_BOARD_MAX_ITEMS}
@@ -1383,8 +1379,8 @@ export function StudioReferencePanel({
         <div className="relative flex shrink-0 items-center gap-0.5">
           <button
             type="button"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "레퍼런스 이미지 자동 정돈")}
-            title={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "겹친 이미지를 한눈에 보이도록 정돈")}
+            aria-label="레퍼런스 이미지 자동 정돈"
+            title="겹친 이미지를 한눈에 보이도록 정돈"
             disabled={document.items.length < 2}
             className={cx(ICON_BUTTON, "size-8")}
             onPointerDown={(event) => event.stopPropagation()}
@@ -1394,8 +1390,8 @@ export function StudioReferencePanel({
           </button>
           <button
             type="button"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "선택 이미지 속성")}
-            title={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "선택 이미지 속성")}
+            aria-label="선택 이미지 속성"
+            title="선택 이미지 속성"
             aria-pressed={inspectorOpen}
             disabled={!effectiveSelectedItem}
             className={cx(ICON_BUTTON, "size-8", inspectorOpen && "border-accent/60 bg-accent-soft text-accent")}
@@ -1409,8 +1405,8 @@ export function StudioReferencePanel({
           </button>
           <button
             type="button"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "참고 이미지 추가")}
-            title={atItemLimit ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "최대 {v0}개까지 추가할 수 있어요."), { v0: String(STUDIO_REFERENCE_BOARD_MAX_ITEMS) }) : translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "참고 이미지 추가")}
+            aria-label="참고 이미지 추가"
+            title={atItemLimit ? `최대 ${STUDIO_REFERENCE_BOARD_MAX_ITEMS}개까지 추가할 수 있어요.` : "참고 이미지 추가"}
             aria-pressed={pickerOpen}
             disabled={atItemLimit}
             className={cx(ICON_BUTTON, "size-8", pickerOpen && "border-accent/60 bg-accent-soft text-accent")}
@@ -1426,8 +1422,8 @@ export function StudioReferencePanel({
           {onOpenDetached ? (
             <button
               type="button"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "레퍼런스 캔버스를 별도 창으로 열기")}
-              title={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "동기화된 전용 창으로 열기")}
+              aria-label="레퍼런스 캔버스를 별도 창으로 열기"
+              title="동기화된 전용 창으로 열기"
               className={cx(ICON_BUTTON, "size-8")}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={onOpenDetached}
@@ -1437,8 +1433,8 @@ export function StudioReferencePanel({
           ) : null}
           <button
             type="button"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "레퍼런스 캔버스 닫기")}
-            title={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "닫기")}
+            aria-label="레퍼런스 캔버스 닫기"
+            title="닫기"
             className={cx(ICON_BUTTON, "size-8")}
             onPointerDown={(event) => event.stopPropagation()}
             onClick={onClose}
@@ -1454,7 +1450,8 @@ export function StudioReferencePanel({
           aria-live="polite"
           className="shrink-0 border-b border-warning/30 bg-warning/10 px-2 py-1 text-[0.61rem] leading-relaxed text-warning"
         >
-          {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "레퍼런스 캔버스 배치는 현재 세션 메모리에서만 유지됩니다.")}</p>
+          레퍼런스 캔버스 배치는 현재 세션 메모리에서만 유지됩니다.
+        </p>
       ) : null}
 
       <div
@@ -1470,7 +1467,8 @@ export function StudioReferencePanel({
             role="status"
             className="pointer-events-none absolute inset-2 z-50 grid place-items-center rounded-xl border-2 border-dashed border-accent bg-panel/90 p-4 text-center text-xs font-bold text-accent"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "PNG · JPG · WebP · GIF를 놓아 레퍼런스 캔버스에 추가")}</div>
+            PNG · JPG · WebP · GIF를 놓아 레퍼런스 캔버스에 추가
+          </div>
         ) : null}
         {importStatus && !dropActive ? (
           <p
@@ -1500,15 +1498,17 @@ export function StudioReferencePanel({
             <div className="grid h-full place-items-center p-4 text-center">
               <div>
                 <ImageIcon className="mx-auto text-fg-3" size={23} aria-hidden />
-                <p className="mt-2 text-[0.72rem] font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "레퍼런스를 캔버스에 펼쳐보세요")}</p>
+                <p className="mt-2 text-[0.72rem] font-semibold text-fg">레퍼런스를 캔버스에 펼쳐보세요</p>
                 <p className="mx-auto mt-1 max-w-[28ch] text-[0.65rem] leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "여러 이미지를 직접 옮기고 겹치며 크기·각도·투명도를 눈으로 맞출 수 있어요.")}</p>
+                  여러 이미지를 직접 옮기고 겹치며 크기·각도·투명도를 눈으로 맞출 수 있어요.
+                </p>
                 <button
                   type="button"
                   className={cx(CONTROL_BUTTON, "mt-3 border-accent/60 bg-accent text-on-accent hover:bg-accent-2")}
                   onClick={() => setPickerOpen(true)}
                 >
-                  <ImagePlus size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "이미지 추가")}</button>
+                  <ImagePlus size={13} aria-hidden /> 이미지 추가
+                </button>
               </div>
             </div>
           ) : null}
@@ -1533,9 +1533,9 @@ export function StudioReferencePanel({
                 aria-pressed={isSelected}
                 title={asset
                   ? eyedropperActive && isSelected
-                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "{v0} — 클릭해서 원본 색상 추출"), { v0: String(label) })
-                    : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "{v0} — 드래그해서 이동"), { v0: String(label) })
-                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "{v0} — 원본 에셋을 찾을 수 없음"), { v0: String(label) })}
+                    ? `${label} — 클릭해서 원본 색상 추출`
+                    : `${label} — 드래그해서 이동`
+                  : `${label} — 원본 에셋을 찾을 수 없음`}
                 className={cx(
                   "group absolute grid touch-none select-none place-items-center border bg-card/20 p-0 outline-none",
                   eyedropperActive && isSelected && "cursor-crosshair",
@@ -1583,7 +1583,8 @@ export function StudioReferencePanel({
                     style={{ opacity: view.opacity }}
                   >
                     <AlertTriangle size={14} className="text-warn" aria-hidden />
-                    {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "원본 없음")}</span>
+                    원본 없음
+                  </span>
                 )}
                 {asset?.kind === "ai" ? (
                   <span className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-accent px-1 py-0.5 text-[0.48rem] font-bold text-on-accent">
@@ -1595,7 +1596,7 @@ export function StudioReferencePanel({
                     <span
                       aria-hidden
                       data-reference-transform-handle="rotate"
-                      title={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "드래그해서 회전 · Shift로 15° 맞춤")}
+                      title="드래그해서 회전 · Shift로 15° 맞춤"
                       className="absolute left-1/2 -top-9 z-30 grid size-7 -translate-x-1/2 cursor-grab place-items-center rounded-full border border-accent/80 bg-panel text-accent shadow-lg before:absolute before:top-full before:h-2 before:w-px before:bg-accent/70 active:cursor-grabbing"
                       onPointerDown={(event) => beginItemTransform("rotate", item, view, event)}
                       onPointerMove={previewItemTransform}
@@ -1608,7 +1609,7 @@ export function StudioReferencePanel({
                     <span
                       aria-hidden
                       data-reference-transform-handle="scale"
-                      title={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "드래그해서 크기 조절")}
+                      title="드래그해서 크기 조절"
                       className="absolute -bottom-3 -right-3 z-30 grid size-7 cursor-nwse-resize place-items-center rounded-lg border border-accent/80 bg-panel text-accent shadow-lg"
                       onPointerDown={(event) => beginItemTransform("scale", item, view, event)}
                       onPointerMove={previewItemTransform}
@@ -1627,11 +1628,11 @@ export function StudioReferencePanel({
 
         <div
           role="group"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "참고 이미지 레이어 (뒤에서 앞으로)")}
+          aria-label="참고 이미지 레이어 (뒤에서 앞으로)"
           className="absolute inset-x-0 bottom-0 flex h-12 items-center gap-1 overflow-x-auto border-t border-line bg-card px-2"
         >
           {document.items.length === 0 ? (
-            <span className="text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "이미지를 추가하면 레이어가 여기에 표시됩니다.")}</span>
+            <span className="text-[0.62rem] text-fg-3">이미지를 추가하면 레이어가 여기에 표시됩니다.</span>
           ) : document.items.map((item, index) => {
             const asset = resolveReferenceAsset(item, assets);
             const label = referenceItemLabel(item, asset);
@@ -1640,7 +1641,7 @@ export function StudioReferencePanel({
                 key={item.id}
                 type="button"
                 aria-pressed={item.id === effectiveSelectedId}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "레이어 {v0}: {v1}"), { v0: String(index + 1), v1: String(label) })}
+                aria-label={`레이어 ${index + 1}: ${label}`}
                 title={`${index + 1}. ${label}`}
                 className={cx(
                   "relative grid size-9 shrink-0 place-items-center overflow-hidden rounded-md border bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
@@ -1667,13 +1668,14 @@ export function StudioReferencePanel({
         {pickerOpen ? (
           <div className="absolute inset-0 z-20 flex flex-col overflow-hidden bg-panel p-2">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-[0.72rem] font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "레퍼런스 추가")}</p>
+              <p className="text-[0.72rem] font-bold text-fg">레퍼런스 추가</p>
               <button
                 type="button"
                 className="text-[0.68rem] font-semibold text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 onClick={() => setPickerOpen(false)}
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "캔버스로 돌아가기")}</button>
+                캔버스로 돌아가기
+              </button>
             </div>
             <button
               type="button"
@@ -1687,9 +1689,11 @@ export function StudioReferencePanel({
               {importingFiles
                 ? <Loader2 size={13} className="animate-spin" aria-hidden />
                 : <Upload size={13} aria-hidden />}
-              {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "내 기기에서 가져오기")}</button>
+              내 기기에서 가져오기
+            </button>
             <p className="mb-2 text-center text-[0.56rem] text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "여러 파일 선택 · 캔버스로 드롭 · 이미지 붙여넣기 지원")}</p>
+              여러 파일 선택 · 캔버스로 드롭 · 이미지 붙여넣기 지원
+            </p>
             <form
               className="mb-2 rounded-lg border border-line bg-card/70 p-2"
               onSubmit={(event) => {
@@ -1698,7 +1702,8 @@ export function StudioReferencePanel({
               }}
             >
               <label htmlFor="studio-reference-remote-url" className="mb-1 flex items-center gap-1 text-[0.62rem] font-semibold text-fg-2">
-                <Link2 size={11} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "공개 이미지 URL")}</label>
+                <Link2 size={11} aria-hidden /> 공개 이미지 URL
+              </label>
               <div className="flex gap-1">
                 <input
                   id="studio-reference-remote-url"
@@ -1717,7 +1722,7 @@ export function StudioReferencePanel({
                     type="button"
                     className={cx(ICON_BUTTON, "size-9 border-bad/40 text-bad")}
                     onClick={() => remoteImportAbortRef.current?.abort()}
-                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "URL 이미지 가져오기 취소")}
+                    aria-label="URL 이미지 가져오기 취소"
                   >
                     <X size={13} aria-hidden />
                   </button>
@@ -1727,11 +1732,13 @@ export function StudioReferencePanel({
                     disabled={!remoteUrl.trim() || addingAssetId !== null || importingFiles || atItemLimit}
                     className={cx(CONTROL_BUTTON, "h-9 min-h-9 shrink-0 border-line bg-panel px-2 text-fg-2 hover:border-accent/50 hover:text-accent")}
                   >
-                    <Link2 size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "가져오기")}</button>
+                    <Link2 size={12} aria-hidden /> 가져오기
+                  </button>
                 )}
               </div>
               <p className="mt-1 text-[0.54rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "서버가 공개 HTTP(S) 주소와 최대 3MB 이미지만 확인하며, 내부망·비공개 주소로 향하는 위험한 리디렉션은 차단합니다.")}</p>
+                서버가 공개 HTTP(S) 주소와 최대 3MB 이미지만 확인하며, 내부망·비공개 주소로 향하는 위험한 리디렉션은 차단합니다.
+              </p>
             </form>
             <label className="relative mb-2 block shrink-0">
               <Search size={12} aria-hidden className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-fg-3" />
@@ -1739,14 +1746,14 @@ export function StudioReferencePanel({
                 type="search"
                 value={pickerQuery}
                 onChange={(event) => setPickerQuery(event.target.value)}
-                placeholder={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "이름으로 찾기 ({v0}개)"), { v0: String(assets.length) })}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "에셋 이름 검색")}
+                placeholder={`이름으로 찾기 (${assets.length}개)`}
+                aria-label="에셋 이름 검색"
                 className="h-8 w-full rounded-lg border border-line bg-card pl-7 pr-2 text-[0.7rem] text-fg outline-none placeholder:text-fg-3 focus:border-accent/60"
               />
             </label>
             <div className="min-h-0 flex-1 overflow-y-auto">
               {libraryStatus === "loading" ? (
-                <div className="space-y-1.5" aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "에셋 목록 불러오는 중")}>
+                <div className="space-y-1.5" aria-label="에셋 목록 불러오는 중">
                   {Array.from({ length: 6 }, (_, index) => (
                     <div key={index} className="h-14 animate-pulse rounded-lg border border-line bg-card" />
                   ))}
@@ -1760,22 +1767,25 @@ export function StudioReferencePanel({
                     className={cx(CONTROL_BUTTON, "border-line bg-card text-fg-2 hover:bg-raised")}
                     onClick={retryLoadAssets}
                   >
-                    {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "다시 시도")}</button>
+                    다시 시도
+                  </button>
                 </div>
               ) : assets.length === 0 ? (
                 <p className="px-3 py-7 text-center text-[0.68rem] leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "저장된 에셋이 없어요. 위 버튼에서 바로 가져오거나 캔버스에 파일을 놓아 주세요.")}</p>
+                  저장된 에셋이 없어요. 위 버튼에서 바로 가져오거나 캔버스에 파일을 놓아 주세요.
+                </p>
               ) : filteredAssets.length === 0 ? (
                 <p className="px-3 py-7 text-center text-[0.68rem] text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "en", "&ldquo;")}{pickerQuery}{translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "&rdquo;와 일치하는 에셋이 없어요.")}</p>
+                  &ldquo;{pickerQuery}&rdquo;와 일치하는 에셋이 없어요.
+                </p>
               ) : (
                 <div className="grid grid-cols-3 gap-1.5">
                   {filteredAssets.map((asset) => (
                     <button
                       key={asset.id}
                       type="button"
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "{v0} 캔버스에 추가"), { v0: String(asset.name) })}
-                      title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "{v0} 캔버스에 추가"), { v0: String(asset.name) })}
+                      aria-label={`${asset.name} 캔버스에 추가`}
+                      title={`${asset.name} 캔버스에 추가`}
                       disabled={
                         atItemLimit ||
                         addingAssetId !== null ||
@@ -1818,8 +1828,8 @@ export function StudioReferencePanel({
               </p>
               <button
                 type="button"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "한 단계 뒤로")}
-                title={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "한 단계 뒤로")}
+                aria-label="한 단계 뒤로"
+                title="한 단계 뒤로"
                 disabled={selectedIndex <= 0}
                 className={cx(ICON_BUTTON, "size-7")}
                 onClick={() => emitDocumentChange(reorderStudioReferenceBoardItem(document, effectiveSelectedItem.id, selectedIndex - 1))}
@@ -1828,8 +1838,8 @@ export function StudioReferencePanel({
               </button>
               <button
                 type="button"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "한 단계 앞으로")}
-                title={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "한 단계 앞으로")}
+                aria-label="한 단계 앞으로"
+                title="한 단계 앞으로"
                 disabled={selectedIndex < 0 || selectedIndex >= document.items.length - 1}
                 className={cx(ICON_BUTTON, "size-7")}
                 onClick={() => emitDocumentChange(reorderStudioReferenceBoardItem(document, effectiveSelectedItem.id, selectedIndex + 1))}
@@ -1838,8 +1848,8 @@ export function StudioReferencePanel({
               </button>
               <button
                 type="button"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "좌우 반전")}
-                title={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "좌우 반전")}
+                aria-label="좌우 반전"
+                title="좌우 반전"
                 aria-pressed={selectedView.flipX}
                 className={cx(ICON_BUTTON, "size-7", selectedView.flipX && "border-accent/60 bg-accent-soft text-accent")}
                 onClick={() => patchSelectedView({ flipX: !selectedView.flipX })}
@@ -1848,8 +1858,8 @@ export function StudioReferencePanel({
               </button>
               <button
                 type="button"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "상하 반전")}
-                title={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "상하 반전")}
+                aria-label="상하 반전"
+                title="상하 반전"
                 aria-pressed={selectedView.flipY}
                 className={cx(ICON_BUTTON, "size-7", selectedView.flipY && "border-accent/60 bg-accent-soft text-accent")}
                 onClick={() => patchSelectedView({ flipY: !selectedView.flipY })}
@@ -1858,8 +1868,8 @@ export function StudioReferencePanel({
               </button>
               <button
                 type="button"
-                aria-label={selectedView.grayscale ? translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "원본 색상으로 보기") : translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "흑백으로 보기")}
-                title={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "흑백 보기")}
+                aria-label={selectedView.grayscale ? "원본 색상으로 보기" : "흑백으로 보기"}
+                title="흑백 보기"
                 aria-pressed={selectedView.grayscale}
                 className={cx(ICON_BUTTON, "size-7", selectedView.grayscale && "border-accent/60 bg-accent-soft text-accent")}
                 onClick={() => patchSelectedView({ grayscale: !selectedView.grayscale })}
@@ -1868,8 +1878,8 @@ export function StudioReferencePanel({
               </button>
               <button
                 type="button"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "선택 이미지 삭제")}
-                title={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "선택 이미지 삭제")}
+                aria-label="선택 이미지 삭제"
+                title="선택 이미지 삭제"
                 className={cx(ICON_BUTTON, "size-7 hover:border-bad/50 hover:bg-bad/10 hover:text-bad")}
                 onClick={() => {
                   const next = removeStudioReferenceBoardItem(document, effectiveSelectedItem.id);
@@ -1885,8 +1895,8 @@ export function StudioReferencePanel({
             </div>
             <div className="space-y-1.5">
               <ReferenceRangeControl
-                label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "크기")}
-                ariaLabel={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "선택 이미지 크기")}
+                label="크기"
+                ariaLabel="선택 이미지 크기"
                 value={selectedView.zoom * 100}
                 min={5}
                 max={3200}
@@ -1897,8 +1907,8 @@ export function StudioReferencePanel({
                 onCancel={clearTransformPreview}
               />
               <ReferenceRangeControl
-                label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "회전")}
-                ariaLabel={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "선택 이미지 회전")}
+                label="회전"
+                ariaLabel="선택 이미지 회전"
                 value={selectedView.rotationDeg}
                 min={-180}
                 max={179}
@@ -1909,8 +1919,8 @@ export function StudioReferencePanel({
                 onCancel={clearTransformPreview}
               />
               <ReferenceRangeControl
-                label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "불투명도")}
-                ariaLabel={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "선택 이미지 불투명도")}
+                label="불투명도"
+                ariaLabel="선택 이미지 불투명도"
                 value={selectedView.opacity * 100}
                 min={0}
                 max={100}
@@ -1922,14 +1932,15 @@ export function StudioReferencePanel({
               />
             </div>
             {colorPickingEnabled ? (
-              <section aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "선택 참고 이미지 색상")} className="mt-2 border-t border-line pt-2">
+              <section aria-label="선택 참고 이미지 색상" className="mt-2 border-t border-line pt-2">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex min-w-0 flex-1 items-center gap-1.5 text-[0.68rem] font-semibold text-fg">
                     <Palette size={13} className="shrink-0 text-accent" aria-hidden />
-                    {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "주요 색상")}</span>
+                    주요 색상
+                  </span>
                   <button
                     type="button"
-                    aria-label={eyedropperActive ? translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "참고 이미지 스포이드 끄기") : translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "참고 이미지 스포이드 켜기")}
+                    aria-label={eyedropperActive ? "참고 이미지 스포이드 끄기" : "참고 이미지 스포이드 켜기"}
                     aria-pressed={eyedropperActive}
                     disabled={colorAnalysisStatus !== "ready"}
                     className={cx(
@@ -1950,13 +1961,15 @@ export function StudioReferencePanel({
                     }}
                     onKeyDown={exitReferenceEyedropperFromKeyboard}
                   >
-                    <Pipette size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "스포이드")}</button>
+                    <Pipette size={13} aria-hidden /> 스포이드
+                  </button>
                 </div>
 
                 {colorAnalysisStatus === "loading" ? (
                   <div role="status" className="mt-2 flex min-h-11 items-center gap-2 text-[0.65rem] text-fg-3">
                     <Loader2 size={14} className="animate-spin text-accent motion-reduce:animate-none" aria-hidden />
-                    {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "선택 이미지의 색상을 분석하는 중…")}</div>
+                    선택 이미지의 색상을 분석하는 중…
+                  </div>
                 ) : null}
 
                 {colorAnalysisStatus === "error" && colorAnalysisError ? (
@@ -1972,21 +1985,22 @@ export function StudioReferencePanel({
                           className="mt-1 inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                           onClick={() => setColorAnalysisNonce((nonce) => nonce + 1)}
                         >
-                          <RefreshCw size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "다시 분석")}</button>
+                          <RefreshCw size={12} aria-hidden /> 다시 분석
+                        </button>
                       ) : null}
                     </div>
                   </div>
                 ) : null}
 
                 {colorAnalysisStatus === "ready" && paletteColors.length > 0 ? (
-                  <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "추출된 주요 색상")} className="mt-2 flex flex-wrap gap-1.5">
+                  <div role="group" aria-label="추출된 주요 색상" className="mt-2 flex flex-wrap gap-1.5">
                     {paletteColors.map((hex) => (
                       <button
                         key={hex}
                         type="button"
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "{v0} 색상 선택"), { v0: String(hex) })}
+                        aria-label={`${hex} 색상 선택`}
                         aria-pressed={pickedColor === hex}
-                        title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "{v0} 기본색으로 선택"), { v0: String(hex) })}
+                        title={`${hex} 기본색으로 선택`}
                         className={cx(
                           "relative grid size-11 place-items-center rounded-lg border bg-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                           pickedColor === hex ? "border-accent" : "border-line hover:border-line-strong"
@@ -2011,12 +2025,14 @@ export function StudioReferencePanel({
 
                 {colorAnalysisStatus === "ready" && paletteColors.length === 0 ? (
                   <p role="status" className="mt-2 text-[0.64rem] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "불투명한 픽셀이 없어 추출할 주요 색상이 없습니다.")}</p>
+                    불투명한 픽셀이 없어 추출할 주요 색상이 없습니다.
+                  </p>
                 ) : null}
 
                 {colorAnalysisStatus === "ready" ? (
                   <p className="mt-2 text-[0.61rem] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "색상 분석은 이 브라우저에서만 실행됩니다. 흑백 보기 중에도 원본 이미지 색상을 선택합니다.")}</p>
+                    색상 분석은 이 브라우저에서만 실행됩니다. 흑백 보기 중에도 원본 이미지 색상을 선택합니다.
+                  </p>
                 ) : null}
                 {colorInteractionStatus ? (
                   <p role="status" aria-live="polite" className="mt-1 text-[0.62rem] leading-relaxed text-fg-2">
@@ -2031,8 +2047,8 @@ export function StudioReferencePanel({
 
       <button
         type="button"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "패널 크기 조절 (방향키로도 조절 가능, 더블클릭으로 기본 크기)")}
-        title={translateCurrentStaticSourceText("domains.creator.StudioReferencePanel", "ko", "드래그해서 크기 조절 (더블클릭: 기본 크기)")}
+        aria-label="패널 크기 조절 (방향키로도 조절 가능, 더블클릭으로 기본 크기)"
+        title="드래그해서 크기 조절 (더블클릭: 기본 크기)"
         className="absolute bottom-0 right-0 z-30 size-4 cursor-nwse-resize border-none bg-transparent p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
         style={{
           touchAction: "none",

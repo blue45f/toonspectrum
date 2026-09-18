@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 
 import { cn } from "@/shared/lib/utils";
 import { useInView } from "@/hooks/use-in-view";
@@ -81,7 +80,7 @@ export function AreaChart({
         {/* 영역 채움 — 라인이 다 그려질 즈음 페이드인 */}
         <path
           d={area}
-          fill={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.insights.components.area.chart", "en", "url(#{v0})"), { v0: String(gid) })}
+          fill={`url(#${gid})`}
           style={{
             opacity: inView ? 1 : 0,
             transition: "opacity 600ms var(--ease-out-expo)",
@@ -115,7 +114,7 @@ export function AreaChart({
                 cx={p.x}
                 cy={p.y}
                 r={isLast ? 3 : 1.8}
-                fill={isLast ? color : translateCurrentStaticSourceText("domains.catalog.insights.components.area.chart", "en", "var(--color-canvas)")}
+                fill={isLast ? color : "var(--color-canvas)"}
                 stroke={color}
                 strokeWidth={isLast ? 0 : 1.4}
                 vectorEffect="non-scaling-stroke"

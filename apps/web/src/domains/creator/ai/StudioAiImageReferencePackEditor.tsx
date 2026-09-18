@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Camera,
   Image as ImageIcon,
   Paintbrush,
@@ -215,8 +211,8 @@ function ReferenceGuidance({
         setDraft(next);
         onChange(next);
       }}
-      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "{v0} 참조 지침"), { v0: String(name) })}
-      placeholder={translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "선택 사항 · 이 역할에서 참고할 특징")}
+      aria-label={`${name} 참조 지침`}
+      placeholder="선택 사항 · 이 역할에서 참고할 특징"
       disabled={disabled}
       rows={2}
       maxLength={STUDIO_AI_IMAGE_REFERENCE_LIMITS.maxGuidanceLength}
@@ -255,7 +251,7 @@ function ReferenceRow({
         <div
           title={
             option?.thumbnailUrl && !thumbnailUrl
-              ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "외부 미리보기는 개인정보 보호를 위해 차단되었습니다.")
+              ? "외부 미리보기는 개인정보 보호를 위해 차단되었습니다."
               : undefined
           }
           className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-raised text-fg-3"
@@ -280,7 +276,8 @@ function ReferenceRow({
             {name}
           </p>
           <p className="mt-0.5 truncate text-[0.65rem] text-fg-3">
-            {roleName} {translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "참조")}</p>
+            {roleName} 참조
+          </p>
           <ReferenceGuidance
             reference={reference}
             name={name}
@@ -293,8 +290,8 @@ function ReferenceRow({
           type="button"
           onClick={() => onRemove(reference.id)}
           disabled={disabled}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "{v0} {v1} 참조 제거"), { v0: String(name), v1: String(roleName) })}
-          title={translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "이 역할에서 제거")}
+          aria-label={`${name} ${roleName} 참조 제거`}
+          title="이 역할에서 제거"
           className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-transparent text-fg-2 transition-colors hover:border-danger/20 hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/35 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <X size={16} aria-hidden />
@@ -374,7 +371,7 @@ function ReferenceRoleSection({
 
   return (
     <section
-      aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "en", "{v0}-title"), { v0: String(id) })}
+      aria-labelledby={`${id}-title`}
       className="min-w-0 rounded-lg border border-line bg-card/35 p-2.5"
       data-studio-ai-image-reference-role={role}
     >
@@ -391,7 +388,7 @@ function ReferenceRoleSection({
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center justify-between gap-2">
             <h3
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "en", "{v0}-title"), { v0: String(id) })}
+              id={`${id}-title`}
               className="min-w-0 truncate text-xs font-bold text-fg"
             >
               {presentation.eyebrow} · {presentation.title}
@@ -428,26 +425,27 @@ function ReferenceRoleSection({
 
       <div className="mt-2.5 border-t border-line pt-2.5">
         <label
-          htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "en", "{v0}-asset"), { v0: String(id) })}
+          htmlFor={`${id}-asset`}
           className="mb-1 block text-[0.68rem] font-semibold text-fg-2"
         >
-          {translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "에셋 추가")}</label>
+          에셋 추가
+        </label>
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_44px] gap-2">
           <select
-            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "en", "{v0}-asset"), { v0: String(id) })}
+            id={`${id}-asset`}
             value={pendingAssetId}
             onChange={(event) => setPendingAssetId(event.target.value)}
             disabled={addUnavailable}
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "{v0}에 추가할 에셋"), { v0: String(presentation.eyebrow) })}
-            aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "en", "{v0}-availability"), { v0: String(id) })}
+            aria-label={`${presentation.eyebrow}에 추가할 에셋`}
+            aria-describedby={`${id}-availability`}
             className="min-h-11 w-full min-w-0 rounded-lg border border-line bg-panel px-2.5 text-xs text-fg outline-none transition-colors hover:border-line-strong focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed disabled:bg-raised/45 disabled:text-fg-3"
           >
             <option value="">
               {loading
-                ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "에셋 불러오는 중…")
+                ? "에셋 불러오는 중…"
                 : availableOptions.length > 0
-                  ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "이미지 에셋 선택…")
-                  : translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "추가할 에셋 없음")}
+                  ? "이미지 에셋 선택…"
+                  : "추가할 에셋 없음"}
             </option>
             {availableOptions.map((option) => (
               <option key={option.id} value={option.id}>
@@ -463,10 +461,10 @@ function ReferenceRoleSection({
               setPendingAssetId("");
             }}
             disabled={addUnavailable || !selectedOption}
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "{v0} 참조 추가"), { v0: String(presentation.eyebrow) })}
+            aria-label={`${presentation.eyebrow} 참조 추가`}
             title={
               selectedOption
-                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "{v0} 추가"), { v0: String(selectedOption.name) })
+                ? `${selectedOption.name} 추가`
                 : availabilityMessage
             }
             className="flex min-h-11 min-w-11 items-center justify-center rounded-lg bg-accent text-on-accent transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-panel disabled:cursor-not-allowed disabled:bg-raised disabled:text-fg-3"
@@ -475,7 +473,7 @@ function ReferenceRoleSection({
           </button>
         </div>
         <p
-          id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "en", "{v0}-availability"), { v0: String(id) })}
+          id={`${id}-availability`}
           className={cn(
             "mt-1.5 text-[0.65rem] leading-relaxed",
             roleLimitReached || providerLimitReached ? "text-warning" : "text-fg-3",
@@ -565,12 +563,14 @@ export function StudioAiImageReferencePackEditor({
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 id={headingId} className="text-sm font-bold text-fg">
-            {translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "AI 이미지 참조 팩")}</h2>
+            AI 이미지 참조 팩
+          </h2>
           <p className="mt-1 text-[0.7rem] leading-relaxed text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "이미지마다 역할을 분리해 정체성·구도·화풍이 서로 섞이는 현상을 줄입니다.")}</p>
+            이미지마다 역할을 분리해 정체성·구도·화풍이 서로 섞이는 현상을 줄입니다.
+          </p>
         </div>
         <span
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "전체 참조 {v0}/{v1}"), { v0: String(totalReferenceCount), v1: String(STUDIO_AI_IMAGE_REFERENCE_PROVIDER_SAFE_MAX) })}
+          aria-label={`전체 참조 ${totalReferenceCount}/${STUDIO_AI_IMAGE_REFERENCE_PROVIDER_SAFE_MAX}`}
           className="shrink-0 rounded-full border border-line bg-raised px-2.5 py-1 text-[0.68rem] font-bold tabular-nums text-fg-2"
         >
           {totalReferenceCount}/{STUDIO_AI_IMAGE_REFERENCE_PROVIDER_SAFE_MAX}
@@ -582,11 +582,13 @@ export function StudioAiImageReferencePackEditor({
           role="status"
           className="mt-2.5 flex min-h-11 items-center rounded-lg border border-line bg-raised/60 px-3 text-xs text-fg-2"
         >
-          {translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "프로젝트 이미지 에셋을 불러오는 중…")}</p>
+          프로젝트 이미지 에셋을 불러오는 중…
+        </p>
       ) : null}
       {disabled ? (
         <p className="mt-2.5 rounded-lg border border-line bg-raised/60 px-3 py-2 text-[0.68rem] leading-relaxed text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.ai.StudioAiImageReferencePackEditor", "ko", "읽기 전용 상태입니다. 현재 참조와 지침은 확인할 수 있지만 변경할 수 없습니다.")}</p>
+          읽기 전용 상태입니다. 현재 참조와 지침은 확인할 수 있지만 변경할 수 없습니다.
+        </p>
       ) : null}
 
       <div className="mt-3 grid min-w-0 grid-cols-1 gap-2.5">

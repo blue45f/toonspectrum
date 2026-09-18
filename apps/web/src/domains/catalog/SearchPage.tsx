@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
@@ -68,7 +67,7 @@ export function SearchPage() {
           </span>
           <span className="h-1 w-1 rounded-full bg-fg-3" aria-hidden="true" />
           <span>
-            {t("search.freeOnlyLabel")}: {freeOnly ? translateCurrentStaticSourceText("domains.catalog.SearchPage", "en", "ON") : translateCurrentStaticSourceText("domains.catalog.SearchPage", "en", "OFF")}
+            {t("search.freeOnlyLabel")}: {freeOnly ? "ON" : "OFF"}
           </span>
         </p>
       </header>

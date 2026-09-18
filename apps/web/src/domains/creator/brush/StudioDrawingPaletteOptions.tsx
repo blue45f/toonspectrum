@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /* eslint-disable react-refresh/only-export-components -- This statically imported Studio leaf intentionally co-locates its typed overlay controller with the portal that exclusively consumes it. */
 import {
   LockKeyhole,
@@ -196,15 +192,15 @@ function PaletteOptions({
       >
         <Pin size={15} className="shrink-0 text-accent" aria-hidden />
         <span className="min-w-0 flex-1">
-          <span className="block font-semibold">{translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteOptions", "ko", "위치 잠금")}</span>
+          <span className="block font-semibold">위치 잠금</span>
           <span className="block truncate text-[0.65rem] text-fg-3">
             {locks.position
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteOptions", "ko", "{v0} 순서를 고정합니다"), { v0: String(label) })
-              : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteOptions", "ko", "{v0} 순서를 바꿀 수 있습니다"), { v0: String(label) })}
+              ? `${label} 순서를 고정합니다`
+              : `${label} 순서를 바꿀 수 있습니다`}
           </span>
         </span>
         <span aria-hidden className="text-[0.65rem] font-semibold">
-          {locks.position ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteOptions", "ko", "켬") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteOptions", "ko", "끔")}
+          {locks.position ? "켬" : "끔"}
         </span>
       </button>
       <button
@@ -221,15 +217,15 @@ function PaletteOptions({
       >
         <LockKeyhole size={15} className="shrink-0 text-accent" aria-hidden />
         <span className="min-w-0 flex-1">
-          <span className="block font-semibold">{translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteOptions", "ko", "높이 잠금")}</span>
+          <span className="block font-semibold">높이 잠금</span>
           <span className="block truncate text-[0.65rem] text-fg-3">
             {locks.height
-              ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteOptions", "ko", "분할선 크기를 고정합니다")
-              : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteOptions", "ko", "분할선으로 높이를 조절합니다")}
+              ? "분할선 크기를 고정합니다"
+              : "분할선으로 높이를 조절합니다"}
           </span>
         </span>
         <span aria-hidden className="text-[0.65rem] font-semibold">
-          {locks.height ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteOptions", "ko", "켬") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteOptions", "ko", "끔")}
+          {locks.height ? "켬" : "끔"}
         </span>
       </button>
       <div role="separator" className="mx-2 my-0.5 h-px bg-line/70" />
@@ -249,8 +245,8 @@ function PaletteOptions({
           aria-hidden
         />
         {nextPresentation === "icon-popup"
-          ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteOptions", "ko", "아이콘 팝업으로 보기")
-          : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteOptions", "ko", "전체 팔레트로 보기")}
+          ? "아이콘 팝업으로 보기"
+          : "전체 팔레트로 보기"}
       </button>
     </div>
   );
@@ -419,7 +415,7 @@ export function StudioDrawingPaletteOverlayPortal({
         label={definition.label}
         surfaceRef={overlayRef}
         optionsOpen={inlineOptionsOpen}
-        optionsId={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteOptions", "en", "{v0}-{v1}-popup-options"), { v0: String(stackId), v1: String(openOverlay.id) })}
+        optionsId={`${stackId}-${openOverlay.id}-popup-options`}
         options={options}
         onToggleOptions={toggleInlineOptions}
         onClose={() => close(true)}
@@ -437,7 +433,7 @@ export function StudioDrawingPaletteOverlayPortal({
       ref={overlayRef}
       id={studioDrawingPaletteOverlayId(stackId, openOverlay)}
       role="menu"
-      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteOptions", "ko", "{v0} 팔레트 옵션"), { v0: String(definition.label) })}
+      aria-label={`${definition.label} 팔레트 옵션`}
       data-studio-drawing-palette-overlay="options"
       data-studio-drawing-palette-overlay-id={openOverlay.id}
       style={overlayStyle}

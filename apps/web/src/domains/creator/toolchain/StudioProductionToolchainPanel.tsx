@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Layers3, ServerCog, Workflow } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -32,16 +28,18 @@ function CompactProfile({
   readonly setProfile: (profile: StudioToolchainProfileId) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2" aria-label={translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPanel", "ko", "제작 도구 라이선스 프로필")}>
+    <div className="flex flex-wrap gap-2" aria-label="제작 도구 라이선스 프로필">
       {STUDIO_TOOLCHAIN_PROFILES.map((item) => (
         <button
           key={item.id}
           type="button"
           aria-pressed={profile === item.id}
           onClick={() => setProfile(item.id)}
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPanel", "en", "min-h-9 rounded-lg border px-3 text-xs font-bold {v0}"), { v0: String(profile === item.id
+          className={`min-h-9 rounded-lg border px-3 text-xs font-bold ${
+            profile === item.id
               ? "border-accent bg-accent-soft text-accent"
-              : "border-line bg-card text-fg-3 hover:text-fg") })}
+              : "border-line bg-card text-fg-3 hover:text-fg"
+          }`}
         >
           {item.name}
         </button>
@@ -69,7 +67,7 @@ export function StudioProductionToolchainPanel({
 
   if (view === "renders") {
     return (
-      <section className="space-y-4" aria-label={translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPanel", "ko", "프로젝트 제작 작업")}>
+      <section className="space-y-4" aria-label="프로젝트 제작 작업">
         <StudioToonBridgeConnectionCard connection={connection} compact />
         <CompactProfile profile={profile} setProfile={setProfile} />
         <StudioProductionJobWorkspace
@@ -86,14 +84,19 @@ export function StudioProductionToolchainPanel({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-3xl">
           <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">
-            {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPanel", "en", "Production toolchain")}</p>
+            Production toolchain
+          </p>
           <h2 className="mt-2 font-display text-2xl font-bold tracking-[-0.035em] text-fg">
-            {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPanel", "ko", "외부 제작 도구 연결")}</h2>
+            외부 제작 도구 연결
+          </h2>
           <p className="mt-2 text-sm leading-7 text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPanel", "ko", "필터·OCR·벡터화·애니메이션·영상·3D·출판 작업을 이 프로젝트의 결과물과 이력으로 연결합니다. GPL 계열 실행 파일은 웹 번들에 포함하지 않고 로컬 프로세스로 격리합니다.")}</p>
+            필터·OCR·벡터화·애니메이션·영상·3D·출판 작업을 이 프로젝트의 결과물과 이력으로 연결합니다.
+            GPL 계열 실행 파일은 웹 번들에 포함하지 않고 로컬 프로세스로 격리합니다.
+          </p>
         </div>
         <span className="inline-flex min-h-9 items-center gap-2 rounded-full bg-card px-3 text-xs font-bold text-fg-2">
-          <Layers3 size={15} className="text-accent" aria-hidden="true" /> {toolCount}{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPanel", "ko", "개 허용 도구")}</span>
+          <Layers3 size={15} className="text-accent" aria-hidden="true" /> {toolCount}개 허용 도구
+        </span>
       </div>
 
       <div className="mt-5 grid gap-3 md:grid-cols-3">
@@ -112,17 +115,19 @@ export function StudioProductionToolchainPanel({
             href={href("/studio/toolchain", projectId)}
             className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line-strong bg-card px-4 text-xs font-bold text-fg-2 hover:text-fg"
           >
-            <Workflow size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPanel", "ko", "전체 제작 흐름")}</Link>
+            <Workflow size={15} aria-hidden="true" /> 전체 제작 흐름
+          </Link>
           <Link
             href={href("/studio/engines", projectId)}
             className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line-strong bg-card px-4 text-xs font-bold text-fg-2 hover:text-fg"
           >
-            <ServerCog size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPanel", "ko", "설치 상태")}</Link>
+            <ServerCog size={15} aria-hidden="true" /> 설치 상태
+          </Link>
           <Link
             href={href("/studio/jobs", projectId)}
             className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-fg px-4 text-xs font-bold text-canvas"
           >
-            {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPanel", "ko", "처리 중 작업 ")}<ArrowRight size={14} aria-hidden="true" />
+            처리 중 작업 <ArrowRight size={14} aria-hidden="true" />
           </Link>
         </div>
       </div>

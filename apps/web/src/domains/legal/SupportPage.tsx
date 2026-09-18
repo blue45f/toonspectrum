@@ -1,7 +1,4 @@
 import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Accessibility,
   ArrowUpRight,
   BookOpenCheck,
@@ -140,28 +137,28 @@ export function SupportPage() {
     <Container size="wide" className="support-center py-7 sm:py-11 lg:py-14">
       <header className="support-center__hero">
         <div>
-          <p className="support-center__eyebrow"><LifeBuoy size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.legal.SupportPage", "en", "TOONSTUDIO · SUPPORT")}</p>
-          <h1>{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "막힌 작업을 찾고,")}<br />{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "안전하게 다시 이어가세요.")}</h1>
-          <p>{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "이용 문의는 문제 해결과 적절한 지원 경로를 찾는 공간입니다. 공개 버그·아이디어·기능 요청은 제보·제안 보드에서 별도로 다룹니다.")}</p>
+          <p className="support-center__eyebrow"><LifeBuoy size={15} aria-hidden="true" /> TOONSTUDIO · SUPPORT</p>
+          <h1>막힌 작업을 찾고,<br />안전하게 다시 이어가세요.</h1>
+          <p>이용 문의는 문제 해결과 적절한 지원 경로를 찾는 공간입니다. 공개 버그·아이디어·기능 요청은 제보·제안 보드에서 별도로 다룹니다.</p>
         </div>
         <div className="support-center__hero-actions">
-          <Link href="/feedback?type=question"><MessageCircleQuestion size={17} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "공개 이용 질문")}</Link>
-          <Link href="/feedback?type=bug" data-secondary><Wrench size={17} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "버그 제보")}</Link>
+          <Link href="/feedback?type=question"><MessageCircleQuestion size={17} aria-hidden="true" /> 공개 이용 질문</Link>
+          <Link href="/feedback?type=bug" data-secondary><Wrench size={17} aria-hidden="true" /> 버그 제보</Link>
         </div>
       </header>
 
       <section className="support-center__finder" aria-labelledby="support-finder-title">
         <div>
-          <p className="support-center__eyebrow">{translateCurrentStaticSourceText("domains.legal.SupportPage", "en", "01 · FIND A PATH")}</p>
-          <h2 id="support-finder-title">{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "어떤 문제를 해결하고 있나요?")}</h2>
-          <p>{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "기능 이름이나 증상을 검색하면 관련 설정과 복구 화면으로 바로 이동할 수 있습니다.")}</p>
+          <p className="support-center__eyebrow">01 · FIND A PATH</p>
+          <h2 id="support-finder-title">어떤 문제를 해결하고 있나요?</h2>
+          <p>기능 이름이나 증상을 검색하면 관련 설정과 복구 화면으로 바로 이동할 수 있습니다.</p>
         </div>
         <label className="support-center__search">
-          <span className="sr-only">{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "지원 항목 검색")}</span>
+          <span className="sr-only">지원 항목 검색</span>
           <Search size={19} aria-hidden="true" />
-          <input type="search" value={query} onChange={(event) => setQuery(event.target.value.slice(0, 120))} placeholder={translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "예: 저장 복구, 로그인, 브러시, 에셋 설치")} />
+          <input type="search" value={query} onChange={(event) => setQuery(event.target.value.slice(0, 120))} placeholder="예: 저장 복구, 로그인, 브러시, 에셋 설치" />
         </label>
-        <p className="support-center__result-count" role="status">{matches.length}{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "개의 해결 경로")}</p>
+        <p className="support-center__result-count" role="status">{matches.length}개의 해결 경로</p>
         {matches.length ? (
           <div className="support-center__path-grid">
             {matches.map((item) => (
@@ -176,32 +173,32 @@ export function SupportPage() {
         ) : (
           <div className="support-center__empty">
             <MessageCircleQuestion size={28} aria-hidden="true" />
-            <h3>{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "일치하는 도움말을 찾지 못했어요.")}</h3>
-            <p>{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "검색어를 줄이거나 공개 이용 질문으로 상황을 알려주세요. 개인정보와 미공개 작품은 게시하지 마세요.")}</p>
-            <button type="button" onClick={() => setQuery("")}>{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "검색 초기화")}</button>
+            <h3>일치하는 도움말을 찾지 못했어요.</h3>
+            <p>검색어를 줄이거나 공개 이용 질문으로 상황을 알려주세요. 개인정보와 미공개 작품은 게시하지 마세요.</p>
+            <button type="button" onClick={() => setQuery("")}>검색 초기화</button>
           </div>
         )}
       </section>
 
       <div className="support-center__lower-grid">
         <section className="support-center__diagnostic" aria-labelledby="support-diagnostic-title">
-          <p className="support-center__eyebrow">{translateCurrentStaticSourceText("domains.legal.SupportPage", "en", "02 · PREPARE CONTEXT")}</p>
-          <h2 id="support-diagnostic-title">{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "문제 확인에 필요한 정보만 복사")}</h2>
-          <p>{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "현재 주소의 쿼리·작품 ID·입력 내용은 제외하고 경로, 연결 상태, 언어, 화면 크기만 복사합니다. 자동 전송하지 않습니다.")}</p>
-          <pre aria-label={translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "복사될 진단 정보")}>{supportDiagnostic()}</pre>
+          <p className="support-center__eyebrow">02 · PREPARE CONTEXT</p>
+          <h2 id="support-diagnostic-title">문제 확인에 필요한 정보만 복사</h2>
+          <p>현재 주소의 쿼리·작품 ID·입력 내용은 제외하고 경로, 연결 상태, 언어, 화면 크기만 복사합니다. 자동 전송하지 않습니다.</p>
+          <pre aria-label="복사될 진단 정보">{supportDiagnostic()}</pre>
           <button type="button" onClick={() => { void copyDiagnostic(); }}>
             {copied ? <Check size={17} aria-hidden="true" /> : <Clipboard size={17} aria-hidden="true" />}
-            {copied ? translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "복사했습니다") : translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "진단 정보 복사")}
+            {copied ? "복사했습니다" : "진단 정보 복사"}
           </button>
         </section>
 
         <section className="support-center__channels" aria-labelledby="support-channel-title">
-          <p className="support-center__eyebrow">{translateCurrentStaticSourceText("domains.legal.SupportPage", "en", "03 · CHOOSE A CHANNEL")}</p>
-          <h2 id="support-channel-title">{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "문의 성격에 맞는 공간")}</h2>
+          <p className="support-center__eyebrow">03 · CHOOSE A CHANNEL</p>
+          <h2 id="support-channel-title">문의 성격에 맞는 공간</h2>
           <ul>
-            <li><BookOpenCheck size={19} aria-hidden="true" /><div><strong>{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "사용법과 일반 질문")}</strong><span>{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "도움말을 먼저 확인하고 해결되지 않으면 공개 이용 질문을 남깁니다.")}</span><Link href="/help">{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "도움말 보기")}<ArrowUpRight size={14} /></Link></div></li>
-            <li><Wrench size={19} aria-hidden="true" /><div><strong>{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "버그·아이디어·기능 요청")}</strong><span>{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "중복을 검색하고 다른 사용자의 경험과 운영 상태를 함께 확인합니다.")}</span><Link href="/feedback">{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "제보·제안 보드")}<ArrowUpRight size={14} /></Link></div></li>
-            <li><ShieldAlert size={19} aria-hidden="true" /><div><strong>{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "개인정보·결제·미공개 작품")}</strong><span>{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "공개 게시판에 입력하지 말고 관련 정책과 권리 절차를 먼저 확인합니다.")}</span><Link href="/privacy">{translateCurrentStaticSourceText("domains.legal.SupportPage", "ko", "개인정보 안내")}<ArrowUpRight size={14} /></Link></div></li>
+            <li><BookOpenCheck size={19} aria-hidden="true" /><div><strong>사용법과 일반 질문</strong><span>도움말을 먼저 확인하고 해결되지 않으면 공개 이용 질문을 남깁니다.</span><Link href="/help">도움말 보기<ArrowUpRight size={14} /></Link></div></li>
+            <li><Wrench size={19} aria-hidden="true" /><div><strong>버그·아이디어·기능 요청</strong><span>중복을 검색하고 다른 사용자의 경험과 운영 상태를 함께 확인합니다.</span><Link href="/feedback">제보·제안 보드<ArrowUpRight size={14} /></Link></div></li>
+            <li><ShieldAlert size={19} aria-hidden="true" /><div><strong>개인정보·결제·미공개 작품</strong><span>공개 게시판에 입력하지 말고 관련 정책과 권리 절차를 먼저 확인합니다.</span><Link href="/privacy">개인정보 안내<ArrowUpRight size={14} /></Link></div></li>
           </ul>
         </section>
       </div>

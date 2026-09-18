@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   CheckCircle2,
   Gauge,
   Layers3,
@@ -64,9 +60,11 @@ export function StudioBg3dProfessionalReadinessPanel({
         className="rounded-xl border border-line bg-card/70 p-3"
       >
         <h3 id={titleId} className="text-xs font-bold text-fg">
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "ko", "전문 제작 준비 상태")}</h3>
+          전문 제작 준비 상태
+        </h3>
         <p role="status" className="mt-1 text-[0.7rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "ko", "canonical SceneDocument와 렌더 패스 준비 상태를 계산하고 있습니다.")}</p>
+          canonical SceneDocument와 렌더 패스 준비 상태를 계산하고 있습니다.
+        </p>
       </section>
     );
   }
@@ -101,10 +99,11 @@ export function StudioBg3dProfessionalReadinessPanel({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 id={titleId} className="text-xs font-bold text-fg">
-              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "ko", "전문 제작 준비 상태")}</h3>
+              전문 제작 준비 상태
+            </h3>
             <span
               role={role}
-              aria-live={role === "alert" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "en", "assertive") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "en", "polite")}
+              aria-live={role === "alert" ? "assertive" : "polite"}
               className={cx(
                 "rounded-full border px-2 py-0.5 text-[0.64rem] font-bold",
                 status.tone,
@@ -122,33 +121,36 @@ export function StudioBg3dProfessionalReadinessPanel({
       <dl className="mt-3 grid grid-cols-2 gap-2 text-[0.65rem] sm:grid-cols-4">
         <div className="rounded-lg border border-line bg-panel/65 px-2.5 py-2">
           <dt className="flex items-center gap-1 text-fg-3">
-            <Gauge className="size-3" aria-hidden="true" />{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "ko", "렌더러")}</dt>
+            <Gauge className="size-3" aria-hidden="true" />렌더러
+          </dt>
           <dd className="mt-0.5 font-semibold text-fg-2">{renderer}</dd>
         </div>
         <div className="rounded-lg border border-line bg-panel/65 px-2.5 py-2">
-          <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "ko", "품질 단계")}</dt>
+          <dt className="text-fg-3">품질 단계</dt>
           <dd className="mt-0.5 font-semibold text-fg-2">{quality}</dd>
         </div>
         <div className="rounded-lg border border-line bg-panel/65 px-2.5 py-2">
           <dt className="flex items-center gap-1 text-fg-3">
-            <Layers3 className="size-3" aria-hidden="true" />{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "ko", "NPR 패스")}</dt>
+            <Layers3 className="size-3" aria-hidden="true" />NPR 패스
+          </dt>
           <dd className="mt-0.5 font-semibold text-fg-2">
-            {readiness.summary.enabledPassCount}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "ko", "개")}{readiness.summary.specialistPassCount > 0
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "en", " · FX {v0}"), { v0: String(readiness.summary.specialistPassCount) })
+            {readiness.summary.enabledPassCount}개
+            {readiness.summary.specialistPassCount > 0
+              ? ` · FX ${readiness.summary.specialistPassCount}`
               : ""}
           </dd>
         </div>
         <div className="rounded-lg border border-line bg-panel/65 px-2.5 py-2">
-          <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "ko", "장면 구성")}</dt>
+          <dt className="text-fg-3">장면 구성</dt>
           <dd className="mt-0.5 font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "ko", "객체 ")}{readiness.summary.entityCount} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "ko", "· 캐릭터 ")}{readiness.summary.characterCount}
+            객체 {readiness.summary.entityCount} · 캐릭터 {readiness.summary.characterCount}
           </dd>
         </div>
       </dl>
 
       {readiness.blockers.length > 0 ? (
         <div className="mt-3 rounded-lg border border-danger/35 bg-danger/6 p-2.5">
-          <p className="text-[0.64rem] font-bold text-danger">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "ko", "출력 전 해결")}</p>
+          <p className="text-[0.64rem] font-bold text-danger">출력 전 해결</p>
           <ul className="mt-1.5 grid gap-1 text-[0.62rem] leading-relaxed text-fg-2">
             {readiness.blockers.slice(0, 3).map((blocker) => (
               <li key={blocker} className="flex gap-1.5">
@@ -158,14 +160,15 @@ export function StudioBg3dProfessionalReadinessPanel({
           </ul>
           {readiness.blockers.length > 3 ? (
             <p className="mt-1 text-[0.58rem] text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "ko", "그 외 ")}{readiness.blockers.length - 3}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "ko", "개 검토 항목")}</p>
+              그 외 {readiness.blockers.length - 3}개 검토 항목
+            </p>
           ) : null}
         </div>
       ) : null}
 
       {readiness.recovery ? (
         <div className="mt-2 rounded-lg border border-warn/35 bg-warn/6 px-2.5 py-2 text-[0.62rem] leading-relaxed text-fg-2">
-          <strong className="text-warn">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "ko", "복구 계획")}</strong>
+          <strong className="text-warn">복구 계획</strong>
           <span className="ml-1">{readiness.recovery.message}</span>
         </div>
       ) : null}
@@ -178,7 +181,7 @@ export function StudioBg3dProfessionalReadinessPanel({
 
       {readiness.summary.sourceHash ? (
         <p className="mt-2 truncate font-mono text-[0.54rem] text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalReadinessPanel", "en", "rev ")}{readiness.summary.documentRevision} · {readiness.summary.sourceHash}
+          rev {readiness.summary.documentRevision} · {readiness.summary.sourceHash}
         </p>
       ) : null}
     </section>

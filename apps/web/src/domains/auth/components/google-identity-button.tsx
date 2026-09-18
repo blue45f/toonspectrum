@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef, useState } from "react";
 
 import { signInWithGoogleIdToken } from "@/compat/auth-session-store";
@@ -234,21 +231,23 @@ export function GoogleIdentityButton({
       <div
         ref={holderRef}
         hidden={!buttonVisible}
-        className={state.status === "submitting" ? translateCurrentStaticSourceText("domains.auth.components.google.identity.button", "en", "pointer-events-none flex justify-center opacity-45") : translateCurrentStaticSourceText("domains.auth.components.google.identity.button", "en", "flex justify-center")}
+        className={state.status === "submitting" ? "pointer-events-none flex justify-center opacity-45" : "flex justify-center"}
       />
       {state.status === "loading" && (
         <div
           className="flex h-11 w-full animate-pulse items-center justify-center rounded-xl border border-line bg-card text-xs text-fg-3"
           role="status"
         >
-          {translateCurrentStaticSourceText("domains.auth.components.google.identity.button", "ko", "Google 로그인 준비 중…")}</div>
+          Google 로그인 준비 중…
+        </div>
       )}
       {state.status === "submitting" && (
         <div
           className="absolute inset-0 flex items-center justify-center rounded-xl bg-card/80 text-xs font-semibold text-fg-2 backdrop-blur-[1px]"
           role="status"
         >
-          {translateCurrentStaticSourceText("domains.auth.components.google.identity.button", "ko", "Google 계정 확인 중…")}</div>
+          Google 계정 확인 중…
+        </div>
       )}
       {state.status === "error" && (
         <div className="rounded-xl border border-bad/35 bg-bad/5 p-3 text-center">
@@ -261,8 +260,8 @@ export function GoogleIdentityButton({
             className="mt-2 min-h-9 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
           >
             {state.phase === "load"
-              ? translateCurrentStaticSourceText("domains.auth.components.google.identity.button", "ko", "Google 로그인 모듈 다시 불러오기")
-              : translateCurrentStaticSourceText("domains.auth.components.google.identity.button", "ko", "Google로 다시 시도")}
+              ? "Google 로그인 모듈 다시 불러오기"
+              : "Google로 다시 시도"}
           </button>
           {onRedirectFallback && (
             <button
@@ -270,7 +269,8 @@ export function GoogleIdentityButton({
               onClick={onRedirectFallback}
               className="mt-2 block min-h-8 w-full text-xs font-semibold text-fg-2 underline decoration-line-strong underline-offset-4 transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
             >
-              {translateCurrentStaticSourceText("domains.auth.components.google.identity.button", "ko", "다른 방식으로 Google 로그인")}</button>
+              다른 방식으로 Google 로그인
+            </button>
           )}
         </div>
       )}

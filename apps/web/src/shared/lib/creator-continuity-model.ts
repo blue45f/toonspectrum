@@ -4,7 +4,7 @@ export const CREATOR_CONTINUITY_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1_000;
 
 export type CreatorLaunchGoal = "draw" | "comic" | "character" | "materials";
 export type CreatorLaunchPace = "quick" | "project";
-export type CreatorContinuityLocale = string;
+export type CreatorContinuityLocale = "ko" | "en";
 export type CreatorDestinationId =
   | "studio"
   | "comic"

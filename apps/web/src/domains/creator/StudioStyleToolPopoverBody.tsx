@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Package, Palette } from "lucide-react";
 import { Suspense, useEffect } from "react";
 
@@ -49,12 +46,12 @@ export function StudioStyleToolPopoverBody({
     <>
       <StudioMenuPopoverHeader
         icon={Palette}
-        title={translateCurrentStaticSourceText("domains.creator.StudioStyleToolPopoverBody", "ko", "색상 · 스타일")}
-        description={translateCurrentStaticSourceText("domains.creator.StudioStyleToolPopoverBody", "ko", "현재 색, 최근 색, 색상환, 조화 배색과 웹툰 음영을 한곳에서 고릅니다.")}
+        title="색상 · 스타일"
+        description="현재 색, 최근 색, 색상환, 조화 배색과 웹툰 음영을 한곳에서 고릅니다."
       />
       <StudioMenuSubtabs
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioStyleToolPopoverBody", "ko", "색상과 스타일 메뉴 구역")}
-        activeId={menu === "palette" || menu === "brandKit" ? menu : translateCurrentStaticSourceText("domains.creator.StudioStyleToolPopoverBody", "en", "palette")}
+        aria-label="색상과 스타일 메뉴 구역"
+        activeId={menu === "palette" || menu === "brandKit" ? menu : "palette"}
         onSelect={(id) => setMenu(id as StudioMenu)}
         items={[
           {
@@ -78,7 +75,7 @@ export function StudioStyleToolPopoverBody({
           onPreviewColor={setColor}
           onCommitColor={rememberColor}
           libraryContent={(
-            <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioStyleToolPopoverBody", "ko", "팔레트 라이브러리를 여는 중...")} />}>
+            <Suspense fallback={<StudioPanelLoading label="팔레트 라이브러리를 여는 중..." />}>
               <StudioPaletteLibraryPanel
                 onPickColor={applyAndRememberColor}
                 seedColors={recentColors}
@@ -88,7 +85,7 @@ export function StudioStyleToolPopoverBody({
         />
       ) : null}
       {menu === "brandKit" ? (
-        <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioStyleToolPopoverBody", "ko", "브랜드 킷 패널을 여는 중...")} />}>
+        <Suspense fallback={<StudioPanelLoading label="브랜드 킷 패널을 여는 중..." />}>
           <StudioBrandKitPanel
             onPickColor={applyAndRememberColor}
             canApplyFont={!!selected && (selected.type === "text" || selected.type === "bubble")}

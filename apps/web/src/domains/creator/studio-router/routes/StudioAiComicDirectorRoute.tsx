@@ -1,7 +1,4 @@
 import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   BookOpenCheck,
   ChevronRight,
   Clapperboard,
@@ -292,11 +289,13 @@ export function StudioAiComicDirectorRoute({
           </span>
           <div className="min-w-0">
             <p className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-accent">
-              {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "en", "Production Workspace")}</p>
+              Production Workspace
+            </p>
             <h1 className="truncate text-xl font-black tracking-tight">
-              {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "AI 코믹 디렉터")}</h1>
+              AI 코믹 디렉터
+            </h1>
             <p className="text-xs text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "세션 ")}{session.id} {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "en", "· revision ")}{session.revision}
+              세션 {session.id} · revision {session.revision}
             </p>
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -319,12 +318,12 @@ export function StudioAiComicDirectorRoute({
                 <CloudOff size={12} aria-hidden />
               )}
               {syncState === "saved"
-                ? translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "클라우드 저장됨")
+                ? "클라우드 저장됨"
                 : syncState === "loading"
-                  ? translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "동기화 중")
+                  ? "동기화 중"
                   : syncState === "conflict"
-                    ? translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "revision 충돌")
-                    : translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "로컬 자동 저장")}
+                    ? "revision 충돌"
+                    : "로컬 자동 저장"}
             </span>
             {syncState === "conflict" ? (
               <button
@@ -336,7 +335,8 @@ export function StudioAiComicDirectorRoute({
                 )}
               >
                 <RefreshCw size={13} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "최신 revision 불러오기")}</button>
+                최신 revision 불러오기
+              </button>
             ) : (
               <button
                 type="button"
@@ -346,7 +346,8 @@ export function StudioAiComicDirectorRoute({
                   STUDIO_FOCUS_RING,
                 )}
               >
-                {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "클라우드 저장")}</button>
+                클라우드 저장
+              </button>
             )}
             <button
               type="button"
@@ -358,7 +359,8 @@ export function StudioAiComicDirectorRoute({
               )}
             >
               <Play size={13} aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "Studio에서 제작 계속")}</button>
+              Studio에서 제작 계속
+            </button>
           </div>
         </header>
 
@@ -372,13 +374,13 @@ export function StudioAiComicDirectorRoute({
         ) : null}
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)]">
-          <nav aria-label={translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "AI 코믹 디렉터 제작 단계")}>
+          <nav aria-label="AI 코믹 디렉터 제작 단계">
             <ol className="grid grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-1">
               {STAGES.map(([id, number, label]) => (
                 <li key={id}>
                   <button
                     type="button"
-                    aria-current={session.stage === id ? translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "en", "step") : undefined}
+                    aria-current={session.stage === id ? "step" : undefined}
                     onClick={() => patchSession({ stage: id })}
                     className={cn(
                       "flex min-h-14 w-full items-center gap-2 rounded-xl border px-3 text-left",
@@ -404,13 +406,15 @@ export function StudioAiComicDirectorRoute({
                   <div className="mb-3 flex items-center gap-2">
                     <BookOpenCheck size={16} className="text-accent" aria-hidden />
                     <div>
-                      <h2 className="text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "이야기와 제작 기준")}</h2>
+                      <h2 className="text-sm font-bold">이야기와 제작 기준</h2>
                       <p className="text-[0.66rem] text-fg-3">
-                        {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "원문은 보존되고 Studio 편집기로 그대로 전달됩니다.")}</p>
+                        원문은 보존되고 Studio 편집기로 그대로 전달됩니다.
+                      </p>
                     </div>
                   </div>
                   <label className="block text-xs font-semibold text-fg-2">
-                    {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "세션 제목")}<input
+                    세션 제목
+                    <input
                       type="text"
                       value={session.title}
                       onChange={(event) => patchSession({ title: event.target.value.slice(0, 160) })}
@@ -418,7 +422,8 @@ export function StudioAiComicDirectorRoute({
                     />
                   </label>
                   <label className="mt-3 block text-xs font-semibold text-fg-2">
-                    {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "이야기 또는 회차 대본")}<textarea
+                    이야기 또는 회차 대본
+                    <textarea
                       value={session.storyText}
                       onChange={(event) => patchSession({ storyText: event.target.value.slice(0, 12_000) })}
                       rows={12}
@@ -426,7 +431,8 @@ export function StudioAiComicDirectorRoute({
                     />
                   </label>
                   <label className="mt-3 block text-xs font-semibold text-fg-2">
-                    {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "캐릭터·스타일 고정 설명")}<textarea
+                    캐릭터·스타일 고정 설명
+                    <textarea
                       value={session.characterDescription}
                       onChange={(event) => patchSession({ characterDescription: event.target.value.slice(0, 4_000) })}
                       rows={5}
@@ -439,9 +445,10 @@ export function StudioAiComicDirectorRoute({
                   <div className="flex items-center gap-2">
                     <ShieldCheck size={16} className="text-accent" aria-hidden />
                     <div>
-                      <h2 className="text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "작품 바이블")}</h2>
+                      <h2 className="text-sm font-bold">작품 바이블</h2>
                       <p className="text-[0.66rem] text-fg-3">
-                        {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "en", "revision ")}{session.visualBible.revision} · {session.visualBible.entries.length}{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "개 기준")}</p>
+                        revision {session.visualBible.revision} · {session.visualBible.entries.length}개 기준
+                      </p>
                     </div>
                   </div>
                   <div className="mt-3 space-y-2">
@@ -455,14 +462,15 @@ export function StudioAiComicDirectorRoute({
                         </div>
                         <p className="mt-1 text-[0.62rem] text-fg-3">
                           {entry.canSendToExternalProvider
-                            ? translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "외부 생성 요청 허용")
-                            : translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "외부 전송 확인 필요")}
+                            ? "외부 생성 요청 허용"
+                            : "외부 전송 확인 필요"}
                         </p>
                       </article>
                     ))}
                   </div>
                   <label className="mt-3 block text-[0.66rem] font-semibold text-fg-2">
-                    {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "기준 종류")}<select
+                    기준 종류
+                    <select
                       value={newBibleKind}
                       onChange={(event) => setNewBibleKind(event.target.value as StudioAiVisualBibleEntry["kind"])}
                       className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2"
@@ -473,7 +481,8 @@ export function StudioAiComicDirectorRoute({
                     </select>
                   </label>
                   <label className="mt-2 block text-[0.66rem] font-semibold text-fg-2">
-                    {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "기준 이름")}<input
+                    기준 이름
+                    <input
                       type="text"
                       value={newBibleName}
                       onChange={(event) => setNewBibleName(event.target.value.slice(0, 120))}
@@ -486,28 +495,31 @@ export function StudioAiComicDirectorRoute({
                     disabled={!newBibleName.trim()}
                     className="mt-2 min-h-11 w-full rounded-lg border border-line bg-card text-xs font-semibold hover:bg-raised disabled:opacity-45"
                   >
-                    {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "작품 기준 추가")}</button>
+                    작품 기준 추가
+                  </button>
                   <button
                     type="button"
                     onClick={() => void saveBibleRevision()}
                     className="mt-2 min-h-11 w-full rounded-lg bg-accent text-xs font-bold text-on-accent"
                   >
-                    {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "새 작품 바이블 revision 저장")}</button>
+                    새 작품 바이블 revision 저장
+                  </button>
                 </aside>
               </div>
             ) : null}
 
             {session.stage === "direction" ? (
               <section className="rounded-2xl border border-line bg-panel p-4">
-                <h2 className="text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "컷 연출 준비")}</h2>
+                <h2 className="text-sm font-bold">컷 연출 준비</h2>
                 <p className="mt-1 text-xs text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "현재 세션에는 ")}{session.scenes.length}{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "개 컷이 있습니다. Studio 편집기에서 체크박스 다중 선택, 비트·카메라·대사·연속성 기준을 조정할 수 있습니다.")}</p>
+                  현재 세션에는 {session.scenes.length}개 컷이 있습니다. Studio 편집기에서 체크박스 다중 선택, 비트·카메라·대사·연속성 기준을 조정할 수 있습니다.
+                </p>
                 <button
                   type="button"
                   onClick={continueInEditor}
                   className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-bold text-on-accent"
                 >
-                  {translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "컷 연출 작업면 열기 ")}<ChevronRight size={13} aria-hidden />
+                  컷 연출 작업면 열기 <ChevronRight size={13} aria-hidden />
                 </button>
               </section>
             ) : null}
@@ -515,8 +527,8 @@ export function StudioAiComicDirectorRoute({
             {session.stage === "production" ? (
               <div className="grid gap-4 xl:grid-cols-2">
                 <section className="rounded-2xl border border-line bg-panel p-4">
-                  <div className="flex items-center gap-2"><Sparkles size={16} className="text-accent" aria-hidden /><h2 className="text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "제작 작업")}</h2></div>
-                  <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "생성·부분 수리·품질 분석·레이어 분리 작업은 operation ID와 lease를 가진 durable job으로 기록됩니다.")}</p>
+                  <div className="flex items-center gap-2"><Sparkles size={16} className="text-accent" aria-hidden /><h2 className="text-sm font-bold">제작 작업</h2></div>
+                  <p className="mt-1 text-xs text-fg-3">생성·부분 수리·품질 분석·레이어 분리 작업은 operation ID와 lease를 가진 durable job으로 기록됩니다.</p>
                   <div className="mt-3 space-y-2">
                     {session.jobs.length ? session.jobs.map((job) => (
                       <article key={job.id} className="rounded-xl border border-line bg-card p-3">
@@ -524,27 +536,27 @@ export function StudioAiComicDirectorRoute({
                         <p className="mt-1 text-[0.62rem] text-fg-3">{job.progressDone}/{job.progressTotal} · {job.operationId}</p>
                         {job.error ? <p className="mt-1 text-[0.62rem] text-bad">{job.error}</p> : null}
                       </article>
-                    )) : <p className="rounded-xl border border-dashed border-line p-5 text-center text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "아직 작업 기록이 없습니다.")}</p>}
+                    )) : <p className="rounded-xl border border-dashed border-line p-5 text-center text-xs text-fg-3">아직 작업 기록이 없습니다.</p>}
                   </div>
                 </section>
                 <section className="rounded-2xl border border-line bg-panel p-4">
-                  <div className="flex items-center gap-2"><Layers3 size={16} className="text-accent" aria-hidden /><h2 className="text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "후보·부분 수리·레이어")}</h2></div>
-                  <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "후보 ")}{session.scenes.reduce((total, scene) => total + (scene.imageCandidates?.length ?? 0), 0)}{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "개 · 편집 레이어 ")}{session.scenes.reduce((total, scene) => total + (scene.layerManifest?.layers.length ?? 0), 0)}{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "개")}</p>
-                  <button type="button" onClick={continueInEditor} className="mt-4 min-h-11 rounded-lg bg-accent px-4 text-xs font-bold text-on-accent">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "제작·수리 작업면 열기")}</button>
+                  <div className="flex items-center gap-2"><Layers3 size={16} className="text-accent" aria-hidden /><h2 className="text-sm font-bold">후보·부분 수리·레이어</h2></div>
+                  <p className="mt-1 text-xs text-fg-3">후보 {session.scenes.reduce((total, scene) => total + (scene.imageCandidates?.length ?? 0), 0)}개 · 편집 레이어 {session.scenes.reduce((total, scene) => total + (scene.layerManifest?.layers.length ?? 0), 0)}개</p>
+                  <button type="button" onClick={continueInEditor} className="mt-4 min-h-11 rounded-lg bg-accent px-4 text-xs font-bold text-on-accent">제작·수리 작업면 열기</button>
                 </section>
               </div>
             ) : null}
 
             {session.stage === "finish" ? (
               <section className="rounded-2xl border border-line bg-panel p-4">
-                <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-accent" aria-hidden /><h2 className="text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "검수 revision과 Studio 인계")}</h2></div>
+                <div className="flex items-center gap-2"><ShieldCheck size={16} className="text-accent" aria-hidden /><h2 className="text-sm font-bold">검수 revision과 Studio 인계</h2></div>
                 <dl className="mt-4 grid gap-2 text-xs sm:grid-cols-2">
-                  <div className="rounded-xl border border-line bg-card p-3"><dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "세션 revision")}</dt><dd className="mt-1 font-bold">{session.revision}</dd></div>
-                  <div className="rounded-xl border border-line bg-card p-3"><dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "후보 digest")}</dt><dd className="mt-1 break-all font-mono font-bold">{candidateDigest}</dd></div>
-                  <div className="rounded-xl border border-line bg-card p-3"><dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "현재 승인")}</dt><dd className={cn("mt-1 font-bold", activeApproval ? "text-good" : "text-warn")}>{activeApproval ? translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "현재 revision 승인됨") : translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "검수 다시 필요")}</dd></div>
-                  <div className="rounded-xl border border-line bg-card p-3"><dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "적용 정책")}</dt><dd className="mt-1 font-bold">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "비파괴 추가 · 한 번의 Undo")}</dd></div>
+                  <div className="rounded-xl border border-line bg-card p-3"><dt className="text-fg-3">세션 revision</dt><dd className="mt-1 font-bold">{session.revision}</dd></div>
+                  <div className="rounded-xl border border-line bg-card p-3"><dt className="text-fg-3">후보 digest</dt><dd className="mt-1 break-all font-mono font-bold">{candidateDigest}</dd></div>
+                  <div className="rounded-xl border border-line bg-card p-3"><dt className="text-fg-3">현재 승인</dt><dd className={cn("mt-1 font-bold", activeApproval ? "text-good" : "text-warn")}>{activeApproval ? "현재 revision 승인됨" : "검수 다시 필요"}</dd></div>
+                  <div className="rounded-xl border border-line bg-card p-3"><dt className="text-fg-3">적용 정책</dt><dd className="mt-1 font-bold">비파괴 추가 · 한 번의 Undo</dd></div>
                 </dl>
-                <button type="button" onClick={continueInEditor} className="mt-4 min-h-11 rounded-lg bg-accent px-4 text-xs font-bold text-on-accent">{translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioAiComicDirectorRoute", "ko", "Studio 마감·추가 열기")}</button>
+                <button type="button" onClick={continueInEditor} className="mt-4 min-h-11 rounded-lg bg-accent px-4 text-xs font-bold text-on-accent">Studio 마감·추가 열기</button>
               </section>
             ) : null}
           </section>

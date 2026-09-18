@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Check, Smartphone } from "lucide-react";
 
 import {
@@ -43,18 +40,18 @@ export function StudioWebtoonCanvasPresetPicker({
     <section data-studio-webtoon-canvas-presets="true">
       <div className="mb-1.5">
         <p className="text-[0.68rem] font-bold text-fg">
-          {korean ? translateCurrentStaticSourceText("domains.creator.StudioWebtoonCanvasPresetPicker", "ko", "웹툰 플랫폼 규격") : translateCurrentStaticSourceText("domains.creator.StudioWebtoonCanvasPresetPicker", "en", "Webtoon platform sizes")}
+          {korean ? "웹툰 플랫폼 규격" : "Webtoon platform sizes"}
         </p>
         <p className="mt-0.5 text-[0.6rem] leading-snug text-fg-3">
           {korean
-            ? translateCurrentStaticSourceText("domains.creator.StudioWebtoonCanvasPresetPicker", "ko", "현재 원고의 비율을 바꾸고, 선택한 내용 맞춤 방식으로 요소를 재배치합니다.")
-            : translateCurrentStaticSourceText("domains.creator.StudioWebtoonCanvasPresetPicker", "en", "Resize the current work and reflow its content with the selected strategy.")}
+            ? "현재 원고의 비율을 바꾸고, 선택한 내용 맞춤 방식으로 요소를 재배치합니다."
+            : "Resize the current work and reflow its content with the selected strategy."}
         </p>
       </div>
 
       <div
         role="group"
-        aria-label={korean ? translateCurrentStaticSourceText("domains.creator.StudioWebtoonCanvasPresetPicker", "ko", "웹툰 플랫폼 규격") : translateCurrentStaticSourceText("domains.creator.StudioWebtoonCanvasPresetPicker", "en", "Webtoon platform sizes")}
+        aria-label={korean ? "웹툰 플랫폼 규격" : "Webtoon platform sizes"}
         className="grid grid-cols-2 gap-1.5"
       >
         {STUDIO_WEBTOON_CANVAS_PRESETS.map((preset) => {
@@ -102,8 +99,8 @@ export function StudioWebtoonCanvasPresetPicker({
 
       <p className="mt-1.5 text-[0.56rem] leading-snug text-fg-3">
         {korean
-          ? translateCurrentStaticSourceText("domains.creator.StudioWebtoonCanvasPresetPicker", "ko", "편집 폭 720px을 유지하면서 목표 플랫폼의 가로세로 비율을 높이에 반영합니다. 변경은 한 번의 실행취소로 되돌릴 수 있어요.")
-          : translateCurrentStaticSourceText("domains.creator.StudioWebtoonCanvasPresetPicker", "en", "The editor keeps its 720px working width and maps the target aspect ratio to canvas height. One undo restores the previous size.")}
+          ? "편집 폭 720px을 유지하면서 목표 플랫폼의 가로세로 비율을 높이에 반영합니다. 변경은 한 번의 실행취소로 되돌릴 수 있어요."
+          : "The editor keeps its 720px working width and maps the target aspect ratio to canvas height. One undo restores the previous size."}
       </p>
     </section>
   );

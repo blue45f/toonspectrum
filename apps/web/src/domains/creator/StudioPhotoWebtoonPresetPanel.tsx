@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Photo → Webtoon Preset Panel
  * 업로드한 사진을 원클릭으로 웹툰풍으로 바꾸는 프리셋 3종 — 칩을 누르면 onApplyPreset(preset)으로
@@ -25,19 +24,23 @@ export function StudioPhotoWebtoonPresetPanel({
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
-          {translateCurrentStaticSourceText("domains.creator.StudioPhotoWebtoonPresetPanel", "ko", "사진→웹툰 필터 (Photo→Webtoon)")}</p>
+          사진→웹툰 필터 (Photo→Webtoon)
+        </p>
         <button
           type="button"
           onClick={onReset}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.StudioPhotoWebtoonPresetPanel", "ko", "대비·포스터라이즈·흑백·생동감·명료도·포토 필터·하프톤을 지웁니다(생동감/명료도/포토 필터/하프톤/스타일라이즈 패널에서 직접 만진 값도 함께 지워집니다). 외곽선·글로우·그레인 등은 유지됩니다.")}
+          title="대비·포스터라이즈·흑백·생동감·명료도·포토 필터·하프톤을 지웁니다(생동감/명료도/포토 필터/하프톤/스타일라이즈 패널에서 직접 만진 값도 함께 지워집니다). 외곽선·글로우·그레인 등은 유지됩니다."
         >
           <RotateCcw className="size-3.5" />
-          {translateCurrentStaticSourceText("domains.creator.StudioPhotoWebtoonPresetPanel", "ko", "원본으로")}</button>
+          원본으로
+        </button>
       </div>
 
       <p className="text-[0.68rem] text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.StudioPhotoWebtoonPresetPanel", "ko", "사진 한 장을 원클릭으로 웹툰풍으로 바꿉니다. 외곽선·글로우·그레인 등 이 프리셋이 다루지 않는 보정은 그대로 유지되지만, 생동감·명료도·포토 필터·하프톤·스타일라이즈·대비처럼 이 프리셋이 쓰는 값은 해당 전용 패널에서 손으로 맞춘 것이라도 덮어씁니다.")}</p>
+        사진 한 장을 원클릭으로 웹툰풍으로 바꿉니다. 외곽선·글로우·그레인 등 이 프리셋이 다루지 않는 보정은 그대로 유지되지만, 생동감·명료도·포토
+        필터·하프톤·스타일라이즈·대비처럼 이 프리셋이 쓰는 값은 해당 전용 패널에서 손으로 맞춘 것이라도 덮어씁니다.
+      </p>
 
       <div className="flex flex-wrap gap-1.5">
         {PHOTO_WEBTOON_PRESETS.map((preset) => (

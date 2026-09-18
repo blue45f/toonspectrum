@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioBg3dCompositionGuideMode } from "./studio-bg3d-composition-guide";
 import { resolveStudioBg3dCaptureFrame } from "./studio-bg3d-capture-frame-geometry";
 
@@ -30,7 +29,7 @@ export function StudioBg3dCompositionOverlay({
       aria-hidden="true"
       data-testid="bg3d-composition-overlay"
       data-guide-mode={mode}
-      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCompositionOverlay", "en", "pointer-events-none absolute inset-0 z-10 overflow-hidden {v0}"), { v0: String(className ?? "") })}
+      className={`pointer-events-none absolute inset-0 z-10 overflow-hidden ${className ?? ""}`}
     >
       <svg
         className="size-full"

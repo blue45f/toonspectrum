@@ -1,7 +1,4 @@
 import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   LayoutTemplate,
   Maximize2,
   MonitorSmartphone,
@@ -94,11 +91,11 @@ export const StudioToolBeltCanvasControls = memo(function StudioToolBeltCanvasCo
     studioChromeIconClass(iconProps ?? {});
 
   return (
-    <StudioToolbarCluster label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCanvasControls", "ko", "화면·캔버스")} className="ml-auto hidden lg:flex">
+    <StudioToolbarCluster label="화면·캔버스" className="ml-auto hidden lg:flex">
       <StudioToolBeltHintTarget
         hint={hints.zoomOut}
         disabled={isZoomOutDisabled}
-        unavailableReason={isZoomOutDisabled ? translateCurrentStaticSourceText("domains.creator.StudioToolBeltCanvasControls", "ko", "최소 축소 배율에 도달했습니다.") : undefined}
+        unavailableReason={isZoomOutDisabled ? "최소 축소 배율에 도달했습니다." : undefined}
       >
         <button
           type="button"
@@ -123,7 +120,7 @@ export const StudioToolBeltCanvasControls = memo(function StudioToolBeltCanvasCo
       <StudioToolBeltHintTarget
         hint={hints.zoomIn}
         disabled={isZoomInDisabled}
-        unavailableReason={isZoomInDisabled ? translateCurrentStaticSourceText("domains.creator.StudioToolBeltCanvasControls", "ko", "최대 확대 배율에 도달했습니다.") : undefined}
+        unavailableReason={isZoomInDisabled ? "최대 확대 배율에 도달했습니다." : undefined}
       >
         <button
           type="button"
@@ -171,7 +168,8 @@ export const StudioToolBeltCanvasControls = memo(function StudioToolBeltCanvasCo
             aria-hidden
             className={studioToolIconClass()}
           />
-          {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCanvasControls", "ko", "폭 맞춤")}</button>
+          폭 맞춤
+        </button>
       </StudioToolBeltHintTarget>
       <StudioToolBeltHintTarget hint={hints.resetView}>
         <button
@@ -186,7 +184,8 @@ export const StudioToolBeltCanvasControls = memo(function StudioToolBeltCanvasCo
             aria-hidden
             className={studioToolIconClass()}
           />
-          {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCanvasControls", "ko", "리셋")}</button>
+          리셋
+        </button>
       </StudioToolBeltHintTarget>
       <StudioToolbarDivider />
       <StudioToolBeltHintTarget
@@ -194,7 +193,7 @@ export const StudioToolBeltCanvasControls = memo(function StudioToolBeltCanvasCo
         disabled={presentationPanelsHidden}
         unavailableReason={
           presentationPanelsHidden
-            ? translateCurrentStaticSourceText("domains.creator.StudioToolBeltCanvasControls", "ko", "전체화면·브라우저 맞춤에서는 작업 패널을 임시로 숨깁니다.")
+            ? "전체화면·브라우저 맞춤에서는 작업 패널을 임시로 숨깁니다."
             : undefined
         }
       >
@@ -219,7 +218,7 @@ export const StudioToolBeltCanvasControls = memo(function StudioToolBeltCanvasCo
             aria-hidden
             className={studioToolIconClass({ active: isWorkspaceWideMode })}
           />
-          <span>{isWorkspaceWideMode ? translateCurrentStaticSourceText("domains.creator.StudioToolBeltCanvasControls", "ko", "패널 펼치기") : translateCurrentStaticSourceText("domains.creator.StudioToolBeltCanvasControls", "ko", "패널 접기")}</span>
+          <span>{isWorkspaceWideMode ? "패널 펼치기" : "패널 접기"}</span>
         </button>
       </StudioToolBeltHintTarget>
       <StudioToolBeltHintTarget
@@ -240,7 +239,8 @@ export const StudioToolBeltCanvasControls = memo(function StudioToolBeltCanvasCo
                 aria-hidden
                 className={studioToolIconClass({ active: maximized })}
               />
-              {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCanvasControls", "ko", "창 복원")}</>
+              창 복원
+            </>
           ) : (
             <>
               <Maximize2
@@ -249,7 +249,8 @@ export const StudioToolBeltCanvasControls = memo(function StudioToolBeltCanvasCo
                 aria-hidden
                 className={studioToolIconClass()}
               />
-              {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCanvasControls", "ko", "창 맞춤")}</>
+              창 맞춤
+            </>
           )}
         </button>
       </StudioToolBeltHintTarget>
@@ -271,7 +272,8 @@ export const StudioToolBeltCanvasControls = memo(function StudioToolBeltCanvasCo
                 aria-hidden
                 className={studioToolIconClass({ active: isFullscreen })}
               />
-              {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCanvasControls", "ko", "전체 해제")}</>
+              전체 해제
+            </>
           ) : (
             <>
               <MonitorSmartphone
@@ -280,7 +282,8 @@ export const StudioToolBeltCanvasControls = memo(function StudioToolBeltCanvasCo
                 aria-hidden
                 className={studioToolIconClass()}
               />
-              {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCanvasControls", "ko", "전체화면")}</>
+              전체화면
+            </>
           )}
         </button>
       </StudioToolBeltHintTarget>
@@ -298,7 +301,8 @@ export const StudioToolBeltCanvasControls = memo(function StudioToolBeltCanvasCo
             aria-hidden
             className={studioToolIconClass({ active: canvasOnlyMode })}
           />
-          {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCanvasControls", "ko", "캔버스 전용")}</button>
+          캔버스 전용
+        </button>
       </StudioToolBeltHintTarget>
     </StudioToolbarCluster>
   );

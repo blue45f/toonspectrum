@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -46,19 +42,19 @@ export function ResourceCard({ item, saved, onToggle, disabled }: { item: Creato
     <div className="flex flex-1 flex-col space-y-3 p-5">
       <p className="text-xs font-semibold text-accent">{RESOURCE_LABELS[item.provider]} · {resourceUsageLabel(item)}</p>
       <h2 className="break-words text-lg font-bold">{item.title}</h2>
-      <p className="text-sm text-fg-2">{item.creator || translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "저작자·기관 원문 확인")}{item.dateLabel ? ` · ${item.dateLabel}` : ""}</p>
+      <p className="text-sm text-fg-2">{item.creator || "저작자·기관 원문 확인"}{item.dateLabel ? ` · ${item.dateLabel}` : ""}</p>
       {item.description && <p className="break-words text-sm leading-6 text-fg-2">{item.description}</p>}
-      {item.provider === "bizinfo" && <div className="rounded-lg bg-raised p-3 text-sm leading-6"><p className="font-semibold">{deadlineLabel(item.deadline)}</p><p>{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "신청 대상: ")}{item.eligibility}</p></div>}
-      {item.isbn && <p className="text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "en", "ISBN: ")}{item.isbn}</p>}
-      <details className="text-xs leading-6 text-fg-2"><summary className="cursor-pointer py-2">{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "출처·이용조건·조회일")}</summary>
-        <p>{item.credit || translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "크레딧 원문 확인")}</p><p>{resourceUsageDescription(item)}</p>
-        {item.licenseUrl && <a className="underline" href={item.licenseUrl} target="_blank" rel="noopener noreferrer">{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "이용조건 확인 ↗")}</a>}
-        <p>{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "조회: ")}{item.fetchedAt}</p>
+      {item.provider === "bizinfo" && <div className="rounded-lg bg-raised p-3 text-sm leading-6"><p className="font-semibold">{deadlineLabel(item.deadline)}</p><p>신청 대상: {item.eligibility}</p></div>}
+      {item.isbn && <p className="text-xs text-fg-2">ISBN: {item.isbn}</p>}
+      <details className="text-xs leading-6 text-fg-2"><summary className="cursor-pointer py-2">출처·이용조건·조회일</summary>
+        <p>{item.credit || "크레딧 원문 확인"}</p><p>{resourceUsageDescription(item)}</p>
+        {item.licenseUrl && <a className="underline" href={item.licenseUrl} target="_blank" rel="noopener noreferrer">이용조건 확인 ↗</a>}
+        <p>조회: {item.fetchedAt}</p>
       </details>
       <div className="mt-auto flex flex-wrap gap-2 pt-2">
-        <a href={item.sourceUrl} className={RESOURCE_BUTTON} target="_blank" rel="noopener noreferrer">{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "원문 확인 ↗")}</a>
-        <button className={RESOURCE_BUTTON} aria-pressed={saved} disabled={disabled} onClick={onToggle}>{saved ? translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "저장 해제") : translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "보드에 저장")}</button>
-        {item.provider === "bizinfo" && item.deadline && <button className={RESOURCE_BUTTON} onClick={() => downloadText("opportunity-deadline.ics", deadlineCalendar(item), "text/calendar;charset=utf-8")}>{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "마감일 일정 파일")}</button>}
+        <a href={item.sourceUrl} className={RESOURCE_BUTTON} target="_blank" rel="noopener noreferrer">원문 확인 ↗</a>
+        <button className={RESOURCE_BUTTON} aria-pressed={saved} disabled={disabled} onClick={onToggle}>{saved ? "저장 해제" : "보드에 저장"}</button>
+        {item.provider === "bizinfo" && item.deadline && <button className={RESOURCE_BUTTON} onClick={() => downloadText("opportunity-deadline.ics", deadlineCalendar(item), "text/calendar;charset=utf-8")}>마감일 일정 파일</button>}
       </div>
     </div>
   </article>;
@@ -111,32 +107,32 @@ export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvi
   return <ResourceLayout title={config.title} intro={config.intro}>
     <ProviderStatus provider={provider} />
     <form className="space-y-3 rounded-2xl border border-line bg-panel p-5" onSubmit={(event) => { event.preventDefault(); searchFor(draft.trim()); }}>
-      <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "en", "resource-query-{v0}"), { v0: String(provider) })} className="block text-sm font-semibold">{RESOURCE_LABELS[provider]} {translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "검색")}</label>
-      <div className="flex flex-col gap-3 sm:flex-row"><input id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "en", "resource-query-{v0}"), { v0: String(provider) })} className={RESOURCE_INPUT} type="search" required minLength={2} maxLength={80} value={draft} placeholder={config.hint} onChange={(event) => setDraft(event.target.value)} /><button className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "en", "{v0} shrink-0 bg-accent-soft"), { v0: String(RESOURCE_BUTTON) })} type="submit">{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "검색하기")}</button></div>
+      <label htmlFor={`resource-query-${provider}`} className="block text-sm font-semibold">{RESOURCE_LABELS[provider]} 검색</label>
+      <div className="flex flex-col gap-3 sm:flex-row"><input id={`resource-query-${provider}`} className={RESOURCE_INPUT} type="search" required minLength={2} maxLength={80} value={draft} placeholder={config.hint} onChange={(event) => setDraft(event.target.value)} /><button className={`${RESOURCE_BUTTON} shrink-0 bg-accent-soft`} type="submit">검색하기</button></div>
       <div className="flex flex-wrap gap-2">{config.examples.map((value) => <button key={value} type="button" className={RESOURCE_BUTTON} onClick={() => searchFor(value)}>{value}</button>)}</div>
     </form>
     <div className="flex flex-wrap items-center gap-3">
-      <button className={RESOURCE_BUTTON} aria-pressed={!savedOnly} onClick={() => setSavedOnly(false)}>{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "검색 결과")}</button>
-      <button className={RESOURCE_BUTTON} aria-pressed={savedOnly} onClick={() => setSavedOnly(true)}>{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "저장한 자료 ")}{savedItems.length}</button>
-      <button className={RESOURCE_BUTTON} disabled={!savedItems.length} onClick={() => downloadText(`${provider}-sources.md`, attributionMarkdown(savedItems))}>{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "출처 내보내기")}</button>
-      <Link className={RESOURCE_BUTTON} to="/research">{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "전체 저장 보드 검색·정렬")}</Link>
-      <a href={config.url} className={RESOURCE_BUTTON} target="_blank" rel="noopener noreferrer">{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "공식 사이트 ↗")}</a>
-      {provider === "kakao" && <Link className={RESOURCE_BUTTON} to="/search">{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "기존 웹툰·작품 검색")}</Link>}
+      <button className={RESOURCE_BUTTON} aria-pressed={!savedOnly} onClick={() => setSavedOnly(false)}>검색 결과</button>
+      <button className={RESOURCE_BUTTON} aria-pressed={savedOnly} onClick={() => setSavedOnly(true)}>저장한 자료 {savedItems.length}</button>
+      <button className={RESOURCE_BUTTON} disabled={!savedItems.length} onClick={() => downloadText(`${provider}-sources.md`, attributionMarkdown(savedItems))}>출처 내보내기</button>
+      <Link className={RESOURCE_BUTTON} to="/research">전체 저장 보드 검색·정렬</Link>
+      <a href={config.url} className={RESOURCE_BUTTON} target="_blank" rel="noopener noreferrer">공식 사이트 ↗</a>
+      {provider === "kakao" && <Link className={RESOURCE_BUTTON} to="/search">기존 웹툰·작품 검색</Link>}
     </div>
     <div aria-live="polite" aria-atomic="true" className="text-sm leading-6 text-fg-2">
-      {!savedOnly && loading && <p role="status">{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "공식 제공처에서 자료를 확인하고 있습니다…")}</p>}
+      {!savedOnly && loading && <p role="status">공식 제공처에서 자료를 확인하고 있습니다…</p>}
       {!savedOnly && requestError && <p role="alert">{requestError}</p>}
-      {!savedOnly && result && <p>{result.status === "not_configured" ? translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "API 연결 대기 · ") : result.status === "unavailable" ? translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "일시적으로 이용 불가 · ") : ""}{result.message}</p>}
-      {!savedOnly && !query && <p>{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "검색어를 입력하거나 추천 키워드를 선택하세요. 외부 API는 검색할 때만 호출합니다.")}</p>}
-      {!loading && !items.length && (savedOnly || result?.status === "ready") && <p>{savedOnly ? translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "이 제공처에서 저장한 자료가 없습니다.") : translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "현재 검색 범위에 표시할 자료가 없습니다. 다른 검색어 또는 다음 페이지를 확인하세요.")}</p>}
+      {!savedOnly && result && <p>{result.status === "not_configured" ? "API 연결 대기 · " : result.status === "unavailable" ? "일시적으로 이용 불가 · " : ""}{result.message}</p>}
+      {!savedOnly && !query && <p>검색어를 입력하거나 추천 키워드를 선택하세요. 외부 API는 검색할 때만 호출합니다.</p>}
+      {!loading && !items.length && (savedOnly || result?.status === "ready") && <p>{savedOnly ? "이 제공처에서 저장한 자료가 없습니다." : "현재 검색 범위에 표시할 자료가 없습니다. 다른 검색어 또는 다음 페이지를 확인하세요."}</p>}
     </div>
-    {!savedOnly && (requestError || result?.status === "unavailable" || result?.status === "partial") && <button className={RESOURCE_BUTTON} onClick={() => setRetry((value) => value + 1)}>{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "다시 시도")}</button>}
+    {!savedOnly && (requestError || result?.status === "unavailable" || result?.status === "partial") && <button className={RESOURCE_BUTTON} onClick={() => setRetry((value) => value + 1)}>다시 시도</button>}
     <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3" aria-busy={!savedOnly && loading}>
       {items.map((item) => <ResourceCard key={item.id} item={item} saved={workspace.saved.some((saved) => saved.id === item.id)} disabled={!ready || !writable || saving} onToggle={() => toggle(item)} />)}
     </div>
-    {!savedOnly && result && (result.status === "ready" || result.status === "partial") && <nav className="flex items-center justify-center gap-4" aria-label={translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "검색 결과 페이지")}>
-      <button className={RESOURCE_BUTTON} disabled={page <= 1 || loading} onClick={() => setParams({ q: query, page: String(page - 1) })}>{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "이전")}</button><span>{page} {translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "페이지")}</span>
-      <button className={RESOURCE_BUTTON} disabled={!result.hasMore || loading} onClick={() => setParams({ q: query, page: String(page + 1) })}>{translateCurrentStaticSourceText("domains.creator.resources.ResourceSearchPage", "ko", "다음")}</button>
+    {!savedOnly && result && (result.status === "ready" || result.status === "partial") && <nav className="flex items-center justify-center gap-4" aria-label="검색 결과 페이지">
+      <button className={RESOURCE_BUTTON} disabled={page <= 1 || loading} onClick={() => setParams({ q: query, page: String(page - 1) })}>이전</button><span>{page} 페이지</span>
+      <button className={RESOURCE_BUTTON} disabled={!result.hasMore || loading} onClick={() => setParams({ q: query, page: String(page + 1) })}>다음</button>
     </nav>}
     <LocalSaveNotice error={error} writable={writable} saving={saving} />
   </ResourceLayout>;

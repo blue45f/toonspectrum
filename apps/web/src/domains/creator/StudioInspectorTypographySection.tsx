@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Text typography — split into three disclosures (UX 감사 2026-09-02 §5.8 텍스트 선택).
  *
@@ -107,9 +103,9 @@ export function StudioInspectorTypographySection({
 
   return (
     <>
-      <StudioInspectorSection sectionId="element.typography" loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "글꼴을 여는 중...")}>
+      <StudioInspectorSection sectionId="element.typography" loadingLabel="글꼴을 여는 중...">
         <div className="mt-2">
-          <p className="mb-1 text-[0.6875rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "글꼴")}</p>
+          <p className="mb-1 text-[0.6875rem] font-medium text-fg-3">글꼴</p>
           <StudioPresetFontPreload />
           <div className="flex flex-wrap gap-1">
             {BRAND_KIT_FONTS.map((f) => (
@@ -119,7 +115,7 @@ export function StudioInspectorTypographySection({
                 onClick={() => patchEl(selected.id, { font: f.value } as Partial<El>)}
                 style={{ fontFamily: f.value }}
                 data-inspector-priority="advanced"
-                data-inspector-control-id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "en", "typography.font.{v0}"), { v0: String(f.label) })}
+                data-inspector-control-id={`typography.font.${f.label}`}
                 className={cn(
                   "rounded-md border px-2 py-1 text-xs",
                   (selected.font ?? DEFAULT_BRAND_KIT_FONT) === f.value
@@ -139,14 +135,15 @@ export function StudioInspectorTypographySection({
           />
         </div>
         <div className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "글자 크기")}<div className="flex items-center gap-1">
+          글자 크기
+          <div className="flex items-center gap-1">
             {[-4, 4].map((d) => (
               <button
                 key={d}
                 type="button"
-                aria-label={d < 0 ? translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "글자 작게") : translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "글자 크게")}
+                aria-label={d < 0 ? "글자 작게" : "글자 크게"}
                 data-inspector-priority="advanced"
-                data-inspector-control-id={d < 0 ? translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "en", "typography.size.decrease") : translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "en", "typography.size.increase")}
+                data-inspector-control-id={d < 0 ? "typography.size.decrease" : "typography.size.increase"}
                 onClick={() => {
                   patchEl(selected.id, { fontSize: Math.max(12, Math.min(96, fontSize + d)) } as Partial<El>);
                 }}
@@ -161,7 +158,8 @@ export function StudioInspectorTypographySection({
           </div>
         </div>
         <div className="mt-2.5 flex items-center justify-between gap-2 text-sm text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "스타일")}<div className="flex gap-0.5 rounded-lg border border-line bg-panel p-0.5">
+          스타일
+          <div className="flex gap-0.5 rounded-lg border border-line bg-panel p-0.5">
             <button
               type="button"
               aria-pressed={isBold}
@@ -180,7 +178,7 @@ export function StudioInspectorTypographySection({
                 "grid size-7 place-items-center rounded transition-colors cursor-pointer",
                 isBold ? "bg-accent/20 text-accent font-bold border border-accent/35" : "text-fg-3 hover:bg-raised hover:text-fg-2"
               )}
-              title={translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "굵게")}
+              title="굵게"
             >
               <Bold size={14} aria-hidden />
             </button>
@@ -202,7 +200,7 @@ export function StudioInspectorTypographySection({
                 "grid size-7 place-items-center rounded transition-colors cursor-pointer",
                 isItalic ? "bg-accent/20 text-accent font-bold border border-accent/35" : "text-fg-3 hover:bg-raised hover:text-fg-2"
               )}
-              title={translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "기울임꼴")}
+              title="기울임꼴"
             >
               <Italic size={14} aria-hidden />
             </button>
@@ -214,16 +212,17 @@ export function StudioInspectorTypographySection({
         <StudioInspectorSection
           sectionId="element.typography-appearance"
           activeCount={countActiveAppearance(text)}
-          loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "외형을 여는 중...")}
+          loadingLabel="외형을 여는 중..."
         >
           <div className="space-y-2.5">
-            <p className="text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "글자 외곽선 (Border)")}</p>
+            <p className="text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-3">글자 외곽선 (Border)</p>
 
             <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "외곽선 사용")}<input
+              외곽선 사용
+              <input
                 type="checkbox"
                 checked={!!text.stroke}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "글자 외곽선 사용")}
+                aria-label="글자 외곽선 사용"
                 data-inspector-priority="advanced"
                 data-inspector-control-id="typography.stroke"
                 onChange={(e) => {
@@ -249,7 +248,7 @@ export function StudioInspectorTypographySection({
             {!!text.stroke && (
               <>
                 <StudioColorField
-                  label={translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "외곽선 색상")}
+                  label="외곽선 색상"
                   value={text.stroke ?? null}
                   fallbackColor="#ffffff"
                   purpose="stroke"
@@ -285,7 +284,8 @@ export function StudioInspectorTypographySection({
                 />
 
                 <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "외곽선 두께")}<span className="flex items-center gap-2">
+                  외곽선 두께
+                  <span className="flex items-center gap-2">
                     <input
                       type="range"
                       min={0.5}
@@ -305,13 +305,14 @@ export function StudioInspectorTypographySection({
           </div>
 
           <div className="space-y-2.5 border-t border-line/40 pt-2.5">
-            <p className="text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "글자 그림자 (Shadow)")}</p>
+            <p className="text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-3">글자 그림자 (Shadow)</p>
 
             <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "그림자 사용")}<input
+              그림자 사용
+              <input
                 type="checkbox"
                 checked={!!text.shadowColor}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "글자 그림자 사용")}
+                aria-label="글자 그림자 사용"
                 data-inspector-priority="advanced"
                 data-inspector-control-id="typography.shadow"
                 onChange={(e) => {
@@ -340,7 +341,7 @@ export function StudioInspectorTypographySection({
             {!!text.shadowColor && (
               <>
                 <StudioColorField
-                  label={translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "그림자 색상")}
+                  label="그림자 색상"
                   value={text.shadowColor ?? null}
                   fallbackColor="#000000"
                   purpose="shadow"
@@ -387,7 +388,7 @@ export function StudioInspectorTypographySection({
                         step={step}
                         value={value}
                         data-inspector-priority="advanced"
-                        data-inspector-control-id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "en", "typography.{v0}"), { v0: String(key) })}
+                        data-inspector-control-id={`typography.${key}`}
                         onChange={(e) => patchEl(text.id, { [key]: Number(e.target.value) } as Partial<El>)}
                         className={SLIDER_CLASS}
                       />
@@ -397,7 +398,8 @@ export function StudioInspectorTypographySection({
                 ))}
 
                 <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "불투명도")}<span className="flex items-center gap-2">
+                  불투명도
+                  <span className="flex items-center gap-2">
                     <input
                       type="range"
                       min={0.1}
@@ -422,13 +424,13 @@ export function StudioInspectorTypographySection({
         <StudioInspectorSection
           sectionId="element.typography-advanced"
           activeCount={text.textPath ? 1 : 0}
-          loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "고급 조판을 여는 중...")}
+          loadingLabel="고급 조판을 여는 중..."
         >
-          <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "글자 효과 패널을 여는 중...")} />}>
+          <Suspense fallback={<StudioPanelLoading label="글자 효과 패널을 여는 중..." />}>
             <StudioTextEffectPanel onApply={(patch) => patchEl(text.id, patch as Partial<El>)} />
           </Suspense>
           <div className="border-t border-line/40 pt-2.5">
-            <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorTypographySection", "ko", "곡선 텍스트 패널을 여는 중...")} />}>
+            <Suspense fallback={<StudioPanelLoading label="곡선 텍스트 패널을 여는 중..." />}>
               <StudioTextPathPanel
                 value={normalizeTextPath(text.textPath)}
                 onPatch={(patch: Partial<TextPathConfig>) =>

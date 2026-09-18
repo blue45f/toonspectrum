@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
   FolderHeart,
@@ -34,19 +33,21 @@ export function MarketWishlistPage() {
         <div>
           <div className="flex items-center gap-2">
             <FolderHeart className="size-5 text-warn" />
-            <h1 className="text-xl font-bold text-fg sm:text-2xl">{translateCurrentStaticSourceText("domains.market.pages.MarketWishlistPage", "ko", "찜 목록")}</h1>
+            <h1 className="text-xl font-bold text-fg sm:text-2xl">찜 목록</h1>
             <span className="numeral tnum rounded-full bg-warn/15 px-2.5 py-0.5 text-xs font-bold text-warn">
-              {wishlistCount}{translateCurrentStaticSourceText("domains.market.pages.MarketWishlistPage", "ko", "개")}</span>
+              {wishlistCount}개
+            </span>
           </div>
           <p className="mt-1 text-xs text-fg-3">
-            {translateCurrentStaticSourceText("domains.market.pages.MarketWishlistPage", "ko", "나중에 활용하기 위해 하트를 눌러둔 에셋 목록입니다. 언제든 1클릭으로 스튜디오에 적용할 수 있습니다.")}</p>
+            나중에 활용하기 위해 하트를 눌러둔 에셋 목록입니다. 언제든 1클릭으로 스튜디오에 적용할 수 있습니다.
+          </p>
         </div>
 
         <Link
           href="/market/browse"
           className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
         >
-          <span>{translateCurrentStaticSourceText("domains.market.pages.MarketWishlistPage", "ko", "더 둘러보기")}</span>
+          <span>더 둘러보기</span>
           <ArrowRight className="size-3.5" />
         </Link>
       </div>
@@ -57,14 +58,16 @@ export function MarketWishlistPage() {
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3">
             <Heart className="size-6" />
           </div>
-          <h2 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketWishlistPage", "ko", "찜한 에셋이 아직 없어요")}</h2>
+          <h2 className="text-sm font-bold text-fg">찜한 에셋이 아직 없어요</h2>
           <p className="mx-auto max-w-sm text-xs text-fg-3 leading-relaxed">
-            {translateCurrentStaticSourceText("domains.market.pages.MarketWishlistPage", "ko", "마켓 카탈로그를 둘러보시면서 마음에 드는 에셋 카드 좌측 상단의 하트 버튼을 눌러보세요.")}</p>
+            마켓 카탈로그를 둘러보시면서 마음에 드는 에셋 카드 좌측 상단의 하트 버튼을 눌러보세요.
+          </p>
           <Link
             href="/market/browse"
             className={buttonClass({ variant: "solid", size: "md", className: "mt-2" })}
           >
-            {translateCurrentStaticSourceText("domains.market.pages.MarketWishlistPage", "ko", "에셋 탐색하러 가기")}</Link>
+            에셋 탐색하러 가기
+          </Link>
         </div>
       ) : (
         <div className="mt-6 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">

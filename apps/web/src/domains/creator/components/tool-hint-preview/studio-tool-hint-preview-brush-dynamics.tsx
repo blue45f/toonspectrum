@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { COLOR, previewVariantMatches } from "./studio-tool-hint-preview-shared";
 
 import type { ReactElement } from "react";
@@ -36,7 +35,7 @@ function PreviewLock({
       <text x="81" y="61" fill={COLOR.accent} fontSize="18" fontWeight="800" textAnchor="middle">
         {metricMark}
       </text>
-      <g transform={locked ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "translate(119 51)") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "translate(119 52)")}>
+      <g transform={locked ? "translate(119 51)" : "translate(119 52)"}>
         <rect x="-17" y="-1" width="34" height="29" rx="6" fill={COLOR.raised} stroke={COLOR.fg} strokeWidth="2" />
         <path
           d={locked ? "M-10-1v-9a10 10 0 0 1 20 0v9" : "M-10-1v-9a10 10 0 0 1 18-6"}
@@ -84,7 +83,7 @@ export function BrushSizePreview({
   const radius = presetRadius ?? (animate ? 7 : 17);
   const chipIndex = preset ? Object.keys(BRUSH_SIZE_PRESET_RADIUS).indexOf(preset) : -1;
   return (
-    <g data-preview-operation={preset ?? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "brush-size-slider")}>
+    <g data-preview-operation={preset ?? "brush-size-slider"}>
       <circle cx="75" cy="50" r="25" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="1.5" />
       <circle cx="75" cy="50" r={radius} fill={COLOR.accent} opacity=".88">
         {animate && presetRadius === null ? (
@@ -149,14 +148,14 @@ export function OpacityPreview({
   );
   const opacity = opacityPreset === undefined ? null : opacityPreset / 100;
   return (
-    <g data-preview-operation={opacityPreset === undefined ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "opacity-slider") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "preset-{v0}"), { v0: String(opacityPreset) })}>
+    <g data-preview-operation={opacityPreset === undefined ? "opacity-slider" : `preset-${opacityPreset}`}>
       <defs>
         <pattern id={patternId} width="12" height="12" patternUnits="userSpaceOnUse">
           <rect width="12" height="12" fill={COLOR.canvas} />
           <path d="M0 0h6v6H0ZM6 6h6v6H6Z" fill={COLOR.raised} />
         </pattern>
       </defs>
-      <rect x="42" y="21" width="74" height="62" rx="7" fill={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "url(#{v0})"), { v0: String(patternId) })} stroke={COLOR.lineStrong} />
+      <rect x="42" y="21" width="74" height="62" rx="7" fill={`url(#${patternId})`} stroke={COLOR.lineStrong} />
       <circle cx="79" cy="52" r="22" fill={COLOR.accent} opacity={opacity ?? (animate ? ".24" : ".72")}>
         {animate && opacity === null ? (
           <animate attributeName="opacity" dur="2.8s" values=".22;.9;.9;.22" keyTimes="0;.4;.68;1" repeatCount="indefinite" />
@@ -231,7 +230,7 @@ export function StabilizerPreview({
             </>
           ) : null}
         </path>
-        <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "translate(178 40)")}>
+        <g transform={animate ? undefined : "translate(178 40)"}>
           <path d="M-6-12H6L4 4 0 11-4 4Z" fill={COLOR.fg} stroke={COLOR.canvas} strokeLinejoin="round" strokeWidth="2" />
           <circle cy="12" r="2.5" fill={COLOR.accent} />
           {animate ? (
@@ -264,7 +263,7 @@ export function StabilizerPreview({
       : [[43, 69], [96, 63], [148, 57], [176, 37]];
 
   return (
-    <g data-preview-stabilizer={isAdaptive ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "adaptive") : isPrecision ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "precision") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "standard")}>
+    <g data-preview-stabilizer={isAdaptive ? "adaptive" : isPrecision ? "precision" : "standard"}>
       {isPrecision ? (
         <path d="M38 61c32-27 61-25 83-10 18 12 35 3 57-17M40 75c30-27 59-25 81-10 18 12 35 3 55-17" fill="none" stroke={COLOR.cool} strokeDasharray="3 4" strokeWidth="1" opacity=".48" />
       ) : null}
@@ -275,7 +274,7 @@ export function StabilizerPreview({
       {controlPoints.map(([cx, cy], index) => (
         <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={isAdaptive && index === 2 ? "4" : "3"} fill={isAdaptive && index === 2 ? COLOR.cool : COLOR.card} stroke={COLOR.fg2} strokeWidth="1.5" />
       ))}
-      <g transform={animate ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "translate({v0})"), { v0: String(endpoint) })}>
+      <g transform={animate ? undefined : `translate(${endpoint})`}>
         <circle r="8" fill={COLOR.fg} stroke={COLOR.canvas} strokeWidth="2" />
         <circle r="2.5" fill={COLOR.accent} />
         {animate ? <animateMotion dur="2.9s" path={smoothPath} keyPoints="0;1;1" keyTimes="0;.72;1" repeatCount="indefinite" /> : null}
@@ -382,9 +381,9 @@ export function SymmetryPreview({
   if (mode === "radial") {
     return (
       <g data-preview-symmetry="radial" transform="translate(108 52)">
-        {[0, 60, 120].map((angle) => <path key={angle} d="M-44 0H44" transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "rotate({v0})"), { v0: String(angle) })} stroke={COLOR.cool} strokeDasharray="3 4" strokeWidth="1" opacity=".52" />)}
+        {[0, 60, 120].map((angle) => <path key={angle} d="M-44 0H44" transform={`rotate(${angle})`} stroke={COLOR.cool} strokeDasharray="3 4" strokeWidth="1" opacity=".52" />)}
         <g>
-          {[0, 60, 120, 180, 240, 300].map((angle) => <path key={angle} d="M8 0c8-13 19-12 29 0-10 12-21 13-29 0Z" transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "rotate({v0})"), { v0: String(angle) })} fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />)}
+          {[0, 60, 120, 180, 240, 300].map((angle) => <path key={angle} d="M8 0c8-13 19-12 29 0-10 12-21 13-29 0Z" transform={`rotate(${angle})`} fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />)}
           {animate ? <animateTransform attributeName="transform" type="rotate" dur="3.6s" values="0;60;60" keyTimes="0;.72;1" repeatCount="indefinite" /> : null}
         </g>
         <circle r="5" fill={COLOR.accent} stroke={COLOR.canvas} strokeWidth="2" />
@@ -396,7 +395,7 @@ export function SymmetryPreview({
     return (
       <g data-preview-symmetry="kaleidoscope" transform="translate(108 52)">
         {Array.from({ length: 8 }, (_, index) => index * 45).map((angle, index) => (
-          <g key={angle} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "rotate({v0})"), { v0: String(angle) })}>
+          <g key={angle} transform={`rotate(${angle})`}>
             <path d="M0 0 45-12V12Z" fill={index % 2 ? COLOR.accentSoft : COLOR.raised} stroke={index % 2 ? COLOR.cool : COLOR.accent} strokeWidth="1.2" />
             <circle cx="31" cy="0" r={index % 2 ? "3" : "5"} fill={index % 2 ? COLOR.cool : COLOR.accent} />
           </g>
@@ -415,7 +414,7 @@ export function SymmetryPreview({
           <path
             key={angle}
             d="M4 0c8-10 18-16 30-18 2 8-1 16-8 22-7 6-16 9-22 8 5-4 7-9 6-14Z"
-            transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "rotate({v0})"), { v0: String(angle) })}
+            transform={`rotate(${angle})`}
             fill={COLOR.accentSoft}
             stroke={COLOR.accent}
             strokeWidth="1.6"
@@ -481,7 +480,7 @@ export function BrushWorkflowPreview({
   if (action === "favorite") {
     const remove = previewVariantMatches(variant, "remove");
     return (
-      <g data-preview-operation={remove ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "remove-favorite") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "add-favorite")}>
+      <g data-preview-operation={remove ? "remove-favorite" : "add-favorite"}>
         <path d="M42 68c20-29 39 15 58-11 16-22 35-19 58-3" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="5" />
         <path d="m166 22 6 13 14 2-10 10 3 14-13-7-13 7 3-14-10-10 14-2Z" fill={remove ? COLOR.canvas : animate ? COLOR.accentSoft : COLOR.accent} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="2" fillOpacity={animate ? (remove ? "1" : ".15") : remove ? ".08" : "1"}>
           {animate ? <animate attributeName="fill-opacity" dur="1.8s" values={remove ? "1;.08;.08;1" : ".15;1;1;.15"} keyTimes="0;.4;.72;1" repeatCount="indefinite" /> : null}
@@ -494,7 +493,7 @@ export function BrushWorkflowPreview({
     return (
       <>
         {[1, 2, 3, 4].map((slot, index) => (
-          <g key={slot} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.brush.dynamics", "en", "translate({v0} 35)"), { v0: String(44 + index * 39) })}>
+          <g key={slot} transform={`translate(${44 + index * 39} 35)`}>
             <rect width="31" height="31" rx="7" fill={slot === 3 ? COLOR.accentSoft : COLOR.canvas} stroke={slot === 3 ? COLOR.accent : COLOR.lineStrong} strokeWidth="1.8" />
             <text x="15.5" y="20" textAnchor="middle" fill={slot === 3 ? COLOR.accent : COLOR.fg2} fontSize="12" fontWeight="700">{slot}</text>
           </g>

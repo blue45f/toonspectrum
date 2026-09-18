@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Check, Images, ListChecks, Map, Paintbrush } from "lucide-react";
 
 import { cn } from "@/shared/lib/utils";
@@ -66,14 +65,16 @@ export function StudioCompanionWorkspacePresets({
     <section aria-labelledby="companion-workspace-presets-title" className="space-y-2">
       <div>
         <h2 id="companion-workspace-presets-title" className="text-xs font-semibold text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioCompanionWorkspacePresets", "ko", "멀티 화면 빠른 배치")}</h2>
+          멀티 화면 빠른 배치
+        </h2>
         <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioCompanionWorkspacePresets", "ko", "작업 단계에 맞춰 기본 화면과 전용 창의 역할을 한 번에 고릅니다.")}</p>
+          작업 단계에 맞춰 기본 화면과 전용 창의 역할을 한 번에 고릅니다.
+        </p>
       </div>
 
       <div
         role="group"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionWorkspacePresets", "ko", "멀티 화면 빠른 배치 프리셋")}
+        aria-label="멀티 화면 빠른 배치 프리셋"
         className="grid grid-cols-1 gap-1.5 min-[480px]:grid-cols-2"
       >
         {PRESETS.map(({ description, icon: Icon, id, label, primaryRole, secondaryRole }) => {

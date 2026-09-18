@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useLayoutEffect, useRef, useState } from "react";
 
 import {
@@ -719,7 +716,7 @@ export function StudioCanonicalVNextDryMediaCanvas({
         aria-hidden="true"
         data-studio-canonical-vnext-dry-media="true"
         data-studio-canonical-vnext-dry-media-authorized={
-          showWebGpuCanvas ? translateCurrentStaticSourceText("domains.creator.StudioCanonicalVNextDryMediaCanvas", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioCanonicalVNextDryMediaCanvas", "en", "false")
+          showWebGpuCanvas ? "true" : "false"
         }
         className={cn("pointer-events-none absolute z-[12]", className)}
         style={{
@@ -738,11 +735,13 @@ export function StudioCanonicalVNextDryMediaCanvas({
           data-studio-canonical-vnext-dry-media-unavailable="true"
           className="pointer-events-none absolute inset-x-4 top-4 z-[31] rounded-md border border-red-400/50 bg-red-950/90 px-4 py-3 text-sm font-medium text-red-50 shadow-lg"
         >
-          {translateCurrentStaticSourceText("domains.creator.StudioCanonicalVNextDryMediaCanvas", "ko", "선택한 WebGPU 드라이 미디어 엔진을 유지하지 못했습니다. 다른 렌더러로 자동 전환하지 않았습니다.")}{showLastGoodSnapshot
-            ? translateCurrentStaticSourceText("domains.creator.StudioCanonicalVNextDryMediaCanvas", "ko", " 마지막으로 검증된 WebGPU 프레임을 유지합니다.")
-            : translateCurrentStaticSourceText("domains.creator.StudioCanonicalVNextDryMediaCanvas", "ko", " 이 엔진의 프레임은 표시하지 않습니다.")}
+          선택한 WebGPU 드라이 미디어 엔진을 유지하지 못했습니다. 다른 렌더러로 자동 전환하지 않았습니다.
+          {showLastGoodSnapshot
+            ? " 마지막으로 검증된 WebGPU 프레임을 유지합니다."
+            : " 이 엔진의 프레임은 표시하지 않습니다."}
           {" "}
-          {translateCurrentStaticSourceText("domains.creator.StudioCanonicalVNextDryMediaCanvas", "ko", "선택을 해제한 뒤 다시 선택하면 같은 엔진을 명시적으로 재시도할 수 있습니다.")}</div>
+          선택을 해제한 뒤 다시 선택하면 같은 엔진을 명시적으로 재시도할 수 있습니다.
+        </div>
       ) : null}
     </>
   );

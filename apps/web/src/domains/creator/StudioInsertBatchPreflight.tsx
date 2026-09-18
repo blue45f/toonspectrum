@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
@@ -236,7 +232,7 @@ function BatchLayoutPreview({
   return (
     <div className="mt-3 rounded-xl border border-line bg-panel p-2">
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <p className="text-[0.6875rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "배치 미리보기")}</p>
+        <p className="text-[0.6875rem] font-bold text-fg-3">배치 미리보기</p>
         <p className="text-[0.6875rem] text-fg-3">
           {STUDIO_INSERT_BATCH_LAYOUT_LABELS[layout]} ·{" "}
           {STUDIO_INSERT_BATCH_SPACING_LABELS[spacing]}
@@ -244,7 +240,7 @@ function BatchLayoutPreview({
       </div>
       <div
         role="img"
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "{v0}개 이미지의 {v1} 배치 미리보기"), { v0: String(items.length), v1: String(STUDIO_INSERT_BATCH_LAYOUT_LABELS[layout]) })}
+        aria-label={`${items.length}개 이미지의 ${STUDIO_INSERT_BATCH_LAYOUT_LABELS[layout]} 배치 미리보기`}
         className="relative mx-auto h-40 w-full max-w-60 overflow-hidden rounded-lg bg-card"
       >
         <span
@@ -677,9 +673,11 @@ export function StudioInsertBatchPreflight({
         </span>
         <span className="min-w-0 flex-1">
           <span id={titleId} className="block text-xs font-bold text-fg">
-            {translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "여러 이미지 한 번에 배치")}</span>
+            여러 이미지 한 번에 배치
+          </span>
           <span className="block truncate text-[0.6875rem] text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "파일 선택·드롭·붙여넣기 → 미리보기 → 안전하게 삽입")}</span>
+            파일 선택·드롭·붙여넣기 → 미리보기 → 안전하게 삽입
+          </span>
         </span>
         {items.length > 0 ? (
           <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[0.6875rem] font-bold text-accent">
@@ -699,7 +697,7 @@ export function StudioInsertBatchPreflight({
             ref={inputRef}
             id={inputId}
             type="file"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "여러 이미지 파일 선택")}
+            aria-label="여러 이미지 파일 선택"
             accept={STUDIO_CANVAS_IMAGE_ACCEPT}
             multiple
             className="sr-only"
@@ -715,21 +713,25 @@ export function StudioInsertBatchPreflight({
           >
             <Upload className="mx-auto text-accent" size={24} aria-hidden />
             <p className="mt-1 text-xs font-semibold text-fg">
-              {translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "이미지를 놓거나 클립보드에서 붙여넣으세요")}</p>
+              이미지를 놓거나 클립보드에서 붙여넣으세요
+            </p>
             <p className="mt-0.5 text-[0.6875rem] text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "최대 ")}{STUDIO_INSERT_BATCH_MAX_ITEMS}{translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "개 · 파일별 해상도·용량·형식 검사")}</p>
+              최대 {STUDIO_INSERT_BATCH_MAX_ITEMS}개 · 파일별 해상도·용량·형식 검사
+            </p>
             <button
               type="button"
               className={cn(CONTROL, "mt-2")}
               onClick={() => inputRef.current?.click()}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "파일 선택")}</button>
+              파일 선택
+            </button>
           </div>
 
           <div className="mt-3 grid gap-3">
             <fieldset>
               <legend className="mb-1 text-[0.6875rem] font-bold text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "배치 대상")}</legend>
+                배치 대상
+              </legend>
               <div className="grid grid-cols-2 gap-1.5">
                 {TARGET_OPTIONS.map((option) => {
                   const disabled =
@@ -742,7 +744,7 @@ export function StudioInsertBatchPreflight({
                       disabled={disabled}
                       title={
                         disabled
-                          ? translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "먼저 캔버스에서 배치할 요소나 영역을 선택하세요.")
+                          ? "먼저 캔버스에서 배치할 요소나 영역을 선택하세요."
                           : undefined
                       }
                       className={cn(
@@ -761,7 +763,8 @@ export function StudioInsertBatchPreflight({
 
             <fieldset>
               <legend className="mb-1 text-[0.6875rem] font-bold text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "자동 배치")}</legend>
+                자동 배치
+              </legend>
               <div className="grid grid-cols-2 gap-1.5">
                 {LAYOUT_OPTIONS.map((option) => (
                   <button
@@ -790,7 +793,8 @@ export function StudioInsertBatchPreflight({
 
             <fieldset>
               <legend className="mb-1 text-[0.6875rem] font-bold text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "이미지 간격")}</legend>
+                이미지 간격
+              </legend>
               <div className="grid grid-cols-3 gap-1.5">
                 {SPACING_OPTIONS.map((option) => (
                   <button
@@ -822,8 +826,9 @@ export function StudioInsertBatchPreflight({
             <div className="mt-3">
               <div className="mb-1.5 flex items-center justify-between gap-2">
                 <p className="text-[0.6875rem] font-bold text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "준비 목록 · ")}{readyItems.length}{translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "개 준비 완료")}{preparingCount > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", " · {v0}개 검사 중"), { v0: String(preparingCount) }) : ""}
-                  {errorCount > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", " · {v0}개 오류"), { v0: String(errorCount) }) : ""}
+                  준비 목록 · {readyItems.length}개 준비 완료
+                  {preparingCount > 0 ? ` · ${preparingCount}개 검사 중` : ""}
+                  {errorCount > 0 ? ` · ${errorCount}개 오류` : ""}
                 </p>
                 <span className="text-[0.6875rem] text-fg-3">
                   {formatStudioInsertBatchBytes(totalBytes)}
@@ -854,7 +859,7 @@ export function StudioInsertBatchPreflight({
                     <span className="flex shrink-0 items-center">
                       <button
                         type="button"
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "{v0} 위로 이동"), { v0: String(item.file.name) })}
+                        aria-label={`${item.file.name} 위로 이동`}
                         disabled={index === 0 || inserting}
                         className={cn(
                           "grid size-11 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg disabled:opacity-30",
@@ -866,7 +871,7 @@ export function StudioInsertBatchPreflight({
                       </button>
                       <button
                         type="button"
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "{v0} 아래로 이동"), { v0: String(item.file.name) })}
+                        aria-label={`${item.file.name} 아래로 이동`}
                         disabled={index === items.length - 1 || inserting}
                         className={cn(
                           "grid size-11 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg disabled:opacity-30",
@@ -878,7 +883,7 @@ export function StudioInsertBatchPreflight({
                       </button>
                       <button
                         type="button"
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "{v0} 준비 목록에서 제거"), { v0: String(item.file.name) })}
+                        aria-label={`${item.file.name} 준비 목록에서 제거`}
                         disabled={inserting}
                         className={cn(
                           "grid size-11 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg disabled:opacity-30",
@@ -909,7 +914,8 @@ export function StudioInsertBatchPreflight({
               onClick={clearItems}
             >
               <Trash2 size={15} aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "목록 비우기")}</button>
+              목록 비우기
+            </button>
             {errorCount > 0 ? (
               <button
                 type="button"
@@ -918,7 +924,8 @@ export function StudioInsertBatchPreflight({
                 onClick={() => void retryErrors()}
               >
                 <RefreshCw size={15} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "오류 다시 시도")}</button>
+                오류 다시 시도
+              </button>
             ) : null}
             <button
               type="button"
@@ -934,11 +941,12 @@ export function StudioInsertBatchPreflight({
               ) : (
                 <CheckCircle2 size={15} aria-hidden />
               )}
-              {translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "준비된 이미지 ")}{readyItems.length}{translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "개 삽입")}</button>
+              준비된 이미지 {readyItems.length}개 삽입
+            </button>
           </div>
 
           <div
-            role={notice?.tone === "error" ? translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "en", "status")}
+            role={notice?.tone === "error" ? "alert" : "status"}
             aria-live="polite"
             className={cn(
               "mt-2 min-h-5 text-[0.6875rem]",
@@ -947,7 +955,7 @@ export function StudioInsertBatchPreflight({
               (!notice || notice.tone === "info") && "text-fg-3",
             )}
           >
-            {notice?.message ?? translateCurrentStaticSourceText("domains.creator.StudioInsertBatchPreflight", "ko", "파일은 확정 전까지 캔버스와 문서 기록을 변경하지 않습니다.")}
+            {notice?.message ?? "파일은 확정 전까지 캔버스와 문서 기록을 변경하지 않습니다."}
           </div>
         </div>
       ) : null}

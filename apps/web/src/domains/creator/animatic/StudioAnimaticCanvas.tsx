@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useLayoutEffect, useRef } from "react";
 
 import { planStudioAnimaticPreview, sampleStudioAnimaticPreview, type StudioAnimaticPreviewSample } from "../studio-animatic-timeline";
@@ -25,6 +24,6 @@ export function StudioAnimaticCanvas({ snapshot, images, sample, timeMs = 0, thu
     if (at) drawStudioAnimaticFrame(context, width, height, snapshot, at, images);
   }, [height, images, sample, snapshot, timeMs, width]);
   return <canvas ref={ref} width={width} height={height} role="img" aria-label={label}
-    data-studio-animatic-artwork={thumbnail ? translateCurrentStaticSourceText("domains.creator.animatic.StudioAnimaticCanvas", "en", "thumbnail") : translateCurrentStaticSourceText("domains.creator.animatic.StudioAnimaticCanvas", "en", "preview")}
-    className={thumbnail ? translateCurrentStaticSourceText("domains.creator.animatic.StudioAnimaticCanvas", "en", "mb-2 h-16 w-full rounded-lg object-contain") : translateCurrentStaticSourceText("domains.creator.animatic.StudioAnimaticCanvas", "en", "h-full max-h-full w-full object-contain")} />;
+    data-studio-animatic-artwork={thumbnail ? "thumbnail" : "preview"}
+    className={thumbnail ? "mb-2 h-16 w-full rounded-lg object-contain" : "h-full max-h-full w-full object-contain"} />;
 }

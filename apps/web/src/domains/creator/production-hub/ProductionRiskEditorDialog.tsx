@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Save, ShieldAlert, X } from "lucide-react";
 import {
   useEffect,
@@ -276,7 +273,7 @@ export function ProductionRiskEditorDialog({
     <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-6">
       <button
         type="button"
-        aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "위험 편집 창 닫기")}
+        aria-label="위험 편집 창 닫기"
         tabIndex={-1}
         className="absolute inset-0 cursor-default"
         disabled={saving}
@@ -294,18 +291,18 @@ export function ProductionRiskEditorDialog({
             <div className="flex items-center gap-2">
               <ShieldAlert className="size-5 text-accent" aria-hidden="true" />
               <h2 id="production-risk-editor-title" className="text-lg font-black text-fg">
-                {risk ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "위험 항목 편집") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "위험 직접 등록")}
+                {risk ? "위험 항목 편집" : "위험 직접 등록"}
               </h2>
             </div>
             <p className="mt-1 text-xs leading-5 text-fg-2">
               {manualFieldsEditable
-                ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "가능성과 영향도를 평가하고 담당자·대응 기한·완화 계획을 기록합니다.")
-                : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "자동 계산 필드는 감지 엔진이 관리합니다. 담당자와 대응 계획만 수정할 수 있습니다.")}
+                ? "가능성과 영향도를 평가하고 담당자·대응 기한·완화 계획을 기록합니다."
+                : "자동 계산 필드는 감지 엔진이 관리합니다. 담당자와 대응 계획만 수정할 수 있습니다."}
             </p>
           </div>
           <button
             type="button"
-            aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "닫기")}
+            aria-label="닫기"
             className={buttonClass({ variant: "ghost", size: "sm" })}
             disabled={saving}
             onClick={onClose}
@@ -316,7 +313,7 @@ export function ProductionRiskEditorDialog({
         <div className="space-y-5 p-5 sm:p-6">
           <div className="grid gap-4 lg:grid-cols-2">
             <label className="block lg:col-span-2">
-              <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "위험 제목")}</FieldLabel>
+              <FieldLabel>위험 제목</FieldLabel>
               <input
                 ref={titleRef}
                 value={draft.title}
@@ -325,11 +322,11 @@ export function ProductionRiskEditorDialog({
                 maxLength={240}
                 required
                 className="mt-2 w-full rounded-xl border border-line bg-panel px-3 py-2.5 text-sm font-bold text-fg outline-none focus:border-accent disabled:opacity-65"
-                placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "예: 14화 채색 일정 초과 가능성")}
+                placeholder="예: 14화 채색 일정 초과 가능성"
               />
             </label>
             <label className="block lg:col-span-2">
-              <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "원인과 예상 영향")}</FieldLabel>
+              <FieldLabel>원인과 예상 영향</FieldLabel>
               <textarea
                 value={draft.description}
                 onChange={(event) => setDraftValue("description", event.target.value)}
@@ -337,11 +334,11 @@ export function ProductionRiskEditorDialog({
                 rows={3}
                 required
                 className="mt-2 w-full rounded-xl border border-line bg-panel px-3 py-2.5 text-sm leading-6 text-fg outline-none focus:border-accent disabled:opacity-65"
-                placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "어떤 조건에서 발생하며 회차·게시·후행 작업에 어떤 영향을 주는지 기록하세요.")}
+                placeholder="어떤 조건에서 발생하며 회차·게시·후행 작업에 어떤 영향을 주는지 기록하세요."
               />
             </label>
             <label className="block">
-              <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "유형")}</FieldLabel>
+              <FieldLabel>유형</FieldLabel>
               <select
                 value={draft.category}
                 onChange={(event) => setDraftValue("category", event.target.value as ProductionRiskCategory)}
@@ -354,14 +351,14 @@ export function ProductionRiskEditorDialog({
               </select>
             </label>
             <label className="block">
-              <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "담당자")}</FieldLabel>
+              <FieldLabel>담당자</FieldLabel>
               <select
                 value={draft.ownerAssignmentId}
                 onChange={(event) => setDraftValue("ownerAssignmentId", event.target.value)}
                 disabled={saving}
                 className="mt-2 w-full rounded-xl border border-line bg-panel px-3 py-2.5 text-sm text-fg disabled:opacity-65"
               >
-                <option value="">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "담당자 미정")}</option>
+                <option value="">담당자 미정</option>
                 {activeAssignments.map((assignment) => (
                   <option key={assignment.id} value={assignment.id}>
                     {assignmentLabel(aggregate, assignment.id)}
@@ -370,14 +367,14 @@ export function ProductionRiskEditorDialog({
               </select>
             </label>
             <label className="block">
-              <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "대상 회차")}</FieldLabel>
+              <FieldLabel>대상 회차</FieldLabel>
               <select
                 value={draft.episodeId}
                 onChange={(event) => setDraftValue("episodeId", event.target.value)}
                 disabled={!manualFieldsEditable || saving}
                 className="mt-2 w-full rounded-xl border border-line bg-panel px-3 py-2.5 text-sm text-fg disabled:opacity-65"
               >
-                <option value="">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "프로젝트 전체")}</option>
+                <option value="">프로젝트 전체</option>
                 {aggregate.episodes.map((episode) => (
                   <option key={episode.episodeId} value={episode.episodeId}>{episode.episodeId}</option>
                 ))}
@@ -385,7 +382,7 @@ export function ProductionRiskEditorDialog({
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
-                <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "발생 가능성")}</FieldLabel>
+                <FieldLabel>발생 가능성</FieldLabel>
                 <select
                   value={draft.probability}
                   onChange={(event) => setDraftValue("probability", Number(event.target.value) as RiskDraft["probability"])}
@@ -396,7 +393,7 @@ export function ProductionRiskEditorDialog({
                 </select>
               </label>
               <label className="block">
-                <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "영향도")}</FieldLabel>
+                <FieldLabel>영향도</FieldLabel>
                 <select
                   value={draft.impact}
                   onChange={(event) => setDraftValue("impact", Number(event.target.value) as RiskDraft["impact"])}
@@ -410,13 +407,13 @@ export function ProductionRiskEditorDialog({
           </div>
 
           <div className="grid gap-3 rounded-2xl border border-accent/30 bg-accent-soft p-4 sm:grid-cols-3">
-            <div><p className="text-[0.6875rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "노출도")}</p><p className="mt-1 text-lg font-black text-fg">{exposureScore}</p></div>
-            <div><p className="text-[0.6875rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "운영 우선순위")}</p><p className="mt-1 text-lg font-black text-fg">{priorityScore}</p></div>
-            <div><p className="text-[0.6875rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "위험도")}</p><p className="mt-1 text-lg font-black text-fg">{severity}</p></div>
+            <div><p className="text-[0.6875rem] font-bold text-fg-3">노출도</p><p className="mt-1 text-lg font-black text-fg">{exposureScore}</p></div>
+            <div><p className="text-[0.6875rem] font-bold text-fg-3">운영 우선순위</p><p className="mt-1 text-lg font-black text-fg">{priorityScore}</p></div>
+            <div><p className="text-[0.6875rem] font-bold text-fg-3">위험도</p><p className="mt-1 text-lg font-black text-fg">{severity}</p></div>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <label className="block lg:col-span-2">
-              <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "영향받는 작업")}</FieldLabel>
+              <FieldLabel>영향받는 작업</FieldLabel>
               <select
                 multiple
                 size={Math.min(7, Math.max(3, aggregate.tasks.length))}
@@ -432,10 +429,10 @@ export function ProductionRiskEditorDialog({
                   <option key={task.id} value={task.id}>{task.title} · {task.status}</option>
                 ))}
               </select>
-              <span className="mt-1 block text-[0.6875rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "여러 작업은 Command 또는 Ctrl 키를 누른 채 선택합니다.")}</span>
+              <span className="mt-1 block text-[0.6875rem] text-fg-3">여러 작업은 Command 또는 Ctrl 키를 누른 채 선택합니다.</span>
             </label>
             <label className="block">
-              <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "대응 기한")}</FieldLabel>
+              <FieldLabel>대응 기한</FieldLabel>
               <input
                 type="datetime-local"
                 value={draft.responseDueAt}
@@ -445,7 +442,7 @@ export function ProductionRiskEditorDialog({
               />
             </label>
             <label className="block">
-              <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "다음 검토")}</FieldLabel>
+              <FieldLabel>다음 검토</FieldLabel>
               <input
                 type="datetime-local"
                 value={draft.nextReviewAt}
@@ -457,38 +454,38 @@ export function ProductionRiskEditorDialog({
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <label className="block">
-              <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "발생 조건·트리거")}</FieldLabel>
+              <FieldLabel>발생 조건·트리거</FieldLabel>
               <input
                 value={draft.trigger}
                 onChange={(event) => setDraftValue("trigger", event.target.value)}
                 disabled={!manualFieldsEditable || saving}
                 className="mt-2 w-full rounded-xl border border-line bg-panel px-3 py-2.5 text-sm text-fg disabled:opacity-65"
-                placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "예: 채색 진척률이 금요일 18시까지 70% 미만")}
+                placeholder="예: 채색 진척률이 금요일 18시까지 70% 미만"
               />
             </label>
             <label className="block">
-              <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "원인 코드")}</FieldLabel>
+              <FieldLabel>원인 코드</FieldLabel>
               <input
                 value={draft.causeCodes}
                 onChange={(event) => setDraftValue("causeCodes", event.target.value)}
                 disabled={!manualFieldsEditable || saving}
                 className="mt-2 w-full rounded-xl border border-line bg-panel px-3 py-2.5 text-sm text-fg disabled:opacity-65"
-                placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "en", "manual, vendor-delay")}
+                placeholder="manual, vendor-delay"
               />
             </label>
             <label className="block lg:col-span-2">
-              <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "조기 징후")}</FieldLabel>
+              <FieldLabel>조기 징후</FieldLabel>
               <textarea
                 value={draft.earlySignals}
                 onChange={(event) => setDraftValue("earlySignals", event.target.value)}
                 disabled={!manualFieldsEditable || saving}
                 rows={3}
                 className="mt-2 w-full rounded-xl border border-line bg-panel px-3 py-2.5 text-sm leading-6 text-fg disabled:opacity-65"
-                placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "한 줄에 하나씩 입력하세요.")}
+                placeholder="한 줄에 하나씩 입력하세요."
               />
             </label>
             <label className="block lg:col-span-2">
-              <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "대응 계획")}</FieldLabel>
+              <FieldLabel>대응 계획</FieldLabel>
               <textarea
                 value={draft.mitigation}
                 onChange={(event) => setDraftValue("mitigation", event.target.value)}
@@ -496,18 +493,18 @@ export function ProductionRiskEditorDialog({
                 rows={3}
                 required
                 className="mt-2 w-full rounded-xl border border-line bg-panel px-3 py-2.5 text-sm leading-6 text-fg disabled:opacity-65"
-                placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "발생 가능성 또는 영향을 줄이기 위해 지금 할 일을 기록하세요.")}
+                placeholder="발생 가능성 또는 영향을 줄이기 위해 지금 할 일을 기록하세요."
               />
             </label>
             <label className="block lg:col-span-2">
-              <FieldLabel>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "비상 계획")}</FieldLabel>
+              <FieldLabel>비상 계획</FieldLabel>
               <textarea
                 value={draft.contingency}
                 onChange={(event) => setDraftValue("contingency", event.target.value)}
                 disabled={saving}
                 rows={3}
                 className="mt-2 w-full rounded-xl border border-line bg-panel px-3 py-2.5 text-sm leading-6 text-fg disabled:opacity-65"
-                placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "위험이 실제 발생했을 때 적용할 대안을 기록하세요.")}
+                placeholder="위험이 실제 발생했을 때 적용할 대안을 기록하세요."
               />
             </label>
           </div>
@@ -526,14 +523,15 @@ export function ProductionRiskEditorDialog({
             disabled={saving}
             onClick={onClose}
           >
-            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "취소")}</button>
+            취소
+          </button>
           <button
             type="submit"
             className={cn(buttonClass({ size: "sm" }), "min-w-28")}
             disabled={saving}
           >
             <Save className="size-4" aria-hidden="true" />
-            {saving ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "저장 중…") : risk ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "변경 저장") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskEditorDialog", "ko", "위험 등록")}
+            {saving ? "저장 중…" : risk ? "변경 저장" : "위험 등록"}
           </button>
         </footer>
       </form>

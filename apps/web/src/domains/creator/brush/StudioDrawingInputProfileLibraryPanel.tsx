@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   BookMarked,
   Check,
   LoaderCircle,
@@ -217,14 +213,16 @@ export function StudioDrawingInputProfileLibraryPanel({
         </span>
         <div className="min-w-0 flex-1">
           <h2 id="studio-drawing-input-profile-library-title" className="text-sm font-extrabold text-fg">
-            {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "내 입력 프로필")}</h2>
+            내 입력 프로필
+          </h2>
           <p className="mt-0.5 text-[0.6rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "브러시 자체가 아니라 안정화·후처리·필압 응답만 기기에 저장합니다.")}</p>
+            브러시 자체가 아니라 안정화·후처리·필압 응답만 기기에 저장합니다.
+          </p>
         </div>
         <button
           ref={closeButtonRef}
           type="button"
-          aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "내 입력 프로필 닫기")}
+          aria-label="내 입력 프로필 닫기"
           onClick={onClose}
           className={cn(
             "grid size-9 shrink-0 place-items-center rounded-lg border border-line text-fg-3 hover:bg-raised hover:text-fg",
@@ -240,9 +238,9 @@ export function StudioDrawingInputProfileLibraryPanel({
         <section className="rounded-xl border border-line/70 bg-bg-2/45 p-2.5">
           <div className="flex flex-wrap gap-1 text-[0.54rem] font-semibold text-fg-3">
             <span className="rounded bg-card px-1.5 py-1">{modeLabel(currentSnapshot.stabilizerMode)} {currentSnapshot.stabilizer}</span>
-            <span className="rounded bg-card px-1.5 py-1">{translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "후처리 ")}{currentSnapshot.postCorrection}</span>
-            <span className="rounded bg-card px-1.5 py-1">{translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "필압 ")}{currentSnapshot.pressureCurveId}</span>
-            <span className="rounded bg-card px-1.5 py-1">{translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "최소 ")}{currentSnapshot.stampMinSize == null ? "—" : `${Math.round(currentSnapshot.stampMinSize * 100)}%`}</span>
+            <span className="rounded bg-card px-1.5 py-1">후처리 {currentSnapshot.postCorrection}</span>
+            <span className="rounded bg-card px-1.5 py-1">필압 {currentSnapshot.pressureCurveId}</span>
+            <span className="rounded bg-card px-1.5 py-1">최소 {currentSnapshot.stampMinSize == null ? "—" : `${Math.round(currentSnapshot.stampMinSize * 100)}%`}</span>
           </div>
           <div className="mt-2 flex gap-1.5">
             <input
@@ -255,8 +253,8 @@ export function StudioDrawingInputProfileLibraryPanel({
                   void saveCurrent();
                 }
               }}
-              placeholder={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "예: 액정 태블릿 선화")}
-              aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "새 입력 프로필 이름")}
+              placeholder="예: 액정 태블릿 선화"
+              aria-label="새 입력 프로필 이름"
               className={cn(
                 "min-h-10 min-w-0 flex-1 rounded-lg border border-line bg-card px-2.5 text-xs text-fg placeholder:text-fg-3",
                 STUDIO_FOCUS_RING,
@@ -273,16 +271,19 @@ export function StudioDrawingInputProfileLibraryPanel({
               )}
             >
               {busy ? <LoaderCircle size={13} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Save size={13} aria-hidden="true" />}
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "저장")}</button>
+              저장
+            </button>
           </div>
           <p className="mt-1.5 text-[0.52rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "같은 이름으로 다시 저장하면 갱신합니다 · 최대 ")}{STUDIO_DRAWING_INPUT_CUSTOM_PROFILE_LIMIT}{translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "개")}</p>
+            같은 이름으로 다시 저장하면 갱신합니다 · 최대 {STUDIO_DRAWING_INPUT_CUSTOM_PROFILE_LIMIT}개
+          </p>
         </section>
 
-        <section aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "저장된 입력 프로필")} className="space-y-1.5">
+        <section aria-label="저장된 입력 프로필" className="space-y-1.5">
           {profiles.length === 0 ? (
             <p className="rounded-xl border border-dashed border-line px-3 py-5 text-center text-[0.58rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "저장된 프로필이 없습니다. 현재 잘 맞는 입력감을 저장해 두면 캔버스나 문서가 바뀌어도 다시 적용할 수 있습니다.")}</p>
+              저장된 프로필이 없습니다. 현재 잘 맞는 입력감을 저장해 두면 캔버스나 문서가 바뀌어도 다시 적용할 수 있습니다.
+            </p>
           ) : profiles.map((profile) => {
             const active = snapshotMatches(currentSnapshot, profile.snapshot);
             return (
@@ -310,14 +311,14 @@ export function StudioDrawingInputProfileLibraryPanel({
                     <span className="truncate">{profile.name}</span>
                   </span>
                   <span className="mt-0.5 block truncate text-[0.52rem] font-semibold text-fg-3">
-                    {modeLabel(profile.snapshot.stabilizerMode)} {profile.snapshot.stabilizer} {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "· 후처리 ")}{profile.snapshot.postCorrection} · {profile.snapshot.pressureCurveId}
+                    {modeLabel(profile.snapshot.stabilizerMode)} {profile.snapshot.stabilizer} · 후처리 {profile.snapshot.postCorrection} · {profile.snapshot.pressureCurveId}
                   </span>
                 </button>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => void removeProfile(profile)}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputProfileLibraryPanel", "ko", "{v0} 프로필 삭제"), { v0: String(profile.name) })}
+                  aria-label={`${profile.name} 프로필 삭제`}
                   className={cn(
                     "grid size-10 shrink-0 place-items-center rounded-lg border border-line text-fg-3 hover:border-bad/40 hover:bg-bad/10 hover:text-bad disabled:cursor-not-allowed disabled:opacity-40",
                     STUDIO_EASE,

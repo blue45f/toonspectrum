@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Sparkles,
   CornerDownLeft,
   Sliders,
@@ -35,29 +31,30 @@ export function CommandPalettePreview({
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-accent">
             <Sparkles size={14} />
-            <span>{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "ToonSpectrum ⌘K 통합 팔레트")}</span>
+            <span>ToonSpectrum ⌘K 통합 팔레트</span>
           </div>
           <p className="text-sm leading-relaxed text-fg-2">
-            {translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "작품 탐색부터 스튜디오 도구, 시스템 제어까지 키보드로 즉시 실행하세요.")}</p>
+            작품 탐색부터 스튜디오 도구, 시스템 제어까지 키보드로 즉시 실행하세요.
+          </p>
 
           <div className="mt-6 space-y-2.5 rounded-xl border border-line bg-card/60 p-3.5 text-xs">
-            <div className="font-semibold text-fg">{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "접두사 빠른 필터")}</div>
+            <div className="font-semibold text-fg">접두사 빠른 필터</div>
             <div className="grid grid-cols-2 gap-2 text-fg-2">
               <div className="flex items-center gap-1.5">
                 <kbd className="rounded border border-line-strong bg-raised px-1.5 py-0.5 font-mono text-[10px] text-accent">&gt;</kbd>
-                <span>{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "명령어 모드")}</span>
+                <span>명령어 모드</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <kbd className="rounded border border-line-strong bg-raised px-1.5 py-0.5 font-mono text-[10px] text-accent">@</kbd>
-                <span>{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "작품 검색")}</span>
+                <span>작품 검색</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <kbd className="rounded border border-line-strong bg-raised px-1.5 py-0.5 font-mono text-[10px] text-accent">/</kbd>
-                <span>{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "스튜디오 도구")}</span>
+                <span>스튜디오 도구</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <kbd className="rounded border border-line-strong bg-raised px-1.5 py-0.5 font-mono text-[10px] text-accent">#</kbd>
-                <span>{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "장르/태그")}</span>
+                <span>장르/태그</span>
               </div>
             </div>
           </div>
@@ -66,10 +63,11 @@ export function CommandPalettePreview({
         <div className="rounded-lg border border-line/60 bg-panel/40 p-3 text-[11px] text-fg-3">
           <div className="flex items-center gap-1.5 text-fg-2">
             <Keyboard size={13} className="text-accent" />
-            <span className="font-medium">{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "키보드 팁")}</span>
+            <span className="font-medium">키보드 팁</span>
           </div>
           <p className="mt-1">
-            <kbd className="font-mono text-fg-2">Tab</kbd> {translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "키로 탭을 순환하고, ")}<kbd className="font-mono text-fg-2">↑↓</kbd> {translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "로 항목을 탐색하세요.")}</p>
+            <kbd className="font-mono text-fg-2">Tab</kbd> 키로 탭을 순환하고, <kbd className="font-mono text-fg-2">↑↓</kbd> 로 항목을 탐색하세요.
+          </p>
         </div>
       </div>
     );
@@ -116,7 +114,7 @@ export function CommandPalettePreview({
               </h3>
               <p className="truncate text-xs text-fg-3">
                 {t.author}
-                {t.artist && t.artist !== t.author && formatI18nTemplate(translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", " · 그림 {v0}"), { v0: String(t.artist) })}
+                {t.artist && t.artist !== t.author && ` · 그림 ${t.artist}`}
               </p>
               <div className="pt-0.5">
                 <RatingInline
@@ -151,7 +149,7 @@ export function CommandPalettePreview({
           {/* Availability Platforms */}
           {t.availability && t.availability.length > 0 && (
             <div className="space-y-1.5 rounded-xl border border-line bg-card/60 p-3 text-xs">
-              <div className="font-semibold text-fg-2">{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "제공 플랫폼 및 가용성")}</div>
+              <div className="font-semibold text-fg-2">제공 플랫폼 및 가용성</div>
               <div className="flex flex-wrap gap-2">
                 {t.availability.map((p) => (
                   <div
@@ -161,7 +159,7 @@ export function CommandPalettePreview({
                     <span className="size-2 rounded-full bg-accent" />
                     <span className="text-fg-2">{p.platformId}</span>
                     <span className="text-[10px] text-fg-3">
-                      ({p.pricing === "free" ? translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "무료") : p.pricing === "wait-free" ? translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "기다무") : translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "유료")})
+                      ({p.pricing === "free" ? "무료" : p.pricing === "wait-free" ? "기다무" : "유료"})
                     </span>
                   </div>
                 ))}
@@ -172,7 +170,7 @@ export function CommandPalettePreview({
           {/* Synopsis */}
           {t.synopsis && (
             <div className="space-y-1 text-xs">
-              <div className="font-semibold text-fg-3">{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "줄거리")}</div>
+              <div className="font-semibold text-fg-3">줄거리</div>
               <p className="line-clamp-4 leading-relaxed text-fg-2">
                 {t.synopsis}
               </p>
@@ -186,7 +184,7 @@ export function CommandPalettePreview({
             onClick={onExecute}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-semibold text-on-accent shadow-lg shadow-accent/20 transition-all hover:bg-accent-2 active:scale-[0.98]"
           >
-            <span>{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "상세 보기")}</span>
+            <span>상세 보기</span>
             <CornerDownLeft size={13} />
           </button>
         </div>
@@ -238,7 +236,7 @@ export function CommandPalettePreview({
 
           {cmd.shortcut && (
             <div className="flex items-center justify-between rounded-lg border border-line bg-panel px-3 py-2 text-xs">
-              <span className="text-fg-3">{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "단축키")}</span>
+              <span className="text-fg-3">단축키</span>
               <div className="flex items-center gap-1">
                 {cmd.shortcut.map((k) => (
                   <kbd
@@ -258,7 +256,7 @@ export function CommandPalettePreview({
           onClick={onExecute}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-semibold text-on-accent shadow-lg shadow-accent/20 transition-all hover:bg-accent-2 active:scale-[0.98]"
         >
-          <span>{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "명령 실행")}</span>
+          <span>명령 실행</span>
           <CornerDownLeft size={13} />
         </button>
       </div>
@@ -280,9 +278,10 @@ export function CommandPalettePreview({
             <div>
               <div className="flex items-center gap-2">
                 <span className="rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold text-accent">
-                  {translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "스튜디오 도구")}</span>
+                  스튜디오 도구
+                </span>
                 <span className="rounded border border-line bg-card px-1.5 py-0.5 font-mono text-[10px] text-fg-2">
-                  {translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "단축키: ")}{tool.shortcutKey}
+                  단축키: {tool.shortcutKey}
                 </span>
               </div>
               <h3 className="text-base font-bold text-fg">{tool.name}</h3>
@@ -291,17 +290,18 @@ export function CommandPalettePreview({
           </div>
 
           <div className="rounded-xl border border-line bg-card/60 p-3.5 text-xs leading-relaxed text-fg-2">
-            <p className="font-medium text-fg">{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "도구 설명")}</p>
+            <p className="font-medium text-fg">도구 설명</p>
             <p className="mt-1 text-fg-3">{tool.tip}</p>
           </div>
 
           <div className="rounded-lg border border-line/80 bg-panel/60 p-3 text-[11px] text-fg-3">
             <div className="flex items-center gap-1.5 font-medium text-fg-2">
               <Sliders size={13} className="text-accent" />
-              <span>{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "작업 팁")}</span>
+              <span>작업 팁</span>
             </div>
             <p className="mt-1">
-              {translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "스튜디오 캔버스에서 키보드 ")}<kbd className="font-mono text-fg">{tool.shortcutKey}</kbd>{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "를 눌러 즉시 전환할 수 있습니다.")}</p>
+              스튜디오 캔버스에서 키보드 <kbd className="font-mono text-fg">{tool.shortcutKey}</kbd>를 눌러 즉시 전환할 수 있습니다.
+            </p>
           </div>
         </div>
 
@@ -310,7 +310,7 @@ export function CommandPalettePreview({
           onClick={onExecute}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-semibold text-on-accent shadow-lg shadow-accent/20 transition-all hover:bg-accent-2 active:scale-[0.98]"
         >
-          <span>{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "도구 선택 / 스튜디오 열기")}</span>
+          <span>도구 선택 / 스튜디오 열기</span>
           <CornerDownLeft size={13} />
         </button>
       </div>
@@ -332,7 +332,8 @@ export function CommandPalettePreview({
             <div>
               <div className="flex items-center gap-2">
                 <span className="rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold text-accent">
-                  {translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "페이지 이동")}</span>
+                  페이지 이동
+                </span>
                 <span className="rounded border border-line bg-card px-1.5 py-0.5 font-mono text-[10px] text-fg-3">
                   {page.href}
                 </span>
@@ -345,7 +346,7 @@ export function CommandPalettePreview({
           <div className="rounded-xl border border-line bg-card/60 p-3.5 text-xs leading-relaxed text-fg-2">
             <div className="flex items-center gap-1.5 font-semibold text-fg">
               <Info size={13} className="text-accent" />
-              <span>{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "화면 안내")}</span>
+              <span>화면 안내</span>
             </div>
             <p className="mt-1.5 text-fg-3">{page.subtitle}</p>
           </div>
@@ -356,7 +357,7 @@ export function CommandPalettePreview({
           onClick={onExecute}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-semibold text-on-accent shadow-lg shadow-accent/20 transition-all hover:bg-accent-2 active:scale-[0.98]"
         >
-          <span>{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "페이지로 이동")}</span>
+          <span>페이지로 이동</span>
           <CornerDownLeft size={13} />
         </button>
       </div>
@@ -370,11 +371,12 @@ export function CommandPalettePreview({
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-accent">
             <Sparkles size={14} />
-            <span>{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "최근 검색어")}</span>
+            <span>최근 검색어</span>
           </div>
           <h3 className="text-lg font-bold text-fg">'{selectedItem.query}'</h3>
           <p className="text-xs text-fg-3">
-            {translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "이 검색어로 작품 및 카탈로그 검색을 즉시 다시 실행합니다.")}</p>
+            이 검색어로 작품 및 카탈로그 검색을 즉시 다시 실행합니다.
+          </p>
         </div>
 
         <button
@@ -382,7 +384,7 @@ export function CommandPalettePreview({
           onClick={onExecute}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-semibold text-on-accent shadow-lg shadow-accent/20 transition-all hover:bg-accent-2 active:scale-[0.98]"
         >
-          <span>{translateCurrentStaticSourceText("shared.components.command.palette.preview", "ko", "검색 실행")}</span>
+          <span>검색 실행</span>
           <CornerDownLeft size={13} />
         </button>
       </div>

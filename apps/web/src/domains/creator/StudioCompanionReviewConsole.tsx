@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Brush, Check, Eye, EyeOff, History, MessageSquare, Redo2, Undo2 } from "lucide-react";
 import { useState, type KeyboardEvent } from "react";
 
@@ -148,7 +147,7 @@ export function StudioCompanionReviewConsole({
               <Brush className="size-3.5" aria-hidden /> {t("studio.toolsCompanion.review.brushRemoteTitle")}
             </span>
             <span className="text-[0.65rem] tabular-nums text-fg-3">
-              {projection.brush.size}{translateCurrentStaticSourceText("domains.creator.StudioCompanionReviewConsole", "en", "px · ")}{Math.round(projection.brush.opacity * 100)}%
+              {projection.brush.size}px · {Math.round(projection.brush.opacity * 100)}%
             </span>
           </div>
           <label className="block text-[0.68rem] font-medium text-fg-3">
@@ -249,9 +248,9 @@ export function StudioCompanionReviewConsole({
             key={id}
             type="button"
             role="tab"
-            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionReviewConsole", "en", "companion-review-tab-{v0}"), { v0: String(id) })}
+            id={`companion-review-tab-${id}`}
             aria-selected={section === id}
-            aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionReviewConsole", "en", "companion-review-panel-{v0}"), { v0: String(id) })}
+            aria-controls={`companion-review-panel-${id}`}
             tabIndex={section === id ? 0 : -1}
             onClick={() => setSection(id)}
             onKeyDown={(event) => handleSectionKeyDown(event, index)}

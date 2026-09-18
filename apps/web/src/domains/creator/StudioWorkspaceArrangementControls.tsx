@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Check,
   LayoutGrid,
   Maximize2,
@@ -133,7 +129,7 @@ export function StudioWorkspaceArrangementControls({
     <div
       data-studio-workspace-arrangement="true"
       data-studio-shell-floating-target="workspace-arrangement"
-      data-studio-shell-force-visible={arranging ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "en", "true") : undefined}
+      data-studio-shell-force-visible={arranging ? "true" : undefined}
       className={cn(
         "pointer-events-auto fixed bottom-3 right-3 z-[69] hidden",
         arranging
@@ -145,7 +141,7 @@ export function StudioWorkspaceArrangementControls({
     >
       <div
         role="group"
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "작업 공간 배치 · 열린 창 {v0}개"), { v0: String(floatingCount) })}
+        aria-label={`작업 공간 배치 · 열린 창 ${floatingCount}개`}
         onWheel={handleStudioHorizontalWheel}
         className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
@@ -162,7 +158,7 @@ export function StudioWorkspaceArrangementControls({
           {arranging
             ? <Check size={15} aria-hidden />
             : <LayoutGrid size={15} aria-hidden />}
-          {arranging ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "배치 완료") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "배치 편집")}
+          {arranging ? "배치 완료" : "배치 편집"}
         </button>
         {arranging ? (
           <>
@@ -178,7 +174,8 @@ export function StudioWorkspaceArrangementControls({
                 setNotice("배치 편집 전 상태로 되돌렸어요.");
               }}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "배치 취소")}</button>
+              배치 취소
+            </button>
             <button
               type="button"
               className={actionClass}
@@ -187,7 +184,8 @@ export function StudioWorkspaceArrangementControls({
                 setNotice("열린 창을 화면 양쪽 가장자리에 정렬했어요.");
               }}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "가장자리 정렬")}</button>
+              가장자리 정렬
+            </button>
             <button
               type="button"
               className={actionClass}
@@ -196,45 +194,52 @@ export function StudioWorkspaceArrangementControls({
                 setNotice("열린 창을 겹쳐 보기 쉬운 계단식으로 정렬했어요.");
               }}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "계단식 정렬")}</button>
+              계단식 정렬
+            </button>
             <button
               type="button"
               className={actionClass}
               onClick={() => setStudioFloatingSurfacesMinimized(true)}
             >
-              <Minimize2 size={14} aria-hidden />{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "모두 접기")}</button>
+              <Minimize2 size={14} aria-hidden />모두 접기
+            </button>
             <button
               type="button"
               className={actionClass}
               onClick={() => setStudioFloatingSurfacesMinimized(false)}
             >
-              <Maximize2 size={14} aria-hidden />{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "모두 펼치기")}</button>
+              <Maximize2 size={14} aria-hidden />모두 펼치기
+            </button>
             <button
               type="button"
               className={actionClass}
               onClick={() => arrangeStudioWorkspaceRegions("detach")}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "영역 분리")}</button>
+              영역 분리
+            </button>
             <button
               type="button"
               className={actionClass}
               onClick={() => arrangeStudioWorkspaceRegions("attach")}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "원래 자리")}</button>
+              원래 자리
+            </button>
             <button
               type="button"
               className={actionClass}
               disabled={busy}
               onClick={() => void deviceSnapshot("save")}
             >
-              <Save size={14} aria-hidden />{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "기기에 저장")}</button>
+              <Save size={14} aria-hidden />기기에 저장
+            </button>
             <button
               type="button"
               className={actionClass}
               disabled={busy}
               onClick={() => void deviceSnapshot("load")}
             >
-              <Undo2 size={14} aria-hidden />{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "기기 배치 불러오기")}</button>
+              <Undo2 size={14} aria-hidden />기기 배치 불러오기
+            </button>
             <button
               type="button"
               className={actionClass}
@@ -245,7 +250,8 @@ export function StudioWorkspaceArrangementControls({
                   : "탭 저장 공간을 사용할 수 없어요.");
               }}
             >
-              <Save size={14} aria-hidden />{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "탭에 저장")}</button>
+              <Save size={14} aria-hidden />탭에 저장
+            </button>
             <button
               type="button"
               className={actionClass}
@@ -256,7 +262,8 @@ export function StudioWorkspaceArrangementControls({
                   : "이 탭에 저장한 배치가 없어요.");
               }}
             >
-              <Undo2 size={14} aria-hidden />{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "탭 배치 불러오기")}</button>
+              <Undo2 size={14} aria-hidden />탭 배치 불러오기
+            </button>
           </>
         ) : null}
         <button
@@ -267,10 +274,11 @@ export function StudioWorkspaceArrangementControls({
             setNotice("열린 창과 고정 영역의 위치·크기·잠금을 초기화했어요.");
           }}
         >
-          <RotateCcw size={14} aria-hidden />{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "전체 복원")}</button>
+          <RotateCcw size={14} aria-hidden />전체 복원
+        </button>
         <button
           type="button"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "배치 도구 닫기")}
+          aria-label="배치 도구 닫기"
           className={cn(actionClass, "size-9 px-0")}
           onClick={() => {
             setStudioWorkspaceArranging(false);
@@ -282,7 +290,8 @@ export function StudioWorkspaceArrangementControls({
       </div>
       {arranging ? (
         <p className="px-2 text-[0.65rem] text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceArrangementControls", "ko", "제목줄을 끌어 이동 · 모서리로 크기 조절 · 가장자리 가까이 놓으면 도킹 · Esc 완료")}</p>
+          제목줄을 끌어 이동 · 모서리로 크기 조절 · 가장자리 가까이 놓으면 도킹 · Esc 완료
+        </p>
       ) : null}
       <p
         role="status"

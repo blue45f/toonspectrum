@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Palette } from "lucide-react";
 
 import { useAppearanceDialog } from "@/shared/lib/appearance-dialog-store";
@@ -15,7 +14,7 @@ export function AppearanceTrigger({ scope = "site", className = "", showLabel = 
   const korean = useI18n((state) => state.lang.startsWith("ko"));
   const label = korean ? "디자인 테마" : "Design themes";
   return (
-    <button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.appearance.AppearanceTrigger", "en", "appearance-trigger {v0}"), { v0: String(className) })} aria-label={label}
+    <button type="button" className={`appearance-trigger ${className}`} aria-label={label}
       title={label} aria-haspopup="dialog" aria-expanded={expanded} onClick={(event) => open(scope, event.currentTarget)}>
       <Palette size={17} aria-hidden />{showLabel && <span>{label}</span>}
     </button>

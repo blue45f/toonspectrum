@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Check,
   Eye,
   EyeOff,
@@ -199,7 +195,8 @@ export function StudioShellFloatingLayoutManager() {
               <div className="min-w-0 flex-1">
                 <h2 className="text-sm font-black">{desktop ? "플로팅 UI 작업공간" : "보기 · 플로팅 UI"}</h2>
                 <p className="mt-1 text-xs leading-5 text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "표시 여부를 고르고, 배치 편집에서 화면을 보며 직접 이동·도킹·크기 조절할 수 있어요.")}</p>
+                  표시 여부를 고르고, 배치 편집에서 화면을 보며 직접 이동·도킹·크기 조절할 수 있어요.
+                </p>
               </div>
               {!desktop ? (
                 <button
@@ -228,9 +225,10 @@ export function StudioShellFloatingLayoutManager() {
                       <Focus size={16} aria-hidden />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "임시 캔버스 집중 보기")}</p>
+                      <p className="text-xs font-black text-fg">임시 캔버스 집중 보기</p>
                       <p className="mt-1 text-[0.68rem] leading-5 text-fg-3">
-                        {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "기존 표시 설정은 그대로 보관했습니다. 복원하면 집중 보기 전 구성으로 즉시 돌아갑니다.")}</p>
+                        기존 표시 설정은 그대로 보관했습니다. 복원하면 집중 보기 전 구성으로 즉시 돌아갑니다.
+                      </p>
                     </div>
                     <button
                       type="button"
@@ -240,7 +238,8 @@ export function StudioShellFloatingLayoutManager() {
                         setNotice("집중 보기 전 플로팅 UI 구성을 복원했어요.");
                       }}
                     >
-                      {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "원래 보기")}</button>
+                      원래 보기
+                    </button>
                   </div>
                 </section>
               ) : null}
@@ -249,9 +248,10 @@ export function StudioShellFloatingLayoutManager() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 id="studio-shell-floating-visibility-heading" className="text-xs font-black">
-                      {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "화면에 보이는 요소")}</h3>
+                      화면에 보이는 요소
+                    </h3>
                     <p className="mt-1 text-[0.68rem] text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "설정 ")}{configuredVisibleCount}/{STUDIO_SHELL_FLOATING_VISIBILITY_IDS.length} {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "· 현재 보기 ")}{visibleCount} {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "· 이 화면에서 사용 가능 ")}{mountedVisibilityCount}
+                      설정 {configuredVisibleCount}/{STUDIO_SHELL_FLOATING_VISIBILITY_IDS.length} · 현재 보기 {visibleCount} · 이 화면에서 사용 가능 {mountedVisibilityCount}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-1 sm:justify-end">
@@ -263,7 +263,8 @@ export function StudioShellFloatingLayoutManager() {
                         setNotice("모든 상시 플로팅 UI를 표시했어요.");
                       }}
                     >
-                      <Eye size={13} aria-hidden />{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "모두 표시")}</button>
+                      <Eye size={13} aria-hidden />모두 표시
+                    </button>
                     <button
                       type="button"
                       className={cn(actionClass, "min-h-8 px-2")}
@@ -272,7 +273,8 @@ export function StudioShellFloatingLayoutManager() {
                         setNotice("상시 플로팅 UI를 숨겼어요. 이 보기 버튼은 항상 남아 복구할 수 있어요.");
                       }}
                     >
-                      <EyeOff size={13} aria-hidden />{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "모두 숨김")}</button>
+                      <EyeOff size={13} aria-hidden />모두 숨김
+                    </button>
                   </div>
                 </div>
 
@@ -306,8 +308,8 @@ export function StudioShellFloatingLayoutManager() {
                           <Switch
                             checked={checked}
                             aria-label={checked
-                              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "{v0} 숨기기"), { v0: String(definition.label) })
-                              : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "{v0} 표시하기"), { v0: String(definition.label) })}
+                              ? `${definition.label} 숨기기`
+                              : `${definition.label} 표시하기`}
                             onCheckedChange={() => {
                               shell.toggleVisible(definition.visibilityId);
                               setNotice(checked
@@ -318,7 +320,7 @@ export function StudioShellFloatingLayoutManager() {
                         </div>
                         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-2">
                           <span
-                            data-studio-shell-mounted-state={mountedCount > 0 ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "en", "available") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "en", "unavailable")}
+                            data-studio-shell-mounted-state={mountedCount > 0 ? "available" : "unavailable"}
                             className={cn(
                               "inline-flex min-h-6 items-center rounded-full border px-2 text-[0.62rem] font-bold",
                               mountedCount > 0
@@ -330,7 +332,7 @@ export function StudioShellFloatingLayoutManager() {
                           </span>
                           <button
                             type="button"
-                            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "{v0} 위치를 기본값으로 복원"), { v0: String(definition.label) })}
+                            aria-label={`${definition.label} 위치를 기본값으로 복원`}
                             className={cn(actionClass, "min-h-8 shrink-0 px-2")}
                             onClick={() => {
                               for (const id of surfaceIds) {
@@ -339,7 +341,8 @@ export function StudioShellFloatingLayoutManager() {
                               setNotice(`${definition.label} 위치를 기본값으로 복원했어요.`);
                             }}
                           >
-                            <RotateCcw size={13} aria-hidden />{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "위치 초기화")}</button>
+                            <RotateCcw size={13} aria-hidden />위치 초기화
+                          </button>
                         </div>
                       </div>
                     );
@@ -349,7 +352,8 @@ export function StudioShellFloatingLayoutManager() {
 
               <section aria-labelledby="studio-shell-floating-presets-heading">
                 <h3 id="studio-shell-floating-presets-heading" className="text-xs font-black">
-                  {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "빠른 보기 프리셋")}</h3>
+                  빠른 보기 프리셋
+                </h3>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   {PRESETS.map((preset) => (
                     <button
@@ -383,12 +387,12 @@ export function StudioShellFloatingLayoutManager() {
                     >
                       <span className="text-xs text-fg">
                         {preset.id === "canvas-focus" && shell.focusModeActive
-                          ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "집중 보기 해제")
+                          ? "집중 보기 해제"
                           : preset.label}
                       </span>
                       <span className="text-[0.62rem] font-medium text-fg-3">
                         {preset.id === "canvas-focus" && shell.focusModeActive
-                          ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "집중 보기 전 설정으로 복원")
+                          ? "집중 보기 전 설정으로 복원"
                           : preset.description}
                       </span>
                     </button>
@@ -398,7 +402,8 @@ export function StudioShellFloatingLayoutManager() {
 
               <section aria-labelledby="studio-shell-floating-auto-hide-heading">
                 <h3 id="studio-shell-floating-auto-hide-heading" className="text-xs font-black">
-                  {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "드로잉 방해 최소화")}</h3>
+                  드로잉 방해 최소화
+                </h3>
                 <button
                   type="button"
                   role="switch"
@@ -422,23 +427,28 @@ export function StudioShellFloatingLayoutManager() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-xs font-black text-fg">
-                      {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "펜으로 그리는 동안 자동 숨김")}</span>
+                      펜으로 그리는 동안 자동 숨김
+                    </span>
                     <span className="mt-1 block text-[0.68rem] leading-5 text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "캔버스에서 펜 스트로크가 시작되면 상시 플로팅 UI와 보기 버튼을 잠시 숨기고, 마지막 스트로크가 끝난 뒤 자동으로 복원합니다.")}</span>
+                      캔버스에서 펜 스트로크가 시작되면 상시 플로팅 UI와 보기 버튼을 잠시 숨기고, 마지막 스트로크가 끝난 뒤 자동으로 복원합니다.
+                    </span>
                     <span className="mt-1 block text-[0.65rem] leading-5 text-accent">
-                      {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "저장 오류·오프라인 경고·참여 중인 통화처럼 안전상 필요한 제어는 계속 표시됩니다.")}</span>
+                      저장 오류·오프라인 경고·참여 중인 통화처럼 안전상 필요한 제어는 계속 표시됩니다.
+                    </span>
                   </span>
                   <span className="shrink-0 rounded-full bg-raised px-2 py-1 text-[0.65rem] font-black text-fg-2">
-                    {shell.autoHideWhileDrawing ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "켜짐") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "꺼짐")}
+                    {shell.autoHideWhileDrawing ? "켜짐" : "꺼짐"}
                   </span>
                 </button>
               </section>
 
               <section aria-labelledby="studio-shell-floating-arrangement-heading">
                 <h3 id="studio-shell-floating-arrangement-heading" className="text-xs font-black">
-                  {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "위지윅 배치 편집")}</h3>
+                  위지윅 배치 편집
+                </h3>
                 <p className="mt-1 text-[0.68rem] leading-5 text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "웹툰 원고 도구 패널은 열어 둔 상태에서 이동·크기 조절할 수 있습니다. 플랫폼 규격은 기존 작업 패널과 함께 분리·도킹할 수 있습니다.")}</p>
+                  웹툰 원고 도구 패널은 열어 둔 상태에서 이동·크기 조절할 수 있습니다. 플랫폼 규격은 기존 작업 패널과 함께 분리·도킹할 수 있습니다.
+                </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -458,7 +468,7 @@ export function StudioShellFloatingLayoutManager() {
                     {arranging
                       ? <Check size={15} aria-hidden />
                       : <Move size={15} aria-hidden />}
-                    {arranging ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "배치 완료") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "배치 편집")}
+                    {arranging ? "배치 완료" : "배치 편집"}
                   </button>
                   <button
                     type="button"
@@ -468,7 +478,8 @@ export function StudioShellFloatingLayoutManager() {
                       setNotice("열린 플로팅 UI를 화면 가장자리에 정렬했어요.");
                     }}
                   >
-                    <Rows3 size={15} aria-hidden />{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "가장자리 정렬")}</button>
+                    <Rows3 size={15} aria-hidden />가장자리 정렬
+                  </button>
                   <button
                     type="button"
                     className={actionClass}
@@ -477,33 +488,39 @@ export function StudioShellFloatingLayoutManager() {
                       setNotice("열린 플로팅 UI를 계단식으로 정렬했어요.");
                     }}
                   >
-                    <LayoutGrid size={15} aria-hidden />{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "계단식 정렬")}</button>
+                    <LayoutGrid size={15} aria-hidden />계단식 정렬
+                  </button>
                   <button type="button" className={actionClass} onClick={resetAll}>
-                    <RotateCcw size={15} aria-hidden />{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "전체 위치 복원")}</button>
+                    <RotateCcw size={15} aria-hidden />전체 위치 복원
+                  </button>
                 </div>
               </section>
 
               <section className="rounded-xl border border-line bg-raised/50 p-3 text-[0.68rem] leading-5 text-fg-3">
-                <p className="font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "전수 조사 적용 범위")}</p>
+                <p className="font-bold text-fg-2">전수 조사 적용 범위</p>
                 <p className="mt-1">
-                  {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "새 통합 대상: 작업공간 바, 문서 도구/웹툰 원고 도구, 저장 상태, 그리기 옵션, 펜 입력 센터, 오프라인 상태, 채팅·통화, 배치 편집 도구.")}</p>
+                  새 통합 대상: 작업공간 바, 문서 도구/웹툰 원고 도구, 저장 상태, 그리기 옵션, 펜 입력 센터, 오프라인 상태, 채팅·통화, 배치 편집 도구.
+                </p>
                 <p className="mt-1">
-                  {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "기존 배치 대상 유지: 페이지, 그리기 도구, 작업 패널/플랫폼 규격, 레이어, Navigator, 레퍼런스, 드로잉 팔레트와 기타 분리 창.")}</p>
+                  기존 배치 대상 유지: 페이지, 그리기 도구, 작업 패널/플랫폼 규격, 레이어, Navigator, 레퍼런스, 드로잉 팔레트와 기타 분리 창.
+                </p>
                 <p className="mt-1">
-                  {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "제외: 확인 모달, 오류 복구, 토스트, 로딩, 권한·보안 안내처럼 숨기면 작업을 막거나 안전성이 떨어지는 일시 UI.")}</p>
+                  제외: 확인 모달, 오류 복구, 토스트, 로딩, 권한·보안 안내처럼 숨기면 작업을 막거나 안전성이 떨어지는 일시 UI.
+                </p>
               </section>
             </div>
 
             <footer className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-[0.65rem] text-fg-3">
               <span>
                 {shell.authority === "sqlite-opfs"
-                  ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "이 기기에 배치·표시 설정 저장됨")
+                  ? "이 기기에 배치·표시 설정 저장됨"
                   : shell.authority === "checking"
-                    ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "설정 저장소 확인 중")
-                    : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "현재 탭에 설정 유지")}
+                    ? "설정 저장소 확인 중"
+                    : "현재 탭에 설정 유지"}
               </span>
               <span className="inline-flex items-center gap-1">
-                <Save size={12} aria-hidden />{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "en", "⌘/Ctrl + Shift + L")}</span>
+                <Save size={12} aria-hidden />⌘/Ctrl + Shift + L
+              </span>
             </footer>
             <p
               role="status"
@@ -583,14 +600,15 @@ export function StudioShellFloatingLayoutManager() {
             : shell.focusModeActive
               ? <Focus size={16} aria-hidden />
               : <SlidersHorizontal size={16} aria-hidden />}
-          {arranging ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "배치 편집 중") : shell.focusModeActive ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "집중 보기") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "보기 설정")}
+          {arranging ? "배치 편집 중" : shell.focusModeActive ? "집중 보기" : "보기 설정"}
           <span
             className="rounded-full bg-raised px-1.5 py-0.5 text-[0.62rem] text-fg-3"
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "현재 플로팅 UI {v0}개 표시"), { v0: String(visibleCount) })}
+            aria-label={`현재 플로팅 UI ${visibleCount}개 표시`}
           >
-            {visibleCount}{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "개")}</span>
+            {visibleCount}개
+          </span>
           {shell.failure ? (
-            <MessageCircle size={13} aria-label={translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingLayoutManager", "ko", "설정 저장 제한")} />
+            <MessageCircle size={13} aria-label="설정 저장 제한" />
           ) : null}
         </button>
       </div>

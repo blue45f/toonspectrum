@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useLayoutEffect, useRef, useState } from "react";
 
 import { createStudioCc0ModelFile, studioCc0AssetUrl } from "../studio-cc0-asset-delivery";
@@ -55,16 +51,16 @@ export function StudioMarketplaceModelImport({ modelId, scopeKey, disabled, onIm
   }
   if (!asset) return null;
   return (
-    <section aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioMarketplaceModelImport", "ko", "선택한 마켓 3D 에셋")} className="m-3 space-y-2 rounded-xl border border-accent/40 bg-card p-3">
+    <section aria-label="선택한 마켓 3D 에셋" className="m-3 space-y-2 rounded-xl border border-accent/40 bg-card p-3">
       <h3 className="text-sm font-bold text-fg">{asset.name}</h3>
-      {asset.previewPath ? <img src={studioCc0AssetUrl(asset.previewPath)} alt={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioMarketplaceModelImport", "ko", "{v0} 모델 미리보기"), { v0: String(asset.name) })} className="max-h-36 w-full rounded-lg object-contain" /> : null}
-      <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioMarketplaceModelImport", "ko", "선택한 상품의 GLB를 해시·형식·기기 예산 검사 후 장면에 배치합니다. 최종 2D 컷 적용은 편집기의 삽입 버튼을 사용하세요.")}</p>
+      {asset.previewPath ? <img src={studioCc0AssetUrl(asset.previewPath)} alt={`${asset.name} 모델 미리보기`} className="max-h-36 w-full rounded-lg object-contain" /> : null}
+      <p className="text-xs text-fg-3">선택한 상품의 GLB를 해시·형식·기기 예산 검사 후 장면에 배치합니다. 최종 2D 컷 적용은 편집기의 삽입 버튼을 사용하세요.</p>
       <button type="button" disabled={disabled || pending} onClick={() => void importSelected()} className="min-h-11 w-full rounded-lg border border-line px-3 text-xs font-semibold text-fg focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50">
-        {pending ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioMarketplaceModelImport", "ko", "검증·가져오는 중…") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioMarketplaceModelImport", "ko", "선택한 마켓 모델 가져오기")}
+        {pending ? "검증·가져오는 중…" : "선택한 마켓 모델 가져오기"}
       </button>
       {pending ? <button type="button" className="min-h-11 w-full rounded-lg border border-line px-3 text-xs text-fg-2 focus-visible:ring-2 focus-visible:ring-accent" onClick={() => {
         controllerRef.current?.abort(); setNotice("모델 가져오기를 취소했습니다.");
-      }}>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioMarketplaceModelImport", "ko", "가져오기 취소")}</button> : null}
+      }}>가져오기 취소</button> : null}
       <p role="status" aria-live="polite" className="text-xs text-fg-2">{notice}</p>
     </section>
   );

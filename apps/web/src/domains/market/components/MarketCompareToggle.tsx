@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { GitCompareArrows } from "lucide-react";
 
 import { useMarketCompare } from "../hooks/use-market-compare";
@@ -60,7 +59,7 @@ export function MarketCompareToggle({
           })}
     >
       <GitCompareArrows className="size-3.5" aria-hidden="true" />
-      {compact ? null : <span>{selected ? translateCurrentStaticSourceText("domains.market.components.MarketCompareToggle", "ko", "비교 중") : translateCurrentStaticSourceText("domains.market.components.MarketCompareToggle", "ko", "비교하기")}</span>}
+      {compact ? null : <span>{selected ? "비교 중" : "비교하기"}</span>}
     </button>
   );
 }

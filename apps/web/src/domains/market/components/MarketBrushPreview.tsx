@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Paintbrush, RotateCcw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -203,7 +199,7 @@ export function MarketBrushPreview({ brush, className }: MarketBrushPreviewProps
       role="region"
       aria-labelledby="market-brush-heading"
       aria-describedby="market-brush-instructions"
-      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketBrushPreview", "en", "overflow-hidden rounded-xl border border-line bg-card {v0}"), { v0: String(className ?? "") })}
+      className={`overflow-hidden rounded-xl border border-line bg-card ${className ?? ""}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5 bg-panel/50">
         <div className="flex items-center gap-2">
@@ -217,7 +213,8 @@ export function MarketBrushPreview({ brush, className }: MarketBrushPreviewProps
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex min-h-8 items-center gap-1.5 text-[0.68rem] text-fg-3 pointer-coarse:min-h-11">
-            {translateCurrentStaticSourceText("domains.market.components.MarketBrushPreview", "ko", "크기")}<input
+            크기
+            <input
               type="range"
               min={2}
               max={64}
@@ -231,17 +228,18 @@ export function MarketBrushPreview({ brush, className }: MarketBrushPreviewProps
             type="color"
             value={brushColor}
             onChange={(e) => setBrushColor(e.target.value)}
-            aria-label={translateCurrentStaticSourceText("domains.market.components.MarketBrushPreview", "ko", "브러시 색상")}
+            aria-label="브러시 색상"
             className="h-9 w-9 cursor-pointer rounded-lg border border-line bg-raised p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 pointer-coarse:size-11"
           />
           <button
             type="button"
             onClick={resetCanvas}
             className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-8 px-2 text-[0.68rem] pointer-coarse:min-h-11" })}
-            title={translateCurrentStaticSourceText("domains.market.components.MarketBrushPreview", "ko", "캔버스 초기화")}
+            title="캔버스 초기화"
           >
             <RotateCcw className="h-3 w-3 mr-1" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.market.components.MarketBrushPreview", "ko", "초기화")}</button>
+            초기화
+          </button>
         </div>
       </div>
 
@@ -258,27 +256,31 @@ export function MarketBrushPreview({ brush, className }: MarketBrushPreviewProps
           onKeyDown={handleCanvasKeyDown}
           tabIndex={0}
           role="application"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketBrushPreview", "ko", "{v0} 브러시 연습 캔버스"), { v0: String(brush.name) })}
+          aria-label={`${brush.name} 브러시 연습 캔버스`}
           className="size-full touch-none cursor-crosshair object-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
         >
-          {brush.name} {translateCurrentStaticSourceText("domains.market.components.MarketBrushPreview", "ko", "브러시의 참고 스트로크. 캔버스에 초점을 두고 방향키로 선을 그리거나 Enter 또는 Space로 점을 찍을 수 있습니다.")}</canvas>
+          {brush.name} 브러시의 참고 스트로크. 캔버스에 초점을 두고 방향키로 선을 그리거나 Enter 또는 Space로 점을 찍을 수 있습니다.
+        </canvas>
         {/* eslint-enable jsx-a11y/no-interactive-element-to-noninteractive-role */}
         {strokeCount === 0 ? (
           <span className="pointer-events-none absolute bottom-2.5 right-3 inline-flex min-h-6 items-center gap-1 rounded-full bg-canvas px-2.5 text-[0.65rem] text-fg-2 shadow-sm">
             <Sparkles className="h-3 w-3 text-accent" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.market.components.MarketBrushPreview", "ko", "포인터 또는 키보드로 직접 그려보세요")}</span>
+            포인터 또는 키보드로 직접 그려보세요
+          </span>
         ) : null}
       </div>
 
       <p id="market-brush-instructions" className="sr-only">
-        {translateCurrentStaticSourceText("domains.market.components.MarketBrushPreview", "ko", "크기와 색상은 위 컨트롤로 바꿀 수 있습니다. 캔버스에 초점을 둔 뒤 방향키로 선을 그리고, Shift와 방향키로 더 크게 이동하며, Enter 또는 Space로 점을 찍습니다. 초기화 버튼은 참고 스트로크로 되돌립니다.")}</p>
+        크기와 색상은 위 컨트롤로 바꿀 수 있습니다. 캔버스에 초점을 둔 뒤 방향키로 선을 그리고,
+        Shift와 방향키로 더 크게 이동하며, Enter 또는 Space로 점을 찍습니다. 초기화 버튼은 참고 스트로크로 되돌립니다.
+      </p>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-line px-4 py-2 text-[0.68rem] text-fg-3 bg-panel/30">
-        <span>{translateCurrentStaticSourceText("domains.market.components.MarketBrushPreview", "ko", "불투명도: ")}<strong className="font-semibold text-fg-2">{Math.round((brush.opacity ?? 1) * 100)}%</strong></span>
-        {brush.flow !== undefined ? <span>{translateCurrentStaticSourceText("domains.market.components.MarketBrushPreview", "ko", "유량: ")}<strong className="font-semibold text-fg-2">{Math.round(brush.flow * 100)}%</strong></span> : null}
-        {brush.spacing !== undefined ? <span>{translateCurrentStaticSourceText("domains.market.components.MarketBrushPreview", "ko", "간격: ")}<strong className="font-semibold text-fg-2">{brush.spacing}</strong></span> : null}
-        {brush.hardness !== undefined ? <span>{translateCurrentStaticSourceText("domains.market.components.MarketBrushPreview", "ko", "경도: ")}<strong className="font-semibold text-fg-2">{Math.round(brush.hardness * 100)}%</strong></span> : null}
-        {brush.blendMode ? <span>{translateCurrentStaticSourceText("domains.market.components.MarketBrushPreview", "ko", "혼합: ")}<strong className="font-semibold text-fg-2">{brush.blendMode}</strong></span> : null}
+        <span>불투명도: <strong className="font-semibold text-fg-2">{Math.round((brush.opacity ?? 1) * 100)}%</strong></span>
+        {brush.flow !== undefined ? <span>유량: <strong className="font-semibold text-fg-2">{Math.round(brush.flow * 100)}%</strong></span> : null}
+        {brush.spacing !== undefined ? <span>간격: <strong className="font-semibold text-fg-2">{brush.spacing}</strong></span> : null}
+        {brush.hardness !== undefined ? <span>경도: <strong className="font-semibold text-fg-2">{Math.round(brush.hardness * 100)}%</strong></span> : null}
+        {brush.blendMode ? <span>혼합: <strong className="font-semibold text-fg-2">{brush.blendMode}</strong></span> : null}
       </div>
     </div>
   );

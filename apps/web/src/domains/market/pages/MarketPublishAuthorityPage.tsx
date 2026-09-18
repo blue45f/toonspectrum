@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
@@ -174,14 +170,18 @@ export function MarketPublishPage() {
 
       <Link href="/market/manage" className="inline-flex min-h-11 items-center gap-1.5 text-xs text-fg-2 hover:text-fg">
         <ArrowLeft className="size-3.5" aria-hidden="true" />
-        {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "판매자 센터로 돌아가기")}</Link>
+        판매자 센터로 돌아가기
+      </Link>
 
       <section aria-labelledby="market-authoring-workshop-heading" className="mt-5">
         <div className="mb-3 rounded-xl border border-line bg-panel px-4 py-3">
           <h1 id="market-authoring-workshop-heading" className="text-base font-bold text-fg">
-            {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "제작 워크숍")}</h1>
+            제작 워크숍
+          </h1>
           <p className="mt-1 text-xs leading-relaxed text-fg-2">
-            {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "Brush Studio와 Studio에서 전달한 저작 handoff를 여기서 이어서 편집합니다. 워크숍 초안과 소스 패키지는 공개 릴리스가 아니며, 아래 서버 게시 검증을 통과해야 공개됩니다.")}</p>
+            Brush Studio와 Studio에서 전달한 저작 handoff를 여기서 이어서 편집합니다.
+            워크숍 초안과 소스 패키지는 공개 릴리스가 아니며, 아래 서버 게시 검증을 통과해야 공개됩니다.
+          </p>
         </div>
         <MarketplaceAuthoringWorkshop />
       </section>
@@ -193,42 +193,52 @@ export function MarketPublishPage() {
               <CheckCircle2 className="size-9" aria-hidden="true" />
             </div>
             <h2 id="market-server-publish-heading" className="mt-4 text-xl font-bold text-fg">
-              {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "서버 게시가 완료되었습니다")}</h2>
+              서버 게시가 완료되었습니다
+            </h2>
             <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-fg-2">
-              {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "서버가 반환한 immutable 릴리스 ID로 공개 성공을 확정했습니다. 브라우저 초안과 패키지 생성 성공만으로는 공개 상태를 만들지 않습니다.")}</p>
+              서버가 반환한 immutable 릴리스 ID로 공개 성공을 확정했습니다. 브라우저 초안과
+              패키지 생성 성공만으로는 공개 상태를 만들지 않습니다.
+            </p>
 
             <dl className="mt-5 divide-y divide-line rounded-xl border border-line bg-panel px-4 text-left text-xs">
-              <MetaRow label={translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "에셋")} value={publishedRecord.name} />
-              <MetaRow label={translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "릴리스")} value={`v${publishedRecord.resourceVersion} · ${publishedRecord.id}`} numeric />
+              <MetaRow label="에셋" value={publishedRecord.name} />
+              <MetaRow label="릴리스" value={`v${publishedRecord.resourceVersion} · ${publishedRecord.id}`} numeric />
               <MetaRow
-                label={translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "종류·사용권")}
+                label="종류·사용권"
                 value={`${marketKindMeta(publishedRecord.kind).label} · ${marketLicenseMeta(publishedRecord.license).label}`}
               />
             </dl>
 
             <div className="mt-6 grid gap-2 sm:grid-cols-2">
-              <Link href={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "en", "/market/resource/{v0}"), { v0: String(publishedRecord.id) })} className={buttonClass({ variant: "solid", size: "md" })}>
-                {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "공개 상세 보기")}</Link>
+              <Link href={`/market/resource/${publishedRecord.id}`} className={buttonClass({ variant: "solid", size: "md" })}>
+                공개 상세 보기
+              </Link>
               <Link href={marketStudioResourceHref(publishedRecord.id)} className={buttonClass({ variant: "outline", size: "md" })}>
                 <Palette className="size-4" aria-hidden="true" />
-                {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "Studio에서 검증")}</Link>
+                Studio에서 검증
+              </Link>
             </div>
             <button type="button" onClick={startAnotherRelease} className={buttonClass({ variant: "ghost", size: "sm", className: "mt-3" })}>
-              {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "다른 릴리스 게시")}</button>
+              다른 릴리스 게시
+            </button>
           </div>
         ) : (
           <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
             <form onSubmit={(event) => void handleSubmit(event)} className="min-w-0 rounded-2xl border border-line bg-card p-5 shadow-sm sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "en", "Server-authoritative publish")}</p>
+                  <p className="eyebrow text-accent">Server-authoritative publish</p>
                   <h2 id="market-server-publish-heading" className="mt-1 text-2xl font-bold text-fg">
-                    {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "검증된 manifest 게시")}</h2>
+                    검증된 manifest 게시
+                  </h2>
                   <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
-                    {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "Studio 런타임 계약에 맞는 공개 manifest JSON을 불러옵니다. 계약 검증과 서버 게시가 모두 성공한 경우에만 공개 완료로 표시됩니다.")}</p>
+                    Studio 런타임 계약에 맞는 공개 manifest JSON을 불러옵니다. 계약 검증과
+                    서버 게시가 모두 성공한 경우에만 공개 완료로 표시됩니다.
+                  </p>
                 </div>
                 <Link href="/studio?assetMarket=community&communityView=share" className={buttonClass({ variant: "outline", size: "sm" })}>
-                  {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "Studio에서 패키지 만들기")}</Link>
+                  Studio에서 패키지 만들기
+                </Link>
               </div>
 
               <div className="mt-6 rounded-xl border border-line bg-panel p-4">
@@ -236,8 +246,8 @@ export function MarketPublishPage() {
                   <div className="flex items-center gap-2">
                     <FileJson className="size-5 text-accent" aria-hidden="true" />
                     <div>
-                      <p className="text-sm font-semibold text-fg">{sourceName ?? translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "공개 manifest JSON 파일")}</p>
-                      <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "권장 확장자: .toonmarket.json · 최대 512KB")}</p>
+                      <p className="text-sm font-semibold text-fg">{sourceName ?? "공개 manifest JSON 파일"}</p>
+                      <p className="text-xs text-fg-3">권장 확장자: .toonmarket.json · 최대 512KB</p>
                     </div>
                   </div>
                   <button
@@ -247,7 +257,8 @@ export function MarketPublishPage() {
                     className={buttonClass({ variant: "outline", size: "sm" })}
                   >
                     <Upload className="size-4" aria-hidden="true" />
-                    {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "파일 선택")}</button>
+                    파일 선택
+                  </button>
                 </div>
                 <input
                   id="market-authority-manifest-file"
@@ -263,7 +274,8 @@ export function MarketPublishPage() {
               </div>
 
               <label htmlFor="market-authority-manifest" className="mt-5 block text-sm font-semibold text-fg">
-                {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "공개 Manifest JSON")}</label>
+                공개 Manifest JSON
+              </label>
               <textarea
                 id="market-authority-manifest"
                 rows={20}
@@ -276,7 +288,7 @@ export function MarketPublishPage() {
                   setPublishedRecord(null);
                   setError(null);
                 }}
-                placeholder={translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "Studio에서 내보낸 공개 manifest JSON을 붙여넣으세요.")}
+                placeholder="Studio에서 내보낸 공개 manifest JSON을 붙여넣으세요."
                 className="mt-2 min-h-[28rem] w-full resize-y rounded-xl border border-line bg-canvas p-4 font-mono text-xs leading-relaxed text-fg outline-none transition-colors focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/30"
                 aria-describedby="market-authority-validation"
               />
@@ -301,7 +313,8 @@ export function MarketPublishPage() {
                   <p>{parentError}</p>
                   <button type="button" className={buttonClass({ variant: "ghost", size: "sm", className: "mt-2" })}
                     onClick={() => setParentLookupAttempt((attempt) => attempt + 1)}>
-                    {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "업데이트 대상 다시 확인")}</button>
+                    업데이트 대상 다시 확인
+                  </button>
                 </div>
               ) : null}
 
@@ -309,19 +322,20 @@ export function MarketPublishPage() {
                 <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-bad/40 bg-bad/10 p-3 text-sm text-fg">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden="true" />
                   <div>
-                    <p className="font-semibold">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "게시되지 않았습니다")}</p>
+                    <p className="font-semibold">게시되지 않았습니다</p>
                     <p className="mt-1 text-xs leading-relaxed text-fg-2">{error}</p>
                   </div>
                 </div>
               ) : null}
 
               {!ready ? (
-                <p role="status" className="mt-4 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "로그인 세션을 확인하고 있습니다.")}</p>
+                <p role="status" className="mt-4 text-xs text-fg-3">로그인 세션을 확인하고 있습니다.</p>
               ) : !authenticated ? (
                 <div className="mt-4 rounded-xl border border-warn/40 bg-warn/10 p-3 text-sm text-fg">
-                  <p className="font-semibold">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "로그인이 필요합니다")}</p>
+                  <p className="font-semibold">로그인이 필요합니다</p>
                   <p className="mt-1 text-xs leading-relaxed text-fg-2">
-                    {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "입력한 JSON은 화면에 유지되지만 로그인 전에는 서버 공개 게시를 실행하지 않습니다.")}</p>
+                    입력한 JSON은 화면에 유지되지만 로그인 전에는 서버 공개 게시를 실행하지 않습니다.
+                  </p>
                 </div>
               ) : null}
 
@@ -335,7 +349,7 @@ export function MarketPublishPage() {
                 ) : (
                   <ShieldCheck className="size-4" aria-hidden="true" />
                 )}
-                {submitting ? translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "서버에서 검증·게시 중") : translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "서버에 검수·게시")}
+                {submitting ? "서버에서 검증·게시 중" : "서버에 검수·게시"}
               </button>
             </form>
 
@@ -343,18 +357,21 @@ export function MarketPublishPage() {
               <section className="rounded-xl border border-line bg-card p-4">
                 <h3 className="flex items-center gap-2 text-sm font-bold text-fg">
                   <ShieldCheck className="size-4 text-good" aria-hidden="true" />
-                  {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "공개 성공 기준")}</h3>
+                  공개 성공 기준
+                </h3>
                 <ol className="mt-3 space-y-2 text-xs leading-relaxed text-fg-2">
-                  <li>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "1. 공개 manifest 계약 검증 통과")}</li>
-                  <li>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "2. entry·manifest 무결성 검증 통과")}</li>
-                  <li>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "3. 로그인 제작자 권한 확인")}</li>
-                  <li>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "4. 서버가 immutable 릴리스 ID 반환")}</li>
+                  <li>1. 공개 manifest 계약 검증 통과</li>
+                  <li>2. entry·manifest 무결성 검증 통과</li>
+                  <li>3. 로그인 제작자 권한 확인</li>
+                  <li>4. 서버가 immutable 릴리스 ID 반환</li>
                 </ol>
               </section>
               <section className="rounded-xl border border-line bg-panel p-4">
-                <h3 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "초안과 공개 상태 분리")}</h3>
+                <h3 className="text-sm font-bold text-fg">초안과 공개 상태 분리</h3>
                 <p className="mt-2 text-xs leading-relaxed text-fg-2">
-                  {translateCurrentStaticSourceText("domains.market.pages.MarketPublishAuthorityPage", "ko", "워크숍 자동 저장, 소스 패키지 생성, 네트워크 실패는 공개 성공이 아닙니다. 실패한 요청은 성공 화면이나 공개 상세 링크를 만들지 않습니다.")}</p>
+                  워크숍 자동 저장, 소스 패키지 생성, 네트워크 실패는 공개 성공이 아닙니다.
+                  실패한 요청은 성공 화면이나 공개 상세 링크를 만들지 않습니다.
+                </p>
               </section>
             </aside>
           </div>

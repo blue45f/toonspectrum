@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Contact Sheet Panel — 콘택트시트 PDF 옵션(용지·열·행·라벨) + 실행 버튼.
  * 이 패널 자신은 캡처도 합성도 하지 않는 순수 컨트롤이다(마술봉·노드 편집 패널과 동일한 관례) —
@@ -61,12 +57,13 @@ export function StudioContactSheetPanel({
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
           <LayoutGrid size={12} aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "콘택트시트 PDF")}</p>
+          콘택트시트 PDF
+        </p>
         {busy && <Loader2 size={13} className="animate-spin text-accent" aria-hidden />}
       </div>
 
       <div>
-        <span className="mb-1 block text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "용지")}</span>
+        <span className="mb-1 block text-[0.68rem] font-semibold text-fg-2">용지</span>
         <div className="flex flex-wrap gap-1">
           {CONTACT_SHEET_PAGE_PRESETS.map((preset) => (
             <button
@@ -88,7 +85,7 @@ export function StudioContactSheetPanel({
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "열")}</span>
+        <span className="text-[0.68rem] font-semibold text-fg-2">열</span>
         <div className="flex items-center gap-1">
           {CONTACT_SHEET_COLUMN_CHOICES.map((n) => (
             <button
@@ -108,7 +105,7 @@ export function StudioContactSheetPanel({
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "행")}</span>
+        <span className="text-[0.68rem] font-semibold text-fg-2">행</span>
         <div className="flex items-center gap-1">
           {CONTACT_SHEET_ROW_CHOICES.map((n) => (
             <button
@@ -129,7 +126,7 @@ export function StudioContactSheetPanel({
 
       <label
         className="flex cursor-pointer items-center gap-1.5 text-[0.68rem] text-fg-2"
-        title={translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "1페이지, 표지 등 페이지 이름을 칸 아래에 작게 표시해요.")}
+        title="1페이지, 표지 등 페이지 이름을 칸 아래에 작게 표시해요."
       >
         <input
           type="checkbox"
@@ -137,10 +134,12 @@ export function StudioContactSheetPanel({
           onChange={(event) => setShowLabels(event.target.checked)}
           className="size-3.5 cursor-pointer accent-[var(--color-accent)]"
         />
-        {translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "페이지 이름 표시")}</label>
+        페이지 이름 표시
+      </label>
 
       <p className="tabular-nums text-[0.66rem] text-fg-3">
-        {columns}×{rows} {translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "= 한 장에 ")}{perSheet}{translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "칸 · 전체 ")}{pageCount}{translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "페이지 → ")}{sheetCount}{translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "장")}</p>
+        {columns}×{rows} = 한 장에 {perSheet}칸 · 전체 {pageCount}페이지 → {sheetCount}장
+      </p>
 
       <button
         type="button"
@@ -149,15 +148,16 @@ export function StudioContactSheetPanel({
         className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
         title={
           busy
-            ? translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "콘택트시트를 만드는 중이에요")
+            ? "콘택트시트를 만드는 중이에요"
             : disabled
-              ? translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "다른 내보내기가 끝난 뒤 이용할 수 있어요")
+              ? "다른 내보내기가 끝난 뒤 이용할 수 있어요"
               : pageCount < 1
-                ? translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "내보낼 페이지가 없어요")
-                : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "전체 {v0}페이지를 {v1}×{v2} 격자로 모은 인쇄용 PDF로 저장"), { v0: String(pageCount), v1: String(columns), v2: String(rows) })
+                ? "내보낼 페이지가 없어요"
+                : `전체 ${pageCount}페이지를 ${columns}×${rows} 격자로 모은 인쇄용 PDF로 저장`
         }
       >
-        <LayoutGrid size={13} /> {translateCurrentStaticSourceText("domains.creator.StudioContactSheetPanel", "ko", "콘택트시트 PDF로 저장")}</button>
+        <LayoutGrid size={13} /> 콘택트시트 PDF로 저장
+      </button>
       <p
         aria-live="polite"
         className={cx(

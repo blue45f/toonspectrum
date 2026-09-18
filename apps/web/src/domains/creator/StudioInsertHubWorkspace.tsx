@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Box,
   Bookmark,
   Clock3,
@@ -479,7 +475,7 @@ export function StudioInsertHubWorkspace({
 
   return (
     <section
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "삽입 허브")}
+      aria-label="삽입 허브"
       data-studio-insert-hub="true"
       className="min-w-0"
     >
@@ -507,7 +503,8 @@ export function StudioInsertHubWorkspace({
               : "text-fg-3 hover:bg-raised",
           )}
         >
-          {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "삽입 허브")}</button>
+          삽입 허브
+        </button>
         <button
           type="button"
           onClick={() => setView("library")}
@@ -520,7 +517,8 @@ export function StudioInsertHubWorkspace({
               : "text-fg-3 hover:bg-raised",
           )}
         >
-          {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "보관함 · 마켓")}</button>
+          보관함 · 마켓
+        </button>
       </div>
 
       {view === "library" ? (
@@ -535,20 +533,24 @@ export function StudioInsertHubWorkspace({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-black text-fg">
-                    {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "한곳에서 찾아 바로 삽입")}</h3>
+                    한곳에서 찾아 바로 삽입
+                  </h3>
                   <kbd className="hidden rounded border border-line bg-panel px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 sm:inline">
                     /
                   </kbd>
                 </div>
                 <p className="mt-1 text-[0.66rem] leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "텍스트·말풍선·이미지·레이아웃·효과·3D·내 에셋을 통합 검색하고 최근 사용과 즐겨찾기로 반복 작업을 줄입니다.")}</p>
+                  텍스트·말풍선·이미지·레이아웃·효과·3D·내 에셋을 통합
+                  검색하고 최근 사용과 즐겨찾기로 반복 작업을 줄입니다.
+                </p>
               </div>
             </div>
           </header>
 
           <div className="relative">
             <label htmlFor={searchId} className="sr-only">
-              {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "에셋 통합 검색")}</label>
+              에셋 통합 검색
+            </label>
             <Search
               size={14}
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
@@ -571,7 +573,7 @@ export function StudioInsertHubWorkspace({
                   setQuery("");
                 }
               }}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "예: 말풍선, 학교 배경, 3D 소품, 내 에셋")}
+              placeholder="예: 말풍선, 학교 배경, 3D 소품, 내 에셋"
               className={cn(
                 CONTROL,
                 "w-full pl-9 pr-11 font-normal text-fg placeholder:text-fg-3",
@@ -585,7 +587,7 @@ export function StudioInsertHubWorkspace({
                   setStatus(null);
                   searchRef.current?.focus();
                 }}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "삽입 검색어 지우기")}
+                aria-label="삽입 검색어 지우기"
                 className={cn(
                   "absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-lg text-fg-3 hover:bg-raised",
                   FOCUS,
@@ -600,9 +602,11 @@ export function StudioInsertHubWorkspace({
             <div>
               <div className="mb-1.5 flex items-center justify-between gap-2">
                 <p className="text-[0.6rem] font-bold uppercase tracking-wide text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "빠른 삽입")}</p>
+                  빠른 삽입
+                </p>
                 <span className="text-[0.58rem] text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "자주 쓰는 6개")}</span>
+                  자주 쓰는 6개
+                </span>
               </div>
               <div className="grid grid-cols-3 gap-1.5">
                 {quickEntries.map((entry) => (
@@ -631,7 +635,7 @@ export function StudioInsertHubWorkspace({
           {!query ? (
             <div
               className="flex gap-1.5 overflow-x-auto pb-1"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "빠른 삽입 검색")}
+              aria-label="빠른 삽입 검색"
             >
               {QUICK_QUERIES.map((value) => (
                 <button
@@ -655,10 +659,11 @@ export function StudioInsertHubWorkspace({
           <div>
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <p className="text-[0.6rem] font-bold uppercase tracking-wide text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "작업 의도")}</p>
-              <span className="text-[0.55rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "컷 목적 기준 탐색")}</span>
+                작업 의도
+              </p>
+              <span className="text-[0.55rem] text-fg-3">컷 목적 기준 탐색</span>
             </div>
-            <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label={translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "작업 의도 필터")}>
+            <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="작업 의도 필터">
               {INTENT_OPTIONS.map((option) => (
                 <button
                   key={option}
@@ -681,7 +686,8 @@ export function StudioInsertHubWorkspace({
 
           <div>
             <p className="mb-1.5 text-[0.6rem] font-bold uppercase tracking-wide text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "내 작업")}</p>
+              내 작업
+            </p>
             <div className="grid grid-cols-3 gap-1 rounded-lg border border-line bg-card p-1">
               {COLLECTION_OPTIONS.map((option) => {
                 const count =
@@ -724,7 +730,8 @@ export function StudioInsertHubWorkspace({
 
           <div>
             <p className="mb-1.5 text-[0.6rem] font-bold uppercase tracking-wide text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "종류")}</p>
+              종류
+            </p>
             <div className="flex gap-1.5 overflow-x-auto pb-1">
               {CATEGORY_OPTIONS.map((option) => (
                 <button
@@ -751,7 +758,8 @@ export function StudioInsertHubWorkspace({
 
           <fieldset className="rounded-xl border border-line bg-card p-2.5">
             <legend className="px-1 text-[0.6rem] font-bold uppercase tracking-wide text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "내 에셋 이미지 배치")}</legend>
+              내 에셋 이미지 배치
+            </legend>
             <div className="grid grid-cols-3 gap-1">
               {PLACEMENT_OPTIONS.map((option) => {
                 const disabled =
@@ -784,8 +792,8 @@ export function StudioInsertHubWorkspace({
             </div>
             <p className="mt-1.5 text-[0.58rem] leading-relaxed text-fg-3">
               {selectionPlacementAvailable
-                ? translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "내 에셋 이미지 카드에 적용됩니다. 선택 영역은 현재 선택한 레이어의 경계에 비율을 유지해 맞춥니다.")
-                : translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "내 에셋 이미지 카드에 적용됩니다. 레이어를 선택하면 선택 영역 배치를 사용할 수 있습니다.")}
+                ? "내 에셋 이미지 카드에 적용됩니다. 선택 영역은 현재 선택한 레이어의 경계에 비율을 유지해 맞춥니다."
+                : "내 에셋 이미지 카드에 적용됩니다. 레이어를 선택하면 선택 영역 배치를 사용할 수 있습니다."}
             </p>
           </fieldset>
 
@@ -810,10 +818,10 @@ export function StudioInsertHubWorkspace({
           <div className="flex items-center justify-between gap-2 text-xs">
             <p role="status" aria-live="polite" className="text-fg-3">
               {query.trim()
-                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "검색 결과 {v0}개"), { v0: String(results.length) })
+                ? `검색 결과 ${results.length}개`
                 : intent !== "all"
-                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "{v0} 결과 {v1}개"), { v0: String(STUDIO_ASSET_INTENT_LABELS[intent]), v1: String(results.length) })
-                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "{v0} {v1}개"), { v0: String(STUDIO_INSERT_HUB_COLLECTION_LABELS[collection]), v1: String(results.length) })}
+                  ? `${STUDIO_ASSET_INTENT_LABELS[intent]} 결과 ${results.length}개`
+                  : `${STUDIO_INSERT_HUB_COLLECTION_LABELS[collection]} ${results.length}개`}
             </p>
             {query || category !== "all" || collection !== "all" || intent !== "all" ? (
               <button
@@ -824,7 +832,8 @@ export function StudioInsertHubWorkspace({
                   FOCUS,
                 )}
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "초기화")}</button>
+                초기화
+              </button>
             ) : null}
           </div>
 
@@ -857,7 +866,7 @@ export function StudioInsertHubWorkspace({
                           setStatus(null);
                         }}
                         aria-label={
-                          favorite ? translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "즐겨찾기 해제") : translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "즐겨찾기 추가")
+                          favorite ? "즐겨찾기 해제" : "즐겨찾기 추가"
                         }
                         aria-pressed={favorite}
                         className={cn(
@@ -868,7 +877,7 @@ export function StudioInsertHubWorkspace({
                       >
                         <Star
                           size={15}
-                          fill={favorite ? translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "en", "none")}
+                          fill={favorite ? "currentColor" : "none"}
                           aria-hidden
                         />
                       </button>
@@ -878,7 +887,7 @@ export function StudioInsertHubWorkspace({
                           onClick={() => setComparisonIds((current) =>
                             toggleStudioAssetComparisonId(current, entry.id),
                           )}
-                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "{v0} 비교 {v1}"), { v0: String(entry.title), v1: String(inComparison ? "제거" : "추가") })}
+                          aria-label={`${entry.title} 비교 ${inComparison ? "제거" : "추가"}`}
                           aria-pressed={inComparison}
                           className={cn(
                             "absolute bottom-1 right-1 grid size-11 place-items-center rounded-full border border-line bg-panel/95 text-fg-3 shadow-sm hover:text-accent",
@@ -891,7 +900,8 @@ export function StudioInsertHubWorkspace({
                       ) : null}
                       {isCaution ? (
                         <span className="absolute bottom-1.5 left-1.5 rounded-full border border-warn/40 bg-panel/95 px-2 py-0.5 text-[0.52rem] font-bold text-warn">
-                          {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "권리 확인 필요")}</span>
+                          권리 확인 필요
+                        </span>
                       ) : null}
                     </div>
                     <div className="p-2">
@@ -938,7 +948,7 @@ export function StudioInsertHubWorkspace({
                         }}
                         aria-label={
                           entry.kind === "asset"
-                            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "{v0} 적용 전 검토"), { v0: String(entry.title) })
+                            ? `${entry.title} 적용 전 검토`
                             : `${entry.title} ${entry.useLabel}`
                         }
                         className={cn(
@@ -952,9 +962,9 @@ export function StudioInsertHubWorkspace({
                           <ImageIcon size={13} aria-hidden />
                         )}
                         {pendingId === entry.id
-                          ? translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "처리 중…")
+                          ? "처리 중…"
                           : entry.kind === "asset"
-                            ? translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "적용 전 검토")
+                            ? "적용 전 검토"
                             : entry.useLabel}
                       </button>
                     </div>
@@ -973,20 +983,23 @@ export function StudioInsertHubWorkspace({
               )}
               <p className="mt-2 text-xs font-bold text-fg-2">
                 {collection === "favorites"
-                  ? translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "즐겨찾기한 삽입 항목이 없습니다.")
+                  ? "즐겨찾기한 삽입 항목이 없습니다."
                   : collection === "recent"
-                    ? translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "아직 사용한 삽입 항목이 없습니다.")
-                    : translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "조건에 맞는 삽입 항목이 없습니다.")}
+                    ? "아직 사용한 삽입 항목이 없습니다."
+                    : "조건에 맞는 삽입 항목이 없습니다."}
               </p>
               <p className="mt-1 text-[0.66rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "조건을 초기화하거나 검색 문맥을 AI 제작 도구로 넘겨 새 에셋을 만들 수 있습니다.")}</p>
+                조건을 초기화하거나 검색 문맥을 AI 제작 도구로 넘겨 새 에셋을
+                만들 수 있습니다.
+              </p>
               <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={resetDiscovery}
                   className={CONTROL}
                 >
-                  {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "전체 항목 보기")}</button>
+                  전체 항목 보기
+                </button>
                 <button
                   type="button"
                   onClick={() => onOpenAi(query.trim())}
@@ -996,14 +1009,15 @@ export function StudioInsertHubWorkspace({
                   )}
                 >
                   <Sparkles size={14} aria-hidden />
-                  {translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "ko", "AI 도구에서 만들기")}</button>
+                  AI 도구에서 만들기
+                </button>
               </div>
             </div>
           )}
 
           {status ? (
             <p
-              role={status.tone === "error" ? translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioInsertHubWorkspace", "en", "status")}
+              role={status.tone === "error" ? "alert" : "status"}
               aria-live="polite"
               className={cn(
                 "rounded-lg border px-2.5 py-2 text-[0.65rem] leading-relaxed",

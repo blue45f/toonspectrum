@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, Focus, Lightbulb, Shapes } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -19,19 +15,19 @@ export function ResearchSceneStudy() {
 
   return <figure className="research-scene-study">
     <div className="research-scene-art">
-      <img src="/brand/atelier-world.webp" alt={translateCurrentStaticSourceText("domains.creator.resources.ResearchSceneStudy", "ko", "빛과 건축, 사물의 형태를 관찰할 수 있는 상상 속 화가의 항구 도시")} width={1536} height={1024} style={{ objectPosition: study.position }} fetchPriority="high" />
-      <div className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.ResearchSceneStudy", "en", "research-viewfinder research-viewfinder--{v0}"), { v0: String(study.id) })} aria-hidden="true"><span /><span /><span /><span /></div>
-      <span className="research-art-label">{translateCurrentStaticSourceText("domains.creator.resources.ResearchSceneStudy", "en", "VISUAL STUDY / CONCEPT ART")}</span>
+      <img src="/brand/atelier-world.webp" alt="빛과 건축, 사물의 형태를 관찰할 수 있는 상상 속 화가의 항구 도시" width={1536} height={1024} style={{ objectPosition: study.position }} fetchPriority="high" />
+      <div className={`research-viewfinder research-viewfinder--${study.id}`} aria-hidden="true"><span /><span /><span /><span /></div>
+      <span className="research-art-label">VISUAL STUDY / CONCEPT ART</span>
     </div>
     <figcaption>
-      <div className="research-study-lenses" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.resources.ResearchSceneStudy", "ko", "장면 관찰 관점")}>
+      <div className="research-study-lenses" role="group" aria-label="장면 관찰 관점">
         {STUDIES.map((item, index) => {
           const Icon = item.icon;
           return <button key={item.id} type="button" aria-pressed={index === selected} onClick={() => setSelected(index)}><Icon size={14} aria-hidden="true" />{item.label}</button>;
         })}
       </div>
       <p aria-live="polite">{study.detail}</p>
-      <Link to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.ResearchSceneStudy", "en", "/research/assets?q={v0}&page=1"), { v0: String(encodeURIComponent(study.query)) })}>{study.label} {translateCurrentStaticSourceText("domains.creator.resources.ResearchSceneStudy", "ko", "레퍼런스 찾기 ")}<ArrowUpRight size={15} aria-hidden="true" /></Link>
+      <Link to={`/research/assets?q=${encodeURIComponent(study.query)}&page=1`}>{study.label} 레퍼런스 찾기 <ArrowUpRight size={15} aria-hidden="true" /></Link>
     </figcaption>
   </figure>;
 }

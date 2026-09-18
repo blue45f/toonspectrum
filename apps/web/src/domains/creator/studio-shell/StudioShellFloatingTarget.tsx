@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { EyeOff, GripHorizontal, Pin, RotateCcw, Scaling } from "lucide-react";
 import {
   useEffect,
@@ -686,17 +682,17 @@ export function StudioShellFloatingTarget({
       />
       <div
         role="toolbar"
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 배치 편집"), { v0: String(definition.label) })}
+        aria-label={`${definition.label} 배치 편집`}
         data-studio-shell-floating-handle={surfaceId}
         className="pointer-events-auto fixed flex max-w-[min(22rem,calc(100vw-1rem))] items-center gap-1 rounded-lg border border-accent/50 bg-panel/95 p-1 text-fg shadow-2xl backdrop-blur"
         style={toolbarStyle}
       >
         <button
           type="button"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 이동"), { v0: String(definition.label) })}
+          aria-label={`${definition.label} 이동`}
           aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight Home"
           disabled={layout.positionLocked}
-          title={layout.positionLocked ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "위치 잠금을 해제한 뒤 이동할 수 있어요.") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "끌어서 이동 · 방향키로 미세 조정")}
+          title={layout.positionLocked ? "위치 잠금을 해제한 뒤 이동할 수 있어요." : "끌어서 이동 · 방향키로 미세 조정"}
           className={cn(
             actionClass,
             "min-w-0 flex-1 cursor-grab touch-none justify-start active:cursor-grabbing",
@@ -711,8 +707,8 @@ export function StudioShellFloatingTarget({
         </button>
         <select
           value={layout.dock}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 도킹 위치"), { v0: String(definition.label) })}
-          title={translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "화면 가장자리에 도킹")}
+          aria-label={`${definition.label} 도킹 위치`}
+          title="화면 가장자리에 도킹"
           disabled={layout.positionLocked}
           className={cn(
             "h-8 max-w-20 rounded-md border border-line bg-card px-1 text-[0.65rem] font-bold text-fg-2",
@@ -727,8 +723,8 @@ export function StudioShellFloatingTarget({
         <button
           type="button"
           aria-pressed={layout.positionLocked}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 위치 {v1}"), { v0: String(definition.label), v1: String(layout.positionLocked ? "잠금 해제" : "잠금") })}
-          title={layout.positionLocked ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "위치 잠금 해제") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "위치 잠금")}
+          aria-label={`${definition.label} 위치 ${layout.positionLocked ? "잠금 해제" : "잠금"}`}
+          title={layout.positionLocked ? "위치 잠금 해제" : "위치 잠금"}
           className={cn(
             actionClass,
             "size-8 px-0",
@@ -742,8 +738,8 @@ export function StudioShellFloatingTarget({
           <button
             type="button"
             aria-pressed={layout.sizeLocked}
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 크기 {v1}"), { v0: String(definition.label), v1: String(layout.sizeLocked ? "잠금 해제" : "잠금") })}
-            title={layout.sizeLocked ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "크기 잠금 해제") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "크기 잠금")}
+            aria-label={`${definition.label} 크기 ${layout.sizeLocked ? "잠금 해제" : "잠금"}`}
+            title={layout.sizeLocked ? "크기 잠금 해제" : "크기 잠금"}
             className={cn(
               actionClass,
               "size-8 px-0",
@@ -756,8 +752,8 @@ export function StudioShellFloatingTarget({
         ) : null}
         <button
           type="button"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 기본 위치로 복원"), { v0: String(definition.label) })}
-          title={translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "기본 위치")}
+          aria-label={`${definition.label} 기본 위치로 복원`}
+          title="기본 위치"
           className={cn(actionClass, "size-8 px-0")}
           onClick={resetLayout}
         >
@@ -765,8 +761,8 @@ export function StudioShellFloatingTarget({
         </button>
         <button
           type="button"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 숨기기"), { v0: String(definition.label) })}
-          title={forceVisible ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "현재 안전 상태 때문에 숨김 후에도 자동 표시됩니다.") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "숨기기")}
+          aria-label={`${definition.label} 숨기기`}
+          title={forceVisible ? "현재 안전 상태 때문에 숨김 후에도 자동 표시됩니다." : "숨기기"}
           className={cn(actionClass, "size-8 px-0")}
           onClick={() => shell.setVisible(definition.visibilityId, false)}
         >
@@ -776,10 +772,10 @@ export function StudioShellFloatingTarget({
       {definition.resizable ? (
         <button
           type="button"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 크기 조절"), { v0: String(definition.label) })}
+          aria-label={`${definition.label} 크기 조절`}
           aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight"
           disabled={layout.sizeLocked}
-          title={layout.sizeLocked ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "크기 잠금을 해제한 뒤 조절할 수 있어요.") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "끌어서 크기 조절 · 방향키로 미세 조정")}
+          title={layout.sizeLocked ? "크기 잠금을 해제한 뒤 조절할 수 있어요." : "끌어서 크기 조절 · 방향키로 미세 조정"}
           data-studio-shell-floating-resize={surfaceId}
           className={cn(
             "pointer-events-auto fixed grid size-11 touch-none cursor-se-resize place-items-center rounded-lg border border-accent/50 bg-panel/95 text-accent shadow-xl",

@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioColorDiscPicker.tsx
  *
@@ -203,7 +199,7 @@ export function StudioColorDiscPicker({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         data-studio-color-disc="true"
-        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorDiscPicker", "en", "relative mx-auto select-none touch-none {v0}"), { v0: String(className ?? "") })}
+        className={`relative mx-auto select-none touch-none ${className ?? ""}`}
         style={{
           width: size,
           height: size,
@@ -238,11 +234,11 @@ export function StudioColorDiscPicker({
         <button
           type="button"
           role="slider"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorDiscPicker", "ko", "색상환 색조 각도")}
+          aria-label="색상환 색조 각도"
           aria-valuemin={0}
           aria-valuemax={360}
           aria-valuenow={hsv.h}
-          aria-valuetext={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorDiscPicker", "ko", "{v0}도"), { v0: String(hsv.h) })}
+          aria-valuetext={`${hsv.h}도`}
           onKeyDown={handleHueKeyDown}
           className="group absolute size-5 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-white shadow-[0_2px_8px_rgba(0,0,0,0.75),0_0_0_1px_rgba(0,0,0,0.3)] active:scale-125 transition-transform duration-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           style={{
@@ -289,11 +285,11 @@ export function StudioColorDiscPicker({
           <button
             type="button"
             role="slider"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorDiscPicker", "ko", "명도 및 채도 선택기")}
+            aria-label="명도 및 채도 선택기"
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={hsv.v}
-            aria-valuetext={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorDiscPicker", "ko", "채도 {v0}%, 명도 {v1}%"), { v0: String(hsv.s), v1: String(hsv.v) })}
+            aria-valuetext={`채도 ${hsv.s}%, 명도 ${hsv.v}%`}
             onKeyDown={handleSvKeyDown}
             className="absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_4px_rgba(0,0,0,0.9),0_0_0_1px_rgba(0,0,0,0.4)] active:scale-125 transition-transform duration-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             style={{

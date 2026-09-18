@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowUpRight,
   Eye,
   EyeOff,
@@ -259,38 +255,44 @@ export function MarketManagePage() {
 
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-6">
         <div>
-          <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "en", "Creator center")}</p>
+          <p className="eyebrow text-accent">Creator center</p>
           <div className="mt-1 flex items-center gap-2">
             <UserCheck className="size-5 text-accent" aria-hidden="true" />
-            <h1 className="text-xl font-bold text-fg sm:text-2xl">{translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "판매자 센터")}</h1>
+            <h1 className="text-xl font-bold text-fg sm:text-2xl">판매자 센터</h1>
           </div>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
-            {translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "서버가 보유한 패키지 head와 릴리스 상태만 표시합니다. 브라우저 임시 레코드로 공개 상태나 immutable 버전을 변경하지 않습니다.")}</p>
+            서버가 보유한 패키지 head와 릴리스 상태만 표시합니다. 브라우저 임시
+            레코드로 공개 상태나 immutable 버전을 변경하지 않습니다.
+          </p>
         </div>
         <Link href="/market/publish" className={buttonClass({ variant: "solid", size: "sm" })}>
           <PackagePlus className="size-4" aria-hidden="true" />
-          {translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "새 릴리스 게시")}</Link>
+          새 릴리스 게시
+        </Link>
       </header>
 
       {!ready ? (
         <div role="status" className="mt-8 rounded-2xl border border-line bg-card p-8 text-center">
           <LoaderCircle className="mx-auto size-8 animate-spin text-accent" aria-hidden="true" />
-          <p className="mt-3 text-sm text-fg-2">{translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "계정과 판매자 데이터를 확인하고 있습니다.")}</p>
+          <p className="mt-3 text-sm text-fg-2">계정과 판매자 데이터를 확인하고 있습니다.</p>
         </div>
       ) : !userId ? (
         <section className="mt-8 rounded-2xl border border-line bg-card p-8 text-center">
           <UserCheck className="mx-auto size-10 text-fg-3" aria-hidden="true" />
           <h2 className="mt-3 text-base font-bold text-fg">
-            {translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "로그인 후 게시한 에셋을 관리할 수 있어요")}</h2>
+            로그인 후 게시한 에셋을 관리할 수 있어요
+          </h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">
-            {translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "로그인하지 않은 브라우저 초안은 판매자 센터의 공개 에셋 수에 포함되지 않습니다.")}</p>
+            로그인하지 않은 브라우저 초안은 판매자 센터의 공개 에셋 수에 포함되지 않습니다.
+          </p>
         </section>
       ) : (
         <>
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-fg-2">
-              {translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "현재 패키지 head")}{" "}
-              <strong className="numeral tnum text-fg">{visibleItems.length}</strong>{translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "개 표시")}</p>
+              현재 패키지 head{" "}
+              <strong className="numeral tnum text-fg">{visibleItems.length}</strong>개 표시
+            </p>
             <button
               type="button"
               onClick={() => void loadFirstPage()}
@@ -304,7 +306,8 @@ export function MarketManagePage() {
                 )}
                 aria-hidden="true"
               />
-              {translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "새로고침")}</button>
+              새로고침
+            </button>
           </div>
 
           {message ? (
@@ -322,20 +325,22 @@ export function MarketManagePage() {
           ) : visibleLoadState === "error" ? (
             <div className="mt-8 rounded-2xl border border-line bg-card p-8 text-center">
               <ShieldAlert className="mx-auto size-9 text-bad" aria-hidden="true" />
-              <h2 className="mt-3 text-base font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "판매자 데이터를 불러오지 못했습니다")}</h2>
+              <h2 className="mt-3 text-base font-bold text-fg">판매자 데이터를 불러오지 못했습니다</h2>
               <button
                 type="button"
                 onClick={() => void loadFirstPage()}
                 className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}
               >
-                {translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "다시 시도")}</button>
+                다시 시도
+              </button>
             </div>
           ) : visibleItems.length === 0 ? (
             <div className="mt-8 rounded-2xl border border-dashed border-line bg-panel/50 p-10 text-center">
               <PackagePlus className="mx-auto size-10 text-fg-3" aria-hidden="true" />
-              <h2 className="mt-3 text-base font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "서버에 게시한 에셋이 없어요")}</h2>
+              <h2 className="mt-3 text-base font-bold text-fg">서버에 게시한 에셋이 없어요</h2>
               <p className="mx-auto mt-2 max-w-md text-sm text-fg-2">
-                {translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "Studio에서 준비한 에셋을 서버에 게시하면 공개 상태와 버전을 이곳에서 관리할 수 있습니다.")}</p>
+                Studio에서 준비한 에셋을 서버에 게시하면 공개 상태와 버전을 이곳에서 관리할 수 있습니다.
+              </p>
             </div>
           ) : (
             <ul className="mt-6 divide-y divide-line overflow-hidden rounded-xl border border-line bg-card">
@@ -368,13 +373,13 @@ export function MarketManagePage() {
                           </span>
                         </div>
                         <p className="mt-1 line-clamp-1 text-xs text-fg-3">
-                          {record.description || translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "설명 없음")}
+                          {record.description || "설명 없음"}
                         </p>
                         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.68rem] text-fg-3">
                           <span>{kind.label}</span>
                           <span>{license.label}</span>
-                          <span>{record.entries.length}{translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "개 항목")}</span>
-                          <span>{translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "en", "manifest ")}{formatMarketByteSize(record.manifestByteSize)}</span>
+                          <span>{record.entries.length}개 항목</span>
+                          <span>manifest {formatMarketByteSize(record.manifestByteSize)}</span>
                           <span>{state.detail}</span>
                         </div>
                       </div>
@@ -386,7 +391,7 @@ export function MarketManagePage() {
                         disabled={moderated || pendingId !== null}
                         onClick={() => void toggleListing(item)}
                         title={moderated
-                          ? translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "관리자 숨김 상태는 제작자가 변경할 수 없습니다.")
+                          ? "관리자 숨김 상태는 제작자가 변경할 수 없습니다."
                           : undefined}
                         className={buttonClass({ variant: "outline", size: "sm" })}
                       >
@@ -397,23 +402,25 @@ export function MarketManagePage() {
                         ) : (
                           <EyeOff className="size-3.5" aria-hidden="true" />
                         )}
-                        {item.delistedAt ? translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "재공개") : translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "공개 목록에서 내리기")}
+                        {item.delistedAt ? "재공개" : "공개 목록에서 내리기"}
                       </button>
 
                       {publiclyAvailable ? (
                         <>
                           <Link
-                            href={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "en", "/market/resource/{v0}"), { v0: String(record.id) })}
+                            href={`/market/resource/${record.id}`}
                             className={buttonClass({ variant: "ghost", size: "sm" })}
                           >
-                            {translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "상세")}<ArrowUpRight className="size-3.5" aria-hidden="true" />
+                            상세
+                            <ArrowUpRight className="size-3.5" aria-hidden="true" />
                           </Link>
                           <Link
                             href={marketStudioResourceHref(record.id)}
                             className={buttonClass({ variant: "ghost", size: "sm" })}
                           >
                             <Palette className="size-3.5" aria-hidden="true" />
-                            {translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "en", "Studio")}</Link>
+                            Studio
+                          </Link>
                         </>
                       ) : null}
                     </div>
@@ -434,7 +441,7 @@ export function MarketManagePage() {
                 {loadingMore ? (
                   <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
                 ) : null}
-                {loadingMore ? translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "불러오는 중") : translateCurrentStaticSourceText("domains.market.pages.MarketOwnedResourcesPage", "ko", "더 보기")}
+                {loadingMore ? "불러오는 중" : "더 보기"}
               </button>
             </div>
           ) : null}

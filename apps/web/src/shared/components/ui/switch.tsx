@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import type { ButtonHTMLAttributes, ReactElement } from "react";
 
 import { cn } from "@/shared/lib/utils";
@@ -22,7 +21,7 @@ export function SwitchIndicator({ checked, className }: SwitchIndicatorProps): R
     <span
       aria-hidden="true"
       data-ui-switch-track="true"
-      data-state={checked ? translateCurrentStaticSourceText("shared.components.ui.switch", "en", "on") : translateCurrentStaticSourceText("shared.components.ui.switch", "en", "off")}
+      data-state={checked ? "on" : "off"}
       className={cn(
         "relative block h-6 w-11 shrink-0 rounded-full border transition-colors duration-150",
         "motion-reduce:transition-none",
@@ -73,7 +72,7 @@ export function Switch({
       role="switch"
       aria-checked={checked}
       data-ui-switch="true"
-      data-state={checked ? translateCurrentStaticSourceText("shared.components.ui.switch", "en", "on") : translateCurrentStaticSourceText("shared.components.ui.switch", "en", "off")}
+      data-state={checked ? "on" : "off"}
       disabled={disabled}
       className={cn(
         "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full p-0 align-middle",

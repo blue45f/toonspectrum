@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   CornerDownRight,
   Heart,
   LoaderCircle,
@@ -84,20 +80,23 @@ function AuthorBadge({
     return (
       <span className="inline-flex items-center gap-0.5 rounded bg-accent/15 px-1.5 py-0.5 text-[0.62rem] font-bold text-accent">
         <Sparkles className="size-2.5" aria-hidden="true" />
-        {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "배급자")}</span>
+        배급자
+      </span>
     );
   }
   if (badge === "studio-verified") {
     return (
       <span className="inline-flex items-center gap-0.5 rounded bg-good/15 px-1.5 py-0.5 text-[0.62rem] font-semibold text-good">
         <ShieldCheck className="size-2.5" aria-hidden="true" />
-        {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "Studio 사용 인증")}</span>
+        Studio 사용 인증
+      </span>
     );
   }
   if (badge === "library-member") {
     return (
       <span className="rounded bg-cool/15 px-1.5 py-0.5 text-[0.62rem] font-medium text-cool">
-        {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "보관함 회원")}</span>
+        보관함 회원
+      </span>
     );
   }
   return null;
@@ -177,13 +176,14 @@ export function MarketCommentsSection({
             className="flex items-center gap-2 text-base font-bold text-fg sm:text-lg"
           >
             <MessageSquare className="size-4 text-accent" aria-hidden="true" />
-            <span>{translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "Q&A 및 커뮤니티 피드백")}</span>
+            <span>Q&A 및 커뮤니티 피드백</span>
             <span className="numeral tnum rounded-full bg-raised px-2 py-0.5 text-xs font-semibold text-accent">
               {totalCount}
             </span>
           </h2>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "모든 글은 계정에 귀속되어 다른 기기와 사용자에게 동기화됩니다. 실제 Studio 적용 이력이 있으면 사용 인증 배지가 표시됩니다.")}</p>
+            모든 글은 계정에 귀속되어 다른 기기와 사용자에게 동기화됩니다. 실제 Studio 적용 이력이 있으면 사용 인증 배지가 표시됩니다.
+          </p>
         </div>
         <button
           type="button"
@@ -199,25 +199,28 @@ export function MarketCommentsSection({
             className={cn("size-3.5", status === "loading" && "animate-spin")}
             aria-hidden="true"
           />
-          {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "새로고침")}</button>
+          새로고침
+        </button>
       </div>
 
       {authenticated ? (
         <form onSubmit={(event) => void submitComment(event)} className="mt-4">
           <label htmlFor="market-comment-input" className="sr-only">
-            {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "에셋 질문 또는 피드백")}</label>
+            에셋 질문 또는 피드백
+          </label>
           <textarea
             id="market-comment-input"
             rows={3}
             value={commentInput}
             onChange={(event) => setCommentInput(event.target.value)}
-            placeholder={translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "호환성, 적용 방법, 라이선스 또는 작업 팁을 질문해 보세요.")}
+            placeholder="호환성, 적용 방법, 라이선스 또는 작업 팁을 질문해 보세요."
             maxLength={700}
             className="w-full rounded-xl border border-line bg-panel p-3 text-xs leading-relaxed text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
           <div className="mt-1.5 flex items-center justify-between gap-3 px-1">
             <span className="text-[0.68rem] text-fg-3">
-              {commentInput.length} {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "/ 700자 · 작성자 이름은 로그인 계정을 사용합니다.")}</span>
+              {commentInput.length} / 700자 · 작성자 이름은 로그인 계정을 사용합니다.
+            </span>
             <button
               type="submit"
               disabled={!commentInput.trim() || Boolean(pendingAction)}
@@ -232,12 +235,14 @@ export function MarketCommentsSection({
               ) : (
                 <Send className="size-3.5" aria-hidden="true" />
               )}
-              {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "댓글 등록")}</button>
+              댓글 등록
+            </button>
           </div>
         </form>
       ) : (
         <div className="mt-4 rounded-xl border border-dashed border-line bg-panel/50 px-4 py-3 text-xs leading-relaxed text-fg-2">
-          {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "댓글과 답글은 공개로 읽을 수 있으며, 작성·좋아요는 로그인 후 사용할 수 있습니다.")}</div>
+          댓글과 답글은 공개로 읽을 수 있으며, 작성·좋아요는 로그인 후 사용할 수 있습니다.
+        </div>
       )}
 
       {error ? (
@@ -248,13 +253,14 @@ export function MarketCommentsSection({
             onClick={() => void refresh()}
             className="ml-auto font-semibold text-accent hover:underline"
           >
-            {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "다시 시도")}</button>
+            다시 시도
+          </button>
         </div>
       ) : null}
 
       <div className="mt-6 space-y-4">
         {loadingInitial ? (
-          <div role="status" className="space-y-3" aria-label={translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "댓글 불러오는 중")}>
+          <div role="status" className="space-y-3" aria-label="댓글 불러오는 중">
             {Array.from({ length: 2 }, (_, index) => (
               <div key={index} className="rounded-xl border border-line/60 bg-panel/30 p-4">
                 <div className="skeleton h-4 w-36" />
@@ -266,7 +272,8 @@ export function MarketCommentsSection({
         ) : roots.length === 0 ? (
           <div className="rounded-xl border border-dashed border-line bg-panel/50 py-8 text-center">
             <p className="text-xs font-medium text-fg-2">
-              {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "아직 등록된 질문이 없습니다. 첫 번째 활용 질문을 남겨보세요.")}</p>
+              아직 등록된 질문이 없습니다. 첫 번째 활용 질문을 남겨보세요.
+            </p>
           </div>
         ) : (
           roots.map((comment) => (
@@ -296,7 +303,7 @@ export function MarketCommentsSection({
                     type="button"
                     onClick={() => void deleteComment(comment.id).catch(() => undefined)}
                     disabled={Boolean(pendingAction)}
-                    aria-label={translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "댓글 삭제")}
+                    aria-label="댓글 삭제"
                     className="rounded p-1 text-fg-3 transition-colors hover:bg-warn/10 hover:text-warn disabled:opacity-40"
                   >
                     <Trash2 className="size-3.5" aria-hidden="true" />
@@ -308,7 +315,7 @@ export function MarketCommentsSection({
                 "mt-2 whitespace-pre-wrap text-xs leading-relaxed",
                 comment.deleted ? "italic text-fg-3" : "text-fg-2",
               )}>
-                {comment.deleted ? translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "삭제된 댓글입니다.") : comment.content}
+                {comment.deleted ? "삭제된 댓글입니다." : comment.content}
               </p>
 
               {!comment.deleted ? (
@@ -318,7 +325,7 @@ export function MarketCommentsSection({
                     onClick={() => void toggleCommentLike(comment.id).catch(() => undefined)}
                     disabled={!authenticated || Boolean(pendingAction)}
                     aria-pressed={comment.likedByViewer}
-                    title={authenticated ? undefined : translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "로그인 후 좋아요를 누를 수 있습니다.")}
+                    title={authenticated ? undefined : "로그인 후 좋아요를 누를 수 있습니다."}
                     className={cn(
                       "inline-flex items-center gap-1 text-[0.7rem] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                       comment.likedByViewer
@@ -333,7 +340,7 @@ export function MarketCommentsSection({
                       )}
                       aria-hidden="true"
                     />
-                    {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "좋아요 ")}{comment.likeCount > 0 ? comment.likeCount : ""}
+                    좋아요 {comment.likeCount > 0 ? comment.likeCount : ""}
                   </button>
                   <button
                     type="button"
@@ -344,7 +351,8 @@ export function MarketCommentsSection({
                     disabled={!authenticated || Boolean(pendingAction)}
                     className="text-[0.7rem] font-medium text-fg-3 transition-colors hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "답글 달기")}</button>
+                    답글 달기
+                  </button>
                 </div>
               ) : null}
 
@@ -368,7 +376,7 @@ export function MarketCommentsSection({
                             type="button"
                             onClick={() => void deleteComment(reply.id).catch(() => undefined)}
                             disabled={Boolean(pendingAction)}
-                            aria-label={translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "답글 삭제")}
+                            aria-label="답글 삭제"
                             className="rounded p-1 text-fg-3 transition-colors hover:bg-warn/10 hover:text-warn disabled:opacity-40"
                           >
                             <Trash2 className="size-3" aria-hidden="true" />
@@ -379,7 +387,7 @@ export function MarketCommentsSection({
                         "mt-1.5 pl-4 whitespace-pre-wrap text-xs leading-relaxed",
                         reply.deleted ? "italic text-fg-3" : "text-fg-2",
                       )}>
-                        {reply.deleted ? translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "삭제된 답글입니다.") : reply.content}
+                        {reply.deleted ? "삭제된 답글입니다." : reply.content}
                       </p>
                       {!reply.deleted ? (
                         <button
@@ -399,7 +407,7 @@ export function MarketCommentsSection({
                             )}
                             aria-hidden="true"
                           />
-                          {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "좋아요 ")}{reply.likeCount > 0 ? reply.likeCount : ""}
+                          좋아요 {reply.likeCount > 0 ? reply.likeCount : ""}
                         </button>
                       ) : null}
                     </article>
@@ -409,16 +417,17 @@ export function MarketCommentsSection({
 
               {replyingTo === comment.id ? (
                 <div className="mt-3 rounded-lg border border-accent/35 bg-card p-3">
-                  <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "en", "market-reply-{v0}"), { v0: String(comment.id) })} className="text-xs font-semibold text-accent">
-                    @{comment.author.name} {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "님에게 답글")}</label>
+                  <label htmlFor={`market-reply-${comment.id}`} className="text-xs font-semibold text-accent">
+                    @{comment.author.name} 님에게 답글
+                  </label>
                   <textarea
-                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "en", "market-reply-{v0}"), { v0: String(comment.id) })}
+                    id={`market-reply-${comment.id}`}
                     rows={2}
                     value={replyInput}
                     onChange={(event) => setReplyInput(event.target.value)}
                     maxLength={700}
                     className="mt-2 w-full rounded-lg border border-line bg-panel p-2.5 text-xs leading-relaxed text-fg focus:border-accent focus:outline-none"
-                    placeholder={translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "답글 내용을 입력하세요.")}
+                    placeholder="답글 내용을 입력하세요."
                   />
                   <div className="mt-2 flex justify-end gap-2">
                     <button
@@ -426,7 +435,8 @@ export function MarketCommentsSection({
                       onClick={() => setReplyingTo(null)}
                       className={buttonClass({ variant: "ghost", size: "sm" })}
                     >
-                      {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "취소")}</button>
+                      취소
+                    </button>
                     <button
                       type="button"
                       onClick={() => void submitReply(comment.id)}
@@ -438,7 +448,8 @@ export function MarketCommentsSection({
                       })}
                     >
                       <Send className="size-3" aria-hidden="true" />
-                      {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "답글 등록")}</button>
+                      답글 등록
+                    </button>
                   </div>
                 </div>
               ) : null}
@@ -449,7 +460,8 @@ export function MarketCommentsSection({
 
       {data?.truncated.comments ? (
         <p className="mt-4 text-center text-[0.68rem] text-fg-3">
-          {translateCurrentStaticSourceText("domains.market.components.MarketCommentsSection", "ko", "대화가 많아 최신 댓글 일부만 표시하고 있습니다.")}</p>
+          대화가 많아 최신 댓글 일부만 표시하고 있습니다.
+        </p>
       ) : null}
     </section>
   );

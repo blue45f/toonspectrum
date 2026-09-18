@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { History as HistoryIcon, Redo2, Undo2 } from "lucide-react";
 import { memo, type ComponentProps } from "react";
 
@@ -84,7 +81,7 @@ export const StudioToolBeltQuickActions = memo(function StudioToolBeltQuickActio
           collaborationDocumentLocked
             ? collaborationLockMessage()
             : hi === 0
-              ? translateCurrentStaticSourceText("domains.creator.StudioToolBeltQuickActions", "ko", "되돌릴 이전 작업이 없습니다.")
+              ? "되돌릴 이전 작업이 없습니다."
               : undefined
         }
       >
@@ -93,7 +90,7 @@ export const StudioToolBeltQuickActions = memo(function StudioToolBeltQuickActio
           onClick={undo}
           disabled={isUndoDisabled}
           className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40", buttonClass)}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltQuickActions", "ko", "실행취소")}
+          aria-label="실행취소"
         >
           <Undo2
             size={STUDIO_ICON_SIZE.toolCompact}
@@ -113,7 +110,7 @@ export const StudioToolBeltQuickActions = memo(function StudioToolBeltQuickActio
           collaborationDocumentLocked
             ? collaborationLockMessage()
             : hi >= history.length - 1
-              ? translateCurrentStaticSourceText("domains.creator.StudioToolBeltQuickActions", "ko", "다시 적용할 작업이 없습니다.")
+              ? "다시 적용할 작업이 없습니다."
               : undefined
         }
       >
@@ -122,7 +119,7 @@ export const StudioToolBeltQuickActions = memo(function StudioToolBeltQuickActio
           onClick={redo}
           disabled={isRedoDisabled}
           className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40", buttonClass)}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltQuickActions", "ko", "다시실행")}
+          aria-label="다시실행"
         >
           <Redo2
             size={STUDIO_ICON_SIZE.toolCompact}
@@ -141,7 +138,7 @@ export const StudioToolBeltQuickActions = memo(function StudioToolBeltQuickActio
           onClick={() => setHistoryPanelOpen((v) => !v)}
           aria-pressed={historyPanelOpen}
           className={cn(toolBtn(historyPanelOpen), "h-8 px-1.5", buttonClass)}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltQuickActions", "ko", "작업 내역")}
+          aria-label="작업 내역"
         >
           <HistoryIcon
             size={STUDIO_ICON_SIZE.toolCompact}

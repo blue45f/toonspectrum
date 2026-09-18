@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef } from "react";
 
@@ -157,7 +156,7 @@ export function WebtoonStrip({ panels, characters, selectedCharacterId, playback
                 />
                 {/* 컷 진입 플래시 */}
                 <motion.div
-                  key={formatI18nTemplate(translateCurrentStaticSourceText("domains.fortune.WebtoonStrip", "en", "flash-{v0}"), { v0: String(playback.activeStep) })}
+                  key={`flash-${playback.activeStep}`}
                   aria-hidden
                   className="pointer-events-none absolute inset-0"
                   style={{ background: `radial-gradient(circle at 50% 42%, oklch(0.96 0.06 ${hue} / 0.4), transparent 62%)` }}
@@ -168,7 +167,7 @@ export function WebtoonStrip({ panels, characters, selectedCharacterId, playback
                 {/* 스파클 파티클 */}
                 {[0, 1, 2, 3, 4, 5].map((i) => (
                   <motion.span
-                    key={formatI18nTemplate(translateCurrentStaticSourceText("domains.fortune.WebtoonStrip", "en", "spark-{v0}-{v1}"), { v0: String(playback.activeStep), v1: String(i) })}
+                    key={`spark-${playback.activeStep}-${i}`}
                     aria-hidden
                     className="pointer-events-none absolute rounded-full"
                     style={{
@@ -192,7 +191,7 @@ export function WebtoonStrip({ panels, characters, selectedCharacterId, playback
               className="absolute right-3 top-3 z-20 select-none rounded-md px-2 py-0.5 font-display text-[10px] font-extrabold tracking-widest"
               style={{ background: "oklch(0.12 0.01 60 / 0.7)", color: nameColor(hue), border: `1px solid ${frameColor(hue)}66` }}
             >
-              {translateCurrentStaticSourceText("domains.fortune.WebtoonStrip", "en", "CUT ")}{panelIndex + 1}
+              CUT {panelIndex + 1}
             </span>
 
             {/* 효과음 — 재생 중 활성 컷이면 버스트(팝+셰이크) */}

@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Building2,
   CalendarClock,
   CheckCircle2,
@@ -139,33 +135,35 @@ export function BusinessPage() {
     <Container size="wide" className="py-8 sm:py-12 lg:py-16">
       <PublicStoryHero
         eyebrow="BUSINESS · IR · SPONSORSHIP"
-        title={translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "함께 성장할 대화를 비공개로 시작하세요.")}
-        description={translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "투자·IR, 사업 제휴, 콘텐츠/IP 협업, 광고·스폰서십 문의를 한곳에서 접수합니다. 공개 피드백 게시판과 분리되어 문의 내용과 연락처가 커뮤니티에 노출되지 않습니다.")}
+        title="함께 성장할 대화를 비공개로 시작하세요."
+        description="투자·IR, 사업 제휴, 콘텐츠/IP 협업, 광고·스폰서십 문의를 한곳에서 접수합니다. 공개 피드백 게시판과 분리되어 문의 내용과 연락처가 커뮤니티에 노출되지 않습니다."
         image="materials"
-        imageAlt={translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "웹툰 제작 재료와 협업 아이디어를 표현한 작업실 콘셉트 아트")}
-        caption={translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "PRIVATE BUSINESS INQUIRY · 비공개 비즈니스 문의")}
+        imageAlt="웹툰 제작 재료와 협업 아이디어를 표현한 작업실 콘셉트 아트"
+        caption="PRIVATE BUSINESS INQUIRY · 비공개 비즈니스 문의"
       >
         <a
           href="#business-inquiry-form"
           className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-accent px-5 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2"
         >
-          {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "문의 작성하기 ")}<Send size={16} aria-hidden="true" />
+          문의 작성하기 <Send size={16} aria-hidden="true" />
         </a>
         <Link
           href="/contact"
           className="ml-4 inline-flex min-h-12 items-center text-sm font-semibold text-fg-2 hover:text-accent"
         >
-          {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "일반 문의 경로 보기")}</Link>
+          일반 문의 경로 보기
+        </Link>
       </PublicStoryHero>
 
       <section className="mt-8" aria-labelledby="business-types-title">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.legal.BusinessPage", "en", "Choose a route")}</p>
-            <h2 id="business-types-title" className="mt-1 text-xl font-bold text-fg">{translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "문의 유형을 선택하세요")}</h2>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent">Choose a route</p>
+            <h2 id="business-types-title" className="mt-1 text-xl font-bold text-fg">문의 유형을 선택하세요</h2>
           </div>
           <p className="inline-flex items-center gap-1.5 text-xs text-fg-3">
-            <LockKeyhole size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "공개 게시판에 게시되지 않습니다.")}</p>
+            <LockKeyhole size={14} aria-hidden="true" /> 공개 게시판에 게시되지 않습니다.
+          </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {BUSINESS_INQUIRY_TYPES.map((item) => {
@@ -178,9 +176,11 @@ export function BusinessPage() {
                 type="button"
                 aria-pressed={active}
                 onClick={() => chooseType(item)}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.BusinessPage", "en", "min-h-32 rounded-2xl border p-5 text-left transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(active
+                className={`min-h-32 rounded-2xl border p-5 text-left transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                  active
                     ? "border-accent bg-accent-soft shadow-sm"
-                    : "border-line bg-card/70 hover:-translate-y-0.5 hover:border-accent/45 hover:bg-raised") })}
+                    : "border-line bg-card/70 hover:-translate-y-0.5 hover:border-accent/45 hover:bg-raised"
+                }`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <span className="grid size-10 place-items-center rounded-xl border border-line bg-panel text-accent">
@@ -204,7 +204,7 @@ export function BusinessPage() {
           className="rounded-3xl border border-line bg-card p-5 shadow-sm sm:p-7"
         >
           <div className="border-b border-line pb-5">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.legal.BusinessPage", "en", "Private inquiry")}</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-accent">Private inquiry</p>
             <h2 className="mt-1 text-2xl font-bold tracking-[-0.025em] text-fg">{BUSINESS_INQUIRY_TYPE_LABELS[type]}</h2>
             <p className="mt-2 text-sm leading-6 text-fg-2">{selected.description}</p>
           </div>
@@ -214,8 +214,8 @@ export function BusinessPage() {
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 shrink-0 text-accent" size={21} aria-hidden="true" />
                 <div>
-                  <p className="font-bold text-fg">{translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "문의가 접수됐습니다.")}</p>
-                  <p className="mt-1 text-sm leading-6 text-fg-2">{translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "입력한 이메일을 기준으로 검토 후 필요한 경우 회신드리겠습니다.")}</p>
+                  <p className="font-bold text-fg">문의가 접수됐습니다.</p>
+                  <p className="mt-1 text-sm leading-6 text-fg-2">입력한 이메일을 기준으로 검토 후 필요한 경우 회신드리겠습니다.</p>
                 </div>
               </div>
             </div>
@@ -223,18 +223,18 @@ export function BusinessPage() {
 
           <div className="mt-6 grid gap-5 sm:grid-cols-2">
             <label className="grid gap-2 text-sm font-semibold text-fg">
-              {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "회사·기관명 ")}<span className="text-xs font-normal text-fg-3">{translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "선택")}</span>
+              회사·기관명 <span className="text-xs font-normal text-fg-3">선택</span>
               <input
                 value={form.organization}
                 onChange={(event) => setField("organization", event.target.value)}
                 maxLength={120}
                 autoComplete="organization"
                 className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm font-normal text-fg outline-none transition-colors focus:border-accent"
-                placeholder={translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "회사, 투자기관, 스튜디오 등")}
+                placeholder="회사, 투자기관, 스튜디오 등"
               />
             </label>
             <label className="grid gap-2 text-sm font-semibold text-fg">
-              {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "담당자 이름 ")}<span className="text-danger">*</span>
+              담당자 이름 <span className="text-danger">*</span>
               <input
                 required
                 value={form.contactName}
@@ -242,11 +242,11 @@ export function BusinessPage() {
                 maxLength={80}
                 autoComplete="name"
                 className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm font-normal text-fg outline-none transition-colors focus:border-accent"
-                placeholder={translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "회신받을 담당자 이름")}
+                placeholder="회신받을 담당자 이름"
               />
             </label>
             <label className="grid gap-2 text-sm font-semibold text-fg">
-              {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "이메일 ")}<span className="text-danger">*</span>
+              이메일 <span className="text-danger">*</span>
               <input
                 required
                 type="email"
@@ -256,11 +256,11 @@ export function BusinessPage() {
                 autoComplete="email"
                 inputMode="email"
                 className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm font-normal text-fg outline-none transition-colors focus:border-accent"
-                placeholder={translateCurrentStaticSourceText("domains.legal.BusinessPage", "en", "name@company.com")}
+                placeholder="name@company.com"
               />
             </label>
             <label className="grid gap-2 text-sm font-semibold text-fg">
-              {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "회사·프로젝트 웹사이트 ")}<span className="text-xs font-normal text-fg-3">{translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "선택")}</span>
+              회사·프로젝트 웹사이트 <span className="text-xs font-normal text-fg-3">선택</span>
               <input
                 type="url"
                 value={form.website}
@@ -275,7 +275,7 @@ export function BusinessPage() {
           </div>
 
           <label className="mt-5 grid gap-2 text-sm font-semibold text-fg">
-            {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "문의 내용 ")}<span className="text-danger">*</span>
+            문의 내용 <span className="text-danger">*</span>
             <textarea
               required
               value={form.message}
@@ -284,14 +284,15 @@ export function BusinessPage() {
               maxLength={5000}
               rows={9}
               className="resize-y rounded-xl border border-line bg-panel p-3 text-sm font-normal leading-6 text-fg outline-none transition-colors focus:border-accent"
-              placeholder={translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "제안 배경, 함께 논의하고 싶은 내용, 필요한 자료나 다음 단계를 적어 주세요. 민감한 계약 정보나 계정 비밀번호는 입력하지 마세요.")}
+              placeholder="제안 배경, 함께 논의하고 싶은 내용, 필요한 자료나 다음 단계를 적어 주세요. 민감한 계약 정보나 계정 비밀번호는 입력하지 마세요."
             />
             <span className="text-right text-xs font-normal text-fg-3">{form.message.length.toLocaleString()} / 5,000</span>
           </label>
 
           <div className="absolute -left-[10000px] top-auto size-px overflow-hidden" aria-hidden="true">
             <label>
-              {translateCurrentStaticSourceText("domains.legal.BusinessPage", "en", "Fax number")}<input
+              Fax number
+              <input
                 tabIndex={-1}
                 autoComplete="off"
                 value={form.faxNumber}
@@ -308,8 +309,9 @@ export function BusinessPage() {
               className="mt-1 size-4 accent-[var(--color-accent)]"
             />
             <span className="text-sm leading-6 text-fg-2">
-              <strong className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "개인정보 수집·이용에 동의합니다.")}</strong><br />
-              {privacySummary} {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "자세한 내용은 ")}<Link href="/privacy" className="font-semibold text-accent hover:underline">{translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "개인정보처리방침")}</Link>{translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "을 확인하세요.")}</span>
+              <strong className="font-semibold text-fg">개인정보 수집·이용에 동의합니다.</strong><br />
+              {privacySummary} 자세한 내용은 <Link href="/privacy" className="font-semibold text-accent hover:underline">개인정보처리방침</Link>을 확인하세요.
+            </span>
           </label>
 
           {error ? (
@@ -323,34 +325,37 @@ export function BusinessPage() {
             disabled={submitting}
             className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
-            {submitting ? translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "접수 중…") : translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "비공개 문의 보내기")}
+            {submitting ? "접수 중…" : "비공개 문의 보내기"}
             <Send size={16} aria-hidden="true" />
           </button>
         </form>
 
         <aside className="space-y-4">
           <section className="rounded-2xl border border-line bg-panel/55 p-5">
-            <h2 className="flex items-center gap-2 font-bold text-fg"><Building2 size={18} className="text-accent" /> {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "투자 문의 안내")}</h2>
+            <h2 className="flex items-center gap-2 font-bold text-fg"><Building2 size={18} className="text-accent" /> 투자 문의 안내</h2>
             <p className="mt-2 text-sm leading-6 text-fg-2">
-              {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "이 화면은 IR 대화와 자료·미팅 요청을 접수하는 창구입니다. 지분·증권 청약, 투자금 결제, 예상 수익률 제시는 제공하지 않습니다.")}</p>
+              이 화면은 IR 대화와 자료·미팅 요청을 접수하는 창구입니다. 지분·증권 청약, 투자금 결제, 예상 수익률 제시는 제공하지 않습니다.
+            </p>
           </section>
           <section className="rounded-2xl border border-line bg-panel/55 p-5">
-            <h2 className="flex items-center gap-2 font-bold text-fg"><HandCoins size={18} className="text-accent" /> {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "후원 · 스폰서십")}</h2>
+            <h2 className="flex items-center gap-2 font-bold text-fg"><HandCoins size={18} className="text-accent" /> 후원 · 스폰서십</h2>
             <p className="mt-2 text-sm leading-6 text-fg-2">
-              {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "현재는 프로젝트 후원·브랜드 스폰서십 의향을 비공개로 접수합니다. 이 경로는 세액공제용 기부금 모집이 아니며, 사이트 내 직접 후원 결제는 아직 받지 않습니다.")}</p>
+              현재는 프로젝트 후원·브랜드 스폰서십 의향을 비공개로 접수합니다. 이 경로는 세액공제용 기부금 모집이 아니며, 사이트 내 직접 후원 결제는 아직 받지 않습니다.
+            </p>
             <button
               type="button"
               onClick={() => chooseType("sponsorship")}
               className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-sm font-semibold text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
             >
-              {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "후원·스폰서십 문의 선택")}</button>
+              후원·스폰서십 문의 선택
+            </button>
           </section>
           <section className="rounded-2xl border border-line bg-card p-5">
-            <h2 className="flex items-center gap-2 font-bold text-fg"><LockKeyhole size={18} className="text-accent" /> {translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "최소 정보만 받습니다")}</h2>
+            <h2 className="flex items-center gap-2 font-bold text-fg"><LockKeyhole size={18} className="text-accent" /> 최소 정보만 받습니다</h2>
             <ul className="mt-3 space-y-2 text-sm leading-6 text-fg-2">
-              <li>{translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "• 첨부파일은 받지 않아 민감 문서의 불필요한 업로드를 막습니다.")}</li>
-              <li>{translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "• IP 주소와 브라우저·기기 식별 정보는 문의 데이터로 저장하지 않습니다.")}</li>
-              <li>{translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "• 공개 토론이 필요한 제안은 ")}<Link href="/feedback" className="font-semibold text-accent hover:underline">{translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "피드백 보드")}</Link>{translateCurrentStaticSourceText("domains.legal.BusinessPage", "ko", "를 이용할 수 있습니다.")}</li>
+              <li>• 첨부파일은 받지 않아 민감 문서의 불필요한 업로드를 막습니다.</li>
+              <li>• IP 주소와 브라우저·기기 식별 정보는 문의 데이터로 저장하지 않습니다.</li>
+              <li>• 공개 토론이 필요한 제안은 <Link href="/feedback" className="font-semibold text-accent hover:underline">피드백 보드</Link>를 이용할 수 있습니다.</li>
             </ul>
           </section>
         </aside>

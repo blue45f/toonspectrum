@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   ArrowRightLeft,
   CircleUserRound,
@@ -359,12 +355,15 @@ export function StudioVrmAvatarForgePanel({
             <div className="flex flex-wrap items-center gap-1.5">
               <h3 className="flex items-center gap-1.5 text-sm font-extrabold text-fg">
                 <Sparkles size={15} className="text-accent" aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "아바타 조형")}</h3>
+                아바타 조형
+              </h3>
               <span className="rounded-full border border-accent/30 bg-accent-soft px-1.5 py-0.5 text-[0.6rem] font-extrabold tracking-wide text-accent">
-                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "en", "LIVE 3D")}</span>
+                LIVE 3D
+              </span>
             </div>
             <p className="mt-1 max-w-[34rem] text-[0.68rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "스타일 프리셋과 슬라이더로 새 VRM을 만들거나, 불러온 모델의 체형·헤어·얼굴을 비파괴로 조형합니다.")}</p>
+              스타일 프리셋과 슬라이더로 새 VRM을 만들거나, 불러온 모델의 체형·헤어·얼굴을 비파괴로 조형합니다.
+            </p>
           </div>
           <button
             type="button"
@@ -376,8 +375,8 @@ export function StudioVrmAvatarForgePanel({
               emit(createAvatarForgeState());
             }}
             className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg disabled:opacity-40"
-            aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "아바타 조형 초기화")}
-            title={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "기본 조형으로 초기화")}
+            aria-label="아바타 조형 초기화"
+            title="기본 조형으로 초기화"
           >
             <RotateCcw size={16} aria-hidden />
           </button>
@@ -388,21 +387,24 @@ export function StudioVrmAvatarForgePanel({
             <StudioVrmAvatarForgePreview
               state={state}
               variant="hero"
-              label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "현재 아바타 조형 미리보기")}
+              label="현재 아바타 조형 미리보기"
             />
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-[0.6rem] font-extrabold text-accent">
-                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "실시간 조합")}</span>
+                실시간 조합
+              </span>
               <span className="rounded-full border border-line bg-panel px-2 py-0.5 text-[0.6rem] font-bold text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "변경 ")}{changedControlCount}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "개")}</span>
+                변경 {changedControlCount}개
+              </span>
             </div>
             <p className="mt-2 text-[0.72rem] font-extrabold text-fg">
               {visualSummary.face} · {visualSummary.hair}
             </p>
             <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
-              {visualSummary.bangs} · {visualSummary.body}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", ". 카드로 큰 방향을 정한 뒤 숫자 입력으로 마무리하세요.")}</p>
+              {visualSummary.bangs} · {visualSummary.body}. 카드로 큰 방향을 정한 뒤 숫자 입력으로 마무리하세요.
+            </p>
             <div className="mt-2 grid grid-cols-2 gap-1.5">
               <button
                 type="button"
@@ -411,7 +413,7 @@ export function StudioVrmAvatarForgePanel({
                 onClick={() => setPrecisionMode((active) => !active)}
               >
                 <SlidersHorizontal size={12} aria-hidden />
-                {precisionMode ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "빠른 편집") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "정밀 편집")}
+                {precisionMode ? "빠른 편집" : "정밀 편집"}
               </button>
               <button
                 type="button"
@@ -420,12 +422,13 @@ export function StudioVrmAvatarForgePanel({
                 onClick={() => emit(sanitizeAvatarForgeState(baselineRef.current.state))}
               >
                 <RotateCcw size={12} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "시작 상태")}</button>
+                시작 상태
+              </button>
             </div>
           </div>
         </div>
 
-        <div role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "아바타 조형 단계")} className="mt-3 grid grid-cols-4 gap-1 rounded-xl border border-line/70 bg-panel/65 p-1">
+        <div role="tablist" aria-label="아바타 조형 단계" className="mt-3 grid grid-cols-4 gap-1 rounded-xl border border-line/70 bg-panel/65 p-1">
           {VIEWS.map((item) => {
             const Icon = item.icon;
             const selected = item.id === view;
@@ -437,9 +440,11 @@ export function StudioVrmAvatarForgePanel({
                 aria-selected={selected}
                 title={item.hint}
                 onClick={() => setView(item.id)}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "en", "flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border px-1 text-[0.66rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent {v0}"), { v0: String(selected
+                className={`flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border px-1 text-[0.66rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                  selected
                     ? "border-accent/45 bg-accent-soft text-accent shadow-sm"
-                    : "border-transparent text-fg-3 hover:bg-raised hover:text-fg") })}
+                    : "border-transparent text-fg-3 hover:bg-raised hover:text-fg"
+                }`}
               >
                 <Icon size={14} className="shrink-0 max-[360px]:hidden" aria-hidden />
                 <span className="min-w-0 truncate">{item.label}</span>
@@ -452,36 +457,38 @@ export function StudioVrmAvatarForgePanel({
 
       <div className="p-3.5">
         {view === "presets" ? (
-          <div role="tabpanel" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "아바타 스타일 프리셋")} className="space-y-3.5">
+          <div role="tabpanel" aria-label="아바타 스타일 프리셋" className="space-y-3.5">
             <div>
               <div className="flex items-end justify-between gap-3">
                 <div>
-                  <p className="text-[0.7rem] font-extrabold text-fg">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "완성형 스타일")}</p>
-                  <p className="mt-0.5 text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "실제 얼굴·헤어·색 조합을 보고 시작점을 고릅니다.")}</p>
+                  <p className="text-[0.7rem] font-extrabold text-fg">완성형 스타일</p>
+                  <p className="mt-0.5 text-[0.6rem] text-fg-3">실제 얼굴·헤어·색 조합을 보고 시작점을 고릅니다.</p>
                 </div>
-                <span className="text-[0.6rem] tabular-nums text-fg-3">{filteredPresets.length}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "개")}</span>
+                <span className="text-[0.6rem] tabular-nums text-fg-3">{filteredPresets.length}개</span>
               </div>
               <label className="relative mt-2 block">
                 <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" aria-hidden />
                 <input
                   type="search"
                   value={presetQuery}
-                  aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "아바타 스타일 검색")}
-                  placeholder={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "분위기·장르·헤어 검색")}
+                  aria-label="아바타 스타일 검색"
+                  placeholder="분위기·장르·헤어 검색"
                   className="min-h-11 w-full rounded-xl border border-line bg-card pl-9 pr-3 text-xs text-fg placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                   onChange={(event) => setPresetQuery(event.currentTarget.value)}
                 />
               </label>
-              <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]" role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "스타일 장르 필터")}>
+              <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]" role="radiogroup" aria-label="스타일 장르 필터">
                 {FORGE_PRESET_FILTERS.map((filter) => (
                   <button
                     key={filter.id}
                     type="button"
                     role="radio"
                     aria-checked={presetFilter === filter.id}
-                    className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "en", "min-h-9 shrink-0 rounded-full border px-3 text-[0.61rem] font-bold transition-colors {v0}"), { v0: String(presetFilter === filter.id
+                    className={`min-h-9 shrink-0 rounded-full border px-3 text-[0.61rem] font-bold transition-colors ${
+                      presetFilter === filter.id
                         ? "border-accent/60 bg-accent-soft text-accent"
-                        : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg") })}
+                        : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+                    }`}
                     onClick={() => setPresetFilter(filter.id)}
                   >
                     {filter.label}
@@ -500,21 +507,23 @@ export function StudioVrmAvatarForgePanel({
                       type="button"
                       disabled={disabled}
                       aria-pressed={selected}
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "{v0} 스타일 적용: {v1}"), { v0: String(preset.label), v1: String(preset.hint) })}
+                      aria-label={`${preset.label} 스타일 적용: ${preset.hint}`}
                       onClick={() => {
                         setHairStyleChosen(false);
                         emit(withAutomaticHairReplacement(createAvatarForgeState(preset.id)));
                       }}
-                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "en", "group min-h-[10.5rem] overflow-hidden rounded-2xl border text-left transition-[border-color,background-color,transform] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 {v0}"), { v0: String(selected
+                      className={`group min-h-[10.5rem] overflow-hidden rounded-2xl border text-left transition-[border-color,background-color,transform] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${
+                        selected
                           ? "border-accent bg-accent-soft text-accent shadow-sm"
-                          : "border-line bg-card text-fg hover:-translate-y-0.5 hover:bg-raised") })}
+                          : "border-line bg-card text-fg hover:-translate-y-0.5 hover:bg-raised"
+                      }`}
                     >
                       <span className="block h-[6.4rem] overflow-hidden border-b border-line/60 bg-panel/60 px-1 pt-1">
                         <StudioVrmAvatarForgePreview
                           state={preset.state}
                           variant="card"
                           showBody
-                          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "{v0} 조합 미리보기"), { v0: String(preset.label) })}
+                          label={`${preset.label} 조합 미리보기`}
                         />
                       </span>
                       <span className="block p-2.5">
@@ -527,12 +536,14 @@ export function StudioVrmAvatarForgePanel({
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-line bg-card/55 p-4 text-center text-[0.65rem] text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "검색 조건과 일치하는 스타일이 없습니다.")}</div>
+                검색 조건과 일치하는 스타일이 없습니다.
+              </div>
             )}
 
             <details className="group rounded-xl border border-line bg-card/55 p-3">
               <summary className="flex min-h-9 cursor-pointer list-none items-center text-[0.68rem] font-bold text-fg-2 [&::-webkit-details-marker]:hidden">
-                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "캐릭터 베리언트")}<span className="ml-auto text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "얼굴 유지 · 실루엣 교체")}</span>
+                캐릭터 베리언트
+                <span className="ml-auto text-[0.6rem] text-fg-3">얼굴 유지 · 실루엣 교체</span>
               </summary>
               <div className="mt-3 grid grid-cols-2 gap-2 border-t border-line/60 pt-3">
                 {listStudioVrmCharacterVariantSummaries().map((variant) => {
@@ -542,13 +553,13 @@ export function StudioVrmAvatarForgePanel({
                       key={variant.id}
                       type="button"
                       disabled={disabled}
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "{v0} 베리언트: {v1}"), { v0: String(variant.label), v1: String(variant.description) })}
+                      aria-label={`${variant.label} 베리언트: ${variant.description}`}
                       title={variant.tags.join(" · ")}
                       onClick={() => emit(withAutomaticHairReplacement(previewState))}
                       className="overflow-hidden rounded-xl border border-line bg-card text-left text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
                     >
                       <span className="block h-20 overflow-hidden border-b border-line/60 bg-panel/60 px-1">
-                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "{v0} 미리보기"), { v0: String(variant.label) })} />
+                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" label={`${variant.label} 미리보기`} />
                       </span>
                       <span className="block p-2.5">
                         <span className="block truncate text-[0.67rem] font-extrabold">{variant.label}</span>
@@ -581,11 +592,11 @@ export function StudioVrmAvatarForgePanel({
         ) : null}
 
         {view === "body" ? (
-          <div role="tabpanel" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "체형 실루엣 편집")} className="space-y-3.5">
+          <div role="tabpanel" aria-label="체형 실루엣 편집" className="space-y-3.5">
             <div>
               <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "두신 비율 프리셋")}</p>
-                <span className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "3~9두신 · 얼굴·헤어 유지")}</span>
+                <p className="text-[0.68rem] font-bold text-fg-2">두신 비율 프리셋</p>
+                <span className="text-[0.6rem] text-fg-3">3~9두신 · 얼굴·헤어 유지</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {ORDERED_PROPORTION_PRESETS.map((preset) => {
@@ -602,14 +613,16 @@ export function StudioVrmAvatarForgePanel({
                       type="button"
                       disabled={proportionControlsDisabled}
                       aria-pressed={selected}
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "{v0} 체형: {v1}"), { v0: String(preset.label), v1: String(preset.hint) })}
+                      aria-label={`${preset.label} 체형: ${preset.hint}`}
                       onClick={() => emit(previewState)}
-                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "en", "min-h-[8.5rem] overflow-hidden rounded-xl border text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 {v0}"), { v0: String(selected
+                      className={`min-h-[8.5rem] overflow-hidden rounded-xl border text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${
+                        selected
                           ? "border-accent bg-accent-soft text-accent"
-                          : "border-line bg-card text-fg hover:bg-raised") })}
+                          : "border-line bg-card text-fg hover:bg-raised"
+                      }`}
                     >
                       <span className="block h-[5.2rem] overflow-hidden border-b border-line/60 bg-panel/60 px-1">
-                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "{v0} 체형 미리보기"), { v0: String(preset.label) })} />
+                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" label={`${preset.label} 체형 미리보기`} />
                       </span>
                       <span className="block p-2">
                         <span className="block truncate text-[0.67rem] font-extrabold">{preset.label}</span>
@@ -623,12 +636,14 @@ export function StudioVrmAvatarForgePanel({
 
             <div className="rounded-lg border border-line bg-card/70 p-3">
               <div className="mb-1 flex items-center justify-between gap-2">
-                <p className="text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "리그 안전 체형 비율")}</p>
+                <p className="text-[0.68rem] font-bold text-fg-2">리그 안전 체형 비율</p>
                 <span className="rounded-full border border-accent/25 bg-accent-soft px-1.5 py-0.5 text-[0.58rem] font-bold text-accent">
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "관절 이동 방식")}</span>
+                  관절 이동 방식
+                </span>
               </div>
               <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "본을 찌그러뜨리지 않고 관절 사이 거리를 rest 자세 기준으로 다시 계산합니다. 포즈·IK·의상·소품은 같은 리그를 계속 따라가요.")}</p>
+                본을 찌그러뜨리지 않고 관절 사이 거리를 rest 자세 기준으로 다시 계산합니다. 포즈·IK·의상·소품은 같은 리그를 계속 따라가요.
+              </p>
               <div className="space-y-3">
                 {STUDIO_VRM_PROPORTION_KEYS.map((key) => {
                   const limit = STUDIO_VRM_PROPORTION_LIMITS[key];
@@ -657,31 +672,31 @@ export function StudioVrmAvatarForgePanel({
               className="rounded-lg border border-line/70 bg-panel/55 px-3 py-2 text-[0.62rem] leading-relaxed text-fg-3"
             >
               <span className="font-bold text-fg-2">
-                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "골격 ")}{formatStudioVrmHeadUnits(proportionMetrics.headUnits)} · {runtimeProportionMetrics ? proportionMetricsLabel : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "비율 기준 예상")} {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "신장 ")}{proportionMetrics.totalHeight.toFixed(2)}m
+                골격 {formatStudioVrmHeadUnits(proportionMetrics.headUnits)} · {runtimeProportionMetrics ? proportionMetricsLabel : "비율 기준 예상"} 신장 {proportionMetrics.totalHeight.toFixed(2)}m
               </span>
               {visualHeadUnitsDiffer
-                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", " · 현재 얼굴 조형 {v0}"), { v0: String(formatStudioVrmHeadUnits(visualProportionMetrics.headUnits)) })
+                ? ` · 현재 얼굴 조형 ${formatStudioVrmHeadUnits(visualProportionMetrics.headUnits)}`
                 : ""}
               {selectedProportionPreset
                 ? proportionPresetNote
                   ? ` · ${proportionPresetNote}`
-                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", " · {v0} 적용 중입니다. 슬라이더를 움직이면 직접 조절로 전환돼요."), { v0: String(selectedProportionPreset.label) })
-                : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", " · 직접 조절 중입니다. 실제 모델의 원래 키를 기준으로 같은 비율이 적용돼요.")}
+                  : ` · ${selectedProportionPreset.label} 적용 중입니다. 슬라이더를 움직이면 직접 조절로 전환돼요.`
+                : " · 직접 조절 중입니다. 실제 모델의 원래 키를 기준으로 같은 비율이 적용돼요."}
             </p>
             {proportionUnavailableReason ? (
               <p role="alert" className="rounded-lg border border-danger/35 bg-danger/10 px-3 py-2 text-[0.62rem] leading-relaxed text-danger">
                 {disabled
-                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "리그를 안전한 상태로 확인할 때까지 아바타 조형을 잠시 중단했습니다. {v0}"), { v0: String(proportionUnavailableReason) })
-                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "이 모델은 리그 안전 체형 편집을 사용할 수 없습니다. {v0} 헤어·얼굴 편집은 계속 사용할 수 있어요."), { v0: String(proportionUnavailableReason) })}
+                  ? `리그를 안전한 상태로 확인할 때까지 아바타 조형을 잠시 중단했습니다. ${proportionUnavailableReason}`
+                  : `이 모델은 리그 안전 체형 편집을 사용할 수 없습니다. ${proportionUnavailableReason} 헤어·얼굴 편집은 계속 사용할 수 있어요.`}
               </p>
             ) : null}
           </div>
         ) : null}
 
         {view === "hair" ? (
-          <div role="tabpanel" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "프로시저럴 헤어 편집")} className="space-y-3.5">
+          <div role="tabpanel" aria-label="프로시저럴 헤어 편집" className="space-y-3.5">
             <div>
-              <p className="mb-2 text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "헤어 실루엣")}</p>
+              <p className="mb-2 text-[0.68rem] font-bold text-fg-2">헤어 실루엣</p>
               <div className="grid grid-cols-3 gap-1.5">
                 {AVATAR_FORGE_HAIR_STYLE_OPTIONS.map((option) => {
                   const selected = state.hair.style === option.id;
@@ -700,10 +715,12 @@ export function StudioVrmAvatarForgePanel({
                           applyAvatarForgeHairStyleRecipe(state, option.id),
                         ));
                       }}
-                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "en", "min-h-[7.5rem] overflow-hidden rounded-xl border text-[0.62rem] font-bold transition-colors disabled:opacity-40 {v0}"), { v0: String(selected ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised") })}
+                      className={`min-h-[7.5rem] overflow-hidden rounded-xl border text-[0.62rem] font-bold transition-colors disabled:opacity-40 ${
+                        selected ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
+                      }`}
                     >
                       <span className="block h-[4.8rem] overflow-hidden border-b border-line/60 bg-panel/60 px-1">
-                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" showBody={false} label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "{v0} 헤어 미리보기"), { v0: String(option.label) })} />
+                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" showBody={false} label={`${option.label} 헤어 미리보기`} />
                       </span>
                       <span className="block truncate px-1.5 py-2 text-center">{option.label}</span>
                     </button>
@@ -713,7 +730,7 @@ export function StudioVrmAvatarForgePanel({
             </div>
 
             <div>
-              <p className="mb-2 text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "앞머리 형태")}</p>
+              <p className="mb-2 text-[0.68rem] font-bold text-fg-2">앞머리 형태</p>
               <div className="grid grid-cols-3 gap-1.5">
                 {AVATAR_FORGE_BANG_STYLE_OPTIONS.map((option) => {
                   const selected = state.hair.bangStyle === option.id;
@@ -731,10 +748,12 @@ export function StudioVrmAvatarForgePanel({
                       aria-pressed={selected}
                       title={option.hint}
                       onClick={() => updateHair("bangStyle", option.id)}
-                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "en", "min-h-[6.8rem] overflow-hidden rounded-xl border text-[0.62rem] font-bold transition-colors disabled:opacity-40 {v0}"), { v0: String(selected ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised") })}
+                      className={`min-h-[6.8rem] overflow-hidden rounded-xl border text-[0.62rem] font-bold transition-colors disabled:opacity-40 ${
+                        selected ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
+                      }`}
                     >
                       <span className="block h-[4.1rem] overflow-hidden border-b border-line/60 bg-panel/60 px-1">
-                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" showBody={false} label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "{v0} 앞머리 미리보기"), { v0: String(option.label) })} />
+                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" showBody={false} label={`${option.label} 앞머리 미리보기`} />
                       </span>
                       <span className="block truncate px-1.5 py-1.5 text-center">{option.label}</span>
                     </button>
@@ -745,7 +764,7 @@ export function StudioVrmAvatarForgePanel({
 
             <div>
               <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "헤어 컬러 조합")}</p>
+                <p className="text-[0.68rem] font-bold text-fg-2">헤어 컬러 조합</p>
                 <button
                   type="button"
                   disabled={disabled || state.hair.style === "none"}
@@ -761,7 +780,8 @@ export function StudioVrmAvatarForgePanel({
                   })}
                 >
                   <ArrowRightLeft size={11} aria-hidden />
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "기본·하이라이트 교체")}</button>
+                  기본·하이라이트 교체
+                </button>
               </div>
               <div className="grid grid-cols-4 gap-1.5">
                 {HAIR_COLOR_PRESETS.map((palette) => {
@@ -773,10 +793,12 @@ export function StudioVrmAvatarForgePanel({
                       key={palette.id}
                       type="button"
                       disabled={disabled || state.hair.style === "none"}
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "{v0} 헤어 컬러 적용"), { v0: String(palette.label) })}
+                      aria-label={`${palette.label} 헤어 컬러 적용`}
                       aria-pressed={selected}
                       title={palette.label}
-                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "en", "min-h-12 rounded-xl border p-1 transition-colors disabled:opacity-35 {v0}"), { v0: String(selected ? "border-accent bg-accent-soft" : "border-line bg-card hover:bg-raised") })}
+                      className={`min-h-12 rounded-xl border p-1 transition-colors disabled:opacity-35 ${
+                        selected ? "border-accent bg-accent-soft" : "border-line bg-card hover:bg-raised"
+                      }`}
                       onClick={() => emit({
                         ...state,
                         presetId: undefined,
@@ -821,7 +843,7 @@ export function StudioVrmAvatarForgePanel({
                       disabled={disabled || state.hair.style === "none"}
                       onChange={(event) => updateHair(key, event.target.value)}
                       className="h-8 w-full cursor-pointer rounded-lg border border-line bg-transparent p-0 disabled:opacity-35 pointer-coarse:h-11"
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "헤어 {v0}"), { v0: String(label) })}
+                      aria-label={`헤어 ${label}`}
                     />
                   </label>
                 );
@@ -852,11 +874,12 @@ export function StudioVrmAvatarForgePanel({
               <div className="space-y-3 rounded-xl border border-accent/25 bg-accent-soft/20 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <p className="text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "정밀 헤어 파라미터")}</p>
-                    <p className="mt-0.5 text-[0.58rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "가닥 두께·웨이브·광택·묶음 위치를 숫자로 마감합니다.")}</p>
+                    <p className="text-[0.68rem] font-bold text-fg-2">정밀 헤어 파라미터</p>
+                    <p className="mt-0.5 text-[0.58rem] text-fg-3">가닥 두께·웨이브·광택·묶음 위치를 숫자로 마감합니다.</p>
                   </div>
                   <span className="rounded-full border border-accent/30 bg-card px-2 py-0.5 text-[0.58rem] font-bold text-accent">
-                    {HAIR_DETAIL_KEYS.length}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "개")}</span>
+                    {HAIR_DETAIL_KEYS.length}개
+                  </span>
                 </div>
                 {HAIR_DETAIL_KEYS.map((key) => {
                   const limit = AVATAR_FORGE_HAIR_LIMITS[key];
@@ -883,7 +906,8 @@ export function StudioVrmAvatarForgePanel({
                 onClick={() => setPrecisionMode(true)}
               >
                 <span>
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "정밀 헤어 조절")}<span className="mt-0.5 block text-[0.58rem] font-normal text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "가닥·웨이브·광택 등 ")}{HAIR_DETAIL_KEYS.length}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "개")}</span>
+                  정밀 헤어 조절
+                  <span className="mt-0.5 block text-[0.58rem] font-normal text-fg-3">가닥·웨이브·광택 등 {HAIR_DETAIL_KEYS.length}개</span>
                 </span>
                 <SlidersHorizontal size={15} className="text-accent" aria-hidden />
               </button>
@@ -891,19 +915,19 @@ export function StudioVrmAvatarForgePanel({
 
             <div className="flex min-h-12 items-center gap-2.5 rounded-xl border border-line bg-panel/55 px-3">
               <input
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "en", "{v0}-replace-original"), { v0: String(controlId) })}
+                id={`${controlId}-replace-original`}
                 type="checkbox"
                 checked={state.hair.replaceOriginal}
                 disabled={disabled || detectedOriginalHairCount === 0}
                 onChange={(event) => updateHair("replaceOriginal", event.target.checked)}
                 className="size-4 accent-accent pointer-coarse:size-5"
               />
-              <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "en", "{v0}-replace-original"), { v0: String(controlId) })} className="min-w-0 flex-1 cursor-pointer">
-                <span className="block text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "선택한 헤어로 원본 교체")}</span>
+              <label htmlFor={`${controlId}-replace-original`} className="min-w-0 flex-1 cursor-pointer">
+                <span className="block text-[0.68rem] font-bold text-fg-2">선택한 헤어로 원본 교체</span>
                 <span className="block text-[0.6rem] text-fg-3">
                   {detectedOriginalHairCount > 0
-                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "새 헤어 선택 시 원본 {v0}개 메시를 자동으로 숨깁니다. 끄면 겹쳐 비교할 수 있어요."), { v0: String(detectedOriginalHairCount) })
-                    : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "이 모델은 머리와 헤어가 한 메시라 원본을 안전하게 분리할 수 없습니다.")}
+                    ? `새 헤어 선택 시 원본 ${detectedOriginalHairCount}개 메시를 자동으로 숨깁니다. 끄면 겹쳐 비교할 수 있어요.`
+                    : "이 모델은 머리와 헤어가 한 메시라 원본을 안전하게 분리할 수 없습니다."}
                 </span>
               </label>
             </div>
@@ -911,14 +935,14 @@ export function StudioVrmAvatarForgePanel({
         ) : null}
 
         {view === "face" ? (
-          <div role="tabpanel" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "얼굴 비율과 디테일 편집")} className="space-y-3.5">
+          <div role="tabpanel" aria-label="얼굴 비율과 디테일 편집" className="space-y-3.5">
             <div>
               <div className="mb-2 flex items-end justify-between gap-2">
                 <div>
-                  <p className="text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "얼굴형 프리셋")}</p>
-                  <p className="mt-0.5 text-[0.58rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "원본 눈·코·입 리그를 유지하면서 두상과 턱 실루엣만 안전하게 조절합니다.")}</p>
+                  <p className="text-[0.68rem] font-bold text-fg-2">얼굴형 프리셋</p>
+                  <p className="mt-0.5 text-[0.58rem] text-fg-3">원본 눈·코·입 리그를 유지하면서 두상과 턱 실루엣만 안전하게 조절합니다.</p>
                 </div>
-                <span className="text-[0.58rem] text-fg-3">{FACE_SHAPE_PRESETS.length}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "종")}</span>
+                <span className="text-[0.58rem] text-fg-3">{FACE_SHAPE_PRESETS.length}종</span>
               </div>
               <div className="grid grid-cols-3 gap-1.5">
                 {FACE_SHAPE_PRESETS.map((preset) => {
@@ -933,10 +957,12 @@ export function StudioVrmAvatarForgePanel({
                       key={preset.id}
                       type="button"
                       disabled={disabled}
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "{v0} 얼굴형 적용: {v1}"), { v0: String(preset.label), v1: String(preset.hint) })}
+                      aria-label={`${preset.label} 얼굴형 적용: ${preset.hint}`}
                       aria-pressed={selected}
                       title={preset.hint}
-                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "en", "min-h-[7.4rem] overflow-hidden rounded-xl border text-[0.61rem] font-bold transition-colors disabled:opacity-40 {v0}"), { v0: String(selected ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised") })}
+                      className={`min-h-[7.4rem] overflow-hidden rounded-xl border text-[0.61rem] font-bold transition-colors disabled:opacity-40 ${
+                        selected ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
+                      }`}
                       onClick={() => emit({
                         ...state,
                         presetId: undefined,
@@ -944,7 +970,7 @@ export function StudioVrmAvatarForgePanel({
                       })}
                     >
                       <span className="block h-[4.7rem] overflow-hidden border-b border-line/60 bg-panel/60 px-1">
-                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" showBody={false} label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "{v0} 얼굴형 미리보기"), { v0: String(preset.label) })} />
+                        <StudioVrmAvatarForgePreview state={previewState} variant="compact" showBody={false} label={`${preset.label} 얼굴형 미리보기`} />
                       </span>
                       <span className="block truncate px-1 py-1.5 text-center">{preset.label}</span>
                     </button>
@@ -954,9 +980,10 @@ export function StudioVrmAvatarForgePanel({
             </div>
 
             <div className="rounded-xl border border-line bg-card/70 p-3">
-              <p className="mb-1 text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "리그 보존 얼굴 비율")}</p>
+              <p className="mb-1 text-[0.68rem] font-bold text-fg-2">리그 보존 얼굴 비율</p>
               <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "머리 본의 안전 범위 안에서 실루엣을 조절합니다. 표정·립싱크·시선 리그는 그대로 유지돼요.")}</p>
+                머리 본의 안전 범위 안에서 실루엣을 조절합니다. 표정·립싱크·시선 리그는 그대로 유지돼요.
+              </p>
               <div className="space-y-3">
                 {(Object.keys(AVATAR_FORGE_FACE_LIMITS) as Array<keyof AvatarForgeFaceParams>).map((key) => {
                   const limit = AVATAR_FORGE_FACE_LIMITS[key];
@@ -980,16 +1007,18 @@ export function StudioVrmAvatarForgePanel({
 
             <div
               className="rounded-xl border border-accent/25 bg-accent-soft/20 p-3"
-              data-studio-vrm-semantic-face-morphs={semanticFaceMorphProfile?.status ?? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "en", "unavailable")}
+              data-studio-vrm-semantic-face-morphs={semanticFaceMorphProfile?.status ?? "unavailable"}
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "적응형 얼굴 디테일")}</p>
+                  <p className="text-[0.68rem] font-bold text-fg-2">적응형 얼굴 디테일</p>
                   <p className="mt-0.5 text-[0.58rem] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "모델 고유 shape key를 먼저 사용하고, 없는 항목은 머리·눈 랜드마크와 얼굴 메시를 기반으로 부드럽게 조형합니다. 표정·립싱크 채널은 제외합니다.")}</p>
+                    모델 고유 shape key를 먼저 사용하고, 없는 항목은 머리·눈 랜드마크와 얼굴 메시를 기반으로 부드럽게 조형합니다. 표정·립싱크 채널은 제외합니다.
+                  </p>
                 </div>
                 <span className="shrink-0 rounded-full border border-accent/30 bg-card px-2 py-0.5 text-[0.57rem] font-bold text-accent">
-                  {semanticFaceMorphProfile?.controls.length ?? 0}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "종")}</span>
+                  {semanticFaceMorphProfile?.controls.length ?? 0}종
+                </span>
               </div>
               {semanticFaceMorphProfile?.status === "ready" ? (
                 <div className="mt-3 space-y-3">
@@ -1010,13 +1039,14 @@ export function StudioVrmAvatarForgePanel({
                   ))}
                   <details className="rounded-lg border border-line/70 bg-card/60 p-2.5">
                     <summary className="min-h-8 cursor-pointer text-[0.59rem] font-bold text-fg-2">
-                      {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "조형 공급자 확인")}</summary>
+                      조형 공급자 확인
+                    </summary>
                     <div className="mt-2 space-y-1 border-t border-line/60 pt-2">
                       {semanticFaceMorphProfile.controls.map((control) => (
                         <p key={control.id} className="break-all text-[0.55rem] leading-relaxed text-fg-3">
                           <b className="text-fg-2">{control.label}</b> · {control.provider === "native-morph"
-                            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "모델 morph · {v0}"), { v0: String(control.targetNames.join(" · ")) })
-                            : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "적응형 mesh · 얼굴 메시 {v0}개"), { v0: String(control.adaptiveMeshCount) })}
+                            ? `모델 morph · ${control.targetNames.join(" · ")}`
+                            : `적응형 mesh · 얼굴 메시 ${control.adaptiveMeshCount}개`}
                         </p>
                       ))}
                     </div>
@@ -1025,13 +1055,13 @@ export function StudioVrmAvatarForgePanel({
               ) : (
                 <p className="mt-3 rounded-lg border border-line bg-card/60 px-3 py-2 text-[0.6rem] leading-relaxed text-fg-3">
                   {semanticFaceMorphProfile?.message
-                    ?? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "모델을 불러오면 native morph와 적응형 얼굴 메시를 함께 검사합니다.")}
+                    ?? "모델을 불러오면 native morph와 적응형 얼굴 메시를 함께 검사합니다."}
                 </p>
               )}
             </div>
 
             <div>
-              <p className="mb-2 text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "얼굴 디테일")}</p>
+              <p className="mb-2 text-[0.68rem] font-bold text-fg-2">얼굴 디테일</p>
               <div className="space-y-2">
                 {AVATAR_FORGE_FACE_ACCENT_OPTIONS.map((option) => {
                   const accent = state.faceAccents?.find((entry) => entry.id === option.id);
@@ -1059,12 +1089,13 @@ export function StudioVrmAvatarForgePanel({
                           disabled={disabled || !accent.enabled}
                           onChange={(event) => updateAccent(option.id, { color: event.target.value })}
                           className="size-8 cursor-pointer rounded-lg border border-line bg-transparent p-0 pointer-coarse:size-11"
-                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "{v0} 색상"), { v0: String(option.label) })}
+                          aria-label={`${option.label} 색상`}
                         />
                       </div>
                       {accent.enabled ? (
                         <label className="mt-2 flex items-center gap-2 text-[0.62rem] text-fg-3">
-                          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "강도")}<input
+                          강도
+                          <input
                             type="range"
                             min={0}
                             max={1}
@@ -1094,12 +1125,14 @@ export function StudioVrmAvatarForgePanel({
           <div className="min-w-0">
             <p className="flex items-center gap-1.5 text-[0.72rem] font-extrabold text-fg">
               <UserPlus size={14} className="text-accent" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "새 VRM 캐릭터")}</p>
+              새 VRM 캐릭터
+            </p>
             <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "위 프리셋·슬라이더를 레시피로 써서 휴머노이드 VRM을 생성합니다. 불러온 모델을 덮어쓰지 않아요.")}</p>
+              위 프리셋·슬라이더를 레시피로 써서 휴머노이드 VRM을 생성합니다. 불러온 모델을 덮어쓰지 않아요.
+            </p>
           </div>
           <span
-            data-studio-vrm-generate-preset={previewRecipe.presetId ?? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "en", "custom")}
+            data-studio-vrm-generate-preset={previewRecipe.presetId ?? "custom"}
             className="shrink-0 rounded-full border border-line bg-card px-2 py-0.5 text-[0.6rem] font-bold text-fg-2"
           >
             {previewRecipe.label}
@@ -1116,7 +1149,7 @@ export function StudioVrmAvatarForgePanel({
             <StudioVrmAvatarForgePreview
               state={previewRecipe.state}
               variant="compact"
-              label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "{v0} 생성 결과 미리보기"), { v0: String(previewRecipe.label) })}
+              label={`${previewRecipe.label} 생성 결과 미리보기`}
             />
           </span>
           <span className="min-w-0 text-[0.62rem] leading-relaxed text-fg-3">
@@ -1136,7 +1169,7 @@ export function StudioVrmAvatarForgePanel({
                 className="size-3 shrink-0 rounded-full border border-line/70 shadow-inner"
                 style={{ backgroundColor: previewRecipe.state.hair.baseColor }}
               />
-              <span className="truncate">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "헤어 컬러 ")}{previewRecipe.state.hair.baseColor.toUpperCase()}</span>
+              <span className="truncate">헤어 컬러 {previewRecipe.state.hair.baseColor.toUpperCase()}</span>
             </span>
           </span>
         </div>
@@ -1146,7 +1179,9 @@ export function StudioVrmAvatarForgePanel({
             data-studio-vrm-generate-default-preset={previewRecipe.appliedDefaultPresetId}
             className="rounded-xl border border-line bg-raised/60 px-3 py-2 text-[0.66rem] leading-relaxed text-fg-3"
           >
-            {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "아직 고른 스타일이 없어 기본 스타일 ")}<b className="text-fg-2">{previewRecipe.label}</b>{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "로 생성됩니다. 위에서 다른 스타일을 고르거나 슬라이더를 조절하면 그 설정이 그대로 쓰입니다.")}</p>
+            아직 고른 스타일이 없어 기본 스타일 <b className="text-fg-2">{previewRecipe.label}</b>로
+            생성됩니다. 위에서 다른 스타일을 고르거나 슬라이더를 조절하면 그 설정이 그대로 쓰입니다.
+          </p>
         ) : null}
 
         {generateResult?.status === "unavailable" ? (
@@ -1166,7 +1201,8 @@ export function StudioVrmAvatarForgePanel({
             role="status"
             className="rounded-xl border border-accent/30 bg-accent-soft px-3 py-2 text-[0.66rem] text-accent"
           >
-            {generateResult.recipe.label} {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "VRM을 만들었습니다. 라이브러리에 넣고 뷰포트에서 미리볼 수 있어요.")}</p>
+            {generateResult.recipe.label} VRM을 만들었습니다. 라이브러리에 넣고 뷰포트에서 미리볼 수 있어요.
+          </p>
         ) : null}
 
         <div className="grid grid-cols-2 gap-2">
@@ -1195,7 +1231,7 @@ export function StudioVrmAvatarForgePanel({
             className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-accent/40 bg-accent-soft px-2 text-[0.7rem] font-extrabold text-accent transition-colors hover:bg-accent/15 disabled:opacity-40"
           >
             <Sparkles size={14} aria-hidden />
-            {generateBusy ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "생성 중…") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "VRM 생성")}
+            {generateBusy ? "생성 중…" : "VRM 생성"}
           </button>
           <button
             type="button"
@@ -1214,7 +1250,8 @@ export function StudioVrmAvatarForgePanel({
             className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-2 text-[0.7rem] font-extrabold text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
           >
             <Download size={14} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePanel", "ko", "VRM 내보내기")}</button>
+            VRM 내보내기
+          </button>
         </div>
       </div>
     </section>

@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, Brush, Layers3, Palette } from "lucide-react";
 import { useState } from "react";
 
@@ -19,13 +16,13 @@ export function MarketMaterialPreview() {
   const material = MATERIALS[selected];
   return <figure className="market-material-preview">
     <div className="market-material-image">
-      <img src="/brand/atelier-materials.webp" alt={translateCurrentStaticSourceText("domains.market.components.MarketMaterialPreview", "ko", "잉크 자국, 색 견본, 인물과 건축 스케치를 모은 웹툰 드로잉 재료 콘셉트 이미지")} width={1536} height={1024} fetchPriority="high" style={{ objectPosition: material.position }} />
-      <span className="market-material-label">{translateCurrentStaticSourceText("domains.market.components.MarketMaterialPreview", "en", "THE ARTIST'S MATERIAL DESK")}</span>
+      <img src="/brand/atelier-materials.webp" alt="잉크 자국, 색 견본, 인물과 건축 스케치를 모은 웹툰 드로잉 재료 콘셉트 이미지" width={1536} height={1024} fetchPriority="high" style={{ objectPosition: material.position }} />
+      <span className="market-material-label">THE ARTIST'S MATERIAL DESK</span>
     </div>
     <figcaption>
-      <div className="market-material-tabs" role="group" aria-label={translateCurrentStaticSourceText("domains.market.components.MarketMaterialPreview", "ko", "작업에 필요한 재료 선택")}>{MATERIALS.map((item, index) => { const Icon = item.icon; return <button key={item.id} type="button" aria-pressed={selected === index} onClick={() => setSelected(index)}><Icon size={14} aria-hidden="true" />{item.label}</button>; })}</div>
+      <div className="market-material-tabs" role="group" aria-label="작업에 필요한 재료 선택">{MATERIALS.map((item, index) => { const Icon = item.icon; return <button key={item.id} type="button" aria-pressed={selected === index} onClick={() => setSelected(index)}><Icon size={14} aria-hidden="true" />{item.label}</button>; })}</div>
       <div className="market-material-description" aria-live="polite"><h2>{material.title}</h2><p>{material.text}</p></div>
-      <div className="market-material-bottom"><span>{translateCurrentStaticSourceText("domains.market.components.MarketMaterialPreview", "ko", "재료 콘셉트 이미지")}</span><Link href={material.href}>{material.action}<ArrowUpRight size={15} aria-hidden="true" /></Link></div>
+      <div className="market-material-bottom"><span>재료 콘셉트 이미지</span><Link href={material.href}>{material.action}<ArrowUpRight size={15} aria-hidden="true" /></Link></div>
     </figcaption>
   </figure>;
 }

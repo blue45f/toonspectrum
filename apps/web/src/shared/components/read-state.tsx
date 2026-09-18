@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Bookmark, BookOpen, CheckCircle2, XCircle } from "lucide-react";
 
 import type { ReadState } from "@/shared/lib/types";
@@ -42,7 +41,7 @@ export function ReadStateSelector({ titleId, className }: { titleId: string; cla
                 : "border-line bg-card text-fg-3 hover:border-line-strong hover:text-fg-2"
             )}
           >
-            <o.icon size={17} className={active ? translateCurrentStaticSourceText("shared.components.read.state", "en", "fill-accent/20") : ""} />
+            <o.icon size={17} className={active ? "fill-accent/20" : ""} />
             {o.label}
           </button>
         );

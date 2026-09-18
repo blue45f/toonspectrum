@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Levels Panel
  * 선택된 이미지의 레벨(Levels) 보정 인스펙터 — 채널 세그먼트(RGB/R/G/B) + 원클릭 톤 프리셋 +
@@ -95,28 +94,29 @@ export function StudioLevelsPanel({
     <div className="space-y-2">
       {/* 헤더 + 항등 복귀(모든 채널) */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioLevelsPanel", "ko", "레벨 보정 (Levels)")}</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">레벨 보정 (Levels)</p>
         <button
           type="button"
           onClick={onReset}
           disabled={channelEditable ? allIdentity : identityByChannel.master}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.StudioLevelsPanel", "ko", "레벨 보정(모든 채널)을 제거하고 원본 톤으로 되돌립니다.")}
+          title="레벨 보정(모든 채널)을 제거하고 원본 톤으로 되돌립니다."
         >
           <RotateCcw className="size-3.5" />
-          {translateCurrentStaticSourceText("domains.creator.StudioLevelsPanel", "ko", "원본으로")}</button>
+          원본으로
+        </button>
       </div>
 
       {/* 채널 세그먼트 — RGB(마스터)/R/G/B. 조정된 채널에는 점 배지를 띄운다. */}
       {channelEditable && (
-        <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioLevelsPanel", "ko", "레벨 채널")} className="flex flex-wrap gap-1.5">
+        <div role="group" aria-label="레벨 채널" className="flex flex-wrap gap-1.5">
           {TONE_CHANNELS.map((c) => (
             <StudioToggleChip key={c.id} active={activeChannel === c.id} title={c.tip} onClick={() => setChannel(c.id)}>
               {c.label}
               {!identityByChannel[c.id] && (
                 <>
                   <span aria-hidden className="ml-1 inline-block size-1.5 rounded-full bg-accent align-middle" />
-                  <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioLevelsPanel", "ko", "(조정됨)")}</span>
+                  <span className="sr-only">(조정됨)</span>
                 </>
               )}
             </StudioToggleChip>

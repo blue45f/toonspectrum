@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Recipe browser and deterministic render-load diagnostics for the canonical smart-filter stack.
  */
@@ -104,27 +100,32 @@ export function StudioEffectsWorkspacePanel({
   return (
     <section
       data-studio-effects-workspace="true"
-      aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "{v0}-title"), { v0: String(searchId) })}
+      aria-labelledby={`${searchId}-title`}
       className="space-y-3 rounded-xl border border-accent/25 bg-accent-soft/10 p-3"
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[0.58rem] font-bold uppercase tracking-[0.14em] text-accent">
-            {translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "효과 작업공간")}</p>
-          <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "{v0}-title"), { v0: String(searchId) })} className="mt-0.5 text-sm font-bold text-fg">
-            {translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "웹툰 레시피 · 렌더 진단")}</h3>
+            효과 작업공간
+          </p>
+          <h3 id={`${searchId}-title`} className="mt-0.5 text-sm font-bold text-fg">
+            웹툰 레시피 · 렌더 진단
+          </h3>
           <p className="mt-1 max-w-2xl text-[0.63rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "현재 스마트 필터 엔진만 조합합니다. 원본·Undo·필터 마스크·내보내기 경로는 그대로 유지됩니다. 부하 점수는 기기 시간이 아닌 상대적 휴리스틱입니다.")}</p>
+            현재 스마트 필터 엔진만 조합합니다. 원본·Undo·필터 마스크·내보내기 경로는 그대로 유지됩니다.
+            부하 점수는 기기 시간이 아닌 상대적 휴리스틱입니다.
+          </p>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
           <span
-            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "rounded-full border px-2 py-1 text-[0.6rem] font-bold {v0}"), { v0: String(diagnosticTone(diagnostics.tier)) })}
+            className={`rounded-full border px-2 py-1 text-[0.6rem] font-bold ${diagnosticTone(diagnostics.tier)}`}
           >
-            {studioEffectCostTierLabel(diagnostics.tier)} · {diagnostics.costPoints}{translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "점")}</span>
+            {studioEffectCostTierLabel(diagnostics.tier)} · {diagnostics.costPoints}점
+          </span>
           {diagnostics.entryCount > 0 ? (
             <button
               type="button"
-              aria-label={clearArmed ? translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "전체 효과 제거 확인") : translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "전체 효과 제거")}
+              aria-label={clearArmed ? "전체 효과 제거 확인" : "전체 효과 제거"}
               onBlur={() => {
                 if (!clearArmed) return;
                 setClearArmed(false);
@@ -151,11 +152,11 @@ export function StudioEffectsWorkspacePanel({
               }}
               className={
                 clearArmed
-                  ? translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "min-h-9 rounded-full border border-bad/50 bg-bad/10 px-2.5 text-[0.6rem] font-bold text-bad pointer-coarse:min-h-11")
-                  : translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "min-h-9 rounded-full border border-line bg-card/70 px-2.5 text-[0.6rem] font-semibold text-fg-3 hover:border-bad/40 hover:text-bad pointer-coarse:min-h-11")
+                  ? "min-h-9 rounded-full border border-bad/50 bg-bad/10 px-2.5 text-[0.6rem] font-bold text-bad pointer-coarse:min-h-11"
+                  : "min-h-9 rounded-full border border-line bg-card/70 px-2.5 text-[0.6rem] font-semibold text-fg-3 hover:border-bad/40 hover:text-bad pointer-coarse:min-h-11"
               }
             >
-              {clearArmed ? translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "한 번 더 눌러 제거") : translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "전체 제거")}
+              {clearArmed ? "한 번 더 눌러 제거" : "전체 제거"}
             </button>
           ) : null}
         </div>
@@ -163,25 +164,25 @@ export function StudioEffectsWorkspacePanel({
 
       <div
         role="group"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "효과 스택 진단 요약")}
+        aria-label="효과 스택 진단 요약"
         className="grid grid-cols-2 gap-1.5 sm:grid-cols-4"
       >
         <div className="rounded-lg border border-line/70 bg-card/60 px-2 py-2">
-          <p className="text-[0.56rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "활성 효과")}</p>
+          <p className="text-[0.56rem] font-semibold text-fg-3">활성 효과</p>
           <p className="mt-0.5 text-sm font-bold tabular-nums text-fg">{diagnostics.activeCount}</p>
         </div>
         <div className="rounded-lg border border-line/70 bg-card/60 px-2 py-2">
-          <p className="text-[0.56rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "꺼짐 / 0%")}</p>
+          <p className="text-[0.56rem] font-semibold text-fg-3">꺼짐 / 0%</p>
           <p className="mt-0.5 text-sm font-bold tabular-nums text-fg">
             {diagnostics.disabledCount} / {diagnostics.zeroOpacityCount}
           </p>
         </div>
         <div className="rounded-lg border border-line/70 bg-card/60 px-2 py-2">
-          <p className="text-[0.56rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "고비용 효과")}</p>
+          <p className="text-[0.56rem] font-semibold text-fg-3">고비용 효과</p>
           <p className="mt-0.5 text-sm font-bold tabular-nums text-fg">{diagnostics.expensiveEngineCount}</p>
         </div>
         <div className="rounded-lg border border-line/70 bg-card/60 px-2 py-2">
-          <p className="text-[0.56rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "권장 미리보기")}</p>
+          <p className="text-[0.56rem] font-semibold text-fg-3">권장 미리보기</p>
           <p className="mt-0.5 text-sm font-bold tabular-nums text-fg">
             {Math.round(diagnostics.recommendedPreviewScale * 100)}%
           </p>
@@ -189,14 +190,14 @@ export function StudioEffectsWorkspacePanel({
       </div>
 
       {diagnostics.messages.length > 0 ? (
-        <ul className="space-y-1" aria-label={translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "효과 스택 진단")}>
+        <ul className="space-y-1" aria-label="효과 스택 진단">
           {diagnostics.messages.slice(0, 4).map((message) => (
             <li
               key={message.id}
               className={
                 message.severity === "warning"
-                  ? translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "rounded-lg border border-warn/35 bg-warn/10 px-2.5 py-2")
-                  : translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "rounded-lg border border-line/70 bg-card/45 px-2.5 py-2")
+                  ? "rounded-lg border border-warn/35 bg-warn/10 px-2.5 py-2"
+                  : "rounded-lg border border-line/70 bg-card/45 px-2.5 py-2"
               }
             >
               <p className="text-[0.62rem] font-bold text-fg-2">{message.title}</p>
@@ -208,8 +209,8 @@ export function StudioEffectsWorkspacePanel({
 
       <div className="space-y-2 rounded-xl border border-line/70 bg-card/45 p-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <fieldset className="flex min-w-0 flex-wrap items-center gap-1" aria-label={translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "레시피 적용 방식")}>
-            <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "레시피 적용 방식")}</legend>
+          <fieldset className="flex min-w-0 flex-wrap items-center gap-1" aria-label="레시피 적용 방식">
+            <legend className="sr-only">레시피 적용 방식</legend>
             {(["append", "replace"] as const).map((candidate) => (
               <button
                 key={candidate}
@@ -218,8 +219,8 @@ export function StudioEffectsWorkspacePanel({
                 onClick={() => setMode(candidate)}
                 className={
                   mode === candidate
-                    ? translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "min-h-10 rounded-lg border border-accent bg-accent-soft px-2.5 text-[0.62rem] font-bold text-accent pointer-coarse:min-h-11")
-                    : translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "min-h-10 rounded-lg border border-line bg-canvas/60 px-2.5 text-[0.62rem] font-semibold text-fg-3 hover:border-accent/45 hover:text-fg pointer-coarse:min-h-11")
+                    ? "min-h-10 rounded-lg border border-accent bg-accent-soft px-2.5 text-[0.62rem] font-bold text-accent pointer-coarse:min-h-11"
+                    : "min-h-10 rounded-lg border border-line bg-canvas/60 px-2.5 text-[0.62rem] font-semibold text-fg-3 hover:border-accent/45 hover:text-fg pointer-coarse:min-h-11"
                 }
               >
                 {MODE_LABEL[candidate]}
@@ -227,24 +228,25 @@ export function StudioEffectsWorkspacePanel({
             ))}
           </fieldset>
           <span className="text-[0.58rem] text-fg-3">
-            {matchingRecipes.length} / {STUDIO_EFFECT_RECIPES.length}{translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "개 조합")}</span>
+            {matchingRecipes.length} / {STUDIO_EFFECT_RECIPES.length}개 조합
+          </span>
         </div>
 
         <label htmlFor={searchId} className="block">
-          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "효과 레시피 검색")}</span>
+          <span className="sr-only">효과 레시피 검색</span>
           <input
             id={searchId}
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "장면·재질·효과 검색: 선화, 야간, 인쇄…")}
+            placeholder="장면·재질·효과 검색: 선화, 야간, 인쇄…"
             className="min-h-11 w-full rounded-lg border border-line bg-canvas px-3 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent pointer-coarse:min-h-11"
           />
         </label>
 
         <div
           role="group"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "레시피 분류")}
+          aria-label="레시피 분류"
           className="flex gap-1 overflow-x-auto pb-1 [scrollbar-width:thin]"
         >
           <button
@@ -253,11 +255,12 @@ export function StudioEffectsWorkspacePanel({
             onClick={() => setCategory("all")}
             className={
               category === "all"
-                ? translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "min-h-9 shrink-0 rounded-full border border-accent bg-accent-soft px-2.5 text-[0.6rem] font-bold text-accent pointer-coarse:min-h-11")
-                : translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "min-h-9 shrink-0 rounded-full border border-line bg-canvas/60 px-2.5 text-[0.6rem] font-semibold text-fg-3 hover:text-fg pointer-coarse:min-h-11")
+                ? "min-h-9 shrink-0 rounded-full border border-accent bg-accent-soft px-2.5 text-[0.6rem] font-bold text-accent pointer-coarse:min-h-11"
+                : "min-h-9 shrink-0 rounded-full border border-line bg-canvas/60 px-2.5 text-[0.6rem] font-semibold text-fg-3 hover:text-fg pointer-coarse:min-h-11"
             }
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "전체")}</button>
+            전체
+          </button>
           {STUDIO_EFFECT_RECIPE_CATEGORY_ORDER.map((item) => (
             <button
               key={item}
@@ -266,8 +269,8 @@ export function StudioEffectsWorkspacePanel({
               onClick={() => setCategory(item)}
               className={
                 category === item
-                  ? translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "min-h-9 shrink-0 rounded-full border border-accent bg-accent-soft px-2.5 text-[0.6rem] font-bold text-accent pointer-coarse:min-h-11")
-                  : translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "min-h-9 shrink-0 rounded-full border border-line bg-canvas/60 px-2.5 text-[0.6rem] font-semibold text-fg-3 hover:text-fg pointer-coarse:min-h-11")
+                  ? "min-h-9 shrink-0 rounded-full border border-accent bg-accent-soft px-2.5 text-[0.6rem] font-bold text-accent pointer-coarse:min-h-11"
+                  : "min-h-9 shrink-0 rounded-full border border-line bg-canvas/60 px-2.5 text-[0.6rem] font-semibold text-fg-3 hover:text-fg pointer-coarse:min-h-11"
               }
             >
               {studioEffectRecipeCategoryLabel(item)}
@@ -289,7 +292,7 @@ export function StudioEffectsWorkspacePanel({
                       <h4 className="mt-0.5 text-xs font-bold text-fg">{recipe.title}</h4>
                     </div>
                     <span className="shrink-0 rounded-md border border-line bg-card px-1.5 py-0.5 text-[0.55rem] tabular-nums text-fg-3">
-                      {recipe.entries.length}{translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "단계 · ")}{estimate.costPoints}{translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "점 · ")}{studioEffectCostTierLabel(estimate.tier)}
+                      {recipe.entries.length}단계 · {estimate.costPoints}점 · {studioEffectCostTierLabel(estimate.tier)}
                     </span>
                   </div>
                   <p className="mt-1.5 flex-1 text-[0.61rem] leading-relaxed text-fg-3">
@@ -297,7 +300,7 @@ export function StudioEffectsWorkspacePanel({
                   </p>
                   <div
                     role="group"
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "{v0} 검색 태그"), { v0: String(recipe.title) })}
+                    aria-label={`${recipe.title} 검색 태그`}
                     className="mt-2 flex flex-wrap gap-1"
                   >
                     {recipe.tags.slice(0, 4).map((tag) => (
@@ -309,7 +312,7 @@ export function StudioEffectsWorkspacePanel({
                   <button
                     type="button"
                     onClick={() => applyRecipe(recipe.id)}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "{v0} 레시피 {v1}"), { v0: String(recipe.title), v1: String(MODE_LABEL[mode]) })}
+                    aria-label={`${recipe.title} 레시피 ${MODE_LABEL[mode]}`}
                     className="mt-2 min-h-10 rounded-lg border border-accent/40 bg-accent-soft px-2.5 text-[0.63rem] font-bold text-accent hover:border-accent hover:bg-accent-soft/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
                   >
                     {MODE_LABEL[mode]}
@@ -320,8 +323,8 @@ export function StudioEffectsWorkspacePanel({
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-line px-3 py-5 text-center">
-            <p className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "일치하는 레시피가 없습니다")}</p>
-            <p className="mt-1 text-[0.61rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "검색어를 줄이거나 다른 제작 목적을 선택하세요.")}</p>
+            <p className="text-xs font-semibold text-fg-2">일치하는 레시피가 없습니다</p>
+            <p className="mt-1 text-[0.61rem] text-fg-3">검색어를 줄이거나 다른 제작 목적을 선택하세요.</p>
           </div>
         )}
 
@@ -331,7 +334,8 @@ export function StudioEffectsWorkspacePanel({
             onClick={() => setShowAll(true)}
             className="min-h-10 w-full rounded-lg border border-line bg-canvas/50 px-3 text-[0.63rem] font-bold text-fg-2 hover:border-accent/45 hover:text-fg pointer-coarse:min-h-11"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "전체 ")}{matchingRecipes.length}{translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "ko", "개 레시피 보기")}</button>
+            전체 {matchingRecipes.length}개 레시피 보기
+          </button>
         ) : null}
       </div>
 
@@ -340,8 +344,8 @@ export function StudioEffectsWorkspacePanel({
         aria-live="polite"
         className={
           announcement
-            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "rounded-lg border px-2.5 py-2 text-[0.62rem] font-semibold {v0}"), { v0: String(announcementTone(announcement.tone)) })
-            : translateCurrentStaticSourceText("domains.creator.StudioEffectsWorkspacePanel", "en", "sr-only")
+            ? `rounded-lg border px-2.5 py-2 text-[0.62rem] font-semibold ${announcementTone(announcement.tone)}`
+            : "sr-only"
         }
       >
         {announcement?.message ?? ""}

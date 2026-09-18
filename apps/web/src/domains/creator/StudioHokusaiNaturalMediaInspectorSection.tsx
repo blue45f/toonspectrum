@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Brush,
   Check,
   ChevronDown,
@@ -353,9 +349,11 @@ export function StudioHokusaiNaturalMediaInspectorSection({
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-xs font-bold text-fg">
-            {translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "Hokusai 자연매체 · 실험적")}</span>
+            Hokusai 자연매체 · 실험적
+          </span>
           <span className="block truncate text-[0.6rem] text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "선택 선화 → 연필 · 목탄 · 오일 · 붓 · 마커")}</span>
+            선택 선화 → 연필 · 목탄 · 오일 · 붓 · 마커
+          </span>
         </span>
         <span
           role="status"
@@ -392,13 +390,15 @@ export function StudioHokusaiNaturalMediaInspectorSection({
           <div className="rounded-lg border border-line/60 bg-card/55 px-2.5 py-2">
             <p className="text-[0.66rem] font-semibold text-fg-2">
               {selectedDraw
-                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "선택 획 · {v0} · {v1}점"), { v0: String(selectedDraw.name ?? selectedDraw.brush ?? "펜"), v1: String(Math.floor(selectedDraw.points.length / 2).toLocaleString()) })
-                : translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "캔버스에서 완성된 자유곡선 선화를 먼저 선택해 주세요.")}
+                ? `선택 획 · ${selectedDraw.name ?? selectedDraw.brush ?? "펜"} · ${Math.floor(selectedDraw.points.length / 2).toLocaleString()}점`
+                : "캔버스에서 완성된 자유곡선 선화를 먼저 선택해 주세요."}
             </p>
             <p className="mt-0.5 text-[0.6rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "변환 성공 시 원본 벡터는 숨김 보존하고 같은 위치에 투명 래스터를 만듭니다. 실행 취소로 즉시 되돌릴 수 있습니다.")}</p>
+              변환 성공 시 원본 벡터는 숨김 보존하고 같은 위치에 투명 래스터를 만듭니다. 실행 취소로 즉시 되돌릴 수 있습니다.
+            </p>
             <p className="mt-1 text-[0.6rem] leading-relaxed text-warn">
-              {translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "품질·처리량 승격 게이트를 아직 통과하지 않은 실험적 명시 변환입니다. 기본 연필·목탄·오일 브러시에는 자동 적용되지 않습니다.")}</p>
+              품질·처리량 승격 게이트를 아직 통과하지 않은 실험적 명시 변환입니다. 기본 연필·목탄·오일 브러시에는 자동 적용되지 않습니다.
+            </p>
             {!selectedDraw && onRequestSelectStroke ? (
               <button
                 type="button"
@@ -411,7 +411,8 @@ export function StudioHokusaiNaturalMediaInspectorSection({
                 )}
               >
                 <Sparkles size={14} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "선화 선택하기")}</button>
+                선화 선택하기
+              </button>
             ) : null}
           </div>
 
@@ -420,7 +421,8 @@ export function StudioHokusaiNaturalMediaInspectorSection({
             className="min-w-0"
           >
             <legend className="mb-1.5 text-[0.68rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "자연매체 프로필")}</legend>
+              자연매체 프로필
+            </legend>
             <div className="grid grid-cols-2 gap-1.5">
               {STUDIO_HOKUSAI_NATURAL_MEDIA_PRESETS.map((preset) => {
                 const Icon = PRESET_ICONS[preset.id];
@@ -472,12 +474,14 @@ export function StudioHokusaiNaturalMediaInspectorSection({
               className="min-w-0"
             >
               <legend className="mb-1.5 text-[0.68rem] font-semibold text-fg-2">
-                {translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "재질 결")}</legend>
+                재질 결
+              </legend>
               <p
                 id={materialProfileHintId}
                 className="mb-2 text-[0.6rem] leading-relaxed text-fg-3"
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "붓 움직임은 유지하고 표면의 입자와 도막만 바꿉니다.")}</p>
+                붓 움직임은 유지하고 표면의 입자와 도막만 바꿉니다.
+              </p>
               <div className="grid grid-cols-2 gap-1.5">
                 {carrierMaterialProfiles.map((profileId) => {
                   const profile = MATERIAL_PROFILE_LABELS[profileId];
@@ -536,10 +540,11 @@ export function StudioHokusaiNaturalMediaInspectorSection({
 
           <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-2">
             <label className="min-w-0 text-[0.68rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "안료 색상")}<span className="mt-1 flex gap-1.5">
+              안료 색상
+              <span className="mt-1 flex gap-1.5">
                 <input
                   type="color"
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "Hokusai 안료 색상")}
+                  aria-label="Hokusai 안료 색상"
                   value={COLOR_PATTERN.test(color) ? color : "#202124"}
                   disabled={controlsDisabled}
                   onChange={(event) => setColor(event.currentTarget.value)}
@@ -547,7 +552,7 @@ export function StudioHokusaiNaturalMediaInspectorSection({
                 />
                 <input
                   type="text"
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "Hokusai 안료 색상 코드")}
+                  aria-label="Hokusai 안료 색상 코드"
                   value={color}
                   maxLength={7}
                   disabled={controlsDisabled}
@@ -560,7 +565,7 @@ export function StudioHokusaiNaturalMediaInspectorSection({
               </span>
             </label>
             <div className="text-[0.68rem] font-semibold text-fg-2">
-              <span>{translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "시드")}</span>
+              <span>시드</span>
               <button
                 type="button"
                 disabled={controlsDisabled}
@@ -573,13 +578,14 @@ export function StudioHokusaiNaturalMediaInspectorSection({
                 )}
               >
                 <RefreshCw size={13} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "변경")}</button>
+                변경
+              </button>
             </div>
           </div>
 
           <div className="space-y-2 rounded-lg border border-line/60 bg-card/45 p-2.5">
             <StudioSliderRow
-              label={translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "붓 크기")}
+              label="붓 크기"
               min={0.25}
               max={3}
               step={0.05}
@@ -589,7 +595,7 @@ export function StudioHokusaiNaturalMediaInspectorSection({
               readout={`${sizeScale.toFixed(2)}×`}
             />
             <StudioSliderRow
-              label={translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "안료 불투명도")}
+              label="안료 불투명도"
               min={0.1}
               max={1}
               step={0.01}
@@ -614,7 +620,7 @@ export function StudioHokusaiNaturalMediaInspectorSection({
               ?? message
               ?? disabledReason
               ?? capabilityMessage
-              ?? translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "Hokusai WASM 기능을 확인한 뒤 선택 획을 변환할 수 있습니다.")}
+              ?? "Hokusai WASM 기능을 확인한 뒤 선택 획을 변환할 수 있습니다."}
           </p>
 
           <div className="flex gap-2">
@@ -627,7 +633,8 @@ export function StudioHokusaiNaturalMediaInspectorSection({
                   STUDIO_FOCUS_RING,
                 )}
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "취소")}</button>
+                취소
+              </button>
             ) : null}
             <button
               type="button"
@@ -648,7 +655,7 @@ export function StudioHokusaiNaturalMediaInspectorSection({
               ) : (
                 <Sparkles size={14} aria-hidden />
               )}
-              {busy ? translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "자연매체 변환 중") : translateCurrentStaticSourceText("domains.creator.StudioHokusaiNaturalMediaInspectorSection", "ko", "선택 획을 자연매체로 변환")}
+              {busy ? "자연매체 변환 중" : "선택 획을 자연매체로 변환"}
             </button>
           </div>
         </div>

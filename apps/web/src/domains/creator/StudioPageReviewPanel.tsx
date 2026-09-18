@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   CheckCircle2,
   ClipboardCheck,
   Lock,
@@ -314,13 +310,13 @@ export function StudioPageReviewPanel({
   const statusSummary = (
     <div
       className="flex flex-wrap items-center gap-1.5 text-[0.68rem] text-fg-3"
-      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "승인 {v0}/{v1}, 잠금 {v2}"), { v0: String(approvedCount), v1: String(pages.length), v2: String(lockedCount) })}
+      aria-label={`승인 ${approvedCount}/${pages.length}, 잠금 ${lockedCount}`}
     >
       <span className="rounded-full border border-line bg-card px-2 py-1">
-        {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "승인 ")}{approvedCount}/{pages.length}
+        승인 {approvedCount}/{pages.length}
       </span>
       <span className="rounded-full border border-line bg-card px-2 py-1">
-        {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "잠금 ")}{lockedCount}
+        잠금 {lockedCount}
       </span>
     </div>
   );
@@ -328,10 +324,10 @@ export function StudioPageReviewPanel({
   const bulkReviewControls: ReactNode = (
     <div className="sticky top-0 z-10 mb-3 space-y-2 rounded-xl border border-line bg-panel/95 p-3 shadow-sm backdrop-blur">
       <div className={isMobile
-        ? translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "en", "grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]")
-        : translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "en", "grid gap-2 @lg:grid-cols-[minmax(0,1fr)_10rem]")}>
+        ? "grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]"
+        : "grid gap-2 @lg:grid-cols-[minmax(0,1fr)_10rem]"}>
         <label className="relative block">
-          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "페이지 검토 검색")}</span>
+          <span className="sr-only">페이지 검토 검색</span>
           <Search
             size={14}
             aria-hidden
@@ -341,19 +337,19 @@ export function StudioPageReviewPanel({
             type="search"
             value={query}
             onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
-            placeholder={translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "페이지·담당자·검토 메모 검색")}
+            placeholder="페이지·담당자·검토 메모 검색"
             className="w-full rounded-lg border border-line bg-card py-2 pl-9 pr-3 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent"
           />
         </label>
         <label>
-          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "검토 상태 필터")}</span>
+          <span className="sr-only">검토 상태 필터</span>
           <select
             value={statusFilter}
             onChange={(event: ChangeEvent<HTMLSelectElement>) =>
               setStatusFilter(event.target.value as "all" | PageReviewStatus)}
             className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-xs text-fg outline-none focus:border-accent"
           >
-            <option value="all">{translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "모든 검토 상태")}</option>
+            <option value="all">모든 검토 상태</option>
             {PAGE_REVIEW_STATUSES.map((status) => (
               <option key={status} value={status}>
                 {PAGE_REVIEW_STATUS_LABELS[status]}
@@ -365,10 +361,12 @@ export function StudioPageReviewPanel({
 
       <div className="flex flex-wrap items-center gap-2 text-[0.68rem]">
         <span className="font-semibold text-fg">
-          {filteredRows.length}{translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "개 표시 · ")}{selectedPageIds.size}{translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "개 선택")}</span>
+          {filteredRows.length}개 표시 · {selectedPageIds.size}개 선택
+        </span>
         {hiddenSelectedCount > 0 ? (
           <span className="rounded-full border border-warning/35 bg-warning-soft/20 px-2 py-1 font-semibold text-warning">
-            {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "필터 밖 ")}{hiddenSelectedCount}{translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "개 포함")}</span>
+            필터 밖 {hiddenSelectedCount}개 포함
+          </span>
         ) : null}
         <button
           type="button"
@@ -376,7 +374,7 @@ export function StudioPageReviewPanel({
           disabled={visiblePageIds.length === 0 || batchBusy}
           className="rounded-lg border border-line bg-card px-2.5 py-1.5 font-semibold text-fg-3 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-45"
         >
-          {allVisibleSelected ? translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "표시 항목 선택 해제") : translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "표시 항목 전체 선택")}
+          {allVisibleSelected ? "표시 항목 선택 해제" : "표시 항목 전체 선택"}
         </button>
         <button
           type="button"
@@ -384,17 +382,18 @@ export function StudioPageReviewPanel({
           disabled={selectedPageIds.size === 0 || batchBusy}
           className="rounded-lg border border-line bg-card px-2.5 py-1.5 font-semibold text-fg-3 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-45"
         >
-          {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "전체 선택 해제")}</button>
+          전체 선택 해제
+        </button>
       </div>
 
       <fieldset
         disabled={selectedPageIds.size === 0 || batchBusy}
         className="grid gap-2 rounded-lg border border-line/80 bg-card/45 p-2.5 disabled:opacity-55 lg:grid-cols-[minmax(12rem,0.85fr)_minmax(15rem,1fr)_auto]"
       >
-        <legend className="px-1 text-[0.68rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "선택 페이지 일괄 편집")}</legend>
+        <legend className="px-1 text-[0.68rem] font-bold text-fg-3">선택 페이지 일괄 편집</legend>
         <div className="flex min-w-0 gap-1.5">
           <label className="min-w-0 flex-1">
-            <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "일괄 검토 상태")}</span>
+            <span className="sr-only">일괄 검토 상태</span>
             <select
               value={bulkStatus}
               onChange={(event: ChangeEvent<HTMLSelectElement>) =>
@@ -417,18 +416,19 @@ export function StudioPageReviewPanel({
               )}
             className="shrink-0 rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-xs font-bold text-accent hover:bg-accent/15"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "상태 적용")}</button>
+            상태 적용
+          </button>
         </div>
 
         <div className="flex min-w-0 gap-1.5">
           <label className="min-w-0 flex-1">
-            <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "일괄 담당자")}</span>
+            <span className="sr-only">일괄 담당자</span>
             <input
               value={bulkAssignee}
               maxLength={PAGE_REVIEW_ASSIGNEE_MAX_LENGTH}
               onChange={(event: ChangeEvent<HTMLInputElement>) =>
                 setBulkAssignee(event.target.value)}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "담당 / 확인자")}
+              placeholder="담당 / 확인자"
               className="w-full rounded-lg border border-line bg-panel px-2.5 py-2 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent"
             />
           </label>
@@ -442,13 +442,15 @@ export function StudioPageReviewPanel({
               )}
             className="shrink-0 rounded-lg border border-line bg-panel px-3 py-2 text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "담당 적용")}</button>
+            담당 적용
+          </button>
           <button
             type="button"
             onClick={() => applyBulkOperation({ type: "assignee", assignee: "" }, "담당자 해제")}
             className="shrink-0 rounded-lg border border-line bg-panel px-3 py-2 text-xs font-bold text-fg-3 hover:bg-raised hover:text-fg"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "해제")}</button>
+            해제
+          </button>
         </div>
 
         <div className="flex gap-1.5">
@@ -457,21 +459,25 @@ export function StudioPageReviewPanel({
             onClick={() => applyBulkOperation({ type: "lock", locked: true }, "편집 잠금")}
             className="inline-flex items-center gap-1.5 rounded-lg border border-warning/35 bg-warning-soft/20 px-3 py-2 text-xs font-bold text-warning hover:bg-warning-soft/35"
           >
-            <Lock size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "잠금")}</button>
+            <Lock size={12} aria-hidden /> 잠금
+          </button>
           <button
             type="button"
             onClick={() => applyBulkOperation({ type: "lock", locked: false }, "편집 잠금 해제")}
             className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-2 text-xs font-bold text-fg-3 hover:bg-raised hover:text-fg"
           >
-            <LockOpen size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "잠금 해제")}</button>
+            <LockOpen size={12} aria-hidden /> 잠금 해제
+          </button>
         </div>
       </fieldset>
       <p
-        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "en", "min-h-4 text-[0.68rem] font-semibold {v0}"), { v0: String(batchBusy ? "text-accent" : "text-fg-3") })}
+        className={`min-h-4 text-[0.68rem] font-semibold ${
+          batchBusy ? "text-accent" : "text-fg-3"
+        }`}
         aria-live="polite"
       >
         {bulkQueue
-          ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "일괄 변경 적용 중 {v0}/{v1}"), { v0: String(bulkQueue.applied), v1: String(bulkQueue.total) })
+          ? `일괄 변경 적용 중 ${bulkQueue.applied}/${bulkQueue.total}`
           : announcement}
       </p>
     </div>
@@ -480,25 +486,30 @@ export function StudioPageReviewPanel({
   const reviewList: ReactNode = (
     <>
       <p className="mb-3 rounded-lg border border-warning/30 bg-warning-soft/20 px-3 py-2 text-[0.7rem] leading-relaxed text-warning">
-        {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "이 잠금은 현재 문서의 편집 사고를 막는 워크플로 기능이며, 서버 권한이나 실시간 공동편집 잠금은 아닙니다. 일괄 변경도 기존 문서 히스토리와 저장 경로를 그대로 사용합니다.")}</p>
+        이 잠금은 현재 문서의 편집 사고를 막는 워크플로 기능이며, 서버 권한이나
+        실시간 공동편집 잠금은 아닙니다. 일괄 변경도 기존 문서 히스토리와 저장 경로를
+        그대로 사용합니다.
+      </p>
       {bulkReviewControls}
       {filteredRows.length > 0 ? (
-        <ol className="space-y-2" aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "페이지 검토 목록")}>
+        <ol className="space-y-2" aria-label="페이지 검토 목록">
           {filteredRows.map(({ page, review }) => {
             const current = page.id === currentPageId;
             const selected = selectedPageIds.has(page.id);
             return (
               <li
                 key={page.id}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "en", "rounded-xl border p-3 {v0}"), { v0: String(current
+                className={`rounded-xl border p-3 ${
+                  current
                     ? "border-accent/55 bg-accent-soft/15"
                     : selected
                       ? "border-accent/35 bg-accent-soft/10"
-                      : "border-line bg-card/45") })}
+                      : "border-line bg-card/45"
+                }`}
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <label className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-lg border border-line bg-panel hover:bg-raised">
-                    <span className="sr-only">{page.label} {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "일괄 편집 선택")}</span>
+                    <span className="sr-only">{page.label} 일괄 편집 선택</span>
                     <input
                       type="checkbox"
                       checked={selected}
@@ -515,34 +526,39 @@ export function StudioPageReviewPanel({
                     {page.label}
                     {current ? (
                       <span className="ml-2 text-[0.65rem] font-medium text-accent">
-                        {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "현재")}</span>
+                        현재
+                      </span>
                     ) : null}
                   </button>
                   {review.status === "approved" ? (
                     <span className="inline-flex items-center gap-1 rounded-full border border-good/35 bg-good/10 px-2 py-1 text-[0.65rem] font-semibold text-good">
-                      <CheckCircle2 size={11} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "승인")}</span>
+                      <CheckCircle2 size={11} aria-hidden /> 승인
+                    </span>
                   ) : null}
                   <button
                     type="button"
                     onClick={() => onPatchReview(page.id, { locked: !review.locked })}
                     disabled={batchBusy}
                     aria-pressed={review.locked}
-                    className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "en", "inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold {v0} disabled:cursor-not-allowed disabled:opacity-50"), { v0: String(review.locked
+                    className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold ${
+                      review.locked
                         ? "border-warning/40 bg-warning-soft/20 text-warning"
-                        : "border-line bg-panel text-fg-3 hover:bg-raised hover:text-fg") })}
+                        : "border-line bg-panel text-fg-3 hover:bg-raised hover:text-fg"
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
                   >
                     {review.locked
                       ? <Lock size={12} aria-hidden />
                       : <LockOpen size={12} aria-hidden />}
-                    {review.locked ? translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "편집 잠김") : translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "편집 가능")}
+                    {review.locked ? "편집 잠김" : "편집 가능"}
                   </button>
                 </div>
 
                 <div className={isMobile
-                  ? translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "en", "mt-2 grid gap-2 sm:grid-cols-[10rem_minmax(0,1fr)]")
-                  : translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "en", "mt-2 grid gap-2 @lg:grid-cols-[10rem_minmax(0,1fr)]")}>
+                  ? "mt-2 grid gap-2 sm:grid-cols-[10rem_minmax(0,1fr)]"
+                  : "mt-2 grid gap-2 @lg:grid-cols-[10rem_minmax(0,1fr)]"}>
                   <label className="text-[0.68rem] font-semibold text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "검토 상태")}<select
+                    검토 상태
+                    <select
                       value={review.status}
                       disabled={batchBusy}
                       onChange={(event: ChangeEvent<HTMLSelectElement>) =>
@@ -560,26 +576,28 @@ export function StudioPageReviewPanel({
                     </select>
                   </label>
                   <label className="text-[0.68rem] font-semibold text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "담당 / 확인자")}<input
+                    담당 / 확인자
+                    <input
                       value={review.assignee ?? ""}
                       disabled={batchBusy}
                       maxLength={PAGE_REVIEW_ASSIGNEE_MAX_LENGTH}
                       onChange={(event: ChangeEvent<HTMLInputElement>) =>
                         onPatchReview(page.id, { assignee: event.target.value })}
-                      placeholder={translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "예: 콘티 편집자")}
+                      placeholder="예: 콘티 편집자"
                       className="mt-1 w-full rounded-lg border border-line bg-panel px-2.5 py-2 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent"
                     />
                   </label>
                 </div>
                 <label className="mt-2 block text-[0.68rem] font-semibold text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "검토 메모")}<textarea
+                  검토 메모
+                  <textarea
                     value={review.note ?? ""}
                     disabled={batchBusy}
                     maxLength={PAGE_REVIEW_NOTE_MAX_LENGTH}
                     onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
                       onPatchReview(page.id, { note: event.target.value })}
                     rows={2}
-                    placeholder={translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "수정 요청이나 승인 근거를 남겨요.")}
+                    placeholder="수정 요청이나 승인 근거를 남겨요."
                     className="mt-1 w-full resize-y rounded-lg border border-line bg-panel px-2.5 py-2 text-xs leading-relaxed text-fg outline-none placeholder:text-fg-3 focus:border-accent"
                   />
                 </label>
@@ -589,8 +607,8 @@ export function StudioPageReviewPanel({
         </ol>
       ) : (
         <div className="rounded-xl border border-dashed border-line bg-card/35 px-4 py-8 text-center">
-          <p className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "조건에 맞는 페이지가 없습니다.")}</p>
-          <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "검색어나 검토 상태 필터를 조정해 보세요.")}</p>
+          <p className="text-sm font-bold text-fg">조건에 맞는 페이지가 없습니다.</p>
+          <p className="mt-1 text-xs text-fg-3">검색어나 검토 상태 필터를 조정해 보세요.</p>
           <button
             type="button"
             onClick={() => {
@@ -599,7 +617,8 @@ export function StudioPageReviewPanel({
             }}
             className="mt-3 rounded-lg border border-line bg-panel px-3 py-2 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "필터 초기화")}</button>
+            필터 초기화
+          </button>
         </div>
       )}
     </>
@@ -609,7 +628,7 @@ export function StudioPageReviewPanel({
     return createPortal(
       <StudioFloatingSurface
         surfaceId="page-review"
-        label={translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "페이지 검토와 잠금")}
+        label="페이지 검토와 잠금"
         layout={layout}
         defaultLayout={DEFAULT_STUDIO_PAGE_REVIEW_FLOATING_LAYOUT}
         minWidth={560}
@@ -631,12 +650,14 @@ export function StudioPageReviewPanel({
         contentClassName="min-h-0 overflow-hidden"
       >
         <section
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "페이지 검토 작업 목록")}
+          aria-label="페이지 검토 작업 목록"
           className="flex h-full min-h-0 flex-col"
         >
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-2">
             <p className="min-w-0 text-[0.7rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "승인 상태·담당·메모를 문서에 남기고 여러 페이지의 검토 정책을 한 번에 정리합니다.")}</p>
+              승인 상태·담당·메모를 문서에 남기고 여러 페이지의 검토 정책을 한 번에
+              정리합니다.
+            </p>
             {statusSummary}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
@@ -652,7 +673,7 @@ export function StudioPageReviewPanel({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "페이지 검토와 잠금")}
+      aria-label="페이지 검토와 잠금"
       data-studio-page-review-surface="mobile"
       className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"
     >
@@ -663,15 +684,17 @@ export function StudioPageReviewPanel({
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-bold tracking-tight text-fg">
-              {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "페이지 검토와 잠금")}</h2>
+              페이지 검토와 잠금
+            </h2>
             <p className="mt-0.5 text-xs leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "검색·다중 선택·일괄 편집으로 승인 상태와 담당, 잠금을 빠르게 정리합니다.")}</p>
+              검색·다중 선택·일괄 편집으로 승인 상태와 담당, 잠금을 빠르게 정리합니다.
+            </p>
           </div>
           <div className="hidden sm:block">{statusSummary}</div>
           <button
             type="button"
             onClick={onClose}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioPageReviewPanel", "ko", "페이지 검토 닫기")}
+            aria-label="페이지 검토 닫기"
             className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
           >
             <X size={15} aria-hidden />

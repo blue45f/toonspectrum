@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowDown,
   ArrowUp,
   Check,
@@ -365,8 +361,8 @@ function ModifierParameters({
     return (
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <ModifierSelectField
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 기준 축"), { v0: String(instanceName) })}
-          visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "기준 축")}
+          label={`${instanceName} 기준 축`}
+          visibleLabel="기준 축"
           value={modifier.axis}
           disabled={busy}
           options={[
@@ -377,8 +373,8 @@ function ModifierParameters({
           onChange={(axis) => onPatch({ axis })}
         />
         <ModifierNumberField
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 합칠 거리"), { v0: String(instanceName) })}
-          visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "합칠 거리")}
+          label={`${instanceName} 합칠 거리`}
+          visibleLabel="합칠 거리"
           value={modifier.mergeThreshold}
           min={0}
           step={0.0001}
@@ -389,22 +385,22 @@ function ModifierParameters({
         <ModifierToggleField
           checked={modifier.merge}
           disabled={busy}
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 가운데 점 합치기"), { v0: String(instanceName) })}
-          description={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "축 위에서 만나는 점을 하나로 정리합니다.")}
+          label={`${instanceName} 가운데 점 합치기`}
+          description="축 위에서 만나는 점을 하나로 정리합니다."
           onChange={(merge) => onPatch({ merge })}
         />
         <ModifierToggleField
           checked={modifier.clip}
           disabled={busy}
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 기준 축 넘지 않기"), { v0: String(instanceName) })}
-          description={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "편집 중인 점이 대칭 축을 지나가지 않게 붙잡습니다.")}
+          label={`${instanceName} 기준 축 넘지 않기`}
+          description="편집 중인 점이 대칭 축을 지나가지 않게 붙잡습니다."
           onChange={(clip) => onPatch({ clip })}
         />
         <ModifierToggleField
           checked={modifier.bisect}
           disabled={busy}
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 축에서 자른 뒤 복사"), { v0: String(instanceName) })}
-          description={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "축 반대편의 기존 모양을 잘라 겹침을 줄입니다.")}
+          label={`${instanceName} 축에서 자른 뒤 복사`}
+          description="축 반대편의 기존 모양을 잘라 겹침을 줄입니다."
           onChange={(bisect) => onPatch({ bisect })}
         />
       </div>
@@ -416,8 +412,8 @@ function ModifierParameters({
     return (
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <ModifierSelectField
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 반복 방식"), { v0: String(instanceName) })}
-          visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "반복 방식")}
+          label={`${instanceName} 반복 방식`}
+          visibleLabel="반복 방식"
           value={modifier.mode}
           disabled={busy}
           options={[
@@ -427,25 +423,26 @@ function ModifierParameters({
           onChange={(mode) => onPatch({ mode })}
         />
         <ModifierNumberField
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 전체 개수"), { v0: String(instanceName) })}
-          visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "전체 개수")}
+          label={`${instanceName} 전체 개수`}
+          visibleLabel="전체 개수"
           value={modifier.count}
           min={1}
           max={64}
           step={1}
-          unit={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "개")}
+          unit="개"
           disabled={busy}
           onChange={(count) => onPatch({ count: Math.max(1, Math.trunc(count)) })}
         />
         <fieldset className="min-w-0 sm:col-span-2">
           <legend className="mb-1.5 text-xs font-medium text-fg-2">
-            {instanceName} {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "반복 간격")}</legend>
+            {instanceName} 반복 간격
+          </legend>
           <div className="grid min-w-0 grid-cols-1 gap-2 min-[480px]:grid-cols-3">
             {(["x", "y", "z"] as const).map((axis) => (
               <ModifierNumberField
                 key={axis}
-                label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 간격 {v1}"), { v0: String(instanceName), v1: String(axis.toUpperCase()) })}
-                visibleLabel={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0}축 간격"), { v0: String(axis.toUpperCase()) })}
+                label={`${instanceName} 간격 ${axis.toUpperCase()}`}
+                visibleLabel={`${axis.toUpperCase()}축 간격`}
                 value={modifier.offset[axis]}
                 step={0.1}
                 unit="m"
@@ -459,8 +456,8 @@ function ModifierParameters({
         </fieldset>
         {modifier.mode === "radial" ? (
           <ModifierNumberField
-            label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 원형 전체 각도"), { v0: String(instanceName) })}
-            visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "원형 전체 각도")}
+            label={`${instanceName} 원형 전체 각도`}
+            visibleLabel="원형 전체 각도"
             value={angleDeg}
             min={0.1}
             max={360}
@@ -473,8 +470,8 @@ function ModifierParameters({
         <ModifierToggleField
           checked={modifier.realizeInstances}
           disabled={busy}
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 복사본을 실제 메시로 만들기"), { v0: String(instanceName) })}
-          description={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "다음 변형이 각 복사본의 점과 면을 직접 다룰 수 있게 합니다.")}
+          label={`${instanceName} 복사본을 실제 메시로 만들기`}
+          description="다음 변형이 각 복사본의 점과 면을 직접 다룰 수 있게 합니다."
           onChange={(realizeInstances) => onPatch({ realizeInstances })}
         />
       </div>
@@ -486,8 +483,8 @@ function ModifierParameters({
     return (
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <ModifierSelectField
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 계산 방식"), { v0: String(instanceName) })}
-          visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "계산 방식")}
+          label={`${instanceName} 계산 방식`}
+          visibleLabel="계산 방식"
           value={modifier.operation}
           disabled={busy}
           options={[
@@ -498,16 +495,16 @@ function ModifierParameters({
           onChange={(operation) => onPatch({ operation })}
         />
         <label className="block min-w-0 text-xs font-medium text-fg-2">
-          <span className="mb-1.5 block">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "대상 오브젝트")}</span>
+          <span className="mb-1.5 block">대상 오브젝트</span>
           {operandOptions.length > 0 ? (
             <select
-              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 대상 오브젝트"), { v0: String(instanceName) })}
+              aria-label={`${instanceName} 대상 오브젝트`}
               value={modifier.operandId ?? ""}
               disabled={busy}
               className={CONTROL_CLASS}
               onChange={(event) => onPatch({ operandId: event.currentTarget.value || null })}
             >
-              <option value="">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "대상을 선택하세요")}</option>
+              <option value="">대상을 선택하세요</option>
               {operandOptions.map((option) => (
                 <option key={option.id} value={option.id} disabled={option.disabled}>
                   {option.label}
@@ -519,10 +516,12 @@ function ModifierParameters({
               role="status"
               className="flex min-h-11 items-center rounded-lg border border-dashed border-line bg-canvas/35 px-3 text-[0.6875rem] font-normal leading-relaxed text-fg-3"
             >
-              {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "먼저 장면에 다른 오브젝트를 하나 추가하세요.")}</span>
+              먼저 장면에 다른 오브젝트를 하나 추가하세요.
+            </span>
           )}
           <span className="mt-1.5 block break-words text-[0.6875rem] leading-relaxed text-fg-3 [overflow-wrap:anywhere]">
-            {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "원본은 그대로 두고 선택한 대상과의 계산 결과만 미리 보여 줍니다.")}</span>
+            원본은 그대로 두고 선택한 대상과의 계산 결과만 미리 보여 줍니다.
+          </span>
         </label>
       </div>
     );
@@ -532,8 +531,8 @@ function ModifierParameters({
     return (
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <ModifierNumberField
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 두께"), { v0: String(instanceName) })}
-          visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "두께")}
+          label={`${instanceName} 두께`}
+          visibleLabel="두께"
           value={modifier.thickness}
           step={0.01}
           unit="m"
@@ -543,15 +542,15 @@ function ModifierParameters({
         <ModifierToggleField
           checked={modifier.evenThickness}
           disabled={busy}
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 두께를 고르게 유지"), { v0: String(instanceName) })}
-          description={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "기울어진 면에서도 보이는 두께 차이를 줄입니다.")}
+          label={`${instanceName} 두께를 고르게 유지`}
+          description="기울어진 면에서도 보이는 두께 차이를 줄입니다."
           onChange={(evenThickness) => onPatch({ evenThickness })}
         />
         <ModifierToggleField
           checked={modifier.rim}
           disabled={busy}
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 열린 가장자리 막기"), { v0: String(instanceName) })}
-          description={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "앞면과 뒷면 사이에 옆면을 만들어 빈 틈을 닫습니다.")}
+          label={`${instanceName} 열린 가장자리 막기`}
+          description="앞면과 뒷면 사이에 옆면을 만들어 빈 틈을 닫습니다."
           onChange={(rim) => onPatch({ rim })}
         />
       </div>
@@ -562,22 +561,22 @@ function ModifierParameters({
     return (
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <ModifierNumberField
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 세분화 단계"), { v0: String(instanceName) })}
-          visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "세분화 단계")}
-          description={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "단계가 높을수록 촘촘하지만 계산량이 늘어납니다.")}
+          label={`${instanceName} 세분화 단계`}
+          visibleLabel="세분화 단계"
+          description="단계가 높을수록 촘촘하지만 계산량이 늘어납니다."
           value={modifier.levels}
           min={1}
           max={3}
           step={1}
-          unit={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "단계")}
+          unit="단계"
           disabled={busy}
           onChange={(levels) => onPatch({ levels })}
         />
         <ModifierToggleField
           checked={modifier.smooth}
           disabled={busy}
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 부드럽게 만들기"), { v0: String(instanceName) })}
-          description={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "끄면 면 분할만 하고, 켜면 전체적으로 둥글게 말립니다.")}
+          label={`${instanceName} 부드럽게 만들기`}
+          description="끄면 면 분할만 하고, 켜면 전체적으로 둥글게 말립니다."
           onChange={(smooth) => onPatch({ smooth })}
         />
       </div>
@@ -588,9 +587,9 @@ function ModifierParameters({
     return (
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <ModifierNumberField
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 병합 거리"), { v0: String(instanceName) })}
-          visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "병합 거리")}
-          description={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "이 거리보다 가까운 꼭짓점을 하나로 합칩니다.")}
+          label={`${instanceName} 병합 거리`}
+          visibleLabel="병합 거리"
+          description="이 거리보다 가까운 꼭짓점을 하나로 합칩니다."
           value={modifier.quantum}
           min={0.000001}
           step={0.0001}
@@ -606,9 +605,9 @@ function ModifierParameters({
     return (
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <ModifierNumberField
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 유지 비율"), { v0: String(instanceName) })}
-          visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "유지 비율")}
-          description={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "원본 삼각형 중 남길 비율입니다. 0.05~0.95.")}
+          label={`${instanceName} 유지 비율`}
+          visibleLabel="유지 비율"
+          description="원본 삼각형 중 남길 비율입니다. 0.05~0.95."
           value={modifier.ratio}
           min={0.05}
           max={0.95}
@@ -625,8 +624,8 @@ function ModifierParameters({
     return (
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <ModifierSelectField
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 변형 종류"), { v0: String(instanceName) })}
-          visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "변형 종류")}
+          label={`${instanceName} 변형 종류`}
+          visibleLabel="변형 종류"
           value={modifier.mode}
           disabled={busy}
           options={[
@@ -637,8 +636,8 @@ function ModifierParameters({
           onChange={(mode) => onPatch({ mode })}
         />
         <ModifierSelectField
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 기준 축"), { v0: String(instanceName) })}
-          visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "기준 축")}
+          label={`${instanceName} 기준 축`}
+          visibleLabel="기준 축"
           value={modifier.axis}
           disabled={busy}
           options={[
@@ -650,9 +649,9 @@ function ModifierParameters({
         />
         {modifier.mode === "twist" ? (
           <ModifierNumberField
-            label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 비틀 각도"), { v0: String(instanceName) })}
-            visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "비틀 각도")}
-            description={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "끝까지 갔을 때의 회전 각도입니다.")}
+            label={`${instanceName} 비틀 각도`}
+            visibleLabel="비틀 각도"
+            description="끝까지 갔을 때의 회전 각도입니다."
             value={angleDeg}
             min={-1440}
             max={1440}
@@ -663,11 +662,11 @@ function ModifierParameters({
           />
         ) : (
           <ModifierNumberField
-            label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 변형 세기"), { v0: String(instanceName) })}
-            visibleLabel={modifier.mode === "taper" ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "끝 지점 크기 배율") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "축 방향 늘림 배율")}
+            label={`${instanceName} 변형 세기`}
+            visibleLabel={modifier.mode === "taper" ? "끝 지점 크기 배율" : "축 방향 늘림 배율"}
             description={modifier.mode === "taper"
-              ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "1이 원본이며, 작게 주면 한쪽이 좁아집니다.")
-              : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "1이 원본이며, 크게 주면 길어집니다.")}
+              ? "1이 원본이며, 작게 주면 한쪽이 좁아집니다."
+              : "1이 원본이며, 크게 주면 길어집니다."}
             value={modifier.factor}
             min={0.001}
             max={100}
@@ -685,8 +684,8 @@ function ModifierParameters({
   return (
     <div className="grid min-w-0 gap-3 sm:grid-cols-2">
       <ModifierNumberField
-        label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 모서리 폭"), { v0: String(instanceName) })}
-        visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "모서리 폭")}
+        label={`${instanceName} 모서리 폭`}
+        visibleLabel="모서리 폭"
         value={modifier.amount}
         min={0}
         step={0.01}
@@ -695,21 +694,21 @@ function ModifierParameters({
         onChange={(amount) => onPatch({ amount })}
       />
       <ModifierNumberField
-        label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 분할 수"), { v0: String(instanceName) })}
-        visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "둥글기 단계 (현재 1단계)")}
-        description={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "정확한 다단계 토폴로지가 준비될 때까지 안전한 1단계로 고정됩니다.")}
+        label={`${instanceName} 분할 수`}
+        visibleLabel="둥글기 단계 (현재 1단계)"
+        description="정확한 다단계 토폴로지가 준비될 때까지 안전한 1단계로 고정됩니다."
         value={modifier.segments}
         min={1}
         max={1}
         step={1}
-        unit={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "단계")}
+        unit="단계"
         disabled
         onChange={() => onPatch({ segments: 1 })}
       />
       <ModifierNumberField
-        label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 적용 각도"), { v0: String(instanceName) })}
-        visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "적용할 모서리 각도")}
-        description={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "이 각도보다 날카로운 모서리를 다듬습니다.")}
+        label={`${instanceName} 적용 각도`}
+        visibleLabel="적용할 모서리 각도"
+        description="이 각도보다 날카로운 모서리를 다듬습니다."
         value={angleDeg}
         min={0}
         max={180}
@@ -719,9 +718,9 @@ function ModifierParameters({
         onChange={(value) => onPatch({ angleLimitRad: value * Math.PI / 180 })}
       />
       <ModifierNumberField
-        label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 가중치 영향"), { v0: String(instanceName) })}
-        visibleLabel={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "그려 둔 모서리 가중치")}
-        description={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "모서리에 따로 지정한 강도를 결과에 얼마나 반영할지 정합니다.")}
+        label={`${instanceName} 가중치 영향`}
+        visibleLabel="그려 둔 모서리 가중치"
+        description="모서리에 따로 지정한 강도를 결과에 얼마나 반영할지 정합니다."
         value={modifier.weightInfluence}
         min={0}
         max={1}
@@ -783,11 +782,11 @@ function ModifierRow({
           descriptionClassName="text-[0.6875rem] leading-relaxed text-fg-3"
           onChange={() => onToggle(modifier.id)}
         />
-        <div className="grid shrink-0 grid-cols-3 gap-1.5 self-end sm:self-start" role="group" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 순서와 삭제"), { v0: String(instanceName) })}>
+        <div className="grid shrink-0 grid-cols-3 gap-1.5 self-end sm:self-start" role="group" aria-label={`${instanceName} 순서와 삭제`}>
           <button
             type="button"
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 위로 이동"), { v0: String(instanceName) })}
-            title={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "한 단계 위로")}
+            aria-label={`${instanceName} 위로 이동`}
+            title="한 단계 위로"
             disabled={busy || index === 0}
             className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-line bg-card text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35"
             onClick={() => onMove(modifier.id, "up")}
@@ -796,8 +795,8 @@ function ModifierRow({
           </button>
           <button
             type="button"
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 아래로 이동"), { v0: String(instanceName) })}
-            title={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "한 단계 아래로")}
+            aria-label={`${instanceName} 아래로 이동`}
+            title="한 단계 아래로"
             disabled={busy || index === count - 1}
             className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-line bg-card text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35"
             onClick={() => onMove(modifier.id, "down")}
@@ -806,8 +805,8 @@ function ModifierRow({
           </button>
           <button
             type="button"
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 삭제"), { v0: String(instanceName) })}
-            title={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "변형 삭제")}
+            aria-label={`${instanceName} 삭제`}
+            title="변형 삭제"
             disabled={busy}
             className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-line bg-card text-fg-3 hover:border-bad/50 hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35"
             onClick={() => onRemove(modifier.id)}
@@ -821,7 +820,7 @@ function ModifierRow({
         id={parameterId}
         disabled={busy}
         className="mt-3 min-w-0 border-t border-line pt-3"
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "{v0} 설정"), { v0: String(instanceName) })}
+        aria-label={`${instanceName} 설정`}
       >
         <ModifierParameters
           modifier={modifier}
@@ -878,19 +877,22 @@ export function StudioHybridDccModifierInspector({
           </span>
           <div className="min-w-0 flex-1">
             <h3 id={titleId} className="break-words text-sm font-semibold tracking-tight [overflow-wrap:anywhere]">
-              {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "비파괴 변형 스택")}</h3>
+              비파괴 변형 스택
+            </h3>
             <p className="mt-1 break-words text-xs leading-relaxed text-fg-3 [overflow-wrap:anywhere]">
-              {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "위에서 아래 순서로 결과를 겹쳐 미리 봅니다. 적용하기 전에는 원본 메시를 바꾸지 않습니다.")}</p>
+              위에서 아래 순서로 결과를 겹쳐 미리 봅니다. 적용하기 전에는 원본 메시를 바꾸지 않습니다.
+            </p>
           </div>
           <span className="inline-flex min-h-7 shrink-0 items-center rounded-full border border-good/35 bg-good/10 px-2 text-[0.625rem] font-bold text-good">
-            {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "확정 전 원본 보존")}</span>
+            확정 전 원본 보존
+          </span>
         </div>
 
         <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 min-[360px]:grid-cols-[minmax(0,1fr)_auto]">
           <label className="min-w-0">
-            <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "추가할 변형 종류")}</span>
+            <span className="sr-only">추가할 변형 종류</span>
             <select
-              aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "추가할 변형 종류")}
+              aria-label="추가할 변형 종류"
               value={addKind}
               disabled={busy}
               className={CONTROL_CLASS}
@@ -910,7 +912,8 @@ export function StudioHybridDccModifierInspector({
             onClick={() => onAdd(addKind)}
           >
             <Plus size={16} aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "변형 추가")}</button>
+            변형 추가
+          </button>
         </div>
       </header>
 
@@ -922,7 +925,8 @@ export function StudioHybridDccModifierInspector({
           className="flex min-h-11 items-center gap-2 border-t border-line bg-cool/10 px-3 py-2 text-xs leading-relaxed text-cool"
         >
           <span className="size-2 shrink-0 animate-pulse rounded-full bg-cool motion-reduce:animate-none" aria-hidden="true" />
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "변형 미리보기를 계산하고 있습니다. 현재 설정은 그대로 보존됩니다.")}</p>
+          변형 미리보기를 계산하고 있습니다. 현재 설정은 그대로 보존됩니다.
+        </p>
       ) : null}
 
       {error ? (
@@ -932,20 +936,23 @@ export function StudioHybridDccModifierInspector({
         >
           <p className="flex items-center gap-2 text-xs font-semibold">
             <TriangleAlert size={16} className="shrink-0" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "미리보기를 계산하지 못했습니다")}</p>
+            미리보기를 계산하지 못했습니다
+          </p>
           <p className="mt-1 break-words text-xs leading-relaxed [overflow-wrap:anywhere]">
-            {error} {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "설정을 수정하거나 문제가 된 변형을 잠시 끈 뒤 다시 확인해 주세요.")}</p>
+            {error} 설정을 수정하거나 문제가 된 변형을 잠시 끈 뒤 다시 확인해 주세요.
+          </p>
         </div>
       ) : null}
 
       {empty ? (
         <div className="border-y border-line px-4 py-7 text-center" data-studio-hybrid-dcc-modifier-empty="true">
-          <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "아직 쌓인 변형이 없습니다")}</p>
+          <p className="text-sm font-semibold text-fg">아직 쌓인 변형이 없습니다</p>
           <p className="mx-auto mt-1 max-w-[32ch] text-xs leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "대칭, 반복, 두께 같은 작업을 추가하면 원본을 지키면서 결과를 비교할 수 있습니다.")}</p>
+            대칭, 반복, 두께 같은 작업을 추가하면 원본을 지키면서 결과를 비교할 수 있습니다.
+          </p>
         </div>
       ) : (
-        <ol className="min-w-0 divide-y divide-line border-y border-line" aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "비파괴 변형 순서")}>
+        <ol className="min-w-0 divide-y divide-line border-y border-line" aria-label="비파괴 변형 순서">
           {modifiers.map((modifier, index) => (
             <ModifierRow
               key={modifier.id}
@@ -967,7 +974,8 @@ export function StudioHybridDccModifierInspector({
           id={applyDescriptionId}
           className="break-words text-[0.6875rem] leading-relaxed text-fg-3 [overflow-wrap:anywhere]"
         >
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "확정 전에는 설정을 언제든 바꿀 수 있습니다. 확정하면 지금 보이는 결과가 새 원본 메시가 되고 목록은 정리되며, 이후에는 ‘되돌리기’로 이전 변형 목록을 복구할 수 있습니다.")}</p>
+          확정 전에는 설정을 언제든 바꿀 수 있습니다. 확정하면 지금 보이는 결과가 새 원본 메시가 되고 목록은 정리되며, 이후에는 ‘되돌리기’로 이전 변형 목록을 복구할 수 있습니다.
+        </p>
         <button
           type="button"
           disabled={busy || empty}
@@ -976,7 +984,8 @@ export function StudioHybridDccModifierInspector({
           onClick={onApply}
         >
           <Check size={17} aria-hidden="true" />
-          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccModifierInspector", "ko", "적용해 원본 메시로 확정")}</button>
+          적용해 원본 메시로 확정
+        </button>
       </footer>
     </section>
   );

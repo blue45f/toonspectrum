@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 // 스톡 사진 검색 패널 — Unsplash BYOK(Bring Your Own Key) 검색 + 캔버스 삽입.
 //
 // StudioAiCompositionPanel과 동일하게 **자기완결형(self-contained)**이다 — 검색어/결과/busy/error를
@@ -107,12 +104,13 @@ export function StudioStockImagePanel({ onInsert, onOpenSettings }: StudioStockI
       <div className="flex items-center justify-between gap-1.5">
         <div className="flex items-center gap-1.5 text-sm font-medium text-fg-1">
           <Images size={14} />
-          {translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "스톡 사진 검색 (Unsplash)")}</div>
+          스톡 사진 검색 (Unsplash)
+        </div>
         <button
           type="button"
           onClick={onOpenSettings}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "연동 설정 열기")}
-          title={translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "연동 설정에서 Unsplash Access Key 등록·변경")}
+          aria-label="연동 설정 열기"
+          title="연동 설정에서 Unsplash Access Key 등록·변경"
           className="text-fg-3 transition-colors hover:text-fg-2"
         >
           <Settings2 size={13} />
@@ -121,9 +119,10 @@ export function StudioStockImagePanel({ onInsert, onOpenSettings }: StudioStockI
 
       {!configured && (
         <p className="rounded-lg border border-dashed border-line px-2 py-2 text-[0.66rem] leading-relaxed text-fg-4">
-          {translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "설정에서 Unsplash Access Key를 등록하세요.")}{" "}
+          설정에서 Unsplash Access Key를 등록하세요.{" "}
           <button type="button" onClick={onOpenSettings} className="font-medium text-accent hover:underline">
-            {translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "연동 설정 열기")}</button>
+            연동 설정 열기
+          </button>
         </p>
       )}
 
@@ -137,7 +136,7 @@ export function StudioStockImagePanel({ onInsert, onOpenSettings }: StudioStockI
             onKeyDown={(e) => {
               if (e.key === "Enter") void runSearch(1);
             }}
-            placeholder={translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "예: 도시 야경, 카페, 바다")}
+            placeholder="예: 도시 야경, 카페, 바다"
             disabled={!configured || loading}
             className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-2 text-[0.65rem] placeholder:text-fg-3 outline-none transition-colors focus:border-accent disabled:opacity-60"
           />
@@ -149,14 +148,16 @@ export function StudioStockImagePanel({ onInsert, onOpenSettings }: StudioStockI
           className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1 text-[0.65rem] font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-55"
         >
           {loading ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
-          {translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "검색")}</button>
+          검색
+        </button>
       </div>
 
       {/* 검색 결과 없이 정적으로 항상 보이는 문구는 아니다 — 실제로 검색을 해서 헤더에 요청 한도가
           왔을 때만 보여준다(무료 티어 시간당 50회를 사용자가 스스로 가늠할 수 있게). */}
       {rateLimit && (
         <p className="text-[0.58rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "이번 시간 남은 검색 한도: ")}{rateLimit.remaining}/{rateLimit.limit} {translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "(Unsplash 무료 티어)")}</p>
+          이번 시간 남은 검색 한도: {rateLimit.remaining}/{rateLimit.limit} (Unsplash 무료 티어)
+        </p>
       )}
 
       {error && <p className="text-xs text-bad">{error}</p>}
@@ -165,10 +166,10 @@ export function StudioStockImagePanel({ onInsert, onOpenSettings }: StudioStockI
         <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
           <p className="text-xs text-fg-3">
             {!configured
-              ? translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "Access Key를 먼저 등록하세요.")
+              ? "Access Key를 먼저 등록하세요."
               : submittedQuery
-                ? translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "검색 결과가 없습니다.")
-                : translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "검색어를 입력해 무료 사진을 찾아보세요.")}
+                ? "검색 결과가 없습니다."
+                : "검색어를 입력해 무료 사진을 찾아보세요."}
           </p>
         </div>
       )}
@@ -181,12 +182,12 @@ export function StudioStockImagePanel({ onInsert, onOpenSettings }: StudioStockI
                 type="button"
                 onClick={() => void onPick(photo)}
                 disabled={insertingId !== null}
-                title={photo.description || translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "이 사진을 캔버스에 삽입")}
+                title={photo.description || "이 사진을 캔버스에 삽입"}
                 className="group relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg border border-line bg-neutral-100 disabled:cursor-not-allowed dark:bg-neutral-800"
               >
                 <img
                   src={photo.thumbUrl}
-                  alt={photo.description || translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "Unsplash 스톡 사진")}
+                  alt={photo.description || "Unsplash 스톡 사진"}
                   loading="lazy"
                   className="h-full w-full object-cover transition-transform group-hover:scale-105"
                 />
@@ -214,7 +215,8 @@ export function StudioStockImagePanel({ onInsert, onOpenSettings }: StudioStockI
                   rel="noopener noreferrer"
                   className="hover:text-fg-2 hover:underline"
                 >
-                  {translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "en", "Unsplash")}</a>
+                  Unsplash
+                </a>
               </p>
             </div>
           ))}
@@ -229,11 +231,13 @@ export function StudioStockImagePanel({ onInsert, onOpenSettings }: StudioStockI
           className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised disabled:opacity-60"
         >
           {loading && <Loader2 size={13} className="animate-spin" />}
-          {translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "더 보기")}</button>
+          더 보기
+        </button>
       )}
 
       <p className="text-[0.6rem] leading-relaxed text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.StudioStockImagePanel", "ko", "Unsplash 무료 사진 — 상업적 이용 가능, 사진작가·Unsplash 출처 표시가 자동으로 포함돼요.")}</p>
+        Unsplash 무료 사진 — 상업적 이용 가능, 사진작가·Unsplash 출처 표시가 자동으로 포함돼요.
+      </p>
     </div>
   );
 }

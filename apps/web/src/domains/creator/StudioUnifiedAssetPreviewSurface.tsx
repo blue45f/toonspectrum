@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Box, LoaderCircle, Rotate3d, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
@@ -463,7 +460,7 @@ function ThreePreview({
         "relative grid size-full min-h-32 place-items-center overflow-hidden bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200 dark:from-neutral-800 dark:via-neutral-900 dark:to-neutral-900",
         className,
       )}
-      role={mode === "thumbnail" ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "en", "img") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "en", "group")}
+      role={mode === "thumbnail" ? "img" : "group"}
       aria-label={preview.alt}
       onPointerEnter={mode === "thumbnail" ? () => setScrubbing(true) : undefined}
       onPointerLeave={mode === "thumbnail" ? () => setScrubbing(false) : undefined}
@@ -478,7 +475,7 @@ function ThreePreview({
       data-studio-three-preview={preview.cacheKey}
       data-preview-mode={mode}
       data-preview-state={state}
-      data-preview-scrubbing={scrubbing ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "en", "false")}
+      data-preview-scrubbing={scrubbing ? "true" : "false"}
     >
       <div ref={canvasHostRef} className="absolute inset-0" aria-hidden />
       {poster && !(mode === "thumbnail" && scrubbing) ? (
@@ -497,8 +494,8 @@ function ThreePreview({
         <div className="absolute inset-0 grid place-items-center p-4 text-center text-xs text-fg-3">
           <div>
             <TriangleAlert size={22} className="mx-auto mb-2 text-warn" aria-hidden />
-            <p className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "ko", "3D 미리보기를 표시하지 못했습니다")}</p>
-            <p className="mt-1">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "ko", "선택한 모델은 3D 편집기에서 계속 열 수 있습니다.")}</p>
+            <p className="font-semibold text-fg-2">3D 미리보기를 표시하지 못했습니다</p>
+            <p className="mt-1">선택한 모델은 3D 편집기에서 계속 열 수 있습니다.</p>
           </div>
         </div>
       ) : null}
@@ -508,7 +505,7 @@ function ThreePreview({
           aria-hidden
         >
           <Rotate3d size={12} />
-          {scrubbing ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "ko", "좌우로 움직여 회전") : "360°"}
+          {scrubbing ? "좌우로 움직여 회전" : "360°"}
         </span>
       ) : null}
       {mode === "interactive" && state === "ready" ? (
@@ -524,7 +521,7 @@ function ThreePreview({
           className="absolute bottom-3 right-3 inline-flex min-h-10 items-center gap-1.5 rounded-full border border-white/70 bg-white/85 px-3 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:border-white/10 dark:bg-black/55 dark:text-white"
         >
           <Rotate3d size={15} aria-hidden />
-          {autoRotate ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "ko", "자동 회전 끄기") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "ko", "자동 회전")}
+          {autoRotate ? "자동 회전 끄기" : "자동 회전"}
         </button>
       ) : null}
     </div>

@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Character Shaper — the workshop shell (summary bar · slot rail · shelf · viewport + HUD ·
  * inspector · output dock) rendered as a modal over the studio, on top of the existing poser host.
@@ -69,7 +65,7 @@ const TAB_BUTTON = cn(
 
 function ShelfSkeleton() {
   return (
-    <div role="status" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "프리셋 불러오는 중")} aria-busy="true" className="flex h-full min-h-0 flex-col bg-panel">
+    <div role="status" aria-label="프리셋 불러오는 중" aria-busy="true" className="flex h-full min-h-0 flex-col bg-panel">
       <div className="space-y-2 border-b border-line px-3 pb-3 pt-3">
         <div className="skeleton h-4 w-24 motion-reduce:animate-none" />
         <div className="skeleton h-11 w-full motion-reduce:animate-none" />
@@ -308,11 +304,11 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
     <div className="flex h-full min-h-0 flex-col justify-center p-3">
       <StudioEmptyState
         icon={<UserRound size={20} aria-hidden />}
-        title={status === "error" ? translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "모델을 불러오지 못했습니다") : translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "VRM 캐릭터를 불러오세요")}
+        title={status === "error" ? "모델을 불러오지 못했습니다" : "VRM 캐릭터를 불러오세요"}
         description={
           status === "error"
-            ? errorMessage || translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "파일 형식이나 경로를 확인한 뒤 다시 시도해 주세요.")
-            : translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "샘플 캐릭터로 바로 시작하거나 내 .vrm 파일을 올릴 수 있습니다.")
+            ? errorMessage || "파일 형식이나 경로를 확인한 뒤 다시 시도해 주세요."
+            : "샘플 캐릭터로 바로 시작하거나 내 .vrm 파일을 올릴 수 있습니다."
         }
         action={
           <>
@@ -325,7 +321,8 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
               )}
             >
               <UserRound size={14} aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "샘플 캐릭터 불러오기")}</button>
+              샘플 캐릭터 불러오기
+            </button>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -335,14 +332,15 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
               )}
             >
               <Upload size={14} aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "VRM 업로드")}</button>
+              VRM 업로드
+            </button>
             <input
               ref={fileInputRef}
               type="file"
               accept=".vrm"
               multiple
               tabIndex={-1}
-              aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "VRM 파일 선택")}
+              aria-label="VRM 파일 선택"
               className="sr-only"
               onChange={onFileChange}
             />
@@ -384,7 +382,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
       ref={drawerRef}
       tabIndex={-1}
       role="region"
-      aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "참고 도구")}
+      aria-label="참고 도구"
       data-character-shaper-drawer={ui.drawer}
       className={cn(
         "absolute inset-y-0 left-0 z-30 flex min-h-0 flex-col overflow-hidden border-r border-line bg-panel shadow-[12px_0_40px_oklch(0.05_0.01_70/0.45)] outline-none",
@@ -426,7 +424,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
           type="button"
           aria-expanded={ui.inspectorOpen}
           aria-controls={inspectorId}
-          title={ui.inspectorOpen ? translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "정밀 조절 패널 닫기") : translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "정밀 조절 패널 열기")}
+          title={ui.inspectorOpen ? "정밀 조절 패널 닫기" : "정밀 조절 패널 열기"}
           onClick={() => dispatch({ type: "set-inspector", open: !ui.inspectorOpen })}
           className={cn(
             "absolute bottom-2 right-2 z-20 inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line/70 bg-panel/85 px-3 text-[0.72rem] font-semibold text-fg-2 shadow-sm backdrop-blur",
@@ -436,20 +434,21 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
           )}
         >
           {ui.inspectorOpen ? <PanelRightClose size={15} aria-hidden /> : <PanelRightOpen size={15} aria-hidden />}
-          {translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "정밀 조절")}</button>
+          정밀 조절
+        </button>
       ) : null}
       {layout === "tablet" && ui.inspectorOpen ? (
         <aside
           id={inspectorId}
-          aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "정밀 조절")}
+          aria-label="정밀 조절"
           data-character-shaper-inspector="slide-over"
           className="absolute inset-y-0 right-0 z-30 flex w-[320px] max-w-[88%] min-h-0 flex-col border-l border-line bg-panel shadow-[-12px_0_40px_oklch(0.05_0.01_70/0.45)]"
         >
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-2">
-            <p className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "정밀 조절")}</p>
+            <p className="text-sm font-bold text-fg">정밀 조절</p>
             <button
               type="button"
-              aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "정밀 조절 닫기")}
+              aria-label="정밀 조절 닫기"
               onClick={() => dispatch({ type: "set-inspector", open: false })}
               className={cn(
                 "grid size-11 place-items-center rounded-xl text-fg-2 hover:bg-raised hover:text-fg",
@@ -504,9 +503,9 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
           <CharacterShaperMobileSheet
             state={ui.mobileSheet}
             onStateChange={(sheet) => dispatch({ type: "set-mobile-sheet", sheet })}
-            title={translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "프리셋과 정밀 조절")}
+            title="프리셋과 정밀 조절"
           >
-            <div role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "시트 내용")} className="flex shrink-0 gap-1 border-b border-line px-2 pb-1.5">
+            <div role="tablist" aria-label="시트 내용" className="flex shrink-0 gap-1 border-b border-line px-2 pb-1.5">
               {(
                 [
                   { id: "shelf", label: "프리셋" },
@@ -519,7 +518,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
                   type="button"
                   role="tab"
                   aria-selected={mobileTab === tab.id}
-                  aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "en", "{v0}-panel"), { v0: String(sheetTabsId) })}
+                  aria-controls={`${sheetTabsId}-panel`}
                   tabIndex={mobileTab === tab.id ? 0 : -1}
                   onClick={() => setMobileTab(tab.id)}
                   onKeyDown={(event) => {
@@ -538,7 +537,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
               ))}
             </div>
             <div
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "en", "{v0}-panel"), { v0: String(sheetTabsId) })}
+              id={`${sheetTabsId}-panel`}
               role="tabpanel"
               aria-labelledby={`${sheetTabsId}-${mobileTab}`}
               className="relative min-h-0 flex-1 overflow-hidden"
@@ -581,7 +580,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
         {showInspectorColumn ? (
           <aside
             id={inspectorId}
-              aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "ko", "정밀 조절")}
+              aria-label="정밀 조절"
             data-character-shaper-inspector="column"
             className="flex min-h-0 min-w-0 flex-col overflow-y-auto overscroll-contain border-l border-line bg-panel"
           >
@@ -604,7 +603,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
       data-studio-vrm-dialog="true"
       data-character-shaper="true"
       data-character-shaper-layout={layout}
-      data-character-shaper-paint={paintActive ? translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaperDialog", "en", "true") : undefined}
+      data-character-shaper-paint={paintActive ? "true" : undefined}
       className={DIALOG_ROOT_CLASS}
       style={{
         paddingTop: "max(0.5rem, env(safe-area-inset-top))",

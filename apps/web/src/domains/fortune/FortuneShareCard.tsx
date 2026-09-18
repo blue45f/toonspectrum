@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { forwardRef } from "react";
 
 import { charHue } from "./fortune-theme";
@@ -83,7 +80,7 @@ export const FortuneShareCard = forwardRef<HTMLDivElement, FortuneShareCardProps
         <div style={{ position: "relative" }}>
           {/* 브랜드 + 타입 */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-            <span style={{ fontWeight: 800, letterSpacing: "0.16em", fontSize: 12, color: accent }}>{translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "en", "✦ TOONSPECTRUM")}</span>
+            <span style={{ fontWeight: 800, letterSpacing: "0.16em", fontSize: 12, color: accent }}>✦ TOONSPECTRUM</span>
             <span
               style={{
                 fontSize: 11,
@@ -118,7 +115,7 @@ export const FortuneShareCard = forwardRef<HTMLDivElement, FortuneShareCardProps
             </div>
             <div>
               <div style={{ fontSize: 17, fontWeight: 800 }}>{character.name}</div>
-              <div style={{ fontSize: 11, color: sub }}>《{character.origin}{translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "》가 전하는 운세")}</div>
+              <div style={{ fontSize: 11, color: sub }}>《{character.origin}》가 전하는 운세</div>
             </div>
           </div>
 
@@ -148,7 +145,8 @@ export const FortuneShareCard = forwardRef<HTMLDivElement, FortuneShareCardProps
           {result.recommendations.length > 0 && (
             <div style={{ marginTop: 14 }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: accent, marginBottom: 6 }}>
-                {translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "행운의 작품")}</div>
+                행운의 작품
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {result.recommendations.slice(0, 3).map((t, i) => (
                   <div key={t.id} style={{ display: "flex", gap: 7, alignItems: "center", fontSize: 12.5 }}>
@@ -176,7 +174,7 @@ export const FortuneShareCard = forwardRef<HTMLDivElement, FortuneShareCardProps
             }}
           >
             <span>{dateLabel}</span>
-            <span style={{ fontWeight: 700, color: accent }}>{translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "en", "www.toonstudio.cloud/fortune")}</span>
+            <span style={{ fontWeight: 700, color: accent }}>www.toonstudio.cloud/fortune</span>
           </div>
         </div>
       </div>
@@ -213,16 +211,16 @@ function ShareHero({
       <div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
           <span style={{ fontSize: 52, fontWeight: 900, lineHeight: 1, color: accent }}>{t.score}</span>
-          <span style={{ fontSize: 16, fontWeight: 700 }}>{translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "점")}</span>
+          <span style={{ fontSize: 16, fontWeight: 700 }}>점</span>
           {result.iljin?.themeName && (
             <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: sub }}>{result.iljin.themeName}</span>
           )}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginTop: 8 }}>
-          <Chip label={translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "행운 컬러")} value={t.color} accent={accent} sub="" />
-          <Chip label={translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "행운 방향")} value={t.direction} accent={accent} sub="" />
-          <Chip label={translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "행운 시간")} value={t.time} accent={accent} sub="" />
-          <Chip label={translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "행운 숫자")} value={t.luckyNumber} accent={accent} sub="" />
+          <Chip label="행운 컬러" value={t.color} accent={accent} sub="" />
+          <Chip label="행운 방향" value={t.direction} accent={accent} sub="" />
+          <Chip label="행운 시간" value={t.time} accent={accent} sub="" />
+          <Chip label="행운 숫자" value={t.luckyNumber} accent={accent} sub="" />
         </div>
       </div>
     );
@@ -239,8 +237,8 @@ function ShareHero({
       <div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
           <span style={{ fontSize: 34, fontWeight: 900, color: accent }}>{dp.kanKorean}{dp.jiKorean}</span>
-          <span style={{ fontSize: 12, color: sub }}>{translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "일주")}</span>
-          {a && <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: sub }}>{a.strength} {translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "· 용신 ")}{ELEMENT_KO[a.usefulElementEn] ?? a.usefulElement}</span>}
+          <span style={{ fontSize: 12, color: sub }}>일주</span>
+          {a && <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: sub }}>{a.strength} · 용신 {ELEMENT_KO[a.usefulElementEn] ?? a.usefulElement}</span>}
         </div>
         {a?.personality && (
           <div style={{ fontSize: 12.5, color: ink, marginTop: 6, lineHeight: 1.5 }}>{a.personality}</div>
@@ -284,7 +282,7 @@ function ShareHero({
                 <span style={{ fontSize: 9, fontWeight: 800, color: cardAccent }}>{v.roman}</span>
                 <span style={{ display: "grid", placeItems: "center", color: cardAccent, transform: card.type === "reversed" ? "rotate(180deg)" : undefined }}><TarotMotif id={v.motif} size={30} strokeWidth={1.8} /></span>
                 <span style={{ fontSize: 11, fontWeight: 800, color: "#fff" }}>{card.name}</span>
-                <span style={{ fontSize: 9, color: sub }}>{card.type === "reversed" ? translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "역") : translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "정")}</span>
+                <span style={{ fontSize: 9, color: sub }}>{card.type === "reversed" ? "역" : "정"}</span>
               </div>
             </div>
           );
@@ -318,7 +316,7 @@ function ShareHero({
         </div>
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: cardAccent }}>
-            {result.card.type === "reversed" ? translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "역방향") : translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "정방향")} · {result.card.nameEn}
+            {result.card.type === "reversed" ? "역방향" : "정방향"} · {result.card.nameEn}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 8 }}>
             {result.card.keywords.slice(0, 3).map((k, i) => (
@@ -343,7 +341,7 @@ function ShareHero({
         </div>
         {result.mySaju && result.partnerSaju && (
           <div style={{ fontSize: 12, color: sub, marginTop: 8 }}>
-            {translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "나 ")}{result.mySaju.dayPillar.kanKorean}{result.mySaju.dayPillar.jiKorean} {translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "· 상대 ")}{result.partnerSaju.dayPillar.kanKorean}{result.partnerSaju.dayPillar.jiKorean}
+            나 {result.mySaju.dayPillar.kanKorean}{result.mySaju.dayPillar.jiKorean} · 상대 {result.partnerSaju.dayPillar.kanKorean}{result.partnerSaju.dayPillar.jiKorean}
           </div>
         )}
         {c.factors[0] && <div style={{ fontSize: 12, color: ink, marginTop: 6, lineHeight: 1.5 }}>{c.factors[0]}</div>}
@@ -359,9 +357,9 @@ function ShareHero({
         <div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
             <span style={{ fontSize: 38, fontWeight: 900, color: accent }}>{z.score}</span>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>{translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "점")}</span>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>점</span>
           </div>
-          <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{z.ko} · {z.element}{translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "의 별자리")}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{z.ko} · {z.element}의 별자리</div>
           <div style={{ fontSize: 11, color: sub, marginTop: 3 }}>#{z.traits.join(" #")}</div>
         </div>
       </div>
@@ -371,11 +369,11 @@ function ShareHero({
   if (tab === "prescription") {
     return (
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: accent, letterSpacing: "0.08em" }}>{translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "진단된 고민")}</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: accent, letterSpacing: "0.08em" }}>진단된 고민</div>
         <div style={{ fontSize: 13.5, color: ink, marginTop: 4, lineHeight: 1.5 }}>
           “{(result.query ?? "").length > 60 ? result.query!.slice(0, 60) + "…" : result.query}”
         </div>
-        <div style={{ fontSize: 12, color: sub, marginTop: 8 }}>{translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "마음을 어루만질 ")}{result.recommendations.length}{translateCurrentStaticSourceText("domains.fortune.FortuneShareCard", "ko", "권을 처방했어요.")}</div>
+        <div style={{ fontSize: 12, color: sub, marginTop: 8 }}>마음을 어루만질 {result.recommendations.length}권을 처방했어요.</div>
       </div>
     );
   }

@@ -1,9 +1,4 @@
 import {
-  getCurrentUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   CheckCircle2,
   Cloud,
   CloudOff,
@@ -65,7 +60,8 @@ export function PersonalCloudConnectionPanel({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.14em] text-accent">
-            <Cloud size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.PersonalCloudConnectionPanel", "en", "PERSONAL CLOUD")}</p>
+            <Cloud size={15} aria-hidden="true" /> PERSONAL CLOUD
+          </p>
           <h2 id="personal-cloud-title" className="mt-2 text-lg font-black text-fg">
             {bt("개인 계정 연결", "Connect personal accounts")}
           </h2>

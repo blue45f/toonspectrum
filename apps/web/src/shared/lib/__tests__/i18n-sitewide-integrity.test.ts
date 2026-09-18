@@ -4,7 +4,6 @@ import {
   formatMissingTranslationKey,
   registerI18nEnglishSourceEntries,
   registerI18nLocaleEntries,
-  registerI18nRuntimeSourceEntries,
   resolveTranslation,
   resolveTranslationForDisplay,
 } from "@/shared/lib/i18n-core";
@@ -58,19 +57,10 @@ describe("sitewide i18n integrity", () => {
     expect(getRuntimeTranslationPendingKeys("fr")).not.toContain(key);
   });
 
-  it("translates static UI only when the selected locale differs from its authored source", () => {
-    const koreanKey = "staticUi.siteAudit.koSource";
-    const englishKey = "staticUi.siteAudit.enSource";
-
-    registerI18nRuntimeSourceEntries("ko", { [koreanKey]: "정적 사용자 인터페이스" });
-    registerI18nEnglishSourceEntries({ [englishKey]: "Static user interface" });
-
-    expect(getRuntimeTranslationPendingKeys("ko")).not.toContain(koreanKey);
-    expect(getRuntimeTranslationPendingKeys("en")).toContain(koreanKey);
-    expect(getRuntimeTranslationPendingKeys("en-US")).toContain(koreanKey);
-
-    expect(getRuntimeTranslationPendingKeys("en")).not.toContain(englishKey);
-    expect(getRuntimeTranslationPendingKeys("ko")).toContain(englishKey);
-    expect(getRuntimeTranslationPendingKeys("fr")).toContain(englishKey);
+  it("does not auto-translate the English and Korean source/fallback locales", () => {
+    expect(getRuntimeTranslationPendingKeys("en")).toEqual([]);
+    expect(getRuntimeTranslationPendingKeys("en-US")).toEqual([]);
+    expect(getRuntimeTranslationPendingKeys("ko")).toEqual([]);
+    expect(getRuntimeTranslationPendingKeys("ko-KR")).toEqual([]);
   });
 });

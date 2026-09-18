@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 // 이메레스 개인 보관함 패널 — studio-emeres-templates.ts(고정 카탈로그)의 "내가 만든 틀" 탭.
 // 캔버스 요소를 캡처하거나(우클릭 "이메레스로 저장" — 통합 문서 §3 참고) 이미지를 업로드해
 // 개인 스케치/사진 참고 틀로 저장·이름변경·삭제·분류하고, 캔버스에 다시 꺼내 쓴다.
@@ -262,7 +258,8 @@ export function StudioEmeresLibraryPanel({
       data-studio-emeres-authority={storageState}
     >
       <p className="rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "캔버스 요소를 우클릭해 &quot;이메레스로 저장&quot;을 누르거나, 이미지를 업로드해 나만의 밑그림 틀을 만들어보세요.")}</p>
+        캔버스 요소를 우클릭해 &quot;이메레스로 저장&quot;을 누르거나, 이미지를 업로드해 나만의 밑그림 틀을 만들어보세요.
+      </p>
 
       {error && (
         <p className="text-[0.64rem] text-bad" role="alert">
@@ -277,26 +274,26 @@ export function StudioEmeresLibraryPanel({
 
       <p className="text-[0.6rem] font-semibold text-fg-3" role="status">
         {storageState === "loading"
-          ? translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "SQLite/OPFS 보관함 확인 중")
+          ? "SQLite/OPFS 보관함 확인 중"
           : storageState === "sqlite"
-            ? translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "이 기기 SQLite/OPFS 저장")
+            ? "이 기기 SQLite/OPFS 저장"
             : storageState === "memory"
-              ? translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "현재 탭 메모리 임시 · 새로고침 시 사라짐")
+              ? "현재 탭 메모리 임시 · 새로고침 시 사라짐"
               : storageState === "unavailable"
-                ? translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "SQLite/OPFS 사용 불가 · 저장되지 않음")
-                : translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "주입 저장소")}
+                ? "SQLite/OPFS 사용 불가 · 저장되지 않음"
+                : "주입 저장소"}
       </p>
 
       {draft ? (
         <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-card p-2">
           <div className="flex h-24 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)] p-1">
-            <img src={draft.src} alt={translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "새 틀 미리보기")} className="h-full w-full object-contain" />
+            <img src={draft.src} alt="새 틀 미리보기" className="h-full w-full object-contain" />
           </div>
           <input
             type="text"
             value={draftName}
             onChange={(e) => setDraftName(e.target.value)}
-            placeholder={translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "틀 이름")}
+            placeholder="틀 이름"
             // eslint-disable-next-line jsx-a11y/no-autofocus -- 저장 폼은 업로드 완료 직후에만 열리고, 곧바로 이름을 입력할 것이므로 즉시 포커스가 정답
             autoFocus
             onKeyDown={(e) => {
@@ -311,14 +308,16 @@ export function StudioEmeresLibraryPanel({
               onClick={handleCancelDraft}
               className="flex-1 rounded-lg border border-line py-1.5 text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "취소")}</button>
+              취소
+            </button>
             <button
               type="button"
               onClick={handleConfirmSave}
               disabled={mutationBusy || storageState === "loading"}
               className="flex-1 rounded-lg bg-accent py-1.5 text-[0.66rem] font-semibold text-on-accent transition-colors hover:opacity-90"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "저장")}</button>
+              저장
+            </button>
           </div>
         </div>
       ) : (
@@ -329,7 +328,7 @@ export function StudioEmeresLibraryPanel({
               && "pointer-events-none opacity-60"
           )}
         >
-          <ImagePlus size={11} /> {draftBusy ? translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "불러오는 중…") : translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "이미지 업로드")}
+          <ImagePlus size={11} /> {draftBusy ? "불러오는 중…" : "이미지 업로드"}
           <input
             type="file"
             accept="image/*"
@@ -342,7 +341,8 @@ export function StudioEmeresLibraryPanel({
 
       {items.length === 0 ? (
         <p className="rounded-lg border border-dashed border-line px-2 py-3 text-center text-[0.64rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "저장된 틀이 없어요. 위에서 이미지를 업로드하거나, 캔버스 요소를 우클릭해 저장해보세요.")}</p>
+          저장된 틀이 없어요. 위에서 이미지를 업로드하거나, 캔버스 요소를 우클릭해 저장해보세요.
+        </p>
       ) : (
         <div className="grid max-h-64 grid-cols-2 gap-1.5 overflow-y-auto pr-1">
           {items.map((i) => (
@@ -368,8 +368,8 @@ export function StudioEmeresLibraryPanel({
                   type="button"
                   onClick={() => startRename(i)}
                   disabled={mutationBusy}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "{v0} 이름 변경"), { v0: String(i.name) })}
-                  title={translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "이름 변경")}
+                  aria-label={`${i.name} 이름 변경`}
+                  title="이름 변경"
                   className="shrink-0 text-fg-3 transition-colors hover:text-accent"
                 >
                   <Pencil size={10} />
@@ -378,8 +378,8 @@ export function StudioEmeresLibraryPanel({
                   type="button"
                   onClick={() => handleDelete(i.id)}
                   disabled={mutationBusy}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "{v0} 틀 삭제"), { v0: String(i.name) })}
-                  title={translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "삭제")}
+                  aria-label={`${i.name} 틀 삭제`}
+                  title="삭제"
                   className="shrink-0 text-fg-3 transition-colors hover:text-bad"
                 >
                   <X size={10} />
@@ -389,10 +389,10 @@ export function StudioEmeresLibraryPanel({
                 value={i.category ?? ""}
                 onChange={(e) => handleCategoryChange(i.id, e.target.value)}
                 disabled={mutationBusy}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "{v0} 분류"), { v0: String(i.name) })}
+                aria-label={`${i.name} 분류`}
                 className="mb-1 h-5 w-full rounded border border-line bg-panel px-1 text-[0.58rem] text-fg-3 outline-none focus:border-accent"
               >
-                <option value="">{translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "미분류")}</option>
+                <option value="">미분류</option>
                 {EMERES_CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>
                     {cat}
@@ -402,7 +402,7 @@ export function StudioEmeresLibraryPanel({
               <button
                 type="button"
                 onClick={() => onPickItem(i)}
-                title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "{v0} 불러오기"), { v0: String(i.name) })}
+                title={`${i.name} 불러오기`}
                 className="flex h-20 w-full items-center justify-center overflow-hidden rounded border border-line/60 bg-[oklch(0.96_0.006_78)] p-1 transition-colors hover:border-accent"
               >
                 <img src={i.src} alt={i.name} className="h-full w-full object-contain" />
@@ -413,7 +413,8 @@ export function StudioEmeresLibraryPanel({
       )}
 
       <p className="border-t border-line/60 pt-1.5 text-[0.6rem] leading-snug text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "이 기기의 공유 Studio SQLite/OPFS에 저장돼요(다른 기기와 공유되지 않아요). 최대 ")}{MAX_EMERES_LIBRARY_ITEMS}{translateCurrentStaticSourceText("domains.creator.StudioEmeresLibraryPanel", "ko", "개까지 보관되고, 넘으면 가장 오래된 항목부터 사라져요.")}</p>
+        이 기기의 공유 Studio SQLite/OPFS에 저장돼요(다른 기기와 공유되지 않아요). 최대 {MAX_EMERES_LIBRARY_ITEMS}개까지 보관되고, 넘으면 가장 오래된 항목부터 사라져요.
+      </p>
     </div>
   );
 }

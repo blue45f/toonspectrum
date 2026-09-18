@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useState } from "react";
 
 import {
@@ -74,7 +70,7 @@ export function StudioHslCmykSliders({ mode, value, onChange }: {
   return (
     <div className="space-y-2.5">
       {mode === "cmyk" && (
-        <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioHslCmykSliders", "ko", "장치 CMYK 근삿값입니다. 선택한 색은 RGB로 저장되며 인쇄용 ICC 프로필은 적용되지 않습니다.")}</p>
+        <p className="text-xs text-fg-3">장치 CMYK 근삿값입니다. 선택한 색은 RGB로 저장되며 인쇄용 ICC 프로필은 적용되지 않습니다.</p>
       )}
       {CHANNELS[mode].map(({ name, max }, index) => {
         const label = `${mode.toUpperCase()} ${name}`;
@@ -95,7 +91,7 @@ export function StudioHslCmykSliders({ mode, value, onChange }: {
             />
             <input
               type="number" min={0} max={max} step={0.1}
-              value={current.channels[index]} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHslCmykSliders", "ko", "{v0} 수치 입력"), { v0: String(label) })}
+              value={current.channels[index]} aria-label={`${label} 수치 입력`}
               onChange={(event) => changeChannel(index, event.currentTarget.valueAsNumber)}
               className="h-8 w-16 shrink-0 rounded-lg border border-line bg-card text-center font-mono text-xs text-fg"
             />

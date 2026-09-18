@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /* Extracted render tree from StudioCuttoonEditor.
  * Session props are an `any` bag matching the original editor closure. */
 // @ts-nocheck
@@ -216,7 +215,7 @@ export function StudioCuttoonEditorPanels(s: StudioCuttoonEditorViewSession) {
           autoActionStatus={autoActionStatus}
           bg3dInitialDataUrl={bg3dInitialDataUrl}
           bg3dInitialScene={bg3dInitialScene}
-          bg3dOperation={bg3dInitialElementId ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorPanels", "en", "update") : translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorPanels", "en", "insert")}
+          bg3dOperation={bg3dInitialElementId ? "update" : "insert"}
           bg3dTargetBundleId={bg3dTargetBundleId}
           bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
           validateRecoveryAccess={validateRecoveryAccess}

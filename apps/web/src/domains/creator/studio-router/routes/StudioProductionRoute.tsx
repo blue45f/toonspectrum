@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense, type ComponentProps } from "react";
 
 import { StudioRouteLoading } from "../../StudioLazySurfaceFallback";
@@ -15,7 +14,7 @@ const StudioProductionHubPage = lazyRetry(
 /** Keep page loading concerns outside the router's canonicalization and dispatch seam. */
 export function StudioProductionRoute(props: ComponentProps<typeof StudioProductionHubPage>) {
   return (
-    <Suspense fallback={<StudioRouteLoading label={translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioProductionRoute", "ko", "제작 운영 허브를 여는 중...")} />}>
+    <Suspense fallback={<StudioRouteLoading label="제작 운영 허브를 여는 중..." />}>
       <StudioProductionHubPage {...props} />
     </Suspense>
   );

@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useCarousel } from "@toonspectrum/core/carousel";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -66,7 +62,7 @@ export function Carousel({
           {/* 데스크톱 화살표 — 끝에 닿으면 비활성(opacity/pointer-none). 모바일은 드래그가 주 인터랙션이라 숨김. */}
           <button
             type="button"
-            aria-label={translateCurrentStaticSourceText("shared.components.ui.carousel", "ko", "이전")}
+            aria-label="이전"
             disabled={!canPrev}
             onClick={scrollPrev}
             className="absolute -left-3 top-[42%] z-10 hidden -translate-y-1/2 place-items-center rounded-full border border-line-strong bg-panel/95 p-1.5 text-fg-2 shadow-[0_8px_24px_-12px_oklch(0_0_0/0.5)] backdrop-blur-sm transition-[opacity,background,color] duration-150 hover:bg-raised hover:text-fg disabled:pointer-events-none disabled:opacity-0 sm:grid"
@@ -75,7 +71,7 @@ export function Carousel({
           </button>
           <button
             type="button"
-            aria-label={translateCurrentStaticSourceText("shared.components.ui.carousel", "ko", "다음")}
+            aria-label="다음"
             disabled={!canNext}
             onClick={scrollNext}
             className="absolute -right-3 top-[42%] z-10 hidden -translate-y-1/2 place-items-center rounded-full border border-line-strong bg-panel/95 p-1.5 text-fg-2 shadow-[0_8px_24px_-12px_oklch(0_0_0/0.5)] backdrop-blur-sm transition-[opacity,background,color] duration-150 hover:bg-raised hover:text-fg disabled:pointer-events-none disabled:opacity-0 sm:grid"
@@ -84,13 +80,13 @@ export function Carousel({
           </button>
 
           {/* 닷 인디케이터 — 스냅(페이지)당 한 점. aria-current 로 현재 페이지 표시. */}
-          <div className="mt-2 flex items-center justify-center" role="tablist" aria-label={translateCurrentStaticSourceText("shared.components.ui.carousel", "ko", "페이지")}>
+          <div className="mt-2 flex items-center justify-center" role="tablist" aria-label="페이지">
             {Array.from({ length: snapCount }).map((_, i) => (
               <button
                 key={i}
                 type="button"
                 role="tab"
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.ui.carousel", "ko", "{v0}페이지로 이동"), { v0: String(i + 1) })}
+                aria-label={`${i + 1}페이지로 이동`}
                 aria-current={i === selectedIndex}
                 aria-selected={i === selectedIndex}
                 onClick={() => scrollTo(i)}

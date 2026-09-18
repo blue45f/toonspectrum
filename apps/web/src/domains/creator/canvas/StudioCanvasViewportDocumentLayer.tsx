@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { CANVAS_W } from "../studio-assets";
 import { buildStudioLiveAdjustmentRenderTree, isStudioLiveAdjustment, studioLiveAdjustmentRenderRevision, studioLiveAdjustmentObjectRevision, type StudioLiveAdjustmentRenderTree } from "../studio-live-adjustment";
 import { StudioLiveAdjustmentGroup } from "./StudioLiveAdjustmentGroup";
@@ -343,7 +342,7 @@ export function StudioCanvasViewportDocumentLayer({
                 const wrapRenderInteraction = (node: ReactNode) =>
                   isNonInteractiveRender ? (
                     <Group
-                      key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportDocumentLayer", "en", "{v0}-non-interactive-render"), { v0: String(el.id) })}
+                      key={`${el.id}-non-interactive-render`}
                       listening={false}
                     >
                       {node}
@@ -461,7 +460,7 @@ export function StudioCanvasViewportDocumentLayer({
                       <Suspense fallback={null}>
                         {onion.map((layer) => (
                           <StudioOnionSkinImage
-                            key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportDocumentLayer", "en", "onion-{v0}-{v1}"), { v0: String(el.id), v1: String(layer.frame.id) })}
+                            key={`onion-${el.id}-${layer.frame.id}`}
                             el={el}
                             layer={layer}
                           />
@@ -585,7 +584,7 @@ export function StudioCanvasViewportDocumentLayer({
                       ref={setRef}
                       x={0}
                       y={0}
-                      globalCompositeOperation={el.mode === "eraser" ? (opts.compositeOverride as GlobalCompositeOperation | undefined) ?? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportDocumentLayer", "en", "destination-out") : undefined}
+                      globalCompositeOperation={el.mode === "eraser" ? (opts.compositeOverride as GlobalCompositeOperation | undefined) ?? "destination-out" : undefined}
                       draggable={draggable}
                       dragBoundFunc={snapBoundFunc}
                       onMouseDown={onSelect}
@@ -906,7 +905,7 @@ export function StudioCanvasViewportDocumentLayer({
                       | undefined;
                     return (
                       <ClipMaskGroup
-                        key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportDocumentLayer", "en", "{v0}-mask"), { v0: String(el.id) })}
+                        key={`${el.id}-mask`}
                         cacheKey={mck}
                         {...(sandwichComposite ? { composite: sandwichComposite } : {})}
                       >
@@ -967,7 +966,7 @@ export function StudioCanvasViewportDocumentLayer({
                     instanceId={maskPrefix ? `${maskPrefix}${node.id}` : undefined}
                     asMask={Boolean(maskPrefix)}
                     pixelRatio={Math.max(1, effScale * (globalThis.devicePixelRatio || 1))}
-                    composite={neutralizeComposite ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportDocumentLayer", "en", "source-over") : node.composite}
+                    composite={neutralizeComposite ? "source-over" : node.composite}
                     width={CANVAS_W} height={activePage.canvasH} sourceIds={node.children.map((child) => child.id)}
                     cacheKey={`${studioLiveAdjustmentRenderRevision(node)}:${adjustmentContextRevision}`}>
                     {children}

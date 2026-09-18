@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { EyeOff, MessageCircle, Send, AlertTriangle, ShieldCheck, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -175,7 +171,7 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
         className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-fg-3 transition-colors hover:bg-raised hover:text-fg-2"
       >
         <MessageCircle size={14} />
-        {open ? translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "답글 접기") : formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "답글 {v0}"), { v0: String(loaded ? count : "보기") })}
+        {open ? "답글 접기" : `답글 ${loaded ? count : "보기"}`}
       </button>
 
       {open && (
@@ -188,7 +184,8 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
           )}
           {replies.length === 0 && !loading ? (
             <p className="rounded-lg border border-dashed border-line bg-canvas/40 px-3 py-3 text-xs text-fg-3">
-              {translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "첫 답글을 남겨 대화를 이어가세요.")}</p>
+              첫 답글을 남겨 대화를 이어가세요.
+            </p>
           ) : (
             <ReplyThread
               items={replies}
@@ -213,8 +210,8 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
                   onChange={(event) => setDraft(ROOT_REPLY, event.target.value)}
                   maxLength={MAX_REPLY_LENGTH}
                   rows={2}
-                  aria-label={translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "리뷰에 답글 남기기")}
-                  placeholder={translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "리뷰에 답글 남기기")}
+                  aria-label="리뷰에 답글 남기기"
+                  placeholder="리뷰에 답글 남기기"
                   className="w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
                 />
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
@@ -226,8 +223,9 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
                       className="size-3.5 rounded border-line"
                     />
                     <AlertTriangle size={12} />
-                    {translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "스포일러 답글")}</label>
-                  <span className="text-[0.7rem] text-fg-3">{translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "최대 4단계까지 대댓글 지원")}</span>
+                    스포일러 답글
+                  </label>
+                  <span className="text-[0.7rem] text-fg-3">최대 4단계까지 대댓글 지원</span>
                   <span className="text-[0.7rem] text-fg-3">{(drafts[ROOT_REPLY] ?? "").length}/{MAX_REPLY_LENGTH}</span>
                   <button
                     type="button"
@@ -236,11 +234,12 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
                     className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     <Send size={13} />
-                    {translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "등록")}</button>
+                    등록
+                  </button>
                 </div>
               </>
             ) : (
-              <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "로그인하면 리뷰에 답글을 남길 수 있습니다.")}</p>
+              <p className="text-xs text-fg-3">로그인하면 리뷰에 답글을 남길 수 있습니다.</p>
             )}
           </div>
         </div>
@@ -353,16 +352,17 @@ function ReviewReplyItem({
           <button
             type="button"
             onClick={() => void onDelete(reply.id)}
-            aria-label={translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "내 답글 삭제")}
-            title={translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "삭제")}
+            aria-label="내 답글 삭제"
+            title="삭제"
             className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[0.68rem] text-fg-3 transition-colors hover:bg-raised hover:text-bad"
           >
             <Trash2 size={12} />
-            {translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "삭제")}</button>
+            삭제
+          </button>
         )}
       </div>
       {isDeleted ? (
-        <p className="text-sm italic leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "삭제된 답글입니다.")}</p>
+        <p className="text-sm italic leading-relaxed text-fg-3">삭제된 답글입니다.</p>
       ) : (
         <div className="relative">
           <p className={cn("text-sm leading-relaxed text-fg-2", hidden && "select-none blur-[5px]")}>{reply.text}</p>
@@ -372,7 +372,8 @@ function ReviewReplyItem({
               onClick={() => setRevealed(true)}
               className="absolute inset-0 flex items-center justify-center text-xs font-medium text-fg-2 hover:text-fg"
             >
-              {translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "스포일러 답글 보기")}</button>
+              스포일러 답글 보기
+            </button>
           )}
         </div>
       )}
@@ -382,7 +383,8 @@ function ReviewReplyItem({
             onClick={() => onToggleComposer(reply.id)}
             className="mt-2 inline-flex items-center gap-1 rounded-md text-[0.68rem] text-fg-3 transition-colors hover:text-fg"
           >
-            {translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "답글 달기")}{hasSpoiler ? <EyeOff size={12} /> : null}
+            답글 달기
+            {hasSpoiler ? <EyeOff size={12} /> : null}
           </button>
         )}
         {hasChildren ? (
@@ -391,10 +393,10 @@ function ReviewReplyItem({
             onClick={() => setCollapsed((current) => !current)}
             className="mt-2 inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[0.65rem] text-fg-3 transition-colors hover:text-fg"
           >
-            {collapsed ? translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "답글 펼치기") : translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "답글 접기")} ({children.length})
+            {collapsed ? "답글 펼치기" : "답글 접기"} ({children.length})
           </button>
           ) : null}
-        {!canReply ? <p className="mt-2 text-[0.65rem] text-fg-3">{translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "이 단계에서는 더 이상 답글을 달 수 없습니다.")}</p> : null}
+        {!canReply ? <p className="mt-2 text-[0.65rem] text-fg-3">이 단계에서는 더 이상 답글을 달 수 없습니다.</p> : null}
 
       {isOpen && (
         <div className="mt-2">
@@ -405,8 +407,8 @@ function ReviewReplyItem({
                 onChange={(event) => onChangeDraft(reply.id, event.target.value)}
                 maxLength={MAX_REPLY_LENGTH}
                 rows={2}
-                aria-label={translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "답글 달기")}
-                placeholder={translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "답글 달기")}
+                aria-label="답글 달기"
+                placeholder="답글 달기"
                 className="w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
               />
                 <div className="mt-1 flex items-center justify-between text-[0.65rem] text-fg-3">
@@ -419,8 +421,9 @@ function ReviewReplyItem({
                       className="size-3.5 rounded border-line"
                     />
                     <ShieldCheck size={12} />
-                    {translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "스포일러 답글")}</label>
-                  {!canReply ? <span>{translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "최대 대댓글 단계에 도달했습니다.")}</span> : null}
+                    스포일러 답글
+                  </label>
+                  {!canReply ? <span>최대 대댓글 단계에 도달했습니다.</span> : null}
                 </div>
               <div className="mt-2 flex items-center justify-end gap-2">
                 <button
@@ -428,7 +431,8 @@ function ReviewReplyItem({
                   onClick={() => onToggleComposer(reply.id)}
                   className="inline-flex items-center rounded-md border border-line px-2 py-1 text-xs text-fg-3"
                 >
-                  {translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "닫기")}</button>
+                  닫기
+                </button>
                 <button
                   type="button"
                   onClick={() => onSubmit(reply.id)}
@@ -436,12 +440,14 @@ function ReviewReplyItem({
                   className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-xs font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <Send size={12} />
-                  {translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "저장")}</button>
+                  저장
+                </button>
               </div>
             </div>
           ) : (
             <p className="rounded-lg border border-dashed border-line bg-canvas/45 px-3 py-2 text-xs text-fg-3">
-              {translateCurrentStaticSourceText("domains.community.components.review.replies", "ko", "로그인하면 답글을 남길 수 있습니다.")}</p>
+              로그인하면 답글을 남길 수 있습니다.
+            </p>
           )}
         </div>
       )}

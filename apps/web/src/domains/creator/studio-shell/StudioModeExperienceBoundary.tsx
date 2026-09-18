@@ -1,9 +1,4 @@
 import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   Download,
   Layers3,
@@ -202,7 +197,7 @@ export function StudioModeExperienceBoundary({
   readonly projectId: string | null;
   readonly documentId: string | null;
   readonly workspace: StudioDocumentWorkspace;
-  readonly locale: string;
+  readonly locale: "ko" | "en";
   readonly children: ReactNode;
 }) {
   const navigate = useNavigate();
@@ -256,21 +251,21 @@ export function StudioModeExperienceBoundary({
       >
         <summary
           className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-full border border-line-strong bg-card/95 px-3 py-2 text-xs font-black text-fg shadow-lg backdrop-blur supports-[backdrop-filter]:bg-card/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
-          aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioModeExperienceBoundary", `${studioModeLabel(profile, locale)} 제작 모드 열기`, `Open ${studioModeLabel(profile, locale)} production mode`)}
+          aria-label={locale === "ko" ? `${studioModeLabel(profile, locale)} 제작 모드 열기` : `Open ${studioModeLabel(profile, locale)} production mode`}
         >
           <span className="grid size-6 place-items-center rounded-full bg-accent-soft text-accent">
             <Workflow size={13} aria-hidden="true" />
           </span>
           <span>{studioModeLabel(profile, locale)}</span>
-          <span className="hidden font-medium text-fg-3 sm:inline">· {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioModeExperienceBoundary", profile.headline)}</span>
+          <span className="hidden font-medium text-fg-3 sm:inline">· {profile.headline[locale]}</span>
         </summary>
 
         <div className="mt-2 w-[min(38rem,calc(100vw-1.5rem))] rounded-2xl border border-line bg-card/98 p-4 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-card/95">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[0.6rem] font-black uppercase tracking-[0.15em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioModeExperienceBoundary", "en", "MODE PROFILE")}</p>
-              <h2 className="mt-1 text-sm font-black text-fg">{translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioModeExperienceBoundary", profile.headline)}</h2>
-              <p className="mt-1 text-xs leading-5 text-fg-3">{translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioModeExperienceBoundary", profile.description)}</p>
+              <p className="text-[0.6rem] font-black uppercase tracking-[0.15em] text-accent">MODE PROFILE</p>
+              <h2 className="mt-1 text-sm font-black text-fg">{profile.headline[locale]}</h2>
+              <p className="mt-1 text-xs leading-5 text-fg-3">{profile.description[locale]}</p>
             </div>
             <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
               <Layers3 size={15} aria-hidden="true" />
@@ -280,7 +275,7 @@ export function StudioModeExperienceBoundary({
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <section>
               <p className="text-[0.6rem] font-black uppercase tracking-wide text-fg-3">
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioModeExperienceBoundary", "작업공간", "Workspaces")}
+                {locale === "ko" ? "작업공간" : "Workspaces"}
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {context.document.allowedWorkspaces.map((item) => (
@@ -312,13 +307,13 @@ export function StudioModeExperienceBoundary({
                     onClick={() => {
                       const opened = clickStudioAiSurface(actionId);
                       setNotice(opened
-                        ? (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioModeExperienceBoundary", "이 작업에 맞는 AI 도구를 열었습니다.", "Opened the AI tool for this task."))
-                        : (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioModeExperienceBoundary", "AI 메뉴에서 해당 작업을 이어서 선택하세요.", "Continue from the AI menu and choose the matching action.")));
+                        ? (locale === "ko" ? "이 작업에 맞는 AI 도구를 열었습니다." : "Opened the AI tool for this task.")
+                        : (locale === "ko" ? "AI 메뉴에서 해당 작업을 이어서 선택하세요." : "Continue from the AI menu and choose the matching action."));
                     }}
                     className="min-h-8 rounded-full border border-line bg-panel px-2.5 text-[0.68rem] font-bold text-fg-2 hover:border-accent/45 hover:bg-accent-soft/50"
                   >
                     <Sparkles size={10} className="mr-1 inline text-accent" aria-hidden="true" />
-                    {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioModeExperienceBoundary", (AI_ACTION_LABELS[actionId] ?? { ko: actionId, en: actionId }))}
+                    {(AI_ACTION_LABELS[actionId] ?? { ko: actionId, en: actionId })[locale]}
                   </button>
                 ))}
               </div>
@@ -332,13 +327,13 @@ export function StudioModeExperienceBoundary({
                 onClick={() => {
                   const opened = clickStudioExportSurface();
                   setNotice(opened
-                    ? (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioModeExperienceBoundary", "내보내기 옵션을 열었습니다.", "Opened export options."))
-                    : (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioModeExperienceBoundary", "상단 메뉴의 내보내기를 이용해 주세요.", "Use Export from the top menu.")));
+                    ? (locale === "ko" ? "내보내기 옵션을 열었습니다." : "Opened export options.")
+                    : (locale === "ko" ? "상단 메뉴의 내보내기를 이용해 주세요." : "Use Export from the top menu."));
                 }}
                 className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
               >
                 <Download size={13} aria-hidden="true" />
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioModeExperienceBoundary", "내보내기", "Export")}
+                {locale === "ko" ? "내보내기" : "Export"}
               </button>
               <span className="text-[0.65rem] text-fg-3">
                 {profile.exports.slice(0, 4).map((preset) => EXPORT_LABELS[preset] ?? preset).join(" · ")}
@@ -348,7 +343,7 @@ export function StudioModeExperienceBoundary({
             {handoffs.length > 0 ? (
               <div className="mt-3">
                 <p className="text-[0.6rem] font-black uppercase tracking-wide text-fg-3">
-                  {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioModeExperienceBoundary", "이어 만들기", "Continue production")}
+                  {locale === "ko" ? "이어 만들기" : "Continue production"}
                 </p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {handoffs.map((handoff) => (
@@ -366,12 +361,12 @@ export function StudioModeExperienceBoundary({
                           );
                           navigate(result.href);
                         } catch (error) {
-                          setNotice(error instanceof Error ? error.message : (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioModeExperienceBoundary", "이어 만들기를 시작하지 못했습니다.", "Could not continue production.")));
+                          setNotice(error instanceof Error ? error.message : (locale === "ko" ? "이어 만들기를 시작하지 못했습니다." : "Could not continue production."));
                         }
                       }}
                       className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-accent/35 bg-accent-soft/40 px-3 text-[0.7rem] font-black text-fg hover:bg-accent-soft"
                     >
-                      {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioModeExperienceBoundary", handoff.label)}
+                      {handoff.label[locale]}
                       <ArrowRight size={12} aria-hidden="true" />
                     </button>
                   ))}

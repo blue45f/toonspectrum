@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
@@ -101,7 +100,7 @@ export function StudioAnimaticTimelineDialog({
     return createPortal(
       <StudioFloatingSurface
         surfaceId={surfaceId}
-        label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelineDialog", "ko", "웹툰 애니매틱")}
+        label="웹툰 애니매틱"
         layout={layout}
         defaultLayout={DEFAULT_STUDIO_ANIMATIC_FLOATING_LAYOUT}
         minWidth={640}
@@ -144,14 +143,14 @@ export function StudioAnimaticTimelineDialog({
     >
       <button
         type="button"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelineDialog", "ko", "애니매틱 배경 닫기")}
+        aria-label="애니매틱 배경 닫기"
         onClick={onClose}
         className="absolute inset-0 cursor-default bg-canvas/80 backdrop-blur-sm"
       />
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimaticTimelineDialog", "ko", "웹툰 애니매틱")}
+        aria-label="웹툰 애니매틱"
         className="relative z-10 flex max-h-[100dvh] w-full max-w-6xl"
       >
         {panel("max-h-[100dvh] rounded-b-none sm:max-h-[calc(100dvh-2rem)] sm:rounded-b-2xl", true)}

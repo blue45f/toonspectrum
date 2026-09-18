@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 // "에셋" 툴바 그룹 팝오버 안에 서브탭 콘텐츠로 얹히는 컴포넌트 — 팝오버 위치·z-index·max-height는
 // 호출부(StudioPage.tsx의 에셋 그룹 wrapper)가 담당한다(2026-07-05 툴바 그룹화로 이관, 자체 wrapper 없음).
 import {
@@ -344,7 +343,7 @@ function AssetFavoriteButton({
           : "border-line bg-panel/95 text-fg-2 hover:border-accent/60 hover:text-accent"
       )}
     >
-      <Star size={16} className={favorite ? translateCurrentStaticSourceText("domains.creator.StudioAssetMenuPanel", "en", "fill-current") : undefined} aria-hidden />
+      <Star size={16} className={favorite ? "fill-current" : undefined} aria-hidden />
     </button>
   );
 }
@@ -686,7 +685,7 @@ export function StudioAssetMenuPanel({
               : "border-line bg-card text-fg-2 hover:bg-raised"
           )}
         >
-          <Star size={14} className={favoriteOnly ? translateCurrentStaticSourceText("domains.creator.StudioAssetMenuPanel", "en", "fill-current") : undefined} aria-hidden />
+          <Star size={14} className={favoriteOnly ? "fill-current" : undefined} aria-hidden />
           {localizeText(t, "즐겨찾기만", "studio.assetMenu.filter.favoritesOnly")}
         </button>
       </div>

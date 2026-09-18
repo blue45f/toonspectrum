@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Sketch Panel
  * 선택된 이미지의 스케치/잉크(Sketch) 인스펙터 — 원클릭 잉크화 프리셋 +
@@ -53,16 +49,17 @@ export function StudioSketchPanel({
     <div className="space-y-2">
       {/* 헤더 + 항등 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioSketchPanel", "ko", "스케치/잉크 (Sketch)")}</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">스케치/잉크 (Sketch)</p>
         <button
           type="button"
           onClick={onReset}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.StudioSketchPanel", "ko", "잉크 효과를 제거하고 원본으로 되돌립니다.")}
+          title="잉크 효과를 제거하고 원본으로 되돌립니다."
         >
           <RotateCcw className="size-3.5" />
-          {translateCurrentStaticSourceText("domains.creator.StudioSketchPanel", "ko", "원본으로")}</button>
+          원본으로
+        </button>
       </div>
 
       {/* 원클릭 잉크화 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). 항등일 땐 활성 칩 없음. */}
@@ -81,7 +78,7 @@ export function StudioSketchPanel({
             key={t.id}
             active={t.id === value.type}
             onClick={() => onPatch({ type: t.id as SketchType })}
-            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSketchPanel", "ko", "효과를 \"{v0}\"로 바꿉니다."), { v0: String(t.label) })}
+            title={`효과를 "${t.label}"로 바꿉니다.`}
           >
             {t.label}
           </StudioPanelChip>

@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Check,
   Download,
   ImagePlus,
@@ -200,31 +196,34 @@ export function StudioShaperPanel({
         "space-y-3 rounded-2xl border border-accent/25 bg-[linear-gradient(145deg,var(--color-card),color-mix(in_oklch,var(--color-accent)_6%,var(--color-panel)))] p-3 text-xs shadow-sm",
         className,
       )}
-      aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "웹툰 캐릭터 셰이퍼")}
+      aria-label="웹툰 캐릭터 셰이퍼"
     >
       <header className="space-y-2 border-b border-line/70 pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="flex items-center gap-1.5 text-sm font-extrabold text-fg">
               <Wand2 size={15} className="text-accent" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "웹툰 캐릭터 셰이퍼")}</h3>
+              웹툰 캐릭터 셰이퍼
+            </h3>
             <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "현재 데생 인형이 실제로 지원하는 얼굴·체형·포즈만 즉시 적용합니다.")}</p>
+              현재 데생 인형이 실제로 지원하는 얼굴·체형·포즈만 즉시 적용합니다.
+            </p>
           </div>
           <span className="shrink-0 rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-[0.58rem] font-extrabold text-accent">
-            {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "en", "TOONSTUDIO")}</span>
+            TOONSTUDIO
+          </span>
         </div>
         <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-line bg-panel/60 p-2">
           <span className="rounded-lg bg-card px-2 py-1.5 text-[0.6rem] text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "즉시 적용 ")}<b className="text-fg">{supportedCount}{translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "개 범주")}</b>
+            즉시 적용 <b className="text-fg">{supportedCount}개 범주</b>
           </span>
           <span className="rounded-lg bg-card px-2 py-1.5 text-[0.6rem] text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "VRM 전용 ")}<b className="text-fg">{unsupportedCategories.length}{translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "개 범주")}</b>
+            VRM 전용 <b className="text-fg">{unsupportedCategories.length}개 범주</b>
           </span>
         </div>
       </header>
 
-      <div role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "캐릭터 셰이퍼 작업")} className="grid grid-cols-3 gap-1 rounded-xl border border-line bg-panel/65 p-1">
+      <div role="tablist" aria-label="캐릭터 셰이퍼 작업" className="grid grid-cols-3 gap-1 rounded-xl border border-line bg-panel/65 p-1">
         {SECTION_TABS.map((tab) => (
           <button
             key={tab.id}
@@ -245,8 +244,8 @@ export function StudioShaperPanel({
       </div>
 
       {activeTab === "recipes" ? (
-        <div role="tabpanel" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "캐릭터 레시피")} className="space-y-3">
-          <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]" role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "셰이퍼 범주")}>
+        <div role="tabpanel" aria-label="캐릭터 레시피" className="space-y-3">
+          <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]" role="tablist" aria-label="셰이퍼 범주">
             {SHAPER_CATEGORIES.map((category) => {
               const available = supported.has(category.id);
               const selected = activeCategory === category.id;
@@ -258,7 +257,7 @@ export function StudioShaperPanel({
                   aria-selected={selected}
                   aria-disabled={!available}
                   disabled={!available}
-                  title={available ? category.description : VRM_ONLY_REASON[category.id] ?? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "현재 데생 인형에서 지원하지 않습니다.")}
+                  title={available ? category.description : VRM_ONLY_REASON[category.id] ?? "현재 데생 인형에서 지원하지 않습니다."}
                   className={cn(
                     "min-h-10 shrink-0 rounded-full border px-3 text-[0.6rem] font-bold transition-colors",
                     selected
@@ -317,11 +316,12 @@ export function StudioShaperPanel({
 
           <details className="rounded-xl border border-line bg-card/55 p-3">
             <summary className="min-h-9 cursor-pointer text-[0.63rem] font-bold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "VRM 캐릭터에서 더 세밀하게 편집")}</summary>
+              VRM 캐릭터에서 더 세밀하게 편집
+            </summary>
             <div className="mt-2 space-y-1.5 border-t border-line/60 pt-2">
               {unsupportedCategories.map((category) => (
                 <p key={category.id} className="text-[0.58rem] leading-relaxed text-fg-3">
-                  <b className="text-fg-2">{category.label}</b> · {VRM_ONLY_REASON[category.id] ?? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "VRM 캐릭터 빌더에서 제공합니다.")}
+                  <b className="text-fg-2">{category.label}</b> · {VRM_ONLY_REASON[category.id] ?? "VRM 캐릭터 빌더에서 제공합니다."}
                 </p>
               ))}
             </div>
@@ -330,11 +330,12 @@ export function StudioShaperPanel({
       ) : null}
 
       {activeTab === "assist" ? (
-        <div role="tabpanel" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "추천과 포즈")} className="space-y-3">
+        <div role="tabpanel" aria-label="추천과 포즈" className="space-y-3">
           <div className="flex items-start gap-2 rounded-xl border border-accent/25 bg-accent-soft/30 p-3">
             <Sparkles size={15} className="mt-0.5 shrink-0 text-accent" aria-hidden />
             <p className="text-[0.61rem] leading-relaxed text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "장르 레시피는 현재 인형이 실제로 지원하는 ")}{supportedCount}{translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "개 범주만 바꿉니다. 의상·헤어를 적용한 것처럼 보이게 꾸미지 않습니다.")}</p>
+              장르 레시피는 현재 인형이 실제로 지원하는 {supportedCount}개 범주만 바꿉니다. 의상·헤어를 적용한 것처럼 보이게 꾸미지 않습니다.
+            </p>
           </div>
           <div className="space-y-2">
             {SHAPER_AI_ARCHETYPES.map((archetype) => (
@@ -344,12 +345,13 @@ export function StudioShaperPanel({
                 disabled={disabled}
                 className="w-full rounded-xl border border-line bg-card p-3 text-left transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
                 onClick={() => applyArchetype(archetype.id)}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "{v0} 지원 범주 적용"), { v0: String(archetype.label) })}
+                aria-label={`${archetype.label} 지원 범주 적용`}
               >
                 <span className="flex items-center justify-between gap-2">
                   <span className="text-[0.68rem] font-extrabold text-fg">{archetype.label}</span>
                   <span className="rounded-full border border-accent/25 bg-accent-soft px-2 py-0.5 text-[0.56rem] font-bold text-accent">
-                    {supportedCount}{translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "개 적용")}</span>
+                    {supportedCount}개 적용
+                  </span>
                 </span>
                 <span className="mt-1 block text-[0.59rem] leading-relaxed text-fg-3">{archetype.description}</span>
               </button>
@@ -362,16 +364,18 @@ export function StudioShaperPanel({
             onClick={onTriggerPoseScanner}
           >
             <ScanSearch size={14} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "사진 위 랜드마크로 포즈 검수")}</button>
+            사진 위 랜드마크로 포즈 검수
+          </button>
         </div>
       ) : null}
 
       {activeTab === "output" ? (
-        <div role="tabpanel" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "셰이퍼 출력")} className="space-y-3">
+        <div role="tabpanel" aria-label="셰이퍼 출력" className="space-y-3">
           <div className="flex items-start gap-2 rounded-xl border border-line bg-panel/55 p-3">
             <ShieldCheck size={15} className="mt-0.5 shrink-0 text-good" aria-hidden />
             <p className="text-[0.61rem] leading-relaxed text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "캡처와 PSD는 현재 3D 장면에서 생성합니다. 콜백이 연결되지 않은 환경에서는 가짜 픽셀이나 빈 PSD를 만들지 않습니다.")}</p>
+              캡처와 PSD는 현재 3D 장면에서 생성합니다. 콜백이 연결되지 않은 환경에서는 가짜 픽셀이나 빈 PSD를 만들지 않습니다.
+            </p>
           </div>
           <button
             type="button"
@@ -380,7 +384,8 @@ export function StudioShaperPanel({
             onClick={onInsertCanvas}
           >
             <ImagePlus size={14} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "현재 장면을 캔버스에 추가")}</button>
+            현재 장면을 캔버스에 추가
+          </button>
           <button
             type="button"
             disabled={disabled || !onExportPsd}
@@ -388,13 +393,16 @@ export function StudioShaperPanel({
             onClick={onExportPsd}
           >
             <Layers size={14} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "레이어드 PSD 내보내기")}</button>
+            레이어드 PSD 내보내기
+          </button>
           <div className="rounded-xl border border-dashed border-line bg-card/45 p-3 text-[0.59rem] leading-relaxed text-fg-3">
             <p className="flex items-center gap-1.5 font-bold text-fg-2">
               <Download size={12} aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "직접 표면 드로잉")}</p>
+              직접 표면 드로잉
+            </p>
             <p className="mt-1">
-              {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioShaperPanel", "ko", "UV가 있는 VRM 캐릭터의 표면 탭에서 B 브러시, F ColorDrop, I 스포이드를 사용합니다. 데생 인형에는 존재하지 않는 UV 기능을 가짜 토글로 노출하지 않습니다.")}</p>
+              UV가 있는 VRM 캐릭터의 표면 탭에서 B 브러시, F ColorDrop, I 스포이드를 사용합니다. 데생 인형에는 존재하지 않는 UV 기능을 가짜 토글로 노출하지 않습니다.
+            </p>
           </div>
         </div>
       ) : null}

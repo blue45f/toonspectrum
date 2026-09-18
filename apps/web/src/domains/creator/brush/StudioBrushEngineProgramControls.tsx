@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /** Connected oil matrix plus the universal BrushGraph wrapper. */
 
 import { ChevronDown, Gauge, Layers, RotateCcw, Sparkles } from "lucide-react";
@@ -178,10 +174,11 @@ function StudioOilProgramMatrix({
         <Layers aria-hidden className="mt-0.5 size-4 shrink-0 text-fg-3" />
         <div className="min-w-0 text-xs leading-relaxed">
           <p className="font-semibold text-fg">
-            {presetName ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "{v0}와 같은 조합"), { v0: String(presetName) }) : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "커스텀 조합")}
+            {presetName ? `${presetName}와 같은 조합` : "커스텀 조합"}
           </p>
           <p className="mt-0.5 text-pretty text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "실제 유화 획에 적용되는 강모·소모·두께 구성입니다. 현재 효과 ")}{activeCount}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "개")}{presetName ? "" : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", " — 같은 기본 프리셋은 없습니다")}
+            실제 유화 획에 적용되는 강모·소모·두께 구성입니다. 현재 효과 {activeCount}개
+            {presetName ? "" : " — 같은 기본 프리셋은 없습니다"}
           </p>
         </div>
         {changed ? (
@@ -191,7 +188,8 @@ function StudioOilProgramMatrix({
             className="ml-auto inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg border border-line px-2 py-1 text-[11px] font-medium text-fg-2 transition hover:bg-bg-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 pointer-coarse:min-h-11"
           >
             <RotateCcw aria-hidden className="size-3" />
-            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "기본값")}</button>
+            기본값
+          </button>
         ) : null}
       </div>
 
@@ -199,12 +197,15 @@ function StudioOilProgramMatrix({
         <div>
           <h3 id="oil-matrix-heading" className="flex items-center gap-1.5 text-xs font-bold text-fg">
             <Sparkles aria-hidden className="size-3.5 text-accent" />
-            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "원하는 질감으로 고르기")}</h3>
+            원하는 질감으로 고르기
+          </h3>
           <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "내부 엔진 이름을 몰라도 됩니다. 원하는 결과를 고르면 관련 물리 설정을 함께 바꿉니다.")}</p>
+            내부 엔진 이름을 몰라도 됩니다. 원하는 결과를 고르면 관련 물리 설정을 함께 바꿉니다.
+          </p>
         </div>
         <span className="rounded-lg border border-line bg-raised px-2 py-1 text-[0.65rem] font-semibold text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "8가지")}</span>
+          8가지
+        </span>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -214,7 +215,7 @@ function StudioOilProgramMatrix({
             <button
               key={recipe.id}
               type="button"
-              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "유화 조합: {v0}"), { v0: String(recipe.name) })}
+              aria-label={`유화 조합: ${recipe.name}`}
               aria-pressed={selected}
               onClick={() => emit(recipe.programs)}
               className={cn(
@@ -256,7 +257,8 @@ function StudioOilProgramMatrix({
       <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card/45 px-3 py-2.5">
         <span className="flex items-center gap-1.5 text-xs font-semibold text-fg-2">
           <Gauge aria-hidden className="size-3.5 text-accent" />
-          {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "성능 부담")}</span>
+          성능 부담
+        </span>
         <span className="text-right">
           <span className="block text-[0.68rem] font-bold text-fg">{complexity.label}</span>
           <span className="block text-[0.6rem] text-fg-3">{complexity.description}</span>
@@ -265,13 +267,14 @@ function StudioOilProgramMatrix({
 
       <details className="rounded-xl border border-line bg-bg-2/35 p-2.5">
         <summary className="flex min-h-9 cursor-pointer items-center justify-between gap-2 text-[0.68rem] font-bold text-fg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 pointer-coarse:min-h-11">
-          {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "각 물리 효과를 직접 켜고 끄기")}<ChevronDown size={14} aria-hidden className="text-fg-3" />
+          각 물리 효과를 직접 켜고 끄기
+          <ChevronDown size={14} aria-hidden className="text-fg-3" />
         </summary>
         <ol className="mt-2 flex flex-col gap-2 border-t border-line pt-2">
           <li className="flex items-center gap-2 rounded-lg border border-dashed border-line px-3 py-2 text-xs text-fg-3">
             <span className="tabular-nums text-fg-4">1</span>
-            <span className="font-medium text-fg-2">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "물감 본체")}</span>
-            <span className="text-fg-4">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "항상 칠해집니다")}</span>
+            <span className="font-medium text-fg-2">물감 본체</span>
+            <span className="text-fg-4">항상 칠해집니다</span>
           </li>
           {OIL_PROGRAM_ROWS.map((row, index) => {
             const on = current[row.key];
@@ -297,10 +300,11 @@ function StudioOilProgramMatrix({
                       </span>
                       {differs ? (
                         <span className="rounded bg-accent-soft px-1 py-px text-[10px] font-medium text-accent">
-                          {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "변경됨")}</span>
+                          변경됨
+                        </span>
                       ) : null}
                       <span className="rounded bg-bg-2 px-1 py-px text-[10px] font-medium text-fg-4">
-                        {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "비용 ")}{row.cost}
+                        비용 {row.cost}
                       </span>
                     </span>
                     <span className="mt-0.5 block text-pretty text-[11px] leading-relaxed text-fg-3">
@@ -344,18 +348,19 @@ export function StudioBrushEngineProgramControls({
   const guide = ENGINE_FAMILY_GUIDE[family];
   return (
     <div className="flex flex-col gap-4">
-      <section className="rounded-2xl border border-accent/30 bg-accent-soft/15 p-3" aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "브러시 엔진 안내")}>
+      <section className="rounded-2xl border border-accent/30 bg-accent-soft/15 p-3" aria-label="브러시 엔진 안내">
         <div className="flex items-start gap-3">
           <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
             <Sparkles size={16} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[0.62rem] font-bold text-accent">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "현재 브러시 계열")}</p>
+            <p className="text-[0.62rem] font-bold text-accent">현재 브러시 계열</p>
             <h3 className="mt-0.5 text-sm font-bold text-fg">{guide.label}</h3>
-            <p className="mt-1 text-xs leading-5 text-fg-2">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "목표 결과: ")}{guide.result}</p>
+            <p className="mt-1 text-xs leading-5 text-fg-2">목표 결과: {guide.result}</p>
             <p className="mt-2 text-[0.65rem] leading-5 text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "처음에는 아래 순서만 조절해도 충분합니다. 결과가 더 필요할 때만 전문 엔진 그래프를 여세요.")}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "권장 조절 순서")}>
+              처음에는 아래 순서만 조절해도 충분합니다. 결과가 더 필요할 때만 전문 엔진 그래프를 여세요.
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label="권장 조절 순서">
               {guide.order.map((label, index) => (
                 <span key={label} className="inline-flex items-center gap-1 rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-semibold text-fg-2">
                   <span className="text-accent">{index + 1}</span>{label}
@@ -377,9 +382,10 @@ export function StudioBrushEngineProgramControls({
       >
         <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl px-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
           <span>
-            <span className="block text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "전문 엔진 그래프")}</span>
+            <span className="block text-xs font-bold text-fg">전문 엔진 그래프</span>
             <span className="mt-0.5 block text-[0.62rem] leading-5 text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "필기감·캐리어·촉·표면·안료·물리·패턴·출력 엔진을 슬롯별로 직접 조합합니다.")}</span>
+              필기감·캐리어·촉·표면·안료·물리·패턴·출력 엔진을 슬롯별로 직접 조합합니다.
+            </span>
           </span>
           <ChevronDown size={16} className="shrink-0 text-fg-3" aria-hidden />
         </summary>
@@ -392,7 +398,8 @@ export function StudioBrushEngineProgramControls({
           />
           {family !== "oil" ? (
             <p className="mt-3 rounded-xl border border-line bg-bg-2/60 p-3 text-[0.65rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineProgramControls", "ko", "현재 제품 경로에 연결된 노드는 즉시 적용됩니다. 실험·어댑터 노드는 저장 전에 상태와 호환성을 확인하세요.")}</p>
+              현재 제품 경로에 연결된 노드는 즉시 적용됩니다. 실험·어댑터 노드는 저장 전에 상태와 호환성을 확인하세요.
+            </p>
           ) : null}
         </div>
       </details>

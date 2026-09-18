@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   CalendarDays,
   FileCheck2,
   FileText,
@@ -100,8 +96,8 @@ export function PolicyArticle({ doc }: { doc: PolicyDocument }) {
                   <a
                     href={`#${id}`}
                     className="grid size-8 shrink-0 place-items-center rounded-lg text-fg-3 opacity-70 transition hover:bg-panel hover:text-accent focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "{v0} 조항 링크"), { v0: String(section.heading) })}
-                    title={translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "이 조항으로 연결")}
+                    aria-label={`${section.heading} 조항 링크`}
+                    title="이 조항으로 연결"
                   >
                     <Link2 size={14} aria-hidden="true" />
                   </a>
@@ -117,12 +113,12 @@ export function PolicyArticle({ doc }: { doc: PolicyDocument }) {
       <footer className="mt-10 rounded-2xl border border-line/60 bg-card/30 p-4 text-xs leading-relaxed text-fg-3">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <FileCheck2 size={14} className="shrink-0 text-accent" aria-hidden="true" />
-          <span className="font-medium text-fg-2">{translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "툰스펙트럼 게시 정책")}</span>
+          <span className="font-medium text-fg-2">툰스펙트럼 게시 정책</span>
           <span>{doc.versionLabel}</span>
-          {effective ? <span>{translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "· 시행일 ")}{effective}</span> : null}
-          <span>{translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "· 문서 ID ")}<code className="font-mono text-fg-2">{shortContentHash(doc.contentHash)}</code></span>
+          {effective ? <span>· 시행일 {effective}</span> : null}
+          <span>· 문서 ID <code className="font-mono text-fg-2">{shortContentHash(doc.contentHash)}</code></span>
         </p>
-        <p className="mt-2">{translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "이 문서는 서비스 배포본에 포함된 검토 정책입니다. 외부 게시 서비스가 중단되어도 같은 내용으로 계속 제공됩니다.")}</p>
+        <p className="mt-2">이 문서는 서비스 배포본에 포함된 검토 정책입니다. 외부 게시 서비스가 중단되어도 같은 내용으로 계속 제공됩니다.</p>
       </footer>
     </>
   );
@@ -132,8 +128,8 @@ export function PolicyArticle({ doc }: { doc: PolicyDocument }) {
 export function PolicyErrorFallback({ slug, label, onRetry }: { slug: PolicySlug; label: string; onRetry?: () => void }) {
   return (
     <div className="mt-8 space-y-4">
-      <ErrorState title={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "{v0}을 표시하지 못했습니다."), { v0: String(label) })} message={translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "페이지를 새로고침하거나 잠시 후 다시 시도해 주세요.")} onRetry={onRetry} />
-      <a href={policyPublicUrl(slug)} className={buttonClass({ size: "sm", variant: "outline" })}>{translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "자사 정책 페이지 다시 열기")}</a>
+      <ErrorState title={`${label}을 표시하지 못했습니다.`} message="페이지를 새로고침하거나 잠시 후 다시 시도해 주세요." onRetry={onRetry} />
+      <a href={policyPublicUrl(slug)} className={buttonClass({ size: "sm", variant: "outline" })}>자사 정책 페이지 다시 열기</a>
     </div>
   );
 }
@@ -152,7 +148,7 @@ function PolicyPageShell({ slug, eyebrow, fallbackName }: { slug: PolicySlug; ey
         <p className="eyebrow text-accent">{eyebrow}</p>
         <h1 className="mt-3 text-pretty font-display text-[clamp(2rem,7vw,4.5rem)] font-bold leading-[1] tracking-[-0.055em] text-fg">{title}</h1>
         <div className="mt-5 flex flex-wrap gap-2 text-xs text-fg-2">
-          {effective ? <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-card px-3"><CalendarDays size={14} aria-hidden="true" />{translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "시행일 ")}{effective}</span> : null}
+          {effective ? <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-card px-3"><CalendarDays size={14} aria-hidden="true" />시행일 {effective}</span> : null}
           <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-card px-3"><FileText size={14} aria-hidden="true" />{doc.versionLabel}</span>
           <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-card px-3 font-mono">ID {shortContentHash(doc.contentHash)}</span>
         </div>
@@ -162,8 +158,8 @@ function PolicyPageShell({ slug, eyebrow, fallbackName }: { slug: PolicySlug; ey
         <div className="flex items-start gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-accent/25 bg-card text-accent"><ShieldCheck size={19} aria-hidden="true" /></span>
           <div>
-            <h2 id="policy-summary-title" className="font-display text-lg font-bold text-fg">{translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "먼저 보는 쉬운 말 요약")}</h2>
-            <p className="mt-1 text-xs leading-6 text-fg-3">{translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "아래 요약은 이해를 돕기 위한 안내이며, 권리와 의무는 전체 정책 본문을 기준으로 합니다.")}</p>
+            <h2 id="policy-summary-title" className="font-display text-lg font-bold text-fg">먼저 보는 쉬운 말 요약</h2>
+            <p className="mt-1 text-xs leading-6 text-fg-3">아래 요약은 이해를 돕기 위한 안내이며, 권리와 의무는 전체 정책 본문을 기준으로 합니다.</p>
           </div>
         </div>
         <ul className="mt-5 grid gap-3 md:grid-cols-3">
@@ -176,9 +172,9 @@ function PolicyPageShell({ slug, eyebrow, fallbackName }: { slug: PolicySlug; ey
       </section>
 
       <div className="policy-page__layout mt-10 grid gap-10 lg:grid-cols-[15rem_minmax(0,46rem)] lg:items-start lg:justify-between">
-        <aside className="policy-page__toc lg:sticky lg:top-24" aria-label={translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "정책 목차")}>
+        <aside className="policy-page__toc lg:sticky lg:top-24" aria-label="정책 목차">
           <div className="rounded-2xl border border-line bg-panel/60 p-4">
-            <h2 className="font-display text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "문서 목차")}</h2>
+            <h2 className="font-display text-sm font-bold text-fg">문서 목차</h2>
             <nav className="mt-3 max-h-[58vh] overflow-y-auto pr-1">
               <ol className="space-y-1">
                 {outline.map((item, index) => (
@@ -192,10 +188,11 @@ function PolicyPageShell({ slug, eyebrow, fallbackName }: { slug: PolicySlug; ey
               </ol>
             </nav>
             <button type="button" onClick={() => window.print()} className="policy-page__print mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-line-strong bg-card px-3 text-xs font-bold text-fg-2 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
-              <Printer size={15} aria-hidden="true" />{translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "인쇄·PDF 저장")}</button>
+              <Printer size={15} aria-hidden="true" />인쇄·PDF 저장
+            </button>
           </div>
         </aside>
-        <article aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "{v0} 전체 본문"), { v0: String(title) })} className="min-w-0 max-w-[46rem]">
+        <article aria-label={`${title} 전체 본문`} className="min-w-0 max-w-[46rem]">
           <PolicyArticle doc={doc} />
         </article>
       </div>
@@ -204,9 +201,9 @@ function PolicyPageShell({ slug, eyebrow, fallbackName }: { slug: PolicySlug; ey
 }
 
 export function TermsPage() {
-  return <PolicyPageShell slug="terms-of-service" eyebrow="TERMS" fallbackName={translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "이용약관")} />;
+  return <PolicyPageShell slug="terms-of-service" eyebrow="TERMS" fallbackName="이용약관" />;
 }
 
 export function PrivacyPage() {
-  return <PolicyPageShell slug="privacy-policy" eyebrow="PRIVACY" fallbackName={translateCurrentStaticSourceText("domains.legal.PolicyPage", "ko", "개인정보처리방침")} />;
+  return <PolicyPageShell slug="privacy-policy" eyebrow="PRIVACY" fallbackName="개인정보처리방침" />;
 }

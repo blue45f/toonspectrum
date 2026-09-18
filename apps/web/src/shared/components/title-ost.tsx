@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Music, ExternalLink } from "lucide-react";
 
 import { Section } from "./section";
@@ -28,8 +24,8 @@ export function TitleOst({ title, original }: { title: Title; original?: Title }
     <Section
       className="mt-14"
       eyebrow="SOUNDTRACK"
-      title={translateCurrentStaticSourceText("shared.components.title.ost", "ko", "주제가 · OST")}
-      desc={translateCurrentStaticSourceText("shared.components.title.ost", "ko", "작품의 애니·드라마 대표곡입니다. 공식 플랫폼에서 들어보세요.")}
+      title="주제가 · OST"
+      desc="작품의 애니·드라마 대표곡입니다. 공식 플랫폼에서 들어보세요."
     >
       <ul className="grid gap-2.5 sm:grid-cols-2">
         {osts.map((t, i) => {
@@ -45,7 +41,7 @@ export function TitleOst({ title, original }: { title: Title; original?: Title }
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-[linear-gradient(150deg,oklch(0.25_0.011_66),oklch(0.19_0.009_68))] text-accent"
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.title.ost", "ko", "{v0} 유튜브에서 보기"), { v0: String(t.song) })}
+                  aria-label={`${t.song} 유튜브에서 보기`}
                 >
                   {thumb ? (
                     <>
@@ -70,15 +66,17 @@ export function TitleOst({ title, original }: { title: Title; original?: Title }
               </span>
               <span className="flex shrink-0 items-center gap-1.5 sm:flex-col sm:items-stretch lg:flex-row">
                 <PlatformLink href={ostWatchUrl(t)} label="YouTube" />
-                <PlatformLink href={ostMelonUrl(t)} label={translateCurrentStaticSourceText("shared.components.title.ost", "ko", "멜론")} />
-                <PlatformLink href={ostSpotifyUrl(t)} label={translateCurrentStaticSourceText("shared.components.title.ost", "en", "Spotify")} />
+                <PlatformLink href={ostMelonUrl(t)} label="멜론" />
+                <PlatformLink href={ostSpotifyUrl(t)} label="Spotify" />
               </span>
             </li>
           );
         })}
       </ul>
       <p className="mt-3 text-[0.7rem] leading-relaxed text-fg-3">
-        {translateCurrentStaticSourceText("shared.components.title.ost", "ko", "음원·영상의 저작권은 각 권리자에게 있습니다. 툰스펙트럼은 음원을 저장·재생하지 않으며, 공식 플랫폼으로 연결만 합니다.")}</p>
+        음원·영상의 저작권은 각 권리자에게 있습니다. 툰스펙트럼은 음원을 저장·재생하지 않으며, 공식
+        플랫폼으로 연결만 합니다.
+      </p>
     </Section>
   );
 }

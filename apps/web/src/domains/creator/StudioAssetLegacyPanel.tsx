@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense } from "react";
 
 import { completeStudioAssetInsertion } from "./studio-asset-insertion-outcome";
@@ -69,7 +68,7 @@ export function StudioAssetLegacyPanel({
   } = toolBelt.stableHandlers;
 
   return (
-    <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioAssetLegacyPanel", "ko", "에셋 보관함을 여는 중...")} />}>
+    <Suspense fallback={<StudioPanelLoading label="에셋 보관함을 여는 중..." />}>
       <StudioAssetMenuPanel
         assetTab={assetTab}
         setAssetTab={setAssetTab}
