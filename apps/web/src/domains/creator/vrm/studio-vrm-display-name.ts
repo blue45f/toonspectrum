@@ -1,3 +1,6 @@
+import {
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { normalizeLocaleCode } from "@/shared/lib/i18n-intl-utils";
 
 import type { VrmLibraryEntry } from "./vrm-library";
@@ -173,9 +176,9 @@ function quaterniusDisplayName(id: string, locale: DisplayLocale): string | null
   const role = QUATERNIUS_ROLE_NAMES[match[2]];
   if (!role) return null;
 
-  const brandName = QUATERNIUS_BRAND_NAMES[locale];
-  const roleName = role[locale];
-  const genderName = QUATERNIUS_GENDER_NAMES[gender][locale];
+  const brandName = translateLocaleBranchForLocale(locale, "domains.creator.vrm.studio.vrm.display.name", QUATERNIUS_BRAND_NAMES);
+  const roleName = translateLocaleBranchForLocale(locale, "domains.creator.vrm.studio.vrm.display.name", role);
+  const genderName = translateLocaleBranchForLocale(locale, "domains.creator.vrm.studio.vrm.display.name", QUATERNIUS_GENDER_NAMES[gender]);
   return locale === "en" || locale === "ko"
     ? `${brandName} ${roleName} (${genderName})`
     : `${brandName} ${roleName}（${genderName}）`;

@@ -1,3 +1,7 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { PanelRightOpen, X } from "lucide-react";
 import { Suspense, useEffect, useId, useMemo, useRef, useState } from "react";
 
@@ -30,7 +34,7 @@ const StudioReviewPanel = lazyRetry(
   "StudioDocumentReviewPanel",
 );
 
-type Locale = "ko" | "en";
+type Locale = string;
 
 type WorkspaceToolProjection =
   | {
@@ -151,13 +155,13 @@ const WORKSPACE_TOOL_PROJECTIONS: Partial<
 });
 
 function localeFromLanguage(language: string): Locale {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  return resolveUiLocale(language);
 }
 
 function DockLoading({ locale }: { readonly locale: Locale }) {
   return (
     <div className="grid min-h-40 place-items-center rounded-2xl border border-line bg-panel/50 p-5 text-sm font-semibold text-fg-3">
-      {locale === "ko" ? "문서 도구를 여는 중..." : "Opening document tools..."}
+      {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioDocumentWorkspaceDock", "문서 도구를 여는 중...", "Opening document tools...")}
     </div>
   );
 }
@@ -222,11 +226,11 @@ export function StudioDocumentWorkspaceDock() {
 
   if (!projectId || !projection) return null;
 
-  const title = locale === "ko" ? projection.titleKo : projection.titleEn;
-  const description = locale === "ko" ? projection.descriptionKo : projection.descriptionEn;
+  const title = translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioDocumentWorkspaceDock", projection.titleKo, projection.titleEn);
+  const description = translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioDocumentWorkspaceDock", projection.descriptionKo, projection.descriptionEn);
   const triggerLabel = open
-    ? (locale === "ko" ? "문서 도구 닫기" : "Close document tools")
-    : (locale === "ko" ? "문서 도구 열기" : "Open document tools");
+    ? (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioDocumentWorkspaceDock", "문서 도구 닫기", "Close document tools"))
+    : (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioDocumentWorkspaceDock", "문서 도구 열기", "Open document tools"));
 
   return (
     <>
@@ -246,7 +250,7 @@ export function StudioDocumentWorkspaceDock() {
           onClick={() => setOpen((value) => !value)}
         >
           <PanelRightOpen size={16} aria-hidden="true" />
-          <span className="hidden sm:inline">{locale === "ko" ? "문서 도구" : "Document tools"}</span>
+          <span className="hidden sm:inline">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioDocumentWorkspaceDock", "문서 도구", "Document tools")}</span>
         </button>
       </div>
 
@@ -268,7 +272,7 @@ export function StudioDocumentWorkspaceDock() {
             <button
               ref={closeButtonRef}
               type="button"
-              aria-label={locale === "ko" ? "문서 도구 닫기" : "Close document tools"}
+              aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioDocumentWorkspaceDock", "문서 도구 닫기", "Close document tools")}
               className={buttonClass({ variant: "quiet", size: "icon" })}
               onClick={() => setOpen(false)}
             >

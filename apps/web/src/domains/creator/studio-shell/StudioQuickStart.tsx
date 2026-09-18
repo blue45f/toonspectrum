@@ -1,3 +1,7 @@
+import {
+  getCurrentUiLocale,
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, PanelsTopLeft, PencilLine, Plus, Zap } from "lucide-react";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -33,7 +37,7 @@ const QUICK_STARTS = [
 type QuickStart = (typeof QUICK_STARTS)[number];
 
 /** A deliberate click creates a real, recoverable project; mounting/prefetching never does. */
-export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
+export function StudioQuickStart({ locale }: { readonly locale: string }) {
   const navigate = useNavigate();
   const starting = useRef(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -47,10 +51,10 @@ export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
     try {
       const plan = resolveStudioModeCreationPlan(item.kind, item.templateId);
       const result = createStudioProjectWithInitialDocument(window.localStorage, {
-        title: locale === "ko" ? item.titleKo : item.titleEn,
+        title: translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioQuickStart", item.titleKo, item.titleEn),
         kind: item.kind,
         templateId: item.templateId,
-        primaryLocale: locale === "ko" ? "ko-KR" : "en-US",
+        primaryLocale: getCurrentUiLocale(),
         document: {
           kind: plan.document.kind,
           defaultWorkspace: plan.document.workspace,
@@ -63,9 +67,7 @@ export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
     } catch {
       starting.current = false;
       setBusyId(null);
-      setError(locale === "ko"
-        ? "이 브라우저에서 새 작업을 저장하지 못했어요. 저장 공간과 브라우저 설정을 확인한 뒤 다시 시도해 주세요. 기존 작업은 변경하지 않았습니다."
-        : "This browser could not save a new project. Check available storage and browser settings, then retry. Existing work was not changed.");
+      setError(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioQuickStart", "이 브라우저에서 새 작업을 저장하지 못했어요. 저장 공간과 브라우저 설정을 확인한 뒤 다시 시도해 주세요. 기존 작업은 변경하지 않았습니다.", "This browser could not save a new project. Check available storage and browser settings, then retry. Existing work was not changed."));
     }
   }
 
@@ -73,22 +75,20 @@ export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
     <section
       id="quick-draw"
       className="mt-6 rounded-2xl border border-accent/30 bg-accent-soft/20 px-4 py-5 sm:px-6"
-      aria-label={locale === "ko" ? "빠른 시작" : "Quick start"}
+      aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioQuickStart", "빠른 시작", "Quick start")}
       data-studio-quick-start="true"
     >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <p className="flex items-center gap-2 text-xs font-black text-accent">
             <Zap size={15} aria-hidden="true" />
-            {locale === "ko" ? "설정 없이 시작" : "Start without setup"}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioQuickStart", "설정 없이 시작", "Start without setup")}
           </p>
           <h2 className="mt-2 text-xl font-black text-fg">
-            {locale === "ko" ? "바로 시작하기" : "Start right away"}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioQuickStart", "바로 시작하기", "Start right away")}
           </h2>
           <p className="mt-2 max-w-xl text-sm leading-6 text-fg-2">
-            {locale === "ko"
-              ? "웹툰은 컷·말풍선 중심 작업공간으로, 그림은 브러시·레이어 중심 작업공간으로 바로 엽니다."
-              : "Webtoons open panel-and-balloon first; drawings open brush-and-layer first."}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioQuickStart", "웹툰은 컷·말풍선 중심 작업공간으로, 그림은 브러시·레이어 중심 작업공간으로 바로 엽니다.", "Webtoons open panel-and-balloon first; drawings open brush-and-layer first.")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -108,14 +108,14 @@ export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
                 })}
               >
                 <Icon size={18} aria-hidden="true" />
-                {busy ? (locale === "ko" ? "여는 중…" : "Opening…") : locale === "ko" ? item.labelKo : item.labelEn}
+                {busy ? (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioQuickStart", "여는 중…", "Opening…")) : translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioQuickStart", item.labelKo, item.labelEn)}
                 <ArrowRight size={16} aria-hidden="true" />
               </button>
             );
           })}
           <Link href="/studio/new" className={buttonClass({ variant: "quiet", size: "lg", className: "min-h-12 gap-2" })}>
             <Plus size={17} aria-hidden="true" />
-            {locale === "ko" ? "다른 작업 만들기" : "More project types"}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioQuickStart", "다른 작업 만들기", "More project types")}
           </Link>
         </div>
       </div>

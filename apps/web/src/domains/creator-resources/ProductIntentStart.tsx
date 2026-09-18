@@ -1,3 +1,4 @@
+import { translateLocaleBranchForLocale } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
   BookOpen,
@@ -78,7 +79,7 @@ const COPY = {
 export function ProductIntentStart() {
   const language = useI18n((state) => state.lang);
   const locale = resolveProductLocale(language);
-  const copy = COPY[locale];
+  const copy = translateLocaleBranchForLocale(locale, "domains.creator.resources.ProductIntentStart", COPY);
   const openSearch = useUi((state) => state.openCommandPalette);
   const prefersReducedMotion = useReducedMotion();
   const continuity = useSyncExternalStore(
@@ -121,14 +122,14 @@ export function ProductIntentStart() {
                 transition={{ duration: 0.4, delay: index * 0.045, ease: [0.16, 1, 0.3, 1] }}
                 whileHover={prefersReducedMotion ? undefined : { y: -4 }}
               >
-                <Link href={destination.href} title={destination.description[locale]}>
+                <Link href={destination.href} title={translateLocaleBranchForLocale(locale, "domains.creator.resources.ProductIntentStart", destination.description)}>
                   <span className="cf-intent-card-media" aria-hidden="true">
                     <img src={visual.image} alt="" loading="lazy" decoding="async" />
                     <span className="cf-intent-card-icon"><Icon size={18} /></span>
                   </span>
                   <span className="cf-intent-card-copy">
-                    <strong>{destination.label[locale]}</strong>
-                    <small>{destination.description[locale]}</small>
+                    <strong>{translateLocaleBranchForLocale(locale, "domains.creator.resources.ProductIntentStart", destination.label)}</strong>
+                    <small>{translateLocaleBranchForLocale(locale, "domains.creator.resources.ProductIntentStart", destination.description)}</small>
                   </span>
                   <ArrowRight size={15} aria-hidden="true" />
                 </Link>

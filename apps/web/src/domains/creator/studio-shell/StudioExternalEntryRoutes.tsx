@@ -1,3 +1,8 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { CircleAlert, ExternalLink } from "lucide-react";
 import { Navigate, useParams } from "react-router-dom";
 
@@ -12,16 +17,17 @@ import {
   validateStudioExternalToken,
 } from "../studio-route-registry";
 
-type Locale = "ko" | "en";
+type Locale = string;
+type AuthoredLocale = "ko" | "en";
 type EntryKind = "join" | "present" | "review";
 
 function localeFromLanguage(language: string): Locale {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  return resolveUiLocale(language);
 }
 
 function InvalidExternalEntry({ kind, locale }: { readonly kind: EntryKind; readonly locale: Locale }) {
-  const title = locale === "ko" ? "이 링크를 열 수 없어요" : "This link cannot be opened";
-  const descriptions: Readonly<Record<EntryKind, Readonly<Record<Locale, string>>>> = {
+  const title = translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioExternalEntryRoutes", "이 링크를 열 수 없어요", "This link cannot be opened");
+  const descriptions: Readonly<Record<EntryKind, Readonly<Record<AuthoredLocale, string>>>> = {
     review: {
       ko: "검토 링크가 잘렸거나 만료됐을 수 있습니다. 링크를 보낸 사람에게 새 링크를 요청해 주세요.",
       en: "The review link may be incomplete or expired. Ask the sender for a new link.",
@@ -44,11 +50,11 @@ function InvalidExternalEntry({ kind, locale }: { readonly kind: EntryKind; read
           </span>
           <h1 className="mt-4 text-2xl font-black text-fg">{title}</h1>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-fg-2">
-            {descriptions[kind][locale]}
+            {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioExternalEntryRoutes", descriptions[kind])}
           </p>
           <Link href="/studio" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent">
             <ExternalLink size={16} aria-hidden="true" />
-            {locale === "ko" ? "ToonStudio로 이동" : "Open ToonStudio"}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioExternalEntryRoutes", "ToonStudio로 이동", "Open ToonStudio")}
           </Link>
         </section>
       </Container>

@@ -1,3 +1,4 @@
+import { resolveUiLocale, translateLocaleBranchForLocale } from "@/shared/lib/i18n-bilingual-copy";
 import {
   BarChart3,
   BookOpen,
@@ -30,9 +31,10 @@ import {
 } from "@/shared/lib/site-route-authority";
 import { resolveSiteRouteNavigationContext } from "@/shared/lib/site-route-metadata";
 
-export type SiteNavigationLocale = "ko" | "en";
+export type SiteNavigationLocale = string;
+export type SiteNavigationAuthoredLocale = "ko" | "en";
 export type SiteNavigationContext = "studio" | "spectrum";
-export type SiteNavigationText = Record<SiteNavigationLocale, string>;
+export type SiteNavigationText = Record<SiteNavigationAuthoredLocale, string>;
 
 export interface SiteNavigationItem {
   id: string;
@@ -442,9 +444,9 @@ export function mobileSiteTabsForPath(pathname: string): readonly SiteNavigation
 }
 
 export function siteNavigationLocale(locale: string): SiteNavigationLocale {
-  return locale.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  return resolveUiLocale(locale);
 }
 
 export function siteNavigationText(text: SiteNavigationText, locale: string): string {
-  return text[siteNavigationLocale(locale)];
+  return translateLocaleBranchForLocale(locale, "shared.components.siteNavigation", text);
 }

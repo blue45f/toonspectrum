@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Character Shaper — mobile bottom sheet (shelf + inspector) with three snap states.
  *
@@ -61,8 +62,8 @@ export function CharacterShaperMobileSheet({ state, onStateChange, title, childr
         aria-valuemin={0}
         aria-valuemax={2}
         aria-valuenow={characterSheetStateIndex(state)}
-        aria-valuetext={`시트 높이 ${stateLabel}`}
-        title={`${title} 크기 전환 (현재 ${stateLabel})`}
+        aria-valuetext={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperMobileSheet", "ko", "시트 높이 {v0}"), { v0: String(stateLabel) })}
+        title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperMobileSheet", "ko", "{v0} 크기 전환 (현재 {v1})"), { v0: String(title), v1: String(stateLabel) })}
         className={cn(
           "group relative flex min-h-11 w-full shrink-0 cursor-grab select-none items-start justify-center rounded-t-2xl pt-2 active:cursor-grabbing",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent",
@@ -84,7 +85,7 @@ export function CharacterShaperMobileSheet({ state, onStateChange, title, childr
             "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
           )}
         >
-          {collapsed ? "펼치기" : "접기"}
+          {collapsed ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperMobileSheet", "ko", "펼치기") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperMobileSheet", "ko", "접기")}
         </button>
       </div>
       <div

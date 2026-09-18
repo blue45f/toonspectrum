@@ -1,3 +1,9 @@
+import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, BookOpen, Brush, Layers3, Search } from "lucide-react";
 
 import Link from "@/compat/router-link";
@@ -13,14 +19,14 @@ const JOURNEY = [
 
 /** Public-page navigation: every step opens an existing working product surface. */
 export function CreativeJourneyLinks({ locale = "ko", current, compact = false }: {
-  locale?: "ko" | "en";
+  locale?: string;
   current?: "research" | "learn" | "market" | "discover" | "community" | "about";
   compact?: boolean;
 }) {
-  return <nav className={`public-creative-journey${compact ? " public-creative-journey--compact" : ""}`} aria-label={locale === "ko" ? "웹툰 제작을 이어가는 길" : "Continue your webtoon workflow"}>
+  return <nav className={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.public.creative", "en", "public-creative-journey{v0}"), { v0: String(compact ? " public-creative-journey--compact" : "") })} aria-label={translateBilingualValueForLocale(locale, "shared.components.public.creative", "웹툰 제작을 이어가는 길", "Continue your webtoon workflow")}>
     {JOURNEY.filter((item) => item.id !== current).map((item) => {
       const Icon = item.icon;
-      return <Link key={item.id} href={item.href}><Icon size={19} aria-hidden="true" /><span><strong>{item[locale]}</strong><small>{locale === "ko" ? item.detailKo : item.detailEn}</small></span><ArrowRight size={16} aria-hidden="true" /></Link>;
+      return <Link key={item.id} href={item.href}><Icon size={19} aria-hidden="true" /><span><strong>{translateLocaleBranchForLocale(locale, "shared.components.public.creative", item)}</strong><small>{translateBilingualValueForLocale(locale, "shared.components.public.creative", item.detailKo, item.detailEn)}</small></span><ArrowRight size={16} aria-hidden="true" /></Link>;
     })}
   </nav>;
 }

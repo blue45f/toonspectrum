@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Layers3, X } from "lucide-react";
 
 import { StudioLayerFilterPresetShelf } from "./StudioLayerFilterPresetShelf";
@@ -75,7 +79,7 @@ export function StudioLayerNavigatorFilterPanel({
       id={id}
       ref={panelRef}
       role="dialog"
-      aria-label="레이어 필터"
+      aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "레이어 필터")}
       aria-modal="false"
       tabIndex={-1}
       hidden={!open}
@@ -86,8 +90,8 @@ export function StudioLayerNavigatorFilterPanel({
     >
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-bold text-fg">레이어 필터</p>
-          <p className="text-[0.6rem] text-fg-3">구조 필터와 검색 조건을 조합해 대형 원고를 빠르게 좁힙니다.</p>
+          <p className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "레이어 필터")}</p>
+          <p className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "구조 필터와 검색 조건을 조합해 대형 원고를 빠르게 좁힙니다.")}</p>
         </div>
         <button
           type="button"
@@ -100,14 +104,14 @@ export function StudioLayerNavigatorFilterPanel({
             coarseTarget,
             focusRing
           )}
-          aria-label="레이어 필터 닫기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "레이어 필터 닫기")}
         >
           <X size={14} />
         </button>
       </div>
 
       <fieldset className="mt-3">
-        <legend className="mb-1 text-[0.62rem] font-bold text-fg-2">스마트 보기</legend>
+        <legend className="mb-1 text-[0.62rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "스마트 보기")}</legend>
         <div className="grid grid-cols-2 gap-1">
           {STUDIO_LAYER_SMART_VIEWS.map((view) => (
             <button
@@ -125,7 +129,7 @@ export function StudioLayerNavigatorFilterPanel({
                 })
               }
               aria-pressed={activeSmartView === view}
-              aria-describedby={`${id}-smart-view-description`}
+              aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "en", "{v0}-smart-view-description"), { v0: String(id) })}
               className={cn(
                 compactControl,
                 "justify-start text-left",
@@ -138,7 +142,7 @@ export function StudioLayerNavigatorFilterPanel({
           ))}
         </div>
         <p
-          id={`${id}-smart-view-description`}
+          id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "en", "{v0}-smart-view-description"), { v0: String(id) })}
           aria-live="polite"
           className="mt-1.5 rounded-md bg-raised/70 px-2 py-1.5 text-[0.58rem] leading-relaxed text-fg-3"
         >
@@ -147,7 +151,7 @@ export function StudioLayerNavigatorFilterPanel({
       </fieldset>
 
       <fieldset className="mt-3">
-        <legend className="mb-1 text-[0.62rem] font-bold text-fg-2">종류</legend>
+        <legend className="mb-1 text-[0.62rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "종류")}</legend>
         <div className="grid grid-cols-3 gap-1">
           {STUDIO_LAYER_KINDS.map((kind) => {
             const Icon = kind === "all" ? Layers3 : KIND_ICONS[kind];
@@ -172,8 +176,7 @@ export function StudioLayerNavigatorFilterPanel({
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <label className="text-[0.62rem] font-bold text-fg-2">
-          표시 상태
-          <select
+          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "표시 상태")}<select
             value={filters.visibility}
             onChange={(event: ChangeEvent<HTMLSelectElement>) =>
               setFilters((current) => ({
@@ -186,14 +189,13 @@ export function StudioLayerNavigatorFilterPanel({
               focusRing
             )}
           >
-            <option value="all">전체</option>
-            <option value="visible">표시만</option>
-            <option value="hidden">숨김만</option>
+            <option value="all">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "전체")}</option>
+            <option value="visible">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "표시만")}</option>
+            <option value="hidden">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "숨김만")}</option>
           </select>
         </label>
         <label className="text-[0.62rem] font-bold text-fg-2">
-          잠금 상태
-          <select
+          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "잠금 상태")}<select
             value={filters.lock}
             onChange={(event: ChangeEvent<HTMLSelectElement>) =>
               setFilters((current) => ({
@@ -206,14 +208,13 @@ export function StudioLayerNavigatorFilterPanel({
               focusRing
             )}
           >
-            <option value="all">전체</option>
-            <option value="locked">잠김만</option>
-            <option value="unlocked">잠금 해제만</option>
+            <option value="all">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "전체")}</option>
+            <option value="locked">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "잠김만")}</option>
+            <option value="unlocked">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "잠금 해제만")}</option>
           </select>
         </label>
         <label className="text-[0.62rem] font-bold text-fg-2">
-          작업 역할
-          <select
+          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "작업 역할")}<select
             value={filters.role}
             onChange={(event: ChangeEvent<HTMLSelectElement>) =>
               setFilters((current) => ({
@@ -226,8 +227,8 @@ export function StudioLayerNavigatorFilterPanel({
               focusRing
             )}
           >
-            <option value="all">전체 역할</option>
-            <option value="unassigned">역할 없음</option>
+            <option value="all">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "전체 역할")}</option>
+            <option value="unassigned">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "역할 없음")}</option>
             {STUDIO_LAYER_ROLES.map((role) => (
               <option key={role} value={role}>
                 {STUDIO_LAYER_ROLE_LABELS[role]}
@@ -236,8 +237,7 @@ export function StudioLayerNavigatorFilterPanel({
           </select>
         </label>
         <label className="text-[0.62rem] font-bold text-fg-2">
-          색 라벨
-          <select
+          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "색 라벨")}<select
             value={filters.color}
             onChange={(event: ChangeEvent<HTMLSelectElement>) =>
               setFilters((current) => ({
@@ -250,8 +250,8 @@ export function StudioLayerNavigatorFilterPanel({
               focusRing
             )}
           >
-            <option value="all">전체 색</option>
-            <option value="none">색 없음</option>
+            <option value="all">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "전체 색")}</option>
+            <option value="none">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "색 없음")}</option>
             {STUDIO_LAYER_COLORS.map((color) => (
               <option key={color} value={color}>
                 {STUDIO_LAYER_COLOR_LABELS[color]}
@@ -262,7 +262,7 @@ export function StudioLayerNavigatorFilterPanel({
       </div>
 
       <fieldset className="mt-3">
-        <legend className="mb-1 text-[0.62rem] font-bold text-fg-2">전문 상태</legend>
+        <legend className="mb-1 text-[0.62rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "전문 상태")}</legend>
         <div className="grid grid-cols-2 gap-1">
           {STUDIO_LAYER_FLAGS.map((flag) => (
             <label
@@ -286,15 +286,14 @@ export function StudioLayerNavigatorFilterPanel({
 
       <details className="mt-3 rounded-lg border border-line bg-card/60 px-2.5 py-2">
         <summary className={cn("cursor-pointer text-[0.65rem] font-bold text-fg-2", focusRing)}>
-          고급 검색 문법
-        </summary>
+          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "고급 검색 문법")}</summary>
         <div className="mt-2 space-y-1.5 text-[0.58rem] leading-relaxed text-fg-3">
-          <p>공백은 AND, 쉼표는 같은 필드 안의 OR, 앞의 <code className="text-fg-2">-</code>는 제외입니다. 따옴표로 공백이 있는 이름을 묶을 수 있습니다.</p>
+          <p>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "공백은 AND, 쉼표는 같은 필드 안의 OR, 앞의 ")}<code className="text-fg-2">-</code>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "는 제외입니다. 따옴표로 공백이 있는 이름을 묶을 수 있습니다.")}</p>
           <code className="block rounded bg-panel px-2 py-1 text-fg-2">kind:draw role:lineart -is:hidden</code>
-          <code className="block rounded bg-panel px-2 py-1 text-fg-2">group:&quot;주인공 선화&quot; opacity:&lt;50%</code>
+          <code className="block rounded bg-panel px-2 py-1 text-fg-2">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "group:&quot;주인공 선화&quot; opacity:&lt;50%")}</code>
           <code className="block rounded bg-panel px-2 py-1 text-fg-2">is:mask-disabled</code>
           <code className="block rounded bg-panel px-2 py-1 text-fg-2">kind:image,bubble view:attention</code>
-          <p>필드: <span className="text-fg-2">kind, role, color, group, name, text, id, is/has, opacity, view</span></p>
+          <p>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "필드: ")}<span className="text-fg-2">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "en", "kind, role, color, group, name, text, id, is/has, opacity, view")}</span></p>
         </div>
       </details>
 
@@ -302,11 +301,10 @@ export function StudioLayerNavigatorFilterPanel({
 
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-2">
         <span className="text-[0.6rem] text-fg-3">
-          참조 {stats.referenced} · 마스크 {stats.masked} · AI {stats.ai}
+          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "참조 ")}{stats.referenced} {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "· 마스크 ")}{stats.masked} {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "en", "· AI ")}{stats.ai}
         </span>
         <button type="button" onClick={onReset} className={compactControl}>
-          필터 초기화
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorFilterPanel", "ko", "필터 초기화")}</button>
       </div>
     </div>
   );

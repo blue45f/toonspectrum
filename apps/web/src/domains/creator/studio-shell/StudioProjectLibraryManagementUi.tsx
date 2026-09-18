@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Check,
   CheckCircle2,
   Cloud,
@@ -44,7 +49,7 @@ export function StudioProjectSaveBadge({
     return (
       <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-warning/35 bg-warning-soft/20 px-2.5 text-[0.68rem] font-bold text-warning">
         <HardDrive size={13} aria-hidden="true" />
-        {locale === "ko" ? "임시 자동저장" : "Temporary autosave"}
+        {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "임시 자동저장", "Temporary autosave")}
       </span>
     );
   }
@@ -58,7 +63,7 @@ export function StudioProjectSaveBadge({
         : "border-success/35 bg-success-soft/20 text-success",
     )}>
       <Icon size={13} aria-hidden="true" />
-      {locale === "ko" ? summary.headline : summary.needsBackup ? "Backup needs attention" : "Backup ready"}
+      {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", summary.headline, summary.needsBackup ? "Backup needs attention" : "Backup ready")}
     </span>
   );
 }
@@ -134,7 +139,7 @@ export function StudioProjectLibraryModal({
       />
       <section
         ref={dialogRef}
-        role={danger ? "alertdialog" : "dialog"}
+        role={danger ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectLibraryManagementUi", "en", "alertdialog") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectLibraryManagementUi", "en", "dialog")}
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
@@ -217,19 +222,19 @@ export function StudioProjectLibraryCard({
       <div className="mt-4 flex items-start gap-3">
         <StudioProjectSelectionCheckbox
           checked={checked}
-          label={locale === "ko" ? `${project.title} 선택` : `Select ${project.title}`}
+          label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", `${project.title} 선택`, `Select ${project.title}`)}
           onChange={onToggle}
         />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-panel px-2.5 py-1 text-[0.66rem] font-bold text-fg-2">
-              {STUDIO_PROJECT_KIND_LABELS[project.kind][locale]}
+              {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", STUDIO_PROJECT_KIND_LABELS[project.kind])}
             </span>
             <StudioProjectSaveBadge profile={profile} locale={locale} />
           </div>
           <h3 className="mt-3 truncate text-lg font-black text-fg">{project.title}</h3>
           <p className="mt-1 text-xs text-fg-3">
-            {locale === "ko" ? "마지막 작업" : "Last opened"}{" "}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "마지막 작업", "Last opened")}{" "}
             {studioProjectLibraryDateLabel(project.lastOpenedAt, locale)}
           </p>
         </div>
@@ -237,15 +242,15 @@ export function StudioProjectLibraryCard({
 
       <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-panel/60 p-3 text-[0.68rem]">
         <div>
-          <p className="font-semibold text-fg-3">{locale === "ko" ? "작업 상태" : "Work status"}</p>
+          <p className="font-semibold text-fg-3">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "작업 상태", "Work status")}</p>
           <p className="mt-1 font-black text-fg">
             {temporary
-              ? locale === "ko" ? "이 기기 임시본" : "Temporary on device"
-              : locale === "ko" ? "프로젝트" : "Project"}
+              ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "이 기기 임시본", "Temporary on device")
+              : translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "프로젝트", "Project")}
           </p>
         </div>
         <div>
-          <p className="font-semibold text-fg-3">{locale === "ko" ? "마지막 정식 저장" : "Last explicit save"}</p>
+          <p className="font-semibold text-fg-3">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "마지막 정식 저장", "Last explicit save")}</p>
           <p className="mt-1 font-black text-fg">
             {studioProjectLibraryDateLabel(profile.lastManualSaveAt, locale)}
           </p>
@@ -259,7 +264,7 @@ export function StudioProjectLibraryCard({
           className={buttonClass({ size: "sm", className: "min-w-32 flex-1 gap-1.5" })}
         >
           <FolderOpen size={15} aria-hidden="true" />
-          {locale === "ko" ? "이어서 작업" : "Continue"}
+          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "이어서 작업", "Continue")}
         </Link>
         {temporary ? (
           <button
@@ -268,7 +273,7 @@ export function StudioProjectLibraryCard({
             className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
           >
             <Save size={15} aria-hidden="true" />
-            {locale === "ko" ? "정식 저장" : "Save"}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "정식 저장", "Save")}
           </button>
         ) : localFileSaved ? (
           <button
@@ -278,7 +283,7 @@ export function StudioProjectLibraryCard({
             className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
           >
             <Download size={15} aria-hidden="true" />
-            {locale === "ko" ? "파일 다시 저장" : "Save file again"}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "파일 다시 저장", "Save file again")}
           </button>
         ) : (
           <Link
@@ -286,13 +291,13 @@ export function StudioProjectLibraryCard({
             className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
           >
             <Cloud size={15} aria-hidden="true" />
-            {locale === "ko" ? "저장·백업" : "Save & backup"}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "저장·백업", "Save & backup")}
           </Link>
         )}
         <button
           type="button"
           onClick={onDuplicate}
-          aria-label={locale === "ko" ? `${project.title} 복제` : `Duplicate ${project.title}`}
+          aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", `${project.title} 복제`, `Duplicate ${project.title}`)}
           className={buttonClass({ variant: "quiet", size: "icon" })}
         >
           <Copy size={15} aria-hidden="true" />
@@ -300,13 +305,13 @@ export function StudioProjectLibraryCard({
       </div>
       <div className="mt-2 flex flex-wrap justify-end gap-3">
         <Link href={overviewHref} className="text-[0.68rem] font-semibold text-accent hover:underline">
-          {locale === "ko" ? "프로젝트 관리" : "Manage project"}
+          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "프로젝트 관리", "Manage project")}
         </Link>
         <button type="button" onClick={onArchive} className="text-[0.68rem] font-semibold text-fg-3 hover:text-fg">
-          {locale === "ko" ? "보관" : "Archive"}
+          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "보관", "Archive")}
         </button>
         <button type="button" onClick={onTrash} className="text-[0.68rem] font-semibold text-danger">
-          {locale === "ko" ? "휴지통" : "Trash"}
+          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "휴지통", "Trash")}
         </button>
       </div>
     </article>
@@ -343,13 +348,13 @@ export function StudioProjectLibraryRecoveryRow({
       <div className="flex min-w-0 items-start gap-3">
         <StudioProjectSelectionCheckbox
           checked={checked}
-          label={locale === "ko" ? `${project.title} 선택` : `Select ${project.title}`}
+          label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", `${project.title} 선택`, `Select ${project.title}`)}
           onChange={onToggle}
         />
         <div className="min-w-0">
           <h2 className="truncate font-black text-fg">{project.title}</h2>
           <p className="mt-1 text-xs text-fg-3">
-            {STUDIO_PROJECT_KIND_LABELS[project.kind][locale]} · {studioProjectLibraryDateLabel(project.updatedAt, locale)}
+            {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", STUDIO_PROJECT_KIND_LABELS[project.kind])} · {studioProjectLibraryDateLabel(project.updatedAt, locale)}
           </p>
         </div>
       </div>
@@ -360,7 +365,7 @@ export function StudioProjectLibraryRecoveryRow({
           className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
         >
           <RotateCcw size={14} aria-hidden="true" />
-          {locale === "ko" ? "복원" : "Restore"}
+          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "복원", "Restore")}
         </button>
         {view === "archived" ? (
           <button
@@ -369,7 +374,7 @@ export function StudioProjectLibraryRecoveryRow({
             className={buttonClass({ variant: "quiet", size: "sm", className: "text-danger" })}
           >
             <Trash2 size={14} aria-hidden="true" />
-            {locale === "ko" ? "휴지통" : "Trash"}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "휴지통", "Trash")}
           </button>
         ) : (
           <button
@@ -378,7 +383,7 @@ export function StudioProjectLibraryRecoveryRow({
             className={buttonClass({ variant: "quiet", size: "sm", className: "text-danger" })}
           >
             <Trash2 size={14} aria-hidden="true" />
-            {locale === "ko" ? "완전 삭제" : "Delete"}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementUi", "완전 삭제", "Delete")}
           </button>
         )}
       </div>

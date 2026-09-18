@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioCircularTextPanel.tsx
  *
@@ -62,10 +66,9 @@ export function StudioCircularTextPanel({
       <div className="flex items-center justify-between border-b border-slate-800 pb-2">
         <div className="flex items-center gap-1.5 font-semibold text-slate-200">
           <Compass size={15} className="text-pink-400" />
-          <span>원형 텍스트 (Circular Text)</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "원형 텍스트 (Circular Text)")}</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-300 font-medium">
-            CSP 3.0
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "en", "CSP 3.0")}</span>
         </div>
         <button
           type="button"
@@ -85,14 +88,12 @@ export function StudioCircularTextPanel({
             ),
           })}
         >
-          {enabled ? "원형 배치 On" : "원형 배치 Off"}
+          {enabled ? translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "원형 배치 On") : translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "원형 배치 Off")}
         </button>
       </div>
 
       <p className="text-[11px] text-slate-400 leading-relaxed">
-        효과음, 마법진 영창, 엠블럼 식자를 원형 호를 따라 자연스러운 회전 각도로
-        배치합니다.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "효과음, 마법진 영창, 엠블럼 식자를 원형 호를 따라 자연스러운 회전 각도로 배치합니다.")}</p>
 
       {enabled && (
         <>
@@ -136,7 +137,7 @@ export function StudioCircularTextPanel({
                     key={g.index}
                     x={nx}
                     y={ny}
-                    transform={`rotate(${g.rotationDeg}, ${nx}, ${ny})`}
+                    transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "en", "rotate({v0}, {v1}, {v2})"), { v0: String(g.rotationDeg), v1: String(nx), v2: String(ny) })}
                     textAnchor="middle"
                     dominantBaseline="central"
                     fill="currentColor"
@@ -149,7 +150,7 @@ export function StudioCircularTextPanel({
               })}
             </svg>
             <div className="absolute bottom-1 right-2 text-[10px] text-slate-500">
-              총 전개각: {Math.round(layout.totalSpanDeg)}°
+              {translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "총 전개각: ")}{Math.round(layout.totalSpanDeg)}°
             </div>
           </div>
 
@@ -158,7 +159,7 @@ export function StudioCircularTextPanel({
             {/* Radius slider */}
             <div className="flex flex-col gap-1">
               <div className="flex justify-between text-[11px]">
-                <span className="text-slate-400">원형 반경 (Radius)</span>
+                <span className="text-slate-400">{translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "원형 반경 (Radius)")}</span>
                 <span className="font-semibold text-slate-200">
                   {Math.round(options.radius)}px
                 </span>
@@ -184,7 +185,7 @@ export function StudioCircularTextPanel({
             {/* Start Angle slider */}
             <div className="flex flex-col gap-1">
               <div className="flex justify-between text-[11px]">
-                <span className="text-slate-400">시작 각도 (Start Angle)</span>
+                <span className="text-slate-400">{translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "시작 각도 (Start Angle)")}</span>
                 <span className="font-semibold text-slate-200">
                   {Math.round(options.startAngleDeg ?? -90)}°
                 </span>
@@ -209,7 +210,7 @@ export function StudioCircularTextPanel({
 
             {/* Direction toggle */}
             <div className="flex items-center justify-between pt-1">
-              <span className="text-slate-400 text-[11px]">진행 방향</span>
+              <span className="text-slate-400 text-[11px]">{translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "진행 방향")}</span>
               <div className="flex gap-1">
                 <button
                   type="button"
@@ -232,8 +233,7 @@ export function StudioCircularTextPanel({
                     ),
                   })}
                 >
-                  시계방향
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "시계방향")}</button>
                 <button
                   type="button"
                   onClick={() =>
@@ -258,14 +258,13 @@ export function StudioCircularTextPanel({
                     ),
                   })}
                 >
-                  반시계방향
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "반시계방향")}</button>
               </div>
             </div>
 
             {/* Orientation toggle */}
             <div className="flex items-center justify-between pt-1">
-              <span className="text-slate-400 text-[11px]">글자 방향</span>
+              <span className="text-slate-400 text-[11px]">{translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "글자 방향")}</span>
               <div className="flex gap-1">
                 <button
                   type="button"
@@ -288,8 +287,7 @@ export function StudioCircularTextPanel({
                     ),
                   })}
                 >
-                  바깥쪽
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "바깥쪽")}</button>
                 <button
                   type="button"
                   onClick={() =>
@@ -309,8 +307,7 @@ export function StudioCircularTextPanel({
                     ),
                   })}
                 >
-                  안쪽
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "안쪽")}</button>
               </div>
             </div>
           </div>

@@ -1,3 +1,8 @@
+import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -35,9 +40,7 @@ function Choice<T extends string>({
           type="button"
           onClick={() => onChange(o.id)}
           aria-pressed={value === o.id}
-          className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-            value === o.id ? "bg-accent text-on-accent" : "text-fg-2 hover:text-fg"
-          }`}
+          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.account.SettingsPage", "en", "rounded-lg px-3 py-2 text-sm font-medium transition-colors {v0}"), { v0: String(value === o.id ? "bg-accent text-on-accent" : "text-fg-2 hover:text-fg") })}
         >
           {o.label}
         </button>
@@ -170,13 +173,13 @@ export function SettingsPage() {
       </header>
 
       <Link to="/settings/ai" className="mb-6 flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
-        <span><strong>통합 AI 설정</strong><span className="mt-1 block text-sm text-fg-2">텍스트·이미지·영상·3D의 사용자 키와 암호화 보관함을 한곳에서 관리</span></span>
+        <span><strong>{translateCurrentStaticSourceText("domains.account.SettingsPage", "ko", "통합 AI 설정")}</strong><span className="mt-1 block text-sm text-fg-2">{translateCurrentStaticSourceText("domains.account.SettingsPage", "ko", "텍스트·이미지·영상·3D의 사용자 키와 암호화 보관함을 한곳에서 관리")}</span></span>
         <ChevronRight size={18} aria-hidden />
       </Link>
 
       <section id="appearance" className="mb-6 rounded-2xl border border-line bg-panel/40 p-5" aria-labelledby="appearance-heading">
         <h2 id="appearance-heading" className="mb-4 text-base font-semibold">
-          {lang.startsWith("ko") ? "디자인 테마" : "Design themes"}
+          {translateBilingualValueForLocale(lang, "domains.account.SettingsPage", "디자인 테마", "Design themes")}
         </h2>
         <AppearanceSettings />
       </section>
@@ -210,11 +213,11 @@ export function SettingsPage() {
           </label>
         </Row>
         {experience && <Row icon={Sparkles}
-          title={lang.startsWith("ko") ? "화면 효과" : "Appearance"}
-          desc={lang.startsWith("ko") ? "화려한 색채와 차분한 화면 중 선택하세요. 스튜디오는 변경되지 않습니다." : "Choose a vivid or calm appearance. Studio remains unchanged."}>
+          title={translateBilingualValueForLocale(lang, "domains.account.SettingsPage", "화면 효과", "Appearance")}
+          desc={translateBilingualValueForLocale(lang, "domains.account.SettingsPage", "화려한 색채와 차분한 화면 중 선택하세요. 스튜디오는 변경되지 않습니다.", "Choose a vivid or calm appearance. Studio remains unchanged.")}>
           <Choice options={[
-            { id: "vivid", label: lang.startsWith("ko") ? "화려하게" : "Vivid" },
-            { id: "calm", label: lang.startsWith("ko") ? "차분하게" : "Calm" },
+            { id: "vivid", label: translateBilingualValueForLocale(lang, "domains.account.SettingsPage", "화려하게", "Vivid") },
+            { id: "calm", label: translateBilingualValueForLocale(lang, "domains.account.SettingsPage", "차분하게", "Calm") },
           ]} value={experience.mode} onChange={experience.setMode} />
         </Row>}
         <Row icon={Star} title={t("settings.rating.title")} desc={t("settings.rating.desc")}>
@@ -300,7 +303,7 @@ export function SettingsPage() {
           </button>
         </Row>
         <Row icon={Upload} title={t("settings.data.import")} desc={t("settings.data.importDesc")}>
-          <LibraryBackupImport onRestore={hydrateFromServer} locale={lang.toLowerCase().startsWith("ko") ? "ko" : "en"} ownerId={userId} />
+          <LibraryBackupImport onRestore={hydrateFromServer} locale={lang} ownerId={userId} />
         </Row>
         <Row
           icon={Clock}

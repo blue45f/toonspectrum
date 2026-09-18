@@ -1,3 +1,7 @@
+import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
 import {
   useEffect,
@@ -15,7 +19,7 @@ import type {
 
 import { cn } from "@/shared/lib/utils";
 
-type Locale = "ko" | "en";
+type Locale = string;
 
 export interface StudioTemplateVisualPreviewProps {
   readonly template: StudioTemplateCatalogItem;
@@ -197,8 +201,7 @@ function Poster({ accent }: { readonly accent: string }) {
             className="mt-3 inline-block rounded-full px-3 py-1 text-[0.45rem] font-black text-white"
             style={{ backgroundColor: accent }}
           >
-            CTA
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioTemplateVisualPreview", "en", "CTA")}</span>
         </div>
       </div>
     </div>
@@ -283,11 +286,11 @@ function renderLayout(
 }
 
 function pageLabel(page: StudioTemplateCompositionPage, locale: Locale): string {
-  return locale === "ko" ? page.labelKo : page.labelEn;
+  return translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioTemplateVisualPreview", page.labelKo, page.labelEn);
 }
 
 function fallbackLabel(template: StudioTemplateCatalogItem, locale: Locale): string {
-  return locale === "ko" ? template.titleKo : template.titleEn;
+  return translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioTemplateVisualPreview", template.titleKo, template.titleEn);
 }
 
 function normalizedIndex(index: number, length: number): number {
@@ -355,8 +358,8 @@ export function StudioTemplateVisualPreview({
           <p className="truncate text-xs font-black text-fg">{pageLabel(activePage, locale)}</p>
           <p className="text-[0.65rem] text-fg-3">
             {activePage.panelCount > 0
-              ? (locale === "ko" ? `${activePage.panelCount}개 컷·영역` : `${activePage.panelCount} panels`)
-              : (locale === "ko" ? "레이아웃" : "Layout")}
+              ? (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioTemplateVisualPreview", `${activePage.panelCount}개 컷·영역`, `${activePage.panelCount} panels`))
+              : (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioTemplateVisualPreview", "레이아웃", "Layout"))}
           </p>
         </div>
         {showNavigation && pages.length > 1 ? (
@@ -364,7 +367,7 @@ export function StudioTemplateVisualPreview({
             <button
               type="button"
               onClick={() => setPage(activeIndex - 1)}
-              aria-label={locale === "ko" ? "이전 템플릿 페이지" : "Previous template page"}
+              aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioTemplateVisualPreview", "이전 템플릿 페이지", "Previous template page")}
               className="grid size-9 place-items-center rounded-lg border border-line text-fg-3 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               <ChevronLeft size={15} aria-hidden />
@@ -375,7 +378,7 @@ export function StudioTemplateVisualPreview({
             <button
               type="button"
               onClick={() => setPage(activeIndex + 1)}
-              aria-label={locale === "ko" ? "다음 템플릿 페이지" : "Next template page"}
+              aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioTemplateVisualPreview", "다음 템플릿 페이지", "Next template page")}
               className="grid size-9 place-items-center rounded-lg border border-line text-fg-3 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               <ChevronRight size={15} aria-hidden />

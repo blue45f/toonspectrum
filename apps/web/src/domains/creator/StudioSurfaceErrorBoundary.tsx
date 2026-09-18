@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 import { AlertTriangle, ArrowLeft, RotateCcw } from "lucide-react";
 import {
@@ -119,8 +122,7 @@ function StudioSurfaceRecoveryFallback({
               <AlertTriangle size={22} aria-hidden="true" />
             </span>
             <h2 id={titleId} className="mt-4 text-base font-bold text-fg">
-              {surfaceLabel}를 계속 열 수 없습니다.
-            </h2>
+              {surfaceLabel}{translateCurrentStaticSourceText("domains.creator.StudioSurfaceErrorBoundary", "ko", "를 계속 열 수 없습니다.")}</h2>
             <p id={detailId} className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-fg-2">
               {detail}
             </p>
@@ -203,8 +205,8 @@ export class StudioSurfaceErrorBoundary extends Component<
     return (
       <StudioSurfaceRecoveryFallback
         detail={this.props.detail
-          ?? "도구 화면만 안전하게 닫았습니다. 캔버스와 편집 기록은 그대로 보존되어 있습니다."}
-        exitLabel={this.props.exitLabel ?? "2D 캔버스로 돌아가기"}
+          ?? translateCurrentStaticSourceText("domains.creator.StudioSurfaceErrorBoundary", "ko", "도구 화면만 안전하게 닫았습니다. 캔버스와 편집 기록은 그대로 보존되어 있습니다.")}
+        exitLabel={this.props.exitLabel ?? translateCurrentStaticSourceText("domains.creator.StudioSurfaceErrorBoundary", "ko", "2D 캔버스로 돌아가기")}
         onExit={this.props.onExit}
         onRetry={this.retry}
         retryLabel={this.props.retryLabel ?? null}

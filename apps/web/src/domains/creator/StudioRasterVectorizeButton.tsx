@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { ScanLine } from "lucide-react";
 import { useState } from "react";
 
@@ -39,7 +40,7 @@ export function StudioRasterVectorizeButton({
     <div className="rounded-lg border border-line bg-card/50 p-2">
       <button type="button" disabled={busy || disabled} onClick={() => void run()} className={buttonClass({ variant: "outline", size: "sm", className: "w-full gap-2" })}>
         <ScanLine size={14} aria-hidden="true" />
-        {busy ? "벡터화 중…" : "이미지를 벡터 외곽선으로 변환"}
+        {busy ? translateCurrentStaticSourceText("domains.creator.StudioRasterVectorizeButton", "ko", "벡터화 중…") : translateCurrentStaticSourceText("domains.creator.StudioRasterVectorizeButton", "ko", "이미지를 벡터 외곽선으로 변환")}
       </button>
       {status ? <p role="status" className="mt-2 text-[0.64rem] leading-relaxed text-fg-3">{status}</p> : null}
     </div>

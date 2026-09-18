@@ -1,3 +1,7 @@
+import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, BookOpen, Boxes, Compass, FolderKanban, Images, PackageCheck, Palette, Sparkles, Store, Workflow } from "lucide-react";
 import { useEffect, useRef } from "react";
 
@@ -20,7 +24,7 @@ const PRODUCTION_JOURNEY = [
 ] as const;
 
 /** The active step stays visible in the mobile rail without scrolling the page. */
-export function PublicSiteJourney({ pathname, locale }: { pathname: string; locale: "ko" | "en" }) {
+export function PublicSiteJourney({ pathname, locale }: { pathname: string; locale: string }) {
   const railRef = useRef<HTMLElement>(null);
   const isProductionHome = pathname === "/";
   const active = isProductionHome ? undefined : activePublicJourney(pathname);
@@ -40,26 +44,26 @@ export function PublicSiteJourney({ pathname, locale }: { pathname: string; loca
   return (
     <div className="public-site-journey">
       <div className="public-site-journey__inner">
-        <span className="public-site-journey__label">{isProductionHome ? "WEBTOON PRODUCTION WORKSPACE" : "THE DIGITAL ATELIER"}</span>
-        <nav ref={railRef} aria-label={locale === "ko" ? (isProductionHome ? "제작 기능 바로가기" : "창작 단계별 바로가기") : (isProductionHome ? "Production shortcuts" : "Creative journey")} className="public-site-journey__routes">
+        <span className="public-site-journey__label">{isProductionHome ? translateCurrentStaticSourceText("shared.components.public.site.journey", "en", "WEBTOON PRODUCTION WORKSPACE") : translateCurrentStaticSourceText("shared.components.public.site.journey", "en", "THE DIGITAL ATELIER")}</span>
+        <nav ref={railRef} aria-label={translateBilingualValueForLocale(locale, "shared.components.public.site.journey", (isProductionHome ? "제작 기능 바로가기" : "창작 단계별 바로가기"), (isProductionHome ? "Production shortcuts" : "Creative journey"))} className="public-site-journey__routes">
           {journey.map(({ id, href, ko, en }, index) => {
             const Icon = isProductionHome
               ? PRODUCTION_ICONS[id as keyof typeof PRODUCTION_ICONS]
               : ICONS[id as keyof typeof ICONS];
             return (
-              <Link key={href} href={href} data-phase={id === "market" || id === "assets" ? "resources" : id === "make" ? "create" : id} aria-current={active === id ? "step" : undefined} data-active={active === id || undefined}>
+              <Link key={href} href={href} data-phase={id === "market" || id === "assets" ? translateCurrentStaticSourceText("shared.components.public.site.journey", "en", "resources") : id === "make" ? translateCurrentStaticSourceText("shared.components.public.site.journey", "en", "create") : id} aria-current={active === id ? translateCurrentStaticSourceText("shared.components.public.site.journey", "en", "step") : undefined} data-active={active === id || undefined}>
                 <span aria-hidden="true" className="public-site-journey__step">{String(index + 1).padStart(2, "0")}</span>
                 <Icon size={13} aria-hidden="true" />
-                <span>{locale === "ko" ? ko : en}</span>
+                <span>{translateBilingualValueForLocale(locale, "shared.components.public.site.journey", ko, en)}</span>
               </Link>
             );
           })}
         </nav>
         <div className="public-site-journey__utilities">
-          <Link href="/about" className="public-site-journey__about">{locale === "ko" ? (isProductionHome ? "제품 소개" : "작업실 소개") : (isProductionHome ? "About ToonStudio" : "About the atelier")}<ArrowUpRight size={13} aria-hidden="true" /></Link>
+          <Link href="/about" className="public-site-journey__about">{translateBilingualValueForLocale(locale, "shared.components.public.site.journey", (isProductionHome ? "제품 소개" : "작업실 소개"), (isProductionHome ? "About ToonStudio" : "About the atelier"))}<ArrowUpRight size={13} aria-hidden="true" /></Link>
           {settings ? <button type="button" className="site-experience-toggle site-experience-toggle--compact"
-            aria-label={locale === "ko" ? "차분한 화면" : "Calm appearance"} aria-pressed={settings.mode === "calm"}
-            title={locale === "ko" ? "차분한 화면 전환" : "Toggle calm appearance"}
+            aria-label={translateBilingualValueForLocale(locale, "shared.components.public.site.journey", "차분한 화면", "Calm appearance")} aria-pressed={settings.mode === "calm"}
+            title={translateBilingualValueForLocale(locale, "shared.components.public.site.journey", "차분한 화면 전환", "Toggle calm appearance")}
             onClick={() => settings.setMode(settings.mode === "vivid" ? "calm" : "vivid")}><Sparkles size={16} aria-hidden="true" /></button> : null}
         </div>
       </div>

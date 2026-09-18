@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useState } from "react";
 import { useInRouterContext } from "react-router-dom";
 
@@ -28,15 +31,15 @@ export function ProviderStatus({ provider }: { provider?: ResourceProvider }) {
       .finally(() => window.clearTimeout(timer));
     return () => { disposed = true; window.clearTimeout(timer); controller.abort(); };
   }, []);
-  return <section aria-label="데이터 제공처 설정 상태" className="rounded-xl border border-line bg-panel p-4 text-sm leading-7">
-    <p className="font-semibold">검색 제공처 설정</p>
+  return <section aria-label={translateCurrentStaticSourceText("domains.creator.resources.ProviderStatus", "ko", "데이터 제공처 설정 상태")} className="rounded-xl border border-line bg-panel p-4 text-sm leading-7">
+    <p className="font-semibold">{translateCurrentStaticSourceText("domains.creator.resources.ProviderStatus", "ko", "검색 제공처 설정")}</p>
     <div role="status">
-      {failed ? <p className="text-fg-2">설정 상태를 확인하지 못했습니다. 검색을 다시 시도하거나 공식 사이트를 확인하세요.</p>
+      {failed ? <p className="text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.ProviderStatus", "ko", "설정 상태를 확인하지 못했습니다. 검색을 다시 시도하거나 공식 사이트를 확인하세요.")}</p>
         : entries ? entries.filter((entry) => !provider || entry.provider === provider).map((entry) =>
-          <p key={entry.provider}>{RESOURCE_LABELS[entry.provider]} · {entry.availability === "keyless" ? "인증키 없이 검색 가능" : entry.availability === "configured" ? "서버 인증키 설정됨" : "서버 인증키 미설정"}</p>)
-          : <p className="text-fg-2">설정 상태 확인 중…</p>}
+          <p key={entry.provider}>{RESOURCE_LABELS[entry.provider]} · {entry.availability === "keyless" ? translateCurrentStaticSourceText("domains.creator.resources.ProviderStatus", "ko", "인증키 없이 검색 가능") : entry.availability === "configured" ? translateCurrentStaticSourceText("domains.creator.resources.ProviderStatus", "ko", "서버 인증키 설정됨") : translateCurrentStaticSourceText("domains.creator.resources.ProviderStatus", "ko", "서버 인증키 미설정")}</p>)
+          : <p className="text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.ProviderStatus", "ko", "설정 상태 확인 중…")}</p>}
     </div>
-    <p className="text-xs text-fg-2">인증키 설정 여부만 표시합니다. 실제 연결 성공·이용권한·잔여 쿼터를 보증하지 않습니다.</p>
+    <p className="text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.ProviderStatus", "ko", "인증키 설정 여부만 표시합니다. 실제 연결 성공·이용권한·잔여 쿼터를 보증하지 않습니다.")}</p>
     {provider === "met" && inRouter && <ReferenceQueryExplanation />}
   </section>;
 }

@@ -1,3 +1,6 @@
+import {
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -17,10 +20,8 @@ export interface StudioProjectFeatureSuiteController {
   readonly reload: () => void;
 }
 
-function storageError(locale: "ko" | "en"): string {
-  return locale === "ko"
-    ? "이 기기에서 프로젝트 기능 변경 내용을 저장하지 못했습니다. 브라우저 저장 공간과 권한을 확인해 주세요."
-    : "Project feature changes could not be stored on this device. Check browser storage space and permissions.";
+function storageError(locale: string): string {
+  return translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectFeatureSuite", "이 기기에서 프로젝트 기능 변경 내용을 저장하지 못했습니다. 브라우저 저장 공간과 권한을 확인해 주세요.", "Project feature changes could not be stored on this device. Check browser storage space and permissions.");
 }
 
 function eventState(value: unknown, projectId: string): StudioProjectFeatureSuiteState | null {
@@ -34,7 +35,7 @@ function eventState(value: unknown, projectId: string): StudioProjectFeatureSuit
 /** One UI controller for storyboard, quality, 3D, voice, template, analytics and automation state. */
 export function useStudioProjectFeatureSuite(
   projectId: string,
-  locale: "ko" | "en",
+  locale: string,
 ): StudioProjectFeatureSuiteController {
   const [state, setState] = useState<StudioProjectFeatureSuiteState | null>(null);
   const [error, setError] = useState<string | null>(null);

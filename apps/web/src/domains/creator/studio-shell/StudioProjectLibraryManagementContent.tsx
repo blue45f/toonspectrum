@@ -1,3 +1,8 @@
+import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { FolderOpen, HardDrive } from "lucide-react";
 
 import type { StudioProjectLibraryEntry } from "../studio-project-library-store";
@@ -40,7 +45,7 @@ export function StudioProjectLibraryManagementContent({
         busy={busyProjectId !== null}
         continueHref={continueProjectHref(project)}
         overviewHref={projectOverviewHref(project)}
-        storageHref={`/studio?view=storage&project=${encodeURIComponent(project.id)}`}
+        storageHref={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectLibraryManagementContent", "en", "/studio?view=storage&project={v0}"), { v0: String(encodeURIComponent(project.id)) })}
         onToggle={() => setSelection(project.id, !checked)}
         onTouch={() => { library.touch(project.id, project.lastOpenedDocumentId); }}
         onOpenSave={() => setSaveTarget(project)}
@@ -79,15 +84,15 @@ export function StudioProjectLibraryManagementContent({
             <FolderOpen size={24} className="mx-auto text-fg-3" aria-hidden="true" />
             <h2 className="mt-3 text-xl font-black text-fg">
               {query
-                ? locale === "ko" ? "검색 결과가 없습니다" : "No matching projects"
-                : locale === "ko" ? "표시할 작업이 없습니다" : "No work to show"}
+                ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementContent", "검색 결과가 없습니다", "No matching projects")
+                : translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementContent", "표시할 작업이 없습니다", "No work to show")}
             </h2>
             <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-fg-3">
               {view === "archived"
-                ? locale === "ko" ? "보관한 프로젝트가 없습니다." : "There are no archived projects."
+                ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementContent", "보관한 프로젝트가 없습니다.", "There are no archived projects.")
                 : view === "trash"
-                  ? locale === "ko" ? "휴지통이 비어 있습니다." : "Trash is empty."
-                  : locale === "ko" ? "검색어를 바꾸거나 필터를 초기화해 보세요." : "Try another search or clear the filters."}
+                  ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementContent", "휴지통이 비어 있습니다.", "Trash is empty.")
+                  : translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementContent", "검색어를 바꾸거나 필터를 초기화해 보세요.", "Try another search or clear the filters.")}
             </p>
           </section>
         )
@@ -98,18 +103,16 @@ export function StudioProjectLibraryManagementContent({
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
                   <h2 id="temporary-work-title" className="text-xl font-black text-fg">
-                    {locale === "ko" ? "임시 작업" : "Temporary work"}
+                    {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementContent", "임시 작업", "Temporary work")}
                     <span className="ml-2 text-sm font-bold text-fg-3">{temporaryProjects.length}</span>
                   </h2>
                   <p className="mt-1 text-xs leading-5 text-fg-3">
-                    {locale === "ko"
-                      ? "이 기기에 자동저장된 작업입니다. 정식 저장을 누르면 그때 저장 위치를 선택합니다."
-                      : "Autosaved on this device. Choose a destination only when you explicitly save."}
+                    {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementContent", "이 기기에 자동저장된 작업입니다. 정식 저장을 누르면 그때 저장 위치를 선택합니다.", "Autosaved on this device. Choose a destination only when you explicitly save.")}
                   </p>
                 </div>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft/20 px-3 py-1.5 text-[0.68rem] font-bold text-warning">
                   <HardDrive size={13} aria-hidden="true" />
-                  {locale === "ko" ? "복구 가능" : "Recoverable"}
+                  {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementContent", "복구 가능", "Recoverable")}
                 </span>
               </div>
               <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -122,11 +125,11 @@ export function StudioProjectLibraryManagementContent({
             <section aria-labelledby="saved-projects-title">
               <div>
                 <h2 id="saved-projects-title" className="text-xl font-black text-fg">
-                  {locale === "ko" ? "프로젝트" : "Projects"}
+                  {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementContent", "프로젝트", "Projects")}
                   <span className="ml-2 text-sm font-bold text-fg-3">{savedProjects.length}</span>
                 </h2>
                 <p className="mt-1 text-xs leading-5 text-fg-3">
-                  {locale === "ko" ? "파일 또는 개인 저장소와 연결한 정식 프로젝트입니다." : "Formally saved projects connected to a file or personal storage."}
+                  {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementContent", "파일 또는 개인 저장소와 연결한 정식 프로젝트입니다.", "Formally saved projects connected to a file or personal storage.")}
                 </p>
               </div>
               <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -142,9 +145,7 @@ export function StudioProjectLibraryManagementContent({
       )}
 
       <footer className="mt-10 border-t border-line pt-5 text-xs leading-5 text-fg-3">
-        {locale === "ko"
-          ? "임시 자동저장, 정식 저장, 백업, 내보내기와 게시를 분리해 관리합니다. 휴지통의 완전 삭제만 되돌릴 수 없습니다."
-          : "Temporary autosave, explicit save, backup, export and publishing are managed separately. Only permanent deletion from Trash cannot be undone."}
+        {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryManagementContent", "임시 자동저장, 정식 저장, 백업, 내보내기와 게시를 분리해 관리합니다. 휴지통의 완전 삭제만 되돌릴 수 없습니다.", "Temporary autosave, explicit save, backup, export and publishing are managed separately. Only permanent deletion from Trash cannot be undone.")}
       </footer>
     </>
   );

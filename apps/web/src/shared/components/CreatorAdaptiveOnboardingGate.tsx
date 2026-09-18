@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowLeft,
   ArrowRight,
   Check,
@@ -94,7 +99,7 @@ const STEP_LABELS = [
 ] as const;
 
 function localized(locale: CreatorRoleLocale, ko: string, en: string): string {
-  return locale === "ko" ? ko : en;
+  return translateBilingualValueForLocale(locale, "shared.components.CreatorAdaptiveOnboardingGate", ko, en);
 }
 
 function selectedRoleLabel(role: CreatorRoleId, locale: CreatorRoleLocale): string {
@@ -110,7 +115,7 @@ function toggleDistinct<T>(values: readonly T[], value: T, maximum: number): T[]
 
 export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly enabled?: boolean }) {
   const { status } = useSession();
-  const locale: CreatorRoleLocale = useI18n((state) => state.lang) === "ko" ? "ko" : "en";
+  const locale: CreatorRoleLocale = useI18n((state) => state.lang);
   const dialogRef = useRef<HTMLDivElement>(null);
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -269,7 +274,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-accent">
               <Sparkles size={15} aria-hidden="true" />
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em]">ADAPTIVE WORKSPACE</p>
+              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em]">{translateCurrentStaticSourceText("shared.components.CreatorAdaptiveOnboardingGate", "en", "ADAPTIVE WORKSPACE")}</p>
             </div>
             <h1 id="adaptive-onboarding-title" className="mt-1 text-xl font-black tracking-tight text-fg sm:text-2xl">
               {localized(locale, "나에게 맞는 작업 환경 만들기", "Build a workspace around how you create")}
@@ -405,7 +410,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
                       )}
                     >
                       {selected ? <Check size={14} aria-hidden="true" /> : null}
-                      {GOAL_LABELS[goal][locale]}
+                      {translateLocaleBranchForLocale(locale, "shared.components.CreatorAdaptiveOnboardingGate", GOAL_LABELS[goal])}
                     </button>
                   );
                 })}
@@ -436,7 +441,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
                         selected ? "border-accent bg-accent-soft" : "border-line bg-panel hover:border-accent/35",
                       )}
                     >
-                      <LayoutDashboard size={20} className={selected ? "text-accent" : "text-fg-3"} aria-hidden="true" />
+                      <LayoutDashboard size={20} className={selected ? translateCurrentStaticSourceText("shared.components.CreatorAdaptiveOnboardingGate", "en", "text-accent") : translateCurrentStaticSourceText("shared.components.CreatorAdaptiveOnboardingGate", "en", "text-fg-3")} aria-hidden="true" />
                       <span className={cn("mt-4 block text-base font-black", selected ? "text-accent" : "text-fg")}>{localized(locale, copy.ko, copy.en)}</span>
                       <span className="mt-2 block text-xs leading-5 text-fg-2">{localized(locale, copy.descriptionKo, copy.descriptionEn)}</span>
                     </button>
@@ -459,7 +464,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
                   <div className="flex flex-wrap gap-2 text-[0.7rem] font-bold">
                     {stage ? <span className="rounded-full bg-card px-3 py-1 text-fg-2">{creatorText(CREATOR_STAGE_LABELS[stage], locale)}</span> : null}
                     {primaryDefinition ? <span className="rounded-full bg-accent px-3 py-1 text-on-accent">{creatorText(primaryDefinition.label, locale)}</span> : null}
-                    <span className="rounded-full bg-card px-3 py-1 text-fg-2">{MODE_COPY[workspaceMode][locale]}</span>
+                    <span className="rounded-full bg-card px-3 py-1 text-fg-2">{translateLocaleBranchForLocale(locale, "shared.components.CreatorAdaptiveOnboardingGate", MODE_COPY[workspaceMode])}</span>
                   </div>
                   <h3 className="mt-4 text-xl font-black text-fg">
                     {primaryDefinition ? creatorText(primaryDefinition.workspaceTitle, locale) : localized(locale, "내 작업실", "My workspace")}
@@ -470,7 +475,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
                 </div>
                 <div className={cn("grid gap-3 p-4 sm:p-5", workspaceMode === "production" ? "lg:grid-cols-[0.8fr_1.2fr]" : "lg:grid-cols-[1fr_1.4fr]")}>
                   <div className="rounded-2xl border border-accent/30 bg-accent-soft/30 p-4">
-                    <p className="text-[0.66rem] font-black uppercase tracking-[0.14em] text-accent">PRIMARY ACTION</p>
+                    <p className="text-[0.66rem] font-black uppercase tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("shared.components.CreatorAdaptiveOnboardingGate", "en", "PRIMARY ACTION")}</p>
                     <p className="mt-2 text-sm font-black text-fg">{localized(locale, experience.primaryAction.labelKo, experience.primaryAction.labelEn)}</p>
                     {workspaceMode !== "production" ? <p className="mt-1 text-xs leading-5 text-fg-2">{localized(locale, experience.primaryAction.descriptionKo, experience.primaryAction.descriptionEn)}</p> : null}
                   </div>

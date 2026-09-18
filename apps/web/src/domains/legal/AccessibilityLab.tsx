@@ -1,4 +1,9 @@
 import {
+  resolveUiLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   CheckCircle2,
   RotateCcw,
@@ -54,8 +59,8 @@ const LIMITATIONS = {
 
 export function AccessibilityLab() {
   const language = useI18n((state) => state.lang);
-  const locale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
-  const copy = COPY[locale];
+  const locale = resolveUiLocale(language);
+  const copy = translateLocaleBranchForLocale(locale, "domains.legal.AccessibilityLab", COPY);
   const [textScale, setTextScale] = useState(100);
   const [strongContrast, setStrongContrast] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -121,8 +126,7 @@ export function AccessibilityLab() {
             style={{ fontSize: `${textScale}%` }}
           >
             <span className="inline-flex min-h-8 items-center gap-2 rounded-full border border-good/40 bg-good/10 px-3 text-[0.75em] font-bold text-good">
-              <CheckCircle2 size="1em" aria-hidden="true" />SAVE COMPLETE
-            </span>
+              <CheckCircle2 size="1em" aria-hidden="true" />{translateCurrentStaticSourceText("domains.legal.AccessibilityLab", "en", "SAVE COMPLETE")}</span>
             <h3 className="mt-5 text-[1.2em] font-bold text-fg">{copy.previewTitle}</h3>
             <p className="mt-2 max-w-2xl text-[0.9em] leading-7 text-fg-2">{copy.previewBody}</p>
             <button
@@ -141,7 +145,7 @@ export function AccessibilityLab() {
           <div className="min-w-0 flex-1">
             <h2 id="accessibility-limitations-title" className="font-display text-lg font-bold text-fg">{copy.limitationsTitle}</h2>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {LIMITATIONS[locale].map(([title, body]) => (
+              {translateLocaleBranchForLocale(locale, "domains.legal.AccessibilityLab.limitations", LIMITATIONS).map(([title, body]) => (
                 <article key={title} className="rounded-2xl border border-line bg-card/75 p-4">
                   <h3 className="text-sm font-bold text-fg">{title}</h3>
                   <p className="mt-2 text-xs leading-6 text-fg-3">{body}</p>

@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Building2,
   ExternalLink,
@@ -37,7 +38,7 @@ export function SupportUsPage() {
         description={t("supportUs.hero.description")}
         image="materials"
         imageAlt="ToonSpectrum creator workspace materials"
-        caption="SUPPORTER · SPONSORSHIP · CLEAR BOUNDARIES"
+        caption={translateCurrentStaticSourceText("domains.legal.SupportUsPage", "en", "SUPPORTER · SPONSORSHIP · CLEAR BOUNDARIES")}
       >
         {checkoutEnabled ? (
           <a

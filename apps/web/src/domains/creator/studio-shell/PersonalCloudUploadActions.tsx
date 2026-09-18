@@ -1,3 +1,7 @@
+import {
+  translateBilingualValueForLocale,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { CloudUpload, Link2, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -8,7 +12,7 @@ import type {
 } from "../save-first/personal-cloud-client";
 import type { PersonalCloudUploadProgress } from "../save-first/personal-cloud-upload";
 
-type Locale = "ko" | "en";
+type Locale = string;
 
 interface ActiveUpload extends PersonalCloudUploadProgress {
   readonly provider: PersonalCloudProviderId;
@@ -24,7 +28,7 @@ function phaseLabel(
     uploading: { ko: "업로드 중", en: "Uploading" },
     finalizing: { ko: "저장 확인 중", en: "Finalizing" },
   } as const;
-  return labels[phase][locale];
+  return translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.PersonalCloudUploadActions", labels[phase]);
 }
 
 function percentage(progress: PersonalCloudUploadProgress): number {
@@ -71,16 +75,10 @@ export function PersonalCloudUploadActions({
                   : <Link2 size={14} className="shrink-0" aria-hidden="true" />}
               <span className="truncate">
                 {connected
-                  ? locale === "ko"
-                    ? `${connection.label}에 저장`
-                    : `Save to ${connection.label}`
+                  ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudUploadActions", `${connection.label}에 저장`, `Save to ${connection.label}`)
                   : connection.configured
-                    ? locale === "ko"
-                      ? `${connection.label} 연결`
-                      : `Connect ${connection.label}`
-                    : locale === "ko"
-                      ? `${connection.label} 설정 필요`
-                      : `${connection.label} needs setup`}
+                    ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudUploadActions", `${connection.label} 연결`, `Connect ${connection.label}`)
+                    : translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudUploadActions", `${connection.label} 설정 필요`, `${connection.label} needs setup`)}
               </span>
             </button>
           );

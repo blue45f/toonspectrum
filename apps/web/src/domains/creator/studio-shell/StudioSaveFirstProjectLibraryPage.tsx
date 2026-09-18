@@ -1,4 +1,12 @@
 import {
+  formatI18nTemplate,
+  getCurrentUiLocale,
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   CheckCircle2,
   CloudOff,
   Copy,
@@ -60,11 +68,12 @@ import { usePersonalCloudConnections } from "./usePersonalCloudConnections";
 import { useStudioProjectLibrary } from "./useStudioProjectLibrary";
 import { useStudioSaveProfiles } from "./useStudioSaveProfiles";
 
-type Locale = "ko" | "en";
+type Locale = string;
+type AuthoredLocale = "ko" | "en";
 type LibraryView = "active" | "storage" | "exports" | "publications" | "archived" | "trash";
 type InitialLibraryView = "active" | "archived" | "trash";
 
-const VIEW_LABELS: Readonly<Record<LibraryView, Readonly<Record<Locale, string>>>> = {
+const VIEW_LABELS: Readonly<Record<LibraryView, Readonly<Record<AuthoredLocale, string>>>> = {
   active: { ko: "내 작업", en: "My work" },
   storage: { ko: "저장·백업", en: "Save and backup" },
   exports: { ko: "내보내기", en: "Export" },
@@ -73,7 +82,7 @@ const VIEW_LABELS: Readonly<Record<LibraryView, Readonly<Record<Locale, string>>
   trash: { ko: "휴지통", en: "Trash" },
 };
 
-const VIEW_DESCRIPTIONS: Readonly<Record<LibraryView, Readonly<Record<Locale, string>>>> = {
+const VIEW_DESCRIPTIONS: Readonly<Record<LibraryView, Readonly<Record<AuthoredLocale, string>>>> = {
   active: { ko: "최근 작업을 이어가거나 새 작품을 시작하세요. 작업은 이 기기에 자동 저장됩니다.", en: "Continue recent work or start something new. Work is saved automatically on this device." },
   storage: { ko: "프로젝트 파일과 연결한 개인 드라이브 백업을 관리합니다.", en: "Manage project files and backups in your connected personal drives." },
   exports: { ko: "플랫폼 제출용 파일과 최근 내보내기를 확인합니다.", en: "Review files prepared for platforms and your recent exports." },
@@ -83,7 +92,7 @@ const VIEW_DESCRIPTIONS: Readonly<Record<LibraryView, Readonly<Record<Locale, st
 };
 
 function localeFromLanguage(language: string): Locale {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  return resolveUiLocale(language);
 }
 
 function resolveView(value: string | null, initialView?: InitialLibraryView): LibraryView {
@@ -96,8 +105,8 @@ function viewHref(view: LibraryView): string {
 }
 
 function dateLabel(value: string | null, locale: Locale): string {
-  if (!value || !Number.isFinite(Date.parse(value))) return locale === "ko" ? "아직 없음" : "Not yet";
-  return new Intl.DateTimeFormat(locale === "ko" ? "ko-KR" : "en-US", {
+  if (!value || !Number.isFinite(Date.parse(value))) return translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "아직 없음", "Not yet");
+  return new Intl.DateTimeFormat(getCurrentUiLocale(), {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -112,7 +121,7 @@ function distributionLabel(profile: StudioSaveProfile, locale: Locale): string {
     submitted: { ko: "외부 제출", en: "Submitted externally" },
     published: { ko: "게시됨", en: "Published" },
   } as const;
-  return labels[profile.distributionState][locale];
+  return translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", labels[profile.distributionState]);
 }
 
 function SaveBadge({ profile, locale }: { readonly profile: StudioSaveProfile; readonly locale: Locale }) {
@@ -126,7 +135,7 @@ function SaveBadge({ profile, locale }: { readonly profile: StudioSaveProfile; r
         : "border-success/35 bg-success-soft/20 text-success",
     )}>
       <Icon size={13} aria-hidden="true" />
-      {locale === "ko" ? summary.headline : summary.needsBackup ? "Backup needs attention" : "Backup ready"}
+      {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", summary.headline, summary.needsBackup ? "Backup needs attention" : "Backup ready")}
     </span>
   );
 }
@@ -146,9 +155,7 @@ function uploadFailureMessage(error: unknown, locale: Locale): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message.trim().slice(0, 500);
   }
-  return locale === "ko"
-    ? "개인 저장소 업로드를 완료하지 못했습니다."
-    : "The personal storage upload could not be completed.";
+  return translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "개인 저장소 업로드를 완료하지 못했습니다.", "The personal storage upload could not be completed.");
 }
 
 export function StudioSaveFirstProjectLibraryPage({
@@ -183,15 +190,11 @@ export function StudioSaveFirstProjectLibraryPage({
     const provider = PERSONAL_CLOUD_PROVIDER_IDS.find((value) => value === rawProvider);
     const label = provider ? personalCloudProviderLabel(provider) : "개인 저장소";
     if (result === "connected") {
-      setMessage(locale === "ko"
-        ? `${label} 개인 계정을 연결했습니다. 이제 프로젝트를 직접 저장할 수 있습니다.`
-        : `${label} is connected. Projects can now be saved directly.`);
+      setMessage(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", `${label} 개인 계정을 연결했습니다. 이제 프로젝트를 직접 저장할 수 있습니다.`, `${label} is connected. Projects can now be saved directly.`));
       void reloadCloudConnections();
     } else {
       const reason = searchParams.get("cloudError");
-      setMessage(locale === "ko"
-        ? `${label} 연결을 완료하지 못했습니다.${reason ? ` (${reason})` : ""}`
-        : `${label} connection could not be completed.${reason ? ` (${reason})` : ""}`);
+      setMessage(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", `${label} 연결을 완료하지 못했습니다.${reason ? ` (${reason})` : ""}`, `${label} connection could not be completed.${reason ? ` (${reason})` : ""}`));
     }
     const next = new URLSearchParams(searchParams);
     next.delete("cloud");
@@ -249,17 +252,11 @@ export function StudioSaveFirstProjectLibraryPage({
         revision: saved.revision,
       });
       setMessage(method === "file-picker"
-        ? locale === "ko"
-          ? `“${project.title}”을 선택한 파일·동기화 폴더에 저장했습니다.`
-          : `Saved “${project.title}” to the selected file or synced folder.`
-        : locale === "ko"
-          ? `“${project.title}” 프로젝트 파일을 다운로드했습니다.`
-          : `Downloaded the “${project.title}” project file.`);
+        ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", `“${project.title}”을 선택한 파일·동기화 폴더에 저장했습니다.`, `Saved “${project.title}” to the selected file or synced folder.`)
+        : translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", `“${project.title}” 프로젝트 파일을 다운로드했습니다.`, `Downloaded the “${project.title}” project file.`));
     } catch (cause) {
       if (!(cause instanceof DOMException && cause.name === "AbortError")) {
-        setMessage(locale === "ko"
-          ? "프로젝트 파일을 저장하지 못했습니다."
-          : "The project file could not be saved.");
+        setMessage(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "프로젝트 파일을 저장하지 못했습니다.", "The project file could not be saved."));
       }
     } finally {
       setBusyProjectId(null);
@@ -271,9 +268,7 @@ export function StudioSaveFirstProjectLibraryPage({
   ) => {
     const connection = cloud.statusFor(provider);
     if (!connection?.configured) {
-      setMessage(locale === "ko"
-        ? `${personalCloudProviderLabel(provider)} OAuth 서버 설정이 필요합니다.`
-        : `${personalCloudProviderLabel(provider)} OAuth server configuration is required.`);
+      setMessage(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", `${personalCloudProviderLabel(provider)} OAuth 서버 설정이 필요합니다.`, `${personalCloudProviderLabel(provider)} OAuth server configuration is required.`));
       return;
     }
     if (!connection.connected) {
@@ -325,9 +320,7 @@ export function StudioSaveFirstProjectLibraryPage({
         byteLength: uploaded.byteLength,
         revision: saved.revision,
       });
-      setMessage(locale === "ko"
-        ? `“${project.title}”을 ${personalCloudProviderLabel(provider)}에 저장했습니다.`
-        : `Saved “${project.title}” to ${personalCloudProviderLabel(provider)}.`);
+      setMessage(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", `“${project.title}”을 ${personalCloudProviderLabel(provider)}에 저장했습니다.`, `Saved “${project.title}” to ${personalCloudProviderLabel(provider)}.`));
     } catch (cause) {
       const detail = uploadFailureMessage(cause, locale);
       const uploadError = cause instanceof PersonalCloudUploadError ? cause : null;
@@ -386,9 +379,7 @@ export function StudioSaveFirstProjectLibraryPage({
       autoSave: true,
       createVersions: true,
     });
-    setMessage(locale === "ko"
-      ? `“${project.title}”의 새 비공개 복사본을 만들었습니다.`
-      : `Created a new private copy of “${project.title}”.`);
+    setMessage(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", `“${project.title}”의 새 비공개 복사본을 만들었습니다.`, `Created a new private copy of “${project.title}”.`));
   };
 
   const primaryNavigation: readonly LibraryView[] = ["active", "archived", "trash"];
@@ -399,48 +390,48 @@ export function StudioSaveFirstProjectLibraryPage({
       <Container size="wide" className="py-7 sm:py-11">
         <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">TOONSTUDIO</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-4xl">{VIEW_LABELS[view][locale]}</h1>
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "en", "TOONSTUDIO")}</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-4xl">{translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", VIEW_LABELS[view])}</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2 sm:text-base">
-              {VIEW_DESCRIPTIONS[view][locale]}
+              {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", VIEW_DESCRIPTIONS[view])}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href="/studio/import" className={buttonClass({ variant: "outline" })}>{locale === "ko" ? "파일 가져오기" : "Import files"}</Link>
-            <Link href="/studio/new" className={buttonClass({ className: "gap-2" })}><Plus size={16} aria-hidden="true" />{locale === "ko" ? "새 작품 만들기" : "Create new work"}</Link>
+            <Link href="/studio/import" className={buttonClass({ variant: "outline" })}>{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "파일 가져오기", "Import files")}</Link>
+            <Link href="/studio/new" className={buttonClass({ className: "gap-2" })}><Plus size={16} aria-hidden="true" />{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "새 작품 만들기", "Create new work")}</Link>
           </div>
         </header>
 
         <div className="mt-7 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <nav className="overflow-x-auto" aria-label={locale === "ko" ? "내 작업 보기" : "My work views"}>
+          <nav className="overflow-x-auto" aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "내 작업 보기", "My work views")}>
             <div className="flex min-w-max gap-1 rounded-2xl border border-line bg-card p-1">
               {primaryNavigation.map((candidate) => (
                 <Link
                   key={candidate}
                   href={viewHref(candidate)}
-                  aria-current={candidate === view ? "page" : undefined}
+                  aria-current={candidate === view ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "en", "page") : undefined}
                   className={cn(
                     "inline-flex min-h-11 items-center rounded-xl px-3 text-xs font-bold",
                     candidate === view ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
                   )}
                 >
-                  {VIEW_LABELS[candidate][locale]}
+                  {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", VIEW_LABELS[candidate])}
                 </Link>
               ))}
             </div>
           </nav>
-          <nav className="flex flex-wrap items-center gap-1" aria-label={locale === "ko" ? "저장과 배포" : "Storage and distribution"}>
+          <nav className="flex flex-wrap items-center gap-1" aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "저장과 배포", "Storage and distribution")}>
             {secondaryNavigation.map((candidate) => (
               <Link
                 key={candidate}
                 href={viewHref(candidate)}
-                aria-current={candidate === view ? "page" : undefined}
+                aria-current={candidate === view ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "en", "page") : undefined}
                 className={cn(
                   "inline-flex min-h-10 items-center rounded-xl px-3 text-xs font-semibold",
                   candidate === view ? "bg-raised text-accent" : "text-fg-3 hover:bg-card hover:text-fg",
                 )}
               >
-                {VIEW_LABELS[candidate][locale]}
+                {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", VIEW_LABELS[candidate])}
               </Link>
             ))}
           </nav>
@@ -448,7 +439,7 @@ export function StudioSaveFirstProjectLibraryPage({
 
         {message ? (
           <div role="status" className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-soft/20 px-3 py-2 text-sm font-semibold text-fg">
-            <span>{message}</span><button type="button" onClick={() => setMessage(null)} className="text-xs underline">{locale === "ko" ? "닫기" : "Dismiss"}</button>
+            <span>{message}</span><button type="button" onClick={() => setMessage(null)} className="text-xs underline">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "닫기", "Dismiss")}</button>
           </div>
         ) : null}
         {library.error || profiles.error ? <p role="alert" className="mt-4 rounded-xl border border-danger/35 bg-danger-soft/15 px-3 py-2 text-sm font-semibold text-danger">{library.error ?? profiles.error}</p> : null}
@@ -459,17 +450,17 @@ export function StudioSaveFirstProjectLibraryPage({
           <section className="mt-7">
             <label className="relative block max-w-md">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" size={16} aria-hidden="true" />
-              <span className="sr-only">{locale === "ko" ? "프로젝트 검색" : "Search projects"}</span>
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={locale === "ko" ? "내 작업 검색" : "Search my work"} className="min-h-11 w-full rounded-xl border border-line bg-card pl-10 pr-3 text-sm text-fg outline-none focus:border-accent" />
+              <span className="sr-only">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "프로젝트 검색", "Search projects")}</span>
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "내 작업 검색", "Search my work")} className="min-h-11 w-full rounded-xl border border-line bg-card pl-10 pr-3 text-sm text-fg outline-none focus:border-accent" />
             </label>
             {filteredProjects.length === 0 ? (
               <div className="mt-5 rounded-3xl border border-dashed border-line bg-card/60 px-5 py-14 text-center">
                 <FolderOpen size={24} className="mx-auto text-fg-3" aria-hidden="true" />
-                <h2 className="mt-3 text-xl font-black text-fg">{locale === "ko" ? "표시할 작업이 없습니다" : "No work to show"}</h2>
+                <h2 className="mt-3 text-xl font-black text-fg">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "표시할 작업이 없습니다", "No work to show")}</h2>
                 {view === "active" ? (
                   <Link href="/studio/new" className={buttonClass({ className: "mt-5 gap-2" })}>
                     <Plus size={16} aria-hidden="true" />
-                    {locale === "ko" ? "새 작품 만들기" : "Create new work"}
+                    {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "새 작품 만들기", "Create new work")}
                   </Link>
                 ) : null}
               </div>
@@ -485,18 +476,18 @@ export function StudioSaveFirstProjectLibraryPage({
                         project={project}
                       />
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex min-h-7 items-center gap-1 rounded-full bg-accent-soft px-2.5 text-[0.68rem] font-black text-accent"><ShieldCheck size={13} aria-hidden="true" />{locale === "ko" ? "나만 보기" : "Owner only"}</span>
+                        <span className="inline-flex min-h-7 items-center gap-1 rounded-full bg-accent-soft px-2.5 text-[0.68rem] font-black text-accent"><ShieldCheck size={13} aria-hidden="true" />{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "나만 보기", "Owner only")}</span>
                         <SaveBadge profile={profile} locale={locale} />
                       </div>
                       <h2 className="mt-3 truncate text-lg font-black text-fg">{project.title}</h2>
-                      <p className="mt-1 text-xs text-fg-3">{locale === "ko" ? "마지막 작업" : "Last opened"} {dateLabel(project.lastOpenedAt, locale)}</p>
+                      <p className="mt-1 text-xs text-fg-3">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "마지막 작업", "Last opened")} {dateLabel(project.lastOpenedAt, locale)}</p>
                       <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-panel/60 p-3 text-[0.68rem]">
-                        <div><p className="font-semibold text-fg-3">{locale === "ko" ? "마지막 저장" : "Last save"}</p><p className="mt-1 font-black text-fg">{dateLabel(profile.lastManualSaveAt, locale)}</p></div>
-                        <div><p className="font-semibold text-fg-3">{locale === "ko" ? "배포" : "Distribution"}</p><p className="mt-1 font-black text-fg">{distributionLabel(profile, locale)}</p></div>
+                        <div><p className="font-semibold text-fg-3">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "마지막 저장", "Last save")}</p><p className="mt-1 font-black text-fg">{dateLabel(profile.lastManualSaveAt, locale)}</p></div>
+                        <div><p className="font-semibold text-fg-3">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "배포", "Distribution")}</p><p className="mt-1 font-black text-fg">{distributionLabel(profile, locale)}</p></div>
                       </div>
                       <details className="mt-3 rounded-xl border border-line bg-panel/55">
                         <summary className="cursor-pointer list-none px-3 py-2.5 text-xs font-black text-fg [&::-webkit-details-marker]:hidden">
-                          {locale === "ko" ? "저장 위치 관리" : "Manage storage"}
+                          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "저장 위치 관리", "Manage storage")}
                         </summary>
                         <div className="border-t border-line p-3">
                           <div className="space-y-2">
@@ -509,10 +500,10 @@ export function StudioSaveFirstProjectLibraryPage({
                                     </p>
                                     <p className="mt-1 text-[0.64rem] text-fg-3">
                                       {binding.lastSyncedAt
-                                        ? `${locale === "ko" ? "마지막 저장" : "Last saved"} ${dateLabel(binding.lastSyncedAt, locale)}`
+                                        ? `${translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "마지막 저장", "Last saved")} ${dateLabel(binding.lastSyncedAt, locale)}`
                                         : binding.connectionRequired
-                                          ? locale === "ko" ? "계정 연결 필요" : "Account connection required"
-                                          : locale === "ko" ? "작업 사본" : "Working copy"}
+                                          ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "계정 연결 필요", "Account connection required")
+                                          : translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "작업 사본", "Working copy")}
                                     </p>
                                   </div>
                                   <span className={cn(
@@ -524,14 +515,14 @@ export function StudioSaveFirstProjectLibraryPage({
                                         : "bg-warning-soft/20 text-warning",
                                   )}>
                                     {binding.syncState === "synced"
-                                      ? locale === "ko" ? "저장됨" : "Saved"
+                                      ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "저장됨", "Saved")
                                       : binding.syncState === "syncing"
-                                        ? locale === "ko" ? "저장 중" : "Saving"
+                                        ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "저장 중", "Saving")
                                         : binding.syncState === "conflict"
-                                          ? locale === "ko" ? "충돌" : "Conflict"
+                                          ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "충돌", "Conflict")
                                           : binding.syncState === "error"
-                                            ? locale === "ko" ? "오류" : "Error"
-                                            : locale === "ko" ? "대기" : "Pending"}
+                                            ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "오류", "Error")
+                                            : translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "대기", "Pending")}
                                   </span>
                                 </div>
                                 {binding.error ? (
@@ -546,7 +537,7 @@ export function StudioSaveFirstProjectLibraryPage({
                                     rel="noreferrer"
                                     className="mt-2 inline-flex items-center gap-1 text-[0.65rem] font-bold text-accent"
                                   >
-                                    {locale === "ko" ? "원격 파일 열기" : "Open remote file"}
+                                    {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "원격 파일 열기", "Open remote file")}
                                     <ExternalLink size={11} aria-hidden="true" />
                                   </a>
                                 ) : null}
@@ -568,20 +559,18 @@ export function StudioSaveFirstProjectLibraryPage({
                             />
                           </div>
                           <p className="mt-3 text-[0.64rem] leading-4 text-fg-3">
-                            {locale === "ko"
-                              ? "WebDAV·S3 직접 연결은 자격 증명 보관 방식을 선택한 뒤 별도 설정에서 제공합니다. 연결되지 않은 저장소를 백업 완료로 표시하지 않습니다."
-                              : "WebDAV and S3 direct connections remain in advanced settings. Unconnected storage is never shown as a completed backup."}
+                            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "WebDAV·S3 직접 연결은 자격 증명 보관 방식을 선택한 뒤 별도 설정에서 제공합니다. 연결되지 않은 저장소를 백업 완료로 표시하지 않습니다.", "WebDAV and S3 direct connections remain in advanced settings. Unconnected storage is never shown as a completed backup.")}
                           </p>
                         </div>
                       </details>
                       <div className="mt-4 flex gap-2 border-t border-line pt-3">
-                        <Link href={`/studio/p/${encodeURIComponent(project.id)}/overview`} onClick={() => { library.touch(project.id, project.lastOpenedDocumentId); }} className={buttonClass({ size: "sm", className: "flex-1 gap-1.5" })}><FolderOpen size={15} aria-hidden="true" />{locale === "ko" ? "이어서 작업" : "Continue"}</Link>
-                        <button type="button" onClick={() => { void savePackage(project); }} disabled={busyProjectId === project.id} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}><Download size={15} aria-hidden="true" />{locale === "ko" ? "저장" : "Save"}</button>
-                        <button type="button" onClick={() => duplicateProject(project)} aria-label={locale === "ko" ? "프로젝트 복제" : "Duplicate project"} className={buttonClass({ variant: "quiet", size: "icon" })}><Copy size={15} aria-hidden="true" /></button>
+                        <Link href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "en", "/studio/p/{v0}/overview"), { v0: String(encodeURIComponent(project.id)) })} onClick={() => { library.touch(project.id, project.lastOpenedDocumentId); }} className={buttonClass({ size: "sm", className: "flex-1 gap-1.5" })}><FolderOpen size={15} aria-hidden="true" />{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "이어서 작업", "Continue")}</Link>
+                        <button type="button" onClick={() => { void savePackage(project); }} disabled={busyProjectId === project.id} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}><Download size={15} aria-hidden="true" />{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "저장", "Save")}</button>
+                        <button type="button" onClick={() => duplicateProject(project)} aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "프로젝트 복제", "Duplicate project")} className={buttonClass({ variant: "quiet", size: "icon" })}><Copy size={15} aria-hidden="true" /></button>
                       </div>
                       <div className="mt-2 flex flex-wrap justify-end gap-2">
-                        <button type="button" onClick={() => { library.archive(project.id); }} className="text-[0.68rem] font-semibold text-fg-3 hover:text-fg">{locale === "ko" ? "보관" : "Archive"}</button>
-                        <button type="button" onClick={() => { library.trash(project.id); }} className="text-[0.68rem] font-semibold text-danger">{locale === "ko" ? "휴지통" : "Trash"}</button>
+                        <button type="button" onClick={() => { library.archive(project.id); }} className="text-[0.68rem] font-semibold text-fg-3 hover:text-fg">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "보관", "Archive")}</button>
+                        <button type="button" onClick={() => { library.trash(project.id); }} className="text-[0.68rem] font-semibold text-danger">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "휴지통", "Trash")}</button>
                       </div>
                     </article>
                   );
@@ -593,8 +582,8 @@ export function StudioSaveFirstProjectLibraryPage({
                   <article key={project.id} className="flex flex-col gap-3 rounded-2xl border border-line bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div><h2 className="font-black text-fg">{project.title}</h2><p className="mt-1 text-xs text-fg-3">{dateLabel(project.updatedAt, locale)}</p></div>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => { if (view === "archived") library.activate(project.id); else library.restore(project.id); }} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}><RotateCcw size={14} aria-hidden="true" />{locale === "ko" ? "복원" : "Restore"}</button>
-                      {view === "trash" ? <button type="button" onClick={() => { if (library.removePermanently(project.id)) profiles.remove(project.id); }} className={buttonClass({ variant: "quiet", size: "sm", className: "text-danger" })}><Trash2 size={14} aria-hidden="true" />{locale === "ko" ? "완전 삭제" : "Delete"}</button> : null}
+                      <button type="button" onClick={() => { if (view === "archived") library.activate(project.id); else library.restore(project.id); }} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}><RotateCcw size={14} aria-hidden="true" />{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "복원", "Restore")}</button>
+                      {view === "trash" ? <button type="button" onClick={() => { if (library.removePermanently(project.id)) profiles.remove(project.id); }} className={buttonClass({ variant: "quiet", size: "sm", className: "text-danger" })}><Trash2 size={14} aria-hidden="true" />{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "완전 삭제", "Delete")}</button> : null}
                     </div>
                   </article>
                 ))}
@@ -613,19 +602,17 @@ export function StudioSaveFirstProjectLibraryPage({
                 </span>
                 <div>
                   <h2 className="text-lg font-black text-fg">
-                    {locale === "ko" ? "프로젝트 저장 위치" : "Project storage locations"}
+                    {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "프로젝트 저장 위치", "Project storage locations")}
                   </h2>
                   <p className="mt-1 text-xs leading-5 text-fg-3">
-                    {locale === "ko"
-                      ? "로컬 파일 백업과 연결한 개인 드라이브 업로드를 프로젝트별로 관리합니다."
-                      : "Manage local file backups and connected personal-drive uploads per project."}
+                    {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "로컬 파일 백업과 연결한 개인 드라이브 업로드를 프로젝트별로 관리합니다.", "Manage local file backups and connected personal-drive uploads per project.")}
                   </p>
                 </div>
               </div>
 
               {activeProjects.length === 0 ? (
                 <p className="mt-5 rounded-xl bg-panel/60 px-4 py-6 text-center text-sm text-fg-3">
-                  {locale === "ko" ? "저장할 비공개 작업이 없습니다." : "There are no private projects to save."}
+                  {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "저장할 비공개 작업이 없습니다.", "There are no private projects to save.")}
                 </p>
               ) : (
                 <div className="mt-5 space-y-3">
@@ -644,7 +631,7 @@ export function StudioSaveFirstProjectLibraryPage({
                               {summary.headline}
                             </p>
                             <p className="mt-1 text-[0.66rem] text-fg-3">
-                              {locale === "ko" ? "마지막 수동 저장" : "Last manual save"} {dateLabel(profile.lastManualSaveAt, locale)}
+                              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "마지막 수동 저장", "Last manual save")} {dateLabel(profile.lastManualSaveAt, locale)}
                             </p>
                           </div>
                           <button
@@ -654,7 +641,7 @@ export function StudioSaveFirstProjectLibraryPage({
                             className={buttonClass({ variant: "outline", size: "sm", className: "gap-2" })}
                           >
                             <FileArchive size={15} aria-hidden="true" />
-                            {locale === "ko" ? ".toonstudio 파일 저장" : "Save .toonstudio file"}
+                            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", ".toonstudio 파일 저장", "Save .toonstudio file")}
                           </button>
                         </div>
                         <div className="mt-4 border-t border-line pt-3">
@@ -682,20 +669,20 @@ export function StudioSaveFirstProjectLibraryPage({
 
         {view === "exports" ? (
           <section className="mt-7 grid gap-5 lg:grid-cols-[1.3fr_0.7fr]">
-            <div className="rounded-2xl border border-line bg-card p-5"><h2 className="text-lg font-black text-fg">{locale === "ko" ? "플랫폼별 내보내기" : "Platform exports"}</h2><div className="mt-4 space-y-3">{STUDIO_EXPORT_PRESETS.map((preset) => <article key={preset.id} className="flex flex-col gap-3 rounded-xl border border-line bg-panel/55 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-black text-fg">{preset.labelKo}</h3><p className="mt-1 text-xs text-fg-3">{preset.exactWidth ? `${preset.exactWidth}px` : `max ${preset.maxWidth ?? "—"}px`} · {preset.formats.join("/").toUpperCase()}</p></div>{activeProjects[0] ? <Link href={`/studio/p/${encodeURIComponent(activeProjects[0].id)}/export?preset=${encodeURIComponent(preset.id)}`} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}><Upload size={14} aria-hidden="true" />{locale === "ko" ? "내보내기 열기" : "Open export"}</Link> : null}</article>)}</div></div>
-            <div className="rounded-2xl border border-line bg-card p-5"><h2 className="text-lg font-black text-fg">{locale === "ko" ? "외부 제출 기록" : "External submissions"}</h2>{submissions.length === 0 ? <p className="mt-3 text-sm leading-6 text-fg-3">{locale === "ko" ? "아직 제출 기록이 없습니다." : "No submissions yet."}</p> : <div className="mt-3 space-y-2">{submissions.slice().reverse().map((submission) => <article key={submission.id} className="rounded-xl bg-panel/60 p-3"><p className="text-xs font-black text-fg">{submission.platform}</p><p className="mt-1 text-[0.68rem] text-fg-3">{submission.status} · revision {submission.sourceRevision}</p>{submission.externalUrl ? <a href={submission.externalUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-accent">{locale === "ko" ? "외부 작품 열기" : "Open external work"}<ExternalLink size={12} aria-hidden="true" /></a> : null}</article>)}</div>}</div>
+            <div className="rounded-2xl border border-line bg-card p-5"><h2 className="text-lg font-black text-fg">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "플랫폼별 내보내기", "Platform exports")}</h2><div className="mt-4 space-y-3">{STUDIO_EXPORT_PRESETS.map((preset) => <article key={preset.id} className="flex flex-col gap-3 rounded-xl border border-line bg-panel/55 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-black text-fg">{preset.labelKo}</h3><p className="mt-1 text-xs text-fg-3">{preset.exactWidth ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "en", "{v0}px"), { v0: String(preset.exactWidth) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "en", "max {v0}px"), { v0: String(preset.maxWidth ?? "—") })} · {preset.formats.join("/").toUpperCase()}</p></div>{activeProjects[0] ? <Link href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "en", "/studio/p/{v0}/export?preset={v1}"), { v0: String(encodeURIComponent(activeProjects[0].id)), v1: String(encodeURIComponent(preset.id)) })} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}><Upload size={14} aria-hidden="true" />{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "내보내기 열기", "Open export")}</Link> : null}</article>)}</div></div>
+            <div className="rounded-2xl border border-line bg-card p-5"><h2 className="text-lg font-black text-fg">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "외부 제출 기록", "External submissions")}</h2>{submissions.length === 0 ? <p className="mt-3 text-sm leading-6 text-fg-3">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "아직 제출 기록이 없습니다.", "No submissions yet.")}</p> : <div className="mt-3 space-y-2">{submissions.slice().reverse().map((submission) => <article key={submission.id} className="rounded-xl bg-panel/60 p-3"><p className="text-xs font-black text-fg">{submission.platform}</p><p className="mt-1 text-[0.68rem] text-fg-3">{submission.status} {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "en", "· revision ")}{submission.sourceRevision}</p>{submission.externalUrl ? <a href={submission.externalUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-accent">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "외부 작품 열기", "Open external work")}<ExternalLink size={12} aria-hidden="true" /></a> : null}</article>)}</div>}</div>
           </section>
         ) : null}
 
         {view === "publications" ? (
           <section className="mt-7 rounded-2xl border border-line bg-card p-5">
-            <div className="flex items-start gap-3"><span className="grid size-11 place-items-center rounded-xl bg-panel text-fg-2"><Send size={19} aria-hidden="true" /></span><div><h2 className="text-lg font-black text-fg">{locale === "ko" ? "게시는 선택 사항입니다" : "Publishing is optional"}</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-fg-2">{locale === "ko" ? "저장된 원본과 게시물은 별개입니다. 게시를 중단해도 비공개 원본은 유지됩니다." : "Saved originals and publications are separate. Unpublishing keeps the private original."}</p></div></div>
-            <div className="mt-5 space-y-3">{activeProjects.map((project) => { const profile = profiles.profileFor(project.id); return <article key={project.id} className="flex flex-col gap-3 rounded-xl border border-line bg-panel/50 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-black text-fg">{project.title}</h3><p className="mt-1 text-xs text-fg-3">{distributionLabel(profile, locale)} · {profile.accessMode === "public" ? "공개" : "나만 보기"}</p></div><Link href={`/studio/p/${encodeURIComponent(project.id)}/export?intent=publish`} className={buttonClass({ variant: "outline", size: "sm" })}>{locale === "ko" ? "배포 옵션 열기" : "Open distribution options"}</Link></article>; })}</div>
+            <div className="flex items-start gap-3"><span className="grid size-11 place-items-center rounded-xl bg-panel text-fg-2"><Send size={19} aria-hidden="true" /></span><div><h2 className="text-lg font-black text-fg">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "게시는 선택 사항입니다", "Publishing is optional")}</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-fg-2">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "저장된 원본과 게시물은 별개입니다. 게시를 중단해도 비공개 원본은 유지됩니다.", "Saved originals and publications are separate. Unpublishing keeps the private original.")}</p></div></div>
+            <div className="mt-5 space-y-3">{activeProjects.map((project) => { const profile = profiles.profileFor(project.id); return <article key={project.id} className="flex flex-col gap-3 rounded-xl border border-line bg-panel/50 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-black text-fg">{project.title}</h3><p className="mt-1 text-xs text-fg-3">{distributionLabel(profile, locale)} · {profile.accessMode === "public" ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "ko", "공개") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "ko", "나만 보기")}</p></div><Link href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "en", "/studio/p/{v0}/export?intent=publish"), { v0: String(encodeURIComponent(project.id)) })} className={buttonClass({ variant: "outline", size: "sm" })}>{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "배포 옵션 열기", "Open distribution options")}</Link></article>; })}</div>
           </section>
         ) : null}
 
         <footer className="mt-10 border-t border-line pt-5 text-xs leading-5 text-fg-3">
-          {locale === "ko" ? "저장, 백업, 내보내기, 외부 제출, ToonSpectrum 게시는 서로 독립적으로 관리됩니다." : "Saving, backup, export, external submission and ToonSpectrum publishing are managed independently."}
+          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "저장, 백업, 내보내기, 외부 제출, ToonSpectrum 게시는 서로 독립적으로 관리됩니다.", "Saving, backup, export, external submission and ToonSpectrum publishing are managed independently.")}
         </footer>
       </Container>
     </div>

@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Armchair,
   Box,
   Building2,
@@ -113,16 +117,13 @@ export function StudioBg3dProceduralStarterPanel({
             className="flex items-center gap-1.5 text-sm font-bold text-fg"
           >
             <Box size={15} className="shrink-0 text-accent" aria-hidden />
-            3D 캐릭터·배경·소품
-          </h3>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "3D 캐릭터·배경·소품")}</h3>
           <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-            포즈 캐릭터, 완성 배경, 상세 소품을 한 번에 삽입합니다. 모든 파츠를 개별 편집·재색상·재배치할 수 있습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "포즈 캐릭터, 완성 배경, 상세 소품을 한 번에 삽입합니다. 모든 파츠를 개별 편집·재색상·재배치할 수 있습니다.")}</p>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-good/35 bg-good/10 px-2 py-1 text-[0.62rem] font-bold text-good">
           <ShieldCheck size={12} aria-hidden />
-          오리지널 · CC0
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "오리지널 · CC0")}</span>
       </div>
 
       <div className="relative mt-3">
@@ -133,8 +134,8 @@ export function StudioBg3dProceduralStarterPanel({
         <input
           type="search"
           value={query}
-          aria-label="3D 에셋 검색"
-          placeholder="캐릭터, 교실, 카페, 카메라…"
+          aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "3D 에셋 검색")}
+          placeholder={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "캐릭터, 교실, 카페, 카메라…")}
           spellCheck={false}
           className="min-h-11 w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-2 text-xs text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
           onChange={(event) => {
@@ -148,7 +149,7 @@ export function StudioBg3dProceduralStarterPanel({
       <div
         className="mt-2 grid grid-cols-3 gap-1.5"
         role="radiogroup"
-        aria-label="블록아웃 프리셋 카테고리"
+        aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "블록아웃 프리셋 카테고리")}
       >
         {STUDIO_BG3D_PROCEDURAL_STARTER_CATEGORY_FILTERS.map((option) => (
           <button
@@ -174,8 +175,7 @@ export function StudioBg3dProceduralStarterPanel({
       </div>
 
       <p className="mt-2 text-[0.64rem] font-medium text-fg-3" aria-live="polite">
-        {filteredAssets.length}개 3D 에셋 · 파츠별 편집
-      </p>
+        {filteredAssets.length}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "개 3D 에셋 · 파츠별 편집")}</p>
 
       {disabledReason ? (
         <p className="mt-2 flex items-start gap-1.5 rounded-lg border border-warn/40 bg-warn/10 px-2.5 py-2 text-[0.68rem] leading-relaxed text-warn">
@@ -186,8 +186,8 @@ export function StudioBg3dProceduralStarterPanel({
 
       {notice ? (
         <p
-          role={notice.tone === "error" ? "alert" : "status"}
-          aria-live={notice.tone === "error" ? "assertive" : "polite"}
+          role={notice.tone === "error" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "en", "status")}
+          aria-live={notice.tone === "error" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "en", "assertive") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "en", "polite")}
           className={cx(
             "mt-2 flex items-start gap-1.5 rounded-lg border px-2.5 py-2 text-[0.68rem] leading-relaxed",
             notice.tone === "success"
@@ -206,8 +206,7 @@ export function StudioBg3dProceduralStarterPanel({
 
       {visibleAssets.length === 0 ? (
         <div className="mt-3 rounded-lg border border-dashed border-line bg-card/45 px-3 py-4 text-center text-xs leading-relaxed text-fg-3">
-          검색과 카테고리에 맞는 3D 에셋이 없습니다.
-          <button
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "검색과 카테고리에 맞는 3D 에셋이 없습니다.")}<button
             type="button"
             className="mt-2 min-h-11 w-full rounded-lg border border-line bg-panel px-3 text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
             onClick={() => {
@@ -216,8 +215,7 @@ export function StudioBg3dProceduralStarterPanel({
               setShowAll(false);
             }}
           >
-            검색·필터 초기화
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "검색·필터 초기화")}</button>
         </div>
       ) : (
         <div className="mt-3 grid grid-cols-2 gap-2">
@@ -228,7 +226,7 @@ export function StudioBg3dProceduralStarterPanel({
               <button
                 key={asset.id}
                 type="button"
-                aria-label={`${asset.label} 장면에 추가`}
+                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "{v0} 장면에 추가"), { v0: String(asset.label) })}
                 aria-describedby={descriptionId}
                 disabled={Boolean(disabledReason)}
                 className="group min-h-[9rem] overflow-hidden rounded-lg border border-line bg-card text-left transition-colors hover:border-accent/45 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
@@ -265,8 +263,7 @@ export function StudioBg3dProceduralStarterPanel({
                       {STUDIO_BG3D_PROCEDURAL_STARTER_CATEGORY_LABELS[asset.category]}
                     </span>
                     <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.6rem] font-bold text-accent">
-                      {asset.budget.nodes} 파츠
-                    </span>
+                      {asset.budget.nodes} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "파츠")}</span>
                     <span className="rounded-full bg-raised px-1.5 py-0.5 text-[0.6rem] font-bold text-fg-3">
                       {asset.budget.triangles.toLocaleString("ko-KR")}△
                     </span>
@@ -284,22 +281,19 @@ export function StudioBg3dProceduralStarterPanel({
           className="mt-3 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs font-bold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
           onClick={() => setShowAll(true)}
         >
-          3D 에셋 {hiddenCount}개 더 보기
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "3D 에셋 ")}{hiddenCount}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "개 더 보기")}</button>
       ) : showAll && filteredAssets.length > FIRST_PAGE_SIZE ? (
         <button
           type="button"
           className="mt-3 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs font-bold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
           onClick={() => setShowAll(false)}
         >
-          처음 {FIRST_PAGE_SIZE}개만 보기
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "처음 ")}{FIRST_PAGE_SIZE}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "개만 보기")}</button>
       ) : null}
 
       <p className="mt-2 text-[0.62rem] leading-relaxed text-fg-3">
-        {STUDIO_BG3D_PROCEDURAL_STARTER_PACK.provenance.author} 직접 제작 ·{" "}
-        {STUDIO_BG3D_PROCEDURAL_STARTER_PACK.provenance.license.label} · 출처 표기 불필요
-      </p>
+        {STUDIO_BG3D_PROCEDURAL_STARTER_PACK.provenance.author} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "직접 제작 ·")}{" "}
+        {STUDIO_BG3D_PROCEDURAL_STARTER_PACK.provenance.license.label} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProceduralStarterPanel", "ko", "· 출처 표기 불필요")}</p>
     </section>
   );
 }

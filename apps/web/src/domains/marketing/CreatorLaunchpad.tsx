@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   Box,
   Brush,
@@ -60,7 +65,7 @@ function rememberHref(href: string): void {
 }
 
 export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }) {
-  const copy = CREATOR_LAUNCHPAD_COPY[locale];
+  const copy = translateLocaleBranchForLocale(locale, "domains.marketing.CreatorLaunchpad", CREATOR_LAUNCHPAD_COPY);
   const continuity = useSyncExternalStore(
     subscribeCreatorContinuity,
     getCreatorContinuitySnapshot,
@@ -133,10 +138,8 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
       ? copy.install
       : copy.installHelp;
   const swReady = pwa.serviceWorkerStatus === "active" || pwa.serviceWorkerStatus === "update-waiting";
-  const drawingInstallLabel = locale === "ko" ? "순수 드로잉 앱 설치" : "Install ToonStudio Draw";
-  const drawingInstallBody = locale === "ko"
-    ? "별도 간이 편집기가 아니라 현재 Studio와 동일한 문서·브러시·레이어·저장 엔진을 캔버스 중심 앱 UI로 설치합니다."
-    : "Installs the same Studio document, brush, layer and save engine with canvas-first app chrome — not a separate lightweight editor.";
+  const drawingInstallLabel = translateBilingualValueForLocale(locale, "domains.marketing.CreatorLaunchpad", "순수 드로잉 앱 설치", "Install ToonStudio Draw");
+  const drawingInstallBody = translateBilingualValueForLocale(locale, "domains.marketing.CreatorLaunchpad", "별도 간이 편집기가 아니라 현재 Studio와 동일한 문서·브러시·레이어·저장 엔진을 캔버스 중심 앱 UI로 설치합니다.", "Installs the same Studio document, brush, layer and save engine with canvas-first app chrome — not a separate lightweight editor.");
 
   return (
     <section className="clp" aria-labelledby="creator-continuity-title" data-creator-launchpad="v1">
@@ -242,7 +245,7 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
             </div>
             <p>{copy.installBody}</p>
             <div className="clp-statuses">
-              <span className={pwa.online ? "is-ready" : "is-warning"}>{pwa.online ? <Wifi size={14} aria-hidden="true" /> : <WifiOff size={14} aria-hidden="true" />}{pwa.online ? copy.online : copy.offline}</span>
+              <span className={pwa.online ? translateCurrentStaticSourceText("domains.marketing.CreatorLaunchpad", "en", "is-ready") : translateCurrentStaticSourceText("domains.marketing.CreatorLaunchpad", "en", "is-warning")}>{pwa.online ? <Wifi size={14} aria-hidden="true" /> : <WifiOff size={14} aria-hidden="true" />}{pwa.online ? copy.online : copy.offline}</span>
               {swReady && <span className="is-ready"><Check size={14} aria-hidden="true" />{pwa.serviceWorkerStatus === "update-waiting" ? copy.updateReady : copy.offlineReady}</span>}
               {pwa.status === "available" && <span className="is-ready"><Download size={14} aria-hidden="true" />{copy.installReady}</span>}
             </div>

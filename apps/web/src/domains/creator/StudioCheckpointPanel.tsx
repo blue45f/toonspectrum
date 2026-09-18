@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   BookmarkPlus,
   Cloud,
@@ -411,10 +415,9 @@ export function StudioCheckpointPanel({
             <History size={18} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 id={dialogTitleId} className="text-base font-bold tracking-tight text-fg">저장 기록</h2>
+            <h2 id={dialogTitleId} className="text-base font-bold tracking-tight text-fg">{translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "저장 기록")}</h2>
             <p id={dialogDescriptionId} className="mt-0.5 text-xs leading-relaxed text-fg-3">
-              지금 그림을 남겨 두거나 이전 그림을 다시 열 수 있어요. 이 기기와 계정의 기록을 구분해 보여 드립니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "지금 그림을 남겨 두거나 이전 그림을 다시 열 수 있어요. 이 기기와 계정의 기록을 구분해 보여 드립니다.")}</p>
           </div>
           <button
             ref={closeButtonRef}
@@ -423,7 +426,7 @@ export function StudioCheckpointPanel({
               if (!interactionLocked) onClose();
             }}
             disabled={interactionLocked}
-            aria-label="저장 기록 닫기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "저장 기록 닫기")}
             className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg disabled:cursor-wait disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <X size={15} aria-hidden />
@@ -433,7 +436,7 @@ export function StudioCheckpointPanel({
         <div
           id={tabListId}
           role="tablist"
-          aria-label="버전 저장 위치"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "버전 저장 위치")}
           className="grid shrink-0 grid-cols-2 gap-1 border-b border-line bg-card/25 p-2"
         >
           <button
@@ -441,41 +444,37 @@ export function StudioCheckpointPanel({
             type="button"
             role="tab"
             aria-selected={visibleTab === "local"}
-            aria-controls={`${tabListId}-local-panel`}
+            aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "en", "{v0}-local-panel"), { v0: String(tabListId) })}
             tabIndex={visibleTab === "local" ? 0 : -1}
             disabled={interactionLocked}
             onKeyDown={handleTabKeyDown}
             onClick={() => activateTab("local")}
-            className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-xs font-semibold transition-colors ${
-              visibleTab === "local" ? "bg-panel text-fg shadow-sm" : "text-fg-3 hover:bg-raised"
-            }`}
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "en", "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-xs font-semibold transition-colors {v0}"), { v0: String(visibleTab === "local" ? "bg-panel text-fg shadow-sm" : "text-fg-3 hover:bg-raised") })}
           >
-            <HardDrive size={15} aria-hidden /> 이 기기에 저장 {checkpoints.length}
+            <HardDrive size={15} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "이 기기에 저장 ")}{checkpoints.length}
           </button>
           <button
             ref={serverTabRef}
             type="button"
             role="tab"
             aria-selected={visibleTab === "server"}
-            aria-controls={`${tabListId}-server-panel`}
+            aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "en", "{v0}-server-panel"), { v0: String(tabListId) })}
             aria-disabled={!serverAvailable}
             tabIndex={visibleTab === "server" ? 0 : -1}
             disabled={!serverAvailable || interactionLocked}
             onKeyDown={handleTabKeyDown}
             onClick={() => activateTab("server")}
-            className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
-              visibleTab === "server" ? "bg-panel text-fg shadow-sm" : "text-fg-3 hover:bg-raised"
-            }`}
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "en", "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45 {v0}"), { v0: String(visibleTab === "server" ? "bg-panel text-fg shadow-sm" : "text-fg-3 hover:bg-raised") })}
           >
-            <Cloud size={15} aria-hidden /> 계정의 저장 기록 {serverRevisions.length}
+            <Cloud size={15} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "계정의 저장 기록 ")}{serverRevisions.length}
           </button>
         </div>
 
         {comparisonVisible && selectedServerRevision ? (
           <div
-            id={`${tabListId}-server-panel`}
+            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "en", "{v0}-server-panel"), { v0: String(tabListId) })}
             role="tabpanel"
-            aria-label={`서버 revision ${selectedServerRevision.revision} 변경 검토`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "서버 revision {v0} 변경 검토"), { v0: String(selectedServerRevision.revision) })}
             className="flex min-h-0 flex-1 flex-col"
           >
             <StudioRevisionCompareView
@@ -504,9 +503,9 @@ export function StudioCheckpointPanel({
           </div>
         ) : (
         <div
-          id={`${tabListId}-${visibleTab}-panel`}
+          id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "en", "{v0}-{v1}-panel"), { v0: String(tabListId), v1: String(visibleTab) })}
           role="tabpanel"
-          aria-label={visibleTab === "local" ? "이 기기의 저장 기록" : "계정의 저장 기록"}
+          aria-label={visibleTab === "local" ? translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "이 기기의 저장 기록") : translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "계정의 저장 기록")}
           className="flex min-h-0 flex-1 flex-col"
         >
         {visibleTab === "local" ? <form
@@ -519,12 +518,11 @@ export function StudioCheckpointPanel({
           }}
         >
           <label className="min-w-[12rem] flex-1 text-xs font-semibold text-fg-2">
-            기록 이름 (선택)
-            <input
+            {translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "기록 이름 (선택)")}<input
               value={name}
               onChange={(event) => setName(event.target.value.slice(0, 80))}
               maxLength={80}
-              placeholder="예: 1화 대사 수정 전"
+              placeholder={translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "예: 1화 대사 수정 전")}
               className="mt-1.5 min-h-11 w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent"
             />
           </label>
@@ -532,8 +530,7 @@ export function StudioCheckpointPanel({
             type="submit"
             className="mt-auto inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-semibold text-on-accent hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-45"
           >
-            <BookmarkPlus size={14} aria-hidden /> 지금 상태 저장
-          </button>
+            <BookmarkPlus size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "지금 상태 저장")}</button>
         </form> : null}
 
         {visibleError && (
@@ -548,12 +545,12 @@ export function StudioCheckpointPanel({
             <div className="grid min-h-48 place-items-center rounded-xl border border-dashed border-line bg-card/30 px-4 text-center">
               <div>
                 <History size={24} className="mx-auto text-fg-3" aria-hidden />
-                <p className="mt-2 text-sm font-semibold text-fg-2">아직 저장한 기록이 없어요</p>
-                <p className="mt-1 text-xs text-fg-3">큰 편집이나 AI 적용 전에 하나 만들어 두면 안전합니다.</p>
+                <p className="mt-2 text-sm font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "아직 저장한 기록이 없어요")}</p>
+                <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "큰 편집이나 AI 적용 전에 하나 만들어 두면 안전합니다.")}</p>
               </div>
             </div>
           ) : (
-            <ol className="space-y-2" aria-label="저장된 그림 기록">
+            <ol className="space-y-2" aria-label={translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "저장된 그림 기록")}>
               {checkpoints.map((checkpoint) => (
                 <li
                   key={checkpoint.id}
@@ -570,12 +567,11 @@ export function StudioCheckpointPanel({
                     onClick={() => onRestore(checkpoint)}
                     className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft/25 px-3 text-xs font-semibold text-accent hover:bg-accent-soft/45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
-                    <RotateCcw size={12} aria-hidden /> 이 시점 복원
-                  </button>
+                    <RotateCcw size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "이 시점 복원")}</button>
                   <button
                     type="button"
                     onClick={() => onDelete(checkpoint)}
-                    aria-label={`${checkpoint.name} 저장 기록 삭제`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "{v0} 저장 기록 삭제"), { v0: String(checkpoint.name) })}
                     className="grid size-11 place-items-center rounded-lg border border-line text-fg-3 hover:border-bad/45 hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bad"
                   >
                     <Trash2 size={13} aria-hidden />
@@ -587,10 +583,9 @@ export function StudioCheckpointPanel({
             <div>
               <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-card/45 px-3 py-2.5">
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-fg">현재 서버 revision {serverCurrentRevision}</p>
+                  <p className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "현재 서버 revision ")}{serverCurrentRevision}</p>
                   <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    저장마다 자동 생성하며 최신 20개를 보존합니다. 다른 창이 먼저 저장하면 덮어쓰지 않고 충돌을 알려요.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "저장마다 자동 생성하며 최신 20개를 보존합니다. 다른 창이 먼저 저장하면 덮어쓰지 않고 충돌을 알려요.")}</p>
                 </div>
                 <button
                   type="button"
@@ -598,23 +593,22 @@ export function StudioCheckpointPanel({
                   disabled={serverLoading}
                   className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-panel px-3 text-xs font-semibold text-fg-2 hover:bg-raised disabled:cursor-wait disabled:opacity-55"
                 >
-                  <RefreshCw size={13} className={serverLoading ? "animate-spin" : undefined} aria-hidden /> 새로고침
-                </button>
+                  <RefreshCw size={13} className={serverLoading ? translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "en", "animate-spin") : undefined} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "새로고침")}</button>
               </div>
               {serverLoading && serverRevisions.length === 0 ? (
                 <div className="grid min-h-48 place-items-center text-center text-xs text-fg-3">
-                  <div><RefreshCw size={22} className="mx-auto mb-2 animate-spin" aria-hidden />서버 버전을 불러오는 중…</div>
+                  <div><RefreshCw size={22} className="mx-auto mb-2 animate-spin" aria-hidden />{translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "서버 버전을 불러오는 중…")}</div>
                 </div>
               ) : serverRevisions.length === 0 ? (
                 <div className="grid min-h-48 place-items-center rounded-xl border border-dashed border-line bg-card/30 px-4 text-center">
                   <div>
                     <Cloud size={24} className="mx-auto text-fg-3" aria-hidden />
-                    <p className="mt-2 text-sm font-semibold text-fg-2">아직 서버에 저장된 버전이 없어요</p>
-                    <p className="mt-1 text-xs text-fg-3">로그인한 작품을 저장하면 자동 revision이 생성됩니다.</p>
+                    <p className="mt-2 text-sm font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "아직 서버에 저장된 버전이 없어요")}</p>
+                    <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "로그인한 작품을 저장하면 자동 revision이 생성됩니다.")}</p>
                   </div>
                 </div>
               ) : (
-                <ol className="space-y-2" aria-label="계정의 저장 기록">
+                <ol className="space-y-2" aria-label={translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "계정의 저장 기록")}>
                   {serverRevisions.map((revision) => {
                     const current = revision.revision === serverCurrentRevision;
                     return (
@@ -624,12 +618,11 @@ export function StudioCheckpointPanel({
                       >
                         <div className="min-w-0 flex-1">
                           <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-fg">
-                            revision {revision.revision}
-                            {current ? <span className="rounded-full bg-good-soft px-2 py-0.5 text-[0.62rem] text-good">현재</span> : null}
+                            {translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "en", "revision ")}{revision.revision}
+                            {current ? <span className="rounded-full bg-good-soft px-2 py-0.5 text-[0.62rem] text-good">{translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "현재")}</span> : null}
                             {revision.restoredFromRevision ? (
                               <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[0.62rem] text-accent">
-                                r{revision.restoredFromRevision}에서 복원
-                              </span>
+                                r{revision.restoredFromRevision}{translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "에서 복원")}</span>
                             ) : null}
                           </p>
                           <time dateTime={revision.createdAt} className="mt-0.5 block text-[0.68rem] text-fg-3">
@@ -642,7 +635,7 @@ export function StudioCheckpointPanel({
                           disabled={current || serverLoading}
                           className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft/25 px-3 text-xs font-semibold text-accent hover:bg-accent-soft/45 disabled:cursor-not-allowed disabled:opacity-45"
                         >
-                          <History size={12} aria-hidden /> {current ? "현재 버전" : "변경 검토"}
+                          <History size={12} aria-hidden /> {current ? translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "현재 버전") : translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "변경 검토")}
                         </button>
                       </li>
                     );
@@ -655,8 +648,8 @@ export function StudioCheckpointPanel({
 
         <p className="shrink-0 border-t border-line px-4 py-2 text-[0.68rem] leading-relaxed text-fg-3">
           {visibleTab === "local"
-            ? `이 기기에 저장은 기기 변경에 유지되지 않으므로 JSON 또는 프로젝트 archive도 함께 보관하세요. 최신 ${STUDIO_CHECKPOINT_LIMIT}개까지 저장합니다.`
-            : "서버 복원은 기존 revision을 덮어쓰지 않고 새 revision으로 기록됩니다. 작품 소유자에게만 목록과 내용이 열립니다."}
+            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "이 기기에 저장은 기기 변경에 유지되지 않으므로 JSON 또는 프로젝트 archive도 함께 보관하세요. 최신 {v0}개까지 저장합니다."), { v0: String(STUDIO_CHECKPOINT_LIMIT) })
+            : translateCurrentStaticSourceText("domains.creator.StudioCheckpointPanel", "ko", "서버 복원은 기존 revision을 덮어쓰지 않고 새 revision으로 기록됩니다. 작품 소유자에게만 목록과 내용이 열립니다.")}
         </p>
         </div>
         )}

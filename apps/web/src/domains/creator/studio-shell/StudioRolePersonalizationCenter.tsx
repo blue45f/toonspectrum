@@ -1,4 +1,10 @@
 import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   ArrowRight,
   Bell,
@@ -149,7 +155,7 @@ const PRODUCTION_ROLE_LABELS: Readonly<Record<CreatorProductionRole, string>> = 
 };
 
 function localized(locale: CreatorRoleLocale, ko: string, en: string): string {
-  return locale === "ko" ? ko : en;
+  return translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioRolePersonalizationCenter", ko, en);
 }
 
 function Card({
@@ -644,7 +650,7 @@ export function StudioRolePersonalizationCenter({
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-accent">
             <Workflow size={16} aria-hidden="true" />
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.15em]">ROLE OPERATIONS</p>
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.15em]">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRolePersonalizationCenter", "en", "ROLE OPERATIONS")}</p>
           </div>
           <h2 id="role-personalization-title" className="mt-2 text-xl font-black tracking-tight text-fg">
             {localized(locale, "내 직무·업무 작업실", "My role and work workspace")}
@@ -713,7 +719,7 @@ export function StudioRolePersonalizationCenter({
                     ? "border-good/30 bg-good/10 text-good"
                     : "border-line bg-panel",
               )}>
-                {locale === "ko" ? label : ["Role", "Specialties", "Goals", "Privacy"][index]}
+                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioRolePersonalizationCenter", label, ["Role", "Specialties", "Goals", "Privacy"][index])}
               </li>
             ))}
           </ol>
@@ -796,7 +802,7 @@ export function StudioRolePersonalizationCenter({
                       : [...current, goal]
                   ))}
                 >
-                  {USAGE_GOAL_LABELS[goal][locale]}
+                  {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioRolePersonalizationCenter", USAGE_GOAL_LABELS[goal])}
                 </ToggleChip>
               ))}
             </div>
@@ -1032,7 +1038,7 @@ export function StudioRolePersonalizationCenter({
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {item.reasons.map((reason) => (
                           <span key={reason} className="rounded-full border border-line px-2 py-0.5 text-[0.65rem] font-semibold text-fg-2">
-                            {WORK_REASON_LABELS[reason][locale]}
+                            {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioRolePersonalizationCenter", WORK_REASON_LABELS[reason])}
                           </span>
                         ))}
                       </div>
@@ -1135,7 +1141,7 @@ export function StudioRolePersonalizationCenter({
                   },
                 })}
               >
-                {NOTIFICATION_LABELS[event][locale]}
+                {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioRolePersonalizationCenter", NOTIFICATION_LABELS[event])}
               </ToggleChip>
             ))}
           </div>
@@ -1148,7 +1154,7 @@ export function StudioRolePersonalizationCenter({
         >
           <div className="grid gap-2 sm:grid-cols-2">
             {aiTools.map((tool) => (
-              <Link key={tool.id} href={`${tool.href}&projectKey=${encodeURIComponent(projectKey)}&role=${encodeURIComponent(activeRole ?? "creator")}`} className="rounded-xl border border-line bg-panel p-3 transition-colors hover:border-accent/35 hover:bg-raised">
+              <Link key={tool.id} href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRolePersonalizationCenter", "en", "{v0}&projectKey={v1}&role={v2}"), { v0: String(tool.href), v1: String(encodeURIComponent(projectKey)), v2: String(encodeURIComponent(activeRole ?? "creator")) })} className="rounded-xl border border-line bg-panel p-3 transition-colors hover:border-accent/35 hover:bg-raised">
                 <span className="text-xs font-black text-fg">
                   {localized(locale, tool.titleKo, tool.titleEn)}
                 </span>
@@ -1176,9 +1182,9 @@ export function StudioRolePersonalizationCenter({
               })}
               className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg"
             >
-              <option value="guided">Guided · {localized(locale, "안내 중심", "more guidance")}</option>
-              <option value="creator">Creator · {localized(locale, "균형형", "balanced")}</option>
-              <option value="production">Production · {localized(locale, "고밀도", "high density")}</option>
+              <option value="guided">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRolePersonalizationCenter", "en", "Guided · ")}{localized(locale, "안내 중심", "more guidance")}</option>
+              <option value="creator">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRolePersonalizationCenter", "en", "Creator · ")}{localized(locale, "균형형", "balanced")}</option>
+              <option value="production">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRolePersonalizationCenter", "en", "Production · ")}{localized(locale, "고밀도", "high density")}</option>
             </select>
             <span className="mt-1.5 block text-[0.68rem] font-normal leading-5 text-fg-3">
               {localized(locale, "Studio를 열 때 Guided/Creator는 단순 화면, Production은 전체 패널 밀도로 연결됩니다.", "Guided and Creator open a simplified Studio layout, while Production opens the full-density layout.")}
@@ -1197,7 +1203,7 @@ export function StudioRolePersonalizationCenter({
                       : [...globalDocument.usageGoals, goal],
                   })}
                 >
-                  {USAGE_GOAL_LABELS[goal][locale]}
+                  {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioRolePersonalizationCenter", USAGE_GOAL_LABELS[goal])}
                 </ToggleChip>
               ))}
             </div>
@@ -1295,7 +1301,7 @@ export function StudioRolePersonalizationCenter({
         {directory ? (
           <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {directory.items.map((candidate) => (
-              <Link key={candidate.userId} href={`/users/${encodeURIComponent(candidate.userId)}`} className="rounded-xl border border-line bg-panel p-3 transition-colors hover:border-accent/35">
+              <Link key={candidate.userId} href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRolePersonalizationCenter", "en", "/users/{v0}"), { v0: String(encodeURIComponent(candidate.userId)) })} className="rounded-xl border border-line bg-panel p-3 transition-colors hover:border-accent/35">
                 <p className="text-xs font-black text-fg">{candidate.name}</p>
                 <p className="mt-1 text-[0.7rem] font-semibold text-accent">
                   {candidate.customRoleLabel

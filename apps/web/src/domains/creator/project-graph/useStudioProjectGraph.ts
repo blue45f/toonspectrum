@@ -1,3 +1,6 @@
+import {
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { httpStatus } from "@/infrastructure/api";
@@ -46,15 +49,13 @@ async function fetchStudioProject(identifier: string): Promise<StudioProjectReco
   }
 }
 
-function readableError(locale: "ko" | "en"): string {
-  return locale === "ko"
-    ? "클라우드 작품 상태를 확인하지 못했습니다. 로컬 원고와 자동 복구 데이터는 그대로 유지됩니다."
-    : "Cloud project state could not be checked. Local documents and recovery data remain unchanged.";
+function readableError(locale: string): string {
+  return translateBilingualValueForLocale(locale, "domains.creator.project.graph.useStudioProjectGraph", "클라우드 작품 상태를 확인하지 못했습니다. 로컬 원고와 자동 복구 데이터는 그대로 유지됩니다.", "Cloud project state could not be checked. Local documents and recovery data remain unchanged.");
 }
 
 export function useStudioProjectGraph(
   identifier: string,
-  locale: "ko" | "en",
+  locale: string,
 ): StudioProjectGraphController {
   const [project, setProject] = useState<StudioProjectRecord | null>(null);
   const [status, setStatus] = useState<StudioProjectGraphStatus>("loading");

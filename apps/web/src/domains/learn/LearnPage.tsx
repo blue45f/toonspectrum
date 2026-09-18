@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Link, useLocation } from "react-router-dom";
 
 import { EducationDirectoryPage } from "./EducationDirectoryPage";
@@ -21,14 +25,14 @@ const REFERENCE_LINKS = [
 
 function LearningReferenceNavigation({ pathname }: { readonly pathname: string }) {
   return (
-    <nav className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 pt-4 sm:px-6" lang="ko" aria-label="웹툰 제작·진로·교육 안내">
-      <span className="mr-1 text-xs font-bold tracking-[.12em] text-fg-2">제작·진로 안내</span>
+    <nav className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 pt-4 sm:px-6" lang="ko" aria-label={translateCurrentStaticSourceText("domains.learn.LearnPage", "ko", "웹툰 제작·진로·교육 안내")}>
+      <span className="mr-1 text-xs font-bold tracking-[.12em] text-fg-2">{translateCurrentStaticSourceText("domains.learn.LearnPage", "ko", "제작·진로 안내")}</span>
       {REFERENCE_LINKS.map((item) => (
         <Link
           key={item.path}
-          className={`inline-flex min-h-10 items-center rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${pathname === item.path ? "border-accent bg-accent-soft text-accent" : "border-line bg-panel text-fg hover:bg-raised"}`}
+          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.learn.LearnPage", "en", "inline-flex min-h-10 items-center rounded-full border px-4 py-2 text-sm font-semibold transition-colors {v0}"), { v0: String(pathname === item.path ? "border-accent bg-accent-soft text-accent" : "border-line bg-panel text-fg hover:bg-raised") })}
           to={item.path}
-          aria-current={pathname === item.path ? "page" : undefined}
+          aria-current={pathname === item.path ? translateCurrentStaticSourceText("domains.learn.LearnPage", "en", "page") : undefined}
         >
           {item.label}
         </Link>
@@ -39,8 +43,8 @@ function LearningReferenceNavigation({ pathname }: { readonly pathname: string }
 
 function LearningRecordShortcut() {
   return (
-    <aside className="learn-record-shortcut" lang="ko" aria-label="학습 기록 관리">
-      <Link to="/learn/records">내 학습 기록 · 백업 / 복원 →</Link>
+    <aside className="learn-record-shortcut" lang="ko" aria-label={translateCurrentStaticSourceText("domains.learn.LearnPage", "ko", "학습 기록 관리")}>
+      <Link to="/learn/records">{translateCurrentStaticSourceText("domains.learn.LearnPage", "ko", "내 학습 기록 · 백업 / 복원 →")}</Link>
     </aside>
   );
 }

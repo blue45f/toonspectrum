@@ -1,3 +1,7 @@
+import {
+  translateBilingualValueForLocale,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { type ReactNode } from "react";
 
 import { CREATOR_HOME_SECTIONS, focusCreatorSection, isPlainCreatorJump, type CreatorHomeSectionId } from "./creator-home-navigation";
@@ -22,17 +26,17 @@ export function CreatorSectionLink({ sectionId, className, children }: {
   );
 }
 
-export function CreatorHomeNavigation({ locale }: { locale: "ko" | "en" }) {
+export function CreatorHomeNavigation({ locale }: { locale: string }) {
   useCreatorHomeSectionNavigation();
 
-  const label = locale === "ko" ? "툰스튜디오 소개 바로가기" : "Explore the ToonStudio introduction";
+  const label = translateBilingualValueForLocale(locale, "domains.marketing.CreatorHomeNavigation", "툰스튜디오 소개 바로가기", "Explore the ToonStudio introduction");
   return (
     <nav className="ch-jump-nav" aria-label={label}>
-      <span className="ch-jump-label">{locale === "ko" ? "필요한 곳으로 바로 이동하세요." : "Jump to the part you need."}</span>
+      <span className="ch-jump-label">{translateBilingualValueForLocale(locale, "domains.marketing.CreatorHomeNavigation", "필요한 곳으로 바로 이동하세요.", "Jump to the part you need.")}</span>
       <div className="ch-jump-links">
         {CREATOR_HOME_SECTIONS.map((section) => (
           <CreatorSectionLink key={section.id} sectionId={section.id}>
-            {section[locale]}<span aria-hidden="true">↘</span>
+            {translateLocaleBranchForLocale(locale, "domains.marketing.CreatorHomeNavigation", section)}<span aria-hidden="true">↘</span>
           </CreatorSectionLink>
         ))}
       </div>

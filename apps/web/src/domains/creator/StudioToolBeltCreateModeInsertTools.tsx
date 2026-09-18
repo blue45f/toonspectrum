@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ImagePlus,
   Library,
@@ -61,12 +62,12 @@ export const StudioToolBeltCreateModeInsertTools = memo(
 
     return (
       <>
-        <StudioToolbarDivider label="삽입" />
-        <StudioToolbarCluster label="삽입·대사">
+        <StudioToolbarDivider label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "삽입")} />
+        <StudioToolbarCluster label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "삽입·대사")}>
           <StudioToolBeltHintTarget hint={hints.assets}>
             <button
               type="button"
-              aria-label="삽입 허브 열기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "삽입 허브 열기")}
               onClick={() => setMenu(menu === "asset" ? null : "asset")}
               onPointerEnter={preloadStudioAssetToolPopoverBody}
               onPointerDown={preloadStudioAssetToolPopoverBody}
@@ -81,8 +82,7 @@ export const StudioToolBeltCreateModeInsertTools = memo(
                 aria-hidden
                 className={studioToolIconClass({ active: menu === "asset" })}
               />
-              삽입
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "삽입")}</button>
           </StudioToolBeltHintTarget>
           <StudioToolBeltHintTarget hint={hints.text}>
             <button
@@ -105,8 +105,7 @@ export const StudioToolBeltCreateModeInsertTools = memo(
                 aria-hidden
                 className={studioToolIconClass()}
               />{" "}
-              텍스트
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "텍스트")}</button>
           </StudioToolBeltHintTarget>
           <div
             ref={menu === "bubble" ? menuRef : undefined}
@@ -131,8 +130,7 @@ export const StudioToolBeltCreateModeInsertTools = memo(
                     active: menu === "bubble",
                   })}
                 />
-                말풍선
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "말풍선")}</button>
             </StudioToolBeltHintTarget>
             <StudioFloatingToolPopover
               open={menu === "bubble"}
@@ -141,7 +139,7 @@ export const StudioToolBeltCreateModeInsertTools = memo(
             >
               <Suspense
                 fallback={
-                  <StudioPanelLoading label="말풍선 메뉴를 여는 중..." />
+                  <StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "말풍선 메뉴를 여는 중...")} />
                 }
               >
                 <LazyStudioBubbleToolPopoverBody toolBelt={toolBelt} />
@@ -161,8 +159,7 @@ export const StudioToolBeltCreateModeInsertTools = memo(
                 aria-hidden
                 className={studioToolIconClass({ tone: "default" })}
               />
-              이미지
-              <input
+              {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "이미지")}<input
                 type="file"
                 accept={studioCanvasImageAccept}
                 className="sr-only"
@@ -177,7 +174,7 @@ export const StudioToolBeltCreateModeInsertTools = memo(
               aria-hidden
               className={studioToolIconClass({ tone: "default" })}
             />
-            <span className="sr-only sm:not-sr-only sm:inline">색</span>
+            <span className="sr-only sm:not-sr-only sm:inline">{translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "색")}</span>
             <LazyStudioColorPopover
               value={color}
               onChange={(nextColor) => {
@@ -190,7 +187,7 @@ export const StudioToolBeltCreateModeInsertTools = memo(
               onLoadRecentColors={() => {
                 stableEnsureRecentColorsLoaded();
               }}
-              label="브러시·도형 색상"
+              label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeInsertTools", "ko", "브러시·도형 색상")}
               purpose="brush-shape"
             />
           </span>

@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Layer Border Effect Panel
  * CSP 경계 효과(境界効果/fuchi) — 선택한 이미지 레이어의 비파괴 테두리 설정.
@@ -65,28 +66,26 @@ export function StudioLayerBorderEffectPanel({
   return (
     <section
       role="group"
-      aria-label="레이어 경계 효과"
+      aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerBorderEffectPanel", "ko", "레이어 경계 효과")}
       data-studio-layer-border-effect-panel
       className="shrink-0 space-y-2 rounded-xl border border-line bg-panel/40 p-2.5"
     >
       <div className="flex items-center justify-between gap-2">
         <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
-          경계 효과 (레이어 테두리)
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerBorderEffectPanel", "ko", "경계 효과 (레이어 테두리)")}</p>
         <label className="flex cursor-pointer items-center gap-1.5 text-xs text-fg-2">
           <input
             type="checkbox"
-            aria-label="경계 효과 사용"
+            aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerBorderEffectPanel", "ko", "경계 효과 사용")}
             className="accent-accent"
             checked={current.enabled}
             disabled={disabled}
             onChange={(e) => patch({ enabled: e.target.checked })}
           />
-          사용
-        </label>
+          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerBorderEffectPanel", "ko", "사용")}</label>
       </div>
 
-      <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="경계 효과 종류">
+      <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerBorderEffectPanel", "ko", "경계 효과 종류")}>
         {BORDER_TYPE_OPTIONS.map((option) => (
           <button
             key={option.id}
@@ -107,11 +106,11 @@ export function StudioLayerBorderEffectPanel({
       </div>
 
       <label className={LABEL_ROW}>
-        <span>굵기</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerBorderEffectPanel", "ko", "굵기")}</span>
         <span className="flex items-center gap-1.5">
           <input
             type="range"
-            aria-label="경계 굵기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerBorderEffectPanel", "ko", "경계 굵기")}
             min={STUDIO_LAYER_BORDER_EFFECT_THICKNESS_RANGE.min}
             max={STUDIO_LAYER_BORDER_EFFECT_THICKNESS_RANGE.max}
             step={1}
@@ -125,10 +124,10 @@ export function StudioLayerBorderEffectPanel({
       </label>
 
       <div className={LABEL_ROW}>
-        <span>색</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerBorderEffectPanel", "ko", "색")}</span>
         <input
           type="color"
-          aria-label="경계 색"
+          aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerBorderEffectPanel", "ko", "경계 색")}
           value={colorInputValue(current.color)}
           disabled={controlsDisabled}
           onChange={(e) => patch({ color: e.target.value })}
@@ -139,14 +138,13 @@ export function StudioLayerBorderEffectPanel({
       <label className="flex cursor-pointer items-center gap-1.5 text-xs text-fg-2">
         <input
           type="checkbox"
-          aria-label="경계 부드럽게"
+          aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerBorderEffectPanel", "ko", "경계 부드럽게")}
           className="accent-accent"
           checked={current.antiAliased !== false}
           disabled={controlsDisabled}
           onChange={(e) => patch({ antiAliased: e.target.checked })}
         />
-        가장자리 부드럽게
-      </label>
+        {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerBorderEffectPanel", "ko", "가장자리 부드럽게")}</label>
     </section>
   );
 }

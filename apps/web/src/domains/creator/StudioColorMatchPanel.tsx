@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioColorMatchPanel.tsx
  *
@@ -155,10 +158,9 @@ export function StudioColorMatchPanel({
       <div className="flex items-center justify-between border-b border-slate-800 pb-2">
         <div className="flex items-center gap-1.5 font-semibold text-slate-200">
           <Sparkles size={15} className="text-amber-400" />
-          <span>컬러 매치 (Color Match)</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "컬러 매치 (Color Match)")}</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium">
-            CSP 3.0
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "en", "CSP 3.0")}</span>
         </div>
         <button
           type="button"
@@ -171,30 +173,28 @@ export function StudioColorMatchPanel({
               showSplitView ? "bg-slate-700 text-white" : "text-slate-400",
             ),
           })}
-          title="Before/After 분할 비교 토글"
+          title={translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "Before/After 분할 비교 토글")}
         >
           <Eye size={12} />
-          <span>{showSplitView ? "비교 뷰 On" : "단일 뷰"}</span>
+          <span>{showSplitView ? translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "비교 뷰 On") : translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "단일 뷰")}</span>
         </button>
       </div>
 
       {/* Description */}
       <p className="text-[11px] text-slate-400 leading-relaxed">
-        참조 이미지나 분위기 프리셋의 색채 분포(평균/표준편차)를 분석하여 선화
-        디테일을 보존하면서 색조를 자연스럽게 조화시킵니다.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "참조 이미지나 분위기 프리셋의 색채 분포(평균/표준편차)를 분석하여 선화 디테일을 보존하면서 색조를 자연스럽게 조화시킵니다.")}</p>
 
       {/* Preset Mood Selector */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <span className="font-medium text-slate-300">참조 분위기 프리셋</span>
+          <span className="font-medium text-slate-300">{translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "참조 분위기 프리셋")}</span>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
           >
             <Upload size={12} />
-            <span>이미지 직접 올리기</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "이미지 직접 올리기")}</span>
           </button>
           <input
             ref={fileInputRef}
@@ -208,7 +208,7 @@ export function StudioColorMatchPanel({
         {customRefName && (
           <div className="flex items-center justify-between px-2 py-1 bg-indigo-950/40 border border-indigo-500/40 rounded text-[11px] text-indigo-200">
             <span className="truncate max-w-[200px]">
-              사용자 이미지: {customRefName}
+              {translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "사용자 이미지: ")}{customRefName}
             </span>
             <button
               type="button"
@@ -218,8 +218,7 @@ export function StudioColorMatchPanel({
               }}
               className="text-slate-400 hover:text-slate-200 text-[10px]"
             >
-              초기화
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "초기화")}</button>
           </div>
         )}
 
@@ -262,7 +261,7 @@ export function StudioColorMatchPanel({
       <div className="flex flex-col gap-2.5 pt-1 border-t border-slate-800">
         <div className="flex flex-col gap-1">
           <div className="flex justify-between text-[11px]">
-            <span className="text-slate-400">적용 강도 (Match Strength)</span>
+            <span className="text-slate-400">{translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "적용 강도 (Match Strength)")}</span>
             <span className="font-semibold text-slate-200">{strengthPercent}%</span>
           </div>
           <input
@@ -278,7 +277,7 @@ export function StudioColorMatchPanel({
 
         <div className="flex flex-col gap-1">
           <div className="flex justify-between text-[11px]">
-            <span className="text-slate-400">대비 클램핑 (Clip Sigma)</span>
+            <span className="text-slate-400">{translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "대비 클램핑 (Clip Sigma)")}</span>
             <span className="font-semibold text-slate-200">{clipSigma.toFixed(1)}σ</span>
           </div>
           <input
@@ -295,7 +294,7 @@ export function StudioColorMatchPanel({
         {showSplitView && (
           <div className="flex flex-col gap-1">
             <div className="flex justify-between text-[11px]">
-              <span className="text-slate-400">비교 분할 (Before / After)</span>
+              <span className="text-slate-400">{translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "비교 분할 (Before / After)")}</span>
               <span className="font-semibold text-slate-200">{splitPercent}%</span>
             </div>
             <input
@@ -327,7 +326,7 @@ export function StudioColorMatchPanel({
           })}
         >
           <RefreshCw size={11} />
-          <span>재설정</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "재설정")}</span>
         </button>
 
         <button
@@ -346,7 +345,7 @@ export function StudioColorMatchPanel({
           })}
         >
           <Check size={13} />
-          <span>컬러 매치 적용</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "컬러 매치 적용")}</span>
         </button>
       </div>
     </div>

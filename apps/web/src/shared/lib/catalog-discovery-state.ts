@@ -1,3 +1,6 @@
+import {
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import type { SortKey } from "./search";
 import {
   EMPTY_TITLE_FILTERS,
@@ -283,7 +286,7 @@ export function titleFiltersEqual(
 
 export function recommendationDiversityLabel(
   diversity: RecommendationDiversity,
-  locale: "ko" | "en",
+  locale: string,
 ): string {
   const labels = {
     ko: {
@@ -297,5 +300,5 @@ export function recommendationDiversityLabel(
       wide: "Broaden discovery",
     },
   } as const;
-  return labels[locale][diversity];
+  return translateLocaleBranchForLocale(locale, "shared.lib.catalog.discovery.state", labels)[diversity];
 }

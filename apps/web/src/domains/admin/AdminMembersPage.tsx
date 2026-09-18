@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowLeft,
   Ban,
   ChevronLeft,
@@ -536,8 +540,8 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
       {!canManageMembers ? (
         <p role="status" className="rounded-xl border border-line bg-card/70 p-3 text-sm text-fg-2">
           {lang === "ko"
-            ? "읽기 전용: 회원 조회와 내보내기는 가능하며, 역할·상태·삭제 변경은 관리자만 할 수 있어요."
-            : "Read only: you can view and export members. Only administrators can change roles, account status, or delete members."}
+            ? translateCurrentStaticSourceText("domains.admin.AdminMembersPage", "ko", "읽기 전용: 회원 조회와 내보내기는 가능하며, 역할·상태·삭제 변경은 관리자만 할 수 있어요.")
+            : translateCurrentStaticSourceText("domains.admin.AdminMembersPage", "en", "Read only: you can view and export members. Only administrators can change roles, account status, or delete members.")}
         </p>
       ) : null}
       <section className="rounded-2xl border border-line bg-card/70 p-4">
@@ -610,7 +614,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
               </label>
 
               <label>
-                <span className="sr-only">Sort</span>
+                <span className="sr-only">{translateCurrentStaticSourceText("domains.admin.AdminMembersPage", "en", "Sort")}</span>
                 <select
                   value={sort}
                   onChange={(event) => {
@@ -867,11 +871,11 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                           {copy.members.details}
                         </button>
 
-                        <label className="sr-only" htmlFor={`role-${member.id}`}>
+                        <label className="sr-only" htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.AdminMembersPage", "en", "role-{v0}"), { v0: String(member.id) })}>
                           {t("admin.members.colRole")}
                         </label>
                         <select
-                          id={`role-${member.id}`}
+                          id={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.AdminMembersPage", "en", "role-{v0}"), { v0: String(member.id) })}
                           value={member.role}
                           disabled={!canManageMembers || actionBusy || refreshing || isSelf || member.status === "deleted"}
                           onChange={(event) =>
@@ -1104,7 +1108,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                   <dd className="mt-1 text-fg">{detail.user.role}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-fg-3">Email</dt>
+                  <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.admin.AdminMembersPage", "en", "Email")}</dt>
                   <dd className="mt-1 break-all text-fg">
                     {detail.user.email ?? "—"}
                   </dd>
@@ -1126,7 +1130,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-fg-3">Bio</dt>
+                  <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.admin.AdminMembersPage", "en", "Bio")}</dt>
                   <dd className="mt-1 whitespace-pre-wrap text-fg">
                     {detail.user.bio ?? "—"}
                   </dd>

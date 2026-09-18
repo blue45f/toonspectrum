@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, ArrowUpRight, BookOpen, Compass, Images, Store } from "lucide-react";
 import { useId } from "react";
 import { useLocation } from "react-router-dom";
@@ -21,10 +24,10 @@ export function PublicSiteWayfinder() {
     <section className="public-wayfinder" aria-labelledby={headingId} data-public-wayfinder="">
       <div className="public-wayfinder__heading">
         <div>
-          <p className="public-wayfinder__eyebrow">YOUR NEXT CHAPTER</p>
-          <h2 id={headingId}>{korean ? "발견에서, 다음 장면으로." : "Make room for your next chapter."}</h2>
+          <p className="public-wayfinder__eyebrow">{translateCurrentStaticSourceText("shared.components.public.site.wayfinder", "en", "YOUR NEXT CHAPTER")}</p>
+          <h2 id={headingId}>{korean ? translateCurrentStaticSourceText("shared.components.public.site.wayfinder", "ko", "발견에서, 다음 장면으로.") : translateCurrentStaticSourceText("shared.components.public.site.wayfinder", "en", "Make room for your next chapter.")}</h2>
         </div>
-        <Link href="/sitemap" className="public-wayfinder__all">{korean ? "전체 공간 둘러보기" : "Explore every space"}<ArrowUpRight size={16} aria-hidden="true" /></Link>
+        <Link href="/sitemap" className="public-wayfinder__all">{korean ? translateCurrentStaticSourceText("shared.components.public.site.wayfinder", "ko", "전체 공간 둘러보기") : translateCurrentStaticSourceText("shared.components.public.site.wayfinder", "en", "Explore every space")}<ArrowUpRight size={16} aria-hidden="true" /></Link>
       </div>
       <div className="public-wayfinder__grid">
         {destinations.map((item) => {

@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { WifiOff } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -19,8 +22,8 @@ export function SiteConnectionNotice() {
   return (
     <div role="status" aria-live="polite" className="site-connection-status">
       {offline ? <p><WifiOff size={17} aria-hidden="true" /><span>{language.toLowerCase().split(/[-_]/u)[0] === "ko"
-        ? "인터넷 연결이 끊겼습니다. 작성 중인 내용은 그대로 두고, 연결이 돌아오면 실패한 요청을 다시 시도해 주세요."
-        : "You are offline. Keep this page open to preserve your input, then retry failed requests when your connection returns."}</span></p> : null}
+        ? translateCurrentStaticSourceText("shared.components.site.experience.SiteConnectionNotice", "ko", "인터넷 연결이 끊겼습니다. 작성 중인 내용은 그대로 두고, 연결이 돌아오면 실패한 요청을 다시 시도해 주세요.")
+        : translateCurrentStaticSourceText("shared.components.site.experience.SiteConnectionNotice", "en", "You are offline. Keep this page open to preserve your input, then retry failed requests when your connection returns.")}</span></p> : null}
     </div>
   );
 }

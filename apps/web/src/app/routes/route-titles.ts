@@ -1,3 +1,4 @@
+import { translateLocaleBranchForLocale } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect } from "react";
 
 import "./reference-labels";
@@ -76,7 +77,7 @@ type Translator = ReturnType<typeof useT>;
 
 export function resolveRouteTitle(pathname: string, t: Translator, productLocale?: ProductLocale): string {
   const canonicalPath = canonicalSitePath(pathname);
-  if (canonicalPath === "/") return productLocale ? PRODUCT_IDENTITY[productLocale].seoTitle : `${t("app.name")} · ${t("home.creatorTitle")}`;
+  if (canonicalPath === "/") return productLocale ? translateLocaleBranchForLocale(productLocale, "app.routes.routeTitles.productIdentity", PRODUCT_IDENTITY).seoTitle : `${t("app.name")} · ${t("home.creatorTitle")}`;
   if (Object.hasOwn(CREATOR_RESOURCE_TITLES, canonicalPath)) return CREATOR_RESOURCE_TITLES[canonicalPath];
   const authority = resolveSiteRouteAuthority(canonicalPath);
   if (authority) return t(authority.titleKey);

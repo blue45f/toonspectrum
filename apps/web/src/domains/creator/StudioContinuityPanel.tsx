@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   CheckCircle2,
   ClipboardCheck,
@@ -580,41 +584,35 @@ export function StudioContinuityPanel({
               id="studio-quality-title"
               className="text-base font-bold tracking-tight text-fg"
             >
-              마감·품질 검사 센터
-            </h2>
+              {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "마감·품질 검사 센터")}</h2>
             <p
               id="studio-quality-description"
               className="mt-0.5 max-w-[78ch] text-xs leading-relaxed text-fg-2"
             >
-              문서 무결성, 이미지 디코딩·해상도, 레이어, 대사 잘림·대비, 컷 간격,
-              검토 상태와 이야기 연속성을 한 번에 검사합니다. 자동으로 확정할 수 없는 연출은
-              통과시키지 않고 수동 확인으로 분리합니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "문서 무결성, 이미지 디코딩·해상도, 레이어, 대사 잘림·대비, 컷 간격, 검토 상태와 이야기 연속성을 한 번에 검사합니다. 자동으로 확정할 수 없는 연출은 통과시키지 않고 수동 확인으로 분리합니다.")}</p>
             <p className="mt-1 text-xs text-fg-3" role="status">
-              {!reviewStateReady ? "검토 기록을 불러오는 중…" : null}
-              {reviewStateReady && reviewPersistence === "saving" ? "검토 기록을 SQLite/OPFS에 저장 중…" : null}
-              {reviewStateReady && reviewPersistence === "saved" ? "검토 기록: SQLite/OPFS 저장됨" : null}
-              {reviewStateReady && reviewPersistence === "memory" ? "검토 기록은 현재 탭에만 보관됩니다. 저장된 원본은 변경하지 않습니다." : null}
+              {!reviewStateReady ? translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "검토 기록을 불러오는 중…") : null}
+              {reviewStateReady && reviewPersistence === "saving" ? translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "검토 기록을 SQLite/OPFS에 저장 중…") : null}
+              {reviewStateReady && reviewPersistence === "saved" ? translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "검토 기록: SQLite/OPFS 저장됨") : null}
+              {reviewStateReady && reviewPersistence === "memory" ? translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "검토 기록은 현재 탭에만 보관됩니다. 저장된 원본은 변경하지 않습니다.") : null}
             </p>
           </div>
-          <div className="hidden shrink-0 items-center gap-2 lg:flex" aria-label="마감 검사 요약">
+          <div className="hidden shrink-0 items-center gap-2 lg:flex" aria-label={translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "마감 검사 요약")}>
             <span className="rounded-full border border-line bg-card px-2.5 py-1 text-[0.68rem] font-semibold text-fg-2">
-              준비도 {report.readinessScore}
+              {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "준비도 ")}{report.readinessScore}
             </span>
             <span
-              className={`rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${
-                ready
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "en", "rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold {v0}"), { v0: String(ready
                   ? "border-good/40 bg-good/10 text-good"
-                  : "border-warning/40 bg-warning-soft/20 text-warning"
-              }`}
+                  : "border-warning/40 bg-warning-soft/20 text-warning") })}
             >
-              {ready ? "마감 준비 완료" : "확인 필요"}
+              {ready ? translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "마감 준비 완료") : translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "확인 필요")}
             </span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="마감·품질 검사 닫기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "마감·품질 검사 닫기")}
             className="grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-2 transition-colors duration-200 hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65"
           >
             <X size={15} aria-hidden />
@@ -625,8 +623,7 @@ export function StudioContinuityPanel({
           {finishSupplement?.detail ? (
             <details className="border-b border-line px-4 py-3">
               <summary className="cursor-pointer text-sm font-semibold text-fg">
-                추가 마감 검사 상세 · 통합 판정은 검사 요약 기준
-              </summary>
+                {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "추가 마감 검사 상세 · 통합 판정은 검사 요약 기준")}</summary>
               <StudioFinishQualityView
                 result={finishSupplement.detail}
                 onSelectIssue={onSelectTarget ? (issue) => onSelectTarget({
@@ -638,55 +635,49 @@ export function StudioContinuityPanel({
           ) : null}
           <section className="border-b border-line px-4 py-4" aria-labelledby="studio-quality-summary">
             <h3 id="studio-quality-summary" className="sr-only">
-              검사 요약
-            </h3>
+              {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "검사 요약")}</h3>
             <div
-              className={`flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center ${
-                ready
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "en", "flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center {v0}"), { v0: String(ready
                   ? "border-good/35 bg-good/10"
                   : blockingReady
                     ? "border-warning/35 bg-warning-soft/15"
-                    : "border-bad/35 bg-bad/10"
-              }`}
+                    : "border-bad/35 bg-bad/10") })}
               role="status"
               aria-live="polite"
             >
               <div
-                className={`grid size-14 shrink-0 place-items-center rounded-2xl border text-xl font-black ${
-                  ready
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "en", "grid size-14 shrink-0 place-items-center rounded-2xl border text-xl font-black {v0}"), { v0: String(ready
                     ? "border-good/35 bg-panel text-good"
                     : blockingReady
                       ? "border-warning/35 bg-panel text-warning"
-                      : "border-bad/35 bg-panel text-bad"
-                }`}
-                aria-label={`자동 검사 준비도 ${report.readinessScore}점`}
+                      : "border-bad/35 bg-panel text-bad") })}
+                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "자동 검사 준비도 {v0}점"), { v0: String(report.readinessScore) })}
               >
                 {report.readinessScore}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold text-fg">
                   {ready
-                    ? "자동 검사와 최종 수동 확인을 모두 마쳤습니다"
+                    ? translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "자동 검사와 최종 수동 확인을 모두 마쳤습니다")
                     : !blockingReady
-                      ? `마감 전에 차단 ${openCounts.blocking}개·오류 ${openCounts.error}개를 해결하세요`
+                      ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "마감 전에 차단 {v0}개·오류 {v1}개를 해결하세요"), { v0: String(openCounts.blocking), v1: String(openCounts.error) })
                       : rasterPending
-                        ? "이미지 디코딩·해상도 검사가 끝날 때까지 마감 판정을 보류합니다"
+                        ? translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "이미지 디코딩·해상도 검사가 끝날 때까지 마감 판정을 보류합니다")
                         : reviewOutstanding > 0
-                          ? `차단 오류는 없으며 경고·확인 ${reviewOutstanding}개를 판단해야 합니다`
-                          : `수동 확인 ${MANUAL_CHECKS.length - manualCompletedCount}개가 남았습니다`}
+                          ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "차단 오류는 없으며 경고·확인 {v0}개를 판단해야 합니다"), { v0: String(reviewOutstanding) })
+                          : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "수동 확인 {v0}개가 남았습니다"), { v0: String(MANUAL_CHECKS.length - manualCompletedCount) })}
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-fg-2">
-                  {report.checkedPageCount}페이지 · {report.checkedElementCount}요소 · 대사/텍스트{" "}
-                  {report.checkedDialogueCount}개를 검사했습니다.{" "}
+                  {report.checkedPageCount}{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "페이지 · ")}{report.checkedElementCount}{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "요소 · 대사/텍스트")}{" "}
+                  {report.checkedDialogueCount}{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "개를 검사했습니다.")}{" "}
                   {rasterBusy
-                    ? `이미지 원본 ${rasterProgress.completed}/${rasterProgress.total} 검사 중입니다.`
+                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "이미지 원본 {v0}/{v1} 검사 중입니다."), { v0: String(rasterProgress.completed), v1: String(rasterProgress.total) })
                     : rasterInspection?.status === "complete"
-                      ? `이미지 참조 ${rasterInspection.assetReferenceCount}개를 확인했습니다.`
+                      ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "이미지 참조 {v0}개를 확인했습니다."), { v0: String(rasterInspection.assetReferenceCount) })
                       : rasterInspection?.status === "unavailable"
-                        ? "이 환경에서는 이미지 원본 해상도 검사를 실행할 수 없습니다."
+                        ? translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "이 환경에서는 이미지 원본 해상도 검사를 실행할 수 없습니다.")
                         : ""}
-                  {" "}경고·확인 항목은 의도된 연출이면 확인 처리할 수 있습니다.
-                </p>
+                  {" "}{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "경고·확인 항목은 의도된 연출이면 확인 처리할 수 있습니다.")}</p>
               </div>
               <div className="grid grid-cols-4 gap-1.5 sm:w-auto">
                 {SEVERITY_ORDER.map((severity) => (
@@ -700,11 +691,9 @@ export function StudioContinuityPanel({
                     }
                     aria-pressed={severityFilter === severity}
                     title={SEVERITY_META[severity].description}
-                    className={`min-w-14 rounded-lg border px-2 py-1.5 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65 ${
-                      severityFilter === severity
+                    className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "en", "min-w-14 rounded-lg border px-2 py-1.5 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65 {v0}"), { v0: String(severityFilter === severity
                         ? SEVERITY_META[severity].badgeClass
-                        : "border-line bg-panel text-fg-2 hover:bg-raised"
-                    }`}
+                        : "border-line bg-panel text-fg-2 hover:bg-raised") })}
                   >
                     <span className="block text-[0.62rem] font-semibold">
                       {SEVERITY_META[severity].label}
@@ -718,34 +707,28 @@ export function StudioContinuityPanel({
             </div>
           </section>
 
-          <section className="border-b border-line bg-card/25 px-4 py-3" aria-label="검사 필터">
+          <section className="border-b border-line bg-card/25 px-4 py-3" aria-label={translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "검사 필터")}>
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex rounded-lg border border-line bg-panel p-0.5">
                 <button
                   type="button"
                   onClick={() => setScope("all")}
                   aria-pressed={scope === "all"}
-                  className={`min-h-8 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65 ${
-                    scope === "all" ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised"
-                  }`}
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "en", "min-h-8 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65 {v0}"), { v0: String(scope === "all" ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised") })}
                 >
-                  전체 원고
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "전체 원고")}</button>
                 <button
                   type="button"
                   onClick={() => setScope("current")}
                   aria-pressed={scope === "current"}
                   disabled={!currentPageId}
-                  className={`min-h-8 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65 disabled:cursor-not-allowed disabled:opacity-45 ${
-                    scope === "current" ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised"
-                  }`}
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "en", "min-h-8 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65 disabled:cursor-not-allowed disabled:opacity-45 {v0}"), { v0: String(scope === "current" ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised") })}
                 >
-                  현재 페이지
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "현재 페이지")}</button>
               </div>
 
               <label className="relative min-w-40 flex-1 sm:max-w-64">
-                <span className="sr-only">문제 검색</span>
+                <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "문제 검색")}</span>
                 <Search
                   size={14}
                   aria-hidden
@@ -754,13 +737,13 @@ export function StudioContinuityPanel({
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="문제·페이지·해결 방법 검색"
+                  placeholder={translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "문제·페이지·해결 방법 검색")}
                   className="min-h-9 w-full rounded-lg border border-line bg-panel py-2 pl-8 pr-3 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-2 focus:ring-accent/20"
                 />
               </label>
 
               <label className="text-xs font-semibold text-fg-2">
-                <span className="sr-only">검사 범주</span>
+                <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "검사 범주")}</span>
                 <select
                   value={categoryFilter}
                   onChange={(event) =>
@@ -768,7 +751,7 @@ export function StudioContinuityPanel({
                   }
                   className="min-h-9 rounded-lg border border-line bg-panel px-3 text-xs text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
                 >
-                  <option value="all">모든 범주</option>
+                  <option value="all">{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "모든 범주")}</option>
                   {(Object.keys(CATEGORY_LABELS) as StudioQualityCategory[]).map(
                     (category) => (
                       <option key={category} value={category}>
@@ -786,7 +769,7 @@ export function StudioContinuityPanel({
                   onChange={(event) => setShowAcknowledged(event.target.checked)}
                   className="accent-accent"
                 />
-                확인됨 {acknowledgedCount}
+                {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "확인됨 ")}{acknowledgedCount}
               </label>
 
               <button
@@ -799,8 +782,7 @@ export function StudioContinuityPanel({
                 ) : (
                   <RotateCcw size={14} aria-hidden />
                 )}
-                다시 검사
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "다시 검사")}</button>
               <button
                 type="button"
                 onClick={() =>
@@ -814,8 +796,7 @@ export function StudioContinuityPanel({
                 className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-panel px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65"
               >
                 <Download size={14} aria-hidden />
-                보고서
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "보고서")}</button>
             </div>
           </section>
 
@@ -824,11 +805,10 @@ export function StudioContinuityPanel({
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div>
                   <h3 id="studio-quality-findings" className="text-sm font-bold text-fg">
-                    발견 항목 {visibleIssues.length}
+                    {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "발견 항목 ")}{visibleIssues.length}
                   </h3>
                   <p className="mt-0.5 text-[0.7rem] text-fg-3">
-                    차단·오류는 확인 처리할 수 없으며 실제 원고를 수정해야 합니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "차단·오류는 확인 처리할 수 없으며 실제 원고를 수정해야 합니다.")}</p>
                 </div>
                 {(severityFilter !== "all" ||
                   categoryFilter !== "all" ||
@@ -844,8 +824,7 @@ export function StudioContinuityPanel({
                     }}
                     className="text-[0.7rem] font-semibold text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65"
                   >
-                    필터 초기화
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "필터 초기화")}</button>
                 )}
               </div>
 
@@ -854,12 +833,9 @@ export function StudioContinuityPanel({
                   <div className="max-w-sm">
                     <CheckCircle2 size={30} className="mx-auto text-good" aria-hidden />
                     <p className="mt-3 text-sm font-bold text-fg">
-                      현재 조건에 표시할 문제가 없습니다
-                    </p>
+                      {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "현재 조건에 표시할 문제가 없습니다")}</p>
                     <p className="mt-1 text-xs leading-relaxed text-fg-2">
-                      모든 자동 검사가 끝났다면 오른쪽 최종 수동 체크리스트까지 완료해 실제 독자
-                      화면과 게시 정책을 확인하세요.
-                    </p>
+                      {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "모든 자동 검사가 끝났다면 오른쪽 최종 수동 체크리스트까지 완료해 실제 독자 화면과 게시 정책을 확인하세요.")}</p>
                   </div>
                 </div>
               ) : (
@@ -879,15 +855,13 @@ export function StudioContinuityPanel({
                         key={issue.id}
                         data-quality-issue-code={issue.code}
                         data-quality-issue-severity={issue.severity}
-                        className={`rounded-xl border p-3 ${
-                          acknowledged
+                        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "en", "rounded-xl border p-3 {v0}"), { v0: String(acknowledged
                             ? "border-line bg-card/25 opacity-70"
-                            : "border-line bg-card/55"
-                        }`}
+                            : "border-line bg-card/55") })}
                       >
                         <div className="flex items-start gap-2.5">
                           <span
-                            className={`mt-0.5 shrink-0 ${meta.iconClass}`}
+                            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "en", "mt-0.5 shrink-0 {v0}"), { v0: String(meta.iconClass) })}
                             aria-hidden
                           >
                             <IssueIcon severity={issue.severity} />
@@ -895,7 +869,7 @@ export function StudioContinuityPanel({
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-1.5">
                               <span
-                                className={`rounded-full border px-2 py-0.5 text-[0.62rem] font-bold ${meta.badgeClass}`}
+                                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "en", "rounded-full border px-2 py-0.5 text-[0.62rem] font-bold {v0}"), { v0: String(meta.badgeClass) })}
                               >
                                 {meta.label}
                               </span>
@@ -915,8 +889,7 @@ export function StudioContinuityPanel({
                               )}
                               {acknowledged && (
                                 <span className="rounded-full border border-good/35 bg-good/10 px-2 py-0.5 text-[0.62rem] font-semibold text-good">
-                                  확인됨
-                                </span>
+                                  {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "확인됨")}</span>
                               )}
                             </div>
                             <h4 className="mt-2 text-xs font-bold text-fg">
@@ -926,7 +899,7 @@ export function StudioContinuityPanel({
                               {issue.message}
                             </p>
                             <p className="mt-1.5 rounded-lg border border-line bg-panel/70 px-2.5 py-2 text-[0.7rem] leading-relaxed text-fg-3">
-                              <strong className="font-semibold text-fg-2">해결:</strong>{" "}
+                              <strong className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "해결:")}</strong>{" "}
                               {issue.remediation}
                             </p>
                             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -937,8 +910,7 @@ export function StudioContinuityPanel({
                                   className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-accent/35 bg-accent-soft px-2.5 text-[0.68rem] font-semibold text-accent transition-colors hover:border-accent/55 hover:bg-accent/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65"
                                 >
                                   <MapPin size={12} aria-hidden />
-                                  위치로 이동
-                                </button>
+                                  {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "위치로 이동")}</button>
                               )}
                               {canAcknowledge && (
                                 <button
@@ -956,14 +928,13 @@ export function StudioContinuityPanel({
                                   className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-line bg-panel px-2.5 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65"
                                 >
                                   <CheckCircle2 size={12} aria-hidden />
-                                  {acknowledged ? "확인 취소" : "의도된 상태로 확인"}
+                                  {acknowledged ? translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "확인 취소") : translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "의도된 상태로 확인")}
                                 </button>
                               )}
                               {issue.relatedElementIds &&
                                 issue.relatedElementIds.length > 1 && (
                                   <span className="text-[0.65rem] text-fg-3">
-                                    관련 요소 {issue.relatedElementIds.length}개
-                                  </span>
+                                    {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "관련 요소 ")}{issue.relatedElementIds.length}{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "개")}</span>
                                 )}
                             </div>
                           </div>
@@ -978,8 +949,7 @@ export function StudioContinuityPanel({
                       onClick={() => setVisibleIssueLimit((current) => current + 100)}
                       className="mt-3 w-full rounded-lg border border-line bg-panel px-3 py-2 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65"
                     >
-                      문제 {Math.min(100, visibleIssues.length - displayedIssues.length)}개 더 보기
-                    </button>
+                      {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "문제 ")}{Math.min(100, visibleIssues.length - displayedIssues.length)}{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "개 더 보기")}</button>
                   )}
                 </>
               )}
@@ -989,11 +959,9 @@ export function StudioContinuityPanel({
               <div className="flex items-baseline justify-between gap-2">
                 <div>
                   <h3 id="studio-quality-manual" className="text-sm font-bold text-fg">
-                    최종 수동 확인
-                  </h3>
+                    {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "최종 수동 확인")}</h3>
                   <p className="mt-0.5 text-[0.7rem] leading-relaxed text-fg-3">
-                    픽셀·연출·게시 정책은 사람이 최종 판단합니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "픽셀·연출·게시 정책은 사람이 최종 판단합니다.")}</p>
                 </div>
                 <span className="rounded-full border border-line bg-panel px-2 py-1 text-[0.65rem] font-bold text-fg-2">
                   {manualCompletedCount}/{MANUAL_CHECKS.length}
@@ -1007,11 +975,9 @@ export function StudioContinuityPanel({
                   return (
                     <label
                       key={check.id}
-                      className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition-colors ${
-                        checked
+                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "en", "flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition-colors {v0}"), { v0: String(checked
                           ? "border-good/35 bg-good/10"
-                          : "border-line bg-panel hover:bg-raised"
-                      }`}
+                          : "border-line bg-panel hover:bg-raised") })}
                     >
                       <input
                         type="checkbox"
@@ -1030,7 +996,7 @@ export function StudioContinuityPanel({
                       <Icon
                         size={15}
                         aria-hidden
-                        className={`mt-0.5 shrink-0 ${checked ? "text-good" : "text-fg-3"}`}
+                        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "en", "mt-0.5 shrink-0 {v0}"), { v0: String(checked ? "text-good" : "text-fg-3") })}
                       />
                       <span className="min-w-0">
                         <span className="block text-xs font-bold text-fg">
@@ -1046,12 +1012,12 @@ export function StudioContinuityPanel({
               </div>
 
               <div className="mt-3 rounded-xl border border-line bg-panel p-3">
-                <p className="text-xs font-bold text-fg">판정 원칙</p>
+                <p className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "판정 원칙")}</p>
                 <ul className="mt-1.5 space-y-1 text-[0.68rem] leading-relaxed text-fg-3">
-                  <li>• 구조 손상·원본 누락·대사 잘림은 차단 또는 오류입니다.</li>
-                  <li>• 여백·겹침·복합 배경 대비는 자동 통과시키지 않습니다.</li>
-                  <li>• 경고·확인은 의도된 연출일 때만 확인 처리합니다.</li>
-                  <li>• 게시처별 변동 규격은 업로드 직전에 다시 확인합니다.</li>
+                  <li>{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "• 구조 손상·원본 누락·대사 잘림은 차단 또는 오류입니다.")}</li>
+                  <li>{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "• 여백·겹침·복합 배경 대비는 자동 통과시키지 않습니다.")}</li>
+                  <li>{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "• 경고·확인은 의도된 연출일 때만 확인 처리합니다.")}</li>
+                  <li>{translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "• 게시처별 변동 규격은 업로드 직전에 다시 확인합니다.")}</li>
                 </ul>
               </div>
             </aside>
@@ -1060,9 +1026,7 @@ export function StudioContinuityPanel({
 
         <footer className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line px-4 py-3">
           <p className="mr-auto max-w-[70ch] text-[0.68rem] leading-relaxed text-fg-3">
-            이 센터는 문서 상태와 구조화된 값을 검사하는 마감 보조 도구입니다. 실제 합성 픽셀,
-            창작 의도, 최신 게시처 정책은 수동 체크리스트와 Publish Pack 사전검사에서 최종 확인하세요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "이 센터는 문서 상태와 구조화된 값을 검사하는 마감 보조 도구입니다. 실제 합성 픽셀, 창작 의도, 최신 게시처 정책은 수동 체크리스트와 Publish Pack 사전검사에서 최종 확인하세요.")}</p>
           {onOpenScrollPreview && (
             <button
               type="button"
@@ -1070,8 +1034,7 @@ export function StudioContinuityPanel({
               className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-panel px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65"
             >
               <ScrollText size={14} aria-hidden />
-              세로 미리보기
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "세로 미리보기")}</button>
           )}
           {onOpenPublishPreflight && (
             <button
@@ -1080,16 +1043,14 @@ export function StudioContinuityPanel({
               className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft px-3 text-xs font-semibold text-accent transition-colors hover:border-accent/55 hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65"
             >
               <UploadCloud size={14} aria-hidden />
-              게시 규격 사전검사
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "게시 규격 사전검사")}</button>
           )}
           <button
             type="button"
             onClick={onClose}
             className="inline-flex min-h-9 items-center rounded-lg bg-accent px-4 text-xs font-semibold text-on-accent transition-colors duration-200 hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65 focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
           >
-            닫기
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioContinuityPanel", "ko", "닫기")}</button>
         </footer>
       </div>
     </div>

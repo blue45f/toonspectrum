@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioLineWidthAdjustmentPanel.tsx
  *
@@ -68,13 +72,12 @@ export function StudioLineWidthAdjustmentPanel({
       <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-line/60">
         <div className="flex items-center gap-1.5 min-w-0">
           <Edit3 size={14} className="text-cyan-400 shrink-0" aria-hidden />
-          <span className="font-semibold truncate">선폭 수정 (Line Width)</span>
+          <span className="font-semibold truncate">{translateCurrentStaticSourceText("domains.creator.brush.StudioLineWidthAdjustmentPanel", "ko", "선폭 수정 (Line Width)")}</span>
           <span className="px-1 py-0.2 text-[10px] rounded font-medium bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shrink-0">
-            CSP
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.brush.StudioLineWidthAdjustmentPanel", "en", "CSP")}</span>
         </div>
         <span className="text-[10px] text-slate-400 font-mono">
-          {currentWidth}px → {previewWidth}px
+          {currentWidth}{translateCurrentStaticSourceText("domains.creator.brush.StudioLineWidthAdjustmentPanel", "en", "px → ")}{previewWidth}px
         </span>
       </div>
 
@@ -117,9 +120,9 @@ export function StudioLineWidthAdjustmentPanel({
       {/* Value Slider & Controls */}
       <div className="space-y-1">
         <div className="flex items-center justify-between text-[11px] text-slate-300">
-          <span>{action === "scale" ? "배율" : "변화 폭"}</span>
+          <span>{action === "scale" ? translateCurrentStaticSourceText("domains.creator.brush.StudioLineWidthAdjustmentPanel", "ko", "배율") : translateCurrentStaticSourceText("domains.creator.brush.StudioLineWidthAdjustmentPanel", "ko", "변화 폭")}</span>
           <span className="font-mono text-cyan-300">
-            {action === "scale" ? `${value}x` : `${value}px`}
+            {action === "scale" ? `${value}x` : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioLineWidthAdjustmentPanel", "en", "{v0}px"), { v0: String(value) })}
           </span>
         </div>
         <input
@@ -130,7 +133,7 @@ export function StudioLineWidthAdjustmentPanel({
           value={value}
           disabled={disabled}
           onChange={(e) => setValue(Number(e.target.value))}
-          aria-label="선폭 조절 값"
+          aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioLineWidthAdjustmentPanel", "ko", "선폭 조절 값")}
           className="w-full accent-cyan-400 cursor-pointer"
         />
       </div>
@@ -144,7 +147,7 @@ export function StudioLineWidthAdjustmentPanel({
           onChange={(e) => setScalePressures(e.target.checked)}
           className="rounded border-line bg-slate-900 text-cyan-500 focus:ring-cyan-400 size-3.5 cursor-pointer"
         />
-        <span>필압 다이내믹스 함께 스케일</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.brush.StudioLineWidthAdjustmentPanel", "ko", "필압 다이내믹스 함께 스케일")}</span>
       </label>
 
       {/* Apply Button */}
@@ -155,7 +158,7 @@ export function StudioLineWidthAdjustmentPanel({
         className="w-full py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 active:scale-[0.98] text-white font-medium text-xs transition-transform flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Check size={13} aria-hidden />
-        <span>선택한 선에 선폭 적용</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.brush.StudioLineWidthAdjustmentPanel", "ko", "선택한 선에 선폭 적용")}</span>
       </button>
     </div>
   );

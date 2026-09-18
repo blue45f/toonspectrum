@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * SurveyDesk 네이티브 통합 — 인앱 피드백 설문.
  * ──────────────────────────────────────────────────────────────────────────
@@ -184,8 +188,7 @@ export function NativeFeedback() {
           className="fixed right-4 top-20 z-[88] inline-flex items-center gap-2 rounded-full border border-line bg-card/95 px-3.5 py-2 text-sm font-medium text-fg-2 shadow-lg backdrop-blur transition-[color,border-color,transform] duration-150 ease-out-expo hover:-translate-y-0.5 hover:border-accent/60 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas motion-reduce:transition-none motion-reduce:hover:translate-y-0"
         >
           <MessageSquarePlus size={15} aria-hidden="true" />
-          피드백
-        </button>
+          {translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "피드백")}</button>
       )}
 
       {open && (
@@ -202,7 +205,7 @@ export function NativeFeedback() {
             aria-modal="true"
             aria-labelledby={survey ? titleId : undefined}
             aria-describedby={survey?.intro ? introId : undefined}
-            aria-label={survey ? undefined : "피드백"}
+            aria-label={survey ? undefined : translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "피드백")}
             className="flex max-h-[min(640px,calc(100vh-2rem))] w-[min(420px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-line bg-panel text-fg shadow-2xl motion-safe:animate-[fade-up_0.2s_var(--ease-out-expo)_both]"
           >
             {phase === "loading" && (
@@ -212,7 +215,7 @@ export function NativeFeedback() {
                   <span className="skeleton block h-10 w-full" />
                   <span className="skeleton block h-4 w-1/2" />
                 </div>
-                <p className="mt-4 text-sm text-fg-3">설문을 불러오는 중…</p>
+                <p className="mt-4 text-sm text-fg-3">{translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "설문을 불러오는 중…")}</p>
               </div>
             )}
 
@@ -221,17 +224,14 @@ export function NativeFeedback() {
                 <span className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-bad/15 text-bad">
                   <TriangleAlert size={24} aria-hidden="true" />
                 </span>
-                <h2 className="text-base font-bold text-fg">설문을 불러오지 못했어요</h2>
+                <h2 className="text-base font-bold text-fg">{translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "설문을 불러오지 못했어요")}</h2>
                 <p className="mx-auto mt-2 max-w-[34ch] text-pretty text-sm leading-relaxed text-fg-2">
-                  네트워크 상태를 확인하고 다시 시도해 주세요.
-                </p>
+                  {translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "네트워크 상태를 확인하고 다시 시도해 주세요.")}</p>
                 <div className="mt-5 flex justify-center gap-2.5">
                   <Button variant="ghost" size="sm" onClick={closeDialog}>
-                    닫기
-                  </Button>
+                    {translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "닫기")}</Button>
                   <Button size="sm" onClick={load}>
-                    다시 시도
-                  </Button>
+                    {translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "다시 시도")}</Button>
                 </div>
               </div>
             )}
@@ -241,14 +241,12 @@ export function NativeFeedback() {
                 <span className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-good/15 text-good">
                   <Check size={24} aria-hidden="true" />
                 </span>
-                <h2 className="text-base font-bold text-fg">소중한 의견 감사합니다</h2>
+                <h2 className="text-base font-bold text-fg">{translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "소중한 의견 감사합니다")}</h2>
                 <p className="mx-auto mt-2 max-w-[34ch] text-pretty text-sm leading-relaxed text-fg-2">
-                  보내 주신 피드백은 서비스 개선에 활용할게요.
-                </p>
+                  {translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "보내 주신 피드백은 서비스 개선에 활용할게요.")}</p>
                 <div className="mt-5">
                   <Button size="sm" onClick={closeDialog}>
-                    닫기
-                  </Button>
+                    {translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "닫기")}</Button>
                 </div>
               </div>
             )}
@@ -302,7 +300,7 @@ function SurveyForm(props: {
         </div>
         <button
           type="button"
-          aria-label="닫기"
+          aria-label={translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "닫기")}
           onClick={onClose}
           className="-mr-1.5 -mt-1 flex size-8 shrink-0 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80"
         >
@@ -330,13 +328,12 @@ function SurveyForm(props: {
       </form>
 
       <footer className="flex items-center gap-2.5 border-t border-line px-5 py-3.5">
-        <span className="text-xs text-fg-3">의견은 익명으로 처리돼요</span>
+        <span className="text-xs text-fg-3">{translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "의견은 익명으로 처리돼요")}</span>
         <span className="flex-1" />
         <Button variant="ghost" size="sm" onClick={onClose}>
-          취소
-        </Button>
+          {translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "취소")}</Button>
         <Button size="sm" disabled={submitting} onClick={onSubmit}>
-          {submitting ? "제출 중…" : "제출"}
+          {submitting ? translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "제출 중…") : translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "제출")}
         </Button>
       </footer>
     </>
@@ -369,8 +366,7 @@ function QuestionField({
       <QuestionBody question={question} value={value} labelId={labelId} describedBy={invalid ? errorId : undefined} onChange={onChange} />
       {invalid && (
         <p id={errorId} data-survey-error className="mt-2 text-xs text-bad" role="alert">
-          필수 항목입니다
-        </p>
+          {translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "필수 항목입니다")}</p>
       )}
     </div>
   );
@@ -414,7 +410,7 @@ function QuestionBody({
                 key={n}
                 type="button"
                 aria-pressed={current === n}
-                aria-label={`${n}점`}
+                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "{v0}점"), { v0: String(n) })}
                 onClick={() => onChange(current === n ? undefined : n)}
                 className={cn(
                   "rounded-lg border py-2 text-sm font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80",
@@ -426,8 +422,8 @@ function QuestionBody({
             ))}
           </div>
           <div className="mt-1.5 flex justify-between text-xs text-fg-3" aria-hidden="true">
-            <span>전혀 아니다</span>
-            <span>매우 그렇다</span>
+            <span>{translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "전혀 아니다")}</span>
+            <span>{translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "매우 그렇다")}</span>
           </div>
         </div>
       );
@@ -505,7 +501,7 @@ function QuestionBody({
               value={text}
               maxLength={max}
               aria-describedby={describedBy}
-              placeholder="자유롭게 적어 주세요"
+              placeholder={translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "자유롭게 적어 주세요")}
               onChange={(e) => set(e.target.value)}
               className="min-h-[88px] w-full resize-y rounded-lg border border-line bg-card px-3 py-2.5 text-sm leading-relaxed text-fg outline-none transition-colors placeholder:text-fg-3 hover:border-line-strong focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40"
             />
@@ -521,7 +517,7 @@ function QuestionBody({
           value={text}
           maxLength={max}
           aria-describedby={describedBy}
-          placeholder="한 줄로 적어 주세요"
+          placeholder={translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "한 줄로 적어 주세요")}
           onChange={(e) => set(e.target.value)}
           className="w-full rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-fg outline-none transition-colors placeholder:text-fg-3 hover:border-line-strong focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40"
         />
@@ -570,7 +566,7 @@ function StarRating({
             type="button"
             role="radio"
             aria-checked={value === n}
-            aria-label={`${n}점`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("components.deskcloud.native.NativeFeedback", "ko", "{v0}점"), { v0: String(n) })}
             tabIndex={value === n || (value === 0 && n === 1) ? 0 : -1}
             onClick={() => onChange(value === n ? 0 : n)}
             onKeyDown={(e) => onKey(e, n)}

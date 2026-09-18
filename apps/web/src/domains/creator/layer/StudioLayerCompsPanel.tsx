@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioLayerCompsPanel.tsx
  *
@@ -181,7 +185,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
     <fieldset
       disabled={disabled || busy}
       aria-busy={busy}
-      aria-label="레이어 콤프"
+      aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "레이어 콤프")}
       className={cn(
         "flex min-w-0 shrink-0 flex-col gap-3 p-3 text-xs bg-slate-900/90 text-slate-100 rounded-lg border border-slate-800 shadow-xl",
         className,
@@ -192,10 +196,9 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
       <div className="flex items-center justify-between border-b border-slate-800 pb-2">
         <div className="flex items-center gap-1.5 font-semibold text-slate-200">
           <Bookmark size={15} className="text-indigo-400" />
-          <span>레이어 콤프 (Layer Comps)</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "레이어 콤프 (Layer Comps)")}</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-medium">
-            CSP 3.0
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "en", "CSP 3.0")}</span>
         </div>
         <button
           type="button"
@@ -206,17 +209,16 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
             variant: "ghost",
             className: "h-6 px-2 text-[11px] gap-1 text-slate-300 hover:text-white",
           })}
-          title={effectiveComps.length >= STUDIO_LAYER_COMPS_MAX_COUNT ? "페이지마다 콤프를 64개까지 저장할 수 있습니다" : "새 콤프 캡처"}
+          title={effectiveComps.length >= STUDIO_LAYER_COMPS_MAX_COUNT ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "페이지마다 콤프를 64개까지 저장할 수 있습니다") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "새 콤프 캡처")}
         >
           <Plus size={13} />
-          <span>새 콤프</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "새 콤프")}</span>
         </button>
       </div>
 
       {/* Description / Guide */}
       <p className="text-[11px] text-slate-400 leading-relaxed">
-        선화, 밑색, 텍스트 유무, 조명 변화 등 다양한 레이어 표시 상태를 저장하고
-        원클릭으로 전환합니다.{onBatchExportPlan ? " 저장한 콤프를 일괄 내보낼 수도 있어요." : null}
+        {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "선화, 밑색, 텍스트 유무, 조명 변화 등 다양한 레이어 표시 상태를 저장하고 원클릭으로 전환합니다.")}{onBatchExportPlan ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", " 저장한 콤프를 일괄 내보낼 수도 있어요.") : null}
       </p>
       {actionError ? <p role="alert" className="text-red-300">{actionError}</p> : null}
 
@@ -225,7 +227,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
         <div className="flex items-center gap-1.5 bg-slate-800/80 p-2 rounded border border-indigo-500/40">
           <input
             type="text"
-            aria-label="새 콤프 이름"
+            aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "새 콤프 이름")}
             data-studio-escape-scope="true"
             maxLength={160}
             value={newCompName}
@@ -239,7 +241,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
                 setIsCreating(false);
               }
             }}
-            placeholder="콤프 이름 (예: 대사 없는 클린본)"
+            placeholder={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "콤프 이름 (예: 대사 없는 클린본)")}
             className="min-w-0 flex-1 bg-slate-950 px-2 py-1 rounded text-slate-200 text-xs border border-slate-700 focus:outline-none focus:border-indigo-400"
           />
           <button
@@ -251,8 +253,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
               className: "h-6 px-2 text-[11px] bg-indigo-600 hover:bg-indigo-500 text-white",
             })}
           >
-            저장
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "저장")}</button>
         </div>
       )}
 
@@ -262,11 +263,9 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
           <div className="flex flex-col items-center justify-center p-4 text-center border border-dashed border-slate-800 rounded bg-slate-950/40">
             <Layers size={22} className="text-slate-600 mb-1" />
             <span className="text-[11px] text-slate-500">
-              저장된 레이어 콤프가 없습니다.
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "저장된 레이어 콤프가 없습니다.")}</span>
             <span className="text-[10px] text-slate-600 mt-0.5">
-              현재 레이어 상태를 새 콤프로 캡처해보세요.
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "현재 레이어 상태를 새 콤프로 캡처해보세요.")}</span>
           </div>
         ) : (
           effectiveComps.map((comp) => {
@@ -291,7 +290,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
                   <div className="flex min-w-0 items-center gap-1.5 flex-1 mr-2">
                     <input
                       type="text"
-                      aria-label={`${comp.name} 이름 수정`}
+                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "{v0} 이름 수정"), { v0: String(comp.name) })}
                       data-studio-escape-scope="true"
                       maxLength={160}
                       value={editNameText}
@@ -310,7 +309,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
                     <button
                       type="button"
                       onClick={handleSaveRename}
-                      aria-label="콤프 이름 저장"
+                      aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "콤프 이름 저장")}
                       className="text-indigo-300 hover:text-white p-1"
                     >
                       <Check size={13} />
@@ -329,8 +328,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
                       <span className="font-medium text-[12px] [overflow-wrap:anywhere]">{comp.name}</span>
                     </div>
                     <span className="text-[10px] text-slate-500 mt-0.5">
-                      표시 레이어 {visibleCount} / {totalCount}개
-                    </span>
+                      {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "표시 레이어 ")}{visibleCount} / {totalCount}{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "개")}</span>
                   </button>
                 )}
 
@@ -349,17 +347,17 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
                           : "border-slate-700 hover:bg-slate-700 text-slate-300",
                       ),
                     })}
-                    title="이 콤프 적용"
+                    title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "이 콤프 적용")}
                   >
                     <Eye size={12} />
-                    <span>적용</span>
+                    <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "적용")}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleUpdateComp(comp.id)}
                     className="p-1 text-slate-400 hover:text-amber-300 transition-colors"
-                    title="현재 레이어 상태로 업데이트"
+                    title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "현재 레이어 상태로 업데이트")}
                   >
                     <FolderSync size={13} />
                   </button>
@@ -372,7 +370,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
                       setEditNameText(comp.name);
                     }}
                     className="p-1 text-slate-400 hover:text-slate-200 transition-colors"
-                    title="이름 수정"
+                    title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "이름 수정")}
                   >
                     <Pencil size={12} />
                   </button>
@@ -381,7 +379,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
                     type="button"
                     onClick={() => handleDeleteComp(comp.id)}
                     className="p-1 text-slate-400 hover:text-red-400 transition-colors"
-                    title="콤프 삭제"
+                    title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "콤프 삭제")}
                   >
                     <Trash2 size={12} />
                   </button>
@@ -396,8 +394,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
       {effectiveComps.length > 0 && onBatchExportPlan && (
         <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
           <span className="text-[11px] text-slate-400">
-            총 {effectiveComps.length}개 상태 콤프
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "총 ")}{effectiveComps.length}{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "개 상태 콤프")}</span>
           <button
             type="button"
             onClick={handleBatchExport}
@@ -408,7 +405,7 @@ export function StudioLayerCompsPanel<T extends StudioLayerLikeItem = StudioLaye
             })}
           >
             <Download size={12} />
-            <span>콤프 일괄 내보내기</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerCompsPanel", "ko", "콤프 일괄 내보내기")}</span>
           </button>
         </div>
       )}

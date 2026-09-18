@@ -1,3 +1,8 @@
+import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, PenTool, Sparkles } from "lucide-react";
 
 import {
@@ -67,19 +72,16 @@ export function SiteFooter() {
           <div className="public-footer-invitation__content">
             <p className="flex items-center gap-2 font-display text-[0.65rem] font-bold uppercase tracking-[0.15em] text-accent">
               <PenTool size={14} aria-hidden="true" />
-              YOUR NEXT WEBTOON STARTS HERE
-            </p>
+              {translateCurrentStaticSourceText("shared.components.site.footer", "en", "YOUR NEXT WEBTOON STARTS HERE")}</p>
             <h2 id="footer-creative-title" className="mt-4 text-balance text-3xl font-bold leading-tight tracking-[-0.045em] text-fg sm:text-4xl">
-              {locale === "ko" ? "오래 상상한 장면, 이제 직접 그려보세요." : "That scene you keep imagining. Make it yours."}
+              {translateBilingualValueForLocale(locale, "shared.components.site.footer", "오래 상상한 장면, 이제 직접 그려보세요.", "That scene you keep imagining. Make it yours.")}
             </h2>
             <p className="mt-4 max-w-md text-sm leading-7 text-fg-2">
-              {locale === "ko"
-                ? "브러시의 첫 선부터 레이어, 말풍선, 완성한 작품의 내보내기까지. 브라우저에서 열리는 당신의 드로잉 작업실."
-                : "From your first brushstroke to layers, speech balloons and the final export. Your drawing atelier, in the browser."}
+              {translateBilingualValueForLocale(locale, "shared.components.site.footer", "브러시의 첫 선부터 레이어, 말풍선, 완성한 작품의 내보내기까지. 브라우저에서 열리는 당신의 드로잉 작업실.", "From your first brushstroke to layers, speech balloons and the final export. Your drawing atelier, in the browser.")}
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link href={make.href} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">
-                {locale === "ko" ? "웹툰 그리기" : "Draw your webtoon"}<ArrowRight size={16} aria-hidden="true" />
+                {translateBilingualValueForLocale(locale, "shared.components.site.footer", "웹툰 그리기", "Draw your webtoon")}<ArrowRight size={16} aria-hidden="true" />
               </Link>
               <Link href={research.href} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-panel/85 px-4 py-3 text-sm font-semibold text-fg-2 transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">
                 {siteNavigationText(research.label, locale)}<ArrowRight size={16} aria-hidden="true" />
@@ -92,15 +94,12 @@ export function SiteFooter() {
           <div className="max-w-2xl">
             <p className="flex items-center gap-2 font-display text-[0.65rem] font-bold uppercase tracking-[0.15em] text-accent">
               <Sparkles size={14} aria-hidden="true" />
-              YOUR NEXT SCENE
-            </p>
+              {translateCurrentStaticSourceText("shared.components.site.footer", "en", "YOUR NEXT SCENE")}</p>
             <h2 id="footer-creative-title" className="mt-3 font-display text-2xl font-bold tracking-[-0.035em] text-fg sm:text-3xl">
-              {locale === "ko" ? "떠올리고, 조사하고, 만드는 흐름을 한곳에서." : "Spark, research and make in one connected flow."}
+              {translateBilingualValueForLocale(locale, "shared.components.site.footer", "떠올리고, 조사하고, 만드는 흐름을 한곳에서.", "Spark, research and make in one connected flow.")}
             </h2>
             <p className="mt-3 max-w-xl text-sm leading-7 text-fg-2">
-              {locale === "ko"
-                ? "빈 캔버스에서 막히지 않도록, 지금 필요한 다음 행동으로 바로 연결합니다."
-                : "Move directly to the next action you need, without getting stuck at a blank canvas."}
+              {translateBilingualValueForLocale(locale, "shared.components.site.footer", "빈 캔버스에서 막히지 않도록, 지금 필요한 다음 행동으로 바로 연결합니다.", "Move directly to the next action you need, without getting stuck at a blank canvas.")}
             </p>
           </div>
           <div className="flex flex-wrap gap-2 md:justify-end">
@@ -131,11 +130,11 @@ export function SiteFooter() {
                   {siteBrand}
                 </h2>
                 <span className="block font-display text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-fg-3">
-                  {isPublicPage ? "Draw · Discover · Share" : "Create · Share · Discover"}
+                  {isPublicPage ? translateCurrentStaticSourceText("shared.components.site.footer", "en", "Draw · Discover · Share") : translateCurrentStaticSourceText("shared.components.site.footer", "en", "Create · Share · Discover")}
                 </span>
               </span>
             </Link>
-            <p className="mt-5 text-sm leading-7 text-fg-2">{isPublicPage ? (locale === "ko" ? "웹툰과 일러스트를 위한 브라우저 드로잉 도구. 영감을 찾는 순간부터 작품을 그려 나누는 순간까지 연결합니다." : "Browser drawing tools for webtoons and illustration. A connected journey from finding inspiration to creating and sharing your work.") : t("footer.description.primary")}</p>
+            <p className="mt-5 text-sm leading-7 text-fg-2">{isPublicPage ? (translateBilingualValueForLocale(locale, "shared.components.site.footer", "웹툰과 일러스트를 위한 브라우저 드로잉 도구. 영감을 찾는 순간부터 작품을 그려 나누는 순간까지 연결합니다.", "Browser drawing tools for webtoons and illustration. A connected journey from finding inspiration to creating and sharing your work.")) : t("footer.description.primary")}</p>
             <p className="mt-3 text-xs leading-6 text-fg-3">{t("footer.description.secondary")}</p>
             <div className="mt-5 flex flex-wrap gap-2">
               {SITE_UTILITY_NAVIGATION.map((item) => {
@@ -155,13 +154,13 @@ export function SiteFooter() {
           </div>
 
           {SITE_NAVIGATION_GROUPS.map((group, index) => (
-            <nav key={group.id} aria-labelledby={`footer-nav-${group.id}`} className="min-w-0">
+            <nav key={group.id} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.site.footer", "en", "footer-nav-{v0}"), { v0: String(group.id) })} className="min-w-0">
               <div className="mb-4 flex items-start gap-2.5">
                 <span aria-hidden="true" className="pt-0.5 font-display text-[0.6rem] font-bold tracking-[0.13em] text-accent">
                   0{index + 1}
                 </span>
                 <div>
-                  <h2 id={`footer-nav-${group.id}`} className="font-display text-sm font-bold text-fg">
+                  <h2 id={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.site.footer", "en", "footer-nav-{v0}"), { v0: String(group.id) })} className="font-display text-sm font-bold text-fg">
                     {siteNavigationText(group.label, locale)}
                   </h2>
                   <p className="mt-1 hidden text-[0.68rem] leading-5 text-fg-3 xl:block">
@@ -193,7 +192,7 @@ export function SiteFooter() {
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-x-4 gap-y-2">
               <Link href="/about/principles" className="font-semibold text-fg-2 transition-colors hover:text-accent">
-                {locale === "ko" ? "제품 원칙" : "Product principles"}
+                {translateBilingualValueForLocale(locale, "shared.components.site.footer", "제품 원칙", "Product principles")}
               </Link>
               {META_LINKS.map((link) => (
                 <Link key={link.href} href={link.href} className="transition-colors hover:text-fg">

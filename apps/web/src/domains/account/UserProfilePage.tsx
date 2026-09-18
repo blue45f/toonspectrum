@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   BookOpen,
   BriefcaseBusiness,
   Mail,
@@ -172,7 +176,7 @@ function ProfileSeriesTab({ userId }: { userId: string }) {
 
 export function UserProfilePage() {
   const t = useT();
-  const locale: CreatorRoleLocale = useI18n((state) => state.lang) === "ko" ? "ko" : "en";
+  const locale: CreatorRoleLocale = useI18n((state) => state.lang);
   const { userId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -328,11 +332,11 @@ export function UserProfilePage() {
               {(profile || data) && (
                 <SharePageButton
                   path={sharePath}
-                  text={`${author} 창작자 프로필`}
+                  text={formatI18nTemplate(translateCurrentStaticSourceText("domains.account.UserProfilePage", "ko", "{v0} 창작자 프로필"), { v0: String(author) })}
                   description={shareDescription}
                   imageUrl={shareImage}
-                  label="프로필 공유"
-                  actionLabel="프로필 보기"
+                  label={translateCurrentStaticSourceText("domains.account.UserProfilePage", "ko", "프로필 공유")}
+                  actionLabel={translateCurrentStaticSourceText("domains.account.UserProfilePage", "ko", "프로필 보기")}
                   className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
                 />
               )}
@@ -352,8 +356,7 @@ export function UserProfilePage() {
                       })}
                     >
                       <Mail size={14} aria-hidden="true" />
-                      메시지
-                    </Link>
+                      {translateCurrentStaticSourceText("domains.account.UserProfilePage", "ko", "메시지")}</Link>
                   )}
                   <button
                     type="button"
@@ -434,7 +437,7 @@ export function UserProfilePage() {
               onClick={reload}
               className={buttonClass({ size: "sm", variant: "quiet", className: "ml-auto gap-1.5" })}
             >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              <RefreshCw size={14} className={loading ? translateCurrentStaticSourceText("domains.account.UserProfilePage", "en", "animate-spin") : ""} />
               {t("userProfile.refresh")}
             </button>
           )}

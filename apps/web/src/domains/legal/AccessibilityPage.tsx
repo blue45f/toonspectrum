@@ -1,3 +1,8 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Eye, Keyboard, MousePointer2, Move, Smartphone, Sparkles } from "lucide-react";
 
 import { AccessibilityLab } from "./AccessibilityLab";
@@ -46,9 +51,9 @@ const ICONS = [Keyboard, MousePointer2, Eye, Move, Smartphone, Sparkles] as cons
 
 export function AccessibilityPage() {
   const language = useI18n((state) => state.lang);
-  const locale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
-  const copy = COPY[locale];
-  useDocumentTitle(locale === "ko" ? "접근성" : "Accessibility");
+  const locale = resolveUiLocale(language);
+  const copy = translateLocaleBranchForLocale(locale, "domains.legal.AccessibilityPage", COPY);
+  useDocumentTitle(translateBilingualValueForLocale(locale, "domains.legal.AccessibilityPage", "접근성", "Accessibility"));
 
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">

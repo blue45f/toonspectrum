@@ -1,4 +1,6 @@
-export type ProductLocale = "ko" | "en";
+import { resolveUiLocale } from "@/shared/lib/i18n-bilingual-copy";
+export type ProductLocale = string;
+export type ProductAuthoredLocale = "ko" | "en";
 
 export interface ProductIdentityCopy {
   readonly brand: string;
@@ -33,13 +35,13 @@ export const PRODUCT_IDENTITY = {
     seoDescription:
       "An all-in-one webtoon creation studio for scripts, storyboards, professional 2D art, 3D characters and backgrounds, assets, cloud files, schedules, collaboration, review and publishing.",
   },
-} as const satisfies Record<ProductLocale, ProductIdentityCopy>;
+} as const satisfies Record<ProductAuthoredLocale, ProductIdentityCopy>;
 
 export interface ProductStartDestination {
   readonly id: "plan" | "draw" | "three-d" | "assets" | "collaborate" | "publish";
   readonly href: string;
-  readonly label: Readonly<Record<ProductLocale, string>>;
-  readonly description: Readonly<Record<ProductLocale, string>>;
+  readonly label: Readonly<Record<ProductAuthoredLocale, string>>;
+  readonly description: Readonly<Record<ProductAuthoredLocale, string>>;
 }
 
 export const PRODUCT_START_DESTINATIONS = [
@@ -84,5 +86,5 @@ export const PRODUCT_START_DESTINATIONS = [
 export type ProductStartDestinationId = (typeof PRODUCT_START_DESTINATIONS)[number]["id"];
 
 export function resolveProductLocale(language: string): ProductLocale {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  return resolveUiLocale(language);
 }

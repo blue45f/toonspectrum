@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Wet Mix Panel
  * 혼색 브러시 컨트롤 — 켜면 메인 캔버스에서 선택된 이미지 위 드래그가 혼색 스트로크로 처리된다.
@@ -105,8 +109,8 @@ export function StudioWetMixPanel({
         <span className="flex shrink-0 items-center gap-1.5">
           <span
             role="img"
-            aria-label="현재 칠할 색"
-            title="현재 그리기 색 — 이 색이 안료로 섞입니다."
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioWetMixPanel", "ko", "현재 칠할 색")}
+            title={translateCurrentStaticSourceText("domains.creator.StudioWetMixPanel", "ko", "현재 그리기 색 — 이 색이 안료로 섞입니다.")}
             data-testid="wet-mix-paint-swatch"
             className="size-3.5 shrink-0 rounded-md border border-line/50 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.25),0_1px_2px_oklch(0.1_0.01_70/0.25)] ring-1 ring-black/10"
             style={{ backgroundColor: paintColor }}
@@ -119,27 +123,27 @@ export function StudioWetMixPanel({
         disabled={locked}
         onClick={onToggleActive}
         aria-label={`${help.actionName} ${active ? "끄기" : "켜기"}`}
-        title={`${help.summary} 결과는 손을 뗄 때 한 획으로 반영됩니다.`}
+        title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWetMixPanel", "ko", "{v0} 결과는 손을 뗄 때 한 획으로 반영됩니다."), { v0: String(help.summary) })}
       >
         <span className="inline-flex items-center gap-1">
           <Droplets className="size-3" aria-hidden />
-          {active ? "섞어 칠하기 끝내기" : "섞어 칠하기 시작"}
+          {active ? translateCurrentStaticSourceText("domains.creator.StudioWetMixPanel", "ko", "섞어 칠하기 끝내기") : translateCurrentStaticSourceText("domains.creator.StudioWetMixPanel", "ko", "섞어 칠하기 시작")}
         </span>
       </StudioToggleChip>
 
       <StudioSliderRow
-        label="브러시 크기"
+        label={translateCurrentStaticSourceText("domains.creator.StudioWetMixPanel", "ko", "브러시 크기")}
         min={WET_MIX_RADIUS_RANGE.min}
         max={WET_MIX_RADIUS_RANGE.max}
         step={WET_MIX_RADIUS_RANGE.step}
         value={radius}
         disabled={locked}
         onChange={onRadiusChange}
-        readout={`${radius}px`}
+        readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWetMixPanel", "en", "{v0}px"), { v0: String(radius) })}
       />
 
       <StudioSliderRow
-        label="칠하는 양"
+        label={translateCurrentStaticSourceText("domains.creator.StudioWetMixPanel", "ko", "칠하는 양")}
         min={WET_MIX_STRENGTH_RANGE.min}
         max={WET_MIX_STRENGTH_RANGE.max}
         step={WET_MIX_STRENGTH_RANGE.step}
@@ -150,7 +154,7 @@ export function StudioWetMixPanel({
       />
 
       <StudioSliderRow
-        label="바닥색 섞기"
+        label={translateCurrentStaticSourceText("domains.creator.StudioWetMixPanel", "ko", "바닥색 섞기")}
         min={WET_MIX_WETNESS_RANGE.min}
         max={WET_MIX_WETNESS_RANGE.max}
         step={WET_MIX_WETNESS_RANGE.step}
@@ -161,7 +165,7 @@ export function StudioWetMixPanel({
       />
 
       <StudioSliderRow
-        label="색 줍기"
+        label={translateCurrentStaticSourceText("domains.creator.StudioWetMixPanel", "ko", "색 줍기")}
         min={WET_MIX_PICKUP_RANGE.min}
         max={WET_MIX_PICKUP_RANGE.max}
         step={WET_MIX_PICKUP_RANGE.step}
@@ -172,7 +176,7 @@ export function StudioWetMixPanel({
       />
 
       <StudioSliderRow
-        label="가장자리 단단함"
+        label={translateCurrentStaticSourceText("domains.creator.StudioWetMixPanel", "ko", "가장자리 단단함")}
         min={WET_MIX_HARDNESS_RANGE.min}
         max={WET_MIX_HARDNESS_RANGE.max}
         step={WET_MIX_HARDNESS_RANGE.step}

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Bookmark, Eye, Heart, Layers, MapPin, Star } from "lucide-react";
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
@@ -109,7 +113,7 @@ export function TitleDetailPage() {
   if (error || !data) {
     return (
       <Container size="wide" className="py-10">
-        <ErrorState title="작품 상세를 불러오지 못했습니다." message={error} onRetry={reload} />
+        <ErrorState title={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "작품 상세를 불러오지 못했습니다.")} message={error} onRetry={reload} />
       </Container>
     );
   }
@@ -167,13 +171,11 @@ export function TitleDetailPage() {
           <div className="rounded-2xl border border-line bg-panel/50 p-4">
             <div className="mb-3 flex items-center gap-2">
               <MapPin size={15} className="text-accent" />
-              <p className="text-sm font-semibold text-fg">어디서 볼 수 있나요</p>
+              <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "어디서 볼 수 있나요")}</p>
             </div>
             <AvailabilityRouter availability={title.availability} />
             <p className="mt-3 text-[0.7rem] leading-relaxed text-fg-3">
-              플랫폼을 가로질러 가격(무료·기다무·유료)을 비교합니다. 가장 저렴한 진입점을 위로
-              정렬했어요.
-            </p>
+              {translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "플랫폼을 가로질러 가격(무료·기다무·유료)을 비교합니다. 가장 저렴한 진입점을 위로 정렬했어요.")}</p>
           </div>
           <PriceCompare availability={title.availability} />
         </aside>
@@ -182,12 +184,12 @@ export function TitleDetailPage() {
           <div>
             <div className="flex flex-wrap items-center gap-1.5">
               <Badge tone="accent">{TYPE_LABEL[title.type]}</Badge>
-              <Badge tone={title.status === "completed" ? "good" : title.status === "hiatus" ? "warn" : "neutral"}>
+              <Badge tone={title.status === "completed" ? translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "en", "good") : title.status === "hiatus" ? translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "en", "warn") : translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "en", "neutral")}>
                 {STATUS_LABEL[title.status]}
               </Badge>
-              <Badge tone={title.ageRating === "19" ? "bad" : "neutral"}>{AGE_LABEL[title.ageRating]}</Badge>
+              <Badge tone={title.ageRating === "19" ? translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "en", "bad") : translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "en", "neutral")}>{AGE_LABEL[title.ageRating]}</Badge>
               {title.updateDays && title.updateDays.length > 0 && (
-                <Badge tone="cool">{title.updateDays.join("·")} 연재</Badge>
+                <Badge tone="cool">{title.updateDays.join("·")} {translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "연재")}</Badge>
               )}
             </div>
 
@@ -206,10 +208,10 @@ export function TitleDetailPage() {
               <div>
                 <div className="flex items-center gap-1.5">
                   <Stars value={reviewAvg} size="md" />
-                  {estimated && <Badge tone="neutral">추정</Badge>}
+                  {estimated && <Badge tone="neutral">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "추정")}</Badge>}
                 </div>
                 <p className="mt-1 text-xs text-fg-3">
-                  {estimated ? `약 ${formatCount(reviewCount)} 평가 (추정)` : `${formatCount(reviewCount)}개의 평가`}
+                  {estimated ? formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "약 {v0} 평가 (추정)"), { v0: String(formatCount(reviewCount)) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "{v0}개의 평가"), { v0: String(formatCount(reviewCount)) })}
                 </p>
               </div>
             </div>
@@ -229,7 +231,7 @@ export function TitleDetailPage() {
               {title.tags.map((tag) => (
                 <Link
                   key={tag}
-                  href={`/explore?tags=${encodeURIComponent(tag)}`}
+                  href={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "en", "/explore?tags={v0}"), { v0: String(encodeURIComponent(tag)) })}
                   className="inline-flex items-center rounded-full border border-line bg-raised/50 px-2.5 py-1 text-xs text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft/40 hover:text-accent pointer-coarse:px-3 pointer-coarse:py-1.5"
                 >
                   #{tag}
@@ -252,20 +254,20 @@ export function TitleDetailPage() {
       </div>
 
       <section className="mt-10 sm:mt-14">
-        <h2 className="eyebrow mb-1 text-accent">METRICS · 지표</h2>
-        <p className="mb-4 text-xs text-fg-2">완독률·몰입·분포는 수집값과 추정값을 함께 사용합니다.</p>
+        <h2 className="eyebrow mb-1 text-accent">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "METRICS · 지표")}</h2>
+        <p className="mb-4 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "완독률·몰입·분포는 수집값과 추정값을 함께 사용합니다.")}</p>
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-line bg-card p-5">
-            <h3 className="mb-4 text-sm font-semibold text-fg">평점 분포</h3>
+            <h3 className="mb-4 text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "평점 분포")}</h3>
             <DistributionBars dist={title.stats.ratingDist} />
           </div>
           <div className="flex flex-col gap-4 rounded-2xl border border-line bg-card p-5">
-            <h3 className="text-sm font-semibold text-fg">정주행 지표</h3>
-            <MeterBar label="완독률" value={Math.round(title.stats.completionRate)} suffix="%" />
-            <MeterBar label="몰입 지수" value={Math.round(title.stats.bingeIndex)} color="var(--color-cool)" />
-            <MeterBar label="트렌드 점수" value={Math.round(title.stats.trendingScore)} color="var(--color-good)" />
+            <h3 className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "정주행 지표")}</h3>
+            <MeterBar label={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "완독률")} value={Math.round(title.stats.completionRate)} suffix="%" />
+            <MeterBar label={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "몰입 지수")} value={Math.round(title.stats.bingeIndex)} color="var(--color-cool)" />
+            <MeterBar label={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "트렌드 점수")} value={Math.round(title.stats.trendingScore)} color="var(--color-good)" />
             <div className="mt-1">
-              <p className="mb-1.5 text-xs text-fg-3">장르 스펙트럼</p>
+              <p className="mb-1.5 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "장르 스펙트럼")}</p>
               <GenreSpectrum genres={title.genres} height={6} />
             </div>
           </div>
@@ -278,13 +280,13 @@ export function TitleDetailPage() {
         <Section
           className="mt-10 sm:mt-14"
           eyebrow="ADAPTATION"
-          title="같은 이야기, 다른 형태"
-          desc="원작·웹툰부터 드라마·영화·애니메이션까지, 하나의 우주로 연결했습니다."
+          title={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "같은 이야기, 다른 형태")}
+          desc={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "원작·웹툰부터 드라마·영화·애니메이션까지, 하나의 우주로 연결했습니다.")}
         >
           <div className="rounded-2xl border border-line bg-card p-5">
             <div className="mb-4 flex items-center gap-2 text-fg-3">
               <Layers size={15} />
-              <span className="eyebrow">{original.title} 유니버스</span>
+              <span className="eyebrow">{original.title} {translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "유니버스")}</span>
             </div>
             <AdaptationGraph
               original={original}
@@ -303,8 +305,8 @@ export function TitleDetailPage() {
       <Section
         className="mt-10 sm:mt-14"
         eyebrow="COMMUNITY"
-        title={`${title.title} 팬카페`}
-        desc="작품 해석, 정주행 메모, 팬아트 아이디어를 독자들과 나눕니다."
+        title={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "{v0} 팬카페"), { v0: String(title.title) })}
+        desc={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "작품 해석, 정주행 메모, 팬아트 아이디어를 독자들과 나눕니다.")}
       >
         <FanCafePanel scope="title" targetId={title.id} targetLabel={title.title} />
       </Section>
@@ -316,8 +318,7 @@ export function TitleDetailPage() {
         eyebrow="REVIEWS"
         title={
           <span className="flex items-baseline gap-3">
-            리뷰
-            <span className="numeral text-lg text-fg-3">{reviews.length}</span>
+            {translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "리뷰")}<span className="numeral text-lg text-fg-3">{reviews.length}</span>
             {reviews.length > 0 && (
               <span className="flex items-center gap-1.5 text-sm font-normal text-fg-3">
                 <Stars value={reviewAvg} size="sm" /> {reviewAvg.toFixed(1)}
@@ -333,8 +334,8 @@ export function TitleDetailPage() {
           <div className="flex flex-col gap-3">
             {reviews.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line bg-card/50 p-10 text-center">
-                <p className="text-sm text-fg-2">아직 리뷰가 없어요.</p>
-                <p className="mt-1 text-xs text-fg-3">첫 리뷰를 남기면 취향 분석에도 반영됩니다.</p>
+                <p className="text-sm text-fg-2">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "아직 리뷰가 없어요.")}</p>
+                <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "첫 리뷰를 남기면 취향 분석에도 반영됩니다.")}</p>
               </div>
             ) : (
               reviews.map((review) => <ReviewCard key={review.id} review={review} enableReplies />)
@@ -347,8 +348,8 @@ export function TitleDetailPage() {
         <Section
           className="mt-10 sm:mt-14"
           eyebrow="BY THIS AUTHOR"
-          title={`${title.author}의 다른 작품`}
-          desc="같은 작가가 그린·쓴 다른 작품"
+          title={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "{v0}의 다른 작품"), { v0: String(title.author) })}
+          desc={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "같은 작가가 그린·쓴 다른 작품")}
         >
           <Rail>
             {byAuthor.map((item) => (
@@ -362,8 +363,8 @@ export function TitleDetailPage() {
         <Section
           className="mt-10 sm:mt-14"
           eyebrow="SIMILAR"
-          title="이 작품과 비슷한"
-          desc="장르·태그·어댑테이션 관계로 찾은 추천"
+          title={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "이 작품과 비슷한")}
+          desc={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "장르·태그·어댑테이션 관계로 찾은 추천")}
         >
           <Rail>
             {similar.map((item) => (

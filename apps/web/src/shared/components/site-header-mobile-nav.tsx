@@ -1,3 +1,7 @@
+import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { X } from "lucide-react";
 import { useEffect, useRef, type RefObject } from "react";
 
@@ -103,8 +107,8 @@ export function MobileHeaderNavigation({
   const navigationGroups = siteNavigationGroupsForPath(pathname);
   const mobileTabs = mobileSiteTabsForPath(pathname);
   const menuDescription = navigationContext === "studio"
-    ? (locale === "ko" ? "기획부터 검수·내보내기까지, 필요한 단계로 바로 이동하세요" : "Jump straight to planning, production, review or export")
-    : (locale === "ko" ? "영감을 찾고, 그리고, 함께 나누는 작업실" : "Discover inspiration, draw and share your work");
+    ? (translateBilingualValueForLocale(locale, "shared.components.site.header.mobile.nav", "기획부터 검수·내보내기까지, 필요한 단계로 바로 이동하세요", "Jump straight to planning, production, review or export"))
+    : (translateBilingualValueForLocale(locale, "shared.components.site.header.mobile.nav", "영감을 찾고, 그리고, 함께 나누는 작업실", "Discover inspiration, draw and share your work"));
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -240,7 +244,7 @@ export function MobileHeaderNavigation({
                             <Link
                               href={item.href}
                               aria-label={label}
-                              aria-current={active ? "page" : undefined}
+                              aria-current={active ? translateCurrentStaticSourceText("shared.components.site.header.mobile.nav", "en", "page") : undefined}
                               className={cx(
                                 "group flex min-h-[4.5rem] items-center gap-3 rounded-xl border px-3 py-2.5 transition-all duration-150",
                                 active
@@ -256,7 +260,7 @@ export function MobileHeaderNavigation({
                                     : "border-line bg-canvas/45 group-hover:border-line-strong"
                                 )}
                               >
-                                <Icon size={17} strokeWidth={1.8} className={active ? "text-accent" : "text-fg-3 group-hover:text-accent"} />
+                                <Icon size={17} strokeWidth={1.8} className={active ? translateCurrentStaticSourceText("shared.components.site.header.mobile.nav", "en", "text-accent") : translateCurrentStaticSourceText("shared.components.site.header.mobile.nav", "en", "text-fg-3 group-hover:text-accent")} />
                               </span>
                               <span className="min-w-0">
                                 <span className="block truncate text-sm font-semibold">{label}</span>
@@ -283,7 +287,7 @@ export function MobileHeaderNavigation({
                       key={item.id}
                       href={item.href}
                       aria-label={label}
-                      aria-current={active ? "page" : undefined}
+                      aria-current={active ? translateCurrentStaticSourceText("shared.components.site.header.mobile.nav", "en", "page") : undefined}
                       className={cx(
                         "group flex min-h-12 items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors",
                         active
@@ -291,7 +295,7 @@ export function MobileHeaderNavigation({
                           : "border-line bg-card/70 text-fg-2 hover:border-line-strong hover:bg-raised hover:text-fg"
                       )}
                     >
-                      <Icon size={17} className={active ? "text-on-accent" : "text-fg-3 group-hover:text-accent"} />
+                      <Icon size={17} className={active ? translateCurrentStaticSourceText("shared.components.site.header.mobile.nav", "en", "text-on-accent") : translateCurrentStaticSourceText("shared.components.site.header.mobile.nav", "en", "text-fg-3 group-hover:text-accent")} />
                       <span>{label}</span>
                       <span aria-hidden="true" className={cx("ml-auto text-xs", active ? "text-on-accent/75" : "text-fg-3")}>↗</span>
                     </Link>
@@ -319,7 +323,7 @@ export function MobileHeaderNavigation({
                   key={item.id}
                   href={item.href}
                   aria-label={label}
-                  aria-current={active ? "page" : undefined}
+                  aria-current={active ? translateCurrentStaticSourceText("shared.components.site.header.mobile.nav", "en", "page") : undefined}
                   className={cx(
                     "relative flex min-h-[3.75rem] flex-col items-center justify-center gap-1 py-2 text-[0.62rem] font-semibold transition-all duration-150 active:bg-raised/55",
                     active ? "text-accent" : "text-fg-3 hover:text-fg",

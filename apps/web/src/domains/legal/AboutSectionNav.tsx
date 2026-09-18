@@ -1,3 +1,9 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Layers, Scale, Sparkles, Wrench } from "lucide-react";
 
 import Link from "@/compat/router-link";
@@ -64,11 +70,11 @@ interface AboutSectionNavProps {
 export function AboutSectionNav({ className }: AboutSectionNavProps) {
   const pathname = usePathname();
   const language = useI18n((state) => state.lang);
-  const locale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  const locale = resolveUiLocale(language);
 
   return (
     <nav
-      aria-label={locale === "ko" ? "ToonStudio 소개 메뉴" : "ToonStudio introduction"}
+      aria-label={translateBilingualValueForLocale(locale, "domains.legal.AboutSectionNav", "ToonStudio 소개 메뉴", "ToonStudio introduction")}
       className={cx(
         "rounded-3xl border border-line/70 bg-panel/70 p-2 shadow-sm backdrop-blur-xl",
         className,
@@ -77,7 +83,7 @@ export function AboutSectionNav({ className }: AboutSectionNavProps) {
       <div className="grid gap-1 sm:grid-cols-2 xl:grid-cols-4">
         {ABOUT_ITEMS.map((item) => {
           const Icon = item.icon;
-          const copy = item[locale];
+          const copy = translateLocaleBranchForLocale(locale, "domains.legal.AboutSectionNav", item);
           const exact = pathname === item.href;
           const descendant = item.href === "/about/technology" && pathname.startsWith("/about/technology/");
           const active = exact || descendant;
@@ -86,7 +92,7 @@ export function AboutSectionNav({ className }: AboutSectionNavProps) {
             <Link
               key={item.href}
               href={item.href}
-              aria-current={exact ? "page" : descendant ? "location" : undefined}
+              aria-current={exact ? translateCurrentStaticSourceText("domains.legal.AboutSectionNav", "en", "page") : descendant ? translateCurrentStaticSourceText("domains.legal.AboutSectionNav", "en", "location") : undefined}
               className={cx(
                 "group flex min-h-20 items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-all duration-200",
                 active

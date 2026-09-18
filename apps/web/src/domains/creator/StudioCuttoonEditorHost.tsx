@@ -1,3 +1,9 @@
+import {
+  formatI18nTemplate,
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useUserAi, userAiLegacySettings } from "@/shared/ai/user-ai-store";
 import { applyStudioTaskWorkspace, studioTaskWorkspaceId } from "./studio-task-workspace";
 import { readStudioLocalCanvasSeed, studioLocalCanvasSeedPage } from "./studio-local-canvas-seed";
@@ -1475,7 +1481,7 @@ export function StudioCuttoonEditor({
   const location = useLocation();
   const t = useT();
   const studioLanguage = useI18n((state) => state.lang);
-  const studioSaveLocale = studioLanguage.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  const studioSaveLocale = resolveUiLocale(studioLanguage);
   const [params] = useSearchParams();
   const ecosystemSampleImportRef = useRef<string | null>(null);
   // Live-session identity (`?room=`, per-tab instant id) is owned by StudioDocumentLayout, one level
@@ -26236,7 +26242,7 @@ function clearSelectionForEdit() {
       }}
       aria-haspopup="menu"
       aria-expanded={quickActionsOpen}
-      aria-label={`퀵 메뉴 · ${workspaceControlSide === "left" ? "왼쪽" : "오른쪽"} 엄지 위치`}
+      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCuttoonEditorHost", "ko", "퀵 메뉴 · {v0} 엄지 위치"), { v0: String(workspaceControlSide === "left" ? "왼쪽" : "오른쪽") })}
       className={mobileBarBtn(quickActionsOpen)}
     >
       <Command
@@ -26245,7 +26251,7 @@ function clearSelectionForEdit() {
         aria-hidden
         className={studioChromeIconClass({ tone: "default" })}
       />
-      <span>퀵 메뉴</span>
+      <span>{translateCurrentStaticSourceText("domains.creator.StudioCuttoonEditorHost", "ko", "퀵 메뉴")}</span>
     </button>
   ), [openStudioQuickActionsAt, quickActionsOpen, workspaceControlSide]);
 
@@ -29748,7 +29754,7 @@ function clearSelectionForEdit() {
         <StudioFormalSaveDialog
           open={formalSaveOpen}
           locale={studioSaveLocale}
-          projectTitle={formalSaveProjectTitle || title || (studioSaveLocale === "ko" ? "제목 없는 프로젝트" : "Untitled project")}
+          projectTitle={formalSaveProjectTitle || title || translateBilingualValueForLocale(studioSaveLocale, "domains.creator.StudioCuttoonEditorHost", "제목 없는 프로젝트", "Untitled project")}
           firstSave={formalSaveFirstSave}
           busy={formalSaveBusy}
           error={formalSaveError}
@@ -29772,8 +29778,7 @@ function clearSelectionForEdit() {
           <Suspense fallback={aiSuperSuiteOpen ? (
             <div className="fixed inset-0 z-[120] grid place-items-center bg-bg/80 p-4 backdrop-blur-sm" role="status">
               <div className="rounded-xl border border-line bg-panel px-4 py-3 text-sm font-semibold text-fg shadow-xl">
-                AI 웹툰 레시피 도구를 여는 중…
-                <button type="button" className="ml-3 min-h-11 rounded-lg border border-line px-3" onClick={() => setAiSuperSuiteOpen(false)}>열기 취소</button>
+                {translateCurrentStaticSourceText("domains.creator.StudioCuttoonEditorHost", "ko", "AI 웹툰 레시피 도구를 여는 중…")}<button type="button" className="ml-3 min-h-11 rounded-lg border border-line px-3" onClick={() => setAiSuperSuiteOpen(false)}>{translateCurrentStaticSourceText("domains.creator.StudioCuttoonEditorHost", "ko", "열기 취소")}</button>
               </div>
             </div>
           ) : null}>

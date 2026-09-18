@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioShadingAssistPanel.tsx
  *
@@ -122,24 +126,21 @@ export function StudioShadingAssistPanel({
       <div className="flex items-center justify-between border-b border-slate-800 pb-2">
         <div className="flex items-center gap-1.5 font-semibold text-slate-200">
           <Sun size={15} className="text-amber-400" />
-          <span>자동 음영 어시스트 (Shading Assist)</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "자동 음영 어시스트 (Shading Assist)")}</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium">
-            CSP 2.0
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "en", "CSP 2.0")}</span>
         </div>
       </div>
 
       <p className="text-[11px] text-slate-400 leading-relaxed">
-        선화와 채색 레이어 위에 광원 각도와 환경광을 지정하여 웹툰 셀 명암 레이어를
-        자동으로 생성합니다.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "선화와 채색 레이어 위에 광원 각도와 환경광을 지정하여 웹툰 셀 명암 레이어를 자동으로 생성합니다.")}</p>
 
       {/* 8-Direction Compass Buttons */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between text-[11px] text-slate-400">
           <span className="flex items-center gap-1">
             <Compass size={13} className="text-amber-400" />
-            <span>광원 방향 (Light Source)</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "광원 방향 (Light Source)")}</span>
           </span>
           <span className="font-semibold text-slate-200">
             {LIGHT_DIRECTION_ANGLES_DEG[direction]}°
@@ -174,7 +175,7 @@ export function StudioShadingAssistPanel({
 
       {/* Ambient Temperature Modes */}
       <div className="flex flex-col gap-1.5 pt-1">
-        <span className="text-[11px] text-slate-400">분위기 환경광 (Ambient Mood)</span>
+        <span className="text-[11px] text-slate-400">{translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "분위기 환경광 (Ambient Mood)")}</span>
         <div className="grid grid-cols-2 gap-1.5">
           {AMBIENT_TEMPERATURES.map((temp) => {
             const isSelected = temperature === temp.id;
@@ -206,7 +207,7 @@ export function StudioShadingAssistPanel({
       <div className="flex flex-col gap-2 pt-1 border-t border-slate-800">
         <div className="flex flex-col gap-1">
           <div className="flex justify-between text-[11px]">
-            <span className="text-slate-400">명암 농도 (Intensity)</span>
+            <span className="text-slate-400">{translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "명암 농도 (Intensity)")}</span>
             <span className="font-semibold text-slate-200">{intensity}%</span>
           </div>
           <input
@@ -221,9 +222,9 @@ export function StudioShadingAssistPanel({
 
         <div className="flex flex-col gap-1">
           <div className="flex justify-between text-[11px]">
-            <span className="text-slate-400">그라데이션 부드러움 (Softness)</span>
+            <span className="text-slate-400">{translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "그라데이션 부드러움 (Softness)")}</span>
             <span className="font-semibold text-slate-200">
-              {softness === 0 ? "하드 셀(Hard)" : `${softness}%`}
+              {softness === 0 ? translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "하드 셀(Hard)") : `${softness}%`}
             </span>
           </div>
           <input
@@ -246,24 +247,24 @@ export function StudioShadingAssistPanel({
             onChange={(e) => setEnableRimLight(e.target.checked)}
             className="rounded accent-amber-400"
           />
-          <span>외곽 림 라이트 (Rim Light) 포함</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "외곽 림 라이트 (Rim Light) 포함")}</span>
         </label>
         <div className="flex items-center gap-1.5">
           <div
             className="size-3.5 rounded-full border border-white/20 shadow-sm"
             style={{ backgroundColor: computed.shadow1ColorHex }}
-            title={`그림자 1단계: ${computed.shadow1ColorHex}`}
+            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "그림자 1단계: {v0}"), { v0: String(computed.shadow1ColorHex) })}
           />
           <div
             className="size-3.5 rounded-full border border-white/20 shadow-sm"
             style={{ backgroundColor: computed.shadow2ColorHex }}
-            title={`그림자 2단계: ${computed.shadow2ColorHex}`}
+            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "그림자 2단계: {v0}"), { v0: String(computed.shadow2ColorHex) })}
           />
           {computed.rimLightColorHex && (
             <div
               className="size-3.5 rounded-full border border-white/20 shadow-sm"
               style={{ backgroundColor: computed.rimLightColorHex }}
-              title={`림 라이트: ${computed.rimLightColorHex}`}
+              title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "림 라이트: {v0}"), { v0: String(computed.rimLightColorHex) })}
             />
           )}
         </div>
@@ -283,12 +284,12 @@ export function StudioShadingAssistPanel({
         {appliedNotice ? (
           <>
             <Check size={14} />
-            <span>음영 생성 완료!</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "음영 생성 완료!")}</span>
           </>
         ) : (
           <>
             <Layers size={14} />
-            <span>음영 어시스트 레이어 생성 (CSP 2.0)</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "음영 어시스트 레이어 생성 (CSP 2.0)")}</span>
           </>
         )}
       </button>

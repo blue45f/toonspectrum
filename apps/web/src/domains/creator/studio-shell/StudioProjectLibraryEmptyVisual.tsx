@@ -1,3 +1,8 @@
+import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, FileUp, PlayCircle, Plus, ShieldCheck, Sparkles } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
@@ -6,7 +11,7 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 
 import "./studio-project-library-empty-visual.css";
 
-type Locale = "ko" | "en";
+type Locale = string;
 
 const COPY = {
   ko: {
@@ -44,7 +49,7 @@ const COPY = {
 const HREFS = ["/studio/new", "/studio/import", "/production/projects/sample-project/overview"] as const;
 
 export function StudioProjectLibraryEmptyVisual({ locale }: { readonly locale: Locale }) {
-  const copy = COPY[locale];
+  const copy = translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryEmptyVisual", COPY);
   const reducedMotion = useReducedMotion();
   return (
     <section className="studio-project-empty-visual" aria-labelledby="studio-project-empty-title" lang={locale}>
@@ -52,7 +57,7 @@ export function StudioProjectLibraryEmptyVisual({ locale }: { readonly locale: L
         <p className="studio-project-empty-visual__eyebrow"><Sparkles size={14} aria-hidden="true" />{copy.eyebrow}</p>
         <h2 id="studio-project-empty-title">{copy.title}</h2>
         <p className="studio-project-empty-visual__body">{copy.body}</p>
-        <div className="studio-project-empty-visual__badges" aria-label={locale === "ko" ? "작업 보호 기능" : "Work protection features"}>
+        <div className="studio-project-empty-visual__badges" aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectLibraryEmptyVisual", "작업 보호 기능", "Work protection features")}>
           {copy.badges.map((badge) => <span key={badge}><ShieldCheck size={13} aria-hidden="true" />{badge}</span>)}
         </div>
         <div className="studio-project-empty-visual__actions">
@@ -67,7 +72,7 @@ export function StudioProjectLibraryEmptyVisual({ locale }: { readonly locale: L
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       >
         <img src="/brand/theme-scenes/aurora-studio.svg" alt={copy.visualAlt} loading="lazy" decoding="async" />
-        <figcaption>TOONSTUDIO · START → CREATE → CONTINUE</figcaption>
+        <figcaption>{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectLibraryEmptyVisual", "en", "TOONSTUDIO · START → CREATE → CONTINUE")}</figcaption>
       </motion.figure>
       <div className="studio-project-empty-visual__routes">
         {copy.routes.map(([number, title, body], index) => (

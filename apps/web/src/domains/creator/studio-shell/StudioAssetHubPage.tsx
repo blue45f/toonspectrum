@@ -1,3 +1,9 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Boxes, Library, Palette, Search, ShieldCheck, Store } from "lucide-react";
 import { lazy, Suspense, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -22,9 +28,10 @@ import {
 
 const CreatorEssentialsPage = lazy(() => import("./creator-essentials/CreatorEssentialsPage"));
 
-type Locale = "ko" | "en";
+type Locale = string;
+type AuthoredLocale = "ko" | "en";
 
-const VIEW_LABELS: Readonly<Record<AssetHubView, Readonly<Record<Locale, string>>>> = {
+const VIEW_LABELS: Readonly<Record<AssetHubView, Readonly<Record<AuthoredLocale, string>>>> = {
   essentials: { ko: "무료 제작 소재", en: "Creator essentials" },
   overview: { ko: "소재 홈", en: "Materials home" },
   "series-kit": { ko: "Series Kit", en: "Series Kit" },
@@ -46,7 +53,7 @@ const VIEW_ICONS = {
 
 /** Convert an application language tag into the locales supported by this shell. */
 function localeFromLanguage(language: string): Locale {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  return resolveUiLocale(language);
 }
 
 /** Build a canonical link while preserving the optional project context. */
@@ -75,20 +82,16 @@ function MissingProjectView({
         </span>
         <h2 className="mt-4 text-xl font-black text-fg">
           {seriesKit
-            ? (locale === "ko" ? "프로젝트에서 Series Kit를 열어 주세요" : "Open Series Kit from a project")
-            : (locale === "ko" ? "확인할 프로젝트를 먼저 선택해 주세요" : "Choose a project to check")}
+            ? (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioAssetHubPage", "프로젝트에서 Series Kit를 열어 주세요", "Open Series Kit from a project"))
+            : (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioAssetHubPage", "확인할 프로젝트를 먼저 선택해 주세요", "Choose a project to check"))}
         </h2>
         <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-fg-2">
           {seriesKit
-            ? (locale === "ko"
-              ? "Series Kit는 작품별 색상·글꼴·말풍선·출력 규칙을 관리합니다. 내 작업에서 프로젝트를 선택한 뒤 소재의 Series Kit를 열면 됩니다."
-              : "Series Kit manages project colors, typography, balloons and export defaults. Choose a project from My work, then open its Series Kit.")
-            : (locale === "ko"
-              ? "사용 목적, 구매 내역, 팀 좌석, 글꼴, AI 출처와 확장 기능 권한은 프로젝트마다 달라집니다. 내 작업에서 프로젝트를 선택하면 한 번에 확인할 수 있습니다."
-              : "Usage purpose, purchases, team seats, fonts, AI provenance and extension permissions differ per project. Choose a project from My work to review them together.")}
+            ? (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioAssetHubPage", "Series Kit는 작품별 색상·글꼴·말풍선·출력 규칙을 관리합니다. 내 작업에서 프로젝트를 선택한 뒤 소재의 Series Kit를 열면 됩니다.", "Series Kit manages project colors, typography, balloons and export defaults. Choose a project from My work, then open its Series Kit."))
+            : (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioAssetHubPage", "사용 목적, 구매 내역, 팀 좌석, 글꼴, AI 출처와 확장 기능 권한은 프로젝트마다 달라집니다. 내 작업에서 프로젝트를 선택하면 한 번에 확인할 수 있습니다.", "Usage purpose, purchases, team seats, fonts, AI provenance and extension permissions differ per project. Choose a project from My work to review them together."))}
         </p>
         <Link href="/studio" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm font-bold text-on-accent">
-          {locale === "ko" ? "내 작업으로" : "Go to My work"}
+          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioAssetHubPage", "내 작업으로", "Go to My work")}
         </Link>
       </section>
     </Container>
@@ -104,7 +107,7 @@ export function StudioAssetHubPage() {
   const projectId = searchParams.get("project")?.trim() || null;
   const CurrentViewIcon = VIEW_ICONS[view];
 
-  const currentLabel = useMemo(() => VIEW_LABELS[view][locale], [locale, view]);
+  const currentLabel = useMemo(() => translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioAssetHubPage", VIEW_LABELS[view]), [locale, view]);
   const visibleViews = projectId
     ? ASSET_HUB_VIEWS
     : ASSET_HUB_VIEWS.filter((candidate) => candidate !== "series-kit" && candidate !== "safety");
@@ -119,17 +122,17 @@ export function StudioAssetHubPage() {
                 <CurrentViewIcon size={18} aria-hidden="true" />
               </span>
               <div>
-                <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">TOONSTUDIO MATERIALS</p>
+                <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioAssetHubPage", "en", "TOONSTUDIO MATERIALS")}</p>
                 <p className="text-sm font-bold text-fg">{currentLabel}</p>
                 {projectId ? (
                   <p className="mt-0.5 text-xs text-fg-3">
-                    {locale === "ko" ? `프로젝트 ${projectId}에 연결` : `Connected to project ${projectId}`}
+                    {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioAssetHubPage", `프로젝트 ${projectId}에 연결`, `Connected to project ${projectId}`)}
                   </p>
                 ) : null}
               </div>
             </div>
 
-            <nav aria-label={locale === "ko" ? "소재 화면" : "Material views"} className="overflow-x-auto">
+            <nav aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioAssetHubPage", "소재 화면", "Material views")} className="overflow-x-auto">
               <div className="flex min-w-max gap-1 rounded-2xl border border-line bg-card p-1">
                 {visibleViews.map((candidate) => {
                   const active = candidate === view;
@@ -138,7 +141,7 @@ export function StudioAssetHubPage() {
                     <Link
                       key={candidate}
                       href={assetHubHref(candidate, projectId)}
-                      aria-current={active ? "page" : undefined}
+                      aria-current={active ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioAssetHubPage", "en", "page") : undefined}
                       className={cn(
                         "inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-xs font-bold transition-colors",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
@@ -148,7 +151,7 @@ export function StudioAssetHubPage() {
                       )}
                     >
                       <Icon size={15} aria-hidden="true" />
-                      {VIEW_LABELS[candidate][locale]}
+                      {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioAssetHubPage", VIEW_LABELS[candidate])}
                     </Link>
                   );
                 })}
@@ -160,7 +163,7 @@ export function StudioAssetHubPage() {
 
       {view === "overview" ? <StudioAssetVisualIntro locale={locale} /> : null}
       {view === "overview" ? <StudioAssetsPage /> : null}
-      {view === "essentials" ? <Suspense fallback={<p role="status" className="p-8 text-sm text-fg-2">{locale === "ko" ? "제작 소재 준비 중…" : "Loading creator essentials…"}</p>}><CreatorEssentialsPage /></Suspense> : null}
+      {view === "essentials" ? <Suspense fallback={<p role="status" className="p-8 text-sm text-fg-2">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioAssetHubPage", "제작 소재 준비 중…", "Loading creator essentials…")}</p>}><CreatorEssentialsPage /></Suspense> : null}
       {view === "series-kit" && projectId ? (
         <Container size="wide" className="py-7 sm:py-10">
           <StudioSeriesKitPanel projectId={projectId} locale={locale} />

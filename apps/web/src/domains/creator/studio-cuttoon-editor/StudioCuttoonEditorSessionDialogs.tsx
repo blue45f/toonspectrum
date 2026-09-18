@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /* Extracted render tree from StudioCuttoonEditor.
  * Session props are an `any` bag matching the original editor closure. */
 // @ts-nocheck
@@ -59,7 +60,7 @@ export function StudioCuttoonEditorSessionDialogs(s: StudioCuttoonEditorViewSess
         <Suspense fallback={null}>
           <StudioFilterDialog
             key={studioFilterSession.id}
-            activeKey={`filter:${studioFilterSession.id}`}
+            activeKey={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorSessionDialogs", "en", "filter:{v0}"), { v0: String(studioFilterSession.id) })}
             kind={studioFilterSession.kind}
             image={studioFilterDialogImage}
             imageSrc={studioFilterDialogImage.src}

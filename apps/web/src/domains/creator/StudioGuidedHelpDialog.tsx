@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Guided Help — an authored, context-aware layer above the existing command
  * search, tutorials and diagnostics surfaces.
@@ -140,13 +144,11 @@ function SurfaceButton({
       type="button"
       onClick={onClick}
       data-active={active || undefined}
-      className={`flex min-h-11 w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-        active
+      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "en", "flex min-h-11 w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(active
           ? "border-accent/55 bg-accent-soft text-fg"
-          : "border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg"
-      }`}
+          : "border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg") })}
     >
-      <Icon size={17} aria-hidden className={active ? "text-accent" : "text-fg-3"} />
+      <Icon size={17} aria-hidden className={active ? translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "en", "text-accent") : translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "en", "text-fg-3")} />
       <span className="min-w-0 flex-1">
         <span className="block text-xs font-semibold">{title}</span>
         {description ? (
@@ -172,18 +174,16 @@ function EmptySearch({ onOpenCommandSearch }: { onOpenCommandSearch: () => void 
   return (
     <div className="rounded-2xl border border-dashed border-line bg-card/40 px-4 py-8 text-center">
       <Search size={24} aria-hidden className="mx-auto text-fg-3" />
-      <h3 className="mt-3 text-sm font-semibold text-fg">작성형 가이드에서 찾지 못했습니다</h3>
+      <h3 className="mt-3 text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "작성형 가이드에서 찾지 못했습니다")}</h3>
       <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-fg-3">
-        F1 검색은 모든 명령·설정·패널·튜토리얼과 CSP·Photoshop·Krita·Procreate 별칭을 함께 찾습니다.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "F1 검색은 모든 명령·설정·패널·튜토리얼과 CSP·Photoshop·Krita·Procreate 별칭을 함께 찾습니다.")}</p>
       <button
         type="button"
         onClick={onOpenCommandSearch}
         className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-xs font-semibold text-accent-contrast transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <Command size={16} aria-hidden />
-        F1 기능·설정 찾기 열기
-      </button>
+        {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "F1 기능·설정 찾기 열기")}</button>
     </div>
   );
 }
@@ -219,17 +219,13 @@ function GuidedHelpHome({
           <div className="relative">
             <span className="inline-flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-accent">
               <Sparkles size={14} aria-hidden />
-              Contextual guided help
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "en", "Contextual guided help")}</span>
             <h2 className="mt-2 text-xl font-bold tracking-tight text-fg sm:text-2xl">
-              막힌 작업을 설명해 보세요
-            </h2>
+              {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "막힌 작업을 설명해 보세요")}</h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-3">
-              현재 도구의 30초 시작법, 실패 원인과 복구 순서를 먼저 보여 주고, 더 넓은 기능은 F1 검색과 실측 진단으로 이어 줍니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "현재 도구의 30초 시작법, 실패 원인과 복구 순서를 먼저 보여 주고, 더 넓은 기능은 F1 검색과 실측 진단으로 이어 줍니다.")}</p>
             <label htmlFor={inputId} className="sr-only">
-              도움말 검색
-            </label>
+              {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "도움말 검색")}</label>
             <div className="mt-4 flex min-h-12 items-center gap-2 rounded-xl border border-line bg-panel px-3 focus-within:border-accent/70 focus-within:ring-2 focus-within:ring-accent/20">
               <Search size={18} aria-hidden className="shrink-0 text-fg-3" />
               <input
@@ -239,7 +235,7 @@ function GuidedHelpHome({
                 value={query}
                 autoComplete="off"
                 onChange={(event: ChangeEvent<HTMLInputElement>) => onQueryChange(event.currentTarget.value)}
-                placeholder="예: 색이 새요, Paint Bucket, 퀵 마스크, 저장 복구"
+                placeholder={translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "예: 색이 새요, Paint Bucket, 퀵 마스크, 저장 복구")}
                 className="min-h-11 min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
               />
               {query ? (
@@ -249,7 +245,7 @@ function GuidedHelpHome({
                   className="flex size-11 shrink-0 items-center justify-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   <X size={16} aria-hidden />
-                  <span className="sr-only">검색어 지우기</span>
+                  <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "검색어 지우기")}</span>
                 </button>
               ) : (
                 <kbd className="shrink-0 rounded-md border border-line bg-card px-2 py-1 text-[0.6875rem] text-fg-3">
@@ -262,15 +258,15 @@ function GuidedHelpHome({
       </section>
 
       <p role="status" aria-live="polite" className="sr-only">
-        {searching ? `작성형 도움말 검색 결과 ${results.length}개` : "추천 도움말을 표시합니다."}
+        {searching ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "작성형 도움말 검색 결과 {v0}개"), { v0: String(results.length) }) : translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "추천 도움말을 표시합니다.")}
       </p>
 
       {searching ? (
         results.length > 0 ? (
-          <section aria-label="도움말 검색 결과" className="space-y-2">
+          <section aria-label={translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "도움말 검색 결과")} className="space-y-2">
             <div className="flex items-baseline justify-between gap-3">
-              <h3 className="text-sm font-semibold text-fg">작성형 도움말</h3>
-              <span className="text-[0.6875rem] tabular-nums text-fg-3">{results.length}개</span>
+              <h3 className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "작성형 도움말")}</h3>
+              <span className="text-[0.6875rem] tabular-nums text-fg-3">{results.length}{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "개")}</span>
             </div>
             <div className="grid gap-2 lg:grid-cols-2">
               {results.map(({ article, matchedOn }) => {
@@ -296,7 +292,7 @@ function GuidedHelpHome({
                         {article.summary}
                       </span>
                       {matchedOn === "alias" ? (
-                        <span className="mt-1 block text-[0.625rem] text-accent">익숙한 타사·이전 용어로 찾음</span>
+                        <span className="mt-1 block text-[0.625rem] text-accent">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "익숙한 타사·이전 용어로 찾음")}</span>
                       ) : null}
                     </span>
                     <ChevronRight size={16} aria-hidden className="mt-1 shrink-0 text-fg-3" />
@@ -314,9 +310,8 @@ function GuidedHelpHome({
             <section aria-labelledby="guided-current-tool-heading">
               <div className="mb-2 flex items-baseline justify-between gap-3">
                 <h3 id="guided-current-tool-heading" className="text-sm font-semibold text-fg">
-                  지금 쓰는 도구
-                </h3>
-                <span className="text-[0.6875rem] text-fg-3">작업 맥락에서 바로 시작</span>
+                  {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "지금 쓰는 도구")}</h3>
+                <span className="text-[0.6875rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "작업 맥락에서 바로 시작")}</span>
               </div>
               <button
                 type="button"
@@ -327,7 +322,7 @@ function GuidedHelpHome({
                   <Paintbrush size={21} aria-hidden />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[0.6875rem] font-semibold uppercase tracking-wider text-accent">현재 도구 가이드</span>
+                  <span className="block text-[0.6875rem] font-semibold uppercase tracking-wider text-accent">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "현재 도구 가이드")}</span>
                   <span className="mt-1 block text-base font-bold text-fg">{initialArticle.title}</span>
                   <span className="mt-1 line-clamp-2 block text-xs leading-relaxed text-fg-3">{initialArticle.summary}</span>
                 </span>
@@ -339,9 +334,8 @@ function GuidedHelpHome({
           <section aria-labelledby="guided-intents-heading">
             <div className="mb-2 flex items-baseline justify-between gap-3">
               <h3 id="guided-intents-heading" className="text-sm font-semibold text-fg">
-                무엇을 하려는 중인가요?
-              </h3>
-              <span className="text-[0.6875rem] text-fg-3">결과 중심으로 찾기</span>
+                {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "무엇을 하려는 중인가요?")}</h3>
+              <span className="text-[0.6875rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "결과 중심으로 찾기")}</span>
             </div>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               {STUDIO_GUIDED_HELP_INTENTS.map((intent) => (
@@ -365,9 +359,8 @@ function GuidedHelpHome({
           <section aria-labelledby="guided-support-heading">
             <div className="mb-2 flex items-baseline justify-between gap-3">
               <h3 id="guided-support-heading" className="text-sm font-semibold text-fg">
-                빠른 해결과 참고
-              </h3>
-              <span className="text-[0.6875rem] text-fg-3">실측·복구·전체 문서</span>
+                {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "빠른 해결과 참고")}</h3>
+              <span className="text-[0.6875rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "실측·복구·전체 문서")}</span>
             </div>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {SUPPORT_ACTIONS.map((item) => (
@@ -381,15 +374,15 @@ function GuidedHelpHome({
               ))}
               <SurfaceButton
                 icon={BookOpen}
-                title="전체 사용자 매뉴얼"
-                description="새 탭에서 긴 형식 문서 열기"
+                title={translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "전체 사용자 매뉴얼")}
+                description={translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "새 탭에서 긴 형식 문서 열기")}
                 onClick={onOpenManual}
                 trailing={<ExternalLink size={15} aria-hidden className="shrink-0 text-fg-3" />}
               />
               <SurfaceButton
                 icon={Command}
-                title="F1 기능·설정 찾기"
-                description="모든 명령·설정·패널·튜토리얼"
+                title={translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "F1 기능·설정 찾기")}
+                description={translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "모든 명령·설정·패널·튜토리얼")}
                 onClick={onOpenCommandSearch}
               />
             </div>
@@ -428,8 +421,7 @@ function GuidedHelpArticle({
         className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <ArrowLeft size={17} aria-hidden />
-        도움말 홈
-      </button>
+        {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "도움말 홈")}</button>
 
       <header className="mt-2 rounded-2xl border border-line bg-card p-4 sm:p-6">
         <div className="flex items-start gap-4">
@@ -441,13 +433,13 @@ function GuidedHelpArticle({
               <span className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-accent">
                 {article.eyebrow}
               </span>
-              {currentTool ? <ArticleBadge>현재 도구</ArticleBadge> : null}
+              {currentTool ? <ArticleBadge>{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "현재 도구")}</ArticleBadge> : null}
             </div>
             <h2 className="mt-2 text-xl font-bold tracking-tight text-fg sm:text-2xl">{article.title}</h2>
             <p className="mt-2 max-w-3xl text-sm leading-relaxed text-fg-2">{article.summary}</p>
             <div className="mt-3 flex flex-wrap gap-1.5">
               <ArticleBadge>{studioGuidedHelpCategoryLabel(article.category)}</ArticleBadge>
-              {toolHelp?.shortcut ? <ArticleBadge>단축키 {toolHelp.shortcut}</ArticleBadge> : null}
+              {toolHelp?.shortcut ? <ArticleBadge>{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "단축키 ")}{toolHelp.shortcut}</ArticleBadge> : null}
               {toolHelp?.aliases.slice(0, 2).map((alias) => (
                 <ArticleBadge key={`${alias.vendor}:${alias.term}`}>{alias.term}</ArticleBadge>
               ))}
@@ -459,7 +451,7 @@ function GuidedHelpArticle({
       <section aria-labelledby="guided-steps-heading" className="mt-5">
         <div className="flex items-center gap-2">
           <Sparkles size={17} aria-hidden className="text-accent" />
-          <h3 id="guided-steps-heading" className="text-sm font-semibold text-fg">30초 시작</h3>
+          <h3 id="guided-steps-heading" className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "30초 시작")}</h3>
         </div>
         <ol className="mt-2 grid gap-2 lg:grid-cols-3">
           {article.steps.map((step, index) => (
@@ -473,7 +465,7 @@ function GuidedHelpArticle({
           ))}
         </ol>
         <div className="mt-2 rounded-xl border border-accent/30 bg-accent-soft/20 px-3.5 py-3">
-          <p className="text-[0.6875rem] font-semibold uppercase tracking-wider text-accent">완료 모습</p>
+          <p className="text-[0.6875rem] font-semibold uppercase tracking-wider text-accent">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "완료 모습")}</p>
           <p className="mt-1 text-xs leading-relaxed text-fg-2">{article.outcome}</p>
         </div>
       </section>
@@ -482,7 +474,7 @@ function GuidedHelpArticle({
         <section aria-labelledby="guided-troubleshooting-heading">
           <div className="flex items-center gap-2">
             <Wrench size={17} aria-hidden className="text-fg-3" />
-            <h3 id="guided-troubleshooting-heading" className="text-sm font-semibold text-fg">잘 안 될 때</h3>
+            <h3 id="guided-troubleshooting-heading" className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "잘 안 될 때")}</h3>
           </div>
           <div className="mt-2 space-y-2">
             {article.problems.map((problem, index) => (
@@ -496,8 +488,8 @@ function GuidedHelpArticle({
                   <ChevronRight size={16} aria-hidden className="shrink-0 text-fg-3 transition-transform group-open:rotate-90" />
                 </summary>
                 <div className="border-t border-line px-3.5 py-3 text-xs leading-relaxed">
-                  <p className="text-fg-3"><strong className="font-semibold text-fg-2">가능한 원인 · </strong>{problem.cause}</p>
-                  <p className="mt-2 text-fg-2"><strong className="font-semibold text-accent">해결 순서 · </strong>{problem.fix}</p>
+                  <p className="text-fg-3"><strong className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "가능한 원인 · ")}</strong>{problem.cause}</p>
+                  <p className="mt-2 text-fg-2"><strong className="font-semibold text-accent">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "해결 순서 · ")}</strong>{problem.fix}</p>
                 </div>
               </details>
             ))}
@@ -509,7 +501,7 @@ function GuidedHelpArticle({
             <section className="rounded-xl border border-line bg-card p-3.5">
               <div className="flex items-center gap-2">
                 <MousePointer2 size={16} aria-hidden className="text-fg-3" />
-                <h3 className="text-xs font-semibold text-fg">먼저 확인</h3>
+                <h3 className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "먼저 확인")}</h3>
               </div>
               <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-fg-3">
                 {article.checks.map((check) => <li key={check}>· {check}</li>)}
@@ -520,7 +512,7 @@ function GuidedHelpArticle({
             <section className="rounded-xl border border-line bg-card p-3.5">
               <div className="flex items-center gap-2">
                 <Lightbulb size={16} aria-hidden className="text-accent" />
-                <h3 className="text-xs font-semibold text-fg">작업 팁</h3>
+                <h3 className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "작업 팁")}</h3>
               </div>
               <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-fg-3">
                 {article.tips.map((tip) => <li key={tip}>· {tip}</li>)}
@@ -531,11 +523,10 @@ function GuidedHelpArticle({
             <section className="rounded-xl border border-line bg-card p-3.5">
               <div className="flex items-center gap-2">
                 <BookOpen size={16} aria-hidden className="text-fg-3" />
-                <h3 className="text-xs font-semibold text-fg">관련 학습 경로</h3>
+                <h3 className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "관련 학습 경로")}</h3>
               </div>
               <p className="mt-2 text-xs leading-relaxed text-fg-3">
-                기능 튜토리얼에서 {article.tutorialIds.length}개 관련 실습을 더 볼 수 있습니다. F1 검색에서 도구 이름을 입력하면 튜토리얼 결과도 함께 표시됩니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "기능 튜토리얼에서 ")}{article.tutorialIds.length}{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "개 관련 실습을 더 볼 수 있습니다. F1 검색에서 도구 이름을 입력하면 튜토리얼 결과도 함께 표시됩니다.")}</p>
             </section>
           ) : null}
         </aside>
@@ -543,7 +534,7 @@ function GuidedHelpArticle({
 
       {related.length > 0 ? (
         <section aria-labelledby="guided-related-heading" className="mt-5">
-          <h3 id="guided-related-heading" className="text-sm font-semibold text-fg">다음에 이어 보기</h3>
+          <h3 id="guided-related-heading" className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "다음에 이어 보기")}</h3>
           <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {related.map((candidate) => {
               const Icon = CATEGORY_ICON[candidate.category];
@@ -563,10 +554,9 @@ function GuidedHelpArticle({
 
       <section className="mt-5 flex flex-col gap-3 rounded-2xl border border-line bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-fg">이제 실제 기능으로 이동하세요</h3>
+          <h3 className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "이제 실제 기능으로 이동하세요")}</h3>
           <p className="mt-1 text-xs leading-relaxed text-fg-3">
-            실행과 이동은 상태를 아는 기존 명령 레지스트리가 담당합니다. 이 도움말은 없는 동작을 실행되는 것처럼 표시하지 않습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "실행과 이동은 상태를 아는 기존 명령 레지스트리가 담당합니다. 이 도움말은 없는 동작을 실행되는 것처럼 표시하지 않습니다.")}</p>
         </div>
         <button
           type="button"
@@ -704,7 +694,7 @@ export function StudioGuidedHelpDialog({
   return createPortal(
     <div
       ref={overlayRef}
-      className={`fixed inset-0 ${STUDIO_Z_CLASS.help} flex items-center justify-center bg-black/50 px-2 py-2 backdrop-blur-sm sm:px-4 sm:py-[4vh]`}
+      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "en", "fixed inset-0 {v0} flex items-center justify-center bg-black/50 px-2 py-2 backdrop-blur-sm sm:px-4 sm:py-[4vh]"), { v0: String(STUDIO_Z_CLASS.help) })}
       onPointerDown={(event: ReactPointerEvent<HTMLDivElement>) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -723,34 +713,33 @@ export function StudioGuidedHelpDialog({
           </span>
           <div className="min-w-0 flex-1">
             <h1 id={titleId} className="truncate text-sm font-bold text-fg">
-              도움말 홈{activeArticle ? ` · ${activeArticle.title}` : ""}
+              {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "도움말 홈")}{activeArticle ? ` · ${activeArticle.title}` : ""}
             </h1>
             <p id={descriptionId} className="truncate text-[0.6875rem] text-fg-3">
-              현재 도구 · 작업별 30초 가이드 · 문제 해결 · 전체 검색
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "현재 도구 · 작업별 30초 가이드 · 문제 해결 · 전체 검색")}</p>
           </div>
           <button
             ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            title="닫기 (Esc)"
+            title={translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "닫기 (Esc)")}
             className="flex size-11 shrink-0 items-center justify-center rounded-xl text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <X size={19} aria-hidden />
-            <span className="sr-only">도움말 닫기</span>
+            <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "도움말 닫기")}</span>
           </button>
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <nav
-            aria-label="도움말 바로가기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "도움말 바로가기")}
             className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-card/35 p-2 md:w-56 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r"
           >
             <div className="min-w-44 md:min-w-0">
               <SurfaceButton
                 icon={Home}
-                title="도움말 홈"
-                description="검색·목적별 시작"
+                title={translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "도움말 홈")}
+                description={translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "검색·목적별 시작")}
                 onClick={goHome}
                 active={!activeArticle}
               />
@@ -759,7 +748,7 @@ export function StudioGuidedHelpDialog({
               <div className="min-w-44 md:min-w-0">
                 <SurfaceButton
                   icon={Paintbrush}
-                  title="현재 도구"
+                  title={translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "현재 도구")}
                   description={initialArticle.title}
                   onClick={() => openArticle(initialArticle.id)}
                   active={activeArticle?.id === initialArticle.id}
@@ -780,19 +769,18 @@ export function StudioGuidedHelpDialog({
             <div className="mt-auto hidden space-y-1 pt-2 md:block">
               <SurfaceButton
                 icon={Command}
-                title="F1 전체 검색"
+                title={translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "F1 전체 검색")}
                 onClick={onOpenCommandSearch}
               />
               <SurfaceButton
                 icon={BookOpen}
-                title="사용자 매뉴얼"
+                title={translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "사용자 매뉴얼")}
                 onClick={onOpenManual}
                 trailing={<ExternalLink size={15} aria-hidden className="shrink-0 text-fg-3" />}
               />
               <div className="flex items-center gap-2 px-3 pt-2 text-[0.625rem] leading-relaxed text-fg-3">
                 <MessageSquare size={14} aria-hidden className="shrink-0" />
-                실행 가능 여부는 현재 스튜디오 상태에서 다시 확인합니다.
-              </div>
+                {translateCurrentStaticSourceText("domains.creator.StudioGuidedHelpDialog", "ko", "실행 가능 여부는 현재 스튜디오 상태에서 다시 확인합니다.")}</div>
             </div>
           </nav>
 

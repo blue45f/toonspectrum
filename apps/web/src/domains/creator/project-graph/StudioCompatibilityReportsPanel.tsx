@@ -1,4 +1,8 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   CheckCircle2,
   FileWarning,
@@ -19,7 +23,7 @@ import {
 import type { CompatibilityReport } from "./studio-project-graph-contract";
 import { useStudioProjectGraph } from "./useStudioProjectGraph";
 
-type Locale = "ko" | "en";
+type Locale = string;
 
 const GRADE_STYLES = Object.freeze({
   A: "border-success/30 bg-success-soft/30 text-success",
@@ -30,10 +34,12 @@ const GRADE_STYLES = Object.freeze({
 
 function reportSummary(report: CompatibilityReport, locale: Locale): string {
   const summary = report.summary;
-  if (locale === "ko") {
-    return `보존 ${summary.preserved} · 변환/근사 ${summary.converted + summary.approximated} · 래스터화 ${summary.rasterized} · 제외/불투명/차단 ${summary.ignored + summary.opaquePreserved + summary.blocked}`;
-  }
-  return `Preserved ${summary.preserved} · converted/approximated ${summary.converted + summary.approximated} · rasterized ${summary.rasterized} · ignored/opaque/blocked ${summary.ignored + summary.opaquePreserved + summary.blocked}`;
+  return translateBilingualValueForLocale(
+    locale,
+    "domains.creator.project.graph.StudioCompatibilityReportsPanel.reportSummary",
+    `보존 ${summary.preserved} · 변환/근사 ${summary.converted + summary.approximated} · 래스터화 ${summary.rasterized} · 제외/불투명/차단 ${summary.ignored + summary.opaquePreserved + summary.blocked}`,
+    `Preserved ${summary.preserved} · converted/approximated ${summary.converted + summary.approximated} · rasterized ${summary.rasterized} · ignored/opaque/blocked ${summary.ignored + summary.opaquePreserved + summary.blocked}`,
+  );
 }
 
 export function StudioCompatibilityReportsPanel({
@@ -62,9 +68,7 @@ export function StudioCompatibilityReportsPanel({
     } catch (nextError) {
       setError(await getApiErrorMessage(
         nextError,
-        locale === "ko"
-          ? "파일 호환성 이력을 불러오지 못했습니다."
-          : "File compatibility history could not be loaded.",
+        translateBilingualValueForLocale(locale, "domains.creator.project.graph.StudioCompatibilityReportsPanel", "파일 호환성 이력을 불러오지 못했습니다.", "File compatibility history could not be loaded."),
       ));
     } finally {
       setLoading(false);
@@ -89,9 +93,7 @@ export function StudioCompatibilityReportsPanel({
     } catch (nextError) {
       setError(await getApiErrorMessage(
         nextError,
-        locale === "ko"
-          ? "호환성 손실 승인을 저장하지 못했습니다."
-          : "Compatibility loss approval could not be saved.",
+        translateBilingualValueForLocale(locale, "domains.creator.project.graph.StudioCompatibilityReportsPanel", "호환성 손실 승인을 저장하지 못했습니다.", "Compatibility loss approval could not be saved."),
       ));
     } finally {
       setApprovingId(null);
@@ -106,15 +108,12 @@ export function StudioCompatibilityReportsPanel({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            IMPORT COMPATIBILITY
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.project.graph.StudioCompatibilityReportsPanel", "en", "IMPORT COMPATIBILITY")}</p>
           <h2 id="studio-compatibility-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
-            {locale === "ko" ? "PSD·PNG·CLIP 원본과 변환 손실" : "PSD, PNG and CLIP source fidelity"}
+            {translateBilingualValueForLocale(locale, "domains.creator.project.graph.StudioCompatibilityReportsPanel", "PSD·PNG·CLIP 원본과 변환 손실", "PSD, PNG and CLIP source fidelity")}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">
-            {locale === "ko"
-              ? "원본은 변경하지 않고 보관하며, 변환·래스터화·제외 항목은 저장 전에 명시적으로 보여줍니다. A 이외 등급은 사용자 승인 없이는 편집 Revision에 연결되지 않습니다."
-              : "Originals remain immutable. Conversion, rasterization and exclusion are disclosed before save. Grades below A require explicit approval before entering an editable revision."}
+            {translateBilingualValueForLocale(locale, "domains.creator.project.graph.StudioCompatibilityReportsPanel", "원본은 변경하지 않고 보관하며, 변환·래스터화·제외 항목은 저장 전에 명시적으로 보여줍니다. A 이외 등급은 사용자 승인 없이는 편집 Revision에 연결되지 않습니다.", "Originals remain immutable. Conversion, rasterization and exclusion are disclosed before save. Grades below A require explicit approval before entering an editable revision.")}
           </p>
         </div>
         <button
@@ -126,7 +125,7 @@ export function StudioCompatibilityReportsPanel({
           {loading
             ? <LoaderCircle size={15} className="animate-spin" aria-hidden="true" />
             : <RefreshCcw size={15} aria-hidden="true" />}
-          {locale === "ko" ? "검사 이력 새로고침" : "Refresh reports"}
+          {translateBilingualValueForLocale(locale, "domains.creator.project.graph.StudioCompatibilityReportsPanel", "검사 이력 새로고침", "Refresh reports")}
         </button>
       </div>
 
@@ -160,17 +159,17 @@ export function StudioCompatibilityReportsPanel({
                     {approved ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-1 text-[0.62rem] font-bold text-success">
                         <ShieldCheck size={12} aria-hidden="true" />
-                        {locale === "ko" ? "손실 승인됨" : "Losses approved"}
+                        {translateBilingualValueForLocale(locale, "domains.creator.project.graph.StudioCompatibilityReportsPanel", "손실 승인됨", "Losses approved")}
                       </span>
                     ) : blocked ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-1 text-[0.62rem] font-bold text-warning-strong">
                         <AlertTriangle size={12} aria-hidden="true" />
-                        {locale === "ko" ? "승인 전 변환 금지" : "Blocked until approval"}
+                        {translateBilingualValueForLocale(locale, "domains.creator.project.graph.StudioCompatibilityReportsPanel", "승인 전 변환 금지", "Blocked until approval")}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-1 text-[0.62rem] font-bold text-success">
                         <CheckCircle2 size={12} aria-hidden="true" />
-                        {locale === "ko" ? "편집 보존" : "Edit-preserving"}
+                        {translateBilingualValueForLocale(locale, "domains.creator.project.graph.StudioCompatibilityReportsPanel", "편집 보존", "Edit-preserving")}
                       </span>
                     )}
                   </div>
@@ -181,9 +180,7 @@ export function StudioCompatibilityReportsPanel({
                   {report.items.length > 0 ? (
                     <details className="mt-3 rounded-xl border border-line bg-card px-3 py-2">
                       <summary className="cursor-pointer text-xs font-bold text-fg-2">
-                        {locale === "ko"
-                          ? `항목별 결과 ${report.items.length}개`
-                          : `${report.items.length} item-level results`}
+                        {translateBilingualValueForLocale(locale, "domains.creator.project.graph.StudioCompatibilityReportsPanel", `항목별 결과 ${report.items.length}개`, `${report.items.length} item-level results`)}
                       </summary>
                       <ul className="mt-3 space-y-2">
                         {report.items.slice(0, 100).map((item) => (
@@ -208,7 +205,7 @@ export function StudioCompatibilityReportsPanel({
                     {approvingId === report.id
                       ? <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
                       : <FileWarning size={14} aria-hidden="true" />}
-                    {locale === "ko" ? "손실 확인 후 승인" : "Review and approve losses"}
+                    {translateBilingualValueForLocale(locale, "domains.creator.project.graph.StudioCompatibilityReportsPanel", "손실 확인 후 승인", "Review and approve losses")}
                   </button>
                 ) : null}
               </div>
@@ -219,8 +216,8 @@ export function StudioCompatibilityReportsPanel({
         {!loading && reports.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line p-6 text-center text-sm text-fg-3">
             {cloudProjectId
-              ? locale === "ko" ? "아직 저장된 호환성 보고서가 없습니다." : "No compatibility reports have been stored yet."
-              : locale === "ko" ? "클라우드 ProjectGraph 전환 후 파일 검사 이력이 여기에 표시됩니다." : "File inspection history appears after ProjectGraph migration."}
+              ? translateBilingualValueForLocale(locale, "domains.creator.project.graph.StudioCompatibilityReportsPanel", "아직 저장된 호환성 보고서가 없습니다.", "No compatibility reports have been stored yet.")
+              : translateBilingualValueForLocale(locale, "domains.creator.project.graph.StudioCompatibilityReportsPanel", "클라우드 ProjectGraph 전환 후 파일 검사 이력이 여기에 표시됩니다.", "File inspection history appears after ProjectGraph migration.")}
           </p>
         ) : null}
       </div>

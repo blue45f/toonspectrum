@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Sparkles, BookHeart, Star, Compass, BellRing } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -167,14 +171,14 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
           {recentTitles.length > 0 && (
             <section className="flex flex-col gap-3">
               <div className="flex items-baseline gap-2">
-                <h3 className="text-sm font-semibold text-fg">최근 본 작품</h3>
-                <span className="text-xs text-fg-3">방문 순</span>
+                <h3 className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("shared.components.library.view", "ko", "최근 본 작품")}</h3>
+                <span className="text-xs text-fg-3">{translateCurrentStaticSourceText("shared.components.library.view", "ko", "방문 순")}</span>
               </div>
               <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {recentTitles.map((t) => (
                   <Link
                     key={t.id}
-                    href={`/title/${t.slug}`}
+                    href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.library.view", "en", "/title/{v0}"), { v0: String(t.slug) })}
                     className="group w-[4.5rem] shrink-0"
                     title={t.title}
                   >
@@ -198,8 +202,8 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
           {shelfTitles.length === 0 ? (
             <EmptyTeach
               icon={BookHeart}
-              title="아직 담은 작품이 없어요"
-              desc="작품 카드의 북마크나 상세 페이지의 상태 버튼으로 서재를 채워보세요."
+              title={translateCurrentStaticSourceText("shared.components.library.view", "ko", "아직 담은 작품이 없어요")}
+              desc={translateCurrentStaticSourceText("shared.components.library.view", "ko", "작품 카드의 북마크나 상세 페이지의 상태 버튼으로 서재를 채워보세요.")}
               cta={{ label: "작품 탐색하기", href: "/explore" }}
             />
           ) : (
@@ -218,16 +222,15 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
           {ratedIds.length === 0 ? (
             <EmptyTeach
               icon={Star}
-              title="평가한 작품이 없어요"
-              desc="별점을 남기면 취향 분석과 추천이 정교해집니다."
+              title={translateCurrentStaticSourceText("shared.components.library.view", "ko", "평가한 작품이 없어요")}
+              desc={translateCurrentStaticSourceText("shared.components.library.view", "ko", "별점을 남기면 취향 분석과 추천이 정교해집니다.")}
               cta={{ label: "평가하러 가기", href: "/ranking" }}
             />
           ) : (
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm text-fg-3">
-                  평가한 작품 <span className="numeral text-fg">{ratedIds.length}</span>편
-                </span>
+                  {translateCurrentStaticSourceText("shared.components.library.view", "ko", "평가한 작품 ")}<span className="numeral text-fg">{ratedIds.length}</span>{translateCurrentStaticSourceText("shared.components.library.view", "ko", "편")}</span>
                 <Segmented
                   value={ratedSort}
                   onChange={setRatedSort}
@@ -242,7 +245,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
                 return (
                   <Link
                     key={id}
-                    href={`/title/${t.slug}`}
+                    href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.library.view", "en", "/title/{v0}"), { v0: String(t.slug) })}
                     className="group flex items-center gap-4 rounded-xl border border-line bg-card p-3 transition-colors hover:border-line-strong"
                   >
                     <MiniPoster title={t} className="w-10" />
@@ -258,7 +261,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
                         <span className="numeral text-sm text-accent">{r.toFixed(1)}</span>
                       </span>
                       <span className="text-[0.7rem] text-fg-3">
-                        평균 {statsAreEstimated(t) ? "≈" : ""}
+                        {translateCurrentStaticSourceText("shared.components.library.view", "ko", "평균 ")}{statsAreEstimated(t) ? "≈" : ""}
                         {t.stats.ratingAvg.toFixed(1)}
                       </span>
                     </div>
@@ -277,40 +280,40 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
           {profile.ratedCount === 0 && readIds.length === 0 ? (
             <EmptyTeach
               icon={Compass}
-              title="취향 데이터를 모으는 중"
-              desc="작품을 평가하거나 서재에 담으면, 당신의 취향 스펙트럼을 분석해 드려요."
+              title={translateCurrentStaticSourceText("shared.components.library.view", "ko", "취향 데이터를 모으는 중")}
+              desc={translateCurrentStaticSourceText("shared.components.library.view", "ko", "작품을 평가하거나 서재에 담으면, 당신의 취향 스펙트럼을 분석해 드려요.")}
               cta={{ label: "지금 평가하기", href: "/ranking" }}
             />
           ) : (
             <>
               <div className="flex flex-col gap-5 rounded-2xl border border-line bg-card p-6 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
                 <div className="min-w-0">
-                  <p className="eyebrow text-fg-3">독자 유형</p>
+                  <p className="eyebrow text-fg-3">{translateCurrentStaticSourceText("shared.components.library.view", "ko", "독자 유형")}</p>
                   <p className="mt-1.5 font-serif text-2xl italic text-accent sm:text-[1.75rem]">
                     {profile.affinityType === "webtoon"
-                      ? "웹툰파"
+                      ? translateCurrentStaticSourceText("shared.components.library.view", "ko", "웹툰파")
                       : profile.affinityType === "webnovel"
-                        ? "웹소설파"
-                        : "균형 잡힌 독자"}
+                        ? translateCurrentStaticSourceText("shared.components.library.view", "ko", "웹소설파")
+                        : translateCurrentStaticSourceText("shared.components.library.view", "ko", "균형 잡힌 독자")}
                   </p>
                 </div>
                 <dl className="flex shrink-0 divide-x divide-line border-line sm:border-l sm:pl-8">
                   <div className="pr-6 sm:px-6 sm:first:pl-0">
                     <dd className="numeral text-2xl text-fg">{profile.ratedCount}</dd>
-                    <dt className="mt-0.5 text-xs text-fg-3">평가한 작품</dt>
+                    <dt className="mt-0.5 text-xs text-fg-3">{translateCurrentStaticSourceText("shared.components.library.view", "ko", "평가한 작품")}</dt>
                   </div>
                   <div className="pl-6 sm:px-6 sm:last:pr-0">
                     <dd className="numeral text-2xl text-fg">
                       {profile.avgRating ? profile.avgRating.toFixed(1) : "·"}
                     </dd>
-                    <dt className="mt-0.5 text-xs text-fg-3">내 평균 별점</dt>
+                    <dt className="mt-0.5 text-xs text-fg-3">{translateCurrentStaticSourceText("shared.components.library.view", "ko", "내 평균 별점")}</dt>
                   </div>
                 </dl>
               </div>
 
               {profile.topGenres.length > 0 && (
                 <div className="rounded-2xl border border-line bg-card p-5">
-                  <h3 className="mb-4 text-sm font-semibold">선호 장르 스펙트럼</h3>
+                  <h3 className="mb-4 text-sm font-semibold">{translateCurrentStaticSourceText("shared.components.library.view", "ko", "선호 장르 스펙트럼")}</h3>
                   <div
                     className="mb-4 h-1.5 w-full rounded-full"
                     style={{ background: spectrumGradient(profile.topGenres.map((g) => g.name)) }}
@@ -348,7 +351,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
                 <div>
                   <div className="mb-4 flex items-center gap-2">
                     <Sparkles size={16} className="text-accent" />
-                    <h3 className="font-semibold">취향 저격 추천</h3>
+                    <h3 className="font-semibold">{translateCurrentStaticSourceText("shared.components.library.view", "ko", "취향 저격 추천")}</h3>
                   </div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
                     {recs.map(({ title, reason }) => (
@@ -371,8 +374,8 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
           {subTitles.length === 0 ? (
             <EmptyTeach
               icon={BellRing}
-              title="구독한 연재가 없어요"
-              desc="작품 상세에서 '연재 알림 받기'를 켜면 요일별 업데이트를 모아 보여드려요."
+              title={translateCurrentStaticSourceText("shared.components.library.view", "ko", "구독한 연재가 없어요")}
+              desc={translateCurrentStaticSourceText("shared.components.library.view", "ko", "작품 상세에서 '연재 알림 받기'를 켜면 요일별 업데이트를 모아 보여드려요.")}
               cta={{ label: "연재 캘린더 보기", href: "/calendar" }}
             />
           ) : (
@@ -382,8 +385,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
                   <div className="mb-4 flex items-center gap-2">
                     <BellRing size={16} className="text-accent" />
                     <h3 className="font-semibold text-fg">
-                      오늘({todayDay}) 새 회차 {todaySubs.length}편
-                    </h3>
+                      {translateCurrentStaticSourceText("shared.components.library.view", "ko", "오늘(")}{todayDay}{translateCurrentStaticSourceText("shared.components.library.view", "ko", ") 새 회차 ")}{todaySubs.length}{translateCurrentStaticSourceText("shared.components.library.view", "ko", "편")}</h3>
                   </div>
                   <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
                     {todaySubs.map((t) => (
@@ -405,15 +407,15 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
                           isToday ? "text-accent" : "text-fg-2"
                         )}
                       >
-                        <span className="font-display">{day}요일</span>
-                        <span className="text-xs font-normal text-fg-3">{list.length}편</span>
-                        {isToday && <span className="text-[0.65rem]">· 오늘</span>}
+                        <span className="font-display">{day}{translateCurrentStaticSourceText("shared.components.library.view", "ko", "요일")}</span>
+                        <span className="text-xs font-normal text-fg-3">{list.length}{translateCurrentStaticSourceText("shared.components.library.view", "ko", "편")}</span>
+                        {isToday && <span className="text-[0.65rem]">{translateCurrentStaticSourceText("shared.components.library.view", "ko", "· 오늘")}</span>}
                       </h4>
                       <div className="grid gap-2 sm:grid-cols-2">
                         {list.map((t) => (
                           <Link
                             key={t.id}
-                            href={`/title/${t.slug}`}
+                            href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.library.view", "en", "/title/{v0}"), { v0: String(t.slug) })}
                             className="group flex items-center gap-3 rounded-xl border border-line bg-card p-2.5 transition-colors hover:border-line-strong"
                           >
                             <MiniPoster title={t} className="w-9" />
@@ -446,24 +448,23 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
 
       <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-5 text-xs text-fg-3">
         <span>
-          성인 인증:{" "}
-          <span className={adultVerified ? "font-medium text-good" : "text-fg-2"}>
-            {adultVerified ? "인증됨 · 19금 표시" : "미인증 · 19금 가림"}
+          {translateCurrentStaticSourceText("shared.components.library.view", "ko", "성인 인증:")}{" "}
+          <span className={adultVerified ? translateCurrentStaticSourceText("shared.components.library.view", "en", "font-medium text-good") : translateCurrentStaticSourceText("shared.components.library.view", "en", "text-fg-2")}>
+            {adultVerified ? translateCurrentStaticSourceText("shared.components.library.view", "ko", "인증됨 · 19금 표시") : translateCurrentStaticSourceText("shared.components.library.view", "ko", "미인증 · 19금 가림")}
           </span>
         </span>
         <button
           onClick={() => setAdultVerified(!adultVerified)}
           className="inline-flex min-h-8 items-center rounded-md border border-line px-2.5 py-1 transition-colors hover:border-line-strong hover:text-fg"
         >
-          {adultVerified ? "인증 해제" : "성인 인증하기 (만 19세+)"}
+          {adultVerified ? translateCurrentStaticSourceText("shared.components.library.view", "ko", "인증 해제") : translateCurrentStaticSourceText("shared.components.library.view", "ko", "성인 인증하기 (만 19세+)")}
         </button>
         {(readIds.length > 0 || ratedIds.length > 0) && (
           <button
             onClick={() => confirm("내 서재 데이터를 모두 초기화할까요?") && resetAll()}
             className="inline-flex min-h-8 items-center rounded-md px-1.5 py-1 transition-colors hover:text-bad"
           >
-            서재 데이터 초기화
-          </button>
+            {translateCurrentStaticSourceText("shared.components.library.view", "ko", "서재 데이터 초기화")}</button>
         )}
       </div>
     </div>

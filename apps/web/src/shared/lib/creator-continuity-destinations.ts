@@ -1,3 +1,7 @@
+import {
+  translateBilingualValueForLocale,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import type {
   CreatorContinuityLocale,
   CreatorDestinationId,
@@ -6,8 +10,8 @@ import type {
 export interface CreatorDestinationDefinition {
   readonly id: CreatorDestinationId;
   readonly pathname: string;
-  readonly label: Record<CreatorContinuityLocale, string>;
-  readonly description: Record<CreatorContinuityLocale, string>;
+  readonly label: Record<"ko" | "en", string>;
+  readonly description: Record<"ko" | "en", string>;
 }
 
 // Specific nested paths come first so they never collapse into a parent route.
@@ -59,14 +63,14 @@ export function creatorDestinationLabel(
   id: CreatorDestinationId,
   locale: CreatorContinuityLocale,
 ): string {
-  return BY_ID.get(id)?.label[locale] ?? id;
+  return translateLocaleBranchForLocale(locale, "shared.lib.creator.continuity.destinations", BY_ID.get(id)?.label) ?? id;
 }
 
 export function creatorDestinationDescription(
   id: CreatorDestinationId,
   locale: CreatorContinuityLocale,
 ): string {
-  return BY_ID.get(id)?.description[locale] ?? "";
+  return translateLocaleBranchForLocale(locale, "shared.lib.creator.continuity.destinations", BY_ID.get(id)?.description) ?? "";
 }
 
 export function formatCreatorRelativeTime(
@@ -75,13 +79,13 @@ export function formatCreatorRelativeTime(
   now = Date.now(),
 ): string {
   const minutes = Math.floor(Math.max(0, now - visitedAt) / 60_000);
-  if (minutes < 1) return locale === "ko" ? "방금 전" : "Just now";
-  if (minutes < 60) return locale === "ko" ? `${minutes}분 전` : `${minutes} min ago`;
+  if (minutes < 1) return translateBilingualValueForLocale(locale, "shared.lib.creator.continuity.destinations", "방금 전", "Just now");
+  if (minutes < 60) return translateBilingualValueForLocale(locale, "shared.lib.creator.continuity.destinations", `${minutes}분 전`, `${minutes} min ago`);
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return locale === "ko" ? `${hours}시간 전` : `${hours} hr ago`;
+  if (hours < 24) return translateBilingualValueForLocale(locale, "shared.lib.creator.continuity.destinations", `${hours}시간 전`, `${hours} hr ago`);
   const days = Math.floor(hours / 24);
-  if (days === 1) return locale === "ko" ? "어제" : "Yesterday";
-  if (days < 30) return locale === "ko" ? `${days}일 전` : `${days} days ago`;
+  if (days === 1) return translateBilingualValueForLocale(locale, "shared.lib.creator.continuity.destinations", "어제", "Yesterday");
+  if (days < 30) return translateBilingualValueForLocale(locale, "shared.lib.creator.continuity.destinations", `${days}일 전`, `${days} days ago`);
   const months = Math.floor(days / 30);
-  return locale === "ko" ? `${months}개월 전` : `${months} mo ago`;
+  return translateBilingualValueForLocale(locale, "shared.lib.creator.continuity.destinations", `${months}개월 전`, `${months} mo ago`);
 }

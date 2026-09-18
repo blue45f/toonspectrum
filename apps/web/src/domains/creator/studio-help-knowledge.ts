@@ -1,4 +1,7 @@
 import {
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   normalizeStudioSearchText,
   studioSearchTextMatches,
   tokenizeStudioSearchQuery,
@@ -6,8 +9,7 @@ import {
 
 import type { StudioHelpCenterSection } from "./studio-help-center-channel";
 
-export type StudioHelpLocale = "ko" | "en";
-export type StudioHelpCategory =
+export type StudioHelpLocale = string;export type StudioHelpCategory =
   | "start"
   | "draw"
   | "compose"
@@ -448,7 +450,7 @@ export const STUDIO_HELP_UPDATES: readonly StudioHelpUpdate[] = Object.freeze([
 ]);
 
 export function studioHelpText(value: StudioHelpLocalizedText, locale: StudioHelpLocale): string {
-  return value[locale];
+  return translateLocaleBranchForLocale(locale, "domains.creator.studio.help.knowledge", value);
 }
 
 export function findStudioHelpArticle(id: string | null | undefined): StudioHelpArticle | null {

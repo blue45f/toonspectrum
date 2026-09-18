@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   BookOpen,
   CheckCircle2,
   CircleDashed,
@@ -107,10 +112,10 @@ export function EngineeringStatusBadge({
         STATUS_STYLES[status],
         className,
       )}
-      title={meta.description[locale]}
+      title={translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringStoryUi", meta.description)}
     >
       <Icon size={12} aria-hidden="true" />
-      {meta.label[locale]}
+      {translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringStoryUi", meta.label)}
     </span>
   );
 }
@@ -121,7 +126,7 @@ export function EngineeringStoryNav({ className }: { readonly className?: string
 
   return (
     <nav
-      aria-label={locale === "ko" ? "기술 스토리 세부 메뉴" : "Engineering story sections"}
+      aria-label={translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringStoryUi", "기술 스토리 세부 메뉴", "Engineering story sections")}
       className={cx(
         "rounded-3xl border border-line/70 bg-panel/75 p-2 shadow-sm backdrop-blur-xl",
         className,
@@ -136,7 +141,7 @@ export function EngineeringStoryNav({ className }: { readonly className?: string
             <Link
               key={item.href}
               href={item.href}
-              aria-current={active ? "page" : undefined}
+              aria-current={active ? translateCurrentStaticSourceText("domains.legal.technology.EngineeringStoryUi", "en", "page") : undefined}
               className={cx(
                 "group flex min-h-12 items-center gap-2.5 rounded-2xl border px-3 py-2 text-sm font-bold transition-colors",
                 active
@@ -154,7 +159,7 @@ export function EngineeringStoryNav({ className }: { readonly className?: string
               >
                 <Icon size={15} aria-hidden="true" />
               </span>
-              <span>{item[locale]}</span>
+              <span>{translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringStoryUi", item)}</span>
             </Link>
           );
         })}

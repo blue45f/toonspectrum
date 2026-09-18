@@ -1,3 +1,4 @@
+import { resolveUiLocale } from "@/shared/lib/i18n-bilingual-copy";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import {
@@ -14,8 +15,8 @@ import { StudioDocumentWindowHub } from "./StudioDocumentWindowHub";
 
 import { useI18n } from "@/shared/lib/i18n";
 
-function localeFromLanguage(language: string): "ko" | "en" {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+function localeFromLanguage(language: string): string {
+  return resolveUiLocale(language);
 }
 
 /**

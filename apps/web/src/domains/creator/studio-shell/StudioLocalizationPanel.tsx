@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   CheckCircle2,
   Languages,
   Plus,
@@ -29,7 +34,8 @@ import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
 
-type Locale = "ko" | "en";
+type Locale = string;
+type AuthoredLocale = "ko" | "en";
 
 interface LayoutDraft {
   sourceRemoved: boolean;
@@ -47,7 +53,7 @@ interface LayoutDraft {
   maxLineCount: number;
 }
 
-const STATUS_LABELS: Readonly<Record<StudioLocalizationStatus, Readonly<Record<Locale, string>>>> = {
+const STATUS_LABELS: Readonly<Record<StudioLocalizationStatus, Readonly<Record<AuthoredLocale, string>>>> = {
   untranslated: { ko: "번역 전", en: "Not translated" },
   "ai-draft": { ko: "초안", en: "Draft" },
   translating: { ko: "번역 중", en: "Translating" },
@@ -57,7 +63,7 @@ const STATUS_LABELS: Readonly<Record<StudioLocalizationStatus, Readonly<Record<L
   complete: { ko: "완료", en: "Complete" },
 };
 
-const KIND_LABELS: Readonly<Record<StudioLocalizationUnitKind, Readonly<Record<Locale, string>>>> = {
+const KIND_LABELS: Readonly<Record<StudioLocalizationUnitKind, Readonly<Record<AuthoredLocale, string>>>> = {
   dialogue: { ko: "대사", en: "Dialogue" },
   narration: { ko: "내레이션", en: "Narration" },
   sfx: { ko: "효과음", en: "SFX" },
@@ -90,7 +96,7 @@ function statusTone(status: StudioLocalizationStatus): string {
 }
 
 function nextActionLabel(status: StudioLocalizationStatus, locale: Locale): string {
-  const labels: Record<Locale, Record<StudioLocalizationStatus, string>> = {
+  const labels: Record<AuthoredLocale, Record<StudioLocalizationStatus, string>> = {
     ko: {
       untranslated: "번역 시작",
       "ai-draft": "번역문 저장",
@@ -110,7 +116,7 @@ function nextActionLabel(status: StudioLocalizationStatus, locale: Locale): stri
       complete: "Reopen",
     },
   };
-  return labels[locale][status];
+  return translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", labels)[status];
 }
 
 function numberValue(value: string, fallback: number): number {
@@ -166,9 +172,7 @@ export function StudioLocalizationPanel({
           : next.units[0]?.id ?? null);
         setError(null);
       } catch {
-        setError(locale === "ko"
-          ? "이 기기에서 현지화 작업을 불러오지 못했습니다."
-          : "Localization work could not be loaded on this device.");
+        setError(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "이 기기에서 현지화 작업을 불러오지 못했습니다.", "Localization work could not be loaded on this device."));
       }
     };
     load();
@@ -209,7 +213,7 @@ export function StudioLocalizationPanel({
     } catch (cause) {
       setError(cause instanceof Error
         ? cause.message
-        : (locale === "ko" ? "현지화 작업을 저장하지 못했습니다." : "Localization work could not be saved."));
+        : (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "현지화 작업을 저장하지 못했습니다.", "Localization work could not be saved.")));
       return false;
     }
   };
@@ -223,7 +227,7 @@ export function StudioLocalizationPanel({
 
   const addUnit = () => {
     if (!sourceText.trim()) {
-      setError(locale === "ko" ? "원문을 입력해 주세요." : "Enter the source text.");
+      setError(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "원문을 입력해 주세요.", "Enter the source text."));
       return;
     }
     try {
@@ -243,21 +247,19 @@ export function StudioLocalizationPanel({
       });
       if (persist(
         [...document.units, unit],
-        locale === "ko" ? "번역할 대사를 추가했습니다." : "Added a localization unit.",
+        translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "번역할 대사를 추가했습니다.", "Added a localization unit."),
       )) {
         setSelectedId(unit.id);
         setSourceText("");
       }
     } catch {
-      setError(locale === "ko"
-        ? "언어 코드와 원문을 확인해 주세요. 예: ko-KR → en-US"
-        : "Check the locales and source text. Example: ko-KR → en-US");
+      setError(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "언어 코드와 원문을 확인해 주세요. 예: ko-KR → en-US", "Check the locales and source text. Example: ko-KR → en-US"));
     }
   };
 
   const translatedUnit = (unit: StudioLocalizationUnit): StudioLocalizationUnit | null => {
     if (!translationDraft.trim()) {
-      setError(locale === "ko" ? "번역문을 입력해 주세요." : "Enter the translated text.");
+      setError(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "번역문을 입력해 주세요.", "Enter the translated text."));
       return null;
     }
     try {
@@ -277,9 +279,7 @@ export function StudioLocalizationPanel({
       }
       return next;
     } catch {
-      setError(locale === "ko"
-        ? "현재 단계에서는 번역문을 수정할 수 없습니다."
-        : "Translation cannot be edited at this stage.");
+      setError(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "현재 단계에서는 번역문을 수정할 수 없습니다.", "Translation cannot be edited at this stage."));
       return null;
     }
   };
@@ -352,11 +352,9 @@ export function StudioLocalizationPanel({
           if (blocking.length > 0) {
             replaceUnit(
               prepared,
-              locale === "ko" ? "확인한 원고 상태를 저장했습니다." : "Saved the verified layout state.",
+              translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "확인한 원고 상태를 저장했습니다.", "Saved the verified layout state."),
             );
-            setError(locale === "ko"
-              ? `완료하려면 오류 ${blocking.length}개를 해결해 주세요.`
-              : `Resolve ${blocking.length} blocking issues before completion.`);
+            setError(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", `완료하려면 오류 ${blocking.length}개를 해결해 주세요.`, `Resolve ${blocking.length} blocking issues before completion.`));
             return;
           }
           next = transitionStudioLocalizationUnit(prepared, { type: "complete", at });
@@ -368,12 +366,12 @@ export function StudioLocalizationPanel({
       }
       replaceUnit(
         next,
-        locale === "ko" ? "현지화 단계를 업데이트했습니다." : "Localization status updated.",
+        translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "현지화 단계를 업데이트했습니다.", "Localization status updated."),
       );
     } catch (cause) {
       setError(cause instanceof Error
         ? cause.message
-        : (locale === "ko" ? "다음 단계로 이동할 수 없습니다." : "Cannot move to the next step."));
+        : (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "다음 단계로 이동할 수 없습니다.", "Cannot move to the next step.")));
     }
   };
 
@@ -382,7 +380,7 @@ export function StudioLocalizationPanel({
     const remaining = document.units.filter((unit) => unit.id !== selected.id);
     if (persist(
       remaining,
-      locale === "ko" ? "현지화 대사를 삭제했습니다." : "Localization unit removed.",
+      translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "현지화 대사를 삭제했습니다.", "Localization unit removed."),
     )) {
       setSelectedId(remaining[0]?.id ?? null);
     }
@@ -401,21 +399,18 @@ export function StudioLocalizationPanel({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            <Languages size={14} aria-hidden="true" /> LOCALIZATION
-          </p>
+            <Languages size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioLocalizationPanel", "en", "LOCALIZATION")}</p>
           <h2 id="localization-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
-            {locale === "ko" ? "번역부터 레터링 QA까지 한 흐름으로" : "From translation to lettering QA in one flow"}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "번역부터 레터링 QA까지 한 흐름으로", "From translation to lettering QA in one flow")}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">
-            {locale === "ko"
-              ? "번역 승인만으로 완료되지 않습니다. 실제 원문 제거·배경 복원·레터링·글꼴·읽기 순서와 말풍선 결과를 확인해야 합니다."
-              : "Translation approval is not completion. Verify actual cleanup, restoration, lettering, fonts, reading order and balloon fit."}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "번역 승인만으로 완료되지 않습니다. 실제 원문 제거·배경 복원·레터링·글꼴·읽기 순서와 말풍선 결과를 확인해야 합니다.", "Translation approval is not completion. Verify actual cleanup, restoration, lettering, fonts, reading order and balloon fit.")}
           </p>
         </div>
         <div className="grid grid-cols-3 gap-2 text-center text-xs">
-          <span className="rounded-xl border border-line bg-panel px-3 py-2"><b className="block text-base text-fg">{summary.total}</b>{locale === "ko" ? "전체" : "Total"}</span>
-          <span className="rounded-xl border border-success/30 bg-success-soft/15 px-3 py-2 text-success"><b className="block text-base">{summary.completed}</b>{locale === "ko" ? "완료" : "Done"}</span>
-          <span className="rounded-xl border border-danger/30 bg-danger-soft/15 px-3 py-2 text-danger"><b className="block text-base">{summary.blocking}</b>{locale === "ko" ? "확인" : "Issues"}</span>
+          <span className="rounded-xl border border-line bg-panel px-3 py-2"><b className="block text-base text-fg">{summary.total}</b>{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "전체", "Total")}</span>
+          <span className="rounded-xl border border-success/30 bg-success-soft/15 px-3 py-2 text-success"><b className="block text-base">{summary.completed}</b>{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "완료", "Done")}</span>
+          <span className="rounded-xl border border-danger/30 bg-danger-soft/15 px-3 py-2 text-danger"><b className="block text-base">{summary.blocking}</b>{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "확인", "Issues")}</span>
         </div>
       </div>
 
@@ -432,11 +427,11 @@ export function StudioLocalizationPanel({
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[18rem_1fr]">
         <aside className="rounded-2xl border border-line bg-panel/55 p-3">
-          <h3 className="text-sm font-black text-fg">{locale === "ko" ? "대사·문구" : "Lines"}</h3>
+          <h3 className="text-sm font-black text-fg">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "대사·문구", "Lines")}</h3>
           <div className="mt-3 max-h-[30rem] space-y-2 overflow-y-auto">
             {document.units.length === 0 ? (
               <p className="rounded-xl border border-dashed border-line p-4 text-xs leading-5 text-fg-3">
-                {locale === "ko" ? "아래에서 첫 원문을 추가하세요." : "Add the first source line below."}
+                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "아래에서 첫 원문을 추가하세요.", "Add the first source line below.")}
               </p>
             ) : null}
             {document.units.map((unit) => (
@@ -457,7 +452,7 @@ export function StudioLocalizationPanel({
                     "shrink-0 rounded-full border px-2 py-0.5 text-[0.6rem] font-bold",
                     statusTone(unit.status),
                   )}>
-                    {STATUS_LABELS[unit.status][locale]}
+                    {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", STATUS_LABELS[unit.status])}
                   </span>
                 </span>
                 <span className="mt-1 block truncate text-[0.65rem] text-fg-3">
@@ -469,15 +464,15 @@ export function StudioLocalizationPanel({
 
           <div className="mt-4 border-t border-line pt-4">
             <div className="grid grid-cols-2 gap-2">
-              <input aria-label={locale === "ko" ? "원문 언어" : "Source locale"} value={sourceLocale} onChange={(event) => setSourceLocale(event.target.value)} className="min-h-10 rounded-lg border border-line bg-card px-2 text-xs text-fg" />
-              <input aria-label={locale === "ko" ? "번역 언어" : "Target locale"} value={targetLocale} onChange={(event) => setTargetLocale(event.target.value)} className="min-h-10 rounded-lg border border-line bg-card px-2 text-xs text-fg" />
+              <input aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "원문 언어", "Source locale")} value={sourceLocale} onChange={(event) => setSourceLocale(event.target.value)} className="min-h-10 rounded-lg border border-line bg-card px-2 text-xs text-fg" />
+              <input aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "번역 언어", "Target locale")} value={targetLocale} onChange={(event) => setTargetLocale(event.target.value)} className="min-h-10 rounded-lg border border-line bg-card px-2 text-xs text-fg" />
             </div>
-            <select aria-label={locale === "ko" ? "문구 종류" : "Unit kind"} value={kind} onChange={(event) => setKind(event.target.value as StudioLocalizationUnitKind)} className="mt-2 min-h-10 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg">
-              {Object.entries(KIND_LABELS).map(([value, label]) => <option key={value} value={value}>{label[locale]}</option>)}
+            <select aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "문구 종류", "Unit kind")} value={kind} onChange={(event) => setKind(event.target.value as StudioLocalizationUnitKind)} className="mt-2 min-h-10 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg">
+              {Object.entries(KIND_LABELS).map(([value, label]) => <option key={value} value={value}>{translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", label)}</option>)}
             </select>
-            <textarea aria-label={locale === "ko" ? "새 원문" : "New source text"} value={sourceText} onChange={(event) => setSourceText(event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-line bg-card px-3 py-2 text-xs leading-5 text-fg" placeholder={locale === "ko" ? "번역할 대사나 문구" : "Source dialogue or text"} />
+            <textarea aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "새 원문", "New source text")} value={sourceText} onChange={(event) => setSourceText(event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-line bg-card px-3 py-2 text-xs leading-5 text-fg" placeholder={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "번역할 대사나 문구", "Source dialogue or text")} />
             <button type="button" onClick={addUnit} className={buttonClass({ size: "sm", className: "mt-2 w-full gap-1.5" })}>
-              <Plus size={14} aria-hidden="true" />{locale === "ko" ? "추가" : "Add"}
+              <Plus size={14} aria-hidden="true" />{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "추가", "Add")}
             </button>
           </div>
         </aside>
@@ -485,24 +480,24 @@ export function StudioLocalizationPanel({
         <div className="rounded-2xl border border-line bg-panel/55 p-4">
           {!selected ? (
             <div className="grid min-h-64 place-items-center text-sm text-fg-3">
-              {locale === "ko" ? "대사를 선택하거나 새로 추가하세요." : "Select or add a line."}
+              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "대사를 선택하거나 새로 추가하세요.", "Select or add a line.")}
             </div>
           ) : (
             <>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold text-accent">
-                    {KIND_LABELS[selected.kind][locale]} · {selected.sourceLocale} → {selected.targetLocale}
+                    {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", KIND_LABELS[selected.kind])} · {selected.sourceLocale} → {selected.targetLocale}
                   </p>
                   <h3 className="mt-1 text-lg font-black text-fg">{selected.sourceText}</h3>
                 </div>
                 <span className={cn("rounded-full border px-3 py-1 text-xs font-bold", statusTone(selected.status))}>
-                  {STATUS_LABELS[selected.status][locale]}
+                  {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", STATUS_LABELS[selected.status])}
                 </span>
               </div>
 
               <label className="mt-5 block text-xs font-bold text-fg-2" htmlFor="localization-translation">
-                {locale === "ko" ? "번역문" : "Translation"}
+                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "번역문", "Translation")}
               </label>
               <textarea
                 id="localization-translation"
@@ -519,20 +514,18 @@ export function StudioLocalizationPanel({
               {showLayout ? (
                 <fieldset className="mt-5 rounded-2xl border border-line bg-card p-4">
                   <legend className="px-1 text-sm font-black text-fg">
-                    {locale === "ko" ? "실제 원고 처리 결과" : "Verified artwork results"}
+                    {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "실제 원고 처리 결과", "Verified artwork results")}
                   </legend>
                   <p className="mt-1 text-xs leading-5 text-fg-3">
-                    {locale === "ko"
-                      ? "실제 편집기나 현지화 처리기가 완료한 항목만 선택하세요. 체크 자체는 이미지 처리를 수행하지 않습니다."
-                      : "Select only work completed by the editor or localization processor. These checks do not alter artwork."}
+                    {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "실제 편집기나 현지화 처리기가 완료한 항목만 선택하세요. 체크 자체는 이미지 처리를 수행하지 않습니다.", "Select only work completed by the editor or localization processor. These checks do not alter artwork.")}
                   </p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {([
-                      ["sourceRemoved", locale === "ko" ? "원문 제거 완료" : "Source removed"],
-                      ["backgroundRestored", locale === "ko" ? "배경 복원 확인" : "Background restored"],
-                      ["letteringApplied", locale === "ko" ? "번역문 레터링 완료" : "Lettering applied"],
-                      ["readingOrderAssigned", locale === "ko" ? "읽기 순서 지정" : "Reading order assigned"],
-                      ["fontAvailable", locale === "ko" ? "대상 언어 글꼴 확인" : "Target font available"],
+                      ["sourceRemoved", translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "원문 제거 완료", "Source removed")],
+                      ["backgroundRestored", translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "배경 복원 확인", "Background restored")],
+                      ["letteringApplied", translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "번역문 레터링 완료", "Lettering applied")],
+                      ["readingOrderAssigned", translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "읽기 순서 지정", "Reading order assigned")],
+                      ["fontAvailable", translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "대상 언어 글꼴 확인", "Target font available")],
                     ] as const).map(([key, label]) => (
                       <label key={key} className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg-2">
                         <input
@@ -548,14 +541,14 @@ export function StudioLocalizationPanel({
                   {selected.kind === "dialogue" ? (
                     <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                       {([
-                        ["availableWidth", locale === "ko" ? "말풍선 폭" : "Balloon width"],
-                        ["availableHeight", locale === "ko" ? "말풍선 높이" : "Balloon height"],
-                        ["renderedWidth", locale === "ko" ? "글자 사용 폭" : "Text width"],
-                        ["renderedHeight", locale === "ko" ? "글자 사용 높이" : "Text height"],
-                        ["minimumFontSize", locale === "ko" ? "최소 글자" : "Minimum font"],
-                        ["actualFontSize", locale === "ko" ? "실제 글자" : "Actual font"],
-                        ["lineCount", locale === "ko" ? "줄 수" : "Line count"],
-                        ["maxLineCount", locale === "ko" ? "허용 줄 수" : "Maximum lines"],
+                        ["availableWidth", translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "말풍선 폭", "Balloon width")],
+                        ["availableHeight", translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "말풍선 높이", "Balloon height")],
+                        ["renderedWidth", translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "글자 사용 폭", "Text width")],
+                        ["renderedHeight", translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "글자 사용 높이", "Text height")],
+                        ["minimumFontSize", translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "최소 글자", "Minimum font")],
+                        ["actualFontSize", translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "실제 글자", "Actual font")],
+                        ["lineCount", translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "줄 수", "Line count")],
+                        ["maxLineCount", translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "허용 줄 수", "Maximum lines")],
                       ] as const).map(([key, label]) => (
                         <label key={key} className="text-[0.65rem] font-bold text-fg-3">
                           {label}
@@ -583,12 +576,12 @@ export function StudioLocalizationPanel({
                     type="button"
                     onClick={() => {
                       const next = translatedUnit(selected);
-                      if (next) replaceUnit(next, locale === "ko" ? "번역문을 저장했습니다." : "Translation saved.");
+                      if (next) replaceUnit(next, translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "번역문을 저장했습니다.", "Translation saved."));
                     }}
                     className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
                   >
                     <Save size={14} aria-hidden="true" />
-                    {locale === "ko" ? "번역문 저장" : "Save translation"}
+                    {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "번역문 저장", "Save translation")}
                   </button>
                 ) : null}
                 <button type="button" onClick={runNextAction} className={buttonClass({ size: "sm", className: "gap-1.5" })}>
@@ -605,23 +598,21 @@ export function StudioLocalizationPanel({
                             type: "request-changes",
                             at: new Date().toISOString(),
                           }),
-                          locale === "ko" ? "번역 수정 단계로 되돌렸습니다." : "Returned to translation edits.",
+                          translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "번역 수정 단계로 되돌렸습니다.", "Returned to translation edits."),
                         );
                       } catch {
-                        setError(locale === "ko"
-                          ? "현재 단계에서는 수정 요청을 만들 수 없습니다."
-                          : "Changes cannot be requested at this stage.");
+                        setError(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "현재 단계에서는 수정 요청을 만들 수 없습니다.", "Changes cannot be requested at this stage."));
                       }
                     }}
                     className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
                   >
                     <RotateCcw size={14} aria-hidden="true" />
-                    {locale === "ko" ? "수정 요청" : "Request changes"}
+                    {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "수정 요청", "Request changes")}
                   </button>
                 ) : null}
                 <button type="button" onClick={removeSelected} className={buttonClass({ variant: "quiet", size: "sm", className: "gap-1.5 text-danger" })}>
                   <Trash2 size={14} aria-hidden="true" />
-                  {locale === "ko" ? "삭제" : "Remove"}
+                  {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "삭제", "Remove")}
                 </button>
               </div>
 
@@ -631,15 +622,15 @@ export function StudioLocalizationPanel({
                   ? "border-danger/35 bg-danger-soft/15"
                   : "border-success/30 bg-success-soft/15",
               )}>
-                <h4 className="text-sm font-black text-fg">{locale === "ko" ? "현재 QA" : "Current QA"}</h4>
+                <h4 className="text-sm font-black text-fg">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "현재 QA", "Current QA")}</h4>
                 {qa.length === 0 ? (
                   <p className="mt-2 text-xs font-semibold text-success">
-                    {locale === "ko" ? "차단 문제가 없습니다." : "No blocking issues."}
+                    {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", "차단 문제가 없습니다.", "No blocking issues.")}
                   </p>
                 ) : (
                   <ul className="mt-2 space-y-1.5 text-xs leading-5 text-fg-2">
                     {qa.map((finding) => (
-                      <li key={finding.code}>• {locale === "ko" ? finding.messageKo : finding.messageEn}</li>
+                      <li key={finding.code}>• {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioLocalizationPanel", finding.messageKo, finding.messageEn)}</li>
                     ))}
                   </ul>
                 )}

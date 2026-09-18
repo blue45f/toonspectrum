@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * 도움말 센터 — §15.3 Help 의 다섯 표면을 한 창에 담는다.
  *
@@ -109,8 +113,8 @@ function Callout({ tone, children }: { tone: "info" | "warn"; children: ReactNod
     <p
       className={
         tone === "warn"
-          ? "rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-fg"
-          : "rounded-lg border border-line bg-card px-3 py-2 text-xs leading-relaxed text-fg-3"
+          ? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "en", "rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-fg")
+          : translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "en", "rounded-lg border border-line bg-card px-3 py-2 text-xs leading-relaxed text-fg-3")
       }
     >
       {children}
@@ -249,9 +253,7 @@ function CurrentToolPanel({ toolCommandId }: { toolCommandId: string | null }) {
   if (!help) {
     return (
       <Callout tone="warn">
-        지금 어떤 도구가 캔버스를 쥐고 있는지 확인하지 못했습니다. 도구를 한 번
-        누른 뒤 다시 열어 주세요.
-      </Callout>
+        {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "지금 어떤 도구가 캔버스를 쥐고 있는지 확인하지 못했습니다. 도구를 한 번 누른 뒤 다시 열어 주세요.")}</Callout>
     );
   }
 
@@ -270,20 +272,17 @@ function CurrentToolPanel({ toolCommandId }: { toolCommandId: string | null }) {
           ) : null}
         </div>
         <p className="mt-1 text-xs leading-relaxed text-fg-3">
-          {help.description ?? "카탈로그에 이 도구의 한 줄 설명이 아직 없습니다."}
+          {help.description ?? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "카탈로그에 이 도구의 한 줄 설명이 아직 없습니다.")}
         </p>
       </div>
 
       <Callout tone="warn">
-        이 도구의 <b>산문 도움말 문서는 아직 없습니다</b>(도움말 노드{" "}
-        <code className="text-[0.7rem]">{help.helpNodeId}</code> 는 비어 있습니다).
-        대신 카탈로그가 실제로 들고 있는 이름·단축키·별칭과, 통합 검색이 이 이름으로
-        찾아 주는 항목을 보여 드립니다.
-      </Callout>
+        {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "이 도구의 ")}<b>{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "산문 도움말 문서는 아직 없습니다")}</b>{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "(도움말 노드")}{" "}
+        <code className="text-[0.7rem]">{help.helpNodeId}</code> {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "는 비어 있습니다). 대신 카탈로그가 실제로 들고 있는 이름·단축키·별칭과, 통합 검색이 이 이름으로 찾아 주는 항목을 보여 드립니다.")}</Callout>
 
       {help.aliases.length > 0 ? (
         <>
-          <SectionHeading>다른 프로그램에서 부르던 이름</SectionHeading>
+          <SectionHeading>{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "다른 프로그램에서 부르던 이름")}</SectionHeading>
           <ul className="flex flex-wrap gap-1.5">
             {help.aliases.map((alias) => (
               <li
@@ -299,9 +298,9 @@ function CurrentToolPanel({ toolCommandId }: { toolCommandId: string | null }) {
         </>
       ) : null}
 
-      <SectionHeading>관련 명령 · 속성 · 패널</SectionHeading>
+      <SectionHeading>{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "관련 명령 · 속성 · 패널")}</SectionHeading>
       {help.related.length === 0 ? (
-        <p className="text-xs text-fg-3">검색 색인이 찾은 관련 항목이 없습니다.</p>
+        <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "검색 색인이 찾은 관련 항목이 없습니다.")}</p>
       ) : (
         <ul className="space-y-1">
           {help.related.map((item) => (
@@ -327,9 +326,7 @@ function CurrentToolPanel({ toolCommandId }: { toolCommandId: string | null }) {
 
       {help.tutorialIds.length > 0 ? (
         <p className="text-xs text-fg-3">
-          관련 튜토리얼: {help.tutorialIds.join(", ")} — 도움말 ▸ 사용법 · 기능
-          튜토리얼에서 열 수 있습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "관련 튜토리얼: ")}{help.tutorialIds.join(", ")} {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "— 도움말 ▸ 사용법 · 기능 튜토리얼에서 열 수 있습니다.")}</p>
       ) : null}
     </div>
   );
@@ -345,16 +342,14 @@ function TerminologyPanel() {
   return (
     <div className="space-y-3 text-sm text-fg">
       <Callout tone="info">
-        카탈로그가 들고 있는 타사 용어 별칭 <b>{total}건</b>입니다. 같은 색인을 F1
-        통합 검색도 씁니다 — 여기서는 훑어보고, 검색창에서는 찾습니다.
-      </Callout>
+        {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "카탈로그가 들고 있는 타사 용어 별칭 ")}<b>{total}{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "건")}</b>{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "입니다. 같은 색인을 F1 통합 검색도 씁니다 — 여기서는 훑어보고, 검색창에서는 찾습니다.")}</Callout>
       <label className="block">
-        <span className="sr-only">용어 검색</span>
+        <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "용어 검색")}</span>
         <input
           type="search"
           value={query}
           onChange={(event) => setQuery(event.currentTarget.value)}
-          placeholder="예: Paint Bucket, 스포이트, Inherit Alpha"
+          placeholder={translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "예: Paint Bucket, 스포이트, Inherit Alpha")}
           className="min-h-11 w-full rounded-lg border border-line bg-card px-3 text-sm text-fg outline-none placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         />
       </label>
@@ -367,7 +362,7 @@ function TerminologyPanel() {
           .join(" · ")}
       </p>
       {rows.length === 0 ? (
-        <p className="text-xs text-fg-3">맞는 용어를 찾지 못했습니다.</p>
+        <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "맞는 용어를 찾지 못했습니다.")}</p>
       ) : (
         <>
           <ul className="space-y-1">
@@ -399,9 +394,7 @@ function TerminologyPanel() {
           </ul>
           {rows.length > shown.length ? (
             <p className="text-[0.7rem] text-fg-3">
-              {rows.length}건 중 {shown.length}건을 표시했습니다. 검색어를 좁혀
-              보세요.
-            </p>
+              {rows.length}{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "건 중 ")}{shown.length}{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "건을 표시했습니다. 검색어를 좁혀 보세요.")}</p>
           ) : null}
         </>
       )}
@@ -420,7 +413,7 @@ function DiagnosticsReportView({ report }: { report: StudioDiagnosticsReport }) 
               <div key={entry.id} className="flex gap-3 px-2.5 py-1.5">
                 <dt className="w-36 shrink-0 text-[0.7rem] text-fg-3">{entry.label}</dt>
                 <dd className="min-w-0 flex-1 text-xs text-fg">
-                  <span className={entry.measured ? "" : "text-fg-3 italic"}>
+                  <span className={entry.measured ? "" : translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "en", "text-fg-3 italic")}>
                     {entry.value}
                   </span>
                   {entry.detail ? (
@@ -473,46 +466,44 @@ function RecoveryPanel() {
 
   return (
     <div className="space-y-3 text-sm text-fg">
-      <SectionHeading>지금 남아 있는 것</SectionHeading>
+      <SectionHeading>{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "지금 남아 있는 것")}</SectionHeading>
       {!scan ? (
-        <p className="text-xs text-fg-3">브라우저 저장소를 읽는 중입니다…</p>
+        <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "브라우저 저장소를 읽는 중입니다…")}</p>
       ) : scan.storageUnavailable ? (
         <Callout tone="warn">
-          브라우저 저장소를 읽지 못했습니다(사생활 보호 모드일 수 있습니다). 이
-          상태에서는 임시저장이 남지 않으니 작업을 파일로 내보내 두세요.
-        </Callout>
+          {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "브라우저 저장소를 읽지 못했습니다(사생활 보호 모드일 수 있습니다). 이 상태에서는 임시저장이 남지 않으니 작업을 파일로 내보내 두세요.")}</Callout>
       ) : (
         <dl className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-card">
           <div className="flex gap-3 px-2.5 py-1.5">
-            <dt className="w-36 shrink-0 text-[0.7rem] text-fg-3">임시저장</dt>
+            <dt className="w-36 shrink-0 text-[0.7rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "임시저장")}</dt>
             <dd className="min-w-0 flex-1 text-xs text-fg">
               {scan.autosaves.length === 0
-                ? "없음"
-                : `${scan.autosaves.length}건`}
+                ? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "없음")
+                : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "{v0}건"), { v0: String(scan.autosaves.length) })}
               {scan.autosaves.slice(0, 4).map((record) => (
                 <span key={record.key} className="mt-0.5 block text-[0.66rem] text-fg-3">
-                  {record.documentLabel} · 페이지 {record.pageCount}개 ·{" "}
+                  {record.documentLabel} {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "· 페이지 ")}{record.pageCount}{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "개 ·")}{" "}
                   {record.savedAt
                     ? new Date(record.savedAt).toLocaleString("ko-KR")
-                    : "시각 미상"}
-                  {record.hasContent ? "" : " · 내용 없음"}
+                    : translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "시각 미상")}
+                  {record.hasContent ? "" : translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", " · 내용 없음")}
                 </span>
               ))}
             </dd>
           </div>
           <div className="flex gap-3 px-2.5 py-1.5">
-            <dt className="w-36 shrink-0 text-[0.7rem] text-fg-3">체크포인트</dt>
+            <dt className="w-36 shrink-0 text-[0.7rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "체크포인트")}</dt>
             <dd className="min-w-0 flex-1 text-xs text-fg">
               {checkpointCount === null
-                ? "확인 못 함"
-                : `${checkpointCount}건 (문서당 최대 10개 보관)`}
+                ? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "확인 못 함")
+                : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "{v0}건 (문서당 최대 10개 보관)"), { v0: String(checkpointCount) })}
             </dd>
           </div>
           <div className="flex gap-3 px-2.5 py-1.5">
-            <dt className="w-36 shrink-0 text-[0.7rem] text-fg-3">저장 권위</dt>
+            <dt className="w-36 shrink-0 text-[0.7rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "저장 권위")}</dt>
             <dd className="min-w-0 flex-1 text-xs text-fg">
               {reliability.save === null
-                ? "최근 저장 실패·강등 보고 없음"
+                ? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "최근 저장 실패·강등 보고 없음")
                 : `${reliability.save.level} · ${reliability.save.title}`}
               {reliability.save?.detail ? (
                 <span className="mt-0.5 block text-[0.66rem] text-fg-3">
@@ -522,23 +513,23 @@ function RecoveryPanel() {
             </dd>
           </div>
           <div className="flex gap-3 px-2.5 py-1.5">
-            <dt className="w-36 shrink-0 text-[0.7rem] text-fg-3">안전 모드</dt>
+            <dt className="w-36 shrink-0 text-[0.7rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "안전 모드")}</dt>
             <dd className="min-w-0 flex-1 text-xs text-fg">
-              {reliability.safeMode.active ? "켜짐" : "꺼짐"}
+              {reliability.safeMode.active ? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "켜짐") : translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "꺼짐")}
             </dd>
           </div>
         </dl>
       )}
 
-      <SectionHeading>지금 할 수 있는 조치</SectionHeading>
+      <SectionHeading>{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "지금 할 수 있는 조치")}</SectionHeading>
       <ul className="space-y-2">
         {actions.map((action) => (
           <li
             key={action.id}
             className={
               action.urgent
-                ? "rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2"
-                : "rounded-lg border border-line bg-card px-3 py-2"
+                ? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "en", "rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2")
+                : translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "en", "rounded-lg border border-line bg-card px-3 py-2")
             }
           >
             <p className="text-xs font-semibold text-fg">{action.title}</p>
@@ -556,16 +547,14 @@ function RecoveryPanel() {
                 className="mt-1.5 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 text-xs text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-60"
               >
                 <RefreshCw size={13} aria-hidden />
-                {reclaiming ? "회수하는 중…" : "지금 공간 회수"}
+                {reclaiming ? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "회수하는 중…") : translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "지금 공간 회수")}
               </button>
             ) : null}
           </li>
         ))}
       </ul>
       <Callout tone="info">
-        복구 센터(파일 ▸ 복구 센터)는 아직 없습니다. 위 조치는 모두 지금 화면에서
-        도달할 수 있는 것만 적었습니다.
-      </Callout>
+        {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "복구 센터(파일 ▸ 복구 센터)는 아직 없습니다. 위 조치는 모두 지금 화면에서 도달할 수 있는 것만 적었습니다.")}</Callout>
     </div>
   );
 }
@@ -588,13 +577,12 @@ function LicensePanel() {
 
   return (
     <div className="space-y-3 text-sm text-fg">
-      <SectionHeading>생성 서드파티 고지</SectionHeading>
+      <SectionHeading>{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "생성 서드파티 고지")}</SectionHeading>
       {notice === null ? (
-        <p className="text-xs text-fg-3">고지 파일을 확인하는 중입니다…</p>
+        <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "고지 파일을 확인하는 중입니다…")}</p>
       ) : notice.status === "absent" ? (
         <Callout tone="warn">
-          <code className="text-[0.7rem]">{notice.url}</code> 를 불러오지
-          못했습니다 — {notice.reason}
+          <code className="text-[0.7rem]">{notice.url}</code> {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "를 불러오지 못했습니다 —")}{notice.reason}
         </Callout>
       ) : (
         <>
@@ -608,8 +596,7 @@ function LicensePanel() {
           </dl>
           <details className="rounded-lg border border-line bg-card">
             <summary className="cursor-pointer px-2.5 py-1.5 text-xs text-fg">
-              전체 고지 원문 보기 ({notice.text.length.toLocaleString("ko-KR")}자)
-            </summary>
+              {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "전체 고지 원문 보기 (")}{notice.text.length.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "자)")}</summary>
             <pre className="max-h-[40vh] overflow-auto whitespace-pre-wrap break-words border-t border-line px-2.5 py-2 text-[0.66rem] leading-relaxed text-fg-3">
               {notice.text}
             </pre>
@@ -620,18 +607,14 @@ function LicensePanel() {
             className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 text-xs text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <Download size={13} aria-hidden />
-            고지 파일 내려받기
-          </a>
+            {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "고지 파일 내려받기")}</a>
         </>
       )}
 
-      <SectionHeading>엔진 후보 라이선스 게이트</SectionHeading>
+      <SectionHeading>{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "엔진 후보 라이선스 게이트")}</SectionHeading>
       <Callout tone="info">
-        {table.rows.length}개 후보의 SPDX 표기를 실제{" "}
-        <code className="text-[0.7rem]">evaluateLicenseGate()</code> 정책에 넣어
-        지금 계산한 판정입니다. 번들 허용 {table.bundleAllowed.length}종 · 격리
-        허용 {table.isolatedAllowed.length}종.
-      </Callout>
+        {table.rows.length}{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "개 후보의 SPDX 표기를 실제")}{" "}
+        <code className="text-[0.7rem]">evaluateLicenseGate()</code> {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "정책에 넣어 지금 계산한 판정입니다. 번들 허용")}{table.bundleAllowed.length}{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "종 · 격리 허용")}{table.isolatedAllowed.length}{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "종.")}</Callout>
       <ul className="space-y-1">
         {table.rows.map((row) => (
           <li
@@ -649,15 +632,15 @@ function LicensePanel() {
             <span
               className={
                 row.gate === "bundle"
-                  ? "shrink-0 rounded-full border border-line bg-panel px-2 py-0.5 text-[0.66rem] text-fg-3"
-                  : "shrink-0 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[0.66rem] text-fg"
+                  ? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "en", "shrink-0 rounded-full border border-line bg-panel px-2 py-0.5 text-[0.66rem] text-fg-3")
+                  : translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "en", "shrink-0 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[0.66rem] text-fg")
               }
             >
               {row.gate === "bundle"
-                ? "번들 가능"
+                ? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "번들 가능")
                 : row.gate === "isolated"
-                  ? "격리 필요"
-                  : "거부"}
+                  ? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "격리 필요")
+                  : translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "거부")}
             </span>
           </li>
         ))}
@@ -717,7 +700,7 @@ function BugReportPanel({
     <div className="space-y-3 text-sm text-fg">
       <div className="grid gap-2 sm:grid-cols-2">
         <div className="rounded-lg border border-line bg-card p-3">
-          <p className="text-xs font-semibold text-fg">담기는 것</p>
+          <p className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "담기는 것")}</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[0.7rem] leading-relaxed text-fg-3">
             {STUDIO_BUG_REPORT_INCLUDED.map((row) => (
               <li key={row}>{row}</li>
@@ -725,7 +708,7 @@ function BugReportPanel({
           </ul>
         </div>
         <div className="rounded-lg border border-line bg-card p-3">
-          <p className="text-xs font-semibold text-fg">담기지 않는 것</p>
+          <p className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "담기지 않는 것")}</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[0.7rem] leading-relaxed text-fg-3">
             {STUDIO_BUG_REPORT_EXCLUDED.map((row) => (
               <li key={row}>{row}</li>
@@ -735,7 +718,7 @@ function BugReportPanel({
       </div>
 
       {running || !packaged ? (
-        <p className="text-xs text-fg-3">진단을 측정하는 중입니다…</p>
+        <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "진단을 측정하는 중입니다…")}</p>
       ) : (
         <>
           <div className="flex flex-wrap gap-2">
@@ -745,34 +728,30 @@ function BugReportPanel({
               className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 text-xs text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Copy size={13} aria-hidden />
-              마크다운 복사
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "마크다운 복사")}</button>
             <button
               type="button"
               onClick={() => copy("json")}
               className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 text-xs text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Copy size={13} aria-hidden />
-              JSON 복사
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "JSON 복사")}</button>
             <button
               type="button"
               onClick={download}
               className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 text-xs text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Download size={13} aria-hidden />
-              파일로 저장
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "파일로 저장")}</button>
             <span role="status" aria-live="polite" className="self-center text-[0.7rem] text-fg-3">
               {copied === null
-                ? `오류 ${packaged.errors.length}건 · 진단 ${packaged.diagnostics.measuredCount}항목 실측`
-                : "클립보드에 복사했습니다."}
+                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "오류 {v0}건 · 진단 {v1}항목 실측"), { v0: String(packaged.errors.length), v1: String(packaged.diagnostics.measuredCount) })
+                : translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "클립보드에 복사했습니다.")}
             </span>
           </div>
           <details className="rounded-lg border border-line bg-card">
             <summary className="cursor-pointer px-2.5 py-1.5 text-xs text-fg">
-              보낼 내용 미리 보기
-            </summary>
+              {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "보낼 내용 미리 보기")}</summary>
             <pre className="max-h-[40vh] overflow-auto whitespace-pre-wrap break-words border-t border-line px-2.5 py-2 text-[0.66rem] leading-relaxed text-fg-3">
               {formatStudioBugReportMarkdown(packaged)}
             </pre>
@@ -817,7 +796,7 @@ export function StudioHelpCenterDialog({
 
   return createPortal(
     <div
-      className={`fixed inset-0 ${STUDIO_Z_CLASS.help} flex items-center justify-center bg-black/45 px-4 py-[6vh] backdrop-blur-sm`}
+      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "en", "fixed inset-0 {v0} flex items-center justify-center bg-black/45 px-4 py-[6vh] backdrop-blur-sm"), { v0: String(STUDIO_Z_CLASS.help) })}
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -833,7 +812,7 @@ export function StudioHelpCenterDialog({
       >
         <div className="flex items-center gap-2 border-b border-line px-3 py-2">
           <h2 id={titleId} className="min-w-0 flex-1 truncate text-sm font-semibold text-fg">
-            도움말 · {PANEL_TITLE[section]}
+            {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "도움말 · ")}{PANEL_TITLE[section]}
           </h2>
           {diagnosticsActive ? (
             <button
@@ -842,23 +821,22 @@ export function StudioHelpCenterDialog({
               className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <RefreshCw size={13} aria-hidden />
-              다시 측정
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "다시 측정")}</button>
           ) : null}
           <button
             type="button"
             onClick={onClose}
-            title="닫기 (Esc)"
+            title={translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "닫기 (Esc)")}
             className="flex size-9 shrink-0 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <X size={16} aria-hidden />
-            <span className="sr-only">도움말 닫기</span>
+            <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "도움말 닫기")}</span>
           </button>
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
           <nav
-            aria-label="도움말 구역"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "도움말 구역")}
             className="flex shrink-0 gap-1 overflow-x-auto border-b border-line p-2 sm:w-44 sm:flex-col sm:overflow-x-visible sm:overflow-y-auto sm:border-b-0 sm:border-r"
           >
             {STUDIO_HELP_CENTER_SECTIONS.map((id) => {
@@ -868,13 +846,11 @@ export function StudioHelpCenterDialog({
                 <button
                   key={id}
                   type="button"
-                  aria-current={id === section ? "page" : undefined}
+                  aria-current={id === section ? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "en", "page") : undefined}
                   onClick={() => onSectionChange(id)}
-                  className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-2.5 text-left text-xs transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                    id === section
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "en", "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-2.5 text-left text-xs transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(id === section
                       ? "bg-raised text-fg"
-                      : "text-fg-3 hover:bg-raised hover:text-fg"
-                  }`}
+                      : "text-fg-3 hover:bg-raised hover:text-fg") })}
                 >
                   <Icon size={14} aria-hidden className="shrink-0" />
                   <span className="whitespace-nowrap">{meta.label}</span>
@@ -899,17 +875,14 @@ export function StudioHelpCenterDialog({
                 {diagnostics.report === null ? (
                   <p className="text-xs text-fg-3">
                     {diagnostics.running
-                      ? "기기 능력을 측정하는 중입니다…"
-                      : "측정 결과를 만들지 못했습니다. ‘다시 측정’을 눌러 주세요."}
+                      ? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "기기 능력을 측정하는 중입니다…")
+                      : translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "측정 결과를 만들지 못했습니다. ‘다시 측정’을 눌러 주세요.")}
                   </p>
                 ) : (
                   <>
                     <Callout tone="info">
                       {new Date(diagnostics.report.collectedAt).toLocaleString("ko-KR")}{" "}
-                      기준 실측 {diagnostics.report.measuredCount}항목 · 확인 못 한
-                      항목 {diagnostics.report.unmeasuredCount}개. 확인 못 한 항목은
-                      추정하지 않고 그대로 둡니다.
-                    </Callout>
+                      {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "기준 실측 ")}{diagnostics.report.measuredCount}{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "항목 · 확인 못 한 항목")}{diagnostics.report.unmeasuredCount}{translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "개. 확인 못 한 항목은 추정하지 않고 그대로 둡니다.")}</Callout>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -919,8 +892,8 @@ export function StudioHelpCenterDialog({
                       >
                         <Stethoscope size={13} aria-hidden />
                         {diagnostics.adapterBusy
-                          ? "어댑터 조회 중…"
-                          : "GPU 어댑터 신원 조회(약 4MB 내려받음)"}
+                          ? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "어댑터 조회 중…")
+                          : translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "GPU 어댑터 신원 조회(약 4MB 내려받음)")}
                       </button>
                       <button
                         type="button"
@@ -935,8 +908,7 @@ export function StudioHelpCenterDialog({
                         className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                       >
                         <Copy size={13} aria-hidden />
-                        진단 복사
-                      </button>
+                        {translateCurrentStaticSourceText("domains.creator.StudioHelpCenterDialog", "ko", "진단 복사")}</button>
                     </div>
                     <DiagnosticsReportView report={diagnostics.report} />
                   </>

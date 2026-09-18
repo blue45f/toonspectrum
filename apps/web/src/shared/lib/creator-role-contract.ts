@@ -1,3 +1,6 @@
+import {
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 export const CREATOR_ROLE_PROFILE_VERSION = 1 as const;
 export const CREATOR_ROLE_MAX_SECONDARY = 5;
 export const CREATOR_ROLE_MAX_SPECIALTIES = 12;
@@ -24,7 +27,7 @@ export const CREATOR_ROLE_IDS = [
 export type CreatorRoleId = (typeof CREATOR_ROLE_IDS)[number];
 export type CreatorRoleGroup = "story" | "art" | "support" | "production";
 export type CreatorRoleLens = "story" | "art" | "producer";
-export type CreatorRoleLocale = "ko" | "en";
+export type CreatorRoleLocale = string;
 
 export const CREATOR_STAGE_IDS = [
   "student",
@@ -471,7 +474,7 @@ const EXPERIENCE_SET = new Set<string>(CREATOR_EXPERIENCE_LEVELS);
 const COLLABORATION_SET = new Set<string>(CREATOR_COLLABORATION_STATUSES);
 
 export function creatorText(value: LocalizedCreatorText, locale: CreatorRoleLocale): string {
-  return value[locale];
+  return translateLocaleBranchForLocale(locale, "shared.lib.creator.role.contract", value);
 }
 
 export function normalizeCreatorRoleId(value: unknown): CreatorRoleId | null {

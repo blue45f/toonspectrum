@@ -1,3 +1,8 @@
+import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Check, Sparkles, WandSparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -20,12 +25,13 @@ export type StudioProjectAssistantSection =
   | "export"
   | "settings";
 
-type Locale = "ko" | "en";
+type Locale = string;
+type AuthoredLocale = "ko" | "en";
 
 type AssistantSuggestion = Readonly<{
   tool: StudioAiAssistToolId;
-  label: Record<Locale, string>;
-  prompt: Record<Locale, string>;
+  label: Record<AuthoredLocale, string>;
+  prompt: Record<AuthoredLocale, string>;
 }>;
 
 const SUGGESTIONS: Readonly<Record<StudioProjectAssistantSection, readonly AssistantSuggestion[]>> = {
@@ -85,19 +91,19 @@ export function StudioProjectAssistantPanel({
   const navigate = useNavigate();
   const suggestions = useMemo(() => SUGGESTIONS[section], [section]);
   const [selectedTool, setSelectedTool] = useState<StudioAiAssistToolId>(suggestions[0]?.tool ?? "composition");
-  const [prompt, setPrompt] = useState(suggestions[0]?.prompt[locale] ?? "");
+  const [prompt, setPrompt] = useState(translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectAssistantPanel", suggestions[0]?.prompt) ?? "");
   const [error, setError] = useState<string | null>(null);
 
   const chooseSuggestion = (suggestion: AssistantSuggestion) => {
     setSelectedTool(suggestion.tool);
-    setPrompt(suggestion.prompt[locale]);
+    setPrompt(translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectAssistantPanel", suggestion.prompt));
     setError(null);
   };
 
   const launch = () => {
     const trimmed = prompt.trim();
     if (!trimmed) {
-      setError(locale === "ko" ? "도우미에게 요청할 내용을 입력해 주세요." : "Describe what the assistant should do.");
+      setError(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectAssistantPanel", "도우미에게 요청할 내용을 입력해 주세요.", "Describe what the assistant should do."));
       return;
     }
     try {
@@ -110,9 +116,7 @@ export function StudioProjectAssistantPanel({
       writeStudioAiProjectHandoff(window.sessionStorage, handoff);
       navigate(editorHref(projectId, selectedTool));
     } catch {
-      setError(locale === "ko"
-        ? "요청을 안전하게 전달하지 못했습니다. 편집기에서 도우미를 직접 열어 주세요."
-        : "The request could not be handed off safely. Open the assistant from the editor instead.");
+      setError(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectAssistantPanel", "요청을 안전하게 전달하지 못했습니다. 편집기에서 도우미를 직접 열어 주세요.", "The request could not be handed off safely. Open the assistant from the editor instead."));
     }
   };
 
@@ -121,26 +125,23 @@ export function StudioProjectAssistantPanel({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-2xl">
           <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            <Sparkles size={14} aria-hidden="true" /> TOONSTUDIO ASSISTANT
-          </p>
+            <Sparkles size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectAssistantPanel", "en", "TOONSTUDIO ASSISTANT")}</p>
           <h2 id="project-assistant-title" className="mt-2 text-xl font-black tracking-tight text-fg">
-            {locale === "ko" ? "현재 작업에서 바로 도움받기" : "Get help with the current task"}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectAssistantPanel", "현재 작업에서 바로 도움받기", "Get help with the current task")}
           </h2>
           <p className="mt-2 text-sm leading-6 text-fg-2">
-            {locale === "ko"
-              ? "요청을 편집기로 안전하게 전달합니다. 실제 실행 전 설정과 비용을 확인하고, 결과는 원본을 덮지 않고 사본으로 적용합니다."
-              : "The request opens in the editor for a final settings and cost check. Results are applied as a copy, never over the original."}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectAssistantPanel", "요청을 편집기로 안전하게 전달합니다. 실제 실행 전 설정과 비용을 확인하고, 결과는 원본을 덮지 않고 사본으로 적용합니다.", "The request opens in the editor for a final settings and cost check. Results are applied as a copy, never over the original.")}
           </p>
         </div>
         <span className="inline-flex min-h-9 items-center gap-1.5 self-start rounded-full border border-success/30 bg-success-soft/20 px-3 text-xs font-bold text-success">
           <Check size={14} aria-hidden="true" />
-          {locale === "ko" ? "원본 보호" : "Original protected"}
+          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectAssistantPanel", "원본 보호", "Original protected")}
         </span>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2" aria-label={locale === "ko" ? "추천 요청" : "Suggested requests"}>
+      <div className="mt-4 flex flex-wrap gap-2" aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectAssistantPanel", "추천 요청", "Suggested requests")}>
         {suggestions.map((suggestion) => {
-          const active = prompt === suggestion.prompt[locale] && selectedTool === suggestion.tool;
+          const active = prompt === translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectAssistantPanel", suggestion.prompt) && selectedTool === suggestion.tool;
           return (
             <button
               key={`${suggestion.tool}:${suggestion.label.en}`}
@@ -155,14 +156,14 @@ export function StudioProjectAssistantPanel({
                   : "border-line bg-card text-fg-2 hover:border-accent/40 hover:text-fg",
               )}
             >
-              {suggestion.label[locale]}
+              {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectAssistantPanel", suggestion.label)}
             </button>
           );
         })}
       </div>
 
       <label className="mt-4 block text-xs font-bold text-fg-2" htmlFor="project-assistant-prompt">
-        {locale === "ko" ? "요청 내용" : "Request"}
+        {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectAssistantPanel", "요청 내용", "Request")}
       </label>
       <textarea
         id="project-assistant-prompt"
@@ -173,17 +174,17 @@ export function StudioProjectAssistantPanel({
         }}
         rows={3}
         className="mt-2 w-full resize-y rounded-2xl border border-line bg-card px-4 py-3 text-sm leading-6 text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent focus:ring-2 focus:ring-accent/25"
-        placeholder={locale === "ko" ? "예: 컷 12~16의 긴장감을 높이는 구도를 제안해줘" : "Example: Suggest compositions that increase tension in panels 12–16"}
+        placeholder={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectAssistantPanel", "예: 컷 12~16의 긴장감을 높이는 구도를 제안해줘", "Example: Suggest compositions that increase tension in panels 12–16")}
       />
       {error ? <p role="alert" className="mt-2 text-xs font-semibold text-danger">{error}</p> : null}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs leading-5 text-fg-3">
-          {locale === "ko" ? "편집기에서 실행 전 공급 방식·외부 전송·예상 비용을 확인할 수 있어요." : "Review processing, external transfer and estimated cost in the editor before running."}
+          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectAssistantPanel", "편집기에서 실행 전 공급 방식·외부 전송·예상 비용을 확인할 수 있어요.", "Review processing, external transfer and estimated cost in the editor before running.")}
         </p>
         <button type="button" onClick={launch} className={buttonClass({ className: "gap-2" })}>
           <WandSparkles size={16} aria-hidden="true" />
-          {locale === "ko" ? "편집기에서 검토" : "Review in editor"}
+          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectAssistantPanel", "편집기에서 검토", "Review in editor")}
           <ArrowRight size={15} aria-hidden="true" />
         </button>
       </div>
