@@ -335,7 +335,18 @@ export class StudioP2pHuddleController {
       const collision = packet.type === "offer" && (link.makingOffer
         || (pc.signalingState !== "stable" && !link.settingAnswer));
       link.ignoreOffer = this.self.sessionId < id && collision;
-      if (link.ignoreOffer) { link.pendingIce = []; return; }
+      if (link.ignoreOffer) {
+        link.pendingIce = [];
+        // The peer may have created its link after our first offer was sent (for example while a
+        // proximity-media scope was still settling). In that race the polite peer's new offer
+        // collides with our still-pending local offer, but simply ignoring it deadlocks both sides:
+        // their copy of our original offer may never have existed. Re-send the same local offer so
+        // the polite side can roll back its glare offer and answer without opening a second route.
+        if (pc.signalingState === "have-local-offer" && pc.localDescription?.type === "offer") {
+          this.sendDescription(id, link);
+        }
+        return;
+      }
       link.settingAnswer = packet.type === "answer";
       try { await pc.setRemoteDescription({ type: packet.type, sdp: packet.sdp }); }
       finally { link.settingAnswer = false; }

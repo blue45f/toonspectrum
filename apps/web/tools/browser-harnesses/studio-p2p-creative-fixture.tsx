@@ -54,7 +54,7 @@ export async function mount(index: number): Promise<void> {
 /** WebKit QA only: generated tracks exercise native RTP without opening physical devices. */
 export function installGeneratedMedia(): void {
   const qa = globalThis as unknown as { qaCaptureCalls: number; qaTracks: MediaStreamTrack[] };
-  navigator.mediaDevices.getUserMedia = async (constraints) => {
+  const getGeneratedUserMedia = async (constraints: MediaStreamConstraints) => {
     qa.qaCaptureCalls++;
     const stream = new MediaStream(); let audio: AudioContext | null = null;
     let oscillator: OscillatorNode | null = null;
@@ -80,4 +80,17 @@ export function installGeneratedMedia(): void {
     }, 80);
     qa.qaTracks.push(...stream.getTracks()); return stream;
   };
+  if (!navigator.mediaDevices) throw new Error("MediaDevices is unavailable in the WebKit QA harness.");
+  const mediaDevices = navigator.mediaDevices;
+  const mediaDevicesPrototype = Object.getPrototypeOf(mediaDevices) as MediaDevices;
+  Object.defineProperty(mediaDevicesPrototype, "getUserMedia", {
+    configurable: true,
+    writable: true,
+    value: getGeneratedUserMedia,
+  });
+  Object.defineProperty(mediaDevices, "getUserMedia", {
+    configurable: true,
+    writable: true,
+    value: getGeneratedUserMedia,
+  });
 }

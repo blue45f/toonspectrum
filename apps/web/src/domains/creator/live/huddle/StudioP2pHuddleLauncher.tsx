@@ -27,17 +27,25 @@ export default function StudioP2pHuddleLauncher() {
   const [deafened, setDeafened] = useState(false);
   const [busy, setBusy] = useState(false);
   const [proximityMedia, setProximityMedia] = useState(true);
-  const [nearbyPeerIds, setNearbyPeerIds] = useState<string[]>([]);
+  const nearbyPeerIdsRef = useRef<string[]>([]);
+  const proximityMediaRef = useRef(true);
   const log = useRef<HTMLDivElement>(null);
   const active = snapshot !== null && !snapshot.closed;
   const room = live.room;
   const handleNearbyChange = useCallback((sessionIds: string[]) => {
-    setNearbyPeerIds((current) => current.length === sessionIds.length
-      && current.every((id, index) => id === sessionIds[index]) ? current : sessionIds);
+    nearbyPeerIdsRef.current = sessionIds;
+    if (proximityMediaRef.current) controller.current?.setMediaPeerScope(sessionIds);
+  }, []);
+  const handleProximityMediaChange = useCallback((enabled: boolean) => {
+    proximityMediaRef.current = enabled;
+    setProximityMedia(enabled);
+    controller.current?.setMediaPeerScope(enabled ? nearbyPeerIdsRef.current : null);
   }, []);
   useEffect(() => {
     proximityPeerIds.current = null;
-    setSnapshot(null); setDraft(""); setBusy(false); setNearbyPeerIds([]); setProximityMedia(true);
+    nearbyPeerIdsRef.current = [];
+    proximityMediaRef.current = true;
+    setSnapshot(null); setDraft(""); setBusy(false); setProximityMedia(true);
     return () => {
       cleanup.current?.(); cleanup.current = null;
       controller.current?.close(); controller.current = null;
@@ -52,10 +60,12 @@ export default function StudioP2pHuddleLauncher() {
       const requestedIds = detail?.peerIds ? [...detail.peerIds] : null;
       proximityPeerIds.current = requestedIds ? new Set(requestedIds) : null;
       if (requestedIds) {
-        setNearbyPeerIds(requestedIds);
+        nearbyPeerIdsRef.current = requestedIds;
+        proximityMediaRef.current = true;
         setProximityMedia(true);
         controller.current?.setMediaPeerScope(requestedIds);
       } else {
+        proximityMediaRef.current = false;
         setProximityMedia(false);
         controller.current?.setMediaPeerScope(null);
       }
@@ -65,10 +75,6 @@ export default function StudioP2pHuddleLauncher() {
     globalThis.addEventListener(STUDIO_P2P_HUDDLE_OPEN_EVENT, handleOpen);
     return () => globalThis.removeEventListener(STUDIO_P2P_HUDDLE_OPEN_EVENT, handleOpen);
   }, []);
-  useEffect(() => {
-    if (!active) return;
-    controller.current?.setMediaPeerScope(proximityMedia ? nearbyPeerIds : null);
-  }, [active, nearbyPeerIds, proximityMedia]);
   useEffect(() => {
     if (!active) return undefined;
     const resume = () => {
@@ -94,7 +100,9 @@ export default function StudioP2pHuddleLauncher() {
     cleanup.current?.(); cleanup.current = null;
     controller.current?.close(); controller.current = null;
     proximityPeerIds.current = null;
-    setSnapshot(null); setDraft(""); setBusy(false); setDeafened(false); setNearbyPeerIds([]); setProximityMedia(true);
+    nearbyPeerIdsRef.current = [];
+    proximityMediaRef.current = true;
+    setSnapshot(null); setDraft(""); setBusy(false); setDeafened(false); setProximityMedia(true);
   }
   function join() {
     if (!room?.direct || live.availability !== "ready" || !live.canChat || controller.current) return;
@@ -180,7 +188,7 @@ export default function StudioP2pHuddleLauncher() {
             self={room.participant}
             port={room.direct}
             proximityMedia={proximityMedia}
-            onProximityMediaChange={setProximityMedia}
+            onProximityMediaChange={handleProximityMediaChange}
             onNearbyChange={handleNearbyChange}
           />}
           <div className="grid grid-cols-2 gap-2">

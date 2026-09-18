@@ -253,4 +253,63 @@ describe("P2P huddle consent and delivery", () => {
     expect(close).toHaveBeenCalledOnce();
     expect(controller.snapshot().peers[0]?.connection).toBe("idle");
   });
+
+  it("re-sends the pending local offer when a delayed proximity link causes glare", async () => {
+    let inbound: ((sender: StudioLiveParticipant, raw: string) => void) | null = null;
+    let signalingState: RTCSignalingState = "stable";
+    let localDescription: RTCSessionDescription | null = null;
+    const send = vi.fn(() => true);
+    const setRemoteDescription = vi.fn(async () => undefined);
+    const replaceTrack = vi.fn(async () => undefined);
+    const peer = {
+      connectionState: "new",
+      get signalingState() { return signalingState; },
+      get localDescription() { return localDescription; },
+      remoteDescription: null,
+      addTransceiver: vi.fn(() => ({ sender: { replaceTrack } })),
+      setLocalDescription: vi.fn(async () => undefined),
+      setRemoteDescription,
+      addIceCandidate: vi.fn(async () => undefined),
+      close: vi.fn(),
+      onicecandidate: null,
+      ontrack: null,
+      onnegotiationneeded: null,
+      onconnectionstatechange: null,
+    } as unknown as RTCPeerConnection;
+    const port: StudioLiveDirectPort = {
+      getPeers: () => [B],
+      subscribe: (listener) => { inbound = listener; return () => { inbound = null; }; },
+      send,
+    };
+    const controller = new StudioP2pHuddleController(A, port, {
+      createPeerConnection: () => peer,
+      id: () => "epoch-a",
+    });
+    sessions.push(controller);
+    controller.start();
+    inbound?.(B, JSON.stringify({
+      kind: "state", epoch: "epoch-b", muted: false, camera: false, sharing: false, hand: false,
+    }));
+
+    signalingState = "have-local-offer";
+    localDescription = { type: "offer", sdp: "local-offer" } as RTCSessionDescription;
+    send.mockClear();
+    inbound?.(B, JSON.stringify({
+      kind: "description",
+      epoch: "epoch-b",
+      toEpoch: "epoch-a",
+      type: "offer",
+      sdp: "remote-glare-offer",
+    }));
+
+    await vi.waitFor(() => {
+      expect(send.mock.calls.some(([, raw]) => {
+        const packet = JSON.parse(String(raw));
+        return packet.kind === "description"
+          && packet.type === "offer"
+          && packet.sdp === "local-offer";
+      })).toBe(true);
+    });
+    expect(setRemoteDescription).not.toHaveBeenCalled();
+  });
 });
