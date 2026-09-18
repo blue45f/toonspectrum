@@ -44,6 +44,7 @@ import {
   planReplay,
   resolveHibernatableBufferedAmount,
   resolveRealtimeRoomLimits,
+  selectAlarmCoveringCleanupWindow,
   selectNextAlarmAt,
   type RealtimeRoomLimits,
 } from "./room-core";
@@ -1501,23 +1502,45 @@ export class RealtimeRoom extends DurableObject<RealtimeWorkerEnv> {
   }
 
   private async scheduleNextAlarm(nowMs: number): Promise<void> {
-    const sockets = this.roomState.getWebSockets();
-    const nextAlarmAt = selectNextAlarmAt(
-      nowMs,
-      this.limits.cleanupIntervalMs,
-      this.store.hasExpiringRows(),
-      sockets.flatMap((socket) => {
+    const connectionExpirations = this.roomState
+      .getWebSockets()
+      .flatMap((socket) => {
         const attachment = socket.deserializeAttachment();
         return isConnectionAttachment(attachment)
           ? [attachment.sessionExpiresAtMs]
           : [nowMs + 1];
-      }),
+      });
+    const currentAlarm = await this.roomState.storage.getAlarm();
+
+    // If an alarm is already scheduled within the cleanup window, or a
+    // connection expiry can be scheduled within it, that alarm will also
+    // service any newly-created expiring rows. Avoid probing SQLite on every
+    // high-frequency realtime frame while preserving the cleanup deadline.
+    const cleanupCoveringAlarmAt = selectAlarmCoveringCleanupWindow(
+      nowMs,
+      this.limits.cleanupIntervalMs,
+      currentAlarm,
+      connectionExpirations,
     );
-    if (nextAlarmAt === null) {
-      await this.roomState.storage.deleteAlarm();
+    if (cleanupCoveringAlarmAt !== null) {
+      if (currentAlarm === null || cleanupCoveringAlarmAt < currentAlarm) {
+        await this.roomState.storage.setAlarm(cleanupCoveringAlarmAt);
+      }
       return;
     }
-    const currentAlarm = await this.roomState.storage.getAlarm();
+
+    const nextAlarmAt = selectNextAlarmAt(
+      nowMs,
+      this.limits.cleanupIntervalMs,
+      this.store.hasExpiringRows(),
+      connectionExpirations,
+    );
+    if (nextAlarmAt === null) {
+      if (currentAlarm !== null) {
+        await this.roomState.storage.deleteAlarm();
+      }
+      return;
+    }
     if (currentAlarm === null || nextAlarmAt < currentAlarm) {
       await this.roomState.storage.setAlarm(nextAlarmAt);
     }
