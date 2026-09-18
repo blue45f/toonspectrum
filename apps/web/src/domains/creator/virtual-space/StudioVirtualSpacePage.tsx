@@ -48,7 +48,6 @@ import {
   startStudioConnectivityRuntime,
   subscribeStudioConnectivity,
 } from "../offline/studio-connectivity";
-
 import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaborationProvider";
 import { useStudioLiveCollaboration } from "../live/studio-live-collaboration-context";
 import { openStudioP2pHuddle } from "../live/huddle/studio-p2p-huddle-events";
@@ -75,6 +74,21 @@ import {
 } from "./studio-virtual-space-presence";
 
 const MOVE_STEP = 28;
+const VIRTUAL_AVATAR_ART = [
+  "/images/characters/ara.jpg",
+  "/images/characters/danwoo.jpg",
+  "/images/characters/gaon.jpg",
+  "/images/characters/leona.jpg",
+] as const;
+
+function virtualAvatarArt(identity: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < identity.length; index += 1) {
+    hash ^= identity.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return VIRTUAL_AVATAR_ART[(hash >>> 0) % VIRTUAL_AVATAR_ART.length] ?? VIRTUAL_AVATAR_ART[0];
+}
 
 const ZONE_ICONS: Readonly<Record<StudioVirtualSpaceZoneId, typeof Coffee>> = {
   lounge: Coffee,
@@ -96,6 +110,17 @@ const ZONE_TONES: Readonly<Record<StudioVirtualSpaceZoneId, string>> = {
   assets: "from-orange-100/75 via-card/85 to-card/70 dark:from-orange-950/25",
   assistant: "from-fuchsia-100/75 via-card/85 to-card/70 dark:from-fuchsia-950/25",
   live: "from-cyan-100/75 via-card/85 to-card/70 dark:from-cyan-950/25",
+};
+
+const ZONE_ART: Readonly<Record<StudioVirtualSpaceZoneId, string>> = {
+  lounge: "/assets/studio/backgrounds/webtoon_cafe.jpg",
+  writers: "/assets/studio/backgrounds/webtoon_classroom.jpg",
+  storyboard: "/assets/studio/backgrounds/webtoon_creator_room.png",
+  drawing: "/assets/studio/backgrounds/webtoon_creator_room.png",
+  review: "/assets/studio/backgrounds/webtoon_drama_boardroom.jpg",
+  assets: "/brand/atelier-materials-640.webp",
+  assistant: "/brand/atelier-process-640.webp",
+  live: "/assets/studio/backgrounds/webtoon_rooftop_sunset.png",
 };
 
 function decodeProjectId(projectId: string): string {
@@ -172,86 +197,56 @@ function ChibiAvatar({
   readonly compact?: boolean;
 }) {
   const profile = useMemo(() => studioVirtualAvatarProfile(identity), [identity]);
-  const initial = (name.trim().charAt(0) || "T").toUpperCase();
+  const art = useMemo(() => virtualAvatarArt(identity), [identity]);
+  const activityTone = activity === "away"
+    ? "bg-fg-3"
+    : activity === "focused"
+      ? "bg-warn"
+      : activity === "reviewing"
+        ? "bg-cool"
+        : "bg-good";
+
   if (compact) {
     return (
       <span
-        className="relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-panel text-xs font-black shadow-sm"
-        style={{ background: `linear-gradient(145deg, ${profile.hairHighlight}, ${profile.outfit})` }}
+        className={cn(
+          "relative size-10 shrink-0 overflow-hidden rounded-full border-2 border-panel shadow-[0_6px_18px_oklch(0.08_0_0/0.28)]",
+          self && "ring-2 ring-accent/60 ring-offset-1 ring-offset-panel",
+        )}
         aria-hidden
       >
-        <span className="grid size-7 place-items-center rounded-full" style={{ backgroundColor: profile.skin, color: profile.hair }}>
-          {initial}
-        </span>
-        <span
-          className={cn(
-            "absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-panel",
-            activity === "away" ? "bg-fg-3" : activity === "focused" ? "bg-warn" : "bg-good",
-          )}
-        />
+        <img src={art} alt="" className="size-full object-cover" loading="lazy" decoding="async" />
+        <span className={cn("absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-panel", activityTone)} />
       </span>
     );
   }
 
-  const hairShape = profile.hairStyle === "long"
-    ? "h-[3.2rem] rounded-[48%_48%_38%_38%]"
-    : profile.hairStyle === "twin"
-      ? "h-11 rounded-[48%_48%_42%_42%]"
-      : profile.hairStyle === "wave"
-        ? "h-12 rounded-[52%_48%_42%_50%]"
-        : "h-10 rounded-[48%_48%_44%_44%]";
   return (
     <div
       className={cn(
-        "pointer-events-none relative flex h-[5.6rem] w-[4.6rem] -translate-x-1/2 -translate-y-[78%] flex-col items-center",
-        self && "drop-shadow-[0_0_10px_oklch(0.7_0.18_300/0.45)]",
+        "pointer-events-none relative flex h-[6.5rem] w-[5.2rem] -translate-x-1/2 -translate-y-[82%] flex-col items-center",
+        self && "drop-shadow-[0_0_16px_oklch(0.7_0.18_300/0.5)]",
       )}
       aria-label={name}
     >
       <span
-        className={cn(
-          "absolute bottom-0 h-5 w-11 rounded-[50%_50%_42%_42%] shadow-md",
-          activity === "focused" && "animate-pulse",
-        )}
-        style={{ backgroundColor: profile.outfit }}
-      />
-      <span className="absolute bottom-3 z-10 h-8 w-8 rounded-[46%_46%_40%_40%]" style={{ backgroundColor: profile.outfit }}>
-        <span className="absolute left-1/2 top-1 h-2 w-3 -translate-x-1/2 rounded-full" style={{ backgroundColor: profile.accent }} />
-      </span>
-      <span className={cn("absolute bottom-8 z-10 w-[3.55rem] shadow-md", hairShape)} style={{ backgroundColor: profile.hair }}>
-        <span className="absolute left-1 top-1 h-5 w-4 rotate-6 rounded-full opacity-50" style={{ backgroundColor: profile.hairHighlight }} />
-      </span>
-      <span
-        className="absolute bottom-[2.25rem] z-20 h-[2.95rem] w-[3.05rem] overflow-hidden rounded-[46%_46%_48%_48%] border border-black/5"
-        style={{ backgroundColor: profile.skin }}
+        className="absolute bottom-1 size-[4.8rem] overflow-hidden rounded-[46%_46%_44%_44%] border-[3px] bg-panel shadow-[0_12px_28px_oklch(0.08_0_0/0.38)]"
+        style={{ borderColor: self ? profile.accent : profile.hairHighlight }}
       >
-        <span className="absolute -left-1 -top-1 h-5 w-[2.1rem] rotate-12 rounded-full" style={{ backgroundColor: profile.hair }} />
-        <span className="absolute -right-1 -top-1 h-5 w-[2rem] -rotate-12 rounded-full" style={{ backgroundColor: profile.hair }} />
-        <span className="absolute left-[0.62rem] top-[1.35rem] size-[0.28rem] rounded-full bg-slate-800" />
-        <span className="absolute right-[0.62rem] top-[1.35rem] size-[0.28rem] rounded-full bg-slate-800" />
-        {profile.expression === "sparkle" ? (
-          <>
-            <span className="absolute left-[0.51rem] top-[1.18rem] text-[0.48rem] text-white">✦</span>
-            <span className="absolute right-[0.51rem] top-[1.18rem] text-[0.48rem] text-white">✦</span>
-          </>
-        ) : null}
-        <span className="absolute bottom-[0.58rem] left-[0.45rem] h-1.5 w-2.5 rounded-full bg-pink-400/20" />
-        <span className="absolute bottom-[0.58rem] right-[0.45rem] h-1.5 w-2.5 rounded-full bg-pink-400/20" />
-        <span className={cn(
-          "absolute bottom-[0.55rem] left-1/2 -translate-x-1/2 border-b border-slate-700/70",
-          profile.expression === "calm" ? "w-2" : "h-1 w-2.5 rounded-b-full",
-        )} />
+        <img src={art} alt="" className="size-full object-cover" loading="lazy" decoding="async" />
+        <span className="absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-black/38 to-transparent" />
       </span>
-      <span className="absolute bottom-[4.55rem] z-20 h-3 w-[3.3rem] rounded-t-[60%]" style={{ backgroundColor: profile.hair }} />
       {accessoryNode(profile)}
-      <span
-        className={cn(
-          "absolute -bottom-4 left-1/2 z-40 max-w-28 -translate-x-1/2 truncate rounded-full border bg-panel/95 px-2 py-0.5 text-[0.58rem] font-black shadow-sm",
-          self ? "border-accent/60 text-accent" : "border-line text-fg",
-        )}
-      >
-        {self ? "★ " : ""}{name}
+      <span className={cn("absolute bottom-1 right-0 z-30 size-3 rounded-full border-2 border-panel", activityTone)} />
+      <span className="absolute -bottom-4 left-1/2 z-40 flex max-w-32 -translate-x-1/2 items-center gap-1 truncate rounded-full border border-line bg-panel/95 px-2 py-0.5 text-[0.58rem] font-black text-fg shadow-sm">
+        {self ? <Sparkles size={9} className="shrink-0 text-accent" aria-hidden /> : null}
+        <span className="truncate">{name}</span>
       </span>
+      {self ? (
+        <span className="absolute -top-1 right-0 z-30 rounded-full bg-accent px-1.5 py-0.5 text-[0.45rem] font-black uppercase tracking-wide text-on-accent">
+          ME
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -263,17 +258,34 @@ function ConnectionBadge({
 }) {
   const bt = useBilingual("StudioVirtualSpaceConnectionBadge");
   const live = useStudioLiveCollaboration();
+  const connectivity = useSyncExternalStore(
+    subscribeStudioConnectivity,
+    getStudioConnectivitySnapshot,
+    getStudioConnectivityServerSnapshot,
+  );
   const direct = Boolean(live.room?.direct && live.availability === "ready");
-  const tone = direct ? "bg-good" : live.availability === "error" ? "bg-danger" : "bg-warn";
-  const label = preparing
-    ? bt("실시간 연결 준비 중", "Preparing live connection")
+  const tone = connectivity.localOnly
+    ? "bg-warn"
     : direct
-      ? bt("P2P Direct", "P2P Direct")
-      : live.availability === "ready"
-        ? bt("Presence 연결됨", "Presence connected")
-        : live.availability === "error"
-          ? bt("연결 확인 필요", "Connection needs attention")
-          : bt("연결 중", "Connecting");
+      ? "bg-good"
+      : live.availability === "error"
+        ? "bg-danger"
+        : "bg-warn";
+  const label = connectivity.mode === "offline"
+    ? bt("오프라인 · 로컬 작업", "Offline · local work")
+    : connectivity.mode === "server-unavailable"
+      ? bt("서버 연결 없음 · 로컬 작업", "Server unavailable · local work")
+      : connectivity.mode === "reconnecting"
+        ? bt("온라인 복구 중", "Reconnecting")
+        : preparing
+          ? bt("실시간 연결 준비 중", "Preparing live connection")
+          : direct
+            ? bt("P2P Direct", "P2P Direct")
+            : live.availability === "ready"
+              ? bt("Presence 연결됨", "Presence connected")
+              : live.availability === "error"
+                ? bt("연결 확인 필요", "Connection needs attention")
+                : bt("연결 중", "Connecting");
   return (
     <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-card/90 px-3 text-xs font-bold text-fg-2 shadow-sm">
       <span className={cn("size-2 rounded-full", tone)} />
@@ -304,7 +316,13 @@ function ZoneSurface({
   };
   const body = (
     <>
-      <span className="absolute inset-2 rounded-[1.25rem] border border-line/60 bg-gradient-to-br from-white/20 via-transparent to-black/[0.025] dark:from-white/[0.025]" />
+      <span
+        className="absolute inset-0 bg-cover bg-center opacity-45 saturate-[0.88]"
+        style={{ backgroundImage: `url("${ZONE_ART[zone.id]}")` }}
+        aria-hidden
+      />
+      <span className="absolute inset-0 bg-gradient-to-t from-panel/95 via-panel/45 to-black/5" aria-hidden />
+      <span className="absolute inset-2 rounded-[1.25rem] border border-white/15 bg-gradient-to-br from-white/10 via-transparent to-black/10" aria-hidden />
       <span className="relative flex items-start justify-between gap-2">
         <span>
           <span className="flex items-center gap-2 text-[0.62rem] font-black uppercase tracking-[0.12em] text-fg-3">
@@ -375,19 +393,25 @@ function MobileZoneCard({
   const Icon = ZONE_ICONS[zone.id];
   const destination = studioVirtualSpaceDestination(projectId, zone.destination);
   const className = cn(
-    "flex min-h-28 flex-col rounded-2xl border border-line bg-gradient-to-br p-4 text-left shadow-sm",
+    "relative flex min-h-28 flex-col overflow-hidden rounded-2xl border border-line bg-gradient-to-br p-4 text-left shadow-sm",
     ZONE_TONES[zone.id],
   );
   const body = (
     <>
-      <span className="flex items-center justify-between gap-2">
+      <span
+        className="absolute inset-0 bg-cover bg-center opacity-35"
+        style={{ backgroundImage: `url("${ZONE_ART[zone.id]}")` }}
+        aria-hidden
+      />
+      <span className="absolute inset-0 bg-gradient-to-t from-panel/95 via-panel/65 to-panel/10" aria-hidden />
+      <span className="relative flex items-center justify-between gap-2">
         <span className="grid size-9 place-items-center rounded-xl border border-line/70 bg-panel/80 text-accent">
           <Icon size={17} aria-hidden />
         </span>
         {(destination || zone.destination === "assistant") && <ExternalLink size={14} className="text-fg-3" aria-hidden />}
       </span>
-      <strong className="mt-3 text-sm font-black text-fg">{bt(zone.labelKo, zone.labelEn)}</strong>
-      <span className="mt-1 text-xs leading-5 text-fg-3">{bt(zone.descriptionKo, zone.descriptionEn)}</span>
+      <strong className="relative mt-3 text-sm font-black text-fg">{bt(zone.labelKo, zone.labelEn)}</strong>
+      <span className="relative mt-1 text-xs leading-5 text-fg-3">{bt(zone.descriptionKo, zone.descriptionEn)}</span>
     </>
   );
   if (zone.destination === "assistant") {
@@ -434,7 +458,7 @@ function VirtualSpaceExperience({
 
   useEffect(() => {
     const room = live.room;
-    if (!room?.direct || live.availability !== "ready") {
+    if (!connectivity.serverAvailable || !room?.direct || live.availability !== "ready") {
       controllerRef.current?.close();
       controllerRef.current = null;
       setSnapshot((current) => ({
@@ -448,22 +472,19 @@ function VirtualSpaceExperience({
     const controller = new StudioVirtualSpacePresenceController(
       room.participant,
       room.direct,
-      snapshot.self,
+      studioVirtualSpaceInitialPoint(room.participant.sessionId),
     );
     controllerRef.current = controller;
     const refresh = () => setSnapshot(controller.snapshot());
     const unsubscribe = controller.subscribe(refresh);
     controller.start();
-    controller.setActivity(activity);
     refresh();
     return () => {
       unsubscribe();
       controller.close();
       if (controllerRef.current === controller) controllerRef.current = null;
     };
-    // Snapshot position is deliberately captured only when the direct lane generation changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live.availability, live.room]);
+  }, [connectivity.serverAvailable, live.availability, live.room]);
 
   const updatePosition = useCallback((
     point: StudioVirtualSpacePoint,
@@ -597,13 +618,34 @@ function VirtualSpaceExperience({
         </header>
 
         {connectivity.localOnly ? (
-          <div role="status" className="mt-4 flex items-start gap-3 rounded-2xl border border-warning/35 bg-warning-soft/10 p-4 text-sm text-fg-2">
-            <CloudOff size={18} className="mt-0.5 shrink-0 text-warning" aria-hidden />
-            <div>
-              <p className="font-bold text-fg">{bt("서버 연결 없이 로컬 공간을 탐색하고 있어요.", "Exploring this space locally while the server is unavailable.")}</p>
-              <p className="mt-1 text-xs leading-5 text-fg-3">{bt("이동과 화면 탐색은 계속 사용할 수 있지만 팀원 발견과 P2P 대화는 서버 연결이 복구된 뒤 다시 활성화됩니다.", "Movement and local exploration remain available. Teammate discovery and P2P huddles resume after the server connection recovers.")}</p>
+          <section
+            className="mt-4 flex flex-col gap-3 rounded-2xl border border-warning/35 bg-warning-soft/10 p-4 sm:flex-row sm:items-center sm:justify-between"
+            role="status"
+            aria-live="polite"
+            data-studio-virtual-offline="true"
+          >
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-warning-soft/20 text-warning">
+                <CloudOff size={17} aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <strong className="text-sm text-fg">
+                  {connectivity.mode === "offline"
+                    ? bt("오프라인 로컬 모드", "Offline local mode")
+                    : bt("서버 연결 없이 로컬 모드", "Local mode without server connection")}
+                </strong>
+                <p className="mt-1 text-xs leading-5 text-fg-3">
+                  {bt(
+                    "공간 탐색과 캐시된 프로젝트 작업은 계속할 수 있습니다. 팀원 발견·P2P 대화·화상·실시간 동기화는 잠시 중지되고 온라인 복귀 시 자동으로 다시 연결됩니다.",
+                    "You can keep exploring the space and working with cached project data. Teammate discovery, P2P huddles, video and live sync pause temporarily and reconnect automatically when the network returns.",
+                  )}
+                </p>
+              </div>
             </div>
-          </div>
+            <span className="shrink-0 rounded-full border border-warning/30 bg-card/70 px-3 py-2 text-[0.68rem] font-bold text-warning">
+              {bt("로컬 작업 유지", "Local work stays available")}
+            </span>
+          </section>
         ) : null}
 
         <section className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
@@ -613,7 +655,6 @@ function VirtualSpaceExperience({
                 ref={stageRef}
                 role="application"
                 aria-label={bt("가상 스튜디오 공간", "Virtual studio space")}
-                tabIndex={0}
                 onPointerDown={handleStagePointer}
                 className="relative aspect-[59/36] min-h-[34rem] w-full cursor-crosshair overflow-hidden rounded-[2rem] border border-line bg-[radial-gradient(circle_at_50%_44%,oklch(0.78_0.13_300/0.16),transparent_17%),linear-gradient(145deg,var(--color-panel),var(--color-card))] shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 data-studio-virtual-space="true"
@@ -747,7 +788,9 @@ function VirtualSpaceExperience({
 
             <section className="rounded-3xl border border-line bg-panel/70 p-4 shadow-sm">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-black">{connectivity.localOnly ? bt("로컬 상태", "Local state") : bt("접속 중", "Online")}</h2>
+                <h2 className="text-sm font-black">
+                  {connectivity.localOnly ? bt("로컬 작업", "Local work") : bt("접속 중", "Online")}
+                </h2>
                 <span className="text-xs font-bold text-fg-3">{visibleParticipantCount}</span>
               </div>
               <div className="mt-3 space-y-2">

@@ -5,6 +5,7 @@ import type { StudioLiveDirectPort } from "../studio-live-direct-port";
 
 const A: StudioLiveParticipant = { sessionId: "a", displayName: "작가 A", role: "editor" };
 const B: StudioLiveParticipant = { sessionId: "b", displayName: "작가 B", role: "editor" };
+const C: StudioLiveParticipant = { sessionId: "c", displayName: "작가 C", role: "editor" };
 const sessions: StudioP2pHuddleController[] = [];
 afterEach(() => { sessions.splice(0).forEach((session) => session.close()); vi.useRealTimers(); });
 function track(kind: string) { return { kind, stop: vi.fn(), onended: null } as unknown as MediaStreamTrack; }
@@ -48,6 +49,30 @@ describe("P2P huddle consent and delivery", () => {
     expect(a.sendChat("함께 그려요")).toBe(true);
     expect(b.snapshot().messages[0]?.text).toBe("함께 그려요");
     expect(a.snapshot().messages[0]?.received).toEqual(["b"]);
+  });
+  it("keeps a proximity-scoped huddle limited to eligible direct peers", () => {
+    let receive: ((sender: StudioLiveParticipant, raw: string) => void) | null = null;
+    const send = vi.fn(() => true);
+    const port: StudioLiveDirectPort = {
+      getPeers: () => [B, C],
+      send,
+      subscribe: (listener) => { receive = listener; return () => undefined; },
+    };
+    const controller = new StudioP2pHuddleController(A, port, {
+      peerFilter: (peer) => peer.sessionId === B.sessionId,
+    });
+    sessions.push(controller);
+    controller.start();
+    const state = (epoch: string) => JSON.stringify({
+      kind: "state", epoch, muted: true, camera: false, sharing: false, hand: false,
+    });
+    receive?.(B, state("peer-b"));
+    receive?.(C, state("peer-c"));
+    controller.refreshPeers();
+
+    expect(controller.snapshot().availablePeers).toBe(1);
+    expect(controller.snapshot().peers.map((peer) => peer.participant.sessionId)).toEqual(["b"]);
+    expect(send.mock.calls.every(([target]) => target === "b")).toBe(true);
   });
   it("deduplicates replays but acknowledges them again", () => {
     const { a, b, packets, listeners } = pair(); a.sendChat("한 번만");

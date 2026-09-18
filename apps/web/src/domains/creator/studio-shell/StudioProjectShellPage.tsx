@@ -52,7 +52,6 @@ import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel";
 
 export type StudioProjectSection = StudioProjectSectionId;
 
-
 type ProjectAction = Readonly<{
   title: BilingualText;
   description: BilingualText;
@@ -238,7 +237,8 @@ function projectSectionHref(projectId: string, section: StudioProjectSection): s
   return `/studio/p/${encodeURIComponent(projectId)}/${section}`;
 }
 
-function InvalidProject({ locale: _locale }: { readonly locale?: string }) {
+function InvalidProject() {
+  const bt = useBilingual("StudioProjectShellPage.InvalidProject");
   return (
     <Container size="wide" className="py-10">
       <section className="rounded-3xl border border-line bg-card p-6" role="alert">
@@ -287,9 +287,9 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
     }
   }, [displayProjectId, section, selectedView]);
 
-  useDocumentTitle(`${l(definition.label.ko, definition.label.en)} · ToonStudio`);
+  useDocumentTitle(`${bt(definition.label.ko, definition.label.en)} · ToonStudio`);
 
-  if (!projectId || !viewResolution || !destination) return <InvalidProject locale={locale} />;
+  if (!projectId || !viewResolution || !destination) return <InvalidProject />;
   if (viewResolution.changed) return <Navigate to={viewResolution.canonicalHref} replace />;
 
   const sectionViews = STUDIO_PROJECT_SECTION_VIEWS[section];
@@ -305,10 +305,10 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
               {definition.eyebrow}
             </p>
             <h1 className="mt-2 text-pretty text-2xl font-black tracking-tight text-fg sm:text-4xl">
-              {l(definition.title.ko, definition.title.en)}
+              {bt(definition.title.ko, definition.title.en)}
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2">
-              {l(definition.description.ko, definition.description.en)}
+              {bt(definition.description.ko, definition.description.en)}
             </p>
             <p className="mt-3 text-xs text-fg-3">
               {bt("프로젝트", "Project")} · {displayProjectId}
@@ -348,7 +348,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
                   active ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
                 )}
               >
-                {l(SECTION_DEFINITIONS[id].label.ko, SECTION_DEFINITIONS[id].label.en)}
+                {bt(SECTION_DEFINITIONS[id].label.ko, SECTION_DEFINITIONS[id].label.en)}
               </Link>
             );
           })}
@@ -440,7 +440,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
             <SectionIcon size={19} aria-hidden="true" />
           </span>
           <h2 id="project-section-actions" className="text-xl font-bold text-fg">
-            {l(definition.label.ko, definition.label.en)}
+            {bt(definition.label.ko, definition.label.en)}
           </h2>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -456,15 +456,15 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
                   <Icon size={18} aria-hidden="true" />
                 </span>
                 <span className="mt-4 flex items-center gap-2">
-                  <strong className="text-sm text-fg">{l(item.title.ko, item.title.en)}</strong>
+                  <strong className="text-sm text-fg">{bt(item.title.ko, item.title.en)}</strong>
                   {item.badge ? (
                     <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[0.62rem] font-bold text-accent">
-                      {l(item.badge.ko, item.badge.en)}
+                      {bt(item.badge.ko, item.badge.en)}
                     </span>
                   ) : null}
                 </span>
                 <span className="mt-1.5 flex-1 text-xs leading-5 text-fg-3">
-                  {l(item.description.ko, item.description.en)}
+                  {bt(item.description.ko, item.description.en)}
                 </span>
                 <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">
                   {bt("열기", "Open")}

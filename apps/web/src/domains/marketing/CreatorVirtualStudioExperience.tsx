@@ -37,7 +37,15 @@ const CHARACTERS = [
   { src: "/images/characters/leona.jpg", name: "레오나" },
 ] as const;
 
-const NAV = [
+type VirtualStudioNavItem = {
+  readonly href: string;
+  readonly ko: string;
+  readonly en: string;
+  readonly icon: typeof Home;
+  readonly active?: boolean;
+};
+
+const NAV: readonly VirtualStudioNavItem[] = [
   { href: "/", ko: "홈", en: "Home", icon: Home },
   { href: "/studio/projects", ko: "프로젝트", en: "Projects", icon: FolderKanban },
   { href: "/studio", ko: "스튜디오", en: "Studio", icon: Sparkles, active: true },
