@@ -66,6 +66,7 @@
     "audit:studio-brush-mark-distance": "tsx scripts/audit-studio-brush-mark-distance.mts",
     "audit:visual-assets": "node scripts/audit-visual-assets.mjs --check && node scripts/audit-visual-asset-quality.mjs --strict",
     "audit:sitewide-visual-ux": "node scripts/audit-sitewide-visual-ux.mjs",
+    "audit:visual-asset-quality": "node scripts/audit-visual-asset-quality.mjs",
     "audit:auth-modal-visual-ux": "node scripts/audit-auth-modal-visual-ux.mjs",
     "audit:licenses": "node scripts/generate-third-party-notices.mjs --check",
     "lint:security": "pnpm run lint:strict && pnpm run audit:security",
