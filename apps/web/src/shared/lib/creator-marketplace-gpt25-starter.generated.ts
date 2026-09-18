@@ -29,9 +29,7 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "액션",
       "실외",
-      "낮",
-      "고속도로",
-      "야간"
+      "고속도로"
     ]
   },
   {
@@ -45,7 +43,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "액션",
       "실외",
-      "노을",
       "정글",
       "유적"
     ]
@@ -61,7 +58,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "액션",
       "실외",
-      "낮",
       "폐허",
       "도시"
     ]
@@ -77,9 +73,9 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "일상",
       "실내",
-      "밤",
       "침실",
-      "방"
+      "방",
+      "아파트"
     ]
   },
   {
@@ -93,9 +89,8 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "일상",
       "실내",
-      "노을",
       "편의점",
-      "야간"
+      "상점"
     ]
   },
   {
@@ -109,7 +104,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "드라마",
       "실내",
-      "낮",
       "회의실",
       "기업"
     ]
@@ -125,7 +119,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "드라마",
       "실내",
-      "밤",
       "법정",
       "재판"
     ]
@@ -141,7 +134,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "드라마",
       "실내",
-      "밤",
       "병원",
       "복도"
     ]
@@ -157,7 +149,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "판타지",
       "실외",
-      "밤",
       "용",
       "절벽"
     ]
@@ -173,7 +164,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "공포",
       "실내",
-      "낮",
       "폐병원",
       "병동"
     ]
@@ -189,7 +179,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "공포",
       "실내",
-      "밤",
       "터널",
       "어둠"
     ]
@@ -205,9 +194,7 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "공포",
       "실외",
-      "노을",
-      "오두막",
-      "안개"
+      "오두막"
     ]
   },
   {
@@ -221,9 +208,9 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "로맨스",
       "실외",
-      "노을",
       "놀이공원",
-      "대관람차"
+      "대관람차",
+      "야경"
     ]
   },
   {
@@ -237,7 +224,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "로맨스",
       "실외",
-      "밤",
       "벚꽃",
       "산책로"
     ]
@@ -253,7 +239,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "SF",
       "실외",
-      "밤",
       "사이버펑크",
       "골목"
     ]
@@ -269,7 +254,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "SF",
       "실내",
-      "낮",
       "연구실",
       "미래"
     ]
@@ -285,7 +269,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "SF",
       "실내",
-      "노을",
       "우주정거장",
       "전망실"
     ]
@@ -301,7 +284,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "무협·사극",
       "실외",
-      "낮",
       "절벽",
       "산길"
     ]
@@ -317,7 +299,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "무협·사극",
       "실외",
-      "노을",
       "저잣거리",
       "사극"
     ]
@@ -333,7 +314,6 @@ const DEFINITIONS = Object.freeze([
       "검수완료",
       "무협·사극",
       "실외",
-      "낮",
       "궁궐",
       "안뜰"
     ]
