@@ -1,0 +1,44 @@
+name: Architecture boundaries
+
+on:
+  pull_request:
+    paths:
+      - "apps/admin/**"
+      - "apps/web/src/**"
+      - "apps/api/src/**"
+      - "config/architecture-boundary-ratchet.json"
+      - "scripts/validate-app-boundaries.mjs"
+      - "vite.admin.config.ts"
+      - ".github/workflows/architecture-boundaries.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/admin/**"
+      - "apps/web/src/**"
+      - "apps/api/src/**"
+      - "config/architecture-boundary-ratchet.json"
+      - "scripts/validate-app-boundaries.mjs"
+      - "vite.admin.config.ts"
+
+permissions:
+  contents: read
+
+jobs:
+  boundaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate application import ratchets
+        run: node scripts/validate-app-boundaries.mjs
+      - name: Type-check Admin boundary
+        run: pnpm exec tsc -p apps/admin/tsconfig.json
+      - name: Build Admin boundary
+        run: pnpm exec vite build --config vite.admin.config.ts
