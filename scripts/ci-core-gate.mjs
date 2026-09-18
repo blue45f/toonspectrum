@@ -8,6 +8,7 @@ export const REQUIRED_CORE_GATES = Object.freeze([
   "typecheck",
   "static",
   "serial",
+  "a11y",
   "build",
 ]);
 
