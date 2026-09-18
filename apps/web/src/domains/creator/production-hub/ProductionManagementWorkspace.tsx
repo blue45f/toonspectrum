@@ -39,6 +39,7 @@ import {
   type ManagementSeverity,
   type ProductionManagementLens,
 } from "./production-management-overview";
+import { ProductionStudioRevisionWorkspace } from "./ProductionStudioRevisionWorkspace";
 import type { ProductionClientCommand } from "./production-api";
 import { ProductionRecoveryScenarioPanel } from "./ProductionRecoveryScenarioPanel";
 import { ProductionRiskIntelligencePanel } from "./ProductionRiskIntelligencePanel";
@@ -419,6 +420,13 @@ export function ProductionManagementWorkspace({
           tone={overview.unassignedTaskCount + overview.overloadedAssignmentCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "success")}
         />
       </div>
+
+      <ProductionStudioRevisionWorkspace
+        aggregate={aggregate}
+        execute={execute}
+        canEdit={canEdit}
+        roleLens={roleLens}
+      />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
         <Section

@@ -24,6 +24,7 @@ import type {
   ProductionInvoice,
   ProductionOperationsRecord,
   ProductionProjectAggregate,
+  ProductionStudioRevisionLink,
   ProductionRisk,
   ProductionRiskPolicy,
   ProductionRiskResponse,
@@ -103,6 +104,7 @@ export type ProductionClientCommand =
   | { readonly type: "upsert-merge-request"; readonly mergeRequest: CreativeMergeRequest }
   | { readonly type: "upsert-deliverable"; readonly deliverable: Deliverable }
   | { readonly type: "upsert-submission"; readonly submission: Submission }
+  | { readonly type: "upsert-studio-revision-link"; readonly link: ProductionStudioRevisionLink }
   | { readonly type: "upsert-review-policy"; readonly policy: ReviewPolicy }
   | { readonly type: "record-review-decision"; readonly policyId: string; readonly decision: ReviewDecision }
   | { readonly type: "upsert-task"; readonly task: ProductionTask }
