@@ -29,6 +29,25 @@ Reward Point와 Studio Credit은 서로 환전하지 않는다.
 운영자 오버라이드는 `membership_policy_override`에 저장하며 공개 정책 API와 사용자 권한 API가
 같은 유효 정책을 사용한다. Studio의 정적 안전 검사도 같은 Core 기본값에서 파생한다.
 
+## Creator Level 정책
+
+Creator Level은 결제 멤버십과 분리한다. 자동 산정에는 보너스·관리자 지급 포인트가 아니라
+`activity:*` 원장으로 확인된 정상 활동 포인트만 사용한다.
+
+| Creator Level | Creator 인증 | 공개 작품 | 활동 포인트 |
+| --- | --- | ---: | ---: |
+| New | 미인증 가능 | 0 | 0 |
+| Verified | 필수 | 0 | 0 |
+| Active Creator | 필수 | 1+ | 300+ |
+| Trusted Creator | 필수 | 5+ | 1,500+ |
+| Professional | 필수 | 20+ | 5,000+ |
+| Partner | 운영 검토 | 운영 검토 | 운영 검토 |
+
+Creator 인증은 `creator_profile.isVerifiedCreator`, 공개 작품은 `published && !hidden`,
+활동 포인트는 `wallet_lot.source LIKE 'activity:%'`를 기준으로 계산한다.
+관리자가 명시적으로 설정한 Creator Level과 Partner는 자동 계산 결과보다 우선한다.
+Trust Level과 Seller Level은 신고·저작권·판매자 검증 등 별도 운영 신호로 유지한다.
+
 ## 활동 포인트
 
 | 활동 | 포인트 | 일일 적립 횟수 | 최소 간격 | 확인 주체 |
