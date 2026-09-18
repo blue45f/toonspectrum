@@ -77,7 +77,7 @@ function ReviewThreadCard({
   onResolve,
 }: {
   readonly thread: StudioReviewThread;
-  readonly locale: string;
+  readonly locale: "ko" | "en";
   readonly canResolve: boolean;
   readonly onResolve: () => void;
 }) {
@@ -127,7 +127,7 @@ export function StudioReviewPanel({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: string;
+  readonly locale: "ko" | "en";
 }) {
   const l = useBilingualLocalizer("studioReview");
   const workspace = useStudioProjectWorkspace(projectId, locale);
