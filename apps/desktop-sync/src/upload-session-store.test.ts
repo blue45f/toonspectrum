@@ -50,6 +50,25 @@ describe("desktop upload session store", () => {
     await expect(store.load(identity)).resolves.toEqual(record());
   });
 
+  it("keeps distinct upload identities in independent bounded vault accounts", async () => {
+    const vault = new MemoryDesktopCredentialVault();
+    const store = new CredentialDesktopUploadSessionStore(
+      vault,
+      () => Date.parse("2026-09-17T00:00:00.000Z"),
+    );
+    const alternateIdentity = { ...identity, relativePath: "episode/other.psd" };
+    const alternate = record({
+      relativePath: alternateIdentity.relativePath,
+      handle: "https://upload.example/other-session",
+    });
+
+    await store.save(record());
+    await store.save(alternate);
+
+    await expect(store.load(identity)).resolves.toEqual(record());
+    await expect(store.load(alternateIdentity)).resolves.toEqual(alternate);
+  });
+
   it("deletes expired session handles instead of reusing them", async () => {
     const vault = new MemoryDesktopCredentialVault();
     const store = new CredentialDesktopUploadSessionStore(

@@ -107,6 +107,32 @@ describe("desktop sync conflict loopback server", () => {
     }
   });
 
+  it("returns stable error codes without reflecting exception text", async () => {
+    const fixture = await serverFixture();
+    const conflict = fixture.server.report.conflicts[0]!;
+    const maliciousResolution = "<img src=x onerror=alert(1)>";
+    try {
+      const response = await fetch(`${fixture.server.origin}/api/apply`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: fixture.server.origin,
+          "X-ToonStudio-Token": fixture.server.token,
+        },
+        body: JSON.stringify({
+          reportId: fixture.server.report.reportId,
+          decisions: [{ conflictId: conflict.id, resolution: maliciousResolution }],
+        }),
+      });
+      expect(response.status).toBe(422);
+      const body = await response.json() as { message: string };
+      expect(body.message).toBe("decision-invalid");
+      expect(body.message).not.toContain(maliciousResolution);
+    } finally {
+      await fixture.server.close();
+    }
+  });
+
   it("only exposes bounded raster previews and never proprietary document bytes", async () => {
     const proprietary = await serverFixture("page.psd");
     try {

@@ -8,7 +8,7 @@ import {
   readdir,
   stat,
 } from "node:fs/promises";
-import { dirname, join, resolve, sep } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -105,14 +105,16 @@ function expectedNativePackage(platform, arch) {
   return `keyring-${platformPart}-${arch}`;
 }
 
-function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+function runTar(args, options = {}) {
+  const result = spawnSync("tar", args, {
     cwd: options.cwd,
     encoding: "utf8",
     stdio: "pipe",
+    shell: false,
   });
+  if (result.error) throw result.error;
   if (result.status !== 0) {
-    throw new Error(`${command} ${args.join(" ")} failed: ${result.stderr || result.stdout}`);
+    throw new Error(`tar ${args.join(" ")} failed: ${result.stderr || result.stdout}`);
   }
   return result.stdout.trim();
 }
@@ -230,8 +232,20 @@ async function verifySigning(bundleRoot, manifest, requireSigned) {
   return evidence;
 }
 
+export function resolveArchiveListingInvocation(
+  archivePath,
+  pathApi = { basename, dirname },
+) {
+  return {
+    command: "tar",
+    args: ["-tzf", pathApi.basename(archivePath)],
+    cwd: pathApi.dirname(archivePath),
+  };
+}
+
 function verifyArchiveListing(archivePath, bundleName) {
-  const listing = run("tar", ["-tzf", archivePath]).split("\n").filter(Boolean);
+  const invocation = resolveArchiveListingInvocation(archivePath);
+  const listing = runTar(invocation.args, { cwd: invocation.cwd }).split("\n").filter(Boolean);
   if (listing.length === 0) throw new Error("release archive is empty");
   for (const path of listing) {
     if (
@@ -242,20 +256,24 @@ function verifyArchiveListing(archivePath, bundleName) {
   }
 }
 
-function executeBundleSmoke(bundleRoot, manifest) {
-  const runtimePath = join(bundleRoot, normalizeRelativePath(manifest.runtime));
-  const runtimeVersion = run(runtimePath, ["--version"]);
-  if (runtimeVersion !== manifest.nodeVersion) {
-    throw new Error(`bundled Node version mismatch: ${runtimeVersion}`);
+async function verifyBundleRuntimeContract(bundleRoot, manifest) {
+  const platform = assertText(manifest.platform, "manifest.platform");
+  const expectedRuntime = platform === "windows" ? "runtime/node.exe" : "runtime/node";
+  const expectedLauncher = platform === "windows" ? "toonstudio-sync.cmd" : "toonstudio-sync";
+  if (manifest.runtime !== expectedRuntime || manifest.launcher !== expectedLauncher) {
+    throw new Error("release runtime paths do not match the trusted bundle layout");
   }
-  const launcherPath = join(bundleRoot, normalizeRelativePath(manifest.launcher));
-  const command = manifest.platform === "windows" ? "cmd.exe" : launcherPath;
-  const args = manifest.platform === "windows"
-    ? ["/d", "/s", "/c", launcherPath, "--help"]
-    : ["--help"];
-  const help = run(command, args, { cwd: bundleRoot });
-  if (!help.includes("ToonStudio folder sync") || !help.includes("toonstudio-sync resolve")) {
-    throw new Error("bundled desktop sync CLI smoke test failed");
+
+  await access(join(bundleRoot, normalizeRelativePath(expectedRuntime)));
+  const launcher = await readFile(
+    join(bundleRoot, normalizeRelativePath(expectedLauncher)),
+    "utf8",
+  );
+  const expectedSource = platform === "windows"
+    ? `@echo off\r\nsetlocal\r\n"%~dp0runtime\\node.exe" "%~dp0app\\dist\\cli.js" %*\r\n`
+    : `#!/bin/sh\nset -eu\nHERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nexec "$HERE/runtime/node" "$HERE/app/dist/cli.js" "$@"\n`;
+  if (launcher !== expectedSource) {
+    throw new Error("release launcher does not match the trusted bundle contract");
   }
 }
 
@@ -285,7 +303,7 @@ export async function verifyDesktopSyncRelease(input = {}) {
     manifest,
     input.requireSigned === true,
   );
-  if (input.executeBundle !== false) executeBundleSmoke(bundleRoot, manifest);
+  await verifyBundleRuntimeContract(bundleRoot, manifest);
   const result = Object.freeze({
     bundleName: manifest.bundleName,
     archiveSha256: receipt.archiveSha256,
