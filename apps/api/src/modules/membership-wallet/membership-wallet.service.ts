@@ -11,6 +11,7 @@ import type { PoolClient } from "pg";
 
 import {
   ACTIVITY_POINT_POLICIES,
+  automaticCreatorLevel,
   type ActivityPointKey,
   CREDIT_COST_POLICIES,
   type CreditFeatureKey,
