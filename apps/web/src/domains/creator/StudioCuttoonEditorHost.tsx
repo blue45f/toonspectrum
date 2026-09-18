@@ -26200,14 +26200,14 @@ function clearSelectionForEdit() {
       openPixelSelectionTransform();
     }
   }
-  const openStudioQuickActionsAt = useCallback((anchor: { x: number; y: number }): void => {
+  function openStudioQuickActionsAt(anchor: { x: number; y: number }): void {
     setQuickActionsAnchor(anchor);
     setMobileSheet(null);
     setMenu(null);
     setColorWheelOpen(false);
     setQuickAccessPaletteOpen(false);
     setQuickActionsOpen(true);
-  }, []);
+  }
 
   function openStudioQuickActionsAtCanvasPointer(): void {
     const stage = stageRef.current;
