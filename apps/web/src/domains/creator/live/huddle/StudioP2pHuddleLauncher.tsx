@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { MessageCircle, Mic, MicOff, Video, MonitorUp, PhoneOff, Hand, VolumeX, X } from "lucide-react";
 import { useStudioLiveCollaboration } from "../studio-live-collaboration-context";
 import { StudioP2pCreativeHuddleController as StudioP2pHuddleController, type CreativeHuddleSnapshot as HuddleSnapshot } from "./studio-p2p-creative-huddle-controller";
 import { HUDDLE_REACTIONS, HUDDLE_TEXT_LIMIT } from "./studio-p2p-huddle-protocol";
 import { StudioP2pMediaTile as MediaTile, P2P_CONTROL_CLASS as controlClass } from "./StudioP2pMediaTile";
 import { StudioP2pActivitiesPanel } from "./StudioP2pActivitiesPanel";
+import { StudioP2pVirtualStudio } from "./StudioP2pVirtualStudio";
 import { studioStrokeFocusActivitySnapshot, subscribeStudioStrokeFocusActivity } from "../../studio-stroke-focus-activity";
 
 export default function StudioP2pHuddleLauncher() {
@@ -22,11 +23,17 @@ export default function StudioP2pHuddleLauncher() {
   const [notice, setNotice] = useState<string | null>(null);
   const [deafened, setDeafened] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [proximityMedia, setProximityMedia] = useState(true);
+  const [nearbyPeerIds, setNearbyPeerIds] = useState<string[]>([]);
   const log = useRef<HTMLDivElement>(null);
   const active = snapshot !== null && !snapshot.closed;
   const room = live.room;
+  const handleNearbyChange = useCallback((sessionIds: string[]) => {
+    setNearbyPeerIds((current) => current.length === sessionIds.length
+      && current.every((id, index) => id === sessionIds[index]) ? current : sessionIds);
+  }, []);
   useEffect(() => {
-    setSnapshot(null); setDraft(""); setBusy(false);
+    setSnapshot(null); setDraft(""); setBusy(false); setNearbyPeerIds([]); setProximityMedia(true);
     return () => {
       cleanup.current?.(); cleanup.current = null;
       controller.current?.close(); controller.current = null;
@@ -36,6 +43,10 @@ export default function StudioP2pHuddleLauncher() {
     if (strokeFocusPhase === "drawing") setOpen(false);
   }, [strokeFocusPhase]);
   useEffect(() => {
+    if (!active) return;
+    controller.current?.setMediaPeerScope(proximityMedia ? nearbyPeerIds : null);
+  }, [active, nearbyPeerIds, proximityMedia]);
+  useEffect(() => {
     const element = log.current;
     if (element && element.scrollHeight - element.scrollTop - element.clientHeight < 160)
       element.scrollTop = element.scrollHeight;
@@ -43,7 +54,7 @@ export default function StudioP2pHuddleLauncher() {
   function leave() {
     cleanup.current?.(); cleanup.current = null;
     controller.current?.close(); controller.current = null;
-    setSnapshot(null); setDraft(""); setBusy(false); setDeafened(false);
+    setSnapshot(null); setDraft(""); setBusy(false); setDeafened(false); setNearbyPeerIds([]); setProximityMedia(true);
   }
   function join() {
     if (!room?.direct || live.availability !== "ready" || !live.canChat || controller.current) return;
@@ -112,6 +123,13 @@ export default function StudioP2pHuddleLauncher() {
               <Hand size={14} />{snapshot?.hand ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "손 내리기") : translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "손들기")}</button>
             <button className={controlClass} type="button" onClick={leave}><PhoneOff size={14} />{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "나가기")}</button>
           </div>
+          {room.direct && <StudioP2pVirtualStudio
+            self={room.participant}
+            port={room.direct}
+            proximityMedia={proximityMedia}
+            onProximityMediaChange={setProximityMedia}
+            onNearbyChange={handleNearbyChange}
+          />}
           <div className="grid grid-cols-2 gap-2">
             <MediaTile name={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "나 · 미리보기")} stream={snapshot?.localStream ?? null} muted visual={Boolean(snapshot?.camera || snapshot?.sharing)} />
             {snapshot?.peers.map((peer) => <div key={peer.participant.sessionId}>
