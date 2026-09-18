@@ -17,3 +17,5 @@ export * from "./creator-support-program.schema";
 export * from "./creator-ecosystem.schema";
 
 export * from "./commerce.schema";
+
+export * from "./membership-wallet.schema";
