@@ -81,19 +81,20 @@ export function StudioP2pVirtualStudio({
   useEffect(() => {
     const controller = new StudioP2pSpaceController(self, port);
     controllerRef.current = controller;
-    const off = controller.subscribe(() => setSnapshot(controller.snapshot()));
+    const publish = () => {
+      const next = controller.snapshot();
+      setSnapshot(next);
+      onNearbyChange(next.nearbySessionIds);
+    };
+    const off = controller.subscribe(publish);
     controller.start();
-    setSnapshot(controller.snapshot());
+    publish();
     return () => {
       off();
       controller.close();
       if (controllerRef.current === controller) controllerRef.current = null;
     };
-  }, [port, self]);
-
-  useEffect(() => {
-    onNearbyChange(snapshot?.nearbySessionIds ?? []);
-  }, [onNearbyChange, snapshot]);
+  }, [onNearbyChange, port, self]);
 
   function moveFromPointer(event: PointerEvent<HTMLButtonElement>, force: boolean): void {
     const rect = event.currentTarget.getBoundingClientRect();
