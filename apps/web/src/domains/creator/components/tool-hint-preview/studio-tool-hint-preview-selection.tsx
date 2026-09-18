@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { COLOR, previewVariantMatches } from "./studio-tool-hint-preview-shared";
 
 import type { ReactElement } from "react";
@@ -41,7 +42,7 @@ export function LassoPreview({ animate }: { animate: boolean }): ReactElement {
           <animate attributeName="stroke-dashoffset" dur="3s" values="164; 0; 0" keyTimes="0; .72; 1" repeatCount="indefinite" />
         ) : null}
       </path>
-      <g transform={animate ? undefined : "translate(55 63)"}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "translate(55 63)")}>
         <path d="m0 0 7 19 4-7 7 6 4-4-7-6 7-4Z" fill={COLOR.fg} stroke={COLOR.canvas} strokeLinejoin="round" strokeWidth="2" />
         {animate ? (
           <animateMotion
@@ -99,7 +100,7 @@ export function SelectionBrushPreview({ animate }: { animate: boolean }): ReactE
       <path d={path} fill="none" stroke={COLOR.accent} strokeDasharray="171" strokeDashoffset={animate ? "171" : "0"} strokeLinecap="round" strokeWidth="5">
         {animate ? <animate attributeName="stroke-dashoffset" dur="2.8s" values="171;0;0" keyTimes="0;.7;1" repeatCount="indefinite" /> : null}
       </path>
-      <g transform={animate ? undefined : "translate(168 48)"}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "translate(168 48)")}>
         <circle r="13" fill={COLOR.canvas} stroke={COLOR.accent} strokeWidth="2" />
         <circle r="3" fill={COLOR.accent} />
         {animate ? <animateMotion dur="2.8s" path={path} keyPoints="0;1;1" keyTimes="0;.7;1" repeatCount="indefinite" /> : null}
@@ -305,7 +306,7 @@ export function SelectionMarqueeTransformPreview({
         <rect x="42" y="16" width="132" height="74" rx="8" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
         <path d={flipX ? "M108 22v62" : "M54 53h108"} stroke={COLOR.cool} strokeDasharray="4 4" strokeWidth="1.5" />
         <g transform="translate(108 53)">
-          <g transform={animate ? "scale(1 1)" : flipX ? "scale(-1 1)" : "scale(1 -1)"}>
+          <g transform={animate ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "scale(1 1)") : flipX ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "scale(-1 1)") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "scale(1 -1)")}>
             <g transform="translate(-108 -53)">
               <path d="M68 34h66v38H68Z" fill={COLOR.accentSoft} stroke={COLOR.fg} strokeDasharray="6 4" strokeWidth="2" />
               <path d="m76 64 17-20 15 13 10-9 9 16" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
@@ -330,7 +331,7 @@ export function SelectionMarqueeTransformPreview({
     return (
       <>
         <rect x="42" y="16" width="132" height="74" rx="8" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
-        <g transform={animate ? undefined : `translate(${dx} ${dy})`}>
+        <g transform={animate ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "translate({v0} {v1})"), { v0: String(dx), v1: String(dy) })}>
           <rect x="78" y="34" width="60" height="38" rx="6" fill={COLOR.accentSoft} stroke={COLOR.fg} strokeDasharray="6 4" strokeWidth="2" />
           {animate ? <animateTransform attributeName="transform" type="translate" dur="2.5s" values={`0 0;${dx} ${dy};${dx} ${dy};0 0`} keyTimes="0;.4;.72;1" repeatCount="indefinite" /> : null}
         </g>
@@ -346,7 +347,7 @@ export function SelectionMarqueeTransformPreview({
         <rect x="42" y="16" width="132" height="74" rx="8" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
         <rect x="75" y="33" width="66" height="40" rx="5" fill="none" stroke={COLOR.fg3} strokeDasharray="4 4" />
         <g transform="translate(108 53)">
-          <g transform={animate ? "scale(1)" : `scale(${targetScale})`}>
+          <g transform={animate ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "scale(1)") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "scale({v0})"), { v0: String(targetScale) })}>
             <g transform="translate(-108 -53)">
               <rect x="75" y="33" width="66" height="40" rx="5" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeDasharray="6 4" strokeWidth="2" />
             </g>
@@ -362,7 +363,7 @@ export function SelectionMarqueeTransformPreview({
   return (
     <>
       <rect x="42" y="16" width="132" height="74" rx="8" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
-      <g transform={animate ? undefined : `rotate(${rotation} 108 53)`}>
+      <g transform={animate ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "rotate({v0} 108 53)"), { v0: String(rotation) })}>
         <rect x="75" y="32" width="66" height="42" rx="6" fill={COLOR.accentSoft} stroke={COLOR.fg} strokeDasharray="6 4" strokeWidth="2" />
         {animate ? <animateTransform attributeName="transform" type="rotate" dur="2.7s" values={`0 108 53;${rotation} 108 53;${rotation} 108 53;0 108 53`} keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
       </g>
@@ -413,7 +414,7 @@ export function SelectionContentTransformPreview({
   );
   const transformedArtwork = flipX || flipY ? (
     <g transform="translate(108 53)">
-      <g transform={animate ? "scale(1 1)" : flipX ? "scale(-1 1)" : "scale(1 -1)"}>
+      <g transform={animate ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "scale(1 1)") : flipX ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "scale(-1 1)") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "scale(1 -1)")}>
         <g transform="translate(-108 -53)">{artwork}</g>
         {animate ? (
           <animateTransform
@@ -428,7 +429,7 @@ export function SelectionContentTransformPreview({
       </g>
     </g>
   ) : rotate ? (
-    <g transform={animate ? undefined : "rotate(90 108 53)"}>
+    <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "rotate(90 108 53)")}>
       {artwork}
       {animate ? (
         <animateTransform
@@ -443,8 +444,8 @@ export function SelectionContentTransformPreview({
     </g>
   ) : (
     <g transform="translate(108 53)">
-      <g transform={animate ? undefined : "rotate(12)"}>
-        <g transform={animate ? undefined : "scale(1.18)"}>
+      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "rotate(12)")}>
+        <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.selection", "en", "scale(1.18)")}>
           <g transform="translate(-108 -53)">{artwork}</g>
           {animate ? (
             <animateTransform

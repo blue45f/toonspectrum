@@ -1,5 +1,8 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowLeft, MessageCircle, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import type { FanCafePost } from "@/shared/lib/types";
@@ -7,7 +10,6 @@ import type { FanCafePost } from "@/shared/lib/types";
 import { FanPostImages, FanPostReplySection } from "@/shared/components/fan-cafe-panel";
 import { KIND_LABEL } from "@/shared/components/fan-cafe-utils";
 import { Container } from "@/shared/components/section";
-import { SharePageButton } from "@/shared/components/share-page-button";
 import { COMMUNITY_SCOPE_LABEL, getCommunityScopeTargetLink } from "@/shared/lib/community-ui";
 import {
   canShareCommunityPost,
@@ -27,6 +29,11 @@ import { useApiResource } from "@/infrastructure/use-api-resource";
 
 // 토론 스레드 상세 — 목록 카드에서 진입하는 분할 라우트(/community/post/:id).
 // 글 전문 + 첨부 + 답글 트리를 한 화면에 모으고, 보드(작품/작가/펜카페/카페)로 돌아가는 길을 연다.
+const SharePageButton = lazy(async () => {
+  const module = await import("@/shared/components/share-page-button");
+  return { default: module.SharePageButton };
+});
+
 export function CommunityPostPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -76,16 +83,15 @@ export function CommunityPostPage() {
       <Container size="default" className="py-16">
         <div className="rounded-3xl border border-dashed border-line bg-card/50 px-6 py-14 text-center">
           <MessageCircle className="mx-auto mb-3 text-fg-3" size={24} />
-          <p className="eyebrow text-accent">COMMUNITY THREAD</p>
-          <h1 className="mt-2 text-2xl font-bold">토론 글을 찾을 수 없어요</h1>
-          <p className="mt-2 text-sm text-fg-3">삭제됐거나 비공개 처리된 글일 수 있습니다.</p>
+          <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.community.CommunityPostPage", "en", "COMMUNITY THREAD")}</p>
+          <h1 className="mt-2 text-2xl font-bold">{translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "토론 글을 찾을 수 없어요")}</h1>
+          <p className="mt-2 text-sm text-fg-3">{translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "삭제됐거나 비공개 처리된 글일 수 있습니다.")}</p>
           <Link
             href="/community"
             className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-on-accent"
           >
             <ArrowLeft size={15} />
-            커뮤니티로 돌아가기
-          </Link>
+            {translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "커뮤니티로 돌아가기")}</Link>
         </div>
       </Container>
     );
@@ -95,14 +101,13 @@ export function CommunityPostPage() {
     return (
       <Container size="default" className="py-16">
         <div className="rounded-3xl border border-bad/35 bg-bad/10 px-6 py-10 text-center">
-          <p className="text-sm font-medium text-bad">{error ?? "토론 글을 불러오지 못했습니다."}</p>
+          <p className="text-sm font-medium text-bad">{error ?? translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "토론 글을 불러오지 못했습니다.")}</p>
           <button
             type="button"
             onClick={reload}
             className="mt-4 rounded-lg border border-bad/35 px-3 py-2 text-xs font-semibold text-bad"
           >
-            다시 시도
-          </button>
+            {translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "다시 시도")}</button>
         </div>
       </Container>
     );
@@ -130,10 +135,9 @@ export function CommunityPostPage() {
 
   return (
     <Container size="default" className="py-8 lg:py-10">
-      <nav aria-label="이동 경로" className="mb-5 flex flex-wrap items-center gap-2 text-xs text-fg-3">
+      <nav aria-label={translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "이동 경로")} className="mb-5 flex flex-wrap items-center gap-2 text-xs text-fg-3">
         <Link href="/community" className="transition-colors hover:text-fg">
-          커뮤니티
-        </Link>
+          {translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "커뮤니티")}</Link>
         <span aria-hidden>/</span>
         <Link href={boardHref} className="inline-flex items-center gap-1 transition-colors hover:text-fg">
           {COMMUNITY_SCOPE_LABEL[post.scope]} · {post.targetLabel}
@@ -166,14 +170,16 @@ export function CommunityPostPage() {
           {(shareable || isOwner) && (
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               {shareable && (
-                <SharePageButton
-                  path={sharePath}
-                  text={post.title}
-                  description={shareDescription}
-                  label="글 공유"
-                  actionLabel="토론 보기"
-                  className="rounded-lg px-2.5"
-                />
+                <Suspense fallback={null}>
+                  <SharePageButton
+                    path={sharePath}
+                    text={post.title}
+                    description={shareDescription}
+                    label="글 공유"
+                    actionLabel="토론 보기"
+                    className="rounded-lg px-2.5"
+                  />
+                </Suspense>
               )}
               {isOwner && (
                 <button
@@ -183,7 +189,7 @@ export function CommunityPostPage() {
                   className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-fg-3 transition-colors hover:border-bad/45 hover:text-bad disabled:opacity-45"
                 >
                   <Trash2 size={13} />
-                  {deleting ? "삭제 중..." : "글 삭제"}
+                  {deleting ? translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "삭제 중...") : translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "글 삭제")}
                 </button>
               )}
             </div>
@@ -204,10 +210,10 @@ export function CommunityPostPage() {
         {deleteError && <p className="mt-3 text-xs text-bad">{deleteError}</p>}
       </article>
 
-      <section className="mt-6" aria-label="댓글">
+      <section className="mt-6" aria-label={translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "댓글")}>
         <h2 className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-fg">
           <MessageCircle size={15} className="text-accent" />
-          댓글 {displayReplyCount}
+          {translateCurrentStaticSourceText("domains.community.CommunityPostPage", "ko", "댓글 ")}{displayReplyCount}
         </h2>
         <FanPostReplySection
           key={post.id}

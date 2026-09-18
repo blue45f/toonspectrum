@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Liquify Panel
  * Push·Twirl·Pinch·Bloat 왜곡 브러시의 모드, 반경, 강도를 한곳에서 조절한다. 패널은 상태만
@@ -174,14 +178,14 @@ export function StudioLiquifyPanel({
             </span>
           </h3>
           <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3 text-pretty">
-            {help.summary} 현재 방식은 {current.description}
+            {help.summary} {translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "현재 방식은 ")}{current.description}
           </p>
         </div>
       </div>
 
       {onModeChange ? (
         <fieldset disabled={locked} className="min-w-0">
-          <legend className="mb-1.5 text-[0.68rem] font-medium text-fg-3">왜곡 방식</legend>
+          <legend className="mb-1.5 text-[0.68rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "왜곡 방식")}</legend>
           <div className="flex flex-wrap gap-1.5">
             {LIQUIFY_MODE_PRESENTATIONS.map((presentation) => {
               const ModeIcon = presentation.icon;
@@ -209,7 +213,7 @@ export function StudioLiquifyPanel({
         disabled={locked}
         onClick={onToggleActive}
         aria-label={`${current.action} ${active ? "끄기" : "켜기"}`}
-        title={`${current.description} 결과는 손을 뗄 때 한 번에 반영됩니다.`}
+        title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "{v0} 결과는 손을 뗄 때 한 번에 반영됩니다."), { v0: String(current.description) })}
       >
         <span className="inline-flex items-center gap-1">
           <CurrentIcon className="size-3" aria-hidden />
@@ -218,18 +222,18 @@ export function StudioLiquifyPanel({
       </StudioToggleChip>
 
       <StudioSliderRow
-        label="브러시 크기"
+        label={translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "브러시 크기")}
         min={LIQUIFY_RADIUS_RANGE.min}
         max={LIQUIFY_RADIUS_RANGE.max}
         step={LIQUIFY_RADIUS_RANGE.step}
         value={radius}
         onChange={onRadiusChange}
         disabled={locked}
-        readout={`${radius}px`}
+        readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "en", "{v0}px"), { v0: String(radius) })}
       />
 
       <StudioSliderRow
-        label="변형 강도"
+        label={translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "변형 강도")}
         min={LIQUIFY_STRENGTH_RANGE.min}
         max={LIQUIFY_STRENGTH_RANGE.max}
         step={LIQUIFY_STRENGTH_RANGE.step}
@@ -244,17 +248,16 @@ export function StudioLiquifyPanel({
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-1.5 text-[0.72rem] font-medium text-fg-2 outline-none transition-colors hover:bg-raised/70 focus-visible:ring-2 focus-visible:ring-accent/70 motion-reduce:transition-none [&::-webkit-details-marker]:hidden">
             <span className="inline-flex items-center gap-1.5">
               <SlidersHorizontal className="size-3.5" aria-hidden />
-              세부 조절
-            </span>
-            <span className="text-[0.66rem] font-normal text-fg-3 group-open:hidden">경도 · 필압</span>
-            <span className="hidden text-[0.66rem] font-normal text-fg-3 group-open:inline">접기</span>
+              {translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "세부 조절")}</span>
+            <span className="text-[0.66rem] font-normal text-fg-3 group-open:hidden">{translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "경도 · 필압")}</span>
+            <span className="hidden text-[0.66rem] font-normal text-fg-3 group-open:inline">{translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "접기")}</span>
           </summary>
 
           <fieldset disabled={locked} className="mt-1.5 space-y-2.5 px-1 pb-0.5">
-            <legend className="sr-only">리퀴파이 세부 조절</legend>
+            <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "리퀴파이 세부 조절")}</legend>
             {onHardnessChange ? (
               <StudioSliderRow
-                label="경도"
+                label={translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "경도")}
                 min={LIQUIFY_HARDNESS_RANGE.min}
                 max={LIQUIFY_HARDNESS_RANGE.max}
                 step={LIQUIFY_HARDNESS_RANGE.step}
@@ -267,7 +270,7 @@ export function StudioLiquifyPanel({
 
             {onStabilizerChange ? (
               <StudioSliderRow
-                label="안정화"
+                label={translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "안정화")}
                 min={LIQUIFY_STABILIZER_RANGE.min}
                 max={LIQUIFY_STABILIZER_RANGE.max}
                 step={LIQUIFY_STABILIZER_RANGE.step}
@@ -280,29 +283,27 @@ export function StudioLiquifyPanel({
 
             {onTogglePressureRadius || onTogglePressureStrength ? (
               <div>
-                <p className="mb-1.5 text-[0.68rem] font-medium text-fg-3">펜 필압</p>
+                <p className="mb-1.5 text-[0.68rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "펜 필압")}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {onTogglePressureRadius ? (
                     <StudioToggleChip
                       active={pressureAffectsRadius}
                       disabled={locked}
                       onClick={onTogglePressureRadius}
-                      aria-label={`필압으로 크기 조절 ${pressureAffectsRadius ? "끄기" : "켜기"}`}
-                      title="펜을 세게 누를수록 브러시 반경이 커집니다."
+                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "필압으로 크기 조절 {v0}"), { v0: String(pressureAffectsRadius ? "끄기" : "켜기") })}
+                      title={translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "펜을 세게 누를수록 브러시 반경이 커집니다.")}
                     >
-                      크기
-                    </StudioToggleChip>
+                      {translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "크기")}</StudioToggleChip>
                   ) : null}
                   {onTogglePressureStrength ? (
                     <StudioToggleChip
                       active={pressureAffectsStrength}
                       disabled={locked}
                       onClick={onTogglePressureStrength}
-                      aria-label={`필압으로 강도 조절 ${pressureAffectsStrength ? "끄기" : "켜기"}`}
-                      title="펜을 세게 누를수록 왜곡 강도가 커집니다."
+                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "필압으로 강도 조절 {v0}"), { v0: String(pressureAffectsStrength ? "끄기" : "켜기") })}
+                      title={translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "펜을 세게 누를수록 왜곡 강도가 커집니다.")}
                     >
-                      늘림 강도
-                    </StudioToggleChip>
+                      {translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "늘림 강도")}</StudioToggleChip>
                   ) : null}
                 </div>
               </div>
@@ -310,7 +311,7 @@ export function StudioLiquifyPanel({
 
             {onMinimumRadiusChange ? (
               <StudioSliderRow
-                label="최소 크기"
+                label={translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "최소 크기")}
                 min={LIQUIFY_MIN_RADIUS_RANGE.min}
                 max={LIQUIFY_MIN_RADIUS_RANGE.max}
                 step={LIQUIFY_MIN_RADIUS_RANGE.step}
@@ -323,27 +324,25 @@ export function StudioLiquifyPanel({
 
             {onReconstruct || onSmooth ? (
               <div>
-                <p className="mb-1.5 text-[0.68rem] font-medium text-fg-3">변위 다듬기</p>
+                <p className="mb-1.5 text-[0.68rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "변위 다듬기")}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {onReconstruct ? (
                     <StudioPanelChip
                       disabled={locked}
                       onClick={onReconstruct}
-                      title="브러시가 닿은 누적 변위를 원래 형태 쪽으로 되돌립니다."
+                      title={translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "브러시가 닿은 누적 변위를 원래 형태 쪽으로 되돌립니다.")}
                     >
                       <Undo2 className="size-3" aria-hidden />
-                      원형 복원
-                    </StudioPanelChip>
+                      {translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "원형 복원")}</StudioPanelChip>
                   ) : null}
                   {onSmooth ? (
                     <StudioPanelChip
                       disabled={locked}
                       onClick={onSmooth}
-                      title="주변 변위 벡터를 평균내 울퉁불퉁한 왜곡을 부드럽게 합니다."
+                      title={translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "주변 변위 벡터를 평균내 울퉁불퉁한 왜곡을 부드럽게 합니다.")}
                     >
                       <Waves className="size-3" aria-hidden />
-                      변위 매끄럽게
-                    </StudioPanelChip>
+                      {translateCurrentStaticSourceText("domains.creator.StudioLiquifyPanel", "ko", "변위 매끄럽게")}</StudioPanelChip>
                   ) : null}
                 </div>
               </div>

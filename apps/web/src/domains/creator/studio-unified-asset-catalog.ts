@@ -138,6 +138,23 @@ const ELEMENT_CATEGORY_LABELS: Readonly<Record<string, string>> = Object.freeze(
   pattern: "패턴",
 });
 
+const NATIVE_TOOL_PREVIEW_SVGS: Readonly<Record<StudioUnifiedNativeToolId, string>> = Object.freeze({
+  bubble: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220">
+    <defs>
+      <linearGradient id="bubble-paper" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f5f7fb"/>
+      </linearGradient>
+      <filter id="bubble-shadow" x="-20%" y="-20%" width="140%" height="160%">
+        <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity=".15"/>
+      </filter>
+    </defs>
+    <rect width="320" height="220" rx="28" fill="#eef2f7"/>
+    <path d="M45 55c0-22 18-40 40-40h151c22 0 40 18 40 40v65c0 22-18 40-40 40H151l-42 35 9-35H85c-22 0-40-18-40-40V55Z" fill="url(#bubble-paper)" stroke="#111827" stroke-width="5" stroke-linejoin="round" filter="url(#bubble-shadow)"/>
+    <path d="M88 68h135M88 92h110M88 116h78" stroke="#64748b" stroke-width="9" stroke-linecap="round" opacity=".72"/>
+    <circle cx="260" cy="184" r="20" fill="#4f46e5"/><path d="M251 184h18M260 175v18" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+  </svg>`,
+});
+
 const DEFAULT_NATIVE_TOOLS: readonly StudioUnifiedNativeTool[] = Object.freeze([
   Object.freeze({
     id: "bubble",
@@ -371,7 +388,7 @@ function nativeToolItem(
     categoryLabel: "제작 도구",
     keywords: Object.freeze([tool.id, ...tool.keywords, "편집 가능", "네이티브"]),
     badges: Object.freeze(["편집 가능", "네이티브 도구"]),
-    preview: { kind: "none" },
+    preview: { kind: "svg", svg: NATIVE_TOOL_PREVIEW_SVGS[tool.id] },
     useMode: "open",
     useLabel: "말풍선 도구 열기",
     discoverability: "featured",

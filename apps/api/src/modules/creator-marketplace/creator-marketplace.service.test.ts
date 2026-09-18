@@ -350,6 +350,7 @@ describe("CreatorMarketplaceService", () => {
   it("저장소 실패는 비밀 메시지 없이 bounded reason code만 운영 로그에 남긴다", async () => {
     const logger = vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
     const repositoryError = Object.assign(
+      // secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic repository-error fixture
       new Error("postgresql://runtime:production-secret@database.example/market"),
       { code: "42501" },
     );

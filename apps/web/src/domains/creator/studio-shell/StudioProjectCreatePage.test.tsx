@@ -108,7 +108,7 @@ describe("StudioProjectCreatePage", () => {
     );
 
     expect(screen.queryByText(/3\. 저장 위치|3\. Save location/u)).toBeNull();
-    expect(screen.getByText(/시작하는 즉시 이 기기에 복구 저장되며|Recovery storage begins on this device immediately/u)).toBeTruthy();
+    expect(screen.getByText(/그리는 동안 이 기기에 자동 저장됩니다|Your work is autosaved on this device while you draw/u)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /웹툰 시작|Start Webtoon/u }));
 
     await waitFor(() => {

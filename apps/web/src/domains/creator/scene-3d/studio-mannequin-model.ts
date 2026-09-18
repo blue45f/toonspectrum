@@ -92,10 +92,22 @@ export interface StudioMannequinBodyParams {
   readonly noseHeight?: number;
   /** 몸통 앞뒤 깊이. 얇은 실루엣↔입체 흉곽. 0.75–1.35. */
   readonly torsoDepth?: number;
+  /** 흉곽 좌우 폭. 어깨 관절 위치와 독립적으로 늑골 실루엣만 조절. 0.75–1.35. */
+  readonly chestWidth?: number;
+  /** 골반 앞뒤 깊이. 골반 너비와 독립적으로 둔부/골반 질량감을 조절. 0.75–1.35. */
+  readonly pelvisDepth?: number;
   /** 허리 중심부 폭/질량. 0.7–1.3. */
   readonly waistWidth?: number;
-  /** 팔·다리 전체 굵기 배율. 0.7–1.35. */
+  /** 팔·다리 전체 굵기 마스터 배율. 세부 사지 굵기에 곱해진다. 0.7–1.35. */
   readonly limbThickness?: number;
+  /** 상완 굵기. 전완과 독립적으로 조절. 0.7–1.4. */
+  readonly upperArmThickness?: number;
+  /** 전완 굵기. 상완과 독립적으로 조절. 0.7–1.4. */
+  readonly forearmThickness?: number;
+  /** 허벅지 굵기. 종아리와 독립적으로 조절. 0.7–1.45. */
+  readonly thighThickness?: number;
+  /** 종아리 굵기. 허벅지와 독립적으로 조절. 0.7–1.4. */
+  readonly calfThickness?: number;
   /** 손바닥·손가락 크기 배율. 0.75–1.3. */
   readonly handScale?: number;
   /** 발 길이·발볼 크기 배율. 0.75–1.3. */
@@ -121,8 +133,14 @@ export type StudioMannequinHeadParamKey =
 
 export type StudioMannequinAnatomyParamKey =
   | "torsoDepth"
+  | "chestWidth"
+  | "pelvisDepth"
   | "waistWidth"
   | "limbThickness"
+  | "upperArmThickness"
+  | "forearmThickness"
+  | "thighThickness"
+  | "calfThickness"
   | "handScale"
   | "footScale"
   | "neckThickness";
@@ -146,8 +164,14 @@ export const STUDIO_MANNEQUIN_HEAD_PARAM_RANGES = Object.freeze({
 
 export const STUDIO_MANNEQUIN_ANATOMY_PARAM_RANGES = Object.freeze({
   torsoDepth: [0.75, 1.35],
+  chestWidth: [0.75, 1.35],
+  pelvisDepth: [0.75, 1.35],
   waistWidth: [0.7, 1.3],
   limbThickness: [0.7, 1.35],
+  upperArmThickness: [0.7, 1.4],
+  forearmThickness: [0.7, 1.4],
+  thighThickness: [0.7, 1.45],
+  calfThickness: [0.7, 1.4],
   handScale: [0.75, 1.3],
   footScale: [0.75, 1.3],
   neckThickness: [0.75, 1.3],
@@ -162,8 +186,14 @@ export const STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS: StudioMannequinBodyParams = O
   legLength: 1,
   build: 1,
   torsoDepth: 1,
+  chestWidth: 1,
+  pelvisDepth: 1,
   waistWidth: 1,
   limbThickness: 1,
+  upperArmThickness: 1,
+  forearmThickness: 1,
+  thighThickness: 1,
+  calfThickness: 1,
   handScale: 1,
   footScale: 1,
   neckThickness: 1,
@@ -462,7 +492,8 @@ export type StudioMannequinMaterialStyle =
   | "magma"
   | "stencil"
   | "bronze"
-  | "porcelain";
+  | "porcelain"
+  | "skin";
 
 export const STUDIO_MANNEQUIN_MATERIAL_STYLES: readonly {
   id: StudioMannequinMaterialStyle;
@@ -477,6 +508,7 @@ export const STUDIO_MANNEQUIN_MATERIAL_STYLES: readonly {
   { id: "stencil", label: "흑백 실루엣", desc: "외곽 형태 선명 추출용 스텐실 모드" },
   { id: "bronze", label: "청동 조각상", desc: "금속 하이라이트로 면 전환을 읽는 고전 조각 모드" },
   { id: "porcelain", label: "백자 인형", desc: "부드러운 반사와 밝은 명암을 보는 유광 백자 모드" },
+  { id: "skin", label: "PBR 피부톤", desc: "거친 플라스틱 대신 피부에 가까운 roughness·sheen 응답으로 면과 볼륨을 확인" },
 ]);
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
@@ -672,7 +704,10 @@ export type StudioMannequinPrimitiveSpec =
       readonly jointId: StudioMannequinJointId;
       readonly from: StudioMannequinVec3;
       readonly to: StudioMannequinVec3;
+      /** 시작점 반지름. endRadius가 없으면 기존의 균일 캡슐 계약이다. */
       readonly radius: number;
+      /** 끝점 반지름. 설정되면 관절구 사이를 해부학적 테이퍼 볼륨으로 렌더한다. */
+      readonly endRadius?: number;
     }
   | {
       readonly kind: "sphere";
@@ -774,9 +809,19 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
   const upperLegLen = legSpan * 0.52;
   const lowerLegLen = legSpan * 0.48;
 
+  const faceWidth = params.faceWidth ?? 1;
+  const chinLength = params.chinLength ?? 1;
+  const eyeScale = params.eyeScale ?? 1;
+  const noseHeight = params.noseHeight ?? 1;
   const torsoDepth = params.torsoDepth ?? 1;
+  const chestWidth = params.chestWidth ?? 1;
+  const pelvisDepth = params.pelvisDepth ?? 1;
   const waistWidth = params.waistWidth ?? 1;
   const limbThickness = params.limbThickness ?? 1;
+  const upperArmThickness = params.upperArmThickness ?? 1;
+  const forearmThickness = params.forearmThickness ?? 1;
+  const thighThickness = params.thighThickness ?? 1;
+  const calfThickness = params.calfThickness ?? 1;
   const handScale = params.handScale ?? 1;
   const footScale = params.footScale ?? 1;
   const neckThickness = params.neckThickness ?? 1;
@@ -790,6 +835,10 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
   const hipHalf = 0.33 * hu * params.pelvisWidth;
 
   const limbR = build.limbRadius * limbThickness;
+  const upperArmR = limbR * upperArmThickness;
+  const forearmR = limbR * forearmThickness;
+  const thighR = limbR * thighThickness;
+  const calfR = limbR * calfThickness;
   const footLen = 0.95 * hu * footScale;
   const pelvisRadius = 0.3 * hu * build.torsoLower;
   const chestRadius = 0.34 * hu * build.torsoUpper;
@@ -827,7 +876,7 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       jointId: "pelvis",
       center: vec3(0, 0.04 * hu, 0),
       radius: pelvisRadius,
-      scale: vec3(1.5 * params.pelvisWidth, 0.8, 0.92 * torsoDepth),
+      scale: vec3(1.5 * params.pelvisWidth, 0.8, 0.92 * torsoDepth * pelvisDepth),
     },
     {
       kind: "capsule",
@@ -842,7 +891,7 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       center: vec3(0, 0.175 * torsoLen, 0),
       radius: chestRadius,
       scale: vec3(
-        1.32 * params.shoulderWidth,
+        1.32 * params.shoulderWidth * chestWidth,
         (0.31 * torsoLen) / (2 * chestRadius),
         0.72 * torsoDepth,
       ),
@@ -869,20 +918,32 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       jointId: "head",
       center: vec3(0, headLen * 0.5, 0),
       radius: headLen * 0.5,
-      scale: vec3(0.78, 1, 0.85),
+      scale: vec3(0.78 * faceWidth, 1, 0.85),
+    },
+    // 턱/하악 볼륨 — 머리 높이는 보존하면서 얼굴 너비와 턱 길이가 실제 실루엣에 반영된다.
+    {
+      kind: "sphere",
+      jointId: "head",
+      center: vec3(
+        0,
+        headLen * (0.24 - 0.035 * (chinLength - 1)),
+        headLen * 0.16,
+      ),
+      radius: 0.2 * hu,
+      scale: vec3(1.42 * faceWidth, 0.72 * chinLength, 0.72),
     },
     // 코·귀 방향 가이드 — 별도 얼굴 골격 없이도 +Z 시선과 머리 회전을 즉시 읽을 수 있다.
     {
       kind: "sphere",
       jointId: "head",
-      center: vec3(0, headLen * 0.52, headLen * 0.43),
+      center: vec3(0, headLen * 0.52, headLen * (0.43 + 0.025 * (noseHeight - 1))),
       radius: 0.06 * hu,
-      scale: vec3(0.55, 0.72, 1.15),
+      scale: vec3(0.55, 0.72, 1.15 * noseHeight),
     },
     {
       kind: "sphere",
       jointId: "head",
-      center: vec3(0.4 * hu, headLen * 0.52, 0),
+      center: vec3(0.4 * hu * faceWidth, headLen * 0.52, 0),
       radius: 0.065 * hu,
       scale: vec3(0.45, 0.8, 0.55),
     },
@@ -890,44 +951,44 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
     {
       kind: "sphere",
       jointId: "head",
-      center: vec3(0.17 * hu, headLen * 0.59, headLen * 0.395),
-      radius: 0.055 * hu,
+      center: vec3(0.17 * hu * faceWidth, headLen * 0.59, headLen * 0.395),
+      radius: 0.055 * hu * eyeScale,
       scale: vec3(1, 0.72, 0.38),
     },
     {
       kind: "sphere",
       jointId: "head",
-      center: vec3(-0.17 * hu, headLen * 0.59, headLen * 0.395),
-      radius: 0.055 * hu,
+      center: vec3(-0.17 * hu * faceWidth, headLen * 0.59, headLen * 0.395),
+      radius: 0.055 * hu * eyeScale,
       scale: vec3(1, 0.72, 0.38),
     },
     {
       kind: "sphere",
       jointId: "head",
-      center: vec3(-0.4 * hu, headLen * 0.52, 0),
+      center: vec3(-0.4 * hu * faceWidth, headLen * 0.52, 0),
       radius: 0.065 * hu,
       scale: vec3(0.45, 0.8, 0.55),
     },
     // 팔 — 관절구와 손바닥 타원체를 겹쳐 관절 굽힘과 손 방향을 명확히 표시한다.
-    { kind: "sphere", jointId: "leftUpperArm", center: vec3(0, 0, 0), radius: 0.14 * hu * limbR },
-    { kind: "capsule", jointId: "leftUpperArm", from: vec3(0, 0, 0), to: vec3(0, -upperArmLen, 0), radius: 0.115 * hu * limbR },
-    { kind: "sphere", jointId: "leftLowerArm", center: vec3(0, 0, 0), radius: 0.12 * hu * limbR },
-    { kind: "capsule", jointId: "leftLowerArm", from: vec3(0, 0, 0), to: vec3(0, -foreArmLen, 0), radius: 0.095 * hu * limbR },
+    { kind: "sphere", jointId: "leftUpperArm", center: vec3(0, 0, 0), radius: 0.14 * hu * upperArmR },
+    { kind: "capsule", jointId: "leftUpperArm", from: vec3(0, 0, 0), to: vec3(0, -upperArmLen, 0), radius: 0.126 * hu * upperArmR, endRadius: 0.104 * hu * upperArmR },
+    { kind: "sphere", jointId: "leftLowerArm", center: vec3(0, 0, 0), radius: 0.12 * hu * forearmR },
+    { kind: "capsule", jointId: "leftLowerArm", from: vec3(0, 0, 0), to: vec3(0, -foreArmLen, 0), radius: 0.104 * hu * forearmR, endRadius: 0.086 * hu * forearmR },
     { kind: "sphere", jointId: "leftHand", center: vec3(0, 0, 0), radius: 0.095 * hu * limbR },
     { kind: "sphere", jointId: "leftHand", center: vec3(0, -handLen * 0.5, 0), radius: handLen * 0.5, scale: vec3(0.45, 1, 0.28) },
     ...buildHandDigitPrimitives("leftHand", handLen, 1),
-    { kind: "sphere", jointId: "rightUpperArm", center: vec3(0, 0, 0), radius: 0.14 * hu * limbR },
-    { kind: "capsule", jointId: "rightUpperArm", from: vec3(0, 0, 0), to: vec3(0, -upperArmLen, 0), radius: 0.115 * hu * limbR },
-    { kind: "sphere", jointId: "rightLowerArm", center: vec3(0, 0, 0), radius: 0.12 * hu * limbR },
-    { kind: "capsule", jointId: "rightLowerArm", from: vec3(0, 0, 0), to: vec3(0, -foreArmLen, 0), radius: 0.095 * hu * limbR },
+    { kind: "sphere", jointId: "rightUpperArm", center: vec3(0, 0, 0), radius: 0.14 * hu * upperArmR },
+    { kind: "capsule", jointId: "rightUpperArm", from: vec3(0, 0, 0), to: vec3(0, -upperArmLen, 0), radius: 0.126 * hu * upperArmR, endRadius: 0.104 * hu * upperArmR },
+    { kind: "sphere", jointId: "rightLowerArm", center: vec3(0, 0, 0), radius: 0.12 * hu * forearmR },
+    { kind: "capsule", jointId: "rightLowerArm", from: vec3(0, 0, 0), to: vec3(0, -foreArmLen, 0), radius: 0.104 * hu * forearmR, endRadius: 0.086 * hu * forearmR },
     { kind: "sphere", jointId: "rightHand", center: vec3(0, 0, 0), radius: 0.095 * hu * limbR },
     { kind: "sphere", jointId: "rightHand", center: vec3(0, -handLen * 0.5, 0), radius: handLen * 0.5, scale: vec3(0.45, 1, 0.28) },
     ...buildHandDigitPrimitives("rightHand", handLen, -1),
     // 다리 — 고관절·무릎·발목 관절구와 둥근 발 볼륨.
-    { kind: "sphere", jointId: "leftUpperLeg", center: vec3(0, 0, 0), radius: 0.18 * hu * limbR },
-    { kind: "capsule", jointId: "leftUpperLeg", from: vec3(0, 0, 0), to: vec3(0, -upperLegLen, 0), radius: 0.155 * hu * limbR },
-    { kind: "sphere", jointId: "leftLowerLeg", center: vec3(0, 0, 0), radius: 0.15 * hu * limbR },
-    { kind: "capsule", jointId: "leftLowerLeg", from: vec3(0, 0, 0), to: vec3(0, -lowerLegLen, 0), radius: 0.115 * hu * limbR },
+    { kind: "sphere", jointId: "leftUpperLeg", center: vec3(0, 0, 0), radius: 0.18 * hu * thighR },
+    { kind: "capsule", jointId: "leftUpperLeg", from: vec3(0, 0, 0), to: vec3(0, -upperLegLen, 0), radius: 0.17 * hu * thighR, endRadius: 0.14 * hu * thighR },
+    { kind: "sphere", jointId: "leftLowerLeg", center: vec3(0, 0, 0), radius: 0.15 * hu * calfR },
+    { kind: "capsule", jointId: "leftLowerLeg", from: vec3(0, 0, 0), to: vec3(0, -lowerLegLen, 0), radius: 0.13 * hu * calfR, endRadius: 0.1 * hu * calfR },
     {
       kind: "sphere",
       jointId: "leftFoot",
@@ -936,10 +997,10 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       scale: vec3((0.26 * hu * footScale) / footLen, (ankleHeight * footScale) / footLen, 1),
     },
     { kind: "sphere", jointId: "leftFoot", center: vec3(0, 0, 0), radius: 0.105 * hu * limbR },
-    { kind: "sphere", jointId: "rightUpperLeg", center: vec3(0, 0, 0), radius: 0.18 * hu * limbR },
-    { kind: "capsule", jointId: "rightUpperLeg", from: vec3(0, 0, 0), to: vec3(0, -upperLegLen, 0), radius: 0.155 * hu * limbR },
-    { kind: "sphere", jointId: "rightLowerLeg", center: vec3(0, 0, 0), radius: 0.15 * hu * limbR },
-    { kind: "capsule", jointId: "rightLowerLeg", from: vec3(0, 0, 0), to: vec3(0, -lowerLegLen, 0), radius: 0.115 * hu * limbR },
+    { kind: "sphere", jointId: "rightUpperLeg", center: vec3(0, 0, 0), radius: 0.18 * hu * thighR },
+    { kind: "capsule", jointId: "rightUpperLeg", from: vec3(0, 0, 0), to: vec3(0, -upperLegLen, 0), radius: 0.17 * hu * thighR, endRadius: 0.14 * hu * thighR },
+    { kind: "sphere", jointId: "rightLowerLeg", center: vec3(0, 0, 0), radius: 0.15 * hu * calfR },
+    { kind: "capsule", jointId: "rightLowerLeg", from: vec3(0, 0, 0), to: vec3(0, -lowerLegLen, 0), radius: 0.13 * hu * calfR, endRadius: 0.1 * hu * calfR },
     {
       kind: "sphere",
       jointId: "rightFoot",

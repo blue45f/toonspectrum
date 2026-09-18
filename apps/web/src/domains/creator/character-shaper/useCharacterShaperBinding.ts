@@ -252,6 +252,10 @@ export function characterShaperBusyReason(h: StudioVrmPoserHost): string | null 
   if (h.proportionRigStatus === "reload-required") {
     return readString(h.proportionRigMessage) ?? "체형 리그를 다시 불러와야 합니다.";
   }
+  if (h.status === "loading") return "VRM 캐릭터를 불러오는 중입니다.";
+  if (h.status === "error") {
+    return "VRM 캐릭터를 불러오지 못했습니다. 모델 상태를 확인한 뒤 다시 시도해 주세요.";
+  }
   if (h.status !== "ready") return "VRM 캐릭터를 먼저 불러오세요.";
   // 위의 구체적인 사유들이 지금의 워드로브 잠금 조건과 같지만, 그건 우연이다. 잠금의 authority는
   // 호스트가 들고 있으므로 마지막에 그 값 자체를 확인한다 — 호스트가 잠금 조건을 하나 더 늘렸을 때

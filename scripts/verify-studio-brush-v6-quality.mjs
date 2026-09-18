@@ -12,6 +12,8 @@ const OUTPUT = process.env.TOONSPECTRUM_BRUSH_V6_VERIFY_DIR
   ?? join(tmpdir(), `toonspectrum-brush-v6-quality-${Date.now()}`);
 const ENTRY = "/scripts/studio-brush-v6-quality-browser.ts";
 const diagnostics = { consoleErrors: [], pageErrors: [], failedRequests: [] };
+const recipeFilter = new Set((process.env.TOONSPECTRUM_BRUSH_V6_VERIFY_FILTER ?? "")
+  .split(",").map((value) => value.trim()).filter(Boolean));
 
 function writeReviewIndex(report) {
   const escape = (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll('"', "&quot;");
@@ -91,7 +93,12 @@ async function main() {
     await page.goto(server.resolvedUrls.local[0]);
     await page.waitForFunction(() => Boolean(window.__studioBrushV6Quality));
     const session = await page.context().newCDPSession(page);
-    const recipes = await page.evaluate(() => window.__studioBrushV6Quality.recipes);
+    const allRecipes = await page.evaluate(() => window.__studioBrushV6Quality.recipes);
+    const recipes = recipeFilter.size > 0 ? allRecipes.filter((recipe) => recipeFilter.has(recipe.id)) : allRecipes;
+    if (recipeFilter.size > 0 && recipes.length !== recipeFilter.size) {
+      const found = new Set(recipes.map((recipe) => recipe.id));
+      throw new Error(`Unknown recipe filter: ${[...recipeFilter].filter((id) => !found.has(id)).join(", ")}`);
+    }
     const results = [];
     for (const recipe of recipes) {
       const preview = await page.evaluate((id) => window.__studioBrushV6Quality.select(id), recipe.id);

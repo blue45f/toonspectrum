@@ -1,0 +1,4079 @@
+{
+  "version": 2,
+  "generator": "generate-studio-vrm-catalog-thumbnails.mts",
+  "browser": "152.0.7977.83",
+  "sourceMaterialsPreserved": true,
+  "requested": 83,
+  "succeeded": 83,
+  "failed": 0,
+  "entries": [
+    {
+      "id": "sample-vrm",
+      "sourceUrl": "/vrm/sample.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.3963898840313179,
+          -5.937947698959232e-7,
+          -0.19198197542363243
+        ],
+        "max": [
+          0.39640667859448053,
+          1.7865095533074293,
+          0.1350829886735196
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.8162853162205694,
+        "position": [
+          -1.6782664876921788e-16,
+          1.0317090161567501,
+          3.9752889550312918
+        ],
+        "target": [
+          -1.6782664876921788e-16,
+          1.0317090161567501,
+          -0.02471104496870818
+        ]
+      },
+      "foregroundPixels": 78049,
+      "renderedTriangles": 70116,
+      "sourceImages": 19,
+      "sourceMaterials": 13,
+      "sourceSha256": "12c2b97e95e700783a6a550dc0eee2d7880aeedccef9ae67bc4c5a2f0f2631a2",
+      "originalThumbnailSha256": "62d50c9d23a3f62a835e1d8523524978725cfe2a5a3faae3d0a1a0d8232d66b7",
+      "thumbnailSha256": "354a0beeb92b58799ce3a5bd2808d993919015a4fbbf274508b63c81489e036e",
+      "thumbnailBytes": 106461
+    },
+    {
+      "id": "avatar-a",
+      "sourceUrl": "/vrm/AvatarSample_A.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.37522991560574237,
+          -0.054897137795131036,
+          -0.30792025631645925
+        ],
+        "max": [
+          0.37518084192701906,
+          1.5582036973500124,
+          0.13628864104302424
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6399858490642292,
+        "position": [
+          -0.000021019730426959378,
+          0.8766685945011894,
+          3.9949067202
+        ],
+        "target": [
+          -0.000021019730426959378,
+          0.8766685945011894,
+          -0.005093279800000001
+        ]
+      },
+      "foregroundPixels": 80814,
+      "renderedTriangles": 39116,
+      "sourceImages": 28,
+      "sourceMaterials": 17,
+      "sourceSha256": "8d081ff0744d09dc5d8fe1972bec6959581889d2ed6f13e52fd27ac619747f13",
+      "originalThumbnailSha256": "4dd1b22a262278d38a8e3d89d90c8284857680bb4078bb70ca91c6a14a0cd876",
+      "thumbnailSha256": "9d54944030ea3ec033d71fb150c95f7a5d7c8f9ba5261e1f6c3fe8e3369c0b51",
+      "thumbnailBytes": 161271
+    },
+    {
+      "id": "avatar-b",
+      "sourceUrl": "/vrm/AvatarSample_B.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.3667332060748958,
+          0.0005225500669612961,
+          -0.3170828075318397
+        ],
+        "max": [
+          0.3666410513256997,
+          1.5820310100491455,
+          0.1784666476709148
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6078669343152205,
+        "position": [
+          -0.00004168226586529938,
+          0.9138436857066727,
+          3.99496807523
+        ],
+        "target": [
+          -0.00004168226586529938,
+          0.9138436857066727,
+          -0.005031924769999998
+        ]
+      },
+      "foregroundPixels": 94407,
+      "renderedTriangles": 54776,
+      "sourceImages": 30,
+      "sourceMaterials": 19,
+      "sourceSha256": "0c9f1cc6f77a4a56c5235123d88cf1c494e550a3ea9e2e707b81b16f35f8e638",
+      "originalThumbnailSha256": "b5ae014e068e5a2af9eb62307d5413ee7d10c7dfa2d8bed35d34ae3ab3f3b77c",
+      "thumbnailSha256": "fd0c3bba0838f723d5359e71d3dfb0ce73c62c33af2c412de7bad0fc9c4cd9a0",
+      "thumbnailBytes": 198300
+    },
+    {
+      "id": "avatar-c",
+      "sourceUrl": "/vrm/AvatarSample_C.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.4554540949148327,
+          -0.00003193717540599962,
+          -0.16973113026876158
+        ],
+        "max": [
+          0.454421087229375,
+          1.7561347454043457,
+          0.15877637226572816
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.7854361272894144,
+        "position": [
+          -0.0005171247762420009,
+          1.0141543220144007,
+          4.00838703097
+        ],
+        "target": [
+          -0.0005171247762420009,
+          1.0141543220144007,
+          0.00838703097
+        ]
+      },
+      "foregroundPixels": 102944,
+      "renderedTriangles": 52168,
+      "sourceImages": 25,
+      "sourceMaterials": 14,
+      "sourceSha256": "ca7d94166ca6531c103e519fda0345d3b74be693a5571ca336bcefdc3a9c345e",
+      "originalThumbnailSha256": "19c38ee05ca6a8b706cb31cb68c923a12d242b5c8032e0f00ea14b9a5038e6b3",
+      "thumbnailSha256": "cf8632b863162b4b46336625797fd47a4f6a84d77efe28b16a19d586cc8b68a9",
+      "thumbnailBytes": 161226
+    },
+    {
+      "id": "shion",
+      "sourceUrl": "/vrm/Sendagaya_Shibu.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.3942974251297746,
+          -0.00018629760789217384,
+          -0.15037944035387446
+        ],
+        "max": [
+          0.39378542916846726,
+          1.6157749910553587,
+          0.13823581002772675
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6428939768076385,
+        "position": [
+          -0.00025545473494485905,
+          0.9330313465951352,
+          3.99203548878
+        ],
+        "target": [
+          -0.00025545473494485905,
+          0.9330313465951352,
+          -0.007964511220000001
+        ]
+      },
+      "foregroundPixels": 82991,
+      "renderedTriangles": 46988,
+      "sourceImages": 30,
+      "sourceMaterials": 17,
+      "sourceSha256": "d5f5b72236b5e3225d452c2bdb6d3b63f09263fb377400f18fa451b2091fe82d",
+      "originalThumbnailSha256": "a384fddd6e57942bdfe0239ea308e63ed095dd1600007c01676c9cbb2d55f2e9",
+      "thumbnailSha256": "0a14c69131005bf7c5e5b4340aad6fe32c8a11d290c35dc239bf92a924a4ce66",
+      "thumbnailBytes": 167650
+    },
+    {
+      "id": "vita",
+      "sourceUrl": "/vrm/Vita.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.3944599654887133,
+          -0.00011479049419440438,
+          -0.23989963922555965
+        ],
+        "max": [
+          0.393620345592701,
+          1.712962200099588,
+          0.19819507363363453
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.7416282737703457,
+        "position": [
+          -0.0004206331930663992,
+          0.989187171573715,
+          3.99335815751
+        ],
+        "target": [
+          -0.0004206331930663992,
+          0.989187171573715,
+          -0.006641842490000004
+        ]
+      },
+      "foregroundPixels": 76094,
+      "renderedTriangles": 38086,
+      "sourceImages": 28,
+      "sourceMaterials": 16,
+      "sourceSha256": "77d4494fac38d1e8177746a28b8c5951b92742341c689de0844de96b3e56748d",
+      "originalThumbnailSha256": "8e46442227c6c5ec1c4e5b0f777dc059b09b2d4b2f94034a32a6c2815e94cc8b",
+      "thumbnailSha256": "79df21f3ab41f0baf16447c88df9f1adf6de192731615b0fbad674f12c9bef5d",
+      "thumbnailBytes": 165722
+    },
+    {
+      "id": "orion",
+      "sourceUrl": "/vrm/Avatar_Orion.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5410240210338979,
+          -0.001928628333700242,
+          -0.15234242757528862
+        ],
+        "max": [
+          0.5423646104874773,
+          1.9539897604295855,
+          0.15749992139734426
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.988517028576007,
+        "position": [
+          0.00004978728462326392,
+          1.1276142411770973,
+          3.9599451275563977
+        ],
+        "target": [
+          0.00004978728462326392,
+          1.1276142411770973,
+          -0.04005487244360242
+        ]
+      },
+      "foregroundPixels": 60280,
+      "renderedTriangles": 8104,
+      "sourceImages": 3,
+      "sourceMaterials": 5,
+      "sourceSha256": "32712a4aad9e83c0b2f86840ce54f1235fb9d133c5a6e7d6c5b653badc62fbb7",
+      "originalThumbnailSha256": "b4831cba55ef4a4d62ef4d337a3b9ec12e8d55eddf5d4686a319f19c005680a2",
+      "thumbnailSha256": "464fc07d19fae373d4af98d9f79efe66db1a74f0d15d47dcc07bfe4cd0ce2555",
+      "thumbnailBytes": 129492
+    },
+    {
+      "id": "cryptovoxel",
+      "sourceUrl": "/vrm/cryptovoxels.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.41926785776102754,
+          0.0197206473576597,
+          -0.07353602522714599
+        ],
+        "max": [
+          0.4381650845856143,
+          1.5099980789237182,
+          0.1552236303871241
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.515115388758826,
+        "position": [
+          -9.318695178453997e-8,
+          0.8803558640870586,
+          4.020376764158322
+        ],
+        "target": [
+          -9.318695178453997e-8,
+          0.8803558640870586,
+          0.020376764158322
+        ]
+      },
+      "foregroundPixels": 70052,
+      "renderedTriangles": 4907,
+      "sourceImages": 0,
+      "sourceMaterials": 1,
+      "sourceSha256": "c5b3ae99adb04138f757b26e836c9e7d763377e7dd7b0c646c2515e818e0cad3",
+      "originalThumbnailSha256": "8364e3f22e18da217a5d8232359578168f16e3970f756b1a36712cc0aeb765d0",
+      "thumbnailSha256": "44c5311d2422f5affa1082090633ae8e20701de93053e269a3bcaeca28278f4f",
+      "thumbnailBytes": 76469
+    },
+    {
+      "id": "seedsan",
+      "sourceUrl": "/vrm/Seed_san.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.4541641524813306,
+          -0.00016683010234902208,
+          -0.4833110917407838
+        ],
+        "max": [
+          0.9595676720626427,
+          2.533311990886296,
+          0.19260811966964195
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 2.575703468005122,
+        "position": [
+          0,
+          1.4629171890185935,
+          3.9879610001904426
+        ],
+        "target": [
+          0,
+          1.4629171890185935,
+          -0.012038999809557405
+        ]
+      },
+      "foregroundPixels": 49208,
+      "renderedTriangles": 81236,
+      "sourceImages": 15,
+      "sourceMaterials": 17,
+      "sourceSha256": "d24a5473a53f5ab76228da7c49a3f6fc2e1a0561566123859311df1e40b26490",
+      "originalThumbnailSha256": "d88e236f1642324214c1b467cfff6118166ab0c9aa8ee2b1377b8ec1111b403a",
+      "thumbnailSha256": "05d0bb0da3dd4b6d89ea7aaa310591e37d896d0838a669b4c3e8e203e4662745",
+      "thumbnailBytes": 116162
+    },
+    {
+      "id": "shino",
+      "sourceUrl": "/vrm/Sendagaya_Shino.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.3943506921488207,
+          -0.0000759205462711184,
+          -0.2013659081139019
+        ],
+        "max": [
+          0.39373171310916666,
+          1.6451448199201661,
+          0.1389854548115952
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.672641086140878,
+        "position": [
+          -0.00030913250543539915,
+          0.9500390570730963,
+          3.9928690886
+        ],
+        "target": [
+          -0.00030913250543539915,
+          0.9500390570730963,
+          -0.0071309114
+        ]
+      },
+      "foregroundPixels": 84673,
+      "renderedTriangles": 43804,
+      "sourceImages": 30,
+      "sourceMaterials": 17,
+      "sourceSha256": "ef8f05c5e0c718a07ad6f455b3f302cd4d76c4e526aec68ae362a3c3569d1832",
+      "originalThumbnailSha256": "cdbd1032b2cdbcc2de8e23594601f3863971a96e410300bff3d1c315db404318",
+      "thumbnailSha256": "dbfd538878fddd6c3594cd453a335c9925627a6e3f3293fd90fa13ce1f4075d7",
+      "thumbnailBytes": 169317
+    },
+    {
+      "id": "fumi",
+      "sourceUrl": "/vrm/Sakurada_Fumiriya.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.45990809592020265,
+          0.00015468422738815126,
+          -0.17120169653604103
+        ],
+        "max": [
+          0.45838432188535516,
+          1.9215537450294797,
+          0.17313656172310443
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.9534223784821263,
+        "position": [
+          -0.0007614392662682011,
+          1.109762641840596,
+          4.008887359656
+        ],
+        "target": [
+          -0.0007614392662682011,
+          1.109762641840596,
+          0.008887359655999998
+        ]
+      },
+      "foregroundPixels": 79283,
+      "renderedTriangles": 52500,
+      "sourceImages": 30,
+      "sourceMaterials": 17,
+      "sourceSha256": "55c936af29b1b533276a89fe327783eb377be637512302f2375e4c3442ac3418",
+      "originalThumbnailSha256": "c71787068036dc1f8f4474cce0d8c7842e8d49e222cec067c154b61e9f6c79db",
+      "thumbnailSha256": "c574f0bb771f22ddd659252796bd4ad23a9b2c6863c3ec2c3db6b5e983d1cf88",
+      "thumbnailBytes": 168459
+    },
+    {
+      "id": "kage",
+      "sourceUrl": "/vrm/Darkness_Shibu.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.3943800947464313,
+          -0.00012833581997505157,
+          -0.25661597384787027
+        ],
+        "max": [
+          0.3937028660783375,
+          1.6500946086367798,
+          0.21378660779208858
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6777266601977008,
+        "position": [
+          -0.000337889097519699,
+          0.9528754146038009,
+          3.99210360121
+        ],
+        "target": [
+          -0.000337889097519699,
+          0.9528754146038009,
+          -0.007896398789999998
+        ]
+      },
+      "foregroundPixels": 100274,
+      "renderedTriangles": 45714,
+      "sourceImages": 27,
+      "sourceMaterials": 15,
+      "sourceSha256": "dd2904a46c019e614e17561145a389587e32e475b199246e8bb62bffc81de93b",
+      "originalThumbnailSha256": "fb21ce3c57666042803d613e6874f1c866763ab0605648c9b22b204a4937ed59",
+      "thumbnailSha256": "5f5044fd1dbede6f2a76f32e85ff34decc4dbe671433b0961d79a39eeae1cea4",
+      "thumbnailBytes": 301188
+    },
+    {
+      "id": "mio",
+      "sourceUrl": "/vrm/fem_vroid.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.4071245302537059,
+          -6.855943065085508e-8,
+          -0.1379665558001714
+        ],
+        "max": [
+          0.4071245302537059,
+          1.583543327355701,
+          0.12793854376421043
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6099357858470504,
+        "position": [
+          1.5765074617367287e-10,
+          0.9144962425815578,
+          3.97528896338
+        ],
+        "target": [
+          1.5765074617367287e-10,
+          0.9144962425815578,
+          -0.02471103662000001
+        ]
+      },
+      "foregroundPixels": 76421,
+      "renderedTriangles": 34518,
+      "sourceImages": 18,
+      "sourceMaterials": 9,
+      "sourceSha256": "983631034570b7a70e2f158e48f12fe7f0fe3ebcba763363efd6e85a2fbbacb8",
+      "originalThumbnailSha256": "032398b8c191fd5309befee60161930381c69a1a88f43fe2649ab28289d66573",
+      "thumbnailSha256": "d0db9013c1bfe0659bc006101696f58b39a53c15fa67d1b9cd215dcef46d7b32",
+      "thumbnailBytes": 87298
+    },
+    {
+      "id": "noa",
+      "sourceUrl": "/vrm/masc_vroid.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.4737184096867808,
+          1.8931311004658983e-7,
+          -0.14043783872655913
+        ],
+        "max": [
+          0.4737184096867808,
+          1.7433474336869141,
+          0.16190173093406723
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.7724030317800343,
+        "position": [
+          -1.7689464298610708e-10,
+          1.006783222938982,
+          3.9727869952
+        ],
+        "target": [
+          -1.7689464298610708e-10,
+          1.006783222938982,
+          -0.027213004799999996
+        ]
+      },
+      "foregroundPixels": 79832,
+      "renderedTriangles": 34520,
+      "sourceImages": 18,
+      "sourceMaterials": 9,
+      "sourceSha256": "ac5e30b9f875b54b13cddbe86d6351b4a8d2d418c2f885d89199281ad5c937cb",
+      "originalThumbnailSha256": "18efcf3405bb3a3efef6208d356210bbb6adc54627d46eadf3f3fe635c77756e",
+      "thumbnailSha256": "77af4d1f165348d1bbc162b6fca44b3fdcf19877586ac3d020b97dcb6705ab7d",
+      "thumbnailBytes": 88594
+    },
+    {
+      "id": "devil",
+      "sourceUrl": "/vrm/Devil.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5272175903890003,
+          -0.00036894958021659247,
+          -0.5503095388412476
+        ],
+        "max": [
+          0.5285973269391316,
+          1.7411376237869263,
+          0.2795550525188446
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.770531682923262,
+        "position": [
+          -0.000018820717741619257,
+          1.0053510965393084,
+          4.003190778195858
+        ],
+        "target": [
+          -0.000018820717741619257,
+          1.0053510965393084,
+          0.0031907781958580017
+        ]
+      },
+      "foregroundPixels": 81315,
+      "renderedTriangles": 3944,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "2e428dd1846504a77f3936259f489a899cc92aa6179b769a1aee230f875a9b4d",
+      "originalThumbnailSha256": "5a542d1a65e29d1b361cb03fa8f383be62b855d48cd6fef29087bece22664302",
+      "thumbnailSha256": "43f6a50d6321267eb3cee9fc6497289e9545351ff8de387caaada118de1d9a08",
+      "thumbnailBytes": 57602
+    },
+    {
+      "id": "polydancer",
+      "sourceUrl": "/vrm/Polydancer.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5664635831957532,
+          -0.0002708206092158884,
+          -0.19805128872394562
+        ],
+        "max": [
+          0.566540909126799,
+          1.7982155084609985,
+          0.1802634298801422
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.8284611012213845,
+        "position": [
+          -0.000004240906491758131,
+          1.0383550344288328,
+          3.991008060052991
+        ],
+        "target": [
+          -0.000004240906491758131,
+          1.0383550344288328,
+          -0.008991939947009087
+        ]
+      },
+      "foregroundPixels": 101954,
+      "renderedTriangles": 3526,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "9bc28f2f2ab9d20aaa0da6c7b272a3f2363058414362bbfc176713c4585e4244",
+      "originalThumbnailSha256": "ca80e26d1dc78dd77c0137907f99b63eaa396cc423be3cd4bded9293a7a5c2e1",
+      "thumbnailSha256": "6004c33f4aa866471015227af5f12f563fa9111952301a424704339f158d7e25",
+      "thumbnailBytes": 106136
+    },
+    {
+      "id": "rose",
+      "sourceUrl": "/vrm/Rose.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.508693225930581,
+          -0.0007589211398070965,
+          -0.20371775343342527
+        ],
+        "max": [
+          0.510970494521714,
+          1.654915452003479,
+          0.14020538330078125
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6832689460290073,
+        "position": [
+          -4.379108418033101e-7,
+          0.9553930293504406,
+          3.939962636679411
+        ],
+        "target": [
+          -4.379108418033101e-7,
+          0.9553930293504406,
+          -0.060037363320589066
+        ]
+      },
+      "foregroundPixels": 112706,
+      "renderedTriangles": 5622,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "8e44e5638ffdf935e5d6fa990aa6cba428269f342f2db024c2961ee286a41e5f",
+      "originalThumbnailSha256": "ec8a5677547809e1bb29d5593d8ad0fe9214ff4ba91ec60ac8325e8008b11506",
+      "thumbnailSha256": "3788455d9fc20b3105f08dc427c035e30650095f01d3b5cc2303e3454913aae6",
+      "thumbnailBytes": 87890
+    },
+    {
+      "id": "robert",
+      "sourceUrl": "/vrm/Robert.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5552886475219998,
+          -0.0002427628915131994,
+          -0.10286877896087199
+        ],
+        "max": [
+          0.5899729148584294,
+          1.6068559885025024,
+          0.13661766052246094
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.633883730583916,
+        "position": [
+          -0.0000015116230542846457,
+          0.9278567660385308,
+          4.001782351639122
+        ],
+        "target": [
+          -0.0000015116230542846457,
+          0.9278567660385308,
+          0.0017823516391217709
+        ]
+      },
+      "foregroundPixels": 119163,
+      "renderedTriangles": 4732,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "5e3edaf330577ee4c3f6440b8989af3722e7c800bb90eb037f1c05cdfe61fd7c",
+      "originalThumbnailSha256": "a31e303100a3a701fa732263eaeb603f7d0007e5d5b6f7b6d9854cdb289d04b8",
+      "thumbnailSha256": "b1f94e78c6855bece6d73e9f50e1b343ee1c3912d20f818ae863d821fb46080c",
+      "thumbnailBytes": 90306
+    },
+    {
+      "id": "bloody",
+      "sourceUrl": "/vrm/Bloody.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5367894454450333,
+          -0.0003880532342775689,
+          -0.18901652097702026
+        ],
+        "max": [
+          0.5372438864371785,
+          1.7752012014389038,
+          0.2099706530570984
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.8051824089177344,
+        "position": [
+          0.00001267301558982667,
+          1.0250147413394848,
+          3.9929594472050667
+        ],
+        "target": [
+          0.00001267301558982667,
+          1.0250147413394848,
+          -0.007040552794933319
+        ]
+      },
+      "foregroundPixels": 95824,
+      "renderedTriangles": 4064,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "c421a4e33ecbaedb29c5059a67eadfabccef7b95e814d8ad56d225a333bb6c3d",
+      "originalThumbnailSha256": "2ac63f8514097458340de24c30d56f71a8ad24efa1564b79d68c64741faacdf3",
+      "thumbnailSha256": "a3ff379df7f0f22b248a2f33235363361fc3ff6a5645352fa3c0987f40fe2c7c",
+      "thumbnailBytes": 112760
+    },
+    {
+      "id": "rabbit",
+      "sourceUrl": "/vrm/Rabbit.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.49796070027740846,
+          -0.0002951645885414056,
+          -0.13817573749221
+        ],
+        "max": [
+          0.4980293881480007,
+          1.7888153791427612,
+          0.15621477365493772
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.818929052793491,
+        "position": [
+          0.00032294500852004057,
+          1.0329161744162858,
+          3.9701258540153503
+        ],
+        "target": [
+          0.00032294500852004057,
+          1.0329161744162858,
+          -0.029874145984649658
+        ]
+      },
+      "foregroundPixels": 81330,
+      "renderedTriangles": 3102,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "ea5453d2d74a9bd23a1fb27159e40e8a0d402f3d42a538b28118c1639bc9eae9",
+      "originalThumbnailSha256": "d254e6c7acbebd7ada0af33f098e6a7169db5f61359c2b83ef215487c229ef42",
+      "thumbnailSha256": "fe8c5cda21b1ca6b50c36cd8c28cb132eb1312ac4f97f552241b0de62f5b7077",
+      "thumbnailBytes": 122503
+    },
+    {
+      "id": "eggplant",
+      "sourceUrl": "/vrm/Eggplant.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.4882805815624537,
+          0.00004315418046151729,
+          -0.24841655050466782
+        ],
+        "max": [
+          0.4902730477687031,
+          1.8071470260620117,
+          0.22975063088605463
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.8372222697462426,
+        "position": [
+          -8.9305575556168e-7,
+          1.0436456401920569,
+          3.9431746304035187
+        ],
+        "target": [
+          -8.9305575556168e-7,
+          1.0436456401920569,
+          -0.05682536959648132
+        ]
+      },
+      "foregroundPixels": 86199,
+      "renderedTriangles": 4496,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "d19c5a40c4cce814878f5bd08b20781662ab13a809fa699c98ed435dbb706919",
+      "originalThumbnailSha256": "0cb562d5318b25e2d1f76e7df74845518a25e103874b92f1bcae770622ad32c0",
+      "thumbnailSha256": "d7e53622336f5c230be9d50b39016861a7f3eca9fa4546b788577bb0874e728b",
+      "thumbnailBytes": 36632
+    },
+    {
+      "id": "coolbanana",
+      "sourceUrl": "/vrm/CoolBanana.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5724317443255251,
+          -0.0002284059652488316,
+          -0.27234944701194763
+        ],
+        "max": [
+          0.5744592598666479,
+          1.812652349472046,
+          0.2933048605918884
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.843095434694583,
+        "position": [
+          5.35693970961111e-7,
+          1.0467102302997888,
+          3.9907876048237085
+        ],
+        "target": [
+          5.35693970961111e-7,
+          1.0467102302997888,
+          -0.009212395176291466
+        ]
+      },
+      "foregroundPixels": 96717,
+      "renderedTriangles": 4004,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "4d316549404d52bb0f4f60ae91a6c7bd234e001987840df04e1e73379941aa4c",
+      "originalThumbnailSha256": "8574c0ea75905026f7bd8f38fd62c09b4cbec175b7e2dd1c1884f2afdf2c3259",
+      "thumbnailSha256": "89c5f0c9766afcda4d945f5b68962eca41f26dd58162a0c2b194ff94738217f8",
+      "thumbnailBytes": 94271
+    },
+    {
+      "id": "skull",
+      "sourceUrl": "/vrm/Skull.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5542175050524475,
+          -0.0022582092535695887,
+          -0.31930938363075256
+        ],
+        "max": [
+          0.5541515743637462,
+          1.6226177215576172,
+          0.19802364706993103
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6519571963247066,
+        "position": [
+          0.000003097494754916377,
+          0.9361076407898907,
+          3.957463327795267
+        ],
+        "target": [
+          0.000003097494754916377,
+          0.9361076407898907,
+          -0.042536672204732895
+        ]
+      },
+      "foregroundPixels": 113510,
+      "renderedTriangles": 3636,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "9aafbe79901873e822f68f9c9f4b004964dbdae05b275584e10649ac8b5ef4ca",
+      "originalThumbnailSha256": "0dec2f6f1b81c5820f291d17c68c3cc0b2c00f9e3a865d0aea8a2e92f0f7e553",
+      "thumbnailSha256": "7e27c5fcb00cc9d5f77c8d7a30d0f3ddc05bb9641275bef43a58eb9bb4ce19e2",
+      "thumbnailBytes": 79705
+    },
+    {
+      "id": "cool-alien",
+      "sourceUrl": "/vrm/CoolAlien.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5603277503248759,
+          -0.00014002792716923815,
+          -0.17642250657081604
+        ],
+        "max": [
+          0.5618627106776531,
+          1.6432193517684937,
+          0.24256394803524017
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6707487026905905,
+        "position": [
+          -0.0000024063867840569548,
+          0.9489000138470761,
+          3.9785761572420597
+        ],
+        "target": [
+          -0.0000024063867840569548,
+          0.9489000138470761,
+          -0.021423842757940292
+        ]
+      },
+      "foregroundPixels": 108652,
+      "renderedTriangles": 4358,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "4ef6749ac4dcf3fa6d7c35f676774bf2f79c1876b8db3a42fc68f2bb01d96acf",
+      "originalThumbnailSha256": "f656e0944442186353ac9b1585ff9062f36408a5f124b49c549d9e997b9c8822",
+      "thumbnailSha256": "9d23440592e6b02ab91ba0e04ac6a62013ef197e9a8b87656ee4ceb95a2f88e9",
+      "thumbnailBytes": 172320
+    },
+    {
+      "id": "jimmy",
+      "sourceUrl": "/vrm/Jimmy.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5753748227555994,
+          -0.0012319752530086745,
+          -0.2561338543891907
+        ],
+        "max": [
+          0.5745516808859289,
+          1.7054219245910645,
+          0.22284379601478577
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.735098131508141,
+        "position": [
+          0.000003763100949074873,
+          0.9843606519069436,
+          3.9797741938382387
+        ],
+        "target": [
+          0.000003763100949074873,
+          0.9843606519069436,
+          -0.020225806161761284
+        ]
+      },
+      "foregroundPixels": 105030,
+      "renderedTriangles": 4528,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "312131992e561cb37be8d816520715ab997ceb2aa2b43de9feb5523409db22be",
+      "originalThumbnailSha256": "dea25aa26155cd9096a20863920c7b737114bb96c107843f3c0befb61132b5f0",
+      "thumbnailSha256": "493471ca3caa5679ffa4c1b0b4bf8d60bf3a770bf7def753833f6520b2ac023f",
+      "thumbnailBytes": 74737
+    },
+    {
+      "id": "froggy",
+      "sourceUrl": "/vrm/Froggy.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.6407086567291864,
+          -0.0008567769936633778,
+          -0.18186936730535708
+        ],
+        "max": [
+          0.641825262116526,
+          1.616452932357788,
+          0.26059678196907043
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6442648711739756,
+        "position": [
+          -0.0000020938787201846115,
+          0.9331395801567999,
+          3.968139059841633
+        ],
+        "target": [
+          -0.0000020938787201846115,
+          0.9331395801567999,
+          -0.03186094015836716
+        ]
+      },
+      "foregroundPixels": 115414,
+      "renderedTriangles": 3330,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "f3d2f2810868618e28e44de10d513b4a4a4f0045a52b47114ad01e068055f159",
+      "originalThumbnailSha256": "6405fe2da6d6d636d0f0e9024a6884c709c4945ee8ed73f33fc23324ad4bea1e",
+      "thumbnailSha256": "6b05e206fbc21dfa95a71f10b198d8755de66c08f175d490dab54c44167ddea0",
+      "thumbnailBytes": 294303
+    },
+    {
+      "id": "teddy",
+      "sourceUrl": "/vrm/Teddy.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.6390624597282502,
+          -0.00761677879309219,
+          -0.3516227033110164
+        ],
+        "max": [
+          0.6128267870971323,
+          1.6428576707839966,
+          0.2842204262159004
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6779823570700403,
+        "position": [
+          -0.000010615216524451036,
+          0.9455322158376767,
+          3.9543506801128387
+        ],
+        "target": [
+          -0.000010615216524451036,
+          0.9455322158376767,
+          -0.045649319887161255
+        ]
+      },
+      "foregroundPixels": 217078,
+      "renderedTriangles": 3068,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "68e0f644a8d6d250b741337b25dff188ed45a425b9658d6f42106931157e9bc8",
+      "originalThumbnailSha256": "f753c7bab30e51ff6fb78860070469d92750cbf07b35eacf9973eda050356a10",
+      "thumbnailSha256": "7c95b935355562e8d33cf13b2306e2b0a25f32b57c8c2332c02a6f74f9990611",
+      "thumbnailBytes": 351675
+    },
+    {
+      "id": "nightmare",
+      "sourceUrl": "/vrm/Nightmare.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.8467974107409605,
+          -0.00023229218935981032,
+          -0.2351146936416626
+        ],
+        "max": [
+          0.8505053268364727,
+          1.623814344406128,
+          0.21457261166829777
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.8448942799754708,
+        "position": [
+          -0.0000022380568225313383,
+          0.9376546404445344,
+          3.974850406870246
+        ],
+        "target": [
+          -0.0000022380568225313383,
+          0.9376546404445344,
+          -0.025149593129754066
+        ]
+      },
+      "foregroundPixels": 154152,
+      "renderedTriangles": 3092,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "4a03be6e76814eeeaf8e901d91ad03d6415297701c2b209ec8747e2a9d10ba52",
+      "originalThumbnailSha256": "d5833356c1cb94e5ff76dd47103afc91800157d9376c632150169ff44dcd13bc",
+      "thumbnailSha256": "ebe931a2a016427b5cd0912b83e26db020fb26ed3ccd35dc48f54e25f4c9f6ad",
+      "thumbnailBytes": 253732
+    },
+    {
+      "id": "pumpkin",
+      "sourceUrl": "/vrm/Pumpkin.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5437304049731214,
+          -0.001100860219660705,
+          -0.21696828305721283
+        ],
+        "max": [
+          0.5455760593729759,
+          1.7695283889770508,
+          0.2608236074447632
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.8001397366833234,
+        "position": [
+          0.0000060312313507887,
+          1.02143753119144,
+          4.004994314163923
+        ],
+        "target": [
+          0.0000060312313507887,
+          1.02143753119144,
+          0.0049943141639232635
+        ]
+      },
+      "foregroundPixels": 82905,
+      "renderedTriangles": 3866,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "926f0107c78a475501b8919fceb29a8ac7f8de830691bc1f6f7b304fc82727f1",
+      "originalThumbnailSha256": "66de9cf412cbc924ee109ffa77048e1b7c7e9e712719a9820d959d0881fb63f8",
+      "thumbnailSha256": "f48e37c8fb4cbef095e6c85067bb9df2e14bd9c8c0748e7b2b0e75403f38582f",
+      "thumbnailBytes": 92474
+    },
+    {
+      "id": "wizzir",
+      "sourceUrl": "/vrm/Wizzir.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5569629486865586,
+          -0.0004015884769614786,
+          -0.3061158359050751
+        ],
+        "max": [
+          0.5983654019131006,
+          1.880714774131775,
+          0.39044108986854553
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.9124683019855486,
+        "position": [
+          0.000004354967586552495,
+          1.0859431109295838,
+          3.984762519598007
+        ],
+        "target": [
+          0.000004354967586552495,
+          1.0859431109295838,
+          -0.015237480401992798
+        ]
+      },
+      "foregroundPixels": 103148,
+      "renderedTriangles": 4333,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "30da69949258cae5885cfe7f739cd4a5903a874ae7d615996c13489ce19c298e",
+      "originalThumbnailSha256": "b5844dc90d04b766d3290612bef421c2f7256efec99c1fe16699aa88a021d4ea",
+      "thumbnailSha256": "790183d31463b3c6b5c55630f198613e496b81556053ea78574eb47d9ce6f2ff",
+      "thumbnailBytes": 92013
+    },
+    {
+      "id": "clown",
+      "sourceUrl": "/vrm/Clown.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5965036713151807,
+          -0.0003987594331799531,
+          -0.17861709181665256
+        ],
+        "max": [
+          0.5865234158218133,
+          1.8135502338409424,
+          0.23337899311477545
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.8441814764953577,
+        "position": [
+          -0.000005421502009992129,
+          1.0471567841826257,
+          3.979969408363104
+        ],
+        "target": [
+          -0.000005421502009992129,
+          1.0471567841826257,
+          -0.020030591636896133
+        ]
+      },
+      "foregroundPixels": 81983,
+      "renderedTriangles": 4436,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "b90b76548f50fcac3512e1da153e311281434f720d5642f937a5703b59bb150d",
+      "originalThumbnailSha256": "b6dc9f77d35c799adda228c10d32c0c72f17880a00a4fa4db0274b63f1914298",
+      "thumbnailSha256": "45a30aaba5066456c9886d68a8371e98a0c5de8adafc405dc7f851af5ef69231",
+      "thumbnailBytes": 106748
+    },
+    {
+      "id": "wolfman",
+      "sourceUrl": "/vrm/Wolfman.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.539282814117765,
+          -0.0004113142586979475,
+          -0.6735002398490906
+        ],
+        "max": [
+          0.5390759372049301,
+          1.652378797531128,
+          0.3380139470100403
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6803366136529896,
+        "position": [
+          -0.000009660639989307974,
+          0.9540749752999266,
+          4.014331195503473
+        ],
+        "target": [
+          -0.000009660639989307974,
+          0.9540749752999266,
+          0.014331195503473282
+        ]
+      },
+      "foregroundPixels": 90044,
+      "renderedTriangles": 5573,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "b63f699f36d5db203a6029add68982148f4c3868f2ed1c9df0d404b5123a3d40",
+      "originalThumbnailSha256": "14671c903971e03b26c08155b39252b5f2d8b6984323a26b06c5cac673b4ea9f",
+      "thumbnailSha256": "29b514563aca3eb0a0ef2cfa80948d32730e0d2e364cee59adbffb484c34afc2",
+      "thumbnailBytes": 98232
+    },
+    {
+      "id": "mummy",
+      "sourceUrl": "/vrm/Mummy.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5267967864836404,
+          -0.00040239531645707306,
+          -0.2029033899307251
+        ],
+        "max": [
+          0.5305616215177809,
+          1.6265004873275757,
+          0.1617477983236313
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6540179306881,
+        "position": [
+          0.0000037369482015515616,
+          0.9391340194104718,
+          3.981039498001337
+        ],
+        "target": [
+          0.0000037369482015515616,
+          0.9391340194104718,
+          -0.01896050199866295
+        ]
+      },
+      "foregroundPixels": 91282,
+      "renderedTriangles": 2900,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "0af3d581fbf1c1493dc7528e8b593d0a19d6b637dee64c496cecfd0533618211",
+      "originalThumbnailSha256": "485228bb36a85b73ee78bf1014b8665dd6b5dee0df00569119cd9c7b79f61d29",
+      "thumbnailSha256": "22d59d64908d982672f0bf1eaa2b4ca6f2ac44481985634cfd6a192329ca8536",
+      "thumbnailBytes": 221057
+    },
+    {
+      "id": "kate",
+      "sourceUrl": "/vrm/Kate.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.6016545051621474,
+          -0.0005302148697549276,
+          -0.18369458615779877
+        ],
+        "max": [
+          0.604776364799892,
+          1.728076696395874,
+          0.18134747445583344
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.7574170264533893,
+        "position": [
+          -2.602866970792515e-7,
+          0.9977402763861458,
+          3.955785747617483
+        ],
+        "target": [
+          -2.602866970792515e-7,
+          0.9977402763861458,
+          -0.04421425238251686
+        ]
+      },
+      "foregroundPixels": 112922,
+      "renderedTriangles": 3960,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "d857bca56a26730b4f78872ffa322d11b6f427580e3224d1b1cd43368b50f9de",
+      "originalThumbnailSha256": "db1e05da23dc3be01310de441513a1f6355802dff888f8ba9e76e2a1c0efa937",
+      "thumbnailSha256": "cdef5412a03454937496485fbd14c7bf07c4d21f4b4cbd5f5a6ccdc418d25c40",
+      "thumbnailBytes": 57980
+    },
+    {
+      "id": "witch",
+      "sourceUrl": "/vrm/Witch.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5861779393922846,
+          -0.0014176188005577991,
+          -0.4625174403190613
+        ],
+        "max": [
+          0.5861961259827283,
+          1.999934196472168,
+          0.4110928773880005
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 2.0347076788606047,
+        "position": [
+          0.0000022409540179146196,
+          1.1543630545194414,
+          3.9370881021022797
+        ],
+        "target": [
+          0.0000022409540179146196,
+          1.1543630545194414,
+          -0.06291189789772034
+        ]
+      },
+      "foregroundPixels": 108186,
+      "renderedTriangles": 4058,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "33fa9a9c4c10d0ba0ab22a051809afddb9b53e7f51cbb69df91e1bf9e1653652",
+      "originalThumbnailSha256": "9f13024b49db952d13f2ddd1c163e4adfb64d6137808af61c2af367f3dacef80",
+      "thumbnailSha256": "af2fac143defafd40a9a07f58cb0c5d80caae08d70f6197884e74dddf0598cff",
+      "thumbnailBytes": 110556
+    },
+    {
+      "id": "dracula",
+      "sourceUrl": "/vrm/Dracula.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5083561358878552,
+          -0.0005327460358719384,
+          -0.19191183149814606
+        ],
+        "max": [
+          0.511864883521639,
+          1.663658857345581,
+          0.14385724550006973
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6919281301044773,
+        "position": [
+          -3.251834925738924e-7,
+          0.9605379049169172,
+          3.9688476771116257
+        ],
+        "target": [
+          -3.251834925738924e-7,
+          0.9605379049169172,
+          -0.03115232288837433
+        ]
+      },
+      "foregroundPixels": 102075,
+      "renderedTriangles": 3870,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "4e6442065696c1058b99a54b1ddda3457126492e69a8a92e8cd9f92d0bea165c",
+      "originalThumbnailSha256": "85d5a7cce14a262404bf0b4ceec26f4f5dfe83fb64dbe83c66bffefb940ed99e",
+      "thumbnailSha256": "1a4e1d7381afebbc75bd3155ba334a317236009259c6214ee864a0044bb023a1",
+      "thumbnailBytes": 92727
+    },
+    {
+      "id": "zombie",
+      "sourceUrl": "/vrm/Zombie.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5745442526747286,
+          -0.0005093701614068396,
+          -0.13682606510461714
+        ],
+        "max": [
+          0.5747000696794384,
+          1.652669072151184,
+          0.2283315509557724
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.680731416351134,
+        "position": [
+          -0.000001779326794348298,
+          0.9542011802741144,
+          3.9951680414378643
+        ],
+        "target": [
+          -0.000001779326794348298,
+          0.9542011802741144,
+          -0.004831958562135696
+        ]
+      },
+      "foregroundPixels": 94165,
+      "renderedTriangles": 5705,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "4d17e44cd4d1e11f860aedc5952ef16266ab6775d69a8cbe096f7d423d8cbb58",
+      "originalThumbnailSha256": "1eca7a378408366170318395dcbaba29d8ef9d50a8e66347e6092145cf702fff",
+      "thumbnailSha256": "a067a809f3359dc170bcc7ac14aad7153c2dcc4ed466731c25265f1c6a4dd3eb",
+      "thumbnailBytes": 147101
+    },
+    {
+      "id": "dino-kid",
+      "sourceUrl": "/vrm/DinoKid.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.44978374885642725,
+          -0.0004833412714300763,
+          -0.31354597210884094
+        ],
+        "max": [
+          0.44889940839628517,
+          1.2346197366714478,
+          0.3550466299057007
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.2556881292419257,
+        "position": [
+          0.000011835268196595768,
+          0.7127886862405818,
+          3.9663003720343113
+        ],
+        "target": [
+          0.000011835268196595768,
+          0.7127886862405818,
+          -0.033699627965688705
+        ]
+      },
+      "foregroundPixels": 181175,
+      "renderedTriangles": 4576,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "ec7770601b1e060e5710e5e7bfb3c597d395fffc90e3c60ef32fcd60f85afc48",
+      "originalThumbnailSha256": "4503479db8a36652432e59780c28b27dc2d0143e518cff7cd9c198c84d5d4f4f",
+      "thumbnailSha256": "cc63505e9d785e1ce72b5080d25df355550c8094a4010142c42175faeabec116",
+      "thumbnailBytes": 153115
+    },
+    {
+      "id": "astronaut",
+      "sourceUrl": "/vrm/Astronaut.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.3868985548248147,
+          -0.00012259771619348544,
+          -0.2972029149532318
+        ],
+        "max": [
+          0.39215460587867135,
+          1.3631103038787842,
+          0.3223126530647278
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.385953449954894,
+        "position": [
+          0.00004943425665260677,
+          0.7871444029549061,
+          3.968556974083185
+        ],
+        "target": [
+          0.00004943425665260677,
+          0.7871444029549061,
+          -0.031443025916814804
+        ]
+      },
+      "foregroundPixels": 182379,
+      "renderedTriangles": 4350,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "1cb8218610deafc0fd4608507fc52cf3303de84b0f641b9a452efb5e8a0e6f23",
+      "originalThumbnailSha256": "c12b6f22dda9df418e0504582f389c253bc5981b44ca7275c3433f0e7cc4df13",
+      "thumbnailSha256": "bcf90e95b76e4cb76adca55b5de24e1c701ef2f07ba76bc3b6c884081469dfba",
+      "thumbnailBytes": 159819
+    },
+    {
+      "id": "polybot",
+      "sourceUrl": "/vrm/Polybot.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.23808909952640533,
+          0.00011871205060742795,
+          -0.16035236418247223
+        ],
+        "max": [
+          0.2390975058078766,
+          1.06412672996521,
+          0.17338259518146515
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.081741484879846,
+        "position": [
+          0.0005040412070229632,
+          0.6145833423962904,
+          4.013534407131374
+        ],
+        "target": [
+          0.0005040412070229632,
+          0.6145833423962904,
+          0.013534407131373882
+        ]
+      },
+      "foregroundPixels": 169299,
+      "renderedTriangles": 2130,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "e255bace0d7de8b5fc90756efc83e167080e6db97692f23623fec5f1c67c423d",
+      "originalThumbnailSha256": "368d08d13a640d30fb2fe9b53420d5d33e5076d609d1908647d14282afb553ff",
+      "thumbnailSha256": "6f1dba8f98cf6fca2a60f5168a2c368cf4adc353031918083990b24d99e71231",
+      "thumbnailBytes": 160703
+    },
+    {
+      "id": "jennifer",
+      "sourceUrl": "/vrm/Jennifer.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.3641379998120168,
+          -0.00031224015925109645,
+          -0.22001796960830688
+        ],
+        "max": [
+          0.36177121921901745,
+          1.2563414573669434,
+          0.3098645806312561
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.2775979258182975,
+        "position": [
+          0.000005358690941649257,
+          0.7254052701621262,
+          3.9904787093400955
+        ],
+        "target": [
+          0.000005358690941649257,
+          0.7254052701621262,
+          -0.00952129065990448
+        ]
+      },
+      "foregroundPixels": 127014,
+      "renderedTriangles": 5372,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "59d7d7e79d4ad24d097dfade6ca067dd99ecc885ec5545b4d61aeda357505a92",
+      "originalThumbnailSha256": "28030359235fc92ff69239627b451483a4bb98ce370619a9ae8d60084275f37c",
+      "thumbnailSha256": "15ee250aba3360f3fcd7e1c3a3c8724f9f7381358d3b218b589280bdc6d8f3c8",
+      "thumbnailBytes": 113324
+    },
+    {
+      "id": "erika",
+      "sourceUrl": "/vrm/Erika.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5800772623493111,
+          -0.00022095576189732008,
+          -0.14578121791943
+        ],
+        "max": [
+          0.5706282431251306,
+          1.660248875617981,
+          0.16566261649131778
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.688144328569543,
+        "position": [
+          -0.0002104669547406931,
+          0.9587003718599824,
+          3.9791949689388275
+        ],
+        "target": [
+          -0.0002104669547406931,
+          0.9587003718599824,
+          -0.020805031061172485
+        ]
+      },
+      "foregroundPixels": 101817,
+      "renderedTriangles": 4032,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "ac2030d23c791065e5cd596e251257269bc55b8c76b29a6ebf183bcfe8c7c1f7",
+      "originalThumbnailSha256": "77f8b782c0224c67b5cad7a2d0fa1ee5c397a89e5eb7c439f10790d046f735a7",
+      "thumbnailSha256": "e6b8081fe740d8d6823eb1c3b25e1ceda9cfef7fcd49824357971309c92bad5a",
+      "thumbnailBytes": 122816
+    },
+    {
+      "id": "olivia",
+      "sourceUrl": "/vrm/Olivia.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5097425231977393,
+          -0.0006306996325520735,
+          -0.2191573977470398
+        ],
+        "max": [
+          0.5097952656272215,
+          1.6654772758483887,
+          0.15759169585729535
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6938764417389562,
+        "position": [
+          -0.00001098176471713608,
+          0.9615466562076912,
+          3.9356501772999763
+        ],
+        "target": [
+          -0.00001098176471713608,
+          0.9615466562076912,
+          -0.06434982270002365
+        ]
+      },
+      "foregroundPixels": 101563,
+      "renderedTriangles": 3888,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "d2597a8e0f6fbfc6c1e77886b737cea9cd9d2640474dc5cb5eafc847376a2473",
+      "originalThumbnailSha256": "166fd5e684bf86df9d355c789cd0c966fa24b089dcdce1fe18aed7aa42a6df13",
+      "thumbnailSha256": "915429469bac5433ea8e9de9ba78453e136a24240c553c0ee35c85ee63f11754",
+      "thumbnailBytes": 90303
+    },
+    {
+      "id": "avocado",
+      "sourceUrl": "/vrm/Avocado.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.6573763603768551,
+          0.00007345149221467788,
+          -0.3541080355644226
+        ],
+        "max": [
+          0.657512856452334,
+          1.870195984840393,
+          0.24212151765823364
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.9012912422373147,
+        "position": [
+          0.00004783375698024765,
+          1.0800692145007877,
+          4.046828273683786
+        ],
+        "target": [
+          0.00004783375698024765,
+          1.0800692145007877,
+          0.04682827368378639
+        ]
+      },
+      "foregroundPixels": 134391,
+      "renderedTriangles": 3904,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "4f8a44907bb2232178514f230aedfc4d344600287e236724a0b660420f2d995e",
+      "originalThumbnailSha256": "9ca629b3903d8ccf1856b6fc75e08e8a1f478d8c0ec12d14aa89c1049e513b95",
+      "thumbnailSha256": "e07f46add3afa5eb1acf13ed9efbc2a058d3becb20c2bc1224d2f49009ed94ca",
+      "thumbnailBytes": 42705
+    },
+    {
+      "id": "ice-cream",
+      "sourceUrl": "/vrm/IceCream.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.4884810526200488,
+          0.0000534504041531649,
+          -0.21620404720306396
+        ],
+        "max": [
+          0.4876509761161478,
+          1.5842976570129395,
+          0.18475426733493805
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6106482767189325,
+        "position": [
+          -0.0000015583608501382384,
+          0.9149544797207273,
+          3.9842993039637804
+        ],
+        "target": [
+          -0.0000015583608501382384,
+          0.9149544797207273,
+          -0.015700696036219597
+        ]
+      },
+      "foregroundPixels": 68733,
+      "renderedTriangles": 3904,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "d8bc8601147df5628d0c200ea7450417fdf851e4c42716b3a43a856ce7f13b07",
+      "originalThumbnailSha256": "559668dda0b13c92115b4d1e52148f2c2ed42a6c0d131e76a94d8e5b996fb296",
+      "thumbnailSha256": "a15a5ef38e3bdfff5f11bd2e88bed820dd95261dc885820ab764afa0b6c58b60",
+      "thumbnailBytes": 42367
+    },
+    {
+      "id": "pyre-sorcerer",
+      "sourceUrl": "/vrm/PyreSorcerer.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.7575789037954932,
+          -0.00021148317634009828,
+          -0.22335290908813477
+        ],
+        "max": [
+          0.7670783871849189,
+          2.190408229827881,
+          0.2412341833114624
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 2.2271300415542914,
+        "position": [
+          -0.000009807740752871646,
+          1.2648714010835975,
+          3.9622347988188267
+        ],
+        "target": [
+          -0.000009807740752871646,
+          1.2648714010835975,
+          -0.037765201181173325
+        ]
+      },
+      "foregroundPixels": 86119,
+      "renderedTriangles": 5366,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "77a4d9ab15556b009bb1b8976e24e8aac31ec7539f4993ee2e2f97d958fd6293",
+      "originalThumbnailSha256": "2dafe0ac229e987ee0e7915ffc033618638ecf09d9d665ff8f316cd34164505b",
+      "thumbnailSha256": "9630c79c1267fa60bcc613ec5382b33ca13b8a17a59e4067d1dbd28b0f9889e2",
+      "thumbnailBytes": 84061
+    },
+    {
+      "id": "lalo-bot",
+      "sourceUrl": "/vrm/LaloBot.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5795133090458824,
+          -0.00020381318374922746,
+          -0.1262561951040883
+        ],
+        "max": [
+          0.5795744994459413,
+          1.9992319345474243,
+          0.21079771220684052
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 2.0327596768600267,
+        "position": [
+          -0.000019279839762020795,
+          1.1544703311310036,
+          3.9995021540671587
+        ],
+        "target": [
+          -0.000019279839762020795,
+          1.1544703311310036,
+          -0.000497845932841301
+        ]
+      },
+      "foregroundPixels": 88859,
+      "renderedTriangles": 4678,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "a0494f75257134f50ee64dbed0f70a07870f275928040d267b278db32dfd79ea",
+      "originalThumbnailSha256": "29ba3e05d1c2e43ec87abdfb6d23a69158f3fc63cce21dff454c42413feca3f8",
+      "thumbnailSha256": "79b712e730c091a27e618e400b0200d76b94381ed89a4bd518dc83d10423395a",
+      "thumbnailBytes": 63171
+    },
+    {
+      "id": "shark-person",
+      "sourceUrl": "/vrm/SharkPerson.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.8544593652122,
+          0.0009826424432040157,
+          -0.20313367247581482
+        ],
+        "max": [
+          0.8536487828869088,
+          2.2105727195739746,
+          0.16502608358860016
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 2.2464165784162833,
+        "position": [
+          -0.0000028195220238531797,
+          1.277020911986224,
+          3.9783986024558544
+        ],
+        "target": [
+          -0.0000028195220238531797,
+          1.277020911986224,
+          -0.021601397544145584
+        ]
+      },
+      "foregroundPixels": 102633,
+      "renderedTriangles": 3928,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "0b6931d30e5cb6615225f65531256039f43259d37a7067efb110d36a3e20760e",
+      "originalThumbnailSha256": "b2a0cb6048415d7af848fcfda25399ac214a6498fb56d7ffcc5b2cf129e92503",
+      "thumbnailSha256": "b3104cb245f72893fb4b00515be626cd2643a664a850f021eff615f9b54ffaf1",
+      "thumbnailBytes": 71709
+    },
+    {
+      "id": "chill-penguin",
+      "sourceUrl": "/vrm/ChillPenguin.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.7041795688573294,
+          -0.00022490829692985924,
+          -0.25043675699962753
+        ],
+        "max": [
+          0.7015037197365267,
+          1.5978056192398071,
+          0.22838938236236572
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6246643696623493,
+        "position": [
+          -0.000001671848053769994,
+          0.9226377213555357,
+          3.9612616151571274
+        ],
+        "target": [
+          -0.000001671848053769994,
+          0.9226377213555357,
+          -0.03873838484287262
+        ]
+      },
+      "foregroundPixels": 153091,
+      "renderedTriangles": 3958,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "52b235d5a36c17798f6ce145d1d56965a17b3be81c143d0b301e7ae881660b14",
+      "originalThumbnailSha256": "e382653e081244e991f414de4b4f0dab04012386035341d961ac5569e476401c",
+      "thumbnailSha256": "583bf50cb081abbb961ed0198cb057f83ad2aa8311faa87cd2f812ff5c77be12",
+      "thumbnailBytes": 89811
+    },
+    {
+      "id": "cool-turtle",
+      "sourceUrl": "/vrm/CoolTurtle.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.6721167385388981,
+          -0.0006042399943111836,
+          -0.45450595613856176
+        ],
+        "max": [
+          0.6690612756985633,
+          1.906172513961792,
+          0.2906114835550383
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.9385563665220382,
+        "position": [
+          -0.00003724894486368525,
+          1.1005593354153385,
+          4.067153163254261
+        ],
+        "target": [
+          -0.00003724894486368525,
+          1.1005593354153385,
+          0.06715316325426102
+        ]
+      },
+      "foregroundPixels": 131166,
+      "renderedTriangles": 4006,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "c6d27e78b5753044e51d2cae9df528a2e702a97f2659cbfa1986d61f9bd4e2bd",
+      "originalThumbnailSha256": "be4f2c9199c0d3540c017f3a6300b6143bc46d137bcc3e5837a8185ce04df04c",
+      "thumbnailSha256": "7206e4a8347fc5f52d56a01f26e07f7a07890e2ab91f851edcbd5697dce61750",
+      "thumbnailBytes": 91217
+    },
+    {
+      "id": "moon-girl",
+      "sourceUrl": "/vrm/MoonGirl.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.7063288810500288,
+          -0.0011859015838649183,
+          -0.3141217827796936
+        ],
+        "max": [
+          0.7064490026701438,
+          1.9866851568222046,
+          0.25014194846153254
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 2.021002242712837,
+        "position": [
+          0.000037475987483049686,
+          1.1468096346456402,
+          3.992832160089165
+        ],
+        "target": [
+          0.000037475987483049686,
+          1.1468096346456402,
+          -0.007167839910835028
+        ]
+      },
+      "foregroundPixels": 117984,
+      "renderedTriangles": 3763,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "4f37152f0f419aac10f50affe65fd4add03747dbf0f4b3fb00d63716a586b360",
+      "originalThumbnailSha256": "10033cc1e4f47b30c2c3c3c779f5add8a70ab2a8ae6003c12f8dd0472ff4a59a",
+      "thumbnailSha256": "3e5f71e837ccdd802451f5f7ce55cbd221f352e53838735a6e105d3f6c8fab92",
+      "thumbnailBytes": 131621
+    },
+    {
+      "id": "eye-wizard",
+      "sourceUrl": "/vrm/EyeWizard.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -1.0349625312511563,
+          0.000897533283690858,
+          -0.6486944556236267
+        ],
+        "max": [
+          1.0308255361086411,
+          2.2621922492980957,
+          0.3459337055683136
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 2.298982961281312,
+        "position": [
+          0.000023803386284274928,
+          1.3067952317820097,
+          3.970006797462702
+        ],
+        "target": [
+          0.000023803386284274928,
+          1.3067952317820097,
+          -0.029993202537298203
+        ]
+      },
+      "foregroundPixels": 122045,
+      "renderedTriangles": 4358,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "c64c91ecbe86b7be41d54f1765306a23bc5786032af756a917a37511c66ddc9a",
+      "originalThumbnailSha256": "bb6d29f4e6f5da4082b01b29783d3b14103c5919e03fe244d052ff5dea3777f6",
+      "thumbnailSha256": "1199e7576770618db371ba138e5d9aadc6e6383c855ac129a06505ce6bec9c7c",
+      "thumbnailBytes": 92060
+    },
+    {
+      "id": "cool-pizza",
+      "sourceUrl": "/vrm/CoolPizza.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5759198595935944,
+          6.229080350307698e-7,
+          -0.17797267436981198
+        ],
+        "max": [
+          0.579725966659277,
+          2.1348984241485596,
+          0.15638061333836942
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 2.1704794312612,
+        "position": [
+          -0.00002915100412791861,
+          1.2329041031244379,
+          3.945659089833498
+        ],
+        "target": [
+          -0.00002915100412791861,
+          1.2329041031244379,
+          -0.054340910166502
+        ]
+      },
+      "foregroundPixels": 87879,
+      "renderedTriangles": 4972,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "03b8e03afca704acb7aea825f36e4e791446e3a0596f25c79f8164beb9efd06d",
+      "originalThumbnailSha256": "e80976dc21db2fd288060a08488736c6f1caa5deca658e62f2a26d64952ed178",
+      "thumbnailSha256": "9775f8db8e463d454bc626586d25e4eab380066a4a69e06cdfcb8c557c66dd7b",
+      "thumbnailBytes": 85050
+    },
+    {
+      "id": "cool-ramen",
+      "sourceUrl": "/vrm/CoolRamen.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.9947619094097517,
+          -0.00001781132400909849,
+          -0.0860042348504066
+        ],
+        "max": [
+          0.9922061090198682,
+          1.9670382738113403,
+          0.08694494709994521
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 2.159747846119152,
+        "position": [
+          -4.518821867816033e-7,
+          1.135957077841655,
+          4.0090535413473845
+        ],
+        "target": [
+          -4.518821867816033e-7,
+          1.135957077841655,
+          0.009053541347384453
+        ]
+      },
+      "foregroundPixels": 113731,
+      "renderedTriangles": 2992,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "376d268dacf34c575c32938ed99a055957b5674c236b2c595b85ea9066480569",
+      "originalThumbnailSha256": "f5e5caec350cd785a3b22a3b3e1f33dc0a42b341bfa08406c80e3a0e4fb49b08",
+      "thumbnailSha256": "3df131e1880837d87641c6f86c8dec3a6a1004ee5ac667815faed263b040a61b",
+      "thumbnailBytes": 109874
+    },
+    {
+      "id": "cool-taco",
+      "sourceUrl": "/vrm/CoolTaco.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.8503421419966836,
+          -0.00006138627849781842,
+          -0.07873201370239258
+        ],
+        "max": [
+          0.8506411672210258,
+          0.9945509433746338,
+          0.08850029855966567
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.8488949013235971,
+        "position": [
+          5.578964987752373e-7,
+          0.5743272340961857,
+          4.008226507343352
+        ],
+        "target": [
+          5.578964987752373e-7,
+          0.5743272340961857,
+          0.008226507343351841
+        ]
+      },
+      "foregroundPixels": 82249,
+      "renderedTriangles": 4288,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "3beecadf0d2dd291e14cc644ade61c9151bae3e925c0acd024d5d1d1e356dd01",
+      "originalThumbnailSha256": "a6c4d4e5f7ffb4039e8e56d8c422b8821435b43b4e1a0f7307f73d7b61b205dd",
+      "thumbnailSha256": "c788de41b142419650648040f729967eabfb048c38e6293629eb5a1ec4990cf0",
+      "thumbnailBytes": 48806
+    },
+    {
+      "id": "cool-pirate",
+      "sourceUrl": "/vrm/CoolPirate.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5418662481316838,
+          -0.0005427426800101946,
+          -0.15671338111774366
+        ],
+        "max": [
+          0.5416747614484827,
+          1.6380128860473633,
+          0.1547599182951425
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6658648892061632,
+        "position": [
+          -0.0000019757057998467813,
+          0.945723132910048,
+          3.970433533191681
+        ],
+        "target": [
+          -0.0000019757057998467813,
+          0.945723132910048,
+          -0.029566466808319092
+        ]
+      },
+      "foregroundPixels": 111529,
+      "renderedTriangles": 4374,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "2193b911fe1e1bf3c38b0efb3d09d173aa1c69a1092b73ef4ee1b1e6c29119ea",
+      "originalThumbnailSha256": "4b5cca22fd50c2b9a968947c8048ee0b4ef004898ae070f35e46526a046cbe20",
+      "thumbnailSha256": "d642619cd839657310336152641c028622fd823277bdca17757d838453fd8d65",
+      "thumbnailBytes": 60780
+    },
+    {
+      "id": "cosmic-dweller",
+      "sourceUrl": "/vrm/CosmicDweller.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.6560119116733046,
+          -0.00046862548246304415,
+          -0.19609844465443738
+        ],
+        "max": [
+          0.6553618743796213,
+          2.1457481384277344,
+          0.19661322822014163
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 2.181987043308701,
+        "position": [
+          -0.000004990262368659157,
+          1.238971555675676,
+          3.9535545855760574
+        ],
+        "target": [
+          -0.000004990262368659157,
+          1.238971555675676,
+          -0.046445414423942566
+        ]
+      },
+      "foregroundPixels": 104663,
+      "renderedTriangles": 4926,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "bc3ad91852dbf3c2db76b9a65f01ca41a887c5c33df3ce7ff802f7c16819ece4",
+      "originalThumbnailSha256": "0c6930bf1df3a1dd2b1623d628a9d931ea40a4d5467a24a1111547300f409cb6",
+      "thumbnailSha256": "6003c7685da2526038cfe121b5b3d56b0304154dec55b666a9748a4364bb269d",
+      "thumbnailBytes": 69493
+    },
+    {
+      "id": "chill-palm",
+      "sourceUrl": "/vrm/ChillPalm.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -1.1444133520126343,
+          -0.0002706104173136564,
+          -1.1090847253799438
+        ],
+        "max": [
+          1.1452025175094604,
+          3.611203193664551,
+          1.015209674835205
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 3.6716650341498953,
+        "position": [
+          -0.00010100679355673257,
+          2.085355511439963,
+          6.3536289893090725
+        ],
+        "target": [
+          -0.00010100679355673257,
+          2.085355511439963,
+          -0.019254211336374283
+        ]
+      },
+      "foregroundPixels": 53492,
+      "renderedTriangles": 4792,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "608b8a086a00f4210f1fb6802eb7f88e4050100c779134ee1acbfe495bc29f0b",
+      "originalThumbnailSha256": "858097743aba9787a14b9d1afce512fc48cd0688e11101540a19f75a96619e0a",
+      "thumbnailSha256": "32f9cd5ce18250e3c171eb5dc297679513aac59abe3d5d230c70235b1d5819f9",
+      "thumbnailBytes": 81683
+    },
+    {
+      "id": "good-knight",
+      "sourceUrl": "/vrm/GoodKnight.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5517511801451364,
+          0.002805227466461613,
+          -0.45653280612733504
+        ],
+        "max": [
+          0.523804716101867,
+          1.892205120551392,
+          0.24695258586392804
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.9208898913030124,
+        "position": [
+          0.00043334293901440304,
+          1.0939336657230088,
+          3.9747557043
+        ],
+        "target": [
+          0.00043334293901440304,
+          1.0939336657230088,
+          -0.025244295700000002
+        ]
+      },
+      "foregroundPixels": 103219,
+      "renderedTriangles": 11182,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "29a1f88ce82c4f1fb7acf1c40bf74a00423d0e8227e41f257e6a3d01b749f713",
+      "originalThumbnailSha256": "61966fa251f78036b8cc7315a2ab18474d9086596101728c59a941aa7afe2d1a",
+      "thumbnailSha256": "65f28260145104f3caad682dcafe0c239e919a35a8d771f86472201e1c225e03",
+      "thumbnailBytes": 206609
+    },
+    {
+      "id": "bad-bot",
+      "sourceUrl": "/vrm/BadBot.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.6741017999299905,
+          -0.00896104250650209,
+          -0.22706532654662667
+        ],
+        "max": [
+          0.6747890066171311,
+          2.083982942204541,
+          0.2906497187452808
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 2.127826384456227,
+        "position": [
+          0.0008005203925801671,
+          1.1997141086641252,
+          4.0229187607
+        ],
+        "target": [
+          0.0008005203925801671,
+          1.1997141086641252,
+          0.0229187607
+        ]
+      },
+      "foregroundPixels": 56794,
+      "renderedTriangles": 8166,
+      "sourceImages": 2,
+      "sourceMaterials": 1,
+      "sourceSha256": "f3af4ebdcf83c2980c4397ee7511edb7e646d0ea5abaac32c12a63fa8d5adb80",
+      "originalThumbnailSha256": "43b3c44073c030d6034795cac15aa53f28eaf3fd4b96a27d74f9e41da9953fa5",
+      "thumbnailSha256": "38a7b3fe63b28ef2c24395ee5295e1a3222eae9ad6ee757c9145d0c03d520792",
+      "thumbnailBytes": 90947
+    },
+    {
+      "id": "pirate-bot",
+      "sourceUrl": "/vrm/PirateBot.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.6360565028990577,
+          -0.001188818101149978,
+          -0.1426443936617292
+        ],
+        "max": [
+          0.6721748196393171,
+          1.7853335222041504,
+          0.284305321958989
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.816297712643722,
+        "position": [
+          1.4324943743735318e-19,
+          1.030527833425161,
+          3.998830279575
+        ],
+        "target": [
+          1.4324943743735318e-19,
+          1.030527833425161,
+          -0.001169720425
+        ]
+      },
+      "foregroundPixels": 92377,
+      "renderedTriangles": 31716,
+      "sourceImages": 2,
+      "sourceMaterials": 2,
+      "sourceSha256": "5e58d13c0ceaa3421c95fb5858e2d43a3748e7a695051168bfed965e1f72c2c3",
+      "originalThumbnailSha256": "c8e344cbc698fd864e5a6ad0fd30236920b790da8c03bc816bb82cf89cda5a7b",
+      "thumbnailSha256": "f634f2d0fe6aa125e055e1457aabd5bbdc074c24f7e9dc8e02bc50808317be6c",
+      "thumbnailBytes": 245854
+    },
+    {
+      "id": "cyberpal",
+      "sourceUrl": "/vrm/Cyberpal.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.4021590054038267,
+          -0.003245979135342386,
+          -0.3157119747127568
+        ],
+        "max": [
+          0.381667539590828,
+          1.7317643140339845,
+          0.29045981207236893
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.7639271313888156,
+        "position": [
+          -0.00019946947608210055,
+          0.9987224651699438,
+          4.004378999037
+        ],
+        "target": [
+          -0.00019946947608210055,
+          0.9987224651699438,
+          0.004378999036999998
+        ]
+      },
+      "foregroundPixels": 116994,
+      "renderedTriangles": 14547,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "2c6b9f8f417e2cfe9770cdd279bfadaca34fd54f68de39192aca86bbfd886c30",
+      "originalThumbnailSha256": "9ab45aa62d4732f7cefa0285120d5d8cb45c06e8686a587bb87150526e6a2a8e",
+      "thumbnailSha256": "598ca7ec777c84eae2c712e03c02e2643cd71b302736ce9e979afa453f01104e",
+      "thumbnailBytes": 258124
+    },
+    {
+      "id": "bao-samurai",
+      "sourceUrl": "/vrm/BaoSamurai.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.8810727018884076,
+          -0.002020070746857154,
+          -0.4525719881448525
+        ],
+        "max": [
+          0.8805723384123982,
+          1.6323590361063112,
+          0.4970740675535423
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.9148315655443542,
+        "position": [
+          0.0007756308993925807,
+          0.9418338634608476,
+          3.99329329081
+        ],
+        "target": [
+          0.0007756308993925807,
+          0.9418338634608476,
+          -0.00670670919
+        ]
+      },
+      "foregroundPixels": 198516,
+      "renderedTriangles": 14288,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "7a0ed74aedd060d11f7856d0e7838238b7cc3a58efdebb24c0de26d2407d4ee6",
+      "originalThumbnailSha256": "846da9df31d322d916a0b0a22955a732c522f6b17420b230c6de27791944b3ed",
+      "thumbnailSha256": "a9a181ee07bf8d35680a68826bd2ad1038811886acbcf4ea814cb6573e0842c4",
+      "thumbnailBytes": 286865
+    },
+    {
+      "id": "kiba",
+      "sourceUrl": "/vrm/Kiba.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5036421873306512,
+          -0.007776005840191772,
+          -0.729154821316023
+        ],
+        "max": [
+          0.5023156428384488,
+          1.811877383177582,
+          0.28489986040549087
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.8499809455014036,
+        "position": [
+          -0.00040284128013472,
+          1.0430738263175727,
+          3.998997323
+        ],
+        "target": [
+          -0.00040284128013472,
+          1.0430738263175727,
+          -0.0010026770000000004
+        ]
+      },
+      "foregroundPixels": 108703,
+      "renderedTriangles": 7014,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "0d1169442836b3a348f8d9c17672bec1d7501d92b83e040ca1d0c5eb3cee225c",
+      "originalThumbnailSha256": "70bace4a776de0a4805f1c44e3a9174da929342d88351094fc911eb0bec4da5c",
+      "thumbnailSha256": "5e1162da577d635f7f1ba35996c1120236c2053778ffc95fa30e45ec9f6f6cd8",
+      "thumbnailBytes": 178317
+    },
+    {
+      "id": "stitch-witch",
+      "sourceUrl": "/vrm/StitchWitch.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.3739545643329652,
+          -0.000778676300998371,
+          -0.3215600856111901
+        ],
+        "max": [
+          0.4013759493827788,
+          1.6648771753411744,
+          0.321497797174607
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6934167825028754,
+        "position": [
+          -0.000009918212530003264,
+          0.9611375780223564,
+          4.026664703293
+        ],
+        "target": [
+          -0.000009918212530003264,
+          0.9611375780223564,
+          0.026664703292999997
+        ]
+      },
+      "foregroundPixels": 91036,
+      "renderedTriangles": 14942,
+      "sourceImages": 3,
+      "sourceMaterials": 2,
+      "sourceSha256": "bfd40328e2776c92da0e087cee8ce7abeb3da8a71c9a235f3b82d2a15210b393",
+      "originalThumbnailSha256": "986ca13f7c71c91c36e33d4bc6b6b2baa696ef5b709c74919e439ffb2b78cf03",
+      "thumbnailSha256": "1644f76da231e4f19e886a12b233f42f7a3d2b36696fed52c647bc7a34b35e31",
+      "thumbnailBytes": 165250
+    },
+    {
+      "id": "mushroom-fairy",
+      "sourceUrl": "/vrm/MushroomFairy.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.48710843818204136,
+          0.007137823715348213,
+          -0.908174399209379
+        ],
+        "max": [
+          0.48710894874856375,
+          2.0443234441993283,
+          0.4419739540826778
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 2.071138714158713,
+        "position": [
+          4.168456550080338e-9,
+          1.1836125195448466,
+          4.07428590787617
+        ],
+        "target": [
+          4.168456550080338e-9,
+          1.1836125195448466,
+          0.023840847999999998
+        ]
+      },
+      "foregroundPixels": 110986,
+      "renderedTriangles": 10576,
+      "sourceImages": 2,
+      "sourceMaterials": 2,
+      "sourceSha256": "d0e95d4462b8f36452bbd60371b78a4944b56f6d964c9b49e1c750e19ea79893",
+      "originalThumbnailSha256": "168a583f53c336e502091a0c2a1d01b8bf3f925ffa850047900cb2db6a1f6000",
+      "thumbnailSha256": "2066b3643d0e5289e4e4b79d82e8726e76775df58954de1d30a04139368d5b6e",
+      "thumbnailBytes": 232055
+    },
+    {
+      "id": "weird-cat",
+      "sourceUrl": "/vrm/WeirdCat.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.4332658946518834,
+          0.0008638107948269294,
+          -0.6291926817737121
+        ],
+        "max": [
+          0.4332659542555873,
+          1.2180106681010376,
+          0.27546301478408663
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.237432638261314,
+        "position": [
+          0.00022896741528050007,
+          0.7037661208891637,
+          3.99966476526
+        ],
+        "target": [
+          0.00022896741528050007,
+          0.7037661208891637,
+          -0.00033523474000000074
+        ]
+      },
+      "foregroundPixels": 147925,
+      "renderedTriangles": 6640,
+      "sourceImages": 3,
+      "sourceMaterials": 1,
+      "sourceSha256": "11c692c35aebc67bb39ce375f52ad6a1c9de195a01d842375d44fa0d9b79c607",
+      "originalThumbnailSha256": "3f2689bbe5bea263f50ad9e1eab63d72c66731bce47e6cb85a7fc3f8d7e21d9c",
+      "thumbnailSha256": "448f0f45a0c3e9ad529146064d25d6ab16fbbd62bb4a176a2084f7774971a275",
+      "thumbnailBytes": 272137
+    },
+    {
+      "id": "cute-saurus",
+      "sourceUrl": "/vrm/CuteSaurus.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.558852590563033,
+          0.002356206130411695,
+          -0.6734917684178772
+        ],
+        "max": [
+          0.5573742391673249,
+          1.5054630633238526,
+          0.37344038542796554
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.528158638146665,
+        "position": [
+          -0.00006719562956649661,
+          0.8704004161596238,
+          3.9723070344
+        ],
+        "target": [
+          -0.00006719562956649661,
+          0.8704004161596238,
+          -0.027692965599999994
+        ]
+      },
+      "foregroundPixels": 208827,
+      "renderedTriangles": 6188,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "12a9daf0de22d4f1a70023163237a1a2bd0fb7a94d74b43b3e9d9e3295835591",
+      "originalThumbnailSha256": "9fbe525c5996d949994e27ca8046140b343b0e35f04503e32844eabb311e7780",
+      "thumbnailSha256": "0671ad1bc048b1f4ccba05bc449419b17924baff4b13c239c49ac6645a14cd98",
+      "thumbnailBytes": 324778
+    },
+    {
+      "id": "crowley",
+      "sourceUrl": "/vrm/Crowley.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5125836675415905,
+          -0.001861900193714349,
+          -0.8280473778491153
+        ],
+        "max": [
+          0.5122583318706306,
+          1.8419675827026367,
+          0.19348372519016266
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.8745599742779568,
+        "position": [
+          -0.00030120564042589767,
+          1.0629496261789284,
+          3.93510053306818
+        ],
+        "target": [
+          -0.00030120564042589767,
+          1.0629496261789284,
+          -0.06489946693181992
+        ]
+      },
+      "foregroundPixels": 116608,
+      "renderedTriangles": 14948,
+      "sourceImages": 2,
+      "sourceMaterials": 1,
+      "sourceSha256": "40f6e8f4918146c1122ac58b55bb35b19f7bcc39826aeba9fce3101e72ba6973",
+      "originalThumbnailSha256": "a416a54f2270a82b7b5c5b8a3dae10614e8ad54045cac67e5962500d29c0df98",
+      "thumbnailSha256": "fbdf72e608a910c3610b5f6122011ee30a589bb079f960b6f59c9fa3ea9e3fde",
+      "thumbnailBytes": 207759
+    },
+    {
+      "id": "lady-koi",
+      "sourceUrl": "/vrm/LadyKoi.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5252180602595737,
+          -0.21909046173095703,
+          -0.6025687367042724
+        ],
+        "max": [
+          0.5161498890773368,
+          1.4217544794082642,
+          0.23196067175225166
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6681923568248749,
+        "position": [
+          -0.0009637654293328508,
+          0.7284974917769432,
+          3.9877922367304564
+        ],
+        "target": [
+          -0.0009637654293328508,
+          0.7284974917769432,
+          -0.012207763269543648
+        ]
+      },
+      "foregroundPixels": 133314,
+      "renderedTriangles": 11078,
+      "sourceImages": 3,
+      "sourceMaterials": 3,
+      "sourceSha256": "fb680d4f3eb5dafe7773ce6eb8117ac7c4fef67c52117b8766f8ea21ff40d236",
+      "originalThumbnailSha256": "3839805a5475637ff684105150ee19b2a3d96aa927d116774bfaaac11a6d3069",
+      "thumbnailSha256": "edd27fce80209dc3c4889040dbee8c3004ee03d82ec3ddd86ee23986cbf30aaf",
+      "thumbnailBytes": 166061
+    },
+    {
+      "id": "yeti-dude",
+      "sourceUrl": "/vrm/YetiDude.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.6198663223992916,
+          -0.0002986548607781574,
+          -1.1590926348465824
+        ],
+        "max": [
+          0.6198658685690045,
+          1.627378562286316,
+          0.18731348772688527
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6548051707662121,
+        "position": [
+          -7.890802958946064e-9,
+          0.9396849380416686,
+          3.9489561316204034
+        ],
+        "target": [
+          -7.890802958946064e-9,
+          0.9396849380416686,
+          -0.09026223609999993
+        ]
+      },
+      "foregroundPixels": 170770,
+      "renderedTriangles": 8240,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "c61d055ba807e88876a0805e0130f1b742310c116870af610ceba032284ebba5",
+      "originalThumbnailSha256": "9ad7bf60b636917b04918dbe99e31e7efad63c0ac5fdfd721a70adb446979641",
+      "thumbnailSha256": "ae50239bb0681f6699b4aae3df829b65c3846b77c10dcca59789ea58a5875360",
+      "thumbnailBytes": 254046
+    },
+    {
+      "id": "anna",
+      "sourceUrl": "/vrm/Anna.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.3316362174487014,
+          0.0001038230641095225,
+          -0.09106527863673915
+        ],
+        "max": [
+          0.33163611527518744,
+          1.5948904598996583,
+          0.21326686658158053
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6213664141161412,
+        "position": [
+          -1.3212590173554777e-19,
+          0.921093105836639,
+          4.001078889863
+        ],
+        "target": [
+          -1.3212590173554777e-19,
+          0.921093105836639,
+          0.0010788898630000009
+        ]
+      },
+      "foregroundPixels": 77816,
+      "renderedTriangles": 11698,
+      "sourceImages": 3,
+      "sourceMaterials": 1,
+      "sourceSha256": "8694d2a0c09014524d5bc7fdf870f55b6efb8dbd5b399d91bde353b779502779",
+      "originalThumbnailSha256": "da6769b2613bcf3ce0b88efe55678f1347c5dbad42dbdbe4e608e503228bde81",
+      "thumbnailSha256": "ff4dffaedd80d1be6140a837887db123fd94a16f979417eaa3fe2e9ad4419abf",
+      "thumbnailBytes": 165985
+    },
+    {
+      "id": "megan-the-fox",
+      "sourceUrl": "/vrm/MeganTheFox.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.4631805023047378,
+          -0.008249393889964984,
+          -1.3362197766697022
+        ],
+        "max": [
+          0.4631813181048872,
+          1.5787425069599244,
+          0.32207453257246055
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6134417658640543,
+        "position": [
+          1.1435152774456176e-18,
+          0.9082384288508462,
+          4.9655454168764885
+        ],
+        "target": [
+          1.1435152774456176e-18,
+          0.9082384288508462,
+          -0.009337510849999998
+        ]
+      },
+      "foregroundPixels": 169512,
+      "renderedTriangles": 10426,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "7167d50eb9fae3d3e0453ab6ab2e26b777452b5e0dc41108dfa162a3a061efd2",
+      "originalThumbnailSha256": "3ebf812b5dfabf9f215da008a8a478c54988317baeab0674b996cfe4f1fa92f7",
+      "thumbnailSha256": "72ff3ae8e56662eb3a72535ac6405a6ffbd45770228359fae805bad064cae5ed",
+      "thumbnailBytes": 353094
+    },
+    {
+      "id": "cool-tiger",
+      "sourceUrl": "/vrm/CoolTiger.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5903014129731267,
+          -0.017608331326395346,
+          -0.7065922750432984
+        ],
+        "max": [
+          0.5943021641267365,
+          1.7584001750988159,
+          0.3010270210667634
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.8056086481989646,
+        "position": [
+          0.00047763896908079734,
+          1.008036581134164,
+          4.0214554764
+        ],
+        "target": [
+          0.00047763896908079734,
+          1.008036581134164,
+          0.0214554764
+        ]
+      },
+      "foregroundPixels": 151004,
+      "renderedTriangles": 14338,
+      "sourceImages": 3,
+      "sourceMaterials": 1,
+      "sourceSha256": "4b471b59517733b2f3804acc80e8ea485260efb956a5c950221e4e1ff30860e2",
+      "originalThumbnailSha256": "617cb1b924e1097944978335dae62e48f07b7f054557b57bf0d3415de51d1c68",
+      "thumbnailSha256": "1c7fbb62ef3b32aca21b881fd3c1824275db592df75874644571084a05087786",
+      "thumbnailBytes": 301613
+    },
+    {
+      "id": "lil-ram",
+      "sourceUrl": "/vrm/LilRam.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.3199205471909719,
+          -0.00988639212297613,
+          -0.21616354373603758
+        ],
+        "max": [
+          0.3197560536574803,
+          1.134290217506134,
+          0.21846656304634116
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.1632462197895952,
+        "position": [
+          -0.000016547894638653306,
+          0.650875599937835,
+          4.04330600974
+        ],
+        "target": [
+          -0.000016547894638653306,
+          0.650875599937835,
+          0.04330600974
+        ]
+      },
+      "foregroundPixels": 182097,
+      "renderedTriangles": 10310,
+      "sourceImages": 2,
+      "sourceMaterials": 1,
+      "sourceSha256": "ecc8993f08c4814efd9d49b02d50b12f824a71cfe2d2a549f78f7bd716d6aa42",
+      "originalThumbnailSha256": "28bab8a49abbb98e6d2bf2b3cf447303701fb508d5f2f8d7cccc65f50ef90520",
+      "thumbnailSha256": "188412f156972d580e28fdbdebc869c6b6ea34d5953c3d4c9cbbb139e82bd5d0",
+      "thumbnailBytes": 289817
+    },
+    {
+      "id": "lady-fawn",
+      "sourceUrl": "/vrm/LadyFawn.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.48833206870141715,
+          -0.0005069518510376511,
+          -0.35641914342267983
+        ],
+        "max": [
+          0.4867184577171178,
+          1.8118927482265716,
+          0.26333674779889815
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.8426063617455695,
+        "position": [
+          -0.0008065011954420984,
+          1.0461538749437818,
+          3.988076733699
+        ],
+        "target": [
+          -0.0008065011954420984,
+          1.0461538749437818,
+          -0.011923266301000001
+        ]
+      },
+      "foregroundPixels": 124144,
+      "renderedTriangles": 10350,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "5cf6109a83ea89e071639979b5763e2cdf83ef683e58ce47a6763f8708996b57",
+      "originalThumbnailSha256": "61664d2acb5018191c3bed834b0a898a74f4f60d7882f1d81dc2ff43c3b42851",
+      "thumbnailSha256": "49da8f78e3f481955d75529c5cae6fa2edcb51181f8f5dbc976ee2dd1ef508a3",
+      "thumbnailBytes": 196344
+    },
+    {
+      "id": "strawberry-princess",
+      "sourceUrl": "/vrm/StrawberryPrincess.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.6876061979661356,
+          0.002284206192580471,
+          -0.49587394780751304
+        ],
+        "max": [
+          0.6889935170858327,
+          1.3738708492118836,
+          0.470412982361242
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.4963040380999657,
+        "position": [
+          0.0010358922913345891,
+          0.7943754925362281,
+          4.0067260544
+        ],
+        "target": [
+          0.0010358922913345891,
+          0.7943754925362281,
+          0.0067260544000000005
+        ]
+      },
+      "foregroundPixels": 163379,
+      "renderedTriangles": 7156,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "300031ba101845988e877141696162421c53b39f4e55caebee9cdc0f01113cc9",
+      "originalThumbnailSha256": "db27f1a916d0e8af8856e3645c8e5ba347af26ae87fc561cf08b0fdc27c0ccb2",
+      "thumbnailSha256": "93b09029a5951dfdf99b5545da61758dd0d3d7f1e3947ee09ac48d096bf450ad",
+      "thumbnailBytes": 182117
+    },
+    {
+      "id": "blue-pixie",
+      "sourceUrl": "/vrm/BluePixie.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.4268917178119189,
+          0.0020775947925719684,
+          -0.9079364922757379
+        ],
+        "max": [
+          0.4252448639037014,
+          1.7970167094602065,
+          0.1466417444572905
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.8248547665787618,
+        "position": [
+          -0.0008235919821635971,
+          1.038654933513131,
+          3.97643091359
+        ],
+        "target": [
+          -0.0008235919821635971,
+          1.038654933513131,
+          -0.02356908641
+        ]
+      },
+      "foregroundPixels": 107593,
+      "renderedTriangles": 10564,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "fb93f935c9b9e083bfc3b61574c79b5c4f223dc60992703584da4a89711ae3bb",
+      "originalThumbnailSha256": "927af4578dd985739e962485e7354d74524505134d35cd17b3e9e022ea224ba2",
+      "thumbnailSha256": "eba291c69c27619b02b7f192f3ff2e02b09becafd1ceaf46345e1b7d8efa3d2a",
+      "thumbnailBytes": 221263
+    },
+    {
+      "id": "bot-bunny",
+      "sourceUrl": "/vrm/BotBunny.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5093833396898106,
+          -0.000818425131478318,
+          -0.22606504049955267
+        ],
+        "max": [
+          0.5076640846581475,
+          1.697205068231885,
+          0.12444350928439325
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.7263238849194193,
+        "position": [
+          -0.000002267491245248041,
+          0.9797901422858641,
+          3.9623684377
+        ],
+        "target": [
+          -0.000002267491245248041,
+          0.9797901422858641,
+          -0.0376315623
+        ]
+      },
+      "foregroundPixels": 105755,
+      "renderedTriangles": 14506,
+      "sourceImages": 2,
+      "sourceMaterials": 2,
+      "sourceSha256": "1acdeaf69446bd3c565b09afef6d847e833e64ef296f5eb26f8289be91100c5a",
+      "originalThumbnailSha256": "07014355da6d017972c9321b0e199de37100c70d85c592e4687035fc99a798f6",
+      "thumbnailSha256": "8b7335e87c19850bc3f1a209ce9755f060afe76a9404bcf4a58afb0fbda3465c",
+      "thumbnailBytes": 94196
+    },
+    {
+      "id": "sport-mecha",
+      "sourceUrl": "/vrm/SportMecha.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.7609905601098204,
+          0.02025107230330532,
+          -0.2009152625205155
+        ],
+        "max": [
+          0.7653541748936858,
+          1.7953264629263184,
+          0.16740697880090832
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.8046599804667298,
+        "position": [
+          0.0014220534405564522,
+          1.0453571103880954,
+          3.9847878412
+        ],
+        "target": [
+          0.0014220534405564522,
+          1.0453571103880954,
+          -0.015212158799999995
+        ]
+      },
+      "foregroundPixels": 138195,
+      "renderedTriangles": 9964,
+      "sourceImages": 2,
+      "sourceMaterials": 2,
+      "sourceSha256": "c53c38a6ccb305281e1b3e820d8b5c69baa69a2c7dd0b726d87c4c6992a9fe39",
+      "originalThumbnailSha256": "dd4f30e827cce4438dc346104237d3139288f8d45a03bfecb9744face4fafdbe",
+      "thumbnailSha256": "0db5dbeeba77f36b442968f164745fb3b00b60448e0aa3cb82f0a8bc75e3b71e",
+      "thumbnailBytes": 275256
+    },
+    {
+      "id": "cosmic-bot",
+      "sourceUrl": "/vrm/CosmicBot.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5709322082131121,
+          -0.003432993000396311,
+          -0.15453622144912277
+        ],
+        "max": [
+          0.5709324372415532,
+          1.9779289923192627,
+          0.3120224187335975
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 2.0143846850749867,
+        "position": [
+          -1.5032991787907778e-7,
+          1.1408035535217067,
+          4.00090451368
+        ],
+        "target": [
+          -1.5032991787907778e-7,
+          1.1408035535217067,
+          0.0009045136799999999
+        ]
+      },
+      "foregroundPixels": 95537,
+      "renderedTriangles": 7172,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "df440a6c2222007545841a6cee74bc2c1fd253af989a4ffa895524a1c7ebe03a",
+      "originalThumbnailSha256": "687a51ca6367b9c04acff2918fe19baebffc33774d52c820798be9490f322088",
+      "thumbnailSha256": "bd317defbf0b9e1626062e735f9af31b2e7174c2354f24bcec0d7c63f584a313",
+      "thumbnailBytes": 159611
+    },
+    {
+      "id": "old-moustache",
+      "sourceUrl": "/vrm/OldMoustache.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.5748270449024231,
+          -0.0012792447814717889,
+          -0.21586275100708008
+        ],
+        "max": [
+          0.5777237592290128,
+          1.6138770580291748,
+          0.287983238697052
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.6420755745241575,
+        "position": [
+          0.000005759736723122128,
+          0.9314735200916766,
+          3.990971155464649
+        ],
+        "target": [
+          0.000005759736723122128,
+          0.9314735200916766,
+          -0.0090288445353508
+        ]
+      },
+      "foregroundPixels": 123971,
+      "renderedTriangles": 3804,
+      "sourceImages": 1,
+      "sourceMaterials": 1,
+      "sourceSha256": "2c04e1567bfe0e864e38bbfcb09056c276e74d5540c4ea71d5e4bb0a5e74b35e",
+      "originalThumbnailSha256": "7c198cdc252135c83721237a9e76fb4f408a309c3f32d59eacd7ba38582a8f0a",
+      "thumbnailSha256": "e7c1a3fc536ffc50e37656947de0ffad9ec5716aa73ecf92deb8e04f7fb43de0",
+      "thumbnailBytes": 88846
+    },
+    {
+      "id": "eugenia",
+      "sourceUrl": "/vrm/Eugenia.vrm",
+      "width": 768,
+      "height": 768,
+      "gpu": {
+        "vendor": "Google Inc. (Apple)",
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+        "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+      },
+      "background": "#596773",
+      "toneMapping": "none",
+      "colorSpace": "srgb",
+      "pose": "neutral-arms-lowered",
+      "modelBounds": {
+        "min": [
+          -0.35844713242214554,
+          -0.0014435851056167602,
+          -0.27897054840565727
+        ],
+        "max": [
+          0.3559439785543076,
+          1.4137203450182922,
+          0.2569280559457051
+        ]
+      },
+      "camera": {
+        "projection": "orthographic",
+        "span": 1.4387499956259742,
+        "position": [
+          -0.00044526782632889697,
+          0.8158135845409407,
+          3.97438689268
+        ],
+        "target": [
+          -0.00044526782632889697,
+          0.8158135845409407,
+          -0.025613107319999998
+        ]
+      },
+      "foregroundPixels": 115001,
+      "renderedTriangles": 10200,
+      "sourceImages": 2,
+      "sourceMaterials": 2,
+      "sourceSha256": "e4fd8e51fcab34803aa97c509f51ed203bb1393abf7f71ab679a2d69cc512765",
+      "originalThumbnailSha256": "7b662cfdf95ee388b243110438577cfc765452e09ec24a61a3ca54ab463d5bde",
+      "thumbnailSha256": "b6ab80a932e6d2f7bf2acf843869e78d62257642aa767cf9057177967153abed",
+      "thumbnailBytes": 178774
+    }
+  ],
+  "failures": []
+}

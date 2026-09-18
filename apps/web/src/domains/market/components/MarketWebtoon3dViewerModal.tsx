@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Box,
   Moon,
   RotateCcw,
@@ -79,17 +83,15 @@ export function MarketWebtoon3dViewerModal({
             <Box className="size-5 text-accent" />
             <div>
               <h2 id="market-3d-viewer-title" className="text-sm font-bold text-fg">
-                {assetTitle} · 3D 렌더 모드 예시
-              </h2>
+                {assetTitle} {translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "· 3D 렌더 모드 예시")}</h2>
               <p className="text-[0.68rem] text-fg-3">
-                아래 도형은 렌더 모드를 설명하는 예시이며 이 에셋의 실제 메시가 아닙니다. 실제 모델과 지원 기능은 Studio에서 확인하세요.
-              </p>
+                {translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "아래 도형은 렌더 모드를 설명하는 예시이며 이 에셋의 실제 메시가 아닙니다. 실제 모델과 지원 기능은 Studio에서 확인하세요.")}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="3D 뷰어 닫기"
+            aria-label={translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "3D 뷰어 닫기")}
             className="rounded-lg p-1.5 text-fg-3 hover:bg-card hover:text-fg"
           >
             <X className="size-4" />
@@ -126,13 +128,13 @@ export function MarketWebtoon3dViewerModal({
               <div className="flex flex-col items-center text-center p-4">
                 <Box className="size-16 mb-2 opacity-80" />
                 <span className="font-bold text-xs">
-                  {renderMode === "line-art" && "은선 추출 (Line-Art)"}
-                  {renderMode === "cel-shade" && "셀 툰 셰이딩 (Cel Shading)"}
-                  {renderMode === "monochrome" && "모노크롬 명암 (Monochrome)"}
-                  {renderMode === "texture-color" && "풀컬러 텍스처 (Full Texture)"}
+                  {renderMode === "line-art" && translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "은선 추출 (Line-Art)")}
+                  {renderMode === "cel-shade" && translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "셀 툰 셰이딩 (Cel Shading)")}
+                  {renderMode === "monochrome" && translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "모노크롬 명암 (Monochrome)")}
+                  {renderMode === "texture-color" && translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "풀컬러 텍스처 (Full Texture)")}
                 </span>
                 <span className="text-[0.62rem] opacity-70 mt-0.5">
-                  조명: {lighting === "day" ? "주간 자연광" : lighting === "sunset" ? "노을 골든아워" : "야경 달빛"}
+                  {translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "조명: ")}{lighting === "day" ? translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "주간 자연광") : lighting === "sunset" ? translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "노을 골든아워") : translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "야경 달빛")}
                 </span>
               </div>
             </div>
@@ -151,15 +153,15 @@ export function MarketWebtoon3dViewerModal({
           <div className="absolute bottom-4 left-4 rounded-xl border border-white/10 bg-black/70 px-3.5 py-2 text-[0.68rem] text-white/80 backdrop-blur-md">
             <div className="flex items-center gap-3 font-mono">
               {validTriangleCount !== undefined ? (
-                <span>Triangles: {validTriangleCount.toLocaleString()}</span>
+                <span>{translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "en", "Triangles: ")}{validTriangleCount.toLocaleString()}</span>
               ) : null}
               {validVertexCount !== undefined ? (
-                <span>Vertices: {validVertexCount.toLocaleString()}</span>
+                <span>{translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "en", "Vertices: ")}{validVertexCount.toLocaleString()}</span>
               ) : null}
               {validTriangleCount === undefined && validVertexCount === undefined ? (
-                <span>메시 통계 미제공</span>
+                <span>{translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "메시 통계 미제공")}</span>
               ) : null}
-              <span>회전각: {orbitAngle}°</span>
+              <span>{translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "회전각: ")}{orbitAngle}°</span>
             </div>
           </div>
         </div>
@@ -168,7 +170,7 @@ export function MarketWebtoon3dViewerModal({
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-line bg-card p-4 text-xs">
           {/* Render Mode Switcher */}
           <div className="flex items-center gap-1.5">
-            <span className="font-bold text-fg-3 text-[0.68rem]">렌더 모드:</span>
+            <span className="font-bold text-fg-3 text-[0.68rem]">{translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "렌더 모드:")}</span>
             <div className="flex gap-1">
               {(
                 [
@@ -198,7 +200,7 @@ export function MarketWebtoon3dViewerModal({
 
           {/* Lighting Atmosphere */}
           <div className="flex items-center gap-1.5">
-            <span className="font-bold text-fg-3 text-[0.68rem]">조명 환경:</span>
+            <span className="font-bold text-fg-3 text-[0.68rem]">{translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "조명 환경:")}</span>
             <div className="flex gap-1">
               <button
                 type="button"
@@ -210,7 +212,7 @@ export function MarketWebtoon3dViewerModal({
                 )}
               >
                 <Sun className="size-3" />
-                <span>주간</span>
+                <span>{translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "주간")}</span>
               </button>
               <button
                 type="button"
@@ -222,7 +224,7 @@ export function MarketWebtoon3dViewerModal({
                 )}
               >
                 <Sunset className="size-3" />
-                <span>노을</span>
+                <span>{translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "노을")}</span>
               </button>
               <button
                 type="button"
@@ -234,7 +236,7 @@ export function MarketWebtoon3dViewerModal({
                 )}
               >
                 <Moon className="size-3" />
-                <span>야경</span>
+                <span>{translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "야경")}</span>
               </button>
             </div>
           </div>
@@ -245,7 +247,7 @@ export function MarketWebtoon3dViewerModal({
               <RotateCcw className="size-3.5 text-fg-3" />
               <input
                 type="range"
-                aria-label="렌더 모드 예시 회전각"
+                aria-label={translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "렌더 모드 예시 회전각")}
                 min={0}
                 max={360}
                 value={orbitAngle}
@@ -261,16 +263,15 @@ export function MarketWebtoon3dViewerModal({
                 onChange={(e) => setShowWireframe(e.target.checked)}
                 className="accent-accent"
               />
-              <span>와이어프레임</span>
+              <span>{translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "와이어프레임")}</span>
             </label>
 
             {studioResourceId ? (
               <Link
-                href={`/studio?installMarketResource=${encodeURIComponent(studioResourceId)}&assetMarket=community`}
+                href={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "en", "/studio?installMarketResource={v0}&assetMarket=community"), { v0: String(encodeURIComponent(studioResourceId)) })}
                 className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 font-bold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
-                Studio에서 실제 에셋 확인
-              </Link>
+                {translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "Studio에서 실제 에셋 확인")}</Link>
             ) : null}
             {!studioResourceId && onImportToStudio && (
               <button
@@ -279,7 +280,7 @@ export function MarketWebtoon3dViewerModal({
                 className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 font-bold text-on-accent shadow-sm hover:brightness-105"
               >
                 <Sparkles className="size-3.5" />
-                <span>Studio에서 확인하기</span>
+                <span>{translateCurrentStaticSourceText("domains.market.components.MarketWebtoon3dViewerModal", "ko", "Studio에서 확인하기")}</span>
               </button>
             )}
           </div>

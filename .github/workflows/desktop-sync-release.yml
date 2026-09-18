@@ -1,0 +1,199 @@
+name: Desktop sync release
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: [main]
+    paths:
+      - ".github/workflows/desktop-sync-release.yml"
+      - "apps/desktop-sync/**"
+      - "scripts/*desktop-sync-release*"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "docs/operations/toonstudio-desktop-folder-sync.md"
+  push:
+    tags: ["desktop-sync-v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without a leading v
+        required: true
+        default: "0.1.0"
+        type: string
+      require_signed:
+        description: Require platform signing credentials and native verification
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: ${{ matrix.platform }} package
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+          - os: macos-15
+            platform: darwin
+          - os: windows-2025
+            platform: windows
+    env:
+      RELEASE_DIR: qa-results/desktop-sync-release
+      SIGNING_EVIDENCE: qa-results/desktop-sync-release/release-signing.evidence.json
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 trusted first-party action
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Resolve release policy
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_REQUIRE_SIGNED: ${{ inputs.require_signed }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/desktop-sync-v* ]]; then
+            version="${GITHUB_REF_NAME#desktop-sync-v}"
+            require_signed=true
+          elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            version="$INPUT_VERSION"
+            require_signed="$INPUT_REQUIRE_SIGNED"
+          else
+            version="0.0.0-pr.${{ github.event.pull_request.number }}.${GITHUB_SHA:0:12}"
+            require_signed=false
+          fi
+          printf 'DESKTOP_SYNC_VERSION=%s\n' "$version" >> "$GITHUB_ENV"
+          printf 'REQUIRE_SIGNED=%s\n' "$require_signed" >> "$GITHUB_ENV"
+      - name: Test sync, credentials, sessions, conflicts, and release packaging
+        run: pnpm run verify:studio-competitor-replacement
+      - name: Stage self-contained release
+        shell: bash
+        run: >-
+          node scripts/package-desktop-sync-release.mjs
+          --mode stage
+          --output-dir "$RELEASE_DIR"
+          --version "$DESKTOP_SYNC_VERSION"
+      - name: Import and apply Apple signing identity
+        if: env.REQUIRE_SIGNED == 'true' && matrix.platform == 'darwin'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.TOONSTUDIO_APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.TOONSTUDIO_APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.TOONSTUDIO_APPLE_SIGNING_IDENTITY }}
+        run: |
+          test -n "$APPLE_CERTIFICATE_BASE64"
+          test -n "$APPLE_CERTIFICATE_PASSWORD"
+          test -n "$APPLE_SIGNING_IDENTITY"
+          keychain="$RUNNER_TEMP/toonstudio-signing.keychain-db"
+          certificate="$RUNNER_TEMP/toonstudio-signing.p12"
+          printf '%s' "$APPLE_CERTIFICATE_BASE64" | base64 --decode > "$certificate"
+          security create-keychain -p temporary "$keychain"
+          security unlock-keychain -p temporary "$keychain"
+          security import "$certificate" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k temporary "$keychain"
+          security list-keychains -d user -s "$keychain"
+          node scripts/sign-desktop-sync-release.mjs \
+            --stage-dir "$RELEASE_DIR/stage" \
+            --output "$SIGNING_EVIDENCE" \
+            --identity "$APPLE_SIGNING_IDENTITY"
+      - name: Import and apply Windows signing identity
+        if: env.REQUIRE_SIGNED == 'true' && matrix.platform == 'windows'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.TOONSTUDIO_WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.TOONSTUDIO_WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:WINDOWS_CERTIFICATE_BASE64) { throw "Windows certificate is missing" }
+          if (-not $env:WINDOWS_CERTIFICATE_PASSWORD) { throw "Windows certificate password is missing" }
+          $certificatePath = Join-Path $env:RUNNER_TEMP "toonstudio-signing.pfx"
+          [IO.File]::WriteAllBytes(
+            $certificatePath,
+            [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64)
+          )
+          $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+          $certificate = Import-PfxCertificate -FilePath $certificatePath -Password $password -CertStoreLocation Cert:\CurrentUser\My
+          Add-Content -Path $env:GITHUB_ENV -Value "WINDOWS_CERTIFICATE_THUMBPRINT=$($certificate.Thumbprint)"
+          $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $signTool) { throw "signtool.exe was not found" }
+          node scripts/sign-desktop-sync-release.mjs `
+            --stage-dir "$env:RELEASE_DIR/stage" `
+            --output $env:SIGNING_EVIDENCE `
+            --identity $certificate.Thumbprint `
+            --tool $signTool.FullName
+      - name: Import and apply Linux signing identity
+        if: env.REQUIRE_SIGNED == 'true' && matrix.platform == 'linux'
+        shell: bash
+        env:
+          LINUX_GPG_PRIVATE_KEY: ${{ secrets.TOONSTUDIO_LINUX_GPG_PRIVATE_KEY }}
+          LINUX_GPG_KEY_ID: ${{ secrets.TOONSTUDIO_LINUX_GPG_KEY_ID }}
+        run: |
+          test -n "$LINUX_GPG_PRIVATE_KEY"
+          test -n "$LINUX_GPG_KEY_ID"
+          printf '%s' "$LINUX_GPG_PRIVATE_KEY" | gpg --batch --import
+          node scripts/sign-desktop-sync-release.mjs \
+            --stage-dir "$RELEASE_DIR/stage" \
+            --output "$SIGNING_EVIDENCE" \
+            --identity "$LINUX_GPG_KEY_ID"
+      - name: Finalize release archive
+        shell: bash
+        run: |
+          args=(--mode finalize --output-dir "$RELEASE_DIR" --version "$DESKTOP_SYNC_VERSION")
+          if [[ -f "$SIGNING_EVIDENCE" ]]; then
+            args+=(--signing-evidence "$SIGNING_EVIDENCE")
+          fi
+          node scripts/package-desktop-sync-release.mjs "${args[@]}"
+      - name: Verify archive, SBOM, checksums, signature policy, and runtime
+        shell: bash
+        run: |
+          if [[ "$REQUIRE_SIGNED" == "true" ]]; then
+            node scripts/verify-desktop-sync-release.mjs \
+              --release-dir "$RELEASE_DIR" \
+              --require-signed
+          else
+            node scripts/verify-desktop-sync-release.mjs \
+              --release-dir "$RELEASE_DIR" \
+              --allow-unsigned
+          fi
+      - name: Upload verified release
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: toonstudio-desktop-sync-${{ matrix.platform }}-${{ runner.arch }}-${{ github.run_id }}
+          path: |
+            qa-results/desktop-sync-release/*.tar.gz
+            qa-results/desktop-sync-release/*.receipt.json
+            qa-results/desktop-sync-release/*.sha256
+            qa-results/desktop-sync-release/release-signing.evidence.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove Windows certificate
+        if: always() && env.REQUIRE_SIGNED == 'true' && matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          if ($env:WINDOWS_CERTIFICATE_THUMBPRINT) {
+            Remove-Item "Cert:\CurrentUser\My\$env:WINDOWS_CERTIFICATE_THUMBPRINT" -ErrorAction SilentlyContinue
+          }
+      - name: Remove temporary signing material
+        if: always() && env.REQUIRE_SIGNED == 'true'
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/toonstudio-signing.p12" "$RUNNER_TEMP/toonstudio-signing.pfx"
+          if [[ "${{ matrix.platform }}" == "darwin" ]]; then
+            security delete-keychain "$RUNNER_TEMP/toonstudio-signing.keychain-db" || true
+          fi

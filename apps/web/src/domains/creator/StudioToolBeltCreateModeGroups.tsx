@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ChevronDown,
   Eraser,
   Film,
@@ -35,7 +39,7 @@ import {
   preloadStudioSceneToolPopoverBody,
   preloadStudioStyleToolPopoverBody,
 } from "./studio-tool-belt-lazy-ui";
-import type { StudioFloatingSurfaceLayout } from "./studio-floating-surface";
+import { STUDIO_FLOATING_MENU_LAYOUTS } from "./studio-floating-menu-layouts";
 import {
   studioToolbarDisclosureAllows,
   studioToolbarIsExpanded,
@@ -66,25 +70,6 @@ const groupPopoverClass = (width: "w-72" | "w-80") =>
     "fixed inset-x-2 top-[6.5rem] z-[70] max-h-[min(78dvh,36rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-2xl lg:inset-x-auto lg:left-3 lg:w-auto lg:max-w-[min(28rem,calc(100vw-1.5rem))]",
     width === "w-72" ? "lg:w-72" : "lg:w-80"
   );
-
-const TOOL_POPOVER_LAYOUTS = {
-  asset: {
-    version: 2, xRatio: 0.02, yRatio: 0.08, width: 420, height: 680,
-    dock: "free", positionLocked: false, sizeLocked: false,
-  },
-  scene: {
-    version: 2, xRatio: 0.03, yRatio: 0.1, width: 380, height: 620,
-    dock: "free", positionLocked: false, sizeLocked: false,
-  },
-  style: {
-    version: 2, xRatio: 0.04, yRatio: 0.12, width: 340, height: 520,
-    dock: "free", positionLocked: false, sizeLocked: false,
-  },
-  ai: {
-    version: 2, xRatio: 0.72, yRatio: 0.08, width: 440, height: 680,
-    dock: "free", positionLocked: false, sizeLocked: false,
-  },
-} satisfies Record<"asset" | "scene" | "style" | "ai", StudioFloatingSurfaceLayout>;
 
 export interface StudioToolBeltCreateModeGroupsProps {
   hints: StudioToolBeltHintMap;
@@ -169,14 +154,14 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
       />
       {(allows("toolbar-assets") || activeToolbarGroup === "assetGroup") ? (
         <StudioToolbarCluster
-          label="에셋 라이브러리"
+          label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "에셋 라이브러리")}
           className={cn(!allows("toolbar-assets") && "border-0 bg-transparent p-0 shadow-none")}
         >
           <div ref={activeToolbarGroup === "assetGroup" ? menuRef : undefined} className="relative">
             <StudioToolBeltHintTarget hint={hints.assets}>
               <button
                 type="button"
-                aria-label="템플릿·에셋"
+                aria-label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "템플릿·에셋")}
                 onClick={() => {
                   preloadStudioAssetToolPopoverBody();
                   setMenu(activeToolbarGroup === "assetGroup" ? null : "asset");
@@ -200,7 +185,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                     active: activeToolbarGroup === "assetGroup",
                   })}
                 />
-                <span><span className="max-[359px]:hidden">템플릿·</span>에셋</span>
+                <span><span className="max-[359px]:hidden">{translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "템플릿·")}</span>{translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "에셋")}</span>
                 <ChevronDown
                   size={STUDIO_ICON_SIZE.subtab}
                   strokeWidth={STUDIO_ICON_STROKE}
@@ -221,16 +206,16 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
               desktopWindow={{
                 label: "에셋",
                 surfaceId: "toolbar-assets",
-                defaultLayout: TOOL_POPOVER_LAYOUTS.asset,
+                defaultLayout: STUDIO_FLOATING_MENU_LAYOUTS.asset,
                 onClose: () => setMenu(null),
-                minWidth: 320,
-                minHeight: 300,
+                minWidth: 400,
+                minHeight: 320,
                 maxWidth: 860,
                 maxHeight: 1100,
-                contentClassName: "overflow-y-auto",
+                contentClassName: "overflow-y-auto overflow-x-hidden",
               }}
             >
-              <Suspense fallback={<StudioPanelLoading label="에셋 메뉴를 여는 중..." />}>
+              <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "에셋 메뉴를 여는 중...")} />}>
                 <LazyStudioAssetToolPopoverBody toolBelt={toolBelt} />
               </Suspense>
             </StudioFloatingToolPopover>
@@ -240,12 +225,12 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
 
       {allows("toolbar-cut") ? (
         <>
-          <StudioToolbarDivider label="컷" />
-          <StudioToolbarCluster label="컷 배치">
+          <StudioToolbarDivider label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "컷")} />
+          <StudioToolbarCluster label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "컷 배치")}>
             <StudioToolBeltHintTarget hint={hints.panelAdd}>
               <button
                 type="button"
-                aria-label="컷 추가 · 만화 패널"
+                aria-label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "컷 추가 · 만화 패널")}
                 onClick={addFrame}
                 className={toolBtn(false)}
               >
@@ -254,8 +239,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                   strokeWidth={STUDIO_ICON_STROKE}
                   aria-hidden
                   className={studioToolIconClass()}
-                /> 컷 추가
-              </button>
+                /> {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "컷 추가")}</button>
             </StudioToolBeltHintTarget>
             {showAdvanced ? (
               <StudioToolBeltHintTarget hint={hints.panelSplit}>
@@ -265,8 +249,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                     strokeWidth={STUDIO_ICON_STROKE}
                     aria-hidden
                     className={studioToolIconClass()}
-                  /> 사선 컷
-                </button>
+                  /> {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "사선 컷")}</button>
               </StudioToolBeltHintTarget>
             ) : null}
             {selected?.type === "frame" && (
@@ -284,7 +267,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                     aria-hidden
                     className={cn(studioToolIconClass({ active: Boolean(selected?.points) }), "opacity-90")}
                   />
-                  {selected.points ? "직선화" : "사선화"}
+                  {selected.points ? translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "직선화") : translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "사선화")}
                 </button>
               </StudioToolBeltHintTarget>
             )}
@@ -294,8 +277,8 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
 
       {allows("toolbar-draw") ? (
         <>
-          <StudioToolbarDivider label="도구" className="lg:hidden" />
-          <StudioToolbarCluster label="그리기 도구" className="lg:hidden">
+          <StudioToolbarDivider label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "도구")} className="lg:hidden" />
+          <StudioToolbarCluster label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "그리기 도구")} className="lg:hidden">
             <StudioToolBeltHintTarget hint={hints.select}>
               <button
                 type="button"
@@ -312,13 +295,12 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                   aria-hidden
                   className={studioToolIconClass({ active: tool === "select" })}
                 />
-                선택
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "선택")}</button>
             </StudioToolBeltHintTarget>
             <StudioToolBeltHintTarget
               hint={hints.pen}
               disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요." : undefined}
+              unavailableReason={activeSurfaceReviewLocked ? translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요.") : undefined}
             >
               <button
                 type="button"
@@ -333,13 +315,12 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                   aria-hidden
                   className={studioToolIconClass({ active: tool === "draw" && drawMode === "pen" })}
                 />
-                펜
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "펜")}</button>
             </StudioToolBeltHintTarget>
             <StudioToolBeltHintTarget
               hint={hints.eraser}
               disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요." : undefined}
+              unavailableReason={activeSurfaceReviewLocked ? translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요.") : undefined}
             >
               <button
                 type="button"
@@ -357,14 +338,13 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                   aria-hidden
                   className={studioToolIconClass({ active: tool === "draw" && drawMode === "eraser" })}
                 />
-                지우개
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "지우개")}</button>
             </StudioToolBeltHintTarget>
             <StudioToolBeltHintTarget
               hint={hints.fill}
               unavailableReason={
                 advancedFillUnsupportedReason
-                  ? `${advancedFillUnsupportedReason} 채우기를 누르면 안전한 단일 래스터 후보를 찾거나 필요한 조건을 안내합니다.`
+                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "{v0} 채우기를 누르면 안전한 단일 래스터 후보를 찾거나 필요한 조건을 안내합니다."), { v0: String(advancedFillUnsupportedReason) })
                   : undefined
               }
             >
@@ -380,14 +360,13 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                   aria-hidden
                   className={studioToolIconClass({ active: advancedFillActive })}
                 />
-                채우기
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "채우기")}</button>
             </StudioToolBeltHintTarget>
             {showAdvanced || selected?.type === "image" ? (
               <StudioToolBeltHintTarget
                 hint={hints.frameAnimation}
                 disabled={selected?.type !== "image"}
-                unavailableReason={selected?.type !== "image" ? "애니메이션으로 만들 이미지를 먼저 선택하세요." : undefined}
+                unavailableReason={selected?.type !== "image" ? translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "애니메이션으로 만들 이미지를 먼저 선택하세요.") : undefined}
               >
                 <button
                   type="button"
@@ -401,8 +380,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                     aria-hidden
                     className={studioToolIconClass({ disabled: selected?.type !== "image" })}
                   />
-                  프레임
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "프레임")}</button>
               </StudioToolBeltHintTarget>
             ) : null}
           </StudioToolbarCluster>
@@ -417,11 +395,11 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
         />
       ) : null}
 
-      <div id={advancedToolsId} className="contents" data-studio-advanced-tools={showAdvanced ? "expanded" : "contextual"}>
+      <div id={advancedToolsId} className="contents" data-studio-advanced-tools={showAdvanced ? translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "en", "expanded") : translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "en", "contextual")}>
       {allows("toolbar-reference") || referencePanelOpen ? (
       <>
-        <StudioToolbarDivider label="참조" />
-        <StudioToolbarCluster label="참고 이미지">
+        <StudioToolbarDivider label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "참조")} />
+        <StudioToolbarCluster label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "참고 이미지")}>
           <StudioToolBeltHintTarget hint={hints.reference}>
             <button
               type="button"
@@ -437,8 +415,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 aria-hidden
                 className={studioToolIconClass({ tone: "accent" })}
               />
-              참고 이미지
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "참고 이미지")}</button>
           </StudioToolBeltHintTarget>
         </StudioToolbarCluster>
       </>
@@ -448,7 +425,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
         <>
           {allows("toolbar-scene") ? <StudioToolbarDivider label="3D" /> : null}
           <StudioToolbarCluster
-            label="3D 제작·배경"
+            label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "3D 제작·배경")}
             className={cn(!allows("toolbar-scene") && "border-0 bg-transparent p-0 shadow-none")}
           >
             <div ref={activeToolbarGroup === "bgGroup" ? menuRef : undefined} className="relative">
@@ -475,8 +452,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                       active: activeToolbarGroup === "bgGroup",
                     })}
                   />
-                  3D 스튜디오
-                  <ChevronDown
+                  {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "3D 스튜디오")}<ChevronDown
                     size={STUDIO_ICON_SIZE.subtab}
                     strokeWidth={STUDIO_ICON_STROKE}
                     aria-hidden
@@ -491,16 +467,16 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 desktopWindow={{
                   label: "장면",
                   surfaceId: "toolbar-scene",
-                  defaultLayout: TOOL_POPOVER_LAYOUTS.scene,
+                  defaultLayout: STUDIO_FLOATING_MENU_LAYOUTS.scene,
                   onClose: () => setMenu(null),
-                  minWidth: 320,
-                  minHeight: 280,
+                  minWidth: 380,
+                  minHeight: 320,
                   maxWidth: 820,
                   maxHeight: 1050,
                   contentClassName: "overflow-y-auto",
                 }}
               >
-                <Suspense fallback={<StudioPanelLoading label="3D 스튜디오를 여는 중..." />}>
+                <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "3D 스튜디오를 여는 중...")} />}>
                   <LazyStudioSceneToolPopoverBody toolBelt={toolBelt} />
                 </Suspense>
               </StudioFloatingToolPopover>
@@ -511,7 +487,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
 
       {(allows("toolbar-style") || activeToolbarGroup === "styleGroup") ? (
         <StudioToolbarCluster
-          label="스타일"
+          label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "스타일")}
           className={cn(!allows("toolbar-style") && "border-0 bg-transparent p-0 shadow-none")}
         >
           <div ref={activeToolbarGroup === "styleGroup" ? menuRef : undefined} className="relative">
@@ -537,8 +513,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                     tone: activeToolbarGroup === "styleGroup" ? "accent" : "default",
                     active: activeToolbarGroup === "styleGroup",
                   })}
-                /> 스타일
-                <ChevronDown
+                /> {translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "스타일")}<ChevronDown
                   size={STUDIO_ICON_SIZE.subtab}
                   strokeWidth={STUDIO_ICON_STROKE}
                   aria-hidden
@@ -556,16 +531,16 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
               desktopWindow={{
                 label: "스타일",
                 surfaceId: "toolbar-style",
-                defaultLayout: TOOL_POPOVER_LAYOUTS.style,
+                defaultLayout: STUDIO_FLOATING_MENU_LAYOUTS.style,
                 onClose: () => setMenu(null),
-                minWidth: 300,
-                minHeight: 260,
+                minWidth: 360,
+                minHeight: 300,
                 maxWidth: 720,
                 maxHeight: 900,
                 contentClassName: "overflow-y-auto",
               }}
             >
-              <Suspense fallback={<StudioPanelLoading label="스타일 메뉴를 여는 중..." />}>
+              <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "스타일 메뉴를 여는 중...")} />}>
                 <LazyStudioStyleToolPopoverBody toolBelt={toolBelt} />
               </Suspense>
             </StudioFloatingToolPopover>
@@ -577,7 +552,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
         <>
           {allows("toolbar-ai") ? <StudioToolbarDivider label="AI" /> : null}
           <StudioToolbarCluster
-            label="AI 연동"
+            label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "AI 연동")}
             className={cn(!allows("toolbar-ai") && "border-0 bg-transparent p-0 shadow-none")}
           >
             <div ref={activeToolbarGroup === "aiGroup" ? menuRef : undefined} className="relative">
@@ -623,16 +598,16 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 desktopWindow={{
                   label: "AI 도우미",
                   surfaceId: "toolbar-ai-assistant",
-                  defaultLayout: TOOL_POPOVER_LAYOUTS.ai,
+                  defaultLayout: STUDIO_FLOATING_MENU_LAYOUTS.ai,
                   onClose: () => setMenu(null),
-                  minWidth: 360,
-                  minHeight: 360,
+                  minWidth: 440,
+                  minHeight: 380,
                   maxWidth: 960,
                   maxHeight: 1100,
                   contentClassName: "flex flex-col overflow-hidden",
                 }}
               >
-                <Suspense fallback={<StudioPanelLoading label="AI 메뉴를 여는 중..." />}>
+                <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeGroups", "ko", "AI 메뉴를 여는 중...")} />}>
                   <LazyStudioAiToolPopoverBody toolBelt={toolBelt} />
                 </Suspense>
               </StudioFloatingToolPopover>

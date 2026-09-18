@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowLeft, Ban, CheckCircle2, Eye, EyeOff, ImageOff, MessagesSquare, RefreshCw, Search, ShieldAlert, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -157,7 +158,7 @@ function AssetModerationBoard() {
     <section aria-labelledby="asset-moderation-title">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="eyebrow flex items-center gap-1.5 text-warn"><ShieldAlert size={13} /> ASSET REPORTS</p>
+          <p className="eyebrow flex items-center gap-1.5 text-warn"><ShieldAlert size={13} /> {translateCurrentStaticSourceText("domains.admin.AdminCommunityPage", "en", "ASSET REPORTS")}</p>
           <h2 id="asset-moderation-title" className="mt-1 text-xl font-bold text-fg">{t("admin.community.assetReportsTitle")}</h2>
           <p className="mt-1 text-xs leading-relaxed text-fg-3">{t("admin.community.assetReportsDesc")}</p>
         </div>
@@ -203,7 +204,7 @@ function AssetModerationBoard() {
                     <span className="rounded-full bg-bad/10 px-2 py-0.5 font-semibold text-bad">{item.reason}</span>
                     <span>{item.asset.licenseLabel ?? item.asset.license}</span>
                     {item.asset.containsAi && <span className="rounded-full bg-accent/10 px-2 py-0.5 text-accent">AI</span>}
-                    <span className="ml-auto">Reports {item.asset.reportCount ?? 1}</span>
+                    <span className="ml-auto">{translateCurrentStaticSourceText("domains.admin.AdminCommunityPage", "en", "Reports ")}{item.asset.reportCount ?? 1}</span>
                   </div>
                   <h3 className="mt-2 truncate text-sm font-bold text-fg">{item.asset.name}</h3>
                   <p className="mt-1 text-xs text-fg-3">{item.asset.author.name} · {item.reporter.id}</p>
@@ -402,7 +403,7 @@ function ModerationBoard({ uid }: { uid: string }) {
                     </span>
                   )}
                   {post.imageCount > 0 && (
-                    <span className="rounded-full bg-raised/60 px-2 py-0.5">Img {post.imageCount}</span>
+                    <span className="rounded-full bg-raised/60 px-2 py-0.5">{translateCurrentStaticSourceText("domains.admin.AdminCommunityPage", "en", "Img ")}{post.imageCount}</span>
                   )}
                   <span className="ml-auto">{post.createdAt ? relativeDate(post.createdAt) : "—"}</span>
                 </div>
@@ -411,7 +412,7 @@ function ModerationBoard({ uid }: { uid: string }) {
                     post.title
                   ) : (
                     <Link
-                      href={`/community/post/${encodeURIComponent(post.id)}`}
+                      href={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.AdminCommunityPage", "en", "/community/post/{v0}"), { v0: String(encodeURIComponent(post.id)) })}
                       className="transition-colors hover:text-accent"
                     >
                       {post.title}

@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Activity,
   AlertTriangle,
   ArrowRight,
@@ -35,6 +39,7 @@ import {
   type ManagementSeverity,
   type ProductionManagementLens,
 } from "./production-management-overview";
+import { ProductionStudioRevisionWorkspace } from "./ProductionStudioRevisionWorkspace";
 import type { ProductionClientCommand } from "./production-api";
 import { ProductionRecoveryScenarioPanel } from "./ProductionRecoveryScenarioPanel";
 import { ProductionRiskIntelligencePanel } from "./ProductionRiskIntelligencePanel";
@@ -253,11 +258,11 @@ function ActionRow({ action }: { readonly action: ManagementAction }) {
         <span className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-bold text-fg">{action.title}</span>
           <Pill tone={severityTone(action.severity)}>
-            {action.severity === "critical" ? "즉시 조치" : action.severity === "warning" ? "주의" : "확인"}
+            {action.severity === "critical" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "즉시 조치") : action.severity === "warning" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "주의") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "확인")}
           </Pill>
         </span>
         <span className="mt-1 block text-xs leading-5 text-fg-2">{action.detail}</span>
-        {action.dueAt ? <span className="mt-1 block text-[0.6875rem] text-fg-3">기한 {formatDate(action.dueAt)}</span> : null}
+        {action.dueAt ? <span className="mt-1 block text-[0.6875rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "기한 ")}{formatDate(action.dueAt)}</span> : null}
       </span>
       <span className="hidden shrink-0 items-center gap-1 text-xs font-bold text-accent sm:flex">
         {action.actionLabel}<ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
@@ -279,7 +284,7 @@ function PhaseCell({
     <div className="flex min-w-20 flex-col items-center gap-1.5">
       <Pill tone={phaseTone(status)}>{PHASE_STATUS_LABELS[status]}</Pill>
       <span className="text-[0.625rem] text-fg-3">
-        {taskCount > 0 ? `${progressPercent}% · ${taskCount}개` : progressPercent === 100 ? "승인 기준" : "—"}
+        {taskCount > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "{v0}% · {v1}개"), { v0: String(progressPercent), v1: String(taskCount) }) : progressPercent === 100 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "승인 기준") : "—"}
       </span>
     </div>
   );
@@ -331,37 +336,32 @@ export function ProductionManagementWorkspace({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <Pill tone="accent">{roleCopy.label}</Pill>
-              <Pill tone={healthTone(overview.health)}>운영 안정도 {overview.healthScore} · {overview.healthLabel}</Pill>
+              <Pill tone={healthTone(overview.health)}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "운영 안정도 ")}{overview.healthScore} · {overview.healthLabel}</Pill>
             </div>
             <h2 id="production-management-heading" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
-              프로젝트 운영 조종석
-            </h2>
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "프로젝트 운영 조종석")}</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">{roleCopy.description}</p>
             <p className="mt-2 max-w-3xl text-xs leading-5 text-fg-3">
-              실제 회차·업무·검수·배정 데이터에서 우선순위를 계산합니다. 숫자를 누르면 원인이 되는 작업으로 이동합니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "실제 회차·업무·검수·배정 데이터에서 우선순위를 계산합니다. 숫자를 누르면 원인이 되는 작업으로 이동합니다.")}</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Link className={buttonClass({ size: "sm" })} to={`${projectBase}/schedule`}>
-                <CalendarClock className="size-4" aria-hidden="true" /> 일정·작업량
-              </Link>
-              <Link className={buttonClass({ variant: "outline", size: "sm" })} to={`${projectBase}/episodes`}>
-                <PanelTopOpen className="size-4" aria-hidden="true" /> 회차 운영
-              </Link>
-              <Link className={buttonClass({ variant: "outline", size: "sm" })} to={`${projectBase}/review`}>
-                <UserRoundCheck className="size-4" aria-hidden="true" /> 검수함
-              </Link>
+              <Link className={buttonClass({ size: "sm" })} to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "{v0}/schedule"), { v0: String(projectBase) })}>
+                <CalendarClock className="size-4" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "일정·작업량")}</Link>
+              <Link className={buttonClass({ variant: "outline", size: "sm" })} to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "{v0}/episodes"), { v0: String(projectBase) })}>
+                <PanelTopOpen className="size-4" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "회차 운영")}</Link>
+              <Link className={buttonClass({ variant: "outline", size: "sm" })} to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "{v0}/review"), { v0: String(projectBase) })}>
+                <UserRoundCheck className="size-4" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "검수함")}</Link>
             </div>
           </div>
 
           <div className={cn("rounded-2xl border p-4", toneClass(healthTone(overview.health)))}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[0.6875rem] font-black uppercase tracking-[0.12em]">운영 안정도 근거</p>
+                <p className="text-[0.6875rem] font-black uppercase tracking-[0.12em]">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "운영 안정도 근거")}</p>
                 <p className="mt-1 text-3xl font-black text-fg">{overview.healthScore}</p>
               </div>
               <Gauge className="size-8" aria-hidden="true" />
             </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-canvas/70" aria-label={`운영 안정도 ${overview.healthScore}점`}>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-canvas/70" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "운영 안정도 {v0}점"), { v0: String(overview.healthScore) })}>
               <div className="h-full rounded-full bg-current" style={{ width: `${overview.healthScore}%` }} />
             </div>
             <ul className="mt-3 space-y-1.5 text-xs leading-5 text-fg-2">
@@ -378,57 +378,64 @@ export function ProductionManagementWorkspace({
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <MetricCard
-          label="다음 연재"
-          value={nextRelease ? relativeDeadline(nextRelease.daysUntilRelease) : "미정"}
-          detail={nextRelease ? `${nextRelease.title} · ${formatDate(nextRelease.releaseAt)}` : "게시 마감 설정 필요"}
+          label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "다음 연재")}
+          value={nextRelease ? relativeDeadline(nextRelease.daysUntilRelease) : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "미정")}
+          detail={nextRelease ? `${nextRelease.title} · ${formatDate(nextRelease.releaseAt)}` : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "게시 마감 설정 필요")}
           icon={CalendarClock}
-          tone={nextRelease?.health === "critical" ? "danger" : nextRelease?.health === "risk" ? "warning" : "accent"}
+          tone={nextRelease?.health === "critical" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "danger") : nextRelease?.health === "risk" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "accent")}
         />
         <MetricCard
-          label="준비 버퍼"
-          value={`${overview.operations.readyBufferCount}회`}
-          detail={overview.operations.cadenceDays ? `${overview.operations.cadenceDays}일 연재 주기 기준` : "연재 주기 확인 필요"}
+          label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "준비 버퍼")}
+          value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "{v0}회"), { v0: String(overview.operations.readyBufferCount) })}
+          detail={overview.operations.cadenceDays ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "{v0}일 연재 주기 기준"), { v0: String(overview.operations.cadenceDays) }) : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "연재 주기 확인 필요")}
           icon={BadgeCheck}
-          tone={overview.operations.readyBufferCount >= 2 ? "success" : "warning"}
+          tone={overview.operations.readyBufferCount >= 2 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "warning")}
         />
         <MetricCard
-          label="마감 위험"
+          label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "마감 위험")}
           value={String(overview.operations.criticalCount + overview.operations.riskCount)}
-          detail={`즉시 ${overview.operations.criticalCount} · 주의 ${overview.operations.riskCount} · 예측 초과 ${overview.riskIntelligence.predictedOverrunTaskCount}`}
+          detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "즉시 {v0} · 주의 {v1} · 예측 초과 {v2}"), { v0: String(overview.operations.criticalCount), v1: String(overview.operations.riskCount), v2: String(overview.riskIntelligence.predictedOverrunTaskCount) })}
           icon={AlertTriangle}
-          tone={overview.operations.criticalCount > 0 || overview.riskIntelligence.predictedOverrunTaskCount > 0 ? "danger" : overview.operations.riskCount > 0 ? "warning" : "success"}
+          tone={overview.operations.criticalCount > 0 || overview.riskIntelligence.predictedOverrunTaskCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "danger") : overview.operations.riskCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "success")}
         />
         <MetricCard
-          label="막힌 질문"
+          label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "막힌 질문")}
           value={String(overview.blockingQuestionCount)}
-          detail={overview.blockingQuestionCount > 0 ? "답변 전 다음 작업 진행 불가" : "차단 질문 없음"}
+          detail={overview.blockingQuestionCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "답변 전 다음 작업 진행 불가") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "차단 질문 없음")}
           icon={ShieldAlert}
-          tone={overview.blockingQuestionCount > 0 ? "danger" : "success"}
+          tone={overview.blockingQuestionCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "success")}
         />
         <MetricCard
-          label="검수·수정"
+          label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "검수·수정")}
           value={String(overview.reviewTaskCount)}
-          detail={`검수·변경 조치 ${reviewOrChangeCount}건`}
+          detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "검수·변경 조치 {v0}건"), { v0: String(reviewOrChangeCount) })}
           icon={ListChecks}
-          tone={overview.reviewTaskCount > 0 ? "warning" : "success"}
+          tone={overview.reviewTaskCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "success")}
         />
         <MetricCard
-          label="미배정·과부하"
+          label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "미배정·과부하")}
           value={`${overview.unassignedTaskCount} · ${overview.overloadedAssignmentCount}`}
           detail={overview.uncoveredUnassignedTaskCount > 0
-            ? `후보 없음 ${overview.uncoveredUnassignedTaskCount} · 과부하 ${overview.overloadedAssignmentCount}`
-            : "책임자 미배정 · 기본 가용량 초과"}
+            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "후보 없음 {v0} · 과부하 {v1}"), { v0: String(overview.uncoveredUnassignedTaskCount), v1: String(overview.overloadedAssignmentCount) })
+            : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "책임자 미배정 · 기본 가용량 초과")}
           icon={Users}
-          tone={overview.unassignedTaskCount + overview.overloadedAssignmentCount > 0 ? "warning" : "success"}
+          tone={overview.unassignedTaskCount + overview.overloadedAssignmentCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "success")}
         />
       </div>
 
+      <ProductionStudioRevisionWorkspace
+        aggregate={aggregate}
+        execute={execute}
+        canEdit={canEdit}
+        roleLens={roleLens}
+      />
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
         <Section
-          title="오늘의 운영 판단"
-          description="차단·마감·검수·배정 순으로 정렬하고, 현재 역할과 관련된 항목을 같은 위험도 안에서 먼저 표시합니다."
+          title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "오늘의 운영 판단")}
+          description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "차단·마감·검수·배정 순으로 정렬하고, 현재 역할과 관련된 항목을 같은 위험도 안에서 먼저 표시합니다.")}
           action={(
-            <div className="flex flex-wrap rounded-xl border border-line bg-panel p-1" role="group" aria-label="운영 판단 필터">
+            <div className="flex flex-wrap rounded-xl border border-line bg-panel p-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "운영 판단 필터")}>
               {ACTION_FILTERS.map((filter) => (
                 <button
                   key={filter.id}
@@ -451,16 +458,16 @@ export function ProductionManagementWorkspace({
             {visibleActions.length === 0 ? (
               <div className="rounded-xl border border-dashed border-line p-8 text-center">
                 <CheckCircle2 className="mx-auto size-8 text-good" aria-hidden="true" />
-                <p className="mt-3 text-sm font-black text-fg">이 조건에서 처리할 항목이 없습니다</p>
-                <p className="mt-1 text-xs text-fg-2">새로운 차단·검수·배정 이슈가 생기면 자동으로 표시됩니다.</p>
+                <p className="mt-3 text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "이 조건에서 처리할 항목이 없습니다")}</p>
+                <p className="mt-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "새로운 차단·검수·배정 이슈가 생기면 자동으로 표시됩니다.")}</p>
               </div>
             ) : null}
           </div>
         </Section>
 
         <Section
-          title="운영 복구 지점"
-          description="점수 자체보다 일정에 직접 영향을 주는 원인을 먼저 해결합니다."
+          title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "운영 복구 지점")}
+          description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "점수 자체보다 일정에 직접 영향을 주는 원인을 먼저 해결합니다.")}
         >
           <div className="space-y-2">
             {[
@@ -484,7 +491,7 @@ export function ProductionManagementWorkspace({
                 label: "열린 제작 위험",
                 value: overview.activeRiskCount,
                 detail: "대응 중이거나 아직 닫히지 않은 위험",
-                href: `${projectBase}/planning`,
+                href: `${projectBase}/risks`,
                 icon: ShieldAlert,
                 tone: overview.activeRiskCount > 0 ? "warning" : "success" as Tone,
               },
@@ -535,11 +542,11 @@ export function ProductionManagementWorkspace({
 
       <Section
         id="assignment-recommendations"
-        title="추천 업무 배정"
-        description="개인 생산성 순위가 아니라 역할·범위·활성 기간·향후 14일 예상 부하만 사용합니다. 사용자 확인 전에는 담당자를 변경하지 않습니다."
+        title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "추천 업무 배정")}
+        description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "개인 생산성 순위가 아니라 역할·범위·활성 기간·향후 14일 예상 부하만 사용합니다. 사용자 확인 전에는 담당자를 변경하지 않습니다.")}
         action={(
-          <Link className={buttonClass({ variant: "outline", size: "sm" })} to={`${projectBase}/settings`}>
-            팀 역할 확인 <ArrowRight className="size-3.5" aria-hidden="true" />
+          <Link className={buttonClass({ variant: "outline", size: "sm" })} to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "{v0}/settings"), { v0: String(projectBase) })}>
+            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "팀 역할 확인 ")}<ArrowRight className="size-3.5" aria-hidden="true" />
           </Link>
         )}
       >
@@ -562,20 +569,20 @@ export function ProductionManagementWorkspace({
                       </div>
                       <h3 className="mt-2 text-sm font-black leading-5 text-fg">{recommendation.task.title}</h3>
                       <p className="mt-1 text-xs text-fg-2">
-                        추천 {recommendation.candidateName} · {recommendation.roleLabel}
+                        {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "추천 ")}{recommendation.candidateName} · {recommendation.roleLabel}
                       </p>
                     </div>
                     <span className="text-right text-[0.6875rem] text-fg-3">
-                      {formatDate(recommendation.task.dueAt)} 마감<br />예상 +{recommendation.addedHours}h
+                      {formatDate(recommendation.task.dueAt)} {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "마감")}<br />{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "예상 +")}{recommendation.addedHours}h
                     </span>
                   </header>
 
                   <div className="mt-3">
                     <div className="flex items-center justify-between gap-2 text-[0.6875rem]">
-                      <span className="text-fg-3">배정 후 예상 작업량</span>
+                      <span className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "배정 후 예상 작업량")}</span>
                       <span className="font-black text-fg">{recommendation.projectedLoadPercent}%</span>
                     </div>
-                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-raised" aria-label={`${recommendation.candidateName} 배정 후 예상 작업량 ${recommendation.projectedLoadPercent}%`}>
+                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-raised" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "{v0} 배정 후 예상 작업량 {v1}%"), { v0: String(recommendation.candidateName), v1: String(recommendation.projectedLoadPercent) })}>
                       <div
                         className={cn("h-full rounded-full", recommendation.projectedLoadPercent > 100 ? "bg-bad" : recommendation.projectedLoadPercent >= 80 ? "bg-warn" : "bg-good")}
                         style={{ width: `${Math.min(100, recommendation.projectedLoadPercent)}%` }}
@@ -595,12 +602,12 @@ export function ProductionManagementWorkspace({
                   <button
                     type="button"
                     className={cn(buttonClass({ size: "sm" }), "mt-4 w-full")}
-                    aria-label={`업무 ${recommendation.task.title} 담당자를 ${recommendation.candidateName}에게 배정`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "업무 {v0} 담당자를 {v1}에게 배정"), { v0: String(recommendation.task.title), v1: String(recommendation.candidateName) })}
                     disabled={!canEdit || assigningTaskId !== null}
                     onClick={() => void applyRecommendedAssignment(recommendation)}
                   >
                     {assigning ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <UserPlus className="size-4" aria-hidden="true" />}
-                    {assigning ? "배정 중…" : canEdit ? "추천 담당자 배정" : "편집 권한 필요"}
+                    {assigning ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "배정 중…") : canEdit ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "추천 담당자 배정") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "편집 권한 필요")}
                   </button>
                 </article>
               );
@@ -612,40 +619,39 @@ export function ProductionManagementWorkspace({
               ? <CheckCircle2 className="mx-auto size-8 text-good" aria-hidden="true" />
               : <Users className="mx-auto size-8 text-warn" aria-hidden="true" />}
             <p className="mt-3 text-sm font-black text-fg">
-              {overview.unassignedTaskCount === 0 ? "모든 열린 업무에 책임자가 있습니다" : "현재 규칙으로 추천할 담당자가 없습니다"}
+              {overview.unassignedTaskCount === 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "모든 열린 업무에 책임자가 있습니다") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "현재 규칙으로 추천할 담당자가 없습니다")}
             </p>
             <p className="mt-1 text-xs leading-5 text-fg-2">
               {overview.unassignedTaskCount === 0
-                ? "새 업무가 생성되면 역할과 작업량을 다시 계산합니다."
-                : "해당 공정의 역할 범위, 활성 기간 또는 프로젝트 참여자를 확인해 주세요."}
+                ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "새 업무가 생성되면 역할과 작업량을 다시 계산합니다.")
+                : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "해당 공정의 역할 범위, 활성 기간 또는 프로젝트 참여자를 확인해 주세요.")}
             </p>
           </div>
         )}
         {overview.assignmentRecommendations.length > 0 && overview.uncoveredUnassignedTaskCount > 0 ? (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/35 bg-warn/10 p-3">
             <div>
-              <p className="text-xs font-black text-fg">적합 후보가 없는 업무 {overview.uncoveredUnassignedTaskCount}개</p>
-              <p className="mt-1 text-[0.6875rem] leading-5 text-fg-2">역할 범위 또는 참여 기간을 보강해야 배정 추천을 만들 수 있습니다.</p>
+              <p className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "적합 후보가 없는 업무 ")}{overview.uncoveredUnassignedTaskCount}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "개")}</p>
+              <p className="mt-1 text-[0.6875rem] leading-5 text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "역할 범위 또는 참여 기간을 보강해야 배정 추천을 만들 수 있습니다.")}</p>
             </div>
-            <Link className={buttonClass({ variant: "outline", size: "sm" })} to={`${projectBase}/settings`}>
-              팀 설정 열기
-            </Link>
+            <Link className={buttonClass({ variant: "outline", size: "sm" })} to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "{v0}/settings"), { v0: String(projectBase) })}>
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "팀 설정 열기")}</Link>
           </div>
         ) : null}
       </Section>
 
       <Section
-        title="회차 공정 매트릭스"
-        description="회차, 공정, 게시 마감과 차단 상태를 한 행에서 비교합니다. 셀의 색상과 텍스트를 함께 제공해 고대비 환경에서도 상태를 구분합니다."
-        action={<Link className={buttonClass({ variant: "outline", size: "sm" })} to={`${projectBase}/episodes`}>회차 운영실 <ArrowRight className="size-3.5" aria-hidden="true" /></Link>}
+        title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "회차 공정 매트릭스")}
+        description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "회차, 공정, 게시 마감과 차단 상태를 한 행에서 비교합니다. 셀의 색상과 텍스트를 함께 제공해 고대비 환경에서도 상태를 구분합니다.")}
+        action={<Link className={buttonClass({ variant: "outline", size: "sm" })} to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "{v0}/episodes"), { v0: String(projectBase) })}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "회차 운영실 ")}<ArrowRight className="size-3.5" aria-hidden="true" /></Link>}
       >
         <div className="overflow-x-auto rounded-xl border border-line">
           <table className="w-full min-w-[62rem] border-collapse text-left">
             <thead className="bg-panel">
               <tr className="border-b border-line text-[0.6875rem] font-black uppercase tracking-[0.08em] text-fg-3">
-                <th className="sticky left-0 z-10 min-w-64 bg-panel px-3 py-3">회차·마감</th>
+                <th className="sticky left-0 z-10 min-w-64 bg-panel px-3 py-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "회차·마감")}</th>
                 {overview.episodeRows[0]?.phases.map((phase) => <th key={phase.key} className="px-3 py-3 text-center">{phase.label}</th>)}
-                <th className="min-w-32 px-3 py-3 text-center">전체 진행</th>
+                <th className="min-w-32 px-3 py-3 text-center">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "전체 진행")}</th>
               </tr>
             </thead>
             <tbody>
@@ -657,8 +663,8 @@ export function ProductionManagementWorkspace({
                     <th className="sticky left-0 z-10 bg-card px-3 py-3 font-normal">
                       <Link to={episodeHref} className="group block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
                         <span className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-black text-fg">{operations.episodeNumber ? `${operations.episodeNumber}화` : operations.episode.episodeId}</span>
-                          <Pill tone={operations.health === "critical" ? "danger" : operations.health === "risk" || operations.health === "unplanned" ? "warning" : operations.health === "published" ? "success" : "accent"}>
+                          <span className="text-sm font-black text-fg">{operations.episodeNumber ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "{v0}화"), { v0: String(operations.episodeNumber) }) : operations.episode.episodeId}</span>
+                          <Pill tone={operations.health === "critical" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "danger") : operations.health === "risk" || operations.health === "unplanned" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "warning") : operations.health === "published" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "accent")}>
                             {episodeHealthLabel(operations.health)}
                           </Pill>
                         </span>
@@ -676,13 +682,13 @@ export function ProductionManagementWorkspace({
                     <td className="px-3 py-3">
                       <div className="mx-auto max-w-28">
                         <div className="flex items-center justify-between gap-2 text-[0.6875rem]">
-                          <span className="text-fg-3">진행률</span>
+                          <span className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "진행률")}</span>
                           <span className="font-black text-fg">{operations.progressPercent}%</span>
                         </div>
-                        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-raised" aria-label={`${operations.title} 진행률 ${operations.progressPercent}%`}>
+                        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-raised" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "{v0} 진행률 {v1}%"), { v0: String(operations.title), v1: String(operations.progressPercent) })}>
                           <div className={cn("h-full rounded-full", operations.progressPercent >= 100 ? "bg-good" : operations.health === "critical" ? "bg-bad" : "bg-accent")} style={{ width: `${operations.progressPercent}%` }} />
                         </div>
-                        <p className="mt-1 text-center text-[0.625rem] text-fg-3">잔여 {operations.remainingHours}h</p>
+                        <p className="mt-1 text-center text-[0.625rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "잔여 ")}{operations.remainingHours}h</p>
                       </div>
                     </td>
                   </tr>
@@ -695,9 +701,9 @@ export function ProductionManagementWorkspace({
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.55fr)]">
         <Section
-          title="팀 작업량"
-          description="향후 14일의 미완료 업무를 기본 주 40시간 가용량과 비교합니다. 실제 근무 캘린더가 연결되면 해당 값으로 대체할 수 있습니다."
-          action={<Link className={buttonClass({ variant: "outline", size: "sm" })} to={`${projectBase}/schedule`}>작업량 조정 <ArrowRight className="size-3.5" aria-hidden="true" /></Link>}
+          title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "팀 작업량")}
+          description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "향후 14일의 미완료 업무를 기본 주 40시간 가용량과 비교합니다. 실제 근무 캘린더가 연결되면 해당 값으로 대체할 수 있습니다.")}
+          action={<Link className={buttonClass({ variant: "outline", size: "sm" })} to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "en", "{v0}/schedule"), { v0: String(projectBase) })}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "작업량 조정 ")}<ArrowRight className="size-3.5" aria-hidden="true" /></Link>}
         >
           <div className="grid gap-3 md:grid-cols-2">
             {overview.workload.slice(0, 8).map((entry) => {
@@ -711,14 +717,14 @@ export function ProductionManagementWorkspace({
                     </div>
                     <Pill tone={tone}>{entry.loadPercent}%</Pill>
                   </header>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-raised" aria-label={`${entry.name} 작업량 ${entry.loadPercent}%`}>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-raised" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "{v0} 작업량 {v1}%"), { v0: String(entry.name), v1: String(entry.loadPercent) })}>
                     <div className={cn("h-full rounded-full", entry.health === "overloaded" ? "bg-bad" : entry.health === "busy" ? "bg-warn" : "bg-good")} style={{ width: `${Math.min(100, entry.loadPercent)}%` }} />
                   </div>
                   <div className="mt-3 grid grid-cols-4 gap-2 text-center text-[0.625rem]">
-                    <div><p className="text-fg-3">공수</p><p className="mt-1 font-black text-fg">{entry.remainingHours}h</p></div>
-                    <div><p className="text-fg-3">업무</p><p className="mt-1 font-black text-fg">{entry.taskCount}</p></div>
-                    <div><p className="text-fg-3">차단</p><p className={cn("mt-1 font-black", entry.blockedCount > 0 ? "text-bad" : "text-fg")}>{entry.blockedCount}</p></div>
-                    <div><p className="text-fg-3">검수</p><p className="mt-1 font-black text-fg">{entry.reviewCount}</p></div>
+                    <div><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "공수")}</p><p className="mt-1 font-black text-fg">{entry.remainingHours}h</p></div>
+                    <div><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "업무")}</p><p className="mt-1 font-black text-fg">{entry.taskCount}</p></div>
+                    <div><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "차단")}</p><p className={cn("mt-1 font-black", entry.blockedCount > 0 ? "text-bad" : "text-fg")}>{entry.blockedCount}</p></div>
+                    <div><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "검수")}</p><p className="mt-1 font-black text-fg">{entry.reviewCount}</p></div>
                   </div>
                 </article>
               );
@@ -727,8 +733,8 @@ export function ProductionManagementWorkspace({
         </Section>
 
         <Section
-          title="최근 프로젝트 활동"
-          description="승인·권리·보상과 일정 변경은 수정할 수 없는 기록으로 남깁니다."
+          title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "최근 프로젝트 활동")}
+          description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "승인·권리·보상과 일정 변경은 수정할 수 없는 기록으로 남깁니다.")}
         >
           <div className="space-y-2">
             {[...aggregate.auditEvents].reverse().slice(0, 6).map((event) => (
@@ -746,7 +752,7 @@ export function ProductionManagementWorkspace({
             {aggregate.auditEvents.length === 0 ? (
               <div className="rounded-xl border border-dashed border-line p-6 text-center">
                 <Sparkles className="mx-auto size-6 text-fg-3" aria-hidden="true" />
-                <p className="mt-2 text-xs font-bold text-fg">기록된 활동이 없습니다</p>
+                <p className="mt-2 text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "기록된 활동이 없습니다")}</p>
               </div>
             ) : null}
           </div>

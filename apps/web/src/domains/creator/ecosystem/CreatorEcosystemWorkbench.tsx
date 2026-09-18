@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, CheckCircle2, Download, Languages, LockKeyhole, WandSparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -150,21 +154,20 @@ export function CreatorEcosystemWorkbench() {
   };
   return <section className="mt-12 rounded-3xl border border-line bg-panel/50 p-5 sm:p-7" aria-labelledby="ecosystem-workbench-heading">
     <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div><p className="text-xs font-black text-accent">LIVE WORKBENCH</p>
-        <h2 id="ecosystem-workbench-heading" className="mt-1 text-2xl font-black text-fg">설명에서 끝나지 않는 제작 워크플로</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">예제 사본에서 번역 승인, 설정 영향 변경, 베타 독자 패키지와 제작 과정 공개 파일을 실제로 만들어 보세요.</p></div>
-      <label className="min-w-64 text-sm font-bold text-fg-2">작업할 예제
-        <select className={`${CONTROL} mt-1`} value={sampleId} onChange={event => resetSample(event.target.value)}>
+      <div><p className="text-xs font-black text-accent">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "en", "LIVE WORKBENCH")}</p>
+        <h2 id="ecosystem-workbench-heading" className="mt-1 text-2xl font-black text-fg">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "설명에서 끝나지 않는 제작 워크플로")}</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "예제 사본에서 번역 승인, 설정 영향 변경, 베타 독자 패키지와 제작 과정 공개 파일을 실제로 만들어 보세요.")}</p></div>
+      <label className="min-w-64 text-sm font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "작업할 예제")}<select className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "en", "{v0} mt-1"), { v0: String(CONTROL) })} value={sampleId} onChange={event => resetSample(event.target.value)}>
           {SAMPLE_WORKS.map(work => <option key={work.id} value={work.id}>{work.genre} · {work.title}</option>)}
         </select>
       </label>
     </div>
     <div className="mt-6 grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
       <aside className="space-y-3">
-        {preview ? <img src={preview} alt={`${page.name ?? "예제 작품"} 현재 원고 미리보기`} className="max-h-[34rem] w-full rounded-2xl border border-line bg-card object-contain" /> : <div className="grid min-h-64 place-items-center rounded-2xl border border-line bg-card text-sm text-fg-3">미리보기를 만들 수 없습니다.</div>}
+        {preview ? <img src={preview} alt={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "{v0} 현재 원고 미리보기"), { v0: String(page.name ?? "예제 작품") })} className="max-h-[34rem] w-full rounded-2xl border border-line bg-card object-contain" /> : <div className="grid min-h-64 place-items-center rounded-2xl border border-line bg-card text-sm text-fg-3">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "미리보기를 만들 수 없습니다.")}</div>}
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-          <Link to={`/studio/canvas?sample=${encodeURIComponent(sampleId)}&tutorial=bubble`} className={`${BUTTON} bg-accent text-on-accent`}>편집기에서 안내 실습 <WandSparkles size={15} /></Link>
-          <Link to="/studio/ecosystem/viewer" className={BUTTON}>검토·과정 패키지 열기 <ArrowRight size={15} /></Link>
+          <Link to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "en", "/studio/canvas?sample={v0}&tutorial=bubble"), { v0: String(encodeURIComponent(sampleId)) })} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "en", "{v0} bg-accent text-on-accent"), { v0: String(BUTTON) })}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "편집기에서 안내 실습 ")}<WandSparkles size={15} /></Link>
+          <Link to="/studio/ecosystem/viewer" className={BUTTON}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "검토·과정 패키지 열기 ")}<ArrowRight size={15} /></Link>
         </div>
         <p className="text-xs leading-5 text-fg-3">{page.note}</p>
       </aside>
@@ -173,47 +176,47 @@ export function CreatorEcosystemWorkbench() {
         <p role="status" className="rounded-xl border border-line bg-card p-3 text-sm text-fg-2">{notice}</p>
         <section className="rounded-2xl border border-line bg-card p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><h3 className="flex items-center gap-2 text-lg font-black text-fg"><Languages size={18} className="text-accent" /> 언어별 원고</h3>
-              <p className="mt-1 text-xs text-fg-3">원문이 바뀌면 초안을 오래된 상태로 표시하고 승인된 항목만 적용합니다.</p></div>
-            <div className="flex flex-wrap gap-2"><input className={`${CONTROL} w-24`} value={locale} maxLength={20} aria-label="번역 대상 로케일" onChange={event => setLocale(event.target.value.trim())} />
-              <button type="button" className={BUTTON} disabled={busy} onClick={() => void runAiTranslation()}><WandSparkles size={15} /> 자동 무료 AI 초안</button>
-              <button type="button" className={BUTTON} onClick={applyTranslations}><CheckCircle2 size={15} /> 승인본 적용</button></div>
+            <div><h3 className="flex items-center gap-2 text-lg font-black text-fg"><Languages size={18} className="text-accent" /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "언어별 원고")}</h3>
+              <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "원문이 바뀌면 초안을 오래된 상태로 표시하고 승인된 항목만 적용합니다.")}</p></div>
+            <div className="flex flex-wrap gap-2"><input className={`${CONTROL} w-24`} value={locale} maxLength={20} aria-label={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "번역 대상 로케일")} onChange={event => setLocale(event.target.value.trim())} />
+              <button type="button" className={BUTTON} disabled={busy} onClick={() => void runAiTranslation()}><WandSparkles size={15} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "자동 무료 AI 초안")}</button>
+              <button type="button" className={BUTTON} onClick={applyTranslations}><CheckCircle2 size={15} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "승인본 적용")}</button></div>
           </div>
-          <p className="mt-3 text-xs text-fg-3">자동 무료 풀을 먼저 사용합니다. 무료 한도 또는 요청 제한으로 사용할 수 없으면 <Link className="text-accent" to="/settings/ai">통합 AI 설정</Link>의 개인 무료 키 또는 로컬 AI로 이어집니다.</p>
+          <p className="mt-3 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "자동 무료 풀을 먼저 사용합니다. 무료 한도 또는 요청 제한으로 사용할 수 없으면 ")}<Link className="text-accent" to="/settings/ai">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "통합 AI 설정")}</Link>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "의 개인 무료 키 또는 로컬 AI로 이어집니다.")}</p>
           <div className="mt-4 max-h-[34rem] space-y-3 overflow-y-auto pr-1">
             {rows.map(row => {
               const draft = drafts.find(item => item.elementId === row.elementId && item.locale === locale);
               const state = translationState(row, draft);
               return <article key={row.elementId} className="grid gap-2 rounded-xl border border-line bg-panel/60 p-3 sm:grid-cols-2">
                 <div><span className="text-[0.65rem] font-black uppercase tracking-wide text-accent">{state}</span><p className="mt-1 text-sm leading-6 text-fg">{row.source}</p></div>
-                <div><textarea className={CONTROL} rows={2} value={draft?.text ?? ""} placeholder={`${locale} 번역문`} onChange={event => patchDraft(row, { text: event.target.value, approved: false })} />
-                  <label className="mt-1 flex min-h-11 items-center gap-2 text-xs font-bold text-fg-2"><input type="checkbox" checked={draft?.approved ?? false} disabled={!draft?.text.trim()} onChange={event => patchDraft(row, { approved: event.target.checked })} /> 검토·승인</label></div>
+                <div><textarea className={CONTROL} rows={2} value={draft?.text ?? ""} placeholder={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "{v0} 번역문"), { v0: String(locale) })} onChange={event => patchDraft(row, { text: event.target.value, approved: false })} />
+                  <label className="mt-1 flex min-h-11 items-center gap-2 text-xs font-bold text-fg-2"><input type="checkbox" checked={draft?.approved ?? false} disabled={!draft?.text.trim()} onChange={event => patchDraft(row, { approved: event.target.checked })} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "검토·승인")}</label></div>
               </article>;
             })}
           </div>
         </section>
         <section className="rounded-2xl border border-line bg-card p-4">
-          <h3 className="flex items-center gap-2 text-lg font-black text-fg"><LockKeyhole size={18} className="text-accent" /> 설정 변경 영향</h3>
-          <p className="mt-1 text-xs text-fg-3">캐릭터 의상·소품처럼 이름이 붙은 설정의 사용 위치를 찾아 선택한 페이지에만 반영합니다.</p>
+          <h3 className="flex items-center gap-2 text-lg font-black text-fg"><LockKeyhole size={18} className="text-accent" /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "설정 변경 영향")}</h3>
+          <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "캐릭터 의상·소품처럼 이름이 붙은 설정의 사용 위치를 찾아 선택한 페이지에만 반영합니다.")}</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
             <select className={CONTROL} value={worldEntity} onChange={event => setWorldEntity(event.target.value)}>
               {choices.map(item => <option key={`${item.entity}:${item.value}`} value={item.entity}>{item.entity} · {item.value}</option>)}
             </select>
-            <input className={CONTROL} type="color" value={worldColor} aria-label="변경할 설정 색상" onChange={event => setWorldColor(event.target.value)} />
-            <button type="button" className={BUTTON} onClick={applyWorld}>선택 위치에 적용</button>
+            <input className={CONTROL} type="color" value={worldColor} aria-label={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "변경할 설정 색상")} onChange={event => setWorldColor(event.target.value)} />
+            <button type="button" className={BUTTON} onClick={applyWorld}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "선택 위치에 적용")}</button>
           </div>
-          <label className="mt-3 flex min-h-11 items-center gap-2 text-sm text-fg-2"><input type="checkbox" checked={released.includes(page.id)} onChange={event => setReleased(event.target.checked ? [page.id] : [])} /> 이 페이지를 공개 완료로 잠그기</label>
-          <p className="mt-2 text-xs text-fg-3">현재 영향 위치 {impacts.length}개 · 변경 가능 {impacts.filter(item => !item.locked).length}개 · 잠금 {impacts.filter(item => item.locked).length}개</p>
+          <label className="mt-3 flex min-h-11 items-center gap-2 text-sm text-fg-2"><input type="checkbox" checked={released.includes(page.id)} onChange={event => setReleased(event.target.checked ? [page.id] : [])} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "이 페이지를 공개 완료로 잠그기")}</label>
+          <p className="mt-2 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "현재 영향 위치 ")}{impacts.length}{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "개 · 변경 가능 ")}{impacts.filter(item => !item.locked).length}{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "개 · 잠금 ")}{impacts.filter(item => item.locked).length}{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "개")}</p>
         </section>
 
         <section className="rounded-2xl border border-line bg-card p-4">
-          <h3 className="text-lg font-black text-fg">베타 독자 검토와 제작 과정 공개</h3>
-          <p className="mt-1 text-xs leading-5 text-fg-3">편집 원본 대신 축소 미리보기·변경 확인값·질문만 전달합니다. 확인값은 변경 감지용이며 서명이나 권한 증명이 아닙니다.</p>
-          <label className="mt-3 flex min-h-11 items-start gap-2 text-sm leading-6 text-fg-2"><input className="mt-1.5" type="checkbox" checked={rightsAcknowledged} onChange={event => setRightsAcknowledged(event.target.checked)} /> 이 예제 또는 내가 권리를 가진 작품만 검토·쇼케이스 패키지로 내보냅니다.</label>
+          <h3 className="text-lg font-black text-fg">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "베타 독자 검토와 제작 과정 공개")}</h3>
+          <p className="mt-1 text-xs leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "편집 원본 대신 축소 미리보기·변경 확인값·질문만 전달합니다. 확인값은 변경 감지용이며 서명이나 권한 증명이 아닙니다.")}</p>
+          <label className="mt-3 flex min-h-11 items-start gap-2 text-sm leading-6 text-fg-2"><input className="mt-1.5" type="checkbox" checked={rightsAcknowledged} onChange={event => setRightsAcknowledged(event.target.checked)} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "이 예제 또는 내가 권리를 가진 작품만 검토·쇼케이스 패키지로 내보냅니다.")}</label>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" className={BUTTON} disabled={!rightsAcknowledged || !preview} onClick={exportBeta}><Download size={15} /> 베타 검토 패키지</button>
-            <button type="button" className={BUTTON} disabled={!rightsAcknowledged} onClick={exportProcess}><Download size={15} /> 4단계 제작 과정</button>
-            <Link to="/studio/ecosystem/viewer" className={BUTTON}>패키지 검토·감상 열기</Link>
+            <button type="button" className={BUTTON} disabled={!rightsAcknowledged || !preview} onClick={exportBeta}><Download size={15} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "베타 검토 패키지")}</button>
+            <button type="button" className={BUTTON} disabled={!rightsAcknowledged} onClick={exportProcess}><Download size={15} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "4단계 제작 과정")}</button>
+            <Link to="/studio/ecosystem/viewer" className={BUTTON}>{translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemWorkbench", "ko", "패키지 검토·감상 열기")}</Link>
           </div>
         </section>
       </div>

@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { ShieldCheck } from "lucide-react";
 import { useEffect } from "react";
 
@@ -150,11 +151,11 @@ export function AdminPage() {
                 {ADMIN_TAB_KEYS.map((tabKey) => (
                   <button
                     key={tabKey}
-                    id={`admin-tab-${tabKey}`}
+                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.AdminPage", "en", "admin-tab-{v0}"), { v0: String(tabKey) })}
                     type="button"
                     role="tab"
                     aria-selected={tab === tabKey}
-                    aria-controls={`admin-panel-${tabKey}`}
+                    aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.AdminPage", "en", "admin-panel-{v0}"), { v0: String(tabKey) })}
                     tabIndex={tab === tabKey ? 0 : -1}
                     onClick={() => selectTab(tabKey)}
                     onKeyDown={(event) => handleTabKeyDown(event, tabKey)}
@@ -189,9 +190,9 @@ export function AdminPage() {
             </div>
 
             <div
-              id={`admin-panel-${tab}`}
+              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.AdminPage", "en", "admin-panel-{v0}"), { v0: String(tab) })}
               role="tabpanel"
-              aria-labelledby={`admin-tab-${tab}`}
+              aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.AdminPage", "en", "admin-tab-{v0}"), { v0: String(tab) })}
               aria-label={copy.console.tabPanelLabel}
               className="min-h-[500px] focus:outline-none"
               tabIndex={-1}

@@ -10,6 +10,8 @@ import { buildAdminCapabilitySql } from "./admin-database-contract.mjs";
 import { buildFeedbackCapabilitySql } from "./feedback-database-contract.mjs";
 import {
   buildAuthRuntimeAclViolationSql,
+  buildTrafficAnalyticsRuntimeAclViolationSql,
+  buildCreatorRoleWorkspaceRuntimeAclViolationSql,
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
   buildCreatorMarketplaceRuntimeAclViolationSql,
   buildMessagingRuntimeAclViolationSql,
@@ -421,6 +423,16 @@ BEGIN
   IF ${buildAuthRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
     RAISE EXCEPTION
       'runtime role lacks the exact authentication lifecycle privileges';
+  END IF;
+
+  IF ${buildTrafficAnalyticsRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION
+      'runtime role lacks the exact traffic analytics privileges';
+  END IF;
+
+  IF ${buildCreatorRoleWorkspaceRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION
+      'runtime role lacks the exact creator role workspace privileges';
   END IF;
 
   IF ${buildPersonalCloudRuntimeAclViolationSql(runtimeDatabaseRole)} THEN

@@ -1,3 +1,5 @@
+import { generateKeyPairSync } from "node:crypto";
+
 import {
   BadRequestException,
   Logger,
@@ -6,12 +8,15 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  oauthLinkSessionCookieName,
   oauthPkceVerifierCookieName,
   oauthStateCookieName,
+  resolveOAuthLinkSessionCookieOptions,
   resolveOAuthPkceVerifierCookieOptions,
   resolveOAuthStateCookieOptions,
 } from "../../oauth-state-cookie";
 import {
+  appleNonceForState,
   createPkceCodeChallenge,
   issuePkceVerifier,
   issueState,
@@ -58,7 +63,7 @@ function request(cookie?: string): Request {
 }
 
 function requestWithOAuthState(
-  provider: "google" | "kakao" | "naver" | "github",
+  provider: "google" | "apple" | "kakao" | "naver" | "github",
   state: string,
   pkceVerifier?: string,
 ): Request {
@@ -147,6 +152,84 @@ describe("AuthController Google GIS/code-flow boundary", () => {
         sameSite: "lax",
         path: "/api/auth/oauth/github",
       }),
+    );
+  });
+
+  it("uses SameSite=None only for Apple cross-site form_post state", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const { privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
+    vi.stubEnv("APPLE_SERVICE_ID", "cloud.toonstudio.web");
+    vi.stubEnv("APPLE_TEAM_ID", "TEAMID1234");
+    vi.stubEnv("APPLE_KEY_ID", "KEYID12345");
+    vi.stubEnv("APPLE_PRIVATE_KEY", privateKey.export({ type: "pkcs8", format: "pem" }).toString());
+    vi.stubEnv("AUTH_STATE_SECRET", "0123456789abcdef0123456789abcdef");
+    vi.stubEnv("OAUTH_REDIRECT_BASE_URL", "https://www.toonstudio.cloud");
+    const res = response();
+
+    controller().oauthStart("apple", res);
+
+    const redirectUrl = String(vi.mocked(res.redirect).mock.calls[0]?.[0]);
+    const authorizeUrl = new URL(redirectUrl);
+    const state = authorizeUrl.searchParams.get("state");
+    expect(state).toBeTruthy();
+    expect(authorizeUrl.searchParams.get("response_mode")).toBe("form_post");
+    expect(authorizeUrl.searchParams.get("scope")).toBe("name email");
+    expect(authorizeUrl.searchParams.get("nonce")).toBe(appleNonceForState(String(state)));
+    expect(res.cookie).toHaveBeenCalledWith(
+      oauthStateCookieName("apple"),
+      state,
+      expect.objectContaining({
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+        path: "/api/auth/oauth/apple",
+      }),
+    );
+    expect(resolveOAuthLinkSessionCookieOptions("apple")).toEqual(
+      expect.objectContaining({ sameSite: "none", secure: true }),
+    );
+    expect(oauthLinkSessionCookieName("apple")).toBe(
+      "toonspectrum-oauth-link-session-apple",
+    );
+  });
+
+  it("accepts Apple form_post callback and forwards first-authorization name payload", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const { privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
+    vi.stubEnv("APPLE_SERVICE_ID", "cloud.toonstudio.web");
+    vi.stubEnv("APPLE_TEAM_ID", "TEAMID1234");
+    vi.stubEnv("APPLE_KEY_ID", "KEYID12345");
+    vi.stubEnv("APPLE_PRIVATE_KEY", privateKey.export({ type: "pkcs8", format: "pem" }).toString());
+    vi.stubEnv("AUTH_STATE_SECRET", "0123456789abcdef0123456789abcdef");
+    vi.stubEnv("AUTH_SESSION_SECRET", "abcdef0123456789abcdef0123456789");
+    vi.stubEnv("WEB_APP_BASE_URL", "https://www.toonstudio.cloud");
+    const state = issueState("apple");
+    const appleUser = JSON.stringify({ name: { firstName: "Apple", lastName: "Creator" } });
+    handleOAuthCallback.mockResolvedValueOnce({
+      id: "apple-user-1",
+      name: "Apple Creator",
+      email: "relay@privaterelay.appleid.com",
+      image: null,
+      role: "user",
+      sessionVersion: 2,
+    });
+    const res = response();
+
+    await controller().oauthAppleCallback(
+      { code: "apple-code", state, user: appleUser },
+      requestWithOAuthState("apple", state),
+      res,
+    );
+
+    expect(handleOAuthCallback).toHaveBeenCalledWith(
+      "apple",
+      "apple-code",
+      state,
+      undefined,
+      { appleUser },
+    );
+    expect(res.redirect).toHaveBeenCalledWith(
+      "https://www.toonstudio.cloud/auth/callback#session=1",
     );
   });
 
@@ -620,6 +703,7 @@ describe("AuthController Google GIS/code-flow boundary", () => {
   it("logs only the stable GIS persistence reason for an unknown failure", async () => {
     const idToken = "header.id-token-never-log-this.signature";
     const internalMessage =
+      // secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic log-redaction fixture
       "postgresql://runtime:db-secret@example.invalid/internal private.artist@example.test";
     handleGoogleIdToken.mockRejectedValueOnce(new Error(internalMessage));
     const logger = vi

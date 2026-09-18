@@ -3,7 +3,19 @@ import {
   createDesktopCloudRemote,
   type DesktopCloudProviderId,
 } from "./cloud/index.js";
+import {
+  SystemDesktopCredentialVault,
+  type DesktopCredentialVault,
+} from "./credential-vault.js";
 import { FileSystemDesktopSyncRemote } from "./filesystem-remote.js";
+import {
+  DEFAULT_DESKTOP_OAUTH_PROFILE,
+  DesktopOAuthCredentialManager,
+} from "./oauth.js";
+import {
+  CredentialDesktopUploadSessionStore,
+  type DesktopUploadSessionStore,
+} from "./upload-session-store.js";
 
 import type { DesktopSyncRemote } from "./runtime.js";
 import type { ScanSyncFolderOptions } from "./scanner.js";
@@ -17,12 +29,16 @@ export type DesktopSyncRemoteTarget =
       readonly kind: "cloud";
       readonly provider: DesktopCloudProviderId;
       readonly rootPath: string;
+      readonly credentialProfile: string;
       readonly accessTokenEnvironmentVariable: string;
     };
 
 export interface DesktopSyncRemoteDependencies {
   readonly environment?: Readonly<Record<string, string | undefined>>;
   readonly fetchImpl?: typeof fetch;
+  readonly credentialVault?: DesktopCredentialVault;
+  readonly oauthManager?: DesktopOAuthCredentialManager;
+  readonly uploadSessionStore?: DesktopUploadSessionStore;
 }
 
 export const DEFAULT_CLOUD_ACCESS_TOKEN_ENVIRONMENT: Readonly<
@@ -45,6 +61,7 @@ export function parseDesktopCloudProviderId(
     `--cloud-provider must be one of ${DESKTOP_CLOUD_PROVIDER_IDS.join(", ")}`,
   );
 }
+
 export function desktopSyncRemoteLabel(
   target: DesktopSyncRemoteTarget,
 ): string {
@@ -68,18 +85,27 @@ export async function createDesktopSyncRemoteForTarget(
     return remote;
   }
   const environment = dependencies.environment ?? process.env;
-  const accessToken = environment[
+  const environmentValue = environment[
     target.accessTokenEnvironmentVariable
   ]?.trim();
-  if (!accessToken) {
-    throw new TypeError(
-      `cloud access token is missing from ${target.accessTokenEnvironmentVariable}`,
-    );
-  }
+  const vault = dependencies.credentialVault
+    ?? new SystemDesktopCredentialVault();
+  const manager = dependencies.oauthManager
+    ?? new DesktopOAuthCredentialManager(vault, {
+      fetchImpl: dependencies.fetchImpl,
+    });
+  const credentialProfile = target.credentialProfile
+    || DEFAULT_DESKTOP_OAUTH_PROFILE;
+  const accessToken = environmentValue
+    || manager.accessTokenSource(target.provider, credentialProfile);
+  const uploadSessionStore = dependencies.uploadSessionStore
+    ?? new CredentialDesktopUploadSessionStore(vault);
   return createDesktopCloudRemote({
     provider: target.provider,
     accessToken,
     rootPath: target.rootPath,
     fetchImpl: dependencies.fetchImpl,
+    credentialProfile,
+    uploadSessionStore,
   });
 }

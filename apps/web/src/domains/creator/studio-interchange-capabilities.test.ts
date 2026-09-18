@@ -274,15 +274,15 @@ describe("Studio interchange capability registry", () => {
       expect(studioInterchangeCapability(id)).toMatchObject({
         extensions: [".pdf"],
         import: "unsupported",
-        export: "engine-ready",
-        status: "engine-ready",
+        export: id === "pdf-vector" ? "partial" : "engine-ready",
+        status: id === "pdf-vector" ? "partial" : "engine-ready",
         implementation: {
           import: "not-implemented",
           export: "implemented",
         },
         uiWiring: {
           import: "not-applicable",
-          export: "not-wired",
+          export: id === "pdf-vector" ? "partial" : "not-wired",
         },
         conformance: {
           publicSpec: "tested-public-subset",
@@ -426,16 +426,16 @@ describe("Studio interchange capability registry", () => {
   it("GIF/APNG 내보내기와 미구현 MP4를 독립 capability로 분리한다", () => {
     const capability = studioInterchangeCapability("gif-apng-export")!;
     expect(capability).toMatchObject({
-      import: "unsupported",
+      import: "partial",
       export: "partial",
       roundTrip: "none",
       status: "partial",
       implementation: {
-        import: "not-implemented",
+        import: "runtime-dependent",
         export: "partial",
       },
       uiWiring: {
-        import: "not-applicable",
+        import: "wired",
         export: "wired",
       },
     });
@@ -481,9 +481,9 @@ describe("Studio interchange capability registry", () => {
 
   it("AVIF browser pipeline과 미구현 HEIC를 같은 지원으로 과장하지 않는다", () => {
     expect(studioInterchangeCapability("avif")).toMatchObject({
-      import: "engine-ready",
+      import: "available",
       export: "unsupported",
-      status: "engine-ready",
+      status: "available",
       technicalLayers: {
         format: ["AVIF"],
         container: ["ISO Base Media File Format / HEIF"],
@@ -494,7 +494,7 @@ describe("Studio interchange capability registry", () => {
         export: "not-implemented",
       },
       uiWiring: {
-        import: "not-wired",
+        import: "wired",
         export: "not-applicable",
       },
       metadata: {
@@ -533,19 +533,19 @@ describe("Studio interchange capability registry", () => {
     ]);
   });
 
-  it("ICC 정책 엔진과 InkML 적합성 receipt를 UI 연결 상태와 분리한다", () => {
+  it("ICC 정책 엔진의 실제 색상 확인·출력 UI와 InkML 적합성 receipt를 기록한다", () => {
     expect(studioInterchangeCapability("icc-profile")).toMatchObject({
       extensions: [".icc", ".icm"],
-      import: "engine-ready",
-      export: "engine-ready",
-      status: "engine-ready",
+      import: "available",
+      export: "partial",
+      status: "partial",
       implementation: {
         import: "implemented",
         export: "implemented",
       },
       uiWiring: {
-        import: "not-wired",
-        export: "not-wired",
+        import: "wired",
+        export: "wired",
       },
       conformance: {
         publicSpec: "tested-public-subset",
@@ -603,8 +603,8 @@ describe("Studio interchange capability registry", () => {
     expect(studioInterchangeCapability("toonproject-archive")?.sizeBudget.maxFileBytes).toBe(280_000_000);
     expect(studioInterchangeCapability("inkml")).toMatchObject({
       label: "InkML (ToonSpectrum 안전 부분집합)",
-      import: "engine-ready",
-      export: "engine-ready",
+      import: "available",
+      export: "partial",
       status: "engine-ready",
       mime: ["application/inkml+xml"],
       sizeBudget: {

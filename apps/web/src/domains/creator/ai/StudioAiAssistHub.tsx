@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioAiAssistHub — tabbed AI assist shell (PicsArt/Canva-class).
  * Connection status · production director · tool tabs · prompt presets · recent chips · tool slot.
@@ -149,7 +152,10 @@ export function StudioAiAssistHub({
 
   return (
     <div
-      className={cn("flex min-h-0 flex-1 flex-col gap-2", className)}
+      className={cn(
+        "pointer-events-auto relative z-[1] isolate flex min-h-0 flex-1 flex-col gap-2",
+        className,
+      )}
       data-studio-ai-assist-hub="true"
     >
       {/* Connection strip — always visible */}
@@ -169,8 +175,7 @@ export function StudioAiAssistHub({
       >
         <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-fg">
           <Settings2 size={14} className="shrink-0 text-accent" aria-hidden />
-          AI 어시스트 설정
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "AI 어시스트 설정")}</span>
         <span
           className={cn(
             "inline-flex shrink-0 items-center gap-1 text-[0.65rem] font-medium",
@@ -202,10 +207,9 @@ export function StudioAiAssistHub({
               <Clapperboard size={15} aria-hidden />
             </span>
             <span className="min-w-0">
-              <strong className="block text-xs font-black text-fg">회차 AI 프로덕션</strong>
+              <strong className="block text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "회차 AI 프로덕션")}</strong>
               <span className="mt-0.5 block text-[0.61rem] leading-relaxed text-fg-3">
-                대본 → 연속성 잠금 → 생성 묶음 → 품질 QA
-              </span>
+                {translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "대본 → 연속성 잠금 → 생성 묶음 → 품질 QA")}</span>
             </span>
           </span>
           <ChevronRight size={15} className="shrink-0 text-accent" aria-hidden />
@@ -228,7 +232,7 @@ export function StudioAiAssistHub({
       <div
         className="flex shrink-0 gap-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]"
         role="tablist"
-        aria-label="AI 어시스트 도구"
+        aria-label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "AI 어시스트 도구")}
         aria-orientation="horizontal"
       >
         {STUDIO_AI_ASSIST_TOOLS.map((tool) => {
@@ -266,7 +270,7 @@ export function StudioAiAssistHub({
         <span className="font-semibold text-fg-2">{toolMeta.label}</span>
         {" · "}
         {toolMeta.title}
-        <span className="mt-0.5 block text-fg-3/90">예시 칩을 누르거나 직접 입력 · ⌘/Ctrl+Enter</span>
+        <span className="mt-0.5 block text-fg-3/90">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "예시 칩을 누르거나 직접 입력 · ⌘/Ctrl+Enter")}</span>
       </p>
 
       {/* Local-only disclosure: this describes execution but never calls a model. */}
@@ -278,7 +282,7 @@ export function StudioAiAssistHub({
             : "border-warn/40 bg-warn/10"
         )}
         data-studio-ai-execution-preflight="true"
-        data-execution-ready={executionPreflight.available ? "true" : "false"}
+        data-execution-ready={executionPreflight.available ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "en", "true") : translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "en", "false")}
       >
         <summary
           className={cn(
@@ -294,7 +298,7 @@ export function StudioAiAssistHub({
             <TriangleAlert size={15} className="shrink-0 text-warn" aria-hidden />
           )}
           <span className="min-w-0 flex-1">
-            <span className="block text-[0.68rem] font-bold text-fg">실행 전 확인</span>
+            <span className="block text-[0.68rem] font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "실행 전 확인")}</span>
             <span className="block truncate text-[0.58rem] text-fg-3">
               {executionPreflight.processingRoute}
             </span>
@@ -309,7 +313,7 @@ export function StudioAiAssistHub({
           >
             {executionPreflight.available
               ? executionPreflight.costCategory
-              : "실행 불가"}
+              : translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "실행 불가")}
           </span>
           <ChevronDown
             size={14}
@@ -332,39 +336,38 @@ export function StudioAiAssistHub({
           className="grid max-h-56 grid-cols-[5.25rem_minmax(0,1fr)] gap-x-2 gap-y-1.5 overflow-y-auto border-t border-line/70 px-3 py-2.5 text-[0.59rem] leading-relaxed"
           data-studio-ai-execution-preflight-details="true"
         >
-          <dt className="font-semibold text-fg-3">처리 경로</dt>
+          <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "처리 경로")}</dt>
           <dd className="min-w-0 text-fg-2">{executionPreflight.processingRoute}</dd>
 
-          <dt className="font-semibold text-fg-3">외부 전송</dt>
+          <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "외부 전송")}</dt>
           <dd className="min-w-0 text-fg-2">
-            {executionPreflight.externalTransfer ? "있음 · " : "없음 · "}
+            {executionPreflight.externalTransfer ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "있음 · ") : translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "없음 · ")}
             {executionPreflight.externalTransferLabel}
           </dd>
 
-          <dt className="font-semibold text-fg-3">비용 범주</dt>
+          <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "비용 범주")}</dt>
           <dd className="min-w-0 font-semibold text-fg-2">
             {executionPreflight.costCategory}
           </dd>
 
-          <dt className="font-semibold text-fg-3">예상 시간</dt>
+          <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "예상 시간")}</dt>
           <dd className="min-w-0 text-fg-2">
             {executionPreflight.estimatedTimeCategory}
             {" · "}
             {executionPreflight.estimatedTimeLabel}
           </dd>
 
-          <dt className="font-semibold text-fg-3">출력 수</dt>
+          <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "출력 수")}</dt>
           <dd className="min-w-0 text-fg-2">{executionPreflight.outputCountLabel}</dd>
 
-          <dt className="font-semibold text-fg-3">실패 정책</dt>
+          <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "실패 정책")}</dt>
           <dd className="min-w-0 text-fg-2">
             {executionPreflight.fallbackRetryPolicy}
           </dd>
 
           <dt className="flex items-start gap-1 font-semibold text-fg-3">
             <ShieldCheck size={11} className="mt-0.5 shrink-0 text-good" aria-hidden />
-            원본 보호
-          </dt>
+            {translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "원본 보호")}</dt>
           <dd className="min-w-0 text-fg-2">
             {executionPreflight.sourceNonDestructivePolicy}
           </dd>
@@ -372,10 +375,10 @@ export function StudioAiAssistHub({
       </details>
 
       {/* Scrollable body: presets + recent + active tool form */}
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-0.5">
+      <div className="pointer-events-auto relative z-[1] flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-0.5">
         {presets.length > 0 ? (
           <div className="shrink-0">
-            <p className="mb-1 text-[0.62rem] font-semibold text-fg-2">빠른 예시</p>
+            <p className="mb-1 text-[0.62rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "빠른 예시")}</p>
             <div className="flex flex-wrap gap-1">
               {presets.map((preset) => (
                 <button
@@ -399,7 +402,7 @@ export function StudioAiAssistHub({
 
         {recents.length > 0 ? (
           <div className="shrink-0">
-            <p className="mb-1 text-[0.62rem] font-semibold text-fg-2">최근 프롬프트</p>
+            <p className="mb-1 text-[0.62rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiAssistHub", "ko", "최근 프롬프트")}</p>
             <div className="flex flex-col gap-0.5">
               {recents.map((prompt) => (
                 <button

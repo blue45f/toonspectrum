@@ -66,6 +66,11 @@ class AuthCsrfProbeController {
   demo() {
     return { ok: true };
   }
+
+  @Post("oauth/apple/callback")
+  appleCallback() {
+    return { ok: true, provider: "apple" };
+  }
 }
 
 @Controller("studio-realtime")
@@ -220,6 +225,31 @@ describe("cookie-authenticated Nest CSRF boundary", () => {
     expect(preflight.status).toBe(404);
     expect(preflight.headers.get("access-control-allow-origin")).toBeNull();
     expect(preflight.headers.get("access-control-allow-credentials")).toBeNull();
+  });
+
+  it("allows only the exact Apple form_post callback through the global CSRF gate", async () => {
+    const appleCallback = await fetch(`${baseUrl}/api/auth/oauth/apple/callback`, {
+      method: "POST",
+      headers: {
+        Origin: "https://appleid.apple.com",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Sec-Fetch-Site": "cross-site",
+        "Sec-Fetch-Mode": "navigate",
+      },
+      body: "code=one-time-code&state=browser-bound-state",
+    });
+    const wrongContentType = await fetch(`${baseUrl}/api/auth/oauth/apple/callback`, {
+      method: "POST",
+      headers: {
+        Origin: "https://appleid.apple.com",
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+
+    expect(appleCallback.status).toBe(201);
+    await expect(appleCallback.json()).resolves.toEqual({ ok: true, provider: "apple" });
+    expect(wrongContentType.status).toBe(403);
   });
 
   it("protects session-issuing auth POSTs before an authentication cookie exists", async () => {

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * `InspectorSection` — the progressive-disclosure primitive for the right inspector.
  *
@@ -95,43 +99,42 @@ export function StudioInspectorSection({
         focusHighlighted && "bg-accent-soft/55 shadow-[0_0_0_2px_oklch(0.72_0.185_42/0.55)]",
       )}
       data-inspector-section={sectionId}
-      data-inspector-section-open={open ? "true" : "false"}
-      data-inspector-section-highlighted={focusHighlighted ? "true" : undefined}
+      data-inspector-section-open={open ? translateCurrentStaticSourceText("domains.creator.StudioInspectorSection", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioInspectorSection", "en", "false")}
+      data-inspector-section-highlighted={focusHighlighted ? translateCurrentStaticSourceText("domains.creator.StudioInspectorSection", "en", "true") : undefined}
     >
       <button
         ref={headerRef}
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-        aria-label={`${heading}, 세부 설정 ${open ? "접기" : "펼치기"}`}
-        title="세밀한 옵션입니다. 필요할 때만 펼쳐도 기본 작업에는 문제가 없습니다."
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorSection", "ko", "{v0}, 세부 설정 {v1}"), { v0: String(heading), v1: String(open ? "접기" : "펼치기") })}
+        title={translateCurrentStaticSourceText("domains.creator.StudioInspectorSection", "ko", "세밀한 옵션입니다. 필요할 때만 펼쳐도 기본 작업에는 문제가 없습니다.")}
         onClick={toggleOpen}
-        data-inspector-control-id={`section.${sectionId}`}
+        data-inspector-control-id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorSection", "en", "section.{v0}"), { v0: String(sectionId) })}
         data-inspector-priority="chrome"
         className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-1.5 py-1 text-left text-xs font-semibold text-fg transition-colors hover:bg-raised/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:min-h-8 pointer-coarse:min-h-11"
       >
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate">{heading}</span>
           <span className="shrink-0 rounded-full border border-line bg-card px-1.5 py-px text-[0.56rem] font-semibold text-fg-3">
-            세부
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.StudioInspectorSection", "ko", "세부")}</span>
           {activeCount > 0 && !open ? (
             <>
               <span
                 aria-hidden
                 className="shrink-0 rounded-full bg-accent/15 px-1.5 py-px text-[0.6rem] font-bold tabular-nums text-accent"
-                title={`${activeCount}개 설정이 켜져 있습니다.`}
+                title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorSection", "ko", "{v0}개 설정이 켜져 있습니다."), { v0: String(activeCount) })}
               >
                 {activeCount}
               </span>
-              <span className="sr-only">{`, 설정 ${activeCount}개 켜짐`}</span>
+              <span className="sr-only">{formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorSection", "ko", ", 설정 {v0}개 켜짐"), { v0: String(activeCount) })}</span>
             </>
           ) : null}
         </span>
         <ChevronDown
           size={14}
           aria-hidden
-          className={open ? "shrink-0 rotate-180 transition-transform" : "shrink-0 transition-transform"}
+          className={open ? translateCurrentStaticSourceText("domains.creator.StudioInspectorSection", "en", "shrink-0 rotate-180 transition-transform") : translateCurrentStaticSourceText("domains.creator.StudioInspectorSection", "en", "shrink-0 transition-transform")}
         />
       </button>
       <div id={panelId} hidden={!open}>

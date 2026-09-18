@@ -68,6 +68,22 @@ export type TrafficRecent = {
   browser: string;
 };
 
+export type TrafficShareChannel = {
+  channel: string;
+  attempts: number;
+  opened: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+};
+
+export type TrafficShareContent = {
+  path: string;
+  attempts: number;
+  opened: number;
+  completed: number;
+};
+
 export type TrafficOverview = {
   generatedAt: string;
   rangeDays: number;
@@ -103,6 +119,19 @@ export type TrafficOverview = {
     bounceRate: number;
     averageEngagedSeconds: number;
     pageViewsPerSession: number;
+  };
+  sharing: {
+    attempts: number;
+    opened: number;
+    completed: number;
+    failed: number;
+    cancelled: number;
+    uniqueSharers: number;
+    attributedPageViews: number;
+    attributedVisitors: number;
+    attributedSessions: number;
+    channels: TrafficShareChannel[];
+    topContent: TrafficShareContent[];
   };
   series: TrafficSeriesPoint[];
   realtimeSeries: TrafficSeriesPoint[];
@@ -189,6 +218,22 @@ export function downloadTrafficOverviewCsv(data: TrafficOverview): void {
       String(item.pageViews),
       String(item.visitors),
       "",
+      "",
+    ]),
+    ...data.sharing.channels.map((item) => [
+      "share-channel",
+      item.channel,
+      String(item.attempts),
+      String(item.opened),
+      String(item.completed),
+      `failed=${item.failed};cancelled=${item.cancelled}`,
+    ]),
+    ...data.sharing.topContent.map((item) => [
+      "share-content",
+      item.path,
+      String(item.attempts),
+      String(item.opened),
+      String(item.completed),
       "",
     ]),
     ...data.devices.map((item) => [

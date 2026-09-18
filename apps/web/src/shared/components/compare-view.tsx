@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Swords, ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
@@ -98,7 +102,7 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
       <div
         className="grid grid-cols-2 gap-6 sm:grid-cols-[1fr_auto_1fr]"
         role="status"
-        aria-label="작품 비교 불러오는 중"
+        aria-label={translateCurrentStaticSourceText("shared.components.compare.view", "ko", "작품 비교 불러오는 중")}
       >
         <div className="skeleton aspect-[3/4] rounded-2xl" />
         {/* 스피너 대신 스켈레톤 'VS' 칩 — 양옆 표지와 톤을 맞춰 로딩 상태를 일관되게(DESIGN.md). */}
@@ -137,7 +141,7 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
 
           {/* 주요 수치 대조 패널 */}
           <div className="overflow-hidden rounded-2xl border border-line bg-panel/40 backdrop-blur-sm p-2 sm:p-4">
-            <h3 className="mb-4 px-2 text-xs font-bold text-fg-3 uppercase tracking-wider">주요 지표 비교분석</h3>
+            <h3 className="mb-4 px-2 text-xs font-bold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("shared.components.compare.view", "ko", "주요 지표 비교분석")}</h3>
             <div className="space-y-4">
               {METRICS.map((m, i) => {
                 const va = m.get(a);
@@ -225,8 +229,7 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
 
           {eitherEstimated && (
             <p className="text-center text-[0.68rem] text-fg-3 leading-relaxed">
-              * 비교 작품 중 카카오웹툰·웹소설은 별점·조회 등이 보정된 추정값이라 우열 그래프 표시를 생략했어요.
-            </p>
+              {translateCurrentStaticSourceText("shared.components.compare.view", "ko", "* 비교 작품 중 카카오웹툰·웹소설은 별점·조회 등이 보정된 추정값이라 우열 그래프 표시를 생략했어요.")}</p>
           )}
 
           {/* 에디토리얼 요약 및 플랫폼 가용성 가격 비교 표 */}
@@ -234,7 +237,7 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
             {/* 작품 A 디테일 */}
             <div className="rounded-2xl border border-line bg-card/30 p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-line/45 pb-3">
-                <span className="text-xs font-bold text-accent">LEFT COLUMN</span>
+                <span className="text-xs font-bold text-accent">{translateCurrentStaticSourceText("shared.components.compare.view", "en", "LEFT COLUMN")}</span>
                 <span className="text-xs text-fg-3">{STATUS_LABEL[a.status]}</span>
               </div>
               <CompareExtra t={a} align="left" />
@@ -244,7 +247,7 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
             {/* 작품 B 디테일 */}
             <div className="rounded-2xl border border-line bg-card/30 p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-line/45 pb-3">
-                <span className="text-xs font-bold text-accent">RIGHT COLUMN</span>
+                <span className="text-xs font-bold text-accent">{translateCurrentStaticSourceText("shared.components.compare.view", "en", "RIGHT COLUMN")}</span>
                 <span className="text-xs text-fg-3">{STATUS_LABEL[b.status]}</span>
               </div>
               <CompareExtra t={b} align="left" />
@@ -269,19 +272,17 @@ function VerdictBanner({ a, b }: { a: Title; b: Title }) {
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-accent/35 bg-accent-soft/40 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <p className="eyebrow text-accent">종합 우세</p>
+        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("shared.components.compare.view", "ko", "종합 우세")}</p>
         {tie ? (
           <p className="mt-1 text-pretty text-sm font-semibold text-fg">
-            막상막하예요 — 주요 지표 {verdict.total}개가 {verdict.aWins} : {verdict.bWins}로 팽팽합니다.
-          </p>
+            {translateCurrentStaticSourceText("shared.components.compare.view", "ko", "막상막하예요 — 주요 지표 ")}{verdict.total}{translateCurrentStaticSourceText("shared.components.compare.view", "ko", "개가 ")}{verdict.aWins} : {verdict.bWins}{translateCurrentStaticSourceText("shared.components.compare.view", "ko", "로 팽팽합니다.")}</p>
         ) : (
           <p className="mt-1 text-pretty text-sm font-semibold text-fg">
-            <span className="text-accent">{winnerTitle?.title}</span>이(가) 주요 지표 {verdict.total}개 중{" "}
-            <span className="numeral">{winnerWins}</span>개에서 앞섭니다
-            <span className="font-normal text-fg-3">
+            <span className="text-accent">{winnerTitle?.title}</span>{translateCurrentStaticSourceText("shared.components.compare.view", "ko", "이(가) 주요 지표 ")}{verdict.total}{translateCurrentStaticSourceText("shared.components.compare.view", "ko", "개 중")}{" "}
+            <span className="numeral">{winnerWins}</span>{translateCurrentStaticSourceText("shared.components.compare.view", "ko", "개에서 앞섭니다")}<span className="font-normal text-fg-3">
               {" "}
               ({winnerWins} : {loserWins}
-              {verdict.ties > 0 ? `, 무승부 ${verdict.ties}` : ""})
+              {verdict.ties > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("shared.components.compare.view", "ko", ", 무승부 {v0}"), { v0: String(verdict.ties) }) : ""})
             </span>
             .
           </p>
@@ -293,8 +294,7 @@ function VerdictBanner({ a, b }: { a: Title; b: Title }) {
             key={`w-${label}`}
             className="rounded-full border border-accent/40 bg-card/60 px-2.5 py-0.5 text-[0.7rem] font-medium text-accent"
           >
-            {label} 우세
-          </span>
+            {label} {translateCurrentStaticSourceText("shared.components.compare.view", "ko", "우세")}</span>
         ))}
       </div>
     </div>
@@ -331,7 +331,7 @@ const PRICING_BADGES: Record<string, { label: string; className: string }> = {
 function ComparePlatformPrice({ t }: { t: Title }) {
   return (
     <div className="rounded-xl border border-line/50 bg-canvas/30 p-3 space-y-2">
-      <p className="text-[0.68rem] font-bold text-fg-3 uppercase tracking-wider mb-2">어디서 봐 (요금 매트릭스)</p>
+      <p className="text-[0.68rem] font-bold text-fg-3 uppercase tracking-wider mb-2">{translateCurrentStaticSourceText("shared.components.compare.view", "ko", "어디서 봐 (요금 매트릭스)")}</p>
       <div className="divide-y divide-line/35">
         {t.availability.map((av) => {
           const platName = PLATFORM_NAMES[av.platformId] ?? av.platformId;
@@ -345,12 +345,12 @@ function ComparePlatformPrice({ t }: { t: Title }) {
                 </span>
                 {av.url && (
                   <a
-                    href={`/api/go/${av.platformId}?to=${encodeURIComponent(av.url)}`}
+                    href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.compare.view", "en", "/api/go/{v0}?to={v1}"), { v0: String(av.platformId), v1: String(encodeURIComponent(av.url)) })}
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center gap-0.5 text-[0.62rem] text-fg-3 hover:text-accent font-semibold transition-colors"
                   >
-                    이동 <ArrowRight size={10} />
+                    {translateCurrentStaticSourceText("shared.components.compare.view", "ko", "이동 ")}<ArrowRight size={10} />
                   </a>
                 )}
               </div>
@@ -375,8 +375,8 @@ function CompareExtra({ t, align }: { t: Title; align: "left" | "right" }) {
         {t.synopsis}
       </p>
       <div className="w-full pt-1">
-        <Link href={`/title/${t.slug}`} className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent-2 transition-colors">
-          작품 상세 정보 바로가기 <ArrowRight size={12} />
+        <Link href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.compare.view", "en", "/title/{v0}"), { v0: String(t.slug) })} className="inline-flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent-2 transition-colors">
+          {translateCurrentStaticSourceText("shared.components.compare.view", "ko", "작품 상세 정보 바로가기 ")}<ArrowRight size={12} />
         </Link>
       </div>
     </div>

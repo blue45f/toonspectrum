@@ -96,6 +96,7 @@ const SCENE_TEMPLATE_INDEX = Object.freeze([
   { id: "shrine_yard", category: "nature", label: "사당 마당", keywords: ["shrine", "사당"] },
   { id: "ancient_palace", category: "nature", label: "고풍 전통 궁궐 사당", keywords: ["palace", "궁"] },
   { id: "fantasy_dungeon_hall", category: "nature", label: "판타지 던전 알현실", keywords: ["dungeon", "던전"] },
+  { id: "fantasy_tavern", category: "interior", label: "판타지 여관", keywords: ["fantasy", "tavern", "여관", "주점"] },
 ] as const);
 
 const SCENE_FAMILY: Record<string, StudioObjectInsertFamily> = {

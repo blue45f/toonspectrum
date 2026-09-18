@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "model": "gpt-image-2.5-sunburst",
+  "quality": "max",
+  "generatedAt": "2026-09-18",
+  "description": "Targeted GPT Image 2.5 replacement recipe for a legacy small-panel-only bedroom background.",
+  "safety": {
+    "people": "none",
+    "readableText": "none",
+    "logos": "none",
+    "operatorFunded": false,
+    "requiresByok": true
+  },
+  "recipes": [
+    {
+      "id": "gpt25-bg-daily-bedroom-night-vertical-depth",
+      "label": "도시 야경이 보이는 침실 · 세로 원근",
+      "title": "도시 야경이 보이는 침실 · 세로 원근",
+      "genre": "daily",
+      "genreLabel": "일상·학원",
+      "subject": "도시 야경이 보이는 침실",
+      "subjectSlug": "bedroom-night",
+      "tags": [
+        "침실",
+        "방",
+        "아파트",
+        "야경",
+        "도시",
+        "실내",
+        "AI 2.5",
+        "웹툰 배경"
+      ],
+      "environment": "실내",
+      "timeOfDay": "밤",
+      "weather": "실내",
+      "composition": "세로 원근, 전경 침대·중경 가구·후경 도시 야경이 명확한 3단 깊이",
+      "camera": "32mm lens, eye-level vertical depth shot, one-point perspective",
+      "orientation": "portrait",
+      "size": "1152x2048",
+      "quality": "max",
+      "model": "gpt-image-2.5-sunburst",
+      "palette": "warm-cool-night",
+      "prompt": "premium 2D webtoon background illustration, hand-painted environment concept art, clean controlled linework, cel-shaded forms with painterly light, production-ready details, coherent perspective and architecture, material-specific textures, crisp edges near focal plane, subtle atmospheric depth. Scene: a stylish modern city bedroom at night, large window showing a believable urban skyline, neatly made bed, bedside table, soft lamp, wardrobe and compact desk, no people. Composition: vertical depth shot with a clear foreground bed edge, midground furniture and distant city view, generous crop-safe floor and wall regions for webtoon characters. Camera: 32mm lens, eye-level, natural one-point perspective, no fisheye. Lighting: warm practical bedside light balanced against cool blue city-night window light, readable shadow shapes, cinematic but not photorealistic. Environment must be empty and immediately usable behind webtoon characters. Preserve believable scale, orthogonal lines, floor contact, furniture construction and material continuity. Output one complete background only. No characters, no silhouettes, no crowds, no readable text, no letters, no signs with glyphs, no logos, no watermark, no speech balloons, no UI, no frame border, no split panels, no duplicated furniture, no floating objects, no melted geometry, no impossible perspective, no extreme blur, no low-resolution texture, no photographic collage.",
+      "negativePrompt": "No characters, no silhouettes, no crowds, no readable text, no letters, no signs with glyphs, no logos, no watermark, no speech balloons, no UI, no frame border, no split panels, no duplicated furniture, no floating objects, no melted geometry, no impossible perspective, no extreme blur, no low-resolution texture, no photographic collage.",
+      "outputPath": "apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/daily/gpt25-bg-daily-bedroom-night-vertical-depth/background.png",
+      "sourcePath": "apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/daily/gpt25-bg-daily-bedroom-night-vertical-depth/SOURCE.json",
+      "review": {
+        "required": true,
+        "checks": [
+          "perspective",
+          "anatomy-free",
+          "text-free",
+          "logo-free",
+          "duplicate-object-free",
+          "crop-safe",
+          "resolution"
+        ]
+      },
+      "promptSha256": "5b4f44c237f7f620df94212f83c534cd120ff95f369992f65c76af9c5e1ec552"
+    }
+  ]
+}

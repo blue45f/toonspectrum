@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Ban,
   CircleAlert,
@@ -60,6 +61,11 @@ export interface StudioSurfaceStateProps {
   icon?: ReactNode;
   action?: ReactNode;
   secondaryAction?: ReactNode;
+  visual?: Readonly<{
+    src: string;
+    alt?: string;
+    objectPosition?: string;
+  }>;
   /** Static cards can opt out; newly appeared states can choose polite or assertive. */
   announce?: StudioSurfaceStateAnnouncement;
   compact?: boolean;
@@ -77,6 +83,7 @@ export function StudioSurfaceState({
   icon,
   action,
   secondaryAction,
+  visual,
   announce = DEFAULT_ANNOUNCEMENT[state],
   compact = false,
   className,
@@ -89,10 +96,10 @@ export function StudioSurfaceState({
     <section
       role={role}
       aria-live={live}
-      aria-atomic={live ? "true" : undefined}
+      aria-atomic={live ? translateCurrentStaticSourceText("domains.creator.StudioSurfaceState", "en", "true") : undefined}
       aria-busy={state === "loading" ? true : undefined}
       data-studio-surface-state={state}
-      data-studio-empty-state={state === "empty" ? "true" : undefined}
+      data-studio-empty-state={state === "empty" ? translateCurrentStaticSourceText("domains.creator.StudioSurfaceState", "en", "true") : undefined}
       data-studio-surface-announcement={announce}
       className={cn(
         "relative isolate overflow-hidden rounded-2xl border text-center",
@@ -102,6 +109,28 @@ export function StudioSurfaceState({
         className,
       )}
     >
+      {visual ? (
+        <div
+          data-studio-surface-visual="true"
+          className={cn(
+            "relative overflow-hidden border-b border-current/10 bg-card/60",
+            compact ? "-mx-3 -mt-4 mb-3 aspect-[16/6]" : "-mx-4 -mt-8 mb-4 aspect-[16/7]",
+          )}
+        >
+          <img
+            src={visual.src}
+            alt={visual.alt ?? ""}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover opacity-90"
+            style={{ objectPosition: visual.objectPosition ?? "center" }}
+          />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card/70 via-transparent to-transparent"
+          />
+        </div>
+      ) : null}
       <span
         aria-hidden
         className="pointer-events-none absolute inset-0 -z-10 opacity-45"

@@ -9,7 +9,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 
 import {
   getProductionExternalReview,
@@ -51,65 +51,10 @@ function isWebUrl(value: string): boolean {
   return /^https?:\/\//iu.test(value);
 }
 
-
-const TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,512}$/u;
-
-function reviewTokenStorageKey(projectId: string, reviewId: string): string {
-  return `toonstudio:external-review:${projectId}:${reviewId}`;
-}
-
-function storageToken(key: string): string {
-  try {
-    return globalThis.sessionStorage?.getItem(key) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function saveStorageToken(key: string, token: string): void {
-  try {
-    globalThis.sessionStorage?.setItem(key, token);
-  } catch {
-    // The review still works in memory when storage is unavailable.
-  }
-}
-
-function clearStorageToken(key: string): void {
-  try {
-    globalThis.sessionStorage?.removeItem(key);
-  } catch {
-    // Nothing else to clean up.
-  }
-}
-
-function tokenFromLocation(search: string, hash: string, storageKey: string): string {
-  const queryToken = new URLSearchParams(search).get("token") ?? "";
-  const fragmentToken = new URLSearchParams(hash.replace(/^#/u, "")).get("token") ?? "";
-  return [fragmentToken, queryToken, storageToken(storageKey)]
-    .map((value) => value.trim())
-    .find((value) => TOKEN_PATTERN.test(value)) ?? "";
-}
-
-function privacyMeta(name: "referrer" | "robots", content: string): () => void {
-  const selector = `meta[name="${name}"]`;
-  const existing = document.head.querySelector<HTMLMetaElement>(selector);
-  const previous = existing?.content ?? null;
-  const element = existing ?? document.createElement("meta");
-  element.name = name;
-  element.content = content;
-  if (!existing) document.head.append(element);
-  return () => {
-    if (previous === null) element.remove();
-    else element.content = previous;
-  };
-}
-
 export function ProductionExternalReviewPage() {
   const params = useParams<{ projectId: string; reviewId: string }>();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const storageKey = reviewTokenStorageKey(params.projectId ?? "unknown", params.reviewId ?? "unknown");
-  const [token] = useState(() => tokenFromLocation(location.search, location.hash, storageKey));
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") ?? "";
   const [view, setView] = useState<ProductionExternalReviewView | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -118,35 +63,6 @@ export function ProductionExternalReviewPage() {
   const [reviewerName, setReviewerName] = useState("");
   const [decision, setDecision] = useState<Decision>("comment");
   const [note, setNote] = useState("");
-
-  useEffect(() => {
-    const restoreReferrer = privacyMeta("referrer", "no-referrer");
-    const restoreRobots = privacyMeta("robots", "noindex,nofollow,noarchive");
-    const previousTitle = document.title;
-    document.title = "보안 외부 검수 · ToonStudio";
-    return () => {
-      restoreReferrer();
-      restoreRobots();
-      document.title = previousTitle;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (token) saveStorageToken(storageKey, token);
-    const query = new URLSearchParams(location.search);
-    const fragment = new URLSearchParams(location.hash.replace(/^#/u, ""));
-    const hadVisibleToken = query.has("token") || fragment.has("token");
-    if (!hadVisibleToken) return;
-    query.delete("token");
-    fragment.delete("token");
-    const nextSearch = query.toString();
-    const nextHash = fragment.toString();
-    navigate({
-      pathname: location.pathname,
-      search: nextSearch ? `?${nextSearch}` : "",
-      hash: nextHash ? `#${nextHash}` : "",
-    }, { replace: true });
-  }, [location.hash, location.pathname, location.search, navigate, storageKey, token]);
 
   useEffect(() => {
     if (!params.projectId || !params.reviewId || !token) {
@@ -162,7 +78,6 @@ export function ProductionExternalReviewPage() {
         if (active) setView(result);
       })
       .catch(async (cause: unknown) => {
-        clearStorageToken(storageKey);
         if (active) setError(await getApiErrorMessage(cause, "검수 링크가 만료되었거나 유효하지 않습니다."));
       })
       .finally(() => {
@@ -171,7 +86,7 @@ export function ProductionExternalReviewPage() {
     return () => {
       active = false;
     };
-  }, [params.projectId, params.reviewId, storageKey, token]);
+  }, [params.projectId, params.reviewId, token]);
 
   const allowedDecisions = useMemo<readonly Decision[]>(() => {
     if (!view) return [];

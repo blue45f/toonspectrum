@@ -12,8 +12,9 @@ import {
 } from "lucide-react";
 
 import {
-  SITE_NAVIGATION_GROUPS,
+  SITE_NAVIGATION_ITEMS,
   SITE_UTILITY_NAVIGATION,
+  type SiteNavigationGroup,
   type SiteNavigationText,
 } from "@/shared/components/site-navigation";
 import {
@@ -58,6 +59,53 @@ const authorityDestination = (id: SitePrimaryRouteId): ExtendedDestination => {
   );
 };
 
+const I = SITE_NAVIGATION_ITEMS;
+
+/**
+ * Sitemap-specific primary information architecture.
+ *
+ * Global navigation intentionally stays compact and context-aware. The sitemap needs a different
+ * job: expose the whole product without making creators understand the Studio/Spectrum split first.
+ */
+export const SITEMAP_CORE_DESTINATION_GROUPS: readonly SiteNavigationGroup[] = [
+  {
+    id: "start-create",
+    label: { ko: "제작 시작", en: "Start creating" },
+    description: {
+      ko: "새 작품을 시작하고 기존 프로젝트·소재·출판 흐름으로 바로 이동",
+      en: "Start a work or jump straight into projects, assets and publishing",
+    },
+    items: [I.production, I.studio, I.make, I.studioAssets, I.publish],
+  },
+  {
+    id: "learn-prepare",
+    label: { ko: "배우고 준비하기", en: "Learn & prepare" },
+    description: {
+      ko: "제작 지식·참고자료·기회·오늘의 영감을 실제 작업에 연결",
+      en: "Connect learning, references, opportunities and daily inspiration to the work",
+    },
+    items: [I.learn, I.research, I.technology, I.opportunities, I.now],
+  },
+  {
+    id: "discover-inspire",
+    label: { ko: "작품 발견", en: "Discover stories" },
+    description: {
+      ko: "검색·랭킹·연재 일정·추천·데이터에서 다음 작품과 아이디어 찾기",
+      en: "Find the next story or idea through discovery, rankings, schedules and data",
+    },
+    items: [I.explore, I.ranking, I.calendar, I.recommend, I.fortune, I.insights],
+  },
+  {
+    id: "connect-manage",
+    label: { ko: "함께하고 관리하기", en: "Connect & manage" },
+    description: {
+      ko: "작품을 공유하고 리뷰·커뮤니티·협업·내 기록까지 이어서 관리",
+      en: "Share work and continue through reviews, community, collaboration and your records",
+    },
+    items: [I.gallery, I.reviews, I.community, I.collaborate, I.play, I.library, I.me, I.home],
+  },
+];
+
 export const PERSONAL_DESTINATIONS = [
   {
     id: "profile-account",
@@ -99,17 +147,18 @@ export const PERSONAL_DESTINATIONS = [
  */
 export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
   {
-    id: "studio-workspaces",
+    id: "studio-foundation",
     icon: Wrench,
-    label: { ko: "Studio 작업공간", en: "Studio workspaces" },
+    label: { ko: "Studio 시작·프로젝트", en: "Studio & projects" },
     description: {
-      ko: "드로잉·애니메이션·3D·게시까지 직접 여는 제작 화면",
-      en: "Open drawing, animation, 3D and publishing workspaces directly",
+      ko: "제작 허브·새 작업·프로젝트·소재·출판으로 이어지는 기본 진입점",
+      en: "Core entry points for production, projects, assets and publishing",
     },
     items: [
       authorityDestination("production"),
       authorityDestination("studio-home"),
       authorityDestination("studio-new"),
+      destination("/studio/projects", "프로젝트 목록", "Project list", "기존 프로젝트를 찾아 이어서 작업", "Find an existing project and continue your work"),
       authorityDestination("studio-assets"),
       destination(
         "/market",
@@ -118,14 +167,41 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
         "호환성과 사용 권리를 확인하고 새 에셋 탐색",
         "Discover assets with compatibility and rights information",
       ),
-      destination("/studio/projects", "프로젝트 목록", "Project list", "기존 프로젝트를 찾아 이어서 작업", "Find an existing project and continue your work"),
+      authorityDestination("studio-publish"),
+      destination("/studio/manual", "Studio 사용 설명서", "Studio manual", "도구·작업 흐름·문제 해결 안내", "Learn tools, workflows and troubleshooting"),
+    ],
+  },
+  {
+    id: "drawing-character-media",
+    icon: Sparkles,
+    label: { ko: "드로잉·캐릭터·미디어", en: "Drawing, character & media" },
+    description: {
+      ko: "웹툰 컷·브러시·캐릭터·애니메이션·사운드 제작 도구",
+      en: "Tools for panels, brushes, characters, animation and sound",
+    },
+    items: [
       destination("/studio/comic", "웹툰 만들기", "Create a webtoon", "컷·말풍선·대사를 한 화면에서 구성", "Arrange panels, balloons and dialogue in one workspace"),
       destination("/studio/assets/characters/new", "캐릭터 만들기", "Create a character", "캐릭터·표정·포즈와 3D 참고 제작", "Build characters, expressions, poses and 3D references"),
+      destination("/studio/character", "캐릭터 작업실", "Character workspace", "캐릭터 외형·표정·자세 제작", "Build character looks, expressions and poses"),
       destination("/studio/animation", "애니메이션 작업실", "Animation workspace", "프레임과 움직임을 편집", "Edit frames and motion"),
       destination("/studio/brushes", "Studio 브러시", "Studio brushes", "작업 중 브러시를 선택하고 조정", "Choose and tune brushes while editing"),
+      destination("/studio/assets/brushes/new", "브러시 연구실", "Brush lab", "브러시를 만들고 시험하기", "Build and test custom brushes"),
+      destination("/studio/assets/audio", "음악·사운드", "Music & sound", "작품에 연결할 음원 만들기", "Create audio for your work"),
+      destination("/studio/storyworld", "스토리월드", "Storyworld", "인물·장소·설정의 관계 정리", "Organize characters, locations and story relationships"),
+      destination("/studio/character-convert", "캐릭터 변환", "Character conversion", "2D 캐릭터를 제작용 형식으로 변환", "Convert 2D characters into production-ready formats"),
+    ],
+  },
+  {
+    id: "three-d-scenes",
+    icon: Database,
+    label: { ko: "3D·장면 제작", en: "3D & scene building" },
+    description: {
+      ko: "배경·포즈·모델링·CAD·조형·재질·카메라 컷까지 3D 장면 제작",
+      en: "Build 3D scenes from backgrounds and poses to modeling, materials and shots",
+    },
+    items: [
       destination("/studio/bg3d", "3D 배경", "3D backgrounds", "장면 배경과 카메라 구도 설계", "Build scene backgrounds and camera composition"),
       destination("/studio/poser", "포즈 스튜디오", "Pose studio", "인체 포즈와 구도 참고 만들기", "Create pose and composition references"),
-      destination("/studio/character", "캐릭터 작업실", "Character workspace", "캐릭터 외형·표정·자세 제작", "Build character looks, expressions and poses"),
       destination("/studio/3d/dcc/model", "3D 모델링", "3D modeling", "메시를 만들고 편집하는 기본 작업 모드", "Create and edit meshes in the core modeling mode"),
       destination("/studio/3d/dcc/build", "3D 공간 제작", "3D environment build", "방·배경·공간 구조 제작", "Build rooms, backgrounds and spatial structures"),
       destination("/studio/3d/dcc/cad", "정밀 CAD", "Precision CAD", "치수 기반 솔리드와 소품 설계", "Design dimensioned solids and props"),
@@ -133,9 +209,17 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
       destination("/studio/3d/dcc/material", "재질·UV", "Materials & UV", "표면 재질과 UV 구성", "Build surface materials and UV layouts"),
       destination("/studio/3d/dcc/shot", "컷·선화", "Shot & line art", "카메라 컷과 비사실 렌더 설계", "Design camera shots and non-photoreal rendering"),
       destination("/studio/lift3d", "2D → 3D 변환", "2D to 3D lift", "이미지 소재를 3D 장면으로 확장", "Lift image subjects into 3D scenes"),
-      destination("/studio/storyworld", "스토리월드", "Storyworld", "인물·장소·설정의 관계 정리", "Organize characters, locations and story relationships"),
-      authorityDestination("studio-publish"),
-      destination("/studio/manual", "Studio 사용 설명서", "Studio manual", "도구·작업 흐름·문제 해결 안내", "Learn tools, workflows and troubleshooting"),
+    ],
+  },
+  {
+    id: "ai-production-tools",
+    icon: Wrench,
+    label: { ko: "AI·제작 도구·런타임", en: "AI, tools & runtimes" },
+    description: {
+      ko: "생성 기능·외부 엔진·처리 작업·개인 AI 런타임을 한곳에서 설정",
+      en: "Configure generation, external engines, jobs and personal AI runtimes",
+    },
+    items: [
       destination("/studio/generate", "생성 도구 연결", "Generation tools", "생성 기능의 연결 상태와 사용 조건 확인", "Review generation availability and requirements"),
       destination("/studio/toolchain", "제작 도구", "Production tools", "효과·OCR·영상·3D·출판 흐름 연결", "Connect effects, OCR, media, 3D and publishing workflows"),
       destination("/studio/engines", "설치·라이선스", "Engines & licenses", "외부 실행기 설치와 사용 조건 확인", "Review local engines and license boundaries"),
@@ -143,21 +227,18 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
       destination("/studio/ai-lab", "AI 실험실", "AI lab", "사용자 키로 창작 추론 작업 실행", "Run creator-funded inference workflows"),
       destination("/studio/ai-runtime", "개인 AI 런타임", "Personal AI runtime", "직접 운영하는 추론 서버 연결", "Connect a creator-operated inference server"),
       destination("/studio/ai-settings", "Studio AI 설정", "Studio AI settings", "Studio 생성 도구의 연결과 모델 설정", "Configure Studio generation connections and models"),
-      destination("/studio/character-convert", "캐릭터 변환", "Character conversion", "2D 캐릭터를 제작용 형식으로 변환", "Convert 2D characters into production-ready formats"),
+      destination("/settings/ai", "통합 AI 설정", "Unified AI settings", "모든 사용자 AI 연결과 키 보관함 관리", "Manage user-funded AI connections and the encrypted vault"),
       destination("/studio/ecosystem", "창작 생태계", "Creator ecosystem", "제작 도구·작업·리소스를 한곳에서 관리", "Manage creation tools, work and resources together"),
       destination("/studio/ecosystem/viewer", "생태계 뷰어", "Ecosystem viewer", "연결된 제작 자산과 흐름을 시각화", "Visualize connected creative assets and workflows"),
-      destination("/studio/assets/brushes/new", "브러시 연구실", "Brush lab", "브러시를 만들고 시험하기", "Build and test custom brushes"),
-      destination("/studio/assets/audio", "음악·사운드", "Music & sound", "작품에 연결할 음원 만들기", "Create audio for your work"),
-      destination("/showcase/promo", "프로모션 제작", "Promotion studio", "작품 홍보용 이미지와 소재 만들기", "Create promotional visuals and assets"),
     ],
   },
   {
-    id: "learning-publishing",
+    id: "learning-planning",
     icon: BookOpen,
-    label: { ko: "학습·기획·출판", en: "Learning, planning & publishing" },
+    label: { ko: "학습·기획", en: "Learning & planning" },
     description: {
-      ko: "제작을 배우고 이야기와 공개 준비를 구체화",
-      en: "Learn production and prepare stories and releases",
+      ko: "제작을 배우고 이야기·연출·진행 기록을 구체화",
+      en: "Learn production and shape stories, direction and progress",
     },
     items: [
       destination("/learn", "웹툰 제작 강좌", "Creation courses", "기초부터 Studio 실습까지", "Learn from foundations to studio practice"),
@@ -170,11 +251,11 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
   },
   {
     id: "production-collaboration",
-    icon: Sparkles,
-    label: { ko: "제작 운영·협업", en: "Production & collaboration" },
+    icon: UsersRound,
+    label: { ko: "검수·협업·홍보", en: "Review, collaboration & promotion" },
     description: {
-      ko: "검수·버전·발표·공유와 공동 작업 흐름",
-      en: "Review, version, present, share and collaborate on work",
+      ko: "버전·검수·공유·발표·협업·작품 홍보까지 완성 이후의 흐름",
+      en: "Review, version, share, present, collaborate and promote finished work",
     },
     items: [
       destination("/studio/review", "리뷰·승인", "Review & approval", "작업을 검수하고 의견 반영", "Review work and resolve feedback"),
@@ -185,21 +266,18 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
       destination("/collaborate/new", "구인·의뢰 등록", "Post collaboration", "팀원 모집·작업 의뢰·작업자 홍보 등록", "Post a team opening, commission or availability listing"),
       destination("/community/promote", "작품 홍보", "Promote work", "작품과 창작 활동을 커뮤니티에 소개", "Share creative work with the community"),
       destination("/community/promote/new", "홍보 글 작성", "Create promotion", "새 작품·연재·창작 활동 홍보 글 작성", "Create a promotion for a release or creative activity"),
+      destination("/showcase/promo", "프로모션 제작", "Promotion studio", "작품 홍보용 이미지와 소재 만들기", "Create promotional visuals and assets"),
     ],
   },
   {
-    id: "collections",
+    id: "asset-market",
     icon: Database,
-    label: { ko: "작품·에셋 관리", en: "Work & asset management" },
+    label: { ko: "소재 마켓·내 에셋", en: "Asset market & library" },
     description: {
-      ko: "공개 작품과 제작 재료를 더 세밀하게 탐색하고 관리",
-      en: "Explore and manage published work and creative materials in detail",
+      ko: "에셋을 찾고 비교하고 등록하며 내 라이브러리와 배포 상태 관리",
+      en: "Find, compare, publish and manage assets and listings",
     },
     items: [
-      destination("/showcase/challenges", "창작 챌린지", "Creative challenges", "주제별 창작 이벤트", "Join themed creative events"),
-      destination("/authors", "작가별 보기", "Browse creators", "작가와 대표 작품 탐색", "Explore creators and representative work"),
-      destination("/discover/works", "만화·작법서 탐색", "Comics & craft books", "만화와 창작 참고서를 함께 검색", "Search comics and creative craft books"),
-      destination("/read/spatial", "공간형 웹툰 감상", "Spatial comic reader", "준비한 컷을 공간형 또는 평면 화면으로 감상", "Read prepared panels in spatial or flat view"),
       destination("/market/browse", "에셋 상세 탐색", "Browse assets", "종류·사용권으로 리소스 찾기", "Find resources by type and license"),
       destination("/market/fit", "에셋 핏 랩", "Asset fit lab", "현재 작업에 맞는 에셋 점검", "Evaluate assets against the current project"),
       destination("/market/publish", "에셋 등록", "Publish an asset", "마켓에 리소스 제출·배포", "Submit and publish resources to Market"),
@@ -207,6 +285,21 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
       destination("/market/library", "내 에셋", "My assets", "획득한 리소스 관리", "Manage acquired resources"),
       destination("/market/wishlist", "찜한 에셋", "Saved assets", "나중에 사용할 리소스", "Keep resources for later"),
       destination("/market/compare", "에셋 비교", "Compare assets", "후보 리소스의 차이 비교", "Compare shortlisted resources"),
+    ],
+  },
+  {
+    id: "reference-library",
+    icon: BookOpen,
+    label: { ko: "작품·레퍼런스 자료실", en: "Works & reference library" },
+    description: {
+      ko: "공개 작품·작가·창작 참고자료와 출처가 확인된 리서치 묶음 탐색",
+      en: "Explore public works, creators and sourced creative references",
+    },
+    items: [
+      destination("/showcase/challenges", "창작 챌린지", "Creative challenges", "주제별 창작 이벤트", "Join themed creative events"),
+      destination("/authors", "작가별 보기", "Browse creators", "작가와 대표 작품 탐색", "Explore creators and representative work"),
+      destination("/discover/works", "만화·작법서 탐색", "Comics & craft books", "만화와 창작 참고서를 함께 검색", "Search comics and creative craft books"),
+      destination("/read/spatial", "공간형 웹툰 감상", "Spatial comic reader", "준비한 컷을 공간형 또는 평면 화면으로 감상", "Read prepared panels in spatial or flat view"),
       destination("/references", "작품 레퍼런스", "Story references", "공식 자료 탐색과 연구 노트", "Explore official sources and notes"),
       destination("/research/assets", "레퍼런스 아틀라스", "Reference atlas", "복식·소품·미술 자료를 장면별로", "Browse costume, prop and art references by scene"),
       destination("/research/books", "글로벌 판본 탐색", "Global editions", "Open Library·Google Books·openBD 메타데이터 검색", "Search Open Library, Google Books and openBD metadata"),
@@ -249,16 +342,17 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
     ],
   },
   {
-    id: "help-policy",
+    id: "about-media",
     icon: ShieldCheck,
-    label: { ko: "안내·지원·정책", en: "Help, support & policy" },
+    label: { ko: "서비스 소개·홍보영상·기술", en: "About, films & engineering" },
     description: {
-      ko: "서비스 원칙과 접근성, 데이터 출처, 문의 및 권리 정책",
-      en: "Service principles, accessibility, data sources, support and rights policies",
+      ko: "툰스튜디오가 무엇인지 영상·제작 과정·기술 이야기로 빠르게 이해",
+      en: "Understand ToonStudio through its film, workflow and engineering story",
     },
     items: [
+      destination("/product-tour", "툰스튜디오 전체 제품 투어", "ToonStudio full product tour", "8분 24초 장편 영상과 실제 제품 화면으로 전체 제작 흐름 이해", "Understand the full production journey through an 8m 24s tour and real product screens"),
+      destination("/brand-film", "툰스튜디오 홍보영상", "ToonStudio brand film", "24초 브랜드 필름으로 핵심 제작 경험 빠르게 보기", "Watch the 24-second brand film for a quick product overview"),
       destination("/about", "서비스 소개", "About ToonStudio", "기능과 운영 원칙", "Features and operating principles"),
-      destination("/brand-film", "브랜드 필름", "Brand film", "Remotion으로 제작한 24초 툰스튜디오 소개 영상", "Watch the 24-second ToonStudio introduction rendered with Remotion"),
       destination(
         "/about/workflow",
         "웹툰 제작 과정",
@@ -277,8 +371,8 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
         "/about/technology/story",
         "기술 제작 스토리",
         "Engineering story",
-        "문제 정의부터 검증까지 15개 기술 챕터",
-        "Follow 15 engineering chapters from problem definition to verification",
+        "문제 정의부터 검증까지 25개 기술 챕터",
+        "Follow 25 engineering chapters from problem definition to verification",
       ),
       destination(
         "/about/technology/guides",
@@ -286,6 +380,20 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
         "Implementation guides",
         "인증·저장·브러시·성능·AI를 다른 프로젝트에 적용",
         "Apply authentication, storage, brush, performance and AI patterns elsewhere",
+      ),
+      destination(
+        "/about/technology/references",
+        "기술 참고·장애 기록",
+        "Technical references & troubleshooting",
+        "사용·평가·참고 기술과 재현 가능한 장애 해결 기록",
+        "Used, evaluated and reference technologies with reproducible incident records",
+      ),
+      destination(
+        "/about/technology/field-notes",
+        "기술 심화 노트",
+        "Engineering field notes",
+        "Worker·PWA·무료 AI·Blender·3D·Open API와 트러블슈팅",
+        "Workers, PWA, free AI, Blender, 3D, Open APIs and troubleshooting",
       ),
       destination(
         "/about/technology/deck",
@@ -315,13 +423,23 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
         "창작 흐름·권리·AI·협업·접근성 의사결정 기준",
         "Product standards for creative flow, rights, AI, collaboration and accessibility",
       ),
+      destination("/design", "디자인 시스템", "Design system", "색상·타이포·컴포넌트 원칙", "Colors, typography and component guidelines"),
+    ],
+  },
+  {
+    id: "support-policy",
+    icon: ShieldCheck,
+    label: { ko: "지원·데이터·정책", en: "Support, data & policy" },
+    description: {
+      ko: "문의·접근성·데이터 출처·수집·저작권·약관·개인정보 정책 확인",
+      en: "Find support, accessibility, data, rights, terms and privacy information",
+    },
+    items: [
       destination("/about/data", "데이터 출처", "Data sources", "공급자별 연결·이용 준비 상태", "Provider connections and readiness"),
       destination("/about/crawler", "공개 데이터 수집 정책", "Public data policy", "자동수집 원칙·제외·중지 요청", "Collection rules, exclusions and opt-out"),
       destination("/guide", "랭킹 산정 방식", "Ranking guide", "데이터와 산식 설명", "Understand ranking data and formulas"),
       destination("/accessibility", "접근성 안내", "Accessibility", "키보드·스크린리더·표시 지원", "Keyboard, screen reader and display support"),
-      destination("/design", "디자인 시스템", "Design system", "색상·타이포·컴포넌트 원칙", "Colors, typography and component guidelines"),
       destination("/support", "이용 문의", "Support", "서비스 이용 도움받기", "Get help using the service"),
-      destination("/settings/ai", "통합 AI 설정", "Unified AI settings", "모든 사용자 AI 연결과 키 보관함 관리", "Manage user-funded AI connections and the encrypted vault"),
       destination("/contact", "광고·제휴", "Business contact", "광고와 파트너십 문의", "Advertising and partnership inquiries"),
       destination("/copyright", "저작권 안내", "Copyright", "콘텐츠·권리 정책", "Content and rights policy"),
       destination("/terms", "이용약관", "Terms", "서비스 이용 조건", "Terms of service"),
@@ -330,8 +448,12 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
   },
 ];
 
-export const SITEMAP_DIRECTORY_ENTRIES = [
-  ...SITE_NAVIGATION_GROUPS.flatMap((group) => group.items),
+const directoryEntries = [
+  ...SITEMAP_CORE_DESTINATION_GROUPS.flatMap((group) => group.items),
   ...PERSONAL_DESTINATIONS,
   ...SITEMAP_EXTENDED_DESTINATION_GROUPS.flatMap((group) => group.items),
 ];
+
+export const SITEMAP_DIRECTORY_ENTRIES = directoryEntries.filter(
+  (entry, index) => directoryEntries.findIndex((candidate) => candidate.href === entry.href) === index,
+);

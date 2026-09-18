@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "id": "gpt25-bg-sf-cyber-alley-vertical-depth",
+  "model": "gpt-image-2.5-sunburst",
+  "quality": "max",
+  "size": "1152x2048",
+  "promptSha256": "1cd658ba904b1a25ad9e63eb8e7e84bcf0f5d5fc1624fe8edfcf692d22e0ff14",
+  "prompt": "premium 2D webtoon background illustration, hand-painted environment concept art, clean controlled linework, cel-shaded forms with painterly light, production-ready details, coherent perspective and architecture, material-specific textures, crisp edges near focal plane, subtle atmospheric depth, no photorealistic people. Scene: rainy cyberpunk alley. Composition: 세로 웹툰 컷에 맞는 깊은 원근, 아래에서 위로 시선이 흐르는 S자 동선 (28mm lens, slightly low camera, strong vertical leading lines); clear walkable floor plane and coherent architectural scale. Lighting and atmosphere: night scene with motivated practical lights, thin atmospheric fog. Palette: cool blue-gray dramatic palette. Environment must be empty and immediately usable behind webtoon characters. Preserve believable scale, orthogonal lines, floor contact, material continuity, and several crop-safe regions. Output one complete background only. No characters, no silhouettes, no crowds, no readable text, no letters, no signs with glyphs, no logos, no watermark, no speech balloons, no UI, no frame border, no split panels, no duplicated furniture, no floating objects, no melted geometry, no impossible stairs, no fisheye distortion, no extreme blur, no low-resolution texture, no photographic collage.",
+  "negativePrompt": "No characters, no silhouettes, no crowds, no readable text, no letters, no signs with glyphs, no logos, no watermark, no speech balloons, no UI, no frame border, no split panels, no duplicated furniture, no floating objects, no melted geometry, no impossible stairs, no fisheye distortion, no extreme blur, no low-resolution texture, no photographic collage.",
+  "generatedAt": "2026-09-18T00:15:49.022886Z",
+  "outputSha256": "3ed82eb947473c5c882a6a038d6cee65d5a81e1bd7dff45ec8ed07c4a9be7e9e",
+  "outputBytes": 4419627,
+  "reviewRequired": false,
+  "operatorFunded": false,
+  "generationChannel": "ChatGPT image generation"
+}

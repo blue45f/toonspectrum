@@ -29,6 +29,7 @@ import {
   deriveProductionFinancialForecast,
   deriveProductionFlowAnalytics,
   deriveScheduleRecoveryScenarios,
+  evaluateAutomationRule,
   evaluateReleaseReadiness,
   type EpisodeReleasePlan,
   type ExternalReviewAccess,
@@ -44,7 +45,6 @@ import {
 } from "@toonspectrum/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
-import { deriveProductionAutomationExecutionPlan } from "./production-automation-execution";
 
 import { downloadBlob } from "../export/studio-export";
 
@@ -527,7 +527,7 @@ export function ProductionOperationsControlWorkspace({
       responses: [],
     };
     await saveRecord({ kind: "external-review-access", value: access }, "외부 검수 링크를 만들었습니다.");
-    const link = `${globalThis.location?.origin ?? ""}/production/review/${encodeURIComponent(aggregate.projectId)}/${encodeURIComponent(reviewId)}#token=${encodeURIComponent(token)}`;
+    const link = `${globalThis.location?.origin ?? ""}/production/review/${encodeURIComponent(aggregate.projectId)}/${encodeURIComponent(reviewId)}?token=${encodeURIComponent(token)}`;
     setGeneratedReviewLink(link);
     setNotice("원문 토큰은 다시 표시되지 않습니다. 지금 링크를 복사해 전달해 주세요.");
   });

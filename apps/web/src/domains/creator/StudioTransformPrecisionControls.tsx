@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Link2, Unlink2 } from "lucide-react";
 
 import type { StudioSelectionResizeAnchor } from "./studio-selection-transform-advanced";
@@ -58,17 +61,17 @@ export function StudioTransformPrecisionControls({
   return (
     <div className="mb-2 flex items-end gap-1.5">
       <label className="grid min-w-0 flex-1 gap-0.5">
-        <span className="text-xs font-bold tracking-tight text-fg-3">크기 기준점</span>
+        <span className="text-xs font-bold tracking-tight text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "크기 기준점")}</span>
         <select
           value={resizeAnchor}
           disabled={disabled || (!supportsWidth && !supportsHeight)}
           title={
             interactionDisabledReason
             ?? ((!supportsWidth && !supportsHeight)
-              ? sizeDisabledReason ?? "이 선택은 수치 크기 조절을 지원하지 않아요."
-              : "W/H 입력 시 고정할 기준점")
+              ? sizeDisabledReason ?? translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "이 선택은 수치 크기 조절을 지원하지 않아요.")
+              : translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "W/H 입력 시 고정할 기준점"))
           }
-          aria-label="크기 조절 기준점"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "크기 조절 기준점")}
           data-inspector-control-id="selection.resize-anchor"
           data-inspector-priority="advanced"
           onChange={(event) => onResizeAnchorChange(event.currentTarget.value as StudioSelectionResizeAnchor)}
@@ -83,16 +86,16 @@ export function StudioTransformPrecisionControls({
         <button
           type="button"
           aria-pressed={aspectLocked}
-          aria-label={aspectLocked ? "가로세로 비율 잠금 해제" : "가로세로 비율 잠금"}
+          aria-label={aspectLocked ? translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "가로세로 비율 잠금 해제") : translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "가로세로 비율 잠금")}
           disabled={disabled || multi || !supportsAspectLock}
           title={
             disabled
-              ? interactionDisabledReason ?? "현재 편집 상태에서는 비율 잠금을 바꿀 수 없어요."
+              ? interactionDisabledReason ?? translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "현재 편집 상태에서는 비율 잠금을 바꿀 수 없어요.")
               : multi
-                ? "여러 개 선택은 배치를 보존하도록 항상 같은 비율로 크기를 조절합니다."
+                ? translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "여러 개 선택은 배치를 보존하도록 항상 같은 비율로 크기를 조절합니다.")
                 : supportsAspectLock
-                  ? aspectLocked ? "가로세로 비율 잠금 해제" : "가로세로 비율 잠금"
-                  : "이 요소는 가로세로 크기를 함께 저장하지 않아요."
+                  ? aspectLocked ? translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "가로세로 비율 잠금 해제") : translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "가로세로 비율 잠금")
+                  : translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "이 요소는 가로세로 크기를 함께 저장하지 않아요.")
           }
           data-inspector-control-id="selection.lock-aspect"
           data-inspector-priority="advanced"
@@ -110,11 +113,11 @@ export function StudioTransformPrecisionControls({
         <button
           type="button"
           aria-pressed={scaleStrokeWidth}
-          aria-label="선 굵기도 함께 확대"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "선 굵기도 함께 확대")}
           disabled={disabled}
           title={
             interactionDisabledReason
-            ?? (scaleStrokeWidth ? "선 굵기를 크기와 함께 확대합니다" : "선 굵기는 유지하고 배치와 크기만 바꿉니다")
+            ?? (scaleStrokeWidth ? translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "선 굵기를 크기와 함께 확대합니다") : translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "선 굵기는 유지하고 배치와 크기만 바꿉니다"))
           }
           data-inspector-control-id="selection.scale-stroke-width"
           data-inspector-priority="advanced"
@@ -125,8 +128,7 @@ export function StudioTransformPrecisionControls({
             className: cn("h-9 min-w-9 px-2 text-[0.6875rem] pointer-coarse:h-11", scaleStrokeWidth && "bg-accent-soft/60 text-accent"),
           })}
         >
-          선 굵기
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioTransformPrecisionControls", "ko", "선 굵기")}</button>
       ) : null}
     </div>
   );

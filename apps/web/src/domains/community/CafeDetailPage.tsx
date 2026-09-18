@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowLeft,
   Coffee,
   Crown,
@@ -8,7 +12,7 @@ import {
   ShieldCheck,
   UserPlus,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import {
@@ -22,7 +26,6 @@ import type { CommunityCafe } from "@/shared/lib/types";
 
 import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
 import { Container } from "@/shared/components/section";
-import { SharePageButton } from "@/shared/components/share-page-button";
 import { resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
 import {
   canShareCommunityCafe,
@@ -37,6 +40,11 @@ import {
   usePageSocialMeta,
 } from "@/hooks/use-document-title";
 import { api, apiPath, getApiErrorMessage } from "@/infrastructure/api";
+
+const SharePageButton = lazy(async () => {
+  const module = await import("@/shared/components/share-page-button");
+  return { default: module.SharePageButton };
+});
 
 export function CafeDetailPage() {
   const { slug: rawSlug } = useParams();
@@ -154,9 +162,9 @@ export function CafeDetailPage() {
       <Container size="wide" className="py-16">
         <div className="rounded-3xl border border-dashed border-line bg-card/50 px-6 py-14 text-center">
           <Coffee className="mx-auto mb-3 text-fg-3" size={24} />
-          <h1 className="text-2xl font-bold">커뮤니티를 찾을 수 없어요</h1>
-          <p className="mt-2 text-sm text-fg-3">삭제됐거나 접근 권한이 없는 커뮤니티일 수 있습니다.</p>
-          <Link href="/community/cafes" className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-on-accent"><ArrowLeft size={15} />목록으로</Link>
+          <h1 className="text-2xl font-bold">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "커뮤니티를 찾을 수 없어요")}</h1>
+          <p className="mt-2 text-sm text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "삭제됐거나 접근 권한이 없는 커뮤니티일 수 있습니다.")}</p>
+          <Link href="/community/cafes" className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-on-accent"><ArrowLeft size={15} />{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "목록으로")}</Link>
         </div>
       </Container>
     );
@@ -166,8 +174,8 @@ export function CafeDetailPage() {
     return (
       <Container size="wide" className="py-16">
         <div className="rounded-3xl border border-bad/35 bg-bad/10 px-6 py-10 text-center">
-          <p className="text-sm font-medium text-bad">{error ?? "커뮤니티 정보를 불러오지 못했습니다."}</p>
-          <button type="button" onClick={() => setRefreshTick((tick) => tick + 1)} className="mt-4 rounded-lg border border-bad/35 px-3 py-2 text-xs font-semibold text-bad">다시 시도</button>
+          <p className="text-sm font-medium text-bad">{error ?? translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "커뮤니티 정보를 불러오지 못했습니다.")}</p>
+          <button type="button" onClick={() => setRefreshTick((tick) => tick + 1)} className="mt-4 rounded-lg border border-bad/35 px-3 py-2 text-xs font-semibold text-bad">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "다시 시도")}</button>
         </div>
       </Container>
     );
@@ -196,9 +204,9 @@ export function CafeDetailPage() {
 
   return (
     <Container size="wide" className="relative py-8 lg:py-10">
-      <nav aria-label="이동 경로" className="mb-5 flex flex-wrap items-center gap-2 text-xs text-fg-3">
-        <Link href="/community" className="hover:text-fg">커뮤니티</Link><span aria-hidden>/</span>
-        <Link href="/community/cafes" className="hover:text-fg">회원 커뮤니티</Link><span aria-hidden>/</span>
+      <nav aria-label={translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "이동 경로")} className="mb-5 flex flex-wrap items-center gap-2 text-xs text-fg-3">
+        <Link href="/community" className="hover:text-fg">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "커뮤니티")}</Link><span aria-hidden>/</span>
+        <Link href="/community/cafes" className="hover:text-fg">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "회원 커뮤니티")}</Link><span aria-hidden>/</span>
         <span className="text-fg-2">{cafe.name}</span>
       </nav>
 
@@ -208,59 +216,61 @@ export function CafeDetailPage() {
             <p className="eyebrow flex items-center gap-1.5 text-accent"><Coffee size={14} />{COMMUNITY_CAFE_KIND_LABELS[cafe.kind]}</p>
             <h1 className="mt-2 flex flex-wrap items-center gap-2 text-[clamp(1.4rem,6vw,1.5rem)] font-bold tracking-tight sm:text-3xl">
               {cafe.name}
-              <span className="rounded-full border border-line bg-canvas/45 px-2 py-0.5 text-[0.68rem] font-medium text-fg-3">{cafe.genre || "자유"}</span>
-              {cafe.visibility === "private" && <span className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[0.68rem] text-fg-3"><Lock size={10} />비공개</span>}
-              {cafe.status === "archived" && <span className="rounded-full border border-warn/40 bg-warn/10 px-2 py-0.5 text-[0.68rem] text-warn">보관됨</span>}
-              {isOwner && <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 text-[0.68rem] font-semibold text-accent"><Crown size={11} />소유자</span>}
+              <span className="rounded-full border border-line bg-canvas/45 px-2 py-0.5 text-[0.68rem] font-medium text-fg-3">{cafe.genre || translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "자유")}</span>
+              {cafe.visibility === "private" && <span className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[0.68rem] text-fg-3"><Lock size={10} />{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "비공개")}</span>}
+              {cafe.status === "archived" && <span className="rounded-full border border-warn/40 bg-warn/10 px-2 py-0.5 text-[0.68rem] text-warn">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "보관됨")}</span>}
+              {isOwner && <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 text-[0.68rem] font-semibold text-accent"><Crown size={11} />{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "소유자")}</span>}
             </h1>
             <p className="mt-2 max-w-2xl whitespace-pre-wrap text-sm leading-relaxed text-fg-2">{cafe.description}</p>
             {cafe.tags.length > 0 && <div className="mt-3 flex flex-wrap gap-1">{cafe.tags.map((tag) => <span key={tag} className="rounded-full bg-canvas/70 px-2 py-0.5 text-[0.68rem] text-fg-3">#{tag}</span>)}</div>}
             <p className="mt-3 text-xs text-fg-3">
               {COMMUNITY_CAFE_VISIBILITY_LABELS[cafe.visibility]} · {COMMUNITY_CAFE_JOIN_POLICY_LABELS[cafe.joinPolicy]} · {COMMUNITY_CAFE_POSTING_POLICY_LABELS[cafe.postingPolicy]}
             </p>
-            <p className="mt-1 text-xs text-fg-3">멤버 <span className="numeral text-fg-2">{cafe.memberCount}</span> · 글 <span className="numeral text-fg-2">{cafe.postCount}</span> · 소유자 {cafe.ownerName} · {relativeDate(cafe.createdAt)} 개설</p>
+            <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "멤버 ")}<span className="numeral text-fg-2">{cafe.memberCount}</span> {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "· 글 ")}<span className="numeral text-fg-2">{cafe.postCount}</span> {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "· 소유자 ")}{cafe.ownerName} · {relativeDate(cafe.createdAt)} {translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "개설")}</p>
           </div>
 
           <div className="w-full max-w-xs space-y-2 sm:w-auto">
             {shareable && (
-              <SharePageButton
-                path={sharePath}
-                text={cafe.name}
-                description={shareDescription}
-                label="커뮤니티 공유"
-                actionLabel="커뮤니티 보기"
-                className="w-full justify-center rounded-lg"
-              />
+              <Suspense fallback={null}>
+                <SharePageButton
+                  path={sharePath}
+                  text={cafe.name}
+                  description={shareDescription}
+                  label="커뮤니티 공유"
+                  actionLabel="커뮤니티 보기"
+                  className="w-full justify-center rounded-lg"
+                />
+              </Suspense>
             )}
             {canManage && (
-              <Link href={`/community/cafes/${encodeURIComponent(cafe.slug)}/manage`} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-xs font-semibold text-accent"><Settings size={14} />운영 관리</Link>
+              <Link href={formatI18nTemplate(translateCurrentStaticSourceText("domains.community.CafeDetailPage", "en", "/community/cafes/{v0}/manage"), { v0: String(encodeURIComponent(cafe.slug)) })} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-xs font-semibold text-accent"><Settings size={14} />{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "운영 관리")}</Link>
             )}
             {userId ? (
               isMember ? (
-                isOwner ? <p className="rounded-lg border border-line bg-canvas/45 px-3 py-2 text-center text-xs text-fg-3">소유권 이전 후 탈퇴할 수 있어요.</p> : (
-                  <button type="button" onClick={() => void changeMembership("leave")} disabled={membershipBusy} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-line px-3 py-2 text-xs font-medium text-fg-3 hover:border-bad/45 hover:text-bad disabled:opacity-45"><DoorOpen size={14} />{membershipBusy ? "처리 중..." : "탈퇴하기"}</button>
+                isOwner ? <p className="rounded-lg border border-line bg-canvas/45 px-3 py-2 text-center text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "소유권 이전 후 탈퇴할 수 있어요.")}</p> : (
+                  <button type="button" onClick={() => void changeMembership("leave")} disabled={membershipBusy} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-line px-3 py-2 text-xs font-medium text-fg-3 hover:border-bad/45 hover:text-bad disabled:opacity-45"><DoorOpen size={14} />{membershipBusy ? translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "처리 중...") : translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "탈퇴하기")}</button>
                 )
               ) : isPending ? (
-                <button type="button" onClick={() => void changeMembership("leave")} disabled={membershipBusy} className="w-full rounded-lg border border-line px-3 py-2 text-xs font-medium text-fg-2 disabled:opacity-45">{membershipBusy ? "처리 중..." : "가입 요청 취소"}</button>
+                <button type="button" onClick={() => void changeMembership("leave")} disabled={membershipBusy} className="w-full rounded-lg border border-line px-3 py-2 text-xs font-medium text-fg-2 disabled:opacity-45">{membershipBusy ? translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "처리 중...") : translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "가입 요청 취소")}</button>
               ) : isBanned ? (
-                <p className="rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-center text-xs text-bad">가입할 수 없는 커뮤니티입니다.</p>
+                <p className="rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-center text-xs text-bad">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "가입할 수 없는 커뮤니티입니다.")}</p>
               ) : (
                 <div className="space-y-2">
-                  {requiresApproval && <textarea value={joinMessage} onChange={(event) => setJoinMessage(event.target.value.slice(0, 300))} rows={2} placeholder="가입 인사 또는 참여 목적" className="w-full resize-none rounded-lg border border-line bg-card px-2.5 py-2 text-xs text-fg" />}
-                  {(requiresInvite || inviteCode) && <input value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} placeholder="초대 코드" className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-xs text-fg" />}
-                  <button type="button" onClick={() => void changeMembership("join")} disabled={membershipBusy || (requiresInvite && !inviteCode.trim())} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-on-accent disabled:opacity-45"><UserPlus size={14} />{membershipBusy ? "처리 중..." : requiresApproval ? "가입 요청" : "가입하기"}</button>
+                  {requiresApproval && <textarea value={joinMessage} onChange={(event) => setJoinMessage(event.target.value.slice(0, 300))} rows={2} placeholder={translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "가입 인사 또는 참여 목적")} className="w-full resize-none rounded-lg border border-line bg-card px-2.5 py-2 text-xs text-fg" />}
+                  {(requiresInvite || inviteCode) && <input value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} placeholder={translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "초대 코드")} className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-xs text-fg" />}
+                  <button type="button" onClick={() => void changeMembership("join")} disabled={membershipBusy || (requiresInvite && !inviteCode.trim())} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-on-accent disabled:opacity-45"><UserPlus size={14} />{membershipBusy ? translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "처리 중...") : requiresApproval ? translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "가입 요청") : translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "가입하기")}</button>
                 </div>
               )
-            ) : <p className="rounded-lg border border-line bg-canvas/45 px-3 py-2 text-center text-xs text-fg-3">로그인하면 가입할 수 있어요.</p>}
+            ) : <p className="rounded-lg border border-line bg-canvas/45 px-3 py-2 text-center text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "로그인하면 가입할 수 있어요.")}</p>}
             {membershipError && <p className="text-xs text-bad">{membershipError}</p>}
-            {cafe.viewerRole && <p className="text-center text-[0.68rem] text-fg-3">내 역할: {COMMUNITY_CAFE_ROLE_LABELS[cafe.viewerRole]}</p>}
+            {cafe.viewerRole && <p className="text-center text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "내 역할: ")}{COMMUNITY_CAFE_ROLE_LABELS[cafe.viewerRole]}</p>}
           </div>
         </div>
       </header>
 
       {cafe.rules.length > 0 && (
         <section className="mt-5 rounded-2xl border border-line bg-card/60 p-4" aria-labelledby="community-rules-title">
-          <h2 id="community-rules-title" className="inline-flex items-center gap-1.5 text-sm font-semibold"><ShieldCheck size={15} className="text-accent" />커뮤니티 규칙</h2>
+          <h2 id="community-rules-title" className="inline-flex items-center gap-1.5 text-sm font-semibold"><ShieldCheck size={15} className="text-accent" />{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "커뮤니티 규칙")}</h2>
           <ol className="mt-3 grid gap-2 sm:grid-cols-2">
             {cafe.rules.map((rule, index) => <li key={rule.id} className="rounded-xl border border-line bg-canvas/40 p-3"><p className="text-xs font-semibold text-fg">{index + 1}. {rule.title}</p>{rule.description && <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-fg-3">{rule.description}</p>}</li>)}
           </ol>
@@ -273,8 +283,8 @@ export function CafeDetailPage() {
         ) : (
           <div className="rounded-3xl border border-dashed border-line bg-card/45 px-6 py-16 text-center">
             <Lock className="mx-auto mb-3 text-fg-3" size={24} />
-            <h2 className="text-base font-semibold">회원 전용 커뮤니티</h2>
-            <p className="mt-2 text-sm text-fg-3">가입이 완료되면 게시글과 댓글을 볼 수 있어요.</p>
+            <h2 className="text-base font-semibold">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "회원 전용 커뮤니티")}</h2>
+            <p className="mt-2 text-sm text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeDetailPage", "ko", "가입이 완료되면 게시글과 댓글을 볼 수 있어요.")}</p>
           </div>
         )}
       </section>

@@ -50,8 +50,8 @@ describe("ProductionRecoveryScenarioPanel", () => {
     await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
     const original = aggregate.tasks.find((task) => task.id === "task-episode-12-background");
     expect(execute).toHaveBeenNthCalledWith(1, {
-      type: "upsert-task-batch",
-      tasks: expect.arrayContaining([expect.objectContaining({
+      type: "upsert-task",
+      task: expect.objectContaining({
         id: "task-episode-12-background",
         dueAt: expect.not.stringMatching(original?.dueAt ?? ""),
       })]),
@@ -67,8 +67,8 @@ describe("ProductionRecoveryScenarioPanel", () => {
     fireEvent.click(undo);
     await waitFor(() => expect(execute).toHaveBeenCalledTimes(2));
     expect(execute).toHaveBeenNthCalledWith(2, {
-      type: "upsert-task-batch",
-      tasks: expect.arrayContaining([expect.objectContaining({
+      type: "upsert-task",
+      task: expect.objectContaining({
         id: "task-episode-12-background",
         dueAt: original?.dueAt,
       })]),

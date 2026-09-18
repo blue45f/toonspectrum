@@ -1,0 +1,28 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  // drizzle.config.ts intentionally throws without DATABASE_URL. Knip only needs source-level
+  // imports here, so do not execute the Drizzle plugin configuration during static analysis.
+  "drizzle": false,
+  // Several specialized Playwright configs intentionally fail closed unless their release-gate
+  // environment variables are present, so Knip must not execute Playwright config discovery.
+  "playwright": false,
+  // Cloudflare worker module specifiers are runtime-provided virtual modules, not npm packages.
+  "ignoreDependencies": ["cloudflare"],
+  // Vite browser harnesses intentionally use server-root module URLs. Product source imports are
+  // separately enforced by import-x/no-unresolved in eslint.config.mjs.
+  "ignoreUnresolved": [
+    "^/src/.+",
+    "^/scripts/.+",
+    "^/offline-draw/.+"
+  ],
+  "rules": {
+    // Existing cycles are reported for cleanup, while unresolved imports/dependency declarations
+    // are enforced separately by the CI-facing quality:imports script.
+    "cycles": "warn"
+  },
+  "ignoreFiles": [
+    "packages/studio-hokusai-wasm/pkg/**",
+    "crates/studio-engine-vello/pkg/**",
+    "crates/studio-engine-vello/pkg-gpu/**"
+  ]
+}

@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   ArrowLeft,
   BadgeCheck,
@@ -33,6 +37,8 @@ import {
 } from "react";
 
 import { storyworldDraftStore } from "./draft-store";
+import { projectStoryworldToStudioProjectStory } from "./studio-storyworld-project-projection";
+import { updateStudioProjectStory } from "../studio-project-feature-adapters";
 import {
   STORYWORLD_CAPABILITIES,
   STORYWORLD_CAPABILITY_GROUPS,
@@ -114,8 +120,20 @@ const MATURITY_LABELS: Readonly<Record<StoryworldCapabilityMaturity, string>> = 
   experimental: "실험실",
 };
 
+const STORYWORLD_DEMO_SEED_FLAG = "toonSpectrumDemoSeed";
+
 function cloneDemoProject(): StoryworldProject {
-  return JSON.parse(JSON.stringify(STORYWORLD_DEMO_PROJECT)) as StoryworldProject;
+  const project = JSON.parse(JSON.stringify(STORYWORLD_DEMO_PROJECT)) as StoryworldProject;
+  return { ...project, metadata: { ...project.metadata, [STORYWORLD_DEMO_SEED_FLAG]: true } };
+}
+
+function authoredStoryworldProject(project: StoryworldProject): StoryworldProject {
+  const metadata = { ...project.metadata, [STORYWORLD_DEMO_SEED_FLAG]: false };
+  return { ...project, metadata };
+}
+
+function isDemoStoryworldSeed(project: StoryworldProject): boolean {
+  return project.metadata?.[STORYWORLD_DEMO_SEED_FLAG] === true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -374,13 +392,13 @@ function AxisCards({ result }: { readonly result: StoryworldAnalysisResult }) {
   return (
     <div className="storyworld-axis-grid">
       {result.axisScores.map((axis) => (
-        <article className={`storyworld-axis-card storyworld-tone--${scoreTone(axis.score)}`} key={axis.axis}>
+        <article className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "en", "storyworld-axis-card storyworld-tone--{v0}"), { v0: String(scoreTone(axis.score)) })} key={axis.axis}>
           <div className="storyworld-axis-card__topline">
             <span>{AXIS_LABELS[axis.axis]}</span>
             <strong>{axis.score}</strong>
           </div>
           <div
-            aria-label={`${AXIS_LABELS[axis.axis]} 점수 ${axis.score}점`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "{v0} 점수 {v1}점"), { v0: String(AXIS_LABELS[axis.axis]), v1: String(axis.score) })}
             aria-valuemax={100}
             aria-valuemin={0}
             aria-valuenow={axis.score}
@@ -389,7 +407,7 @@ function AxisCards({ result }: { readonly result: StoryworldAnalysisResult }) {
           >
             <span style={{ width: `${axis.score}%` }} />
           </div>
-          <p>오류 {axis.errorCount} · 경고 {axis.warningCount} · 확인 {axis.infoCount}</p>
+          <p>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "오류 ")}{axis.errorCount} {translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "· 경고 ")}{axis.warningCount} {translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "· 확인 ")}{axis.infoCount}</p>
         </article>
       ))}
     </div>
@@ -401,13 +419,13 @@ function IssueList({ issues, limit }: {
   readonly limit?: number;
 }) {
   const visible = limit === undefined ? issues : issues.slice(0, limit);
-  if (visible.length === 0) return <EmptyState>현재 필터에서 발견된 문제가 없습니다.</EmptyState>;
+  if (visible.length === 0) return <EmptyState>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "현재 필터에서 발견된 문제가 없습니다.")}</EmptyState>;
   return (
     <div className="storyworld-issue-list">
       {visible.map((issue) => {
         const Icon = severityIcon(issue.severity);
         return (
-          <article className={`storyworld-issue storyworld-issue--${issue.severity}`} key={issue.id}>
+          <article className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "en", "storyworld-issue storyworld-issue--{v0}"), { v0: String(issue.severity) })} key={issue.id}>
             <Icon aria-hidden size={18} />
             <div>
               <div className="storyworld-issue__meta">
@@ -433,19 +451,17 @@ function OverviewTab({ result, onOpenIssues }: {
   return (
     <div className="storyworld-tab-stack">
       <div className="storyworld-score-hero">
-        <div className={`storyworld-score-orb storyworld-tone--${scoreTone(result.overallScore)}`}>
+        <div className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "en", "storyworld-score-orb storyworld-tone--{v0}"), { v0: String(scoreTone(result.overallScore)) })}>
           <strong>{result.overallScore}</strong>
-          <span>통합 건전성</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "통합 건전성")}</span>
         </div>
         <div className="storyworld-score-copy">
-          <span className="storyworld-eyebrow">NARRATIVE DIGITAL TWIN</span>
-          <h2>원고를 읽는 대신, 원고가 성립하는지 실행했습니다.</h2>
+          <span className="storyworld-eyebrow">{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "en", "NARRATIVE DIGITAL TWIN")}</span>
+          <h2>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "원고를 읽는 대신, 원고가 성립하는지 실행했습니다.")}</h2>
           <p>
-            {result.orderedSceneIds.length}개 장면과 {result.receipt.factCount}개 사실을 순서대로 적용해
-            {" "}{result.issues.length}개 검토 신호와 {result.repairProposals.length}개 비파괴 수선 의도를 만들었습니다.
-          </p>
+            {result.orderedSceneIds.length}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "개 장면과 ")}{result.receipt.factCount}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "개 사실을 순서대로 적용해")}{" "}{result.issues.length}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "개 검토 신호와 ")}{result.repairProposals.length}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "개 비파괴 수선 의도를 만들었습니다.")}</p>
           <button className="storyworld-button storyworld-button--primary" onClick={onOpenIssues} type="button">
-            {blockingIssues > 0 ? `${blockingIssues}개 차단 오류 검토` : "전체 검토 신호 보기"}
+            {blockingIssues > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "{v0}개 차단 오류 검토"), { v0: String(blockingIssues) }) : translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "전체 검토 신호 보기")}
             <ChevronRight aria-hidden size={16} />
           </button>
         </div>
@@ -454,36 +470,36 @@ function OverviewTab({ result, onOpenIssues }: {
       <AxisCards result={result} />
 
       <div className="storyworld-summary-grid">
-        <Panel title="캐논 실행 스냅샷" description="마지막 장면까지 실제로 성립한 세계 상태입니다.">
+        <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "캐논 실행 스냅샷")} description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "마지막 장면까지 실제로 성립한 세계 상태입니다.")}>
           <dl className="storyworld-stat-list">
-            <div><dt>실행 장면</dt><dd>{result.orderedSceneIds.length}</dd></div>
-            <div><dt>세계 프레임</dt><dd>{result.worldTimeline.length}</dd></div>
-            <div><dt>열린 복선</dt><dd>{result.setupLedger.filter((row) => row.status === "open" || row.status === "overdue").length}</dd></div>
-            <div><dt>독자 공개 사실</dt><dd>{result.worldTimeline.at(-1)?.readerFactIds.length ?? 0}</dd></div>
+            <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "실행 장면")}</dt><dd>{result.orderedSceneIds.length}</dd></div>
+            <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "세계 프레임")}</dt><dd>{result.worldTimeline.length}</dd></div>
+            <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "열린 복선")}</dt><dd>{result.setupLedger.filter((row) => row.status === "open" || row.status === "overdue").length}</dd></div>
+            <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "독자 공개 사실")}</dt><dd>{result.worldTimeline.at(-1)?.readerFactIds.length ?? 0}</dd></div>
           </dl>
         </Panel>
-        <Panel title="제작 디지털 트윈" description="품질 문제와 제작 비용을 같은 분기에서 비교합니다.">
+        <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "제작 디지털 트윈")} description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "품질 문제와 제작 비용을 같은 분기에서 비교합니다.")}>
           <dl className="storyworld-stat-list">
-            <div><dt>예상 총 작업</dt><dd>{formatMinutes(result.production.totalMinutes)}</dd></div>
-            <div><dt>가용량 사용</dt><dd>{result.production.utilizationPercent === null ? "미설정" : `${result.production.utilizationPercent}%`}</dd></div>
-            <div><dt>고유 자산</dt><dd>{result.production.uniqueAssetCount}</dd></div>
-            <div><dt>재사용 가능</dt><dd>{result.production.reusableAssetCount}</dd></div>
+            <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "예상 총 작업")}</dt><dd>{formatMinutes(result.production.totalMinutes)}</dd></div>
+            <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "가용량 사용")}</dt><dd>{result.production.utilizationPercent === null ? translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "미설정") : `${result.production.utilizationPercent}%`}</dd></div>
+            <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "고유 자산")}</dt><dd>{result.production.uniqueAssetCount}</dd></div>
+            <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "재사용 가능")}</dt><dd>{result.production.reusableAssetCount}</dd></div>
           </dl>
         </Panel>
-        <Panel title="결정적 근거 영수증" description="같은 입력은 같은 지문과 문제 집합을 만듭니다.">
+        <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "결정적 근거 영수증")} description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "같은 입력은 같은 지문과 문제 집합을 만듭니다.")}>
           <dl className="storyworld-receipt">
-            <div><dt>프로젝트</dt><dd><code>{result.receipt.projectFingerprint}</code></dd></div>
-            <div><dt>문제 집합</dt><dd><code>{result.receipt.issueFingerprint}</code></dd></div>
-            <div><dt>스키마</dt><dd>v{result.receipt.version}</dd></div>
-            <div><dt>결정적 실행</dt><dd>예</dd></div>
+            <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "프로젝트")}</dt><dd><code>{result.receipt.projectFingerprint}</code></dd></div>
+            <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "문제 집합")}</dt><dd><code>{result.receipt.issueFingerprint}</code></dd></div>
+            <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "스키마")}</dt><dd>v{result.receipt.version}</dd></div>
+            <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "결정적 실행")}</dt><dd>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "예")}</dd></div>
           </dl>
         </Panel>
       </div>
 
       <Panel
-        title="우선 검토 신호"
-        description="원고를 자동으로 고치지 않고 근거가 큰 순서대로 보여줍니다."
-        action={<button className="storyworld-text-button" onClick={onOpenIssues} type="button">모두 보기 <ChevronRight aria-hidden size={14} /></button>}
+        title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "우선 검토 신호")}
+        description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "원고를 자동으로 고치지 않고 근거가 큰 순서대로 보여줍니다.")}
+        action={<button className="storyworld-text-button" onClick={onOpenIssues} type="button">{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "모두 보기 ")}<ChevronRight aria-hidden size={14} /></button>}
       >
         <IssueList issues={result.issues} limit={5} />
       </Panel>
@@ -500,36 +516,34 @@ function IssuesTab({ result }: { readonly result: StoryworldAnalysisResult }) {
   );
   return (
     <div className="storyworld-tab-stack">
-      <Panel title="모순·위험 탐색기" description="필터는 표시만 바꾸며 분석 결과와 영수증을 변경하지 않습니다.">
+      <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "모순·위험 탐색기")} description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "필터는 표시만 바꾸며 분석 결과와 영수증을 변경하지 않습니다.")}>
         <div className="storyworld-filter-row">
           <label>
-            심각도
-            <select onChange={(event) => setSeverity(event.target.value as StoryworldSeverity | "all")} value={severity}>
-              <option value="all">전체</option>
-              <option value="error">오류</option>
-              <option value="warning">경고</option>
-              <option value="info">확인</option>
+            {translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "심각도")}<select onChange={(event) => setSeverity(event.target.value as StoryworldSeverity | "all")} value={severity}>
+              <option value="all">{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "전체")}</option>
+              <option value="error">{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "오류")}</option>
+              <option value="warning">{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "경고")}</option>
+              <option value="info">{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "확인")}</option>
             </select>
           </label>
           <label>
-            품질 축
-            <select onChange={(event) => setAxis(event.target.value as StoryworldAxisId | "all")} value={axis}>
-              <option value="all">전체</option>
+            {translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "품질 축")}<select onChange={(event) => setAxis(event.target.value as StoryworldAxisId | "all")} value={axis}>
+              <option value="all">{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "전체")}</option>
               {Object.entries(AXIS_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
             </select>
           </label>
-          <span aria-live="polite">{filtered.length}개 표시</span>
+          <span aria-live="polite">{filtered.length}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "개 표시")}</span>
         </div>
         <IssueList issues={filtered} />
       </Panel>
-      <Panel title="비파괴 수선 의도" description="각 제안은 설명 가능한 중립 명령이며 명시적 승인 전에는 원고를 바꾸지 않습니다.">
+      <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "비파괴 수선 의도")} description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "각 제안은 설명 가능한 중립 명령이며 명시적 승인 전에는 원고를 바꾸지 않습니다.")}>
         <div className="storyworld-proposal-grid">
           {result.repairProposals.map((proposal) => (
             <article className="storyworld-proposal" key={proposal.id}>
               <div className="storyworld-proposal__topline">
                 <WandSparkles aria-hidden size={17} />
                 <strong>{proposal.title}</strong>
-                <span data-risk={proposal.risk}>위험 {proposal.risk}</span>
+                <span data-risk={proposal.risk}>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "위험 ")}{proposal.risk}</span>
               </div>
               <p>{proposal.rationale}</p>
               <code>{proposal.intent.kind}</code>
@@ -567,18 +581,16 @@ function MultiverseTab({ project, result }: {
 
   return (
     <div className="storyworld-tab-stack">
-      <Panel title="반사실 장면 제거 실험" description="원본을 바꾸지 않고 ‘이 장면이 없었다면’을 실행해 후속 파급을 계산합니다.">
+      <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "반사실 장면 제거 실험")} description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "원본을 바꾸지 않고 ‘이 장면이 없었다면’을 실행해 후속 파급을 계산합니다.")}>
         <div className="storyworld-branch-controls">
           <label>
-            가상으로 제외할 장면
-            <select onChange={(event) => setSceneId(event.target.value)} value={sceneId}>
+            {translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "가상으로 제외할 장면")}<select onChange={(event) => setSceneId(event.target.value)} value={sceneId}>
               {activeScenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.order}. {scene.title}</option>)}
             </select>
           </label>
           <button className="storyworld-button storyworld-button--primary" disabled={!sceneId} onClick={run} type="button">
             <FlaskConical aria-hidden size={17} />
-            분기 실행
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "분기 실행")}</button>
         </div>
       </Panel>
 
@@ -586,53 +598,53 @@ function MultiverseTab({ project, result }: {
         <>
           <div className="storyworld-branch-comparison">
             <article>
-              <span>현재 캐논</span>
+              <span>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "현재 캐논")}</span>
               <strong>{branch.baseline.overallScore}</strong>
-              <small>문제 {branch.baseline.issues.length}개</small>
+              <small>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "문제 ")}{branch.baseline.issues.length}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "개")}</small>
             </article>
-            <div className={`storyworld-delta storyworld-tone--${branch.scoreDelta >= 0 ? "good" : "bad"}`}>
+            <div className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "en", "storyworld-delta storyworld-tone--{v0}"), { v0: String(branch.scoreDelta >= 0 ? "good" : "bad") })}>
               {branch.scoreDelta >= 0 ? "+" : ""}{branch.scoreDelta}
             </div>
             <article>
-              <span>가상 분기</span>
+              <span>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "가상 분기")}</span>
               <strong>{branch.branch.overallScore}</strong>
-              <small>문제 {branch.branch.issues.length}개</small>
+              <small>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "문제 ")}{branch.branch.issues.length}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "개")}</small>
             </article>
           </div>
           <div className="storyworld-summary-grid">
-            <Panel title="영향 원뿔" description="직접 변경과 장면 의존성을 따라 영향을 받는 범위입니다.">
+            <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "영향 원뿔")} description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "직접 변경과 장면 의존성을 따라 영향을 받는 범위입니다.")}>
               <div className="storyworld-chip-list">
                 {branch.impactedSceneIds.map((id) => <code key={id}>{id}</code>)}
               </div>
             </Panel>
-            <Panel title="새로 생긴 문제">
+            <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "새로 생긴 문제")}>
               {branch.addedIssueIds.length > 0
                 ? <div className="storyworld-code-list">{branch.addedIssueIds.map((id) => <code key={id}>{id}</code>)}</div>
-                : <EmptyState>새 문제 없음</EmptyState>}
+                : <EmptyState>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "새 문제 없음")}</EmptyState>}
             </Panel>
-            <Panel title="해결된 문제">
+            <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "해결된 문제")}>
               {branch.resolvedIssueIds.length > 0
                 ? <div className="storyworld-code-list">{branch.resolvedIssueIds.map((id) => <code key={id}>{id}</code>)}</div>
-                : <EmptyState>해결된 문제 없음</EmptyState>}
+                : <EmptyState>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "해결된 문제 없음")}</EmptyState>}
             </Panel>
           </div>
-          <Panel title="파레토 판정" description="숨은 가중치 없이 9개 품질 축을 모두 비교합니다.">
+          <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "파레토 판정")} description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "숨은 가중치 없이 9개 품질 축을 모두 비교합니다.")}>
             <div className="storyworld-frontier-grid">
               {frontier.map((candidate) => (
-                <article className={candidate.frontier ? "is-frontier" : ""} key={candidate.id}>
+                <article className={candidate.frontier ? translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "en", "is-frontier") : ""} key={candidate.id}>
                   <CircleDot aria-hidden size={18} />
-                  <div><strong>{candidate.label}</strong><span>{candidate.overallScore}점</span></div>
-                  <em>{candidate.frontier ? "비지배 후보" : `${candidate.dominatedByIds.join(", ")}에 지배됨`}</em>
+                  <div><strong>{candidate.label}</strong><span>{candidate.overallScore}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "점")}</span></div>
+                  <em>{candidate.frontier ? translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "비지배 후보") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "{v0}에 지배됨"), { v0: String(candidate.dominatedByIds.join(", ")) })}</em>
                 </article>
               ))}
             </div>
           </Panel>
-          <Panel title="분기 축별 점수">
+          <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "분기 축별 점수")}>
             <AxisCards result={branch.branch} />
           </Panel>
         </>
       ) : (
-        <EmptyState>장면을 선택해 원본을 건드리지 않는 반사실 실험을 실행하세요.</EmptyState>
+        <EmptyState>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "장면을 선택해 원본을 건드리지 않는 반사실 실험을 실행하세요.")}</EmptyState>
       )}
     </div>
   );
@@ -645,7 +657,7 @@ function KnowledgeTab({ project, result }: {
   const factById = new Map(project.facts.map((fact) => [fact.id, fact]));
   return (
     <div className="storyworld-tab-stack">
-      <Panel title="인물별 믿음 행렬" description="작가가 아는 진실과 등장인물이 아는 사실을 분리합니다.">
+      <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "인물별 믿음 행렬")} description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "작가가 아는 진실과 등장인물이 아는 사실을 분리합니다.")}>
         <div className="storyworld-knowledge-grid">
           {result.knowledgeMatrix.map((row) => (
             <article key={row.characterId}>
@@ -655,8 +667,8 @@ function KnowledgeTab({ project, result }: {
                 <code>{row.characterId}</code>
               </div>
               <dl>
-                <div><dt>현재 아는 사실</dt><dd>{row.knownFactIds.length}</dd></div>
-                <div><dt>비밀 계약</dt><dd>{row.secretFactIds.length}</dd></div>
+                <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "현재 아는 사실")}</dt><dd>{row.knownFactIds.length}</dd></div>
+                <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "비밀 계약")}</dt><dd>{row.secretFactIds.length}</dd></div>
               </dl>
               <div className="storyworld-fact-list">
                 {row.knownFactIds.map((factId) => (
@@ -667,16 +679,16 @@ function KnowledgeTab({ project, result }: {
           ))}
         </div>
       </Panel>
-      <Panel title="지식 누출" description="획득 장면 없이 사용한 사실만 모았습니다.">
+      <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "지식 누출")} description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "획득 장면 없이 사용한 사실만 모았습니다.")}>
         <IssueList issues={result.issues.filter((issue) => issue.code === "knowledge-leak")} />
       </Panel>
-      <Panel title="세계 상태 실행 로그" description="각 장면이 끝난 직후의 캐논 사실과 독자 공개 범위입니다.">
+      <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "세계 상태 실행 로그")} description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "각 장면이 끝난 직후의 캐논 사실과 독자 공개 범위입니다.")}>
         <div className="storyworld-timeline">
           {result.worldTimeline.map((frame) => (
             <article key={frame.sceneId}>
               <div><span>{frame.order}</span><code>{frame.sceneId}</code></div>
-              <p>성립 사실 {Object.keys(frame.facts).length} · 독자 공개 {frame.readerFactIds.length}</p>
-              <details><summary>상태 보기</summary><pre>{JSON.stringify(frame.facts, null, 2)}</pre></details>
+              <p>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "성립 사실 ")}{Object.keys(frame.facts).length} {translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "· 독자 공개 ")}{frame.readerFactIds.length}</p>
+              <details><summary>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "상태 보기")}</summary><pre>{JSON.stringify(frame.facts, null, 2)}</pre></details>
             </article>
           ))}
         </div>
@@ -688,7 +700,7 @@ function KnowledgeTab({ project, result }: {
 function ContractsTab({ result }: { readonly result: StoryworldAnalysisResult }) {
   return (
     <div className="storyworld-tab-stack">
-      <Panel title="체호프 원장" description="복선 설치와 회수를 하나의 계약으로 추적합니다.">
+      <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "체호프 원장")} description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "복선 설치와 회수를 하나의 계약으로 추적합니다.")}>
         <div className="storyworld-contract-grid">
           {result.setupLedger.map((row) => (
             <article data-status={row.status} key={row.setupId}>
@@ -698,9 +710,9 @@ function ContractsTab({ result }: { readonly result: StoryworldAnalysisResult })
                 <span>{row.status}</span>
               </div>
               <dl>
-                <div><dt>설치</dt><dd>{row.setupSceneIds.length}회</dd></div>
-                <div><dt>회수</dt><dd>{row.payoffSceneIds.length}회</dd></div>
-                <div><dt>기한</dt><dd>{row.dueByOrder ?? "미설정"}</dd></div>
+                <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "설치")}</dt><dd>{row.setupSceneIds.length}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "회")}</dd></div>
+                <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "회수")}</dt><dd>{row.payoffSceneIds.length}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "회")}</dd></div>
+                <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "기한")}</dt><dd>{row.dueByOrder ?? translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "미설정")}</dd></div>
               </dl>
               <div className="storyworld-chip-list">
                 {[...row.setupSceneIds, ...row.payoffSceneIds].map((id, index) => <code key={`${id}:${index}`}>{id}</code>)}
@@ -709,21 +721,21 @@ function ContractsTab({ result }: { readonly result: StoryworldAnalysisResult })
           ))}
         </div>
       </Panel>
-      <Panel title="모티프 DNA" description="반복되는 시각·소리·소품 모티프의 빈도와 최대 공백입니다.">
+      <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "모티프 DNA")} description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "반복되는 시각·소리·소품 모티프의 빈도와 최대 공백입니다.")}>
         <div className="storyworld-motif-grid">
           {result.motifLedger.map((row) => (
             <article key={row.motifId}>
               <Sparkles aria-hidden size={20} />
               <div><strong>{row.label}</strong><code>{row.motifId}</code></div>
               <dl>
-                <div><dt>등장</dt><dd>{row.occurrenceCount}</dd></div>
-                <div><dt>최대 공백</dt><dd>{row.largestGapScenes}장면</dd></div>
+                <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "등장")}</dt><dd>{row.occurrenceCount}</dd></div>
+                <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "최대 공백")}</dt><dd>{row.largestGapScenes}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "장면")}</dd></div>
               </dl>
             </article>
           ))}
         </div>
       </Panel>
-      <Panel title="스포일러 방화벽">
+      <Panel title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "스포일러 방화벽")}>
         <IssueList issues={result.issues.filter((issue) => issue.axis === "spoiler-safety")} />
       </Panel>
     </div>
@@ -738,20 +750,20 @@ function CapabilitiesTab() {
     <div className="storyworld-tab-stack">
       <div className="storyworld-capability-intro">
         <div>
-          <span className="storyworld-eyebrow">CREATIVE EXPANSION MAP</span>
-          <h2>{STORYWORLD_CAPABILITIES.length}개 차별화 기능을 하나의 문서 모델로 묶었습니다.</h2>
-          <p>버튼을 무작정 늘리지 않고 엔진 포함, 기존 기능 연계, 실험실 후보를 구분합니다.</p>
+          <span className="storyworld-eyebrow">{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "en", "CREATIVE EXPANSION MAP")}</span>
+          <h2>{STORYWORLD_CAPABILITIES.length}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "개 차별화 기능을 하나의 문서 모델로 묶었습니다.")}</h2>
+          <p>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "버튼을 무작정 늘리지 않고 엔진 포함, 기존 기능 연계, 실험실 후보를 구분합니다.")}</p>
         </div>
         <dl>
-          <div><dt>엔진 포함</dt><dd>{counts.engine}</dd></div>
-          <div><dt>연계 설계</dt><dd>{counts.adapter}</dd></div>
-          <div><dt>실험실</dt><dd>{counts.experimental}</dd></div>
+          <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "엔진 포함")}</dt><dd>{counts.engine}</dd></div>
+          <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "연계 설계")}</dt><dd>{counts.adapter}</dd></div>
+          <div><dt>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "실험실")}</dt><dd>{counts.experimental}</dd></div>
         </dl>
       </div>
-      <div className="storyworld-segmented" role="group" aria-label="기능 성숙도 필터">
+      <div className="storyworld-segmented" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "기능 성숙도 필터")}>
         {(["all", "engine", "adapter", "experimental"] as const).map((value) => (
           <button aria-pressed={maturity === value} key={value} onClick={() => setMaturity(value)} type="button">
-            {value === "all" ? "전체" : MATURITY_LABELS[value]}
+            {value === "all" ? translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "전체") : MATURITY_LABELS[value]}
           </button>
         ))}
       </div>
@@ -771,11 +783,11 @@ function CapabilitiesTab() {
                   <h3>{capability.name}</h3>
                   <p>{capability.oneLine}</p>
                   <details>
-                    <summary>증거와 안전 경계</summary>
-                    <strong>안전 경계</strong>
+                    <summary>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "증거와 안전 경계")}</summary>
+                    <strong>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "안전 경계")}</strong>
                     <p>{capability.guardrail}</p>
                     <div className="storyworld-chip-list">{capability.evidence.map((item) => <code key={item}>{item}</code>)}</div>
-                    {capability.composesWith ? <small>연계: {capability.composesWith.join(" · ")}</small> : null}
+                    {capability.composesWith ? <small>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "연계: ")}{capability.composesWith.join(" · ")}</small> : null}
                   </details>
                 </article>
               ))}
@@ -805,12 +817,12 @@ function JsonTab({ project, onApply }: {
   };
   return (
     <Panel
-      title="스토리월드 원본 데이터"
-      description="자동 추론 대신 사실·공개·지식·제작 근거를 명시적으로 편집합니다."
-      action={<button className="storyworld-button storyworld-button--primary" onClick={apply} type="button"><Save aria-hidden size={16} /> 적용 후 분석</button>}
+      title={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "스토리월드 원본 데이터")}
+      description={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "자동 추론 대신 사실·공개·지식·제작 근거를 명시적으로 편집합니다.")}
+      action={<button className="storyworld-button storyworld-button--primary" onClick={apply} type="button"><Save aria-hidden size={16} /> {translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "적용 후 분석")}</button>}
     >
       <label className="storyworld-json-editor">
-        <span className="sr-only">스토리월드 JSON</span>
+        <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "스토리월드 JSON")}</span>
         <textarea onChange={(event) => setText(event.target.value)} spellCheck={false} value={text} />
       </label>
       {error ? <p className="storyworld-inline-error" role="alert"><XCircle aria-hidden size={16} />{error}</p> : null}
@@ -838,12 +850,12 @@ export function StudioStoryworldLabPage(props: StudioStoryworldLabPageProps) {
   if (loaded === null || loaded.key !== key) {
     return (
       <div className="storyworld-main" aria-busy={error === null}>
-        <h1>스토리월드 인과관계 랩</h1>
-        <p role={error === null ? "status" : "alert"}>
-          {error === null ? "SQLite/OPFS에서 스토리월드 초안을 복원하는 중입니다." : `복원 실패: ${error} 저장된 원본은 변경하지 않았습니다.`}
+        <h1>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "스토리월드 인과관계 랩")}</h1>
+        <p role={error === null ? translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "en", "status") : translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "en", "alert")}>
+          {error === null ? translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "SQLite/OPFS에서 스토리월드 초안을 복원하는 중입니다.") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "복원 실패: {v0} 저장된 원본은 변경하지 않았습니다."), { v0: String(error) })}
         </p>
-        {error !== null ? <button className="storyworld-button" type="button" onClick={() => setAttempt((value) => value + 1)}>저장소 다시 열기</button> : null}
-        <Link className="storyworld-button" href={editorHref(props.workId, props.remixSourceWorkId)}>Studio 편집기로 돌아가기</Link>
+        {error !== null ? <button className="storyworld-button" type="button" onClick={() => setAttempt((value) => value + 1)}>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "저장소 다시 열기")}</button> : null}
+        <Link className="storyworld-button" href={editorHref(props.workId, props.remixSourceWorkId)}>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "Studio 편집기로 돌아가기")}</Link>
       </div>
     );
   }
@@ -876,16 +888,35 @@ function StudioStoryworldLabEditor({
     setSaveState("idle");
     // Complete JSON edits queue immediately; only obsolete UI receipts are cancelled.
     void storyworldDraftStore.save(storageKey, project).then(() => {
+      let readinessProjected: boolean | null = workId && !isDemoStoryworldSeed(project) ? true : null;
+      if (readinessProjected !== null && workId && typeof window !== "undefined") {
+        try {
+          updateStudioProjectStory(
+            window.localStorage,
+            workId,
+            projectStoryworldToStudioProjectStory(project, workId),
+            { target: window },
+          );
+        } catch {
+          readinessProjected = false;
+        }
+      }
       if (!active) return;
       setSaveState("saved");
-      setStatusText("SQLite/OPFS에 스토리월드 초안을 저장했습니다.");
+      setStatusText(readinessProjected === null
+        ? workId
+          ? "데모 스토리월드는 저장했지만 실제 프로젝트 준비도에는 반영하지 않았습니다."
+          : "SQLite/OPFS에 스토리월드 초안을 저장했습니다."
+        : readinessProjected
+          ? "SQLite/OPFS에 스토리월드 초안을 저장하고 프로젝트 준비도에 반영했습니다."
+          : "스토리월드 초안은 저장했지만 프로젝트 준비도에는 반영하지 못했습니다.");
     }).catch(() => {
       if (!active) return;
       setSaveState("error");
       setStatusText("SQLite/OPFS에 저장하지 못했습니다. 현재 편집은 이 탭에만 남아 있습니다. JSON으로 내보내 보관하세요.");
     });
     return () => { active = false; };
-  }, [project, storageKey]);
+  }, [project, storageKey, workId]);
 
   const reset = () => {
     setProject(cloneDemoProject());
@@ -905,7 +936,7 @@ function StudioStoryworldLabEditor({
     if (!file) return;
     try {
       if (file.size > 1_000_000) throw new Error("스토리월드 JSON은 1MB 이하여야 합니다.");
-      const next = parseStoryworldProject(await file.text());
+      const next = authoredStoryworldProject(parseStoryworldProject(await file.text()));
       setProject(next);
       setActiveTab("overview");
       setStatusText(`‘${next.title}’ 데이터를 가져와 분석했습니다.`);
@@ -918,24 +949,24 @@ function StudioStoryworldLabEditor({
     <div className="storyworld-shell">
       <header className="storyworld-topbar">
         <div className="storyworld-topbar__brand">
-          <Link aria-label="Studio 편집기로 돌아가기" className="storyworld-icon-button" href={backHref}>
+          <Link aria-label={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "Studio 편집기로 돌아가기")} className="storyworld-icon-button" href={backHref}>
             <ArrowLeft aria-hidden size={19} />
           </Link>
           <div className="storyworld-brand-mark" aria-hidden><Network size={20} /></div>
           <div>
-            <span>TOONSPECTRUM STUDIO</span>
-            <strong>스토리월드 인과관계 랩</strong>
+            <span>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "en", "TOONSPECTRUM STUDIO")}</span>
+            <strong>{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "스토리월드 인과관계 랩")}</strong>
           </div>
         </div>
         <div className="storyworld-topbar__actions">
-          <span className={`storyworld-save-state storyworld-save-state--${saveState}`}>
+          <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "en", "storyworld-save-state storyworld-save-state--{v0}"), { v0: String(saveState) })}>
             {saveState === "error" ? <AlertTriangle aria-hidden size={14} /> : <ShieldCheck aria-hidden size={14} />}
-            {saveState === "error" ? "저장 실패" : saveState === "saved" ? "로컬 저장됨" : "분석 중"}
+            {saveState === "error" ? translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "저장 실패") : saveState === "saved" ? translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "로컬 저장됨") : translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "분석 중")}
           </span>
-          <button className="storyworld-button" onClick={() => importRef.current?.click()} type="button"><Import aria-hidden size={16} /> 가져오기</button>
+          <button className="storyworld-button" onClick={() => importRef.current?.click()} type="button"><Import aria-hidden size={16} /> {translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "가져오기")}</button>
           <button className="storyworld-button" onClick={exportProject} type="button"><Download aria-hidden size={16} /> JSON</button>
-          <button className="storyworld-button" onClick={exportReceipt} type="button"><BadgeCheck aria-hidden size={16} /> 영수증</button>
-          <input aria-label="스토리월드 JSON 가져오기" accept="application/json,.json" className="sr-only" onChange={importProject} ref={importRef} type="file" />
+          <button className="storyworld-button" onClick={exportReceipt} type="button"><BadgeCheck aria-hidden size={16} /> {translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "영수증")}</button>
+          <input aria-label={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "스토리월드 JSON 가져오기")} accept="application/json,.json" className="sr-only" onChange={importProject} ref={importRef} type="file" />
         </div>
       </header>
 
@@ -944,13 +975,13 @@ function StudioStoryworldLabEditor({
           <div className="storyworld-project-card">
             <span>{documentScope}</span>
             <strong>{project.title}</strong>
-            <small>{project.id === STORYWORLD_DEMO_PROJECT.id ? "예시 데이터 · " : "로컬 실험 · "}{project.scenes.length}개 장면 · {project.characters.length}명 · {project.facts.length}개 사실</small>
+            <small>{project.id === STORYWORLD_DEMO_PROJECT.id ? translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "예시 데이터 · ") : translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "로컬 실험 · ")}{project.scenes.length}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "개 장면 · ")}{project.characters.length}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "명 · ")}{project.facts.length}{translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "개 사실")}</small>
           </div>
-          <nav aria-label="스토리월드 랩 섹션">
+          <nav aria-label={translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "스토리월드 랩 섹션")}>
             {TAB_ITEMS.map((tab) => {
               const Icon = tab.icon;
               return (
-                <button aria-current={activeTab === tab.id ? "page" : undefined} key={tab.id} onClick={() => setActiveTab(tab.id)} type="button">
+                <button aria-current={activeTab === tab.id ? translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "en", "page") : undefined} key={tab.id} onClick={() => setActiveTab(tab.id)} type="button">
                   <Icon aria-hidden size={17} />
                   <span>{tab.label}</span>
                   {tab.id === "issues" && result.issues.length > 0 ? <em>{result.issues.length}</em> : null}
@@ -959,20 +990,20 @@ function StudioStoryworldLabEditor({
             })}
           </nav>
           <div className="storyworld-sidebar__footer">
-            <button onClick={reset} type="button"><RefreshCcw aria-hidden size={15} /> 데모 초기화</button>
-            <p><TimerReset aria-hidden size={14} /> 분석은 네트워크 없이 이 탭에서 실행됩니다.</p>
+            <button onClick={reset} type="button"><RefreshCcw aria-hidden size={15} /> {translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "데모 초기화")}</button>
+            <p><TimerReset aria-hidden size={14} /> {translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "분석은 네트워크 없이 이 탭에서 실행됩니다.")}</p>
           </div>
         </aside>
 
         <div className="storyworld-main">
           <div className="storyworld-page-heading">
             <div>
-              <span className="storyworld-eyebrow">{documentScope} · 캔버스 원고와 자동 연결되지 않은 로컬 실험</span>
+              <span className="storyworld-eyebrow">{documentScope} {translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "· 원고 캔버스와 직접 병합하지 않고 프로젝트 준비도에 투영되는 스토리월드")}</span>
               <h1>{TAB_ITEMS.find((tab) => tab.id === activeTab)?.label}</h1>
             </div>
             <div className="storyworld-run-badge">
               <BrainCircuit aria-hidden size={18} />
-              <span><strong>{result.receipt.issueFingerprint}</strong> 문제 지문</span>
+              <span><strong>{result.receipt.issueFingerprint}</strong> {translateCurrentStaticSourceText("domains.creator.storyworld.StudioStoryworldLabPage", "ko", "문제 지문")}</span>
             </div>
           </div>
 
@@ -982,7 +1013,7 @@ function StudioStoryworldLabEditor({
           {activeTab === "knowledge" ? <KnowledgeTab project={project} result={result} /> : null}
           {activeTab === "contracts" ? <ContractsTab result={result} /> : null}
           {activeTab === "capabilities" ? <CapabilitiesTab /> : null}
-          {activeTab === "json" ? <JsonTab onApply={(next) => { setProject(next); setStatusText("JSON 변경을 적용해 다시 분석했습니다."); }} project={project} /> : null}
+          {activeTab === "json" ? <JsonTab onApply={(next) => { setProject(authoredStoryworldProject(next)); setStatusText("JSON 변경을 적용해 다시 분석했습니다."); }} project={project} /> : null}
         </div>
       </div>
       <div aria-live="polite" className="storyworld-statusbar">
