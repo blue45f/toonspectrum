@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Character Shaper — output dock.
  *
@@ -347,8 +351,8 @@ export function CharacterShaperOutputDock({
       disabled={capturing || exportBusy || auditionActive}
       title={
         transparent
-          ? "투명 배경 · 캔버스와 PNG에 캐릭터만 남습니다"
-          : `배경색 ${insertBackgroundColor.toUpperCase()}로 채웁니다`
+          ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "투명 배경 · 캔버스와 PNG에 캐릭터만 남습니다")
+          : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "배경색 {v0}로 채웁니다"), { v0: String(insertBackgroundColor.toUpperCase()) })
       }
       onClick={() => h.setTransparentBackground(!transparent)}
       className={cn(BUTTON, transparent && ACTIVE_BUTTON)}
@@ -362,18 +366,16 @@ export function CharacterShaperOutputDock({
         )}
         style={transparent ? undefined : { backgroundColor: insertBackgroundColor }}
       />
-      투명 배경
-    </button>
+      {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "투명 배경")}</button>
   );
 
   const backgroundColorField = transparent ? null : (
     <label className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-line bg-card px-2 text-[0.7rem] font-semibold text-fg-2">
-      배경색
-      <input
+      {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "배경색")}<input
         type="color"
         value={insertBackgroundColor}
         disabled={capturing || exportBusy || auditionActive}
-        aria-label="삽입 배경색"
+        aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "삽입 배경색")}
         className="size-8 cursor-pointer rounded-md border border-line bg-panel p-0.5 disabled:cursor-not-allowed disabled:opacity-45"
         onChange={(event) => h.setInsertBackgroundColor(event.currentTarget.value)}
       />
@@ -384,13 +386,13 @@ export function CharacterShaperOutputDock({
     <button
       type="button"
       disabled={exportBlocked}
-      aria-label="PNG 저장"
-      title={transparent ? "투명 배경 PNG로 저장" : "배경색을 포함한 PNG로 저장"}
+      aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "PNG 저장")}
+      title={transparent ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "투명 배경 PNG로 저장") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "배경색을 포함한 PNG로 저장")}
       onClick={savePng}
       className={icon ? ICON_BUTTON : BUTTON}
     >
       <ImageDown size={16} aria-hidden />
-      {icon ? null : "PNG 저장"}
+      {icon ? null : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "PNG 저장")}
     </button>
   );
 
@@ -398,31 +400,31 @@ export function CharacterShaperOutputDock({
     <button
       type="button"
       disabled={exportBlocked}
-      aria-label="PSD 내보내기"
-      title="밑색 · 음영 · 하이라이트 · 주선을 레이어로 나눠 저장합니다"
+      aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "PSD 내보내기")}
+      title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "밑색 · 음영 · 하이라이트 · 주선을 레이어로 나눠 저장합니다")}
       onClick={exportPsd}
       className={icon ? ICON_BUTTON : BUTTON}
     >
       <Layers size={16} aria-hidden />
-      {icon ? null : "PSD 내보내기"}
+      {icon ? null : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "PSD 내보내기")}
     </button>
   );
 
   const exportSettings = (
     <div className="min-w-0 space-y-1">
     {onFramingChange ? <CharacterShaperFramingControls value={framing} onChange={onFramingChange} disabled={exportBlocked} /> : null}
-    <div role="group" aria-label="파일 내보내기 설정" className="flex min-h-11 min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pb-1.5 text-[0.7rem] font-semibold text-fg-2">
-      <span className="shrink-0">파일 긴 변</span>
-      <select aria-label="파일 내보내기 해상도" value={exportEdge} disabled={exportBlocked}
+    <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "파일 내보내기 설정")} className="flex min-h-11 min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pb-1.5 text-[0.7rem] font-semibold text-fg-2">
+      <span className="shrink-0">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "파일 긴 변")}</span>
+      <select aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "파일 내보내기 해상도")} value={exportEdge} disabled={exportBlocked}
         onChange={(event) => setExportEdge(Number(event.currentTarget.value) as CharacterExportEdge)}
         className={cn("min-h-11 shrink-0 rounded-lg border border-line bg-panel px-2 text-fg disabled:opacity-45", STUDIO_FOCUS_RING)}>
         {CHARACTER_EXPORT_EDGES.map((edge) => <option key={edge} value={edge}>{edge} px</option>)}
       </select>
-      <span data-character-export-size-help="true" className={cn("min-w-0 text-fg-3", compact && "basis-full")}>{framing.aspect === "viewport" ? "화면 비율 유지" : "가이드 안쪽을 잘라 저장"} · PSD 최대 2048 px</span>
-      <button type="button" className={BUTTON} disabled={exportBlocked} onClick={() => runExport("sheet4")} title="현재 방향을 기준으로 90°씩 회전 · 동일 축척 · 방향별 768×1024 · 체커보드 배경">4방향 설정화</button>
-      <button type="button" className={BUTTON} disabled={exportBlocked} onClick={() => runExport("sheet8")} title="현재 방향을 기준으로 45°씩 회전 · 동일 축척 · 방향별 768×1024 · 체커보드 배경">8방향 설정화</button>
+      <span data-character-export-size-help="true" className={cn("min-w-0 text-fg-3", compact && "basis-full")}>{framing.aspect === "viewport" ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "화면 비율 유지") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "가이드 안쪽을 잘라 저장")} {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "· PSD 최대 2048 px")}</span>
+      <button type="button" className={BUTTON} disabled={exportBlocked} onClick={() => runExport("sheet4")} title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "현재 방향을 기준으로 90°씩 회전 · 동일 축척 · 방향별 768×1024 · 체커보드 배경")}>{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "4방향 설정화")}</button>
+      <button type="button" className={BUTTON} disabled={exportBlocked} onClick={() => runExport("sheet8")} title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "현재 방향을 기준으로 45°씩 회전 · 동일 축척 · 방향별 768×1024 · 체커보드 배경")}>{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "8방향 설정화")}</button>
     </div>
-    {framing.aspect !== "viewport" ? <p className="text-[0.65rem] text-fg-3">가이드는 파일에 포함되지 않습니다. 캔버스에 추가는 현재 화면 전체를 사용합니다.</p> : null}
+    {framing.aspect !== "viewport" ? <p className="text-[0.65rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "가이드는 파일에 포함되지 않습니다. 캔버스에 추가는 현재 화면 전체를 사용합니다.")}</p> : null}
     </div>
   );
 
@@ -432,11 +434,11 @@ export function CharacterShaperOutputDock({
 
   return (
     <div
-      data-character-shaper-dock={compact ? "compact" : "wide"}
+      data-character-shaper-dock={compact ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "en", "compact") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "en", "wide")}
       className={cn("relative flex min-w-0 shrink-0 flex-wrap items-center border-t border-line bg-panel px-2 py-2", compact ? "gap-1" : "gap-1.5")}
     >
       {compact ? null : <div className="w-full">{exportSettings}</div>}
-      <div role="group" aria-label="참고 도구" className="flex shrink-0 items-center gap-1">
+      <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "참고 도구")} className="flex shrink-0 items-center gap-1">
         {DRAWER_BUTTONS.map((item) => {
           const Icon = item.icon;
           const open = drawer === item.id;
@@ -464,14 +466,14 @@ export function CharacterShaperOutputDock({
         type="button"
         aria-pressed={paintActive}
         aria-keyshortcuts="B"
-        aria-label="표면 드로잉"
+        aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "표면 드로잉")}
         disabled={capturing || exportBusy || paintBlocked || (!paintActive && !modelReady)}
-        title={paintBlocked ? paintDisabledReason : "모델 표면에 직접 그립니다 (B)"}
+        title={paintBlocked ? paintDisabledReason : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "모델 표면에 직접 그립니다 (B)")}
         onClick={onTogglePaint}
         className={cn(compact ? ICON_BUTTON : BUTTON, paintActive && ACTIVE_BUTTON)}
       >
         <Paintbrush size={16} aria-hidden />
-        {compact ? null : "표면 드로잉"}
+        {compact ? null : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "표면 드로잉")}
       </button>
 
       <div className={cn("ml-auto flex min-w-0 shrink-0 items-center", compact ? "gap-1" : "gap-1.5")}>
@@ -484,13 +486,13 @@ export function CharacterShaperOutputDock({
         <button
           type="button"
           disabled={exportBlocked}
-          aria-label="캔버스에 추가"
-          title={auditionActive ? "후보를 확정하거나 취소한 뒤 캔버스에 넣을 수 있습니다" : "지금 화면 그대로 현재 페이지에 넣습니다"}
+          aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "캔버스에 추가")}
+          title={auditionActive ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "후보를 확정하거나 취소한 뒤 캔버스에 넣을 수 있습니다") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "지금 화면 그대로 현재 페이지에 넣습니다")}
           onClick={insert}
           className={compact ? cn(ICON_BUTTON, "border-accent/60 bg-accent text-on-accent hover:bg-accent-2") : PRIMARY_BUTTON}
         >
           <FileImage size={16} aria-hidden />
-          {compact ? null : "캔버스에 추가"}
+          {compact ? null : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "캔버스에 추가")}
         </button>
         {compact ? (
           <button
@@ -498,8 +500,8 @@ export function CharacterShaperOutputDock({
             type="button"
             aria-expanded={sheetOpen}
             aria-controls={sheetId}
-            aria-label="내보내기 더 보기"
-            title="내보내기 더 보기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "내보내기 더 보기")}
+            title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "내보내기 더 보기")}
             onClick={() => setSheetOpen((open) => !open)}
             className={cn(ICON_BUTTON, sheetOpen && ACTIVE_BUTTON)}
           >
@@ -528,7 +530,7 @@ export function CharacterShaperOutputDock({
             {statusLine}
             {notice?.detail ? <span className="ml-1 font-normal text-fg-3">{notice.detail}</span> : null}
           </p>
-          {exportBusy ? <button type="button" onClick={() => exportRef.current?.cancel()} className={BUTTON}>내보내기 취소</button> : null}
+          {exportBusy ? <button type="button" onClick={() => exportRef.current?.cancel()} className={BUTTON}>{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "내보내기 취소")}</button> : null}
         </div>
       ) : null}
 
@@ -537,7 +539,7 @@ export function CharacterShaperOutputDock({
           ref={sheetRef}
           id={sheetId}
           role="group"
-          aria-label="내보내기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "내보내기")}
           data-character-export-sheet="true"
           className="absolute inset-x-2 bottom-full z-40 mb-1.5 ml-auto max-w-80 max-h-[70dvh] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel p-2 shadow-[0_-12px_40px_oklch(0.05_0.01_70/0.45)]"
         >
@@ -554,8 +556,7 @@ export function CharacterShaperOutputDock({
               className={BUTTON}
             >
               <ImageDown size={16} aria-hidden />
-              PNG 저장
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "PNG 저장")}</button>
             <button
               type="button"
               disabled={exportBlocked}
@@ -563,8 +564,7 @@ export function CharacterShaperOutputDock({
               className={BUTTON}
             >
               <Layers size={16} aria-hidden />
-              PSD 내보내기
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperOutputDock", "ko", "PSD 내보내기")}</button>
           </div>
         </div>
       ) : null}

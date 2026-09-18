@@ -7,6 +7,7 @@ import type {
   StudioBg3dShot,
 } from "./studio-bg3d-scene-document";
 import type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
+import type { StudioBg3dProfessionalRuntimeReadiness } from "./studio-bg3d-professional-runtime-readiness";
 
 export interface StudioBg3dProductionBatchProgress {
   readonly stage: "render" | "contact" | "archive";
@@ -70,6 +71,7 @@ export interface StudioBg3dProSuiteRuntimeValue {
   readonly productionBatch?: StudioBg3dProductionBatchRuntime;
   /** Bounded projection used by the connected production workflow UI. */
   readonly sceneSummary?: StudioBg3dProductionSceneSummary;
+  readonly professionalReadiness?: StudioBg3dProfessionalRuntimeReadiness;
   readonly onSetLineArtPreview?: (enabled: boolean) => void;
   readonly onSetTransparentBackground?: (transparent: boolean) => void;
   /** Composes from the live viewport at command time; null means the edit was accepted. */

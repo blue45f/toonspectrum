@@ -246,6 +246,7 @@ export type StudioAiErrorCode =
   | "invalid_input" // 빈 프롬프트, data URL이 아닌 채색 소스 등 호출 전 검증 실패.
   | "network_error" // fetch 자체가 reject(오프라인, CORS, DNS 등).
   | "http_error" // 2xx 아닌 응답(401/429/500 등).
+  | "login_required" // 관리형 무료 풀 사용 전에 로그인해야 함. 입력은 보존하고 로그인 CTA를 표시한다.
   | "free_exhausted" // 공용·개인 무료 경로가 모두 소진되었거나 제한되어 기능을 사용할 수 없음.
   | "parse_error"; // 2xx이지만 JSON이 아니거나 기대한 필드가 없음.
 
@@ -579,6 +580,14 @@ function extractFirstB64Json(json: unknown): string | null {
   const first = data[0] as Record<string, unknown> | undefined;
   const b64 = first?.b64_json;
   return typeof b64 === "string" && b64.length > 0 ? b64 : null;
+}
+
+function extractGeneratedModel(json: unknown, fallback: string): string {
+  if (!json || typeof json !== "object") return fallback;
+  const candidate = (json as Record<string, unknown>).model;
+  return typeof candidate === "string" && candidate.trim().length > 0
+    ? candidate.trim().slice(0, 200)
+    : fallback;
 }
 
 function extractFirstChatContent(json: unknown): string | null {
@@ -1006,7 +1015,7 @@ export async function generateBackgroundImage(
   settings: StudioAiSettings,
   prompt: string,
   opts: { size?: StudioAiImageSize; signal?: AbortSignal } = {}
-): Promise<StudioAiResult<{ dataUrl: string; width: number; height: number }>> {
+): Promise<StudioAiResult<{ dataUrl: string; width: number; height: number; model: string }>> {
   const trimmed = prompt.trim();
   if (!trimmed) return { ok: false, code: "invalid_input", error: "배경 프롬프트를 입력하세요." };
   if (!isStudioAiConfigured(settings)) {
@@ -1024,7 +1033,15 @@ export async function generateBackgroundImage(
   const b64 = extractFirstB64Json(result.data);
   if (!b64) return { ok: false, code: "parse_error", error: "응답에서 이미지 데이터(b64_json)를 찾을 수 없습니다." };
   const { width, height } = parseImageSize(size);
-  return { ok: true, data: { dataUrl: `data:image/png;base64,${b64}`, width, height } };
+  return {
+    ok: true,
+    data: {
+      dataUrl: `data:image/png;base64,${b64}`,
+      width,
+      height,
+      model: extractGeneratedModel(result.data, settings.imageModel),
+    },
+  };
 }
 
 /**

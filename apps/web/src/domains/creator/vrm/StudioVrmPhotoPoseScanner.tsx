@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Check, FlipHorizontal2, ImageUp, Loader2, RotateCcw, X } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
@@ -252,7 +256,7 @@ function SkeletonPreview({
 }) {
   return (
     <svg
-      aria-label="인식한 사진 포즈 골격 미리보기"
+      aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "인식한 사진 포즈 골격 미리보기")}
       className="h-32 w-full rounded-lg border border-line bg-[linear-gradient(180deg,oklch(0.22_0.02_250/0.75),oklch(0.12_0.015_250/0.9))]"
       role="img"
       viewBox="0 0 100 100"
@@ -525,7 +529,7 @@ export function StudioVrmPhotoPoseScanner({
     : true;
 
   return (
-    <section className="mb-3 rounded-xl border border-line bg-card/45 p-3" aria-label="사진 포즈 스캐너">
+    <section className="mb-3 rounded-xl border border-line bg-card/45 p-3" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "사진 포즈 스캐너")}>
       <input
         ref={inputRef}
         accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
@@ -537,12 +541,9 @@ export function StudioVrmPhotoPoseScanner({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h4 className="flex items-center gap-1.5 text-xs font-bold text-fg">
-            <ImageUp size={13} className="text-accent" aria-hidden /> 사진 포즈 스캔
-          </h4>
+            <ImageUp size={13} className="text-accent" aria-hidden /> {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "사진 포즈 스캔")}</h4>
           <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-            사진은 서버로 보내지 않고, Worker 전처리 후 브라우저 안에서 한 사람의 전신 포즈
-            {includeHandDetection ? "와 보이는 손가락을" : "를"} 분석합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "사진은 서버로 보내지 않고, Worker 전처리 후 브라우저 안에서 한 사람의 전신 포즈")}{includeHandDetection ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "와 보이는 손가락을") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "를")} {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "분석합니다.")}</p>
         </div>
         {busy ? (
           <button
@@ -550,8 +551,7 @@ export function StudioVrmPhotoPoseScanner({
             className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-line px-3 py-1 text-[0.66rem] font-bold text-fg-2 hover:bg-raised"
             onClick={cancelScan}
           >
-            <X size={11} aria-hidden /> 취소
-          </button>
+            <X size={11} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "취소")}</button>
         ) : (
           <button
             type="button"
@@ -559,25 +559,24 @@ export function StudioVrmPhotoPoseScanner({
             disabled={disabled}
             onClick={() => inputRef.current?.click()}
           >
-            <ImageUp size={11} aria-hidden /> 사진 선택
-          </button>
+            <ImageUp size={11} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "사진 선택")}</button>
         )}
       </div>
 
       <div className="mt-2 grid grid-cols-2 gap-2">
         <label className="text-[0.65rem] font-semibold text-fg-2">
-          <span className="mb-1 flex items-center gap-1"><RotateCcw size={10} aria-hidden /> 회전</span>
+          <span className="mb-1 flex items-center gap-1"><RotateCcw size={10} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "회전")}</span>
           <select
-            aria-label="사진 회전"
+            aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "사진 회전")}
             className="h-11 w-full rounded-md border border-line bg-panel px-2 text-[0.68rem] text-fg"
             disabled={busy || disabled}
             value={rotation}
             onChange={(event) => setRotation(Number(event.target.value) as StudioVrmPhotoPoseRotation)}
           >
-            <option value={0}>자동 방향</option>
-            <option value={90}>오른쪽 90°</option>
+            <option value={0}>{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "자동 방향")}</option>
+            <option value={90}>{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "오른쪽 90°")}</option>
             <option value={180}>180°</option>
-            <option value={270}>왼쪽 90°</option>
+            <option value={270}>{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "왼쪽 90°")}</option>
           </select>
         </label>
         <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-line bg-panel px-2 py-1.5 text-[0.66rem] font-semibold text-fg-2">
@@ -588,7 +587,7 @@ export function StudioVrmPhotoPoseScanner({
             onChange={(event) => setMirrorHorizontal(event.target.checked)}
             className="size-3.5 accent-accent"
           />
-          <span className="inline-flex items-center gap-1"><FlipHorizontal2 size={10} aria-hidden /> 좌우 반전</span>
+          <span className="inline-flex items-center gap-1"><FlipHorizontal2 size={10} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "좌우 반전")}</span>
         </label>
       </div>
 
@@ -612,18 +611,17 @@ export function StudioVrmPhotoPoseScanner({
           <div className="flex items-center justify-between gap-2 text-[0.66rem] text-fg-2">
             <span className="min-w-0 truncate" title={candidate.sourceName}>{candidate.sourceName}</span>
             <span className="shrink-0 font-bold">
-              신뢰도 {confidenceLabel(candidate.confidence)} · {Math.round(candidate.confidence.overall * 100)}%
+              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "신뢰도 ")}{confidenceLabel(candidate.confidence)} · {Math.round(candidate.confidence.overall * 100)}%
             </span>
           </div>
           {candidate.confidence.lowConfidenceGroups.length > 0 ? (
             <p className="text-[0.64rem] leading-relaxed text-warning">
-              확인 권장: {candidate.confidence.lowConfidenceGroups.map((group) => LOW_CONFIDENCE_LABELS[group] ?? group).join(", ")}
+              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "확인 권장: ")}{candidate.confidence.lowConfidenceGroups.map((group) => LOW_CONFIDENCE_LABELS[group] ?? group).join(", ")}
             </p>
           ) : null}
           {!candidateMeetsMinimum ? (
             <p role="alert" className="text-[0.64rem] leading-relaxed text-danger">
-              신뢰도가 적용 기준보다 낮습니다. 사람이 더 크게 보이고 팔·다리가 선명한 사진을 다시 선택해 주세요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "신뢰도가 적용 기준보다 낮습니다. 사람이 더 크게 보이고 팔·다리가 선명한 사진을 다시 선택해 주세요.")}</p>
           ) : null}
           {includeHandDetection ? (
             <p className="text-[0.64rem] font-semibold text-fg-2" aria-live="polite">
@@ -643,12 +641,11 @@ export function StudioVrmPhotoPoseScanner({
                 onChange={(event) => setIncludeFingerEdits(event.target.checked)}
                 className="size-4 accent-accent"
               />
-              인식한 손가락도 함께 적용
-            </label>
+              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "인식한 손가락도 함께 적용")}</label>
           ) : null}
           <fieldset className="rounded-lg border border-line bg-panel/60 p-2">
-            <legend className="px-1 text-[0.62rem] font-bold text-fg-2">적용 범위</legend>
-            <div className="grid grid-cols-3 gap-1" role="radiogroup" aria-label="사진 포즈 적용 범위">
+            <legend className="px-1 text-[0.62rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "적용 범위")}</legend>
+            <div className="grid grid-cols-3 gap-1" role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "사진 포즈 적용 범위")}>
               {PHOTO_POSE_APPLY_SCOPES.map((scope) => (
                 <button
                   key={scope.id}
@@ -656,11 +653,9 @@ export function StudioVrmPhotoPoseScanner({
                   role="radio"
                   aria-checked={applyScope === scope.id}
                   title={scope.hint}
-                  className={`min-h-10 rounded-lg border px-1 text-[0.6rem] font-bold transition-colors ${
-                    applyScope === scope.id
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "en", "min-h-10 rounded-lg border px-1 text-[0.6rem] font-bold transition-colors {v0}"), { v0: String(applyScope === scope.id
                       ? "border-accent/60 bg-accent-soft text-accent"
-                      : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
-                  }`}
+                      : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg") })}
                   onClick={() => setApplyScope(scope.id)}
                 >
                   {scope.label}
@@ -677,8 +672,7 @@ export function StudioVrmPhotoPoseScanner({
                 replacePreviewUrl(null);
               }}
             >
-              다시 선택
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "다시 선택")}</button>
             <button
               type="button"
               className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-accent/60 bg-accent px-2 py-1.5 text-[0.68rem] font-bold text-on-accent hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
@@ -702,8 +696,7 @@ export function StudioVrmPhotoPoseScanner({
                 if (applied) replacePreviewUrl(null);
               }}
             >
-              <Check size={11} aria-hidden /> 포즈 적용
-            </button>
+              <Check size={11} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPhotoPoseScanner", "ko", "포즈 적용")}</button>
           </div>
         </div>
       ) : null}

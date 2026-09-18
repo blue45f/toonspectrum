@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useState } from "react";
 
 import {
@@ -31,7 +32,7 @@ export function StudioQuickAccessDesktopSurface({
     <StudioFloatingSurface
       ref={surfaceRef}
       surfaceId="quick-access"
-      label="빠른 액세스 팔레트"
+      label={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessDesktopSurface", "ko", "빠른 액세스 팔레트")}
       descriptionId={descriptionId}
       layout={layout}
       defaultLayout={DEFAULT_STUDIO_QUICK_ACCESS_FLOATING_LAYOUT}
@@ -54,8 +55,7 @@ export function StudioQuickAccessDesktopSurface({
       contentClassName="overflow-hidden"
     >
       <p id={descriptionId} className="sr-only">
-        자주 쓰는 명령을 실행하거나 표시 방식과 명령 순서를 편집합니다.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.StudioQuickAccessDesktopSurface", "ko", "자주 쓰는 명령을 실행하거나 표시 방식과 명령 순서를 편집합니다.")}</p>
       <StudioQuickAccessPalette
         state={state}
         catalog={catalog}

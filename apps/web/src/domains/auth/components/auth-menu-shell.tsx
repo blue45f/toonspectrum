@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { UserRound } from "lucide-react";
 import { lazy, Suspense, useState, type ComponentType } from "react";
 
@@ -37,7 +38,7 @@ function AuthMenuFallback({ onClick }: { onClick: () => void }) {
         onMouseEnter={preloadAuthMenu}
         onFocus={preloadAuthMenu}
         className="grid size-11 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent outline-none transition-transform active:scale-95"
-        aria-label="계정 메뉴"
+        aria-label={translateCurrentStaticSourceText("domains.auth.components.auth.menu.shell", "ko", "계정 메뉴")}
       >
         {initial}
       </button>

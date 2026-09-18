@@ -2,6 +2,7 @@ import { base, react, plugin, boundaries, defineConfig } from '@heejun/eslint-co
 import js from '@eslint/js'
 import { globalIgnores } from 'eslint/config'
 import globals from 'globals'
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript'
 
 // 린트 예외 원장(ledger). 두 예외 블록의 파일 목록은 여기 단일 소스에 있고,
 // scripts/eslint-legacy-exceptions.test.mjs 가 "글롭이 실제 파일과 맞는가 / 개수가
@@ -37,6 +38,36 @@ export default defineConfig(
 
   // 공유 베이스(TS + import 위생 + 커스텀 규칙 + prettier 충돌 비활성).
   base({ files: ['**/*.{ts,tsx,mts,cts}'] }),
+
+  // Source imports must resolve through the same TypeScript path aliases used by builds.
+  // Browser-harness scripts intentionally use Vite-root specifiers and are covered by Knip's
+  // explicit virtual-import allowlist instead of weakening product-source resolution.
+  {
+    files: [
+      'apps/web/src/**/*.{ts,tsx}',
+      'apps/api/src/**/*.ts',
+      'packages/*/src/**/*.{ts,tsx,mts,cts}',
+      'deploy/*/src/**/*.{ts,tsx,mts,cts}',
+    ],
+    settings: {
+      'import-x/resolver-next': [
+        createTypeScriptImportResolver({
+          alwaysTryTypes: true,
+          noWarnOnMultipleProjects: true,
+          project: [
+            'tsconfig.json',
+            'apps/*/tsconfig.json',
+            'packages/*/tsconfig.json',
+            'deploy/*/tsconfig.json',
+          ],
+        }),
+      ],
+    },
+    rules: {
+      'import-x/no-unresolved': ['error', { ignore: ['^cloudflare:'] }],
+      'import-x/no-duplicates': ['error', { considerQueryString: true }],
+    },
+  },
 
   // apps/web/src 아래의 Vite 브라우저 앱 — React 19 + RC + jsx-a11y.
   // 루트 package.json이 프런트엔드 툴체인을 소유하고, NestJS API만 별도 workspace package다.
@@ -273,6 +304,7 @@ export default defineConfig(
       'apps/web/src/domains/creator/ai/StudioAiComicDirectorPanel.tsx',
       'apps/web/src/domains/creator/brush-lab/StudioBrushV5QualityWorkbench.tsx',
       'apps/web/src/domains/creator/brush-lab/StudioBrushV6Workbench.tsx',
+      'apps/web/src/domains/creator/studio-shell/StudioRolePersonalizationCenter.tsx',
     ],
     rules: { 'jsx-a11y/label-has-associated-control': 'off' },
   },

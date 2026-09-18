@@ -309,3 +309,26 @@
 @media print {
   [data-site-experience] .site-theme-scene { display: none; }
 }
+
+/* Explicit contrast theme follows the same calm, unambiguous rules as OS high contrast. */
+:root[data-design-theme="contrast"] [data-site-experience] :is(
+  .site-experience-ambient,
+  .site-theme-art,
+  .site-theme-scene
+) { display: none; }
+:root[data-design-theme="contrast"] [data-site-experience] [data-site-chrome="header"]::before { display: none; }
+:root[data-design-theme="contrast"] [data-site-experience] :is(
+  .site-next-steps__card,
+  .public-story-hero,
+  .public-story-route,
+  .market-collection-card
+) {
+  border: 2px solid var(--color-line-strong);
+  background: var(--color-panel);
+  box-shadow: none;
+}
+:root[data-design-theme="contrast"] [data-site-experience] .creator-flagship .cf-hero h1 em {
+  color: var(--color-fg);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}

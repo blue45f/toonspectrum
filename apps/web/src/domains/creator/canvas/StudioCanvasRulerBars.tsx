@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   useEffect,
   useRef,
@@ -329,9 +330,7 @@ export function StudioCanvasRulerBars({
         data-studio-ruler-guide-gesture="drag-to-canvas"
         aria-label={topInstruction}
         aria-disabled={onAddGuide ? undefined : true}
-        className={`pointer-events-auto absolute top-0 touch-none border-b border-line bg-panel text-fg-3 ${
-          onAddGuide ? "cursor-ns-resize" : "cursor-default"
-        }`}
+        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasRulerBars", "en", "pointer-events-auto absolute top-0 touch-none border-b border-line bg-panel text-fg-3 {v0}"), { v0: String(onAddGuide ? "cursor-ns-resize" : "cursor-default") })}
         style={{
           left: "var(--studio-ruler-thickness)",
           width: "calc(100% - var(--studio-ruler-thickness))",
@@ -350,9 +349,7 @@ export function StudioCanvasRulerBars({
         data-studio-ruler-guide-gesture="drag-to-canvas"
         aria-label={leftInstruction}
         aria-disabled={onAddGuide ? undefined : true}
-        className={`pointer-events-auto absolute left-0 touch-none border-r border-line bg-panel text-fg-3 ${
-          onAddGuide ? "cursor-ew-resize" : "cursor-default"
-        }`}
+        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasRulerBars", "en", "pointer-events-auto absolute left-0 touch-none border-r border-line bg-panel text-fg-3 {v0}"), { v0: String(onAddGuide ? "cursor-ew-resize" : "cursor-default") })}
         style={{
           top: "var(--studio-ruler-thickness)",
           width: "var(--studio-ruler-thickness)",

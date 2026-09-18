@@ -209,6 +209,7 @@ describe("Studio AI provenance recorder", () => {
 
   it("derives provider context without retaining base URL credentials or query strings", () => {
     expect(studioImageAiProviderContext({
+      // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL sanitization fixture
       baseUrl: "https://user:secret@images.example.test/v1?api_key=secret",
       imageModel: " image-v1 ",
     })).toEqual({ provider: "images.example.test", model: "image-v1", transport: "byok" });

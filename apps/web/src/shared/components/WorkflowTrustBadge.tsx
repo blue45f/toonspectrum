@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { useT } from "@/shared/lib/i18n";
 import {
   resolveWorkflowTrustPresentation,
   type WorkflowTrustLocale,
@@ -43,18 +44,20 @@ const TONES: Readonly<Record<WorkflowTrustTone, string>> = {
 
 export interface WorkflowTrustBadgeProps {
   readonly state: WorkflowTrustState;
-  readonly locale: WorkflowTrustLocale;
+  /** @deprecated Copy follows the global i18n locale. */
+  readonly locale?: WorkflowTrustLocale;
   readonly compact?: boolean;
   readonly className?: string;
 }
 
 export function WorkflowTrustBadge({
   state,
-  locale,
   compact = true,
   className,
 }: WorkflowTrustBadgeProps) {
-  const presentation = resolveWorkflowTrustPresentation(state, locale);
+  const t = useT();
+  const presentation = resolveWorkflowTrustPresentation(state);
+  const description = t(presentation.description);
   const Icon = ICONS[state];
   return (
     <span
@@ -65,12 +68,12 @@ export function WorkflowTrustBadge({
       )}
       role="status"
       aria-live={presentation.live}
-      title={presentation.description}
+      title={description}
       data-workflow-trust-state={state}
     >
       <Icon className="size-3.5 shrink-0" aria-hidden="true" />
-      <span className="min-w-0 break-words">{presentation.label}</span>
-      {!compact ? <span className="sr-only">. {presentation.description}</span> : null}
+      <span className="min-w-0 break-words">{t(presentation.label)}</span>
+      {!compact ? <span className="sr-only">. {description}</span> : null}
     </span>
   );
 }

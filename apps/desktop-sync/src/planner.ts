@@ -11,6 +11,7 @@ export type SyncPlanAction =
   | "delete-local"
   | "delete-remote"
   | "record"
+  | "forget"
   | "conflict";
 
 export interface SyncPlanItem {
@@ -140,6 +141,8 @@ export function buildDesktopSyncPlan(
       plan.push(planLocalOnly(path, localFile, base));
     } else if (remoteFile) {
       plan.push(planRemoteOnly(path, remoteFile, base));
+    } else if (base) {
+      plan.push({ relativePath: path, action: "forget", local: null, remote: null, base, reason: "both-deleted" });
     }
   }
   return plan;
@@ -154,6 +157,7 @@ export function countSyncPlanActions(
     "delete-local": 0,
     "delete-remote": 0,
     record: 0,
+    forget: 0,
     conflict: 0,
   };
   for (const item of plan) counts[item.action] += 1;

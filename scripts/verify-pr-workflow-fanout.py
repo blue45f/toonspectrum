@@ -5,12 +5,20 @@ import re
 import sys
 
 TARGETS = ['marketplace-integrity.yml', 'marketplace-authoring.yml', 'studio-mesh-sync-repair.yml', 'character-merge-validation.yml', 'studio-cc0-library.yml', 'feedback-community-validation.yml', 'studio-manual.yml', 'studio-2d-asset-quality.yml', 'character-shaper-discovery-quality.yml', 'studio-production-integrity.yml', 'studio-ai-comic-director-complete.yml', 'studio-finishing-quality.yml', 'learning-quality.yml', 'studio-collaboration-sync.yml', 'studio-promo-video.yml', 'character-contact-naturalness.yml', 'studio-brush-filter-stability.yml', 'studio-discovery-ux.yml', 'creator-resources.yml', 'studio-vrm-asset-quality.yml', 'kmas-reference-library.yml']
+FOCUSED_ONLY = {'studio-cc0-library.yml', 'studio-vrm-asset-quality.yml'}
+ROOT_GATE_PATTERNS = (
+    (re.compile(r"^\s*(?:(?:-\s*)?run:\s*)?pnpm exec tsc -p tsconfig\.json(?:\s+[^#\n]+)?\s*$", re.MULTILINE), 'repository-wide TypeScript'),
+    (re.compile(r"^\s*(?:(?:-\s*)?run:\s*)?pnpm (?:run )?typecheck(?:\s+[^#\n]+)?\s*$", re.MULTILINE), 'repository-wide typecheck'),
+    (re.compile(r"^\s*(?:(?:-\s*)?run:\s*)?pnpm (?:run )?build\s*$", re.MULTILINE), 'repository-wide production build'),
+)
+
 
 def top_level_end(lines, start):
     for i in range(start + 1, len(lines)):
         if re.match(r"^[A-Za-z_][A-Za-z0-9_-]*:", lines[i]):
             return i
     return len(lines)
+
 
 def section(text, event):
     lines = text.splitlines()
@@ -26,6 +34,7 @@ def section(text, event):
             stop = starts[pos + 1][1] if pos + 1 < len(starts) else end
             return "\n".join(lines[start:stop])
     raise AssertionError(f"{event} missing")
+
 
 def list_field(block, key):
     """Read only the flow/block string lists used in our reviewed event filters."""
@@ -49,6 +58,13 @@ def list_field(block, key):
     return None
 
 
+def validate_focused_ownership(filename, text):
+    if filename not in FOCUSED_ONLY:
+        return
+    for pattern, gate in ROOT_GATE_PATTERNS:
+        assert not pattern.search(text), f"focused workflow repeats {gate}; CI/core owns global gates"
+
+
 def validate_repository(root):
     failures = []
     for filename in TARGETS:
@@ -69,6 +85,7 @@ def validate_repository(root):
             assert concurrency, "missing workflow concurrency"
             assert "  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}" in concurrency.group(1).splitlines(), "concurrency must be scoped to workflow and PR/ref, not SHA"
             assert "  cancel-in-progress: true" in concurrency.group(1).splitlines(), "obsolete runs must be cancelled"
+            validate_focused_ownership(filename, text)
         except (AssertionError, StopIteration, OSError) as error:
             failures.append(f"{filename}: {error}")
     return failures
@@ -82,7 +99,7 @@ def main():
     if failures:
         print("\n".join(failures), file=sys.stderr)
         return 1
-    print(f"Verified PR updates, target-branch pushes and cancellation for {len(TARGETS)} product workflows.")
+    print(f"Verified PR updates, target-branch pushes, cancellation, and focused ownership for {len(TARGETS)} product workflows.")
     return 0
 
 

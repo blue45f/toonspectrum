@@ -8,6 +8,7 @@ export const ADMIN_TRAFFIC_OVERVIEW_QUERY = `
       title,
       source,
       medium,
+      campaign,
       country_code,
       device_type,
       browser,
@@ -16,6 +17,21 @@ export const ADMIN_TRAFFIC_OVERVIEW_QUERY = `
     WHERE occurred_at >= $1::timestamptz
       AND occurred_at <= $3::timestamptz
       AND NOT is_bot
+  ),
+  share_events AS (
+    SELECT
+      occurred_at,
+      visitor_hash,
+      session_hash,
+      path,
+      channel,
+      outcome,
+      country_code,
+      device_type,
+      browser
+    FROM public.traffic_share_event
+    WHERE occurred_at >= $1::timestamptz
+      AND occurred_at <= $3::timestamptz
   ),
   sessions AS (
     SELECT
@@ -169,6 +185,49 @@ export const ADMIN_TRAFFIC_OVERVIEW_QUERY = `
     FROM events
     GROUP BY visitor_hash
   ),
+  share_channel_rows AS (
+    SELECT
+      channel,
+      count(*)::integer AS attempts,
+      count(*) FILTER (WHERE outcome = 'opened')::integer AS opened,
+      count(*) FILTER (WHERE outcome = 'completed')::integer AS completed,
+      count(*) FILTER (WHERE outcome IN ('opened', 'completed'))::integer AS handoffs,
+      count(*) FILTER (WHERE outcome = 'failed')::integer AS failed,
+      count(*) FILTER (WHERE outcome = 'cancelled')::integer AS cancelled
+    FROM share_events
+    GROUP BY channel
+    ORDER BY attempts DESC, channel
+  ),
+  share_content_rows AS (
+    SELECT
+      path,
+      count(*)::integer AS attempts,
+      count(*) FILTER (WHERE outcome = 'opened')::integer AS opened,
+      count(*) FILTER (WHERE outcome = 'completed')::integer AS completed,
+      count(*) FILTER (WHERE outcome IN ('opened', 'completed'))::integer AS handoffs
+    FROM share_events
+    GROUP BY path
+    ORDER BY attempts DESC, handoffs DESC, path
+    LIMIT 12
+  ),
+  share_totals AS (
+    SELECT
+      count(*)::integer AS attempts,
+      count(*) FILTER (WHERE outcome = 'opened')::integer AS opened,
+      count(*) FILTER (WHERE outcome = 'completed')::integer AS completed,
+      count(*) FILTER (WHERE outcome = 'failed')::integer AS failed,
+      count(*) FILTER (WHERE outcome = 'cancelled')::integer AS cancelled,
+      count(DISTINCT visitor_hash)::integer AS unique_sharers
+    FROM share_events
+  ),
+  share_attribution AS (
+    SELECT
+      count(*)::integer AS page_views,
+      count(DISTINCT visitor_hash)::integer AS visitors,
+      count(DISTINCT session_hash)::integer AS sessions
+    FROM events
+    WHERE campaign = 'content_share'
+  ),
   totals AS (
     SELECT
       count(*)::integer AS page_views,
@@ -197,7 +256,12 @@ export const ADMIN_TRAFFIC_OVERVIEW_QUERY = `
     'rangeDays', $4::integer,
     'bucketSeconds', $2::integer,
     'status',
-      CASE WHEN (SELECT page_views FROM totals) > 0 THEN 'live' ELSE 'empty' END,
+      CASE
+        WHEN (SELECT page_views FROM totals) > 0
+          OR COALESCE((SELECT attempts FROM share_totals), 0) > 0
+        THEN 'live'
+        ELSE 'empty'
+      END,
     'storageMode', 'first-party-postgres-v2',
     'retentionDays', $5::integer,
     'privacy', jsonb_build_object(
@@ -252,6 +316,37 @@ export const ADMIN_TRAFFIC_OVERVIEW_QUERY = `
         COALESCE((SELECT average_engaged_seconds FROM engagement), 0),
       'pageViewsPerSession',
         COALESCE((SELECT page_views_per_session FROM engagement), 0)
+    ),
+    'sharing', jsonb_build_object(
+      'attempts', COALESCE((SELECT attempts FROM share_totals), 0),
+      'opened', COALESCE((SELECT opened FROM share_totals), 0),
+      'completed', COALESCE((SELECT completed FROM share_totals), 0),
+      'failed', COALESCE((SELECT failed FROM share_totals), 0),
+      'cancelled', COALESCE((SELECT cancelled FROM share_totals), 0),
+      'uniqueSharers', COALESCE((SELECT unique_sharers FROM share_totals), 0),
+      'attributedPageViews', COALESCE((SELECT page_views FROM share_attribution), 0),
+      'attributedVisitors', COALESCE((SELECT visitors FROM share_attribution), 0),
+      'attributedSessions', COALESCE((SELECT sessions FROM share_attribution), 0),
+      'channels', COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'channel', channel,
+          'attempts', attempts,
+          'opened', opened,
+          'completed', completed,
+          'failed', failed,
+          'cancelled', cancelled
+        ) ORDER BY attempts DESC, channel)
+        FROM share_channel_rows
+      ), '[]'::jsonb),
+      'topContent', COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'path', path,
+          'attempts', attempts,
+          'opened', opened,
+          'completed', completed
+        ) ORDER BY attempts DESC, handoffs DESC, path)
+        FROM share_content_rows
+      ), '[]'::jsonb)
     ),
     'series', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(

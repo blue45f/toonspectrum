@@ -18,10 +18,14 @@ describe("explicit blocked-viewport engine recovery", () => {
     view.rerender(<StudioBg3dEngineRecoveryActions preference="webgl2" onPreferenceChange={change} />);
     expect(change).not.toHaveBeenCalled();
   });
-  it("selects WebGL2 only after the artist explicitly activates its button", () => {
+  it("makes WebGL2 the explicit continuation path without auto-switching", () => {
     const change = vi.fn();
     render(<StudioBg3dEngineRecoveryActions preference="webgpu" onPreferenceChange={change} />);
-    fireEvent.click(screen.getByTestId("studio-bg3d-recovery-webgl2"));
+    const webgl = screen.getByTestId("studio-bg3d-recovery-webgl2");
+    expect(webgl.textContent).toContain("WebGL2로 계속");
+    expect(webgl.getAttribute("data-studio-bg3d-recovery-recommended")).toBe("true");
+    expect(change).not.toHaveBeenCalled();
+    fireEvent.click(webgl);
     expect(change).toHaveBeenCalledExactlyOnceWith("webgl2");
   });
   it.each(["webgpu", "webgl2"] as const)("retries the chosen %s without changing engines", (preference) => {

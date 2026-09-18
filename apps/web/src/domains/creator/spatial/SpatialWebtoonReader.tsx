@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import { StudioWebXrSessionError, studioWebXrSessionErrorMessage } from "../studio-webxr-session";
@@ -151,17 +155,17 @@ export default function SpatialWebtoonReader({ pages: initialPages = EMPTY_PAGES
     <dialog ref={dialogRef} className="spatial-reader" aria-labelledby={titleId} aria-describedby={helpId}
       data-theme={settings.theme} onCancel={(event) => { event.preventDefault(); void close(); }}>
       <header className="spatial-reader-header">
-        <div><p className="spatial-reader-eyebrow">TOONSTUDIO · SPATIAL READER</p><h2 id={titleId}>{displayTitle}</h2></div>
-        <button type="button" className="spatial-reader-close" disabled={closing} onClick={() => { void close(); }} aria-label="공간 리더 닫기">{closing ? "종료 중" : "닫기 ×"}</button>
+        <div><p className="spatial-reader-eyebrow">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "en", "TOONSTUDIO · SPATIAL READER")}</p><h2 id={titleId}>{displayTitle}</h2></div>
+        <button type="button" className="spatial-reader-close" disabled={closing} onClick={() => { void close(); }} aria-label={translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "공간 리더 닫기")}>{closing ? translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "종료 중") : translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "닫기 ×")}</button>
       </header>
-      <p id={helpId} className="spatial-reader-intro">집중해서 한 구간씩, 또는 공간에 펼쳐 읽으세요. 원고는 수정하지 않습니다.</p>
+      <p id={helpId} className="spatial-reader-intro">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "집중해서 한 구간씩, 또는 공간에 펼쳐 읽으세요. 원고는 수정하지 않습니다.")}</p>
       <div className="spatial-reader-layout">
         <div className="spatial-reader-main">
-          <section className="spatial-reader-preview" aria-label="공간 웹툰 2D 읽기">
-            {pages.length === 0 ? <div className="spatial-reader-empty"><span aria-hidden>▤</span><h3>원고를 공간에 펼쳐 보세요</h3><p>이미지를 선택하면 바로 읽을 수 있습니다.<br />계정·API 키·유료 변환은 필요하지 않습니다.</p></div>
-              : !imageSource ? <p role="alert">지원하지 않는 이미지 주소입니다. 원본 보기로 돌아가 주세요.</p>
+          <section className="spatial-reader-preview" aria-label={translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "공간 웹툰 2D 읽기")}>
+            {pages.length === 0 ? <div className="spatial-reader-empty"><span aria-hidden>▤</span><h3>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "원고를 공간에 펼쳐 보세요")}</h3><p>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "이미지를 선택하면 바로 읽을 수 있습니다.")}<br />{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "계정·API 키·유료 변환은 필요하지 않습니다.")}</p></div>
+              : !imageSource ? <p role="alert">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "지원하지 않는 이미지 주소입니다. 원본 보기로 돌아가 주세요.")}</p>
               : <div className="spatial-reader-crop" style={{ aspectRatio: `${crop.width} / ${crop.height}`, width: `min(100%, ${480 * settings.scale}px)` }}>
-                <img key={`${current.page}:${pages[current.page]}`} src={imageSource} referrerPolicy="no-referrer" alt={`${displayTitle} ${current.page + 1}페이지 · ${current.segment + 1}구간`}
+                <img key={`${current.page}:${pages[current.page]}`} src={imageSource} referrerPolicy="no-referrer" alt={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "{v0} {v1}페이지 · {v2}구간"), { v0: String(displayTitle), v1: String(current.page + 1), v2: String(current.segment + 1) })}
                   style={{ transform: `translateY(-${crop.y / (sizes[current.page]?.height ?? crop.height) * 100}%)` }}
                   onLoad={(event) => { const img = event.currentTarget; setSizes((old) => old[current.page]?.width === img.naturalWidth && old[current.page]?.height === img.naturalHeight ? old : { ...old, [current.page]: { width: img.naturalWidth, height: img.naturalHeight } }); }}
                   onError={() => setError("원본 이미지를 불러오지 못했습니다. 네트워크 또는 이미지 파일을 확인해 주세요.")} />
@@ -174,63 +178,63 @@ export default function SpatialWebtoonReader({ pages: initialPages = EMPTY_PAGES
             data-xr-presenting={presenting || undefined}
           >
             <div className="spatial-reader-toolbar" data-spatial-xr-controls>
-              <nav aria-label="공간 웹툰 읽기 조작" className="spatial-reader-navigation">
-                <button type="button" onKeyDown={onReaderKeyDown} disabled={!imageReady || first || closing} onClick={() => command("previous")}>이전 구간</button>
-                <span role="status" aria-live="polite">{pages.length ? `${current.page + 1} / ${pages.length} 페이지 · ${current.segment + 1} / ${crops.length} 구간` : "이미지 없음"}</span>
-                <button type="button" onKeyDown={onReaderKeyDown} disabled={!imageReady || last || closing} onClick={() => command("next")}>다음 구간</button>
+              <nav aria-label={translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "공간 웹툰 읽기 조작")} className="spatial-reader-navigation">
+                <button type="button" onKeyDown={onReaderKeyDown} disabled={!imageReady || first || closing} onClick={() => command("previous")}>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "이전 구간")}</button>
+                <span role="status" aria-live="polite">{pages.length ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "{v0} / {v1} 페이지 · {v2} / {v3} 구간"), { v0: String(current.page + 1), v1: String(pages.length), v2: String(current.segment + 1), v3: String(crops.length) }) : translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "이미지 없음")}</span>
+                <button type="button" onKeyDown={onReaderKeyDown} disabled={!imageReady || last || closing} onClick={() => command("next")}>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "다음 구간")}</button>
               </nav>
               <div className="spatial-reader-mode-buttons">
                 {presenting ? <>
-                  <button type="button" onClick={() => command("recenter")} disabled={transitioning}>중앙 정렬 / 다시 배치</button>
-                  <button type="button" onClick={() => command("smaller")} disabled={transitioning}>축소</button>
-                  <button type="button" onClick={() => command("larger")} disabled={transitioning}>확대</button>
-                  <button type="button" className="spatial-reader-primary" onClick={() => { void runtimeRef.current?.end().catch(() => setError("기기 시스템 메뉴에서 XR을 종료해 주세요.")); }} disabled={transitioning}>XR 종료 · 2D로 돌아가기</button>
+                  <button type="button" onClick={() => command("recenter")} disabled={transitioning}>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "중앙 정렬 / 다시 배치")}</button>
+                  <button type="button" onClick={() => command("smaller")} disabled={transitioning}>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "축소")}</button>
+                  <button type="button" onClick={() => command("larger")} disabled={transitioning}>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "확대")}</button>
+                  <button type="button" className="spatial-reader-primary" onClick={() => { void runtimeRef.current?.end().catch(() => setError("기기 시스템 메뉴에서 XR을 종료해 주세요.")); }} disabled={transitioning}>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "XR 종료 · 2D로 돌아가기")}</button>
                 </> : <>
-                  <button type="button" className="spatial-reader-primary" onClick={() => start("immersive-ar")} disabled={!ready || !pages.length || transitioning || closing || support?.immersiveAr === "unsupported"}>AR로 읽기</button>
-                  <button type="button" className="spatial-reader-primary" onClick={() => start("immersive-vr")} disabled={!ready || !pages.length || transitioning || closing || support?.immersiveVr === "unsupported"}>VR로 읽기</button>
-                  <span className="spatial-reader-quiet">{transitioning ? "기기 권한 확인 중…" : "현재 화면: 2D 읽기"}</span>
+                  <button type="button" className="spatial-reader-primary" onClick={() => start("immersive-ar")} disabled={!ready || !pages.length || transitioning || closing || support?.immersiveAr === "unsupported"}>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "AR로 읽기")}</button>
+                  <button type="button" className="spatial-reader-primary" onClick={() => start("immersive-vr")} disabled={!ready || !pages.length || transitioning || closing || support?.immersiveVr === "unsupported"}>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "VR로 읽기")}</button>
+                  <span className="spatial-reader-quiet">{transitioning ? translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "기기 권한 확인 중…") : translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "현재 화면: 2D 읽기")}</span>
                 </>}
               </div>
               <p className="spatial-reader-message" role="status">{message}</p>
               {error && <p className="spatial-reader-error" role="alert">{error}</p>}
             </div>
           </div>
-          {pages.length > 1 && <label className="spatial-reader-page-jump">페이지 바로가기 <output>{current.page + 1} / {pages.length}</output>
-            <input aria-label="공간 리더 페이지 바로가기" type="range" min={0} max={pages.length - 1} value={current.page} onChange={(event) => { setError(""); setCursor({ page: Number(event.target.value), segment: 0 }); }} />
+          {pages.length > 1 && <label className="spatial-reader-page-jump">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "페이지 바로가기 ")}<output>{current.page + 1} / {pages.length}</output>
+            <input aria-label={translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "공간 리더 페이지 바로가기")} type="range" min={0} max={pages.length - 1} value={current.page} onChange={(event) => { setError(""); setCursor({ page: Number(event.target.value), segment: 0 }); }} />
           </label>}
-          {crops.length > 1 && <label className="spatial-reader-page-jump">긴 원고 구간 <output>{current.segment + 1} / {crops.length}</output>
-            <input aria-label="공간 리더 구간 바로가기" type="range" min={0} max={crops.length - 1} value={current.segment} onChange={(event) => setCursor({ page: current.page, segment: Number(event.target.value) })} />
+          {crops.length > 1 && <label className="spatial-reader-page-jump">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "긴 원고 구간 ")}<output>{current.segment + 1} / {crops.length}</output>
+            <input aria-label={translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "공간 리더 구간 바로가기")} type="range" min={0} max={crops.length - 1} value={current.segment} onChange={(event) => setCursor({ page: current.page, segment: Number(event.target.value) })} />
           </label>}
         </div>
-        <aside className="spatial-reader-settings" aria-label="공간 읽기 설정">
-          <h3>나에게 맞는 읽기 공간</h3>
-          <fieldset><legend>XR 배치</legend><div className="spatial-reader-presets">
+        <aside className="spatial-reader-settings" aria-label={translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "공간 읽기 설정")}>
+          <h3>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "나에게 맞는 읽기 공간")}</h3>
+          <fieldset><legend>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "XR 배치")}</legend><div className="spatial-reader-presets">
             {[["focus", "집중", "한 구간"], ["arc", "곡면", "앞뒤 구간"], ["wall", "벽면", "나란히"]].map(([value, label, note]) =>
               <button key={value} type="button" aria-pressed={settings.layout === value} onClick={() => edit({ layout: value as SpatialReaderSettings["layout"] })}><strong>{label}</strong><small>{note}</small></button>)}
           </div></fieldset>
-          {settings.layout !== "focus" && settings.distance < settings.scale * 1.35 && <p className="spatial-reader-quiet">가까운 거리·큰 원고에서는 겹침을 피하기 위해 앞뒤 구간을 숨깁니다. 거리를 늘리거나 크기를 줄이면 다시 펼쳐집니다.</p>}
-          <label className="spatial-reader-check"><input type="checkbox" checked={settings.segments} onChange={(event) => { edit({ segments: event.target.checked }); setCursor({ page: current.page, segment: 0 }); }} />긴 세로 원고를 읽기 구간으로 나누기</label>
-          <p className="spatial-reader-quiet">내용이 잘리지 않도록 구간을 겹칩니다. AI 컷 인식이 아닌 읽기 창 분할입니다.</p>
-          <label>읽기 방향<select value={settings.direction} onChange={(event) => edit({ direction: event.target.value as SpatialReaderDirection })}>
-            <option value="ltr">왼쪽 → 오른쪽</option><option value="rtl">오른쪽 → 왼쪽 (만화)</option>
+          {settings.layout !== "focus" && settings.distance < settings.scale * 1.35 && <p className="spatial-reader-quiet">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "가까운 거리·큰 원고에서는 겹침을 피하기 위해 앞뒤 구간을 숨깁니다. 거리를 늘리거나 크기를 줄이면 다시 펼쳐집니다.")}</p>}
+          <label className="spatial-reader-check"><input type="checkbox" checked={settings.segments} onChange={(event) => { edit({ segments: event.target.checked }); setCursor({ page: current.page, segment: 0 }); }} />{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "긴 세로 원고를 읽기 구간으로 나누기")}</label>
+          <p className="spatial-reader-quiet">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "내용이 잘리지 않도록 구간을 겹칩니다. AI 컷 인식이 아닌 읽기 창 분할입니다.")}</p>
+          <label>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "읽기 방향")}<select value={settings.direction} onChange={(event) => edit({ direction: event.target.value as SpatialReaderDirection })}>
+            <option value="ltr">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "왼쪽 → 오른쪽")}</option><option value="rtl">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "오른쪽 → 왼쪽 (만화)")}</option>
           </select></label>
-          <label>관람 거리 <output>{settings.distance.toFixed(2)}m</output><input aria-label="XR 관람 거리" type="range" min={1} max={5} step={0.25} value={settings.distance} onChange={(event) => edit({ distance: Number(event.target.value) })} /></label>
-          <label>원고 크기 <output>{Math.round(settings.scale * 100)}%</output><input aria-label="공간 원고 크기" type="range" min={0.5} max={1.8} step={0.1} value={settings.scale} onChange={(event) => edit({ scale: Number(event.target.value) })} /></label>
-          <label>읽기 배경<select value={settings.theme} onChange={(event) => edit({ theme: event.target.value as SpatialReaderSettings["theme"] })}>
-            <option value="night">야간 상영관</option><option value="paper">밝은 갤러리</option><option value="sepia">따뜻한 서재</option>
+          <label>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "관람 거리 ")}<output>{settings.distance.toFixed(2)}m</output><input aria-label={translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "XR 관람 거리")} type="range" min={1} max={5} step={0.25} value={settings.distance} onChange={(event) => edit({ distance: Number(event.target.value) })} /></label>
+          <label>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "원고 크기 ")}<output>{Math.round(settings.scale * 100)}%</output><input aria-label={translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "공간 원고 크기")} type="range" min={0.5} max={1.8} step={0.1} value={settings.scale} onChange={(event) => edit({ scale: Number(event.target.value) })} /></label>
+          <label>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "읽기 배경")}<select value={settings.theme} onChange={(event) => edit({ theme: event.target.value as SpatialReaderSettings["theme"] })}>
+            <option value="night">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "야간 상영관")}</option><option value="paper">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "밝은 갤러리")}</option><option value="sepia">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "따뜻한 서재")}</option>
           </select></label>
-          <label>XR 화질<select value={settings.quality} disabled={presenting || transitioning} onChange={(event) => edit({ quality: event.target.value as SpatialReaderSettings["quality"] })}>
-            <option value="battery">절전 · 1K 텍스처</option><option value="balanced">균형 · 1.5K 텍스처</option><option value="sharp">선명 · 2K 텍스처</option>
+          <label>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "XR 화질")}<select value={settings.quality} disabled={presenting || transitioning} onChange={(event) => edit({ quality: event.target.value as SpatialReaderSettings["quality"] })}>
+            <option value="battery">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "절전 · 1K 텍스처")}</option><option value="balanced">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "균형 · 1.5K 텍스처")}</option><option value="sharp">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "선명 · 2K 텍스처")}</option>
           </select></label>
-          <label className="spatial-reader-check"><input type="checkbox" checked={settings.dwell} onChange={(event) => edit({ dwell: event.target.checked })} />고개 방향으로 버튼 1.4초 바라봐 선택</label>
-          <p className="spatial-reader-quiet">기본은 꺼짐입니다. 눈 추적이 아니라 머리가 향하는 방향을 사용하며, 자동 카메라 이동은 없습니다.</p>
+          <label className="spatial-reader-check"><input type="checkbox" checked={settings.dwell} onChange={(event) => edit({ dwell: event.target.checked })} />{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "고개 방향으로 버튼 1.4초 바라봐 선택")}</label>
+          <p className="spatial-reader-quiet">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "기본은 꺼짐입니다. 눈 추적이 아니라 머리가 향하는 방향을 사용하며, 자동 카메라 이동은 없습니다.")}</p>
           <div className="spatial-reader-import">
-            <label>내 원고 이미지 열기<input type="file" aria-label="공간 리더 원고 이미지 선택" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" multiple disabled={presenting || transitioning || closing} onChange={(event) => { importFiles(event.target.files); event.currentTarget.value = ""; }} /></label>
-            <p className="spatial-reader-quiet">최대 64장 · 파일당 16MB · 합계 64MB<br />파일명 숫자 순서 · 서버 업로드 없음<br />XR에서 움직이는 GIF·WebP는 정지 이미지로 검토합니다.</p>
+            <label>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "내 원고 이미지 열기")}<input type="file" aria-label={translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "공간 리더 원고 이미지 선택")} accept="image/png,image/jpeg,image/webp,image/avif,image/gif" multiple disabled={presenting || transitioning || closing} onChange={(event) => { importFiles(event.target.files); event.currentTarget.value = ""; }} /></label>
+            <p className="spatial-reader-quiet">{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "최대 64장 · 파일당 16MB · 합계 64MB")}<br />{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "파일명 숫자 순서 · 서버 업로드 없음")}<br />{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "XR에서 움직이는 GIF·WebP는 정지 이미지로 검토합니다.")}</p>
           </div>
-          <details><summary>기기 지원과 조작 안내</summary><p>AR·VR 지원은 브라우저가 모드별로 판정합니다. 미지원 환경에서는 2D로 읽으세요. 지원 기기에서도 권한·정책에 따라 시작이 거절될 수 있습니다.</p><p>헤드셋 안의 버튼을 컨트롤러 또는 기기가 제공하는 손가락 집기로 선택합니다. 스틱은 한 번 기울일 때 한 구간씩 이동합니다. AR 표면 배치가 불가능하면 시점 앞 배치로 전환합니다.</p><p>2D 키보드: 이전·다음 버튼에 초점을 두고 방향키·PageUp/Down·Home/End. 실공간을 확보하고 앉은 자세부터 검토하세요. 불편하면 즉시 종료하세요. 이 설정은 기기 안전 인증을 의미하지 않습니다.</p></details>
-          <button type="button" onClick={() => setSettings({ ...SPATIAL_READER_DEFAULTS, ...(direction ? { direction } : {}) })}>읽기 설정 초기화</button>
-          <p className="spatial-reader-quiet">{storageUnavailable ? "브라우저 저장이 차단돼 이번 읽기 동안만 설정을 유지합니다." : localPages || workId.startsWith("local:") ? "설정만 이 브라우저에 저장합니다. 로컬 원고의 파일명·읽기 위치는 저장하지 않습니다." : "읽기 설정과 페이지·구간만 이 브라우저에 저장합니다. 카메라·방·기기 좌표는 저장하지 않습니다."}</p>
+          <details><summary>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "기기 지원과 조작 안내")}</summary><p>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "AR·VR 지원은 브라우저가 모드별로 판정합니다. 미지원 환경에서는 2D로 읽으세요. 지원 기기에서도 권한·정책에 따라 시작이 거절될 수 있습니다.")}</p><p>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "헤드셋 안의 버튼을 컨트롤러 또는 기기가 제공하는 손가락 집기로 선택합니다. 스틱은 한 번 기울일 때 한 구간씩 이동합니다. AR 표면 배치가 불가능하면 시점 앞 배치로 전환합니다.")}</p><p>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "2D 키보드: 이전·다음 버튼에 초점을 두고 방향키·PageUp/Down·Home/End. 실공간을 확보하고 앉은 자세부터 검토하세요. 불편하면 즉시 종료하세요. 이 설정은 기기 안전 인증을 의미하지 않습니다.")}</p></details>
+          <button type="button" onClick={() => setSettings({ ...SPATIAL_READER_DEFAULTS, ...(direction ? { direction } : {}) })}>{translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "읽기 설정 초기화")}</button>
+          <p className="spatial-reader-quiet">{storageUnavailable ? translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "브라우저 저장이 차단돼 이번 읽기 동안만 설정을 유지합니다.") : localPages || workId.startsWith("local:") ? translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "설정만 이 브라우저에 저장합니다. 로컬 원고의 파일명·읽기 위치는 저장하지 않습니다.") : translateCurrentStaticSourceText("domains.creator.spatial.SpatialWebtoonReader", "ko", "읽기 설정과 페이지·구간만 이 브라우저에 저장합니다. 카메라·방·기기 좌표는 저장하지 않습니다.")}</p>
         </aside>
       </div>
     </dialog>

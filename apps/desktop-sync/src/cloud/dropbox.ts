@@ -5,6 +5,7 @@ import {
   jsonObject,
   normalizeCloudRelativePath,
   numberField,
+  sha256Bytes,
   stringField,
 } from "./http.js";
 import {
@@ -13,16 +14,27 @@ import {
   type DesktopCloudProvider,
 } from "./types.js";
 
+import type { DesktopCloudAccessTokenSource } from "../oauth.js";
+import type {
+  DesktopUploadSessionIdentity,
+  DesktopUploadSessionRecord,
+  DesktopUploadSessionStore,
+} from "../upload-session-store.js";
+
 export interface DropboxDesktopCloudProviderOptions {
-  readonly accessToken: string;
+  readonly accessToken: string | DesktopCloudAccessTokenSource;
   readonly rootPath?: string;
   readonly fetchImpl?: typeof fetch;
+  readonly credentialProfile?: string;
+  readonly uploadSessionStore?: DesktopUploadSessionStore;
+  readonly simpleUploadThresholdBytes?: number;
 }
 
 const DROPBOX_API = "https://api.dropboxapi.com/2";
 const DROPBOX_CONTENT = "https://content.dropboxapi.com/2";
 const DROPBOX_SIMPLE_UPLOAD_BYTES = 128 * 1024 * 1024;
 const DROPBOX_CHUNK_BYTES = 8 * 1024 * 1024;
+const DROPBOX_TRASH_ROOT = ".toonstudio-trash";
 
 function normalizeDropboxRoot(value: string | undefined): string {
   const normalized = normalizeCloudRelativePath(value ?? "ToonStudio/Sync");
@@ -86,11 +98,22 @@ export class DropboxDesktopCloudProvider implements DesktopCloudProvider {
   readonly rootLabel: string;
   private readonly rootPath: string;
   private readonly http: DesktopCloudHttpClient;
+  private readonly credentialProfile: string;
+  private readonly uploadSessionStore?: DesktopUploadSessionStore;
+  private readonly simpleUploadThresholdBytes: number;
   private rootEnsured = false;
 
   constructor(options: DropboxDesktopCloudProviderOptions) {
     this.rootPath = normalizeDropboxRoot(options.rootPath);
     this.rootLabel = this.rootPath;
+    this.credentialProfile = options.credentialProfile?.trim() || "default";
+    this.uploadSessionStore = options.uploadSessionStore;
+    this.simpleUploadThresholdBytes = options.simpleUploadThresholdBytes
+      ?? DROPBOX_SIMPLE_UPLOAD_BYTES;
+    if (this.simpleUploadThresholdBytes < 1
+      || this.simpleUploadThresholdBytes > DROPBOX_SIMPLE_UPLOAD_BYTES) {
+      throw new TypeError("invalid Dropbox simple upload threshold");
+    }
     this.http = new DesktopCloudHttpClient({
       provider: this.id,
       accessToken: options.accessToken,
@@ -218,7 +241,13 @@ export class DropboxDesktopCloudProvider implements DesktopCloudProvider {
       const entries = Array.isArray(body.entries) ? body.entries : [];
       for (const entry of entries) {
         const metadata = dropboxMetadata(entry);
-        if (metadata) files.push(cloudObject(this.rootPath, metadata));
+        if (metadata) {
+          const object = cloudObject(this.rootPath, metadata);
+          if (
+            object.relativePath !== DROPBOX_TRASH_ROOT
+            && !object.relativePath.startsWith(`${DROPBOX_TRASH_ROOT}/`)
+          ) files.push(object);
+        }
       }
       if (body.has_more !== true) break;
       const cursor = stringField(body.cursor);
@@ -289,12 +318,60 @@ export class DropboxDesktopCloudProvider implements DesktopCloudProvider {
     return metadata;
   }
 
-  private async uploadSession(input: {
+  private uploadIdentity(input: {
     readonly relativePath: string;
     readonly bytes: Uint8Array;
+    readonly sourceSha256?: string;
     readonly expected: DesktopCloudObject | null;
-    readonly signal?: AbortSignal;
-  }): Promise<DropboxMetadata> {
+  }): DesktopUploadSessionIdentity {
+    const sourceSha256 = input.sourceSha256 ?? sha256Bytes(input.bytes);
+    if (!/^[a-f0-9]{64}$/u.test(sourceSha256)) {
+      throw new DesktopCloudError(
+        this.id,
+        "integrity",
+        `Dropbox upload hash is invalid: ${input.relativePath}`,
+      );
+    }
+    return {
+      provider: this.id,
+      remoteRoot: this.rootLabel,
+      credentialProfile: this.credentialProfile,
+      relativePath: normalizeCloudRelativePath(input.relativePath),
+      sourceSha256,
+      size: input.bytes.byteLength,
+      expectedObjectId: input.expected?.id ?? null,
+      expectedVersion: input.expected?.version ?? null,
+    };
+  }
+
+  private async saveUploadSession(
+    identity: DesktopUploadSessionIdentity,
+    handle: string,
+    offset: number,
+    signal?: AbortSignal,
+  ): Promise<DesktopUploadSessionRecord> {
+    const now = Date.now();
+    const record: DesktopUploadSessionRecord = {
+      ...identity,
+      schemaVersion: 1,
+      kind: "dropbox-session",
+      handle,
+      offset,
+      expiresAt: new Date(now + 6 * 24 * 60 * 60_000).toISOString(),
+      updatedAt: new Date(now).toISOString(),
+    };
+    await this.uploadSessionStore?.save(record, signal);
+    return record;
+  }
+
+  private async startUploadSession(
+    input: {
+      readonly relativePath: string;
+      readonly bytes: Uint8Array;
+      readonly signal?: AbortSignal;
+    },
+    identity: DesktopUploadSessionIdentity,
+  ): Promise<DesktopUploadSessionRecord> {
     const firstEnd = Math.min(input.bytes.byteLength, DROPBOX_CHUNK_BYTES);
     const start = await this.content(
       "files/upload_session/start",
@@ -311,51 +388,173 @@ export class DropboxDesktopCloudProvider implements DesktopCloudProvider {
         "Dropbox upload session id is missing",
       );
     }
-    let offset = firstEnd;
-    while (input.bytes.byteLength - offset > DROPBOX_CHUNK_BYTES) {
-      const endExclusive = offset + DROPBOX_CHUNK_BYTES;
-      await this.content(
-        "files/upload_session/append_v2",
-        {
-          cursor: { session_id: sessionId, offset },
-          close: false,
-        },
-        input.bytes.slice(offset, endExclusive),
-        input.signal,
-      );
-      offset = endExclusive;
-    }
-    const finish = await this.content(
-      "files/upload_session/finish",
-      {
-        cursor: { session_id: sessionId, offset },
-        commit: this.commit(input.relativePath, input.expected),
-      },
-      input.bytes.slice(offset),
+    return this.saveUploadSession(
+      identity,
+      sessionId,
+      firstEnd,
       input.signal,
     );
-    const metadata = dropboxMetadata(await jsonObject(finish, this.id));
-    if (!metadata) {
-      throw new DesktopCloudError(
-        this.id,
-        "invalid-response",
-        "Dropbox upload session did not return file metadata",
-      );
+  }
+
+  private correctedOffset(error: unknown): number | null {
+    if (!(error instanceof DesktopCloudError)) return null;
+    const match = /correct_offset[^0-9]{0,80}(\d+)/iu.exec(error.message);
+    if (!match) return null;
+    const offset = Number(match[1]);
+    return Number.isSafeInteger(offset) && offset >= 0 ? offset : null;
+  }
+
+  private staleUploadSession(error: unknown): boolean {
+    return error instanceof DesktopCloudError
+      && error.code === "version-conflict"
+      && /lookup_failed|not_found|closed|session[^\n]{0,40}(?:missing|expired)/iu
+        .test(error.message);
+  }
+
+  private async uploadSession(
+    input: {
+      readonly relativePath: string;
+      readonly bytes: Uint8Array;
+      readonly expected: DesktopCloudObject | null;
+      readonly signal?: AbortSignal;
+    },
+    identity: DesktopUploadSessionIdentity,
+    initial: DesktopUploadSessionRecord,
+  ): Promise<DropboxMetadata> {
+    let record = initial;
+    let corrections = 0;
+    while (record.offset < input.bytes.byteLength) {
+      const remaining = input.bytes.byteLength - record.offset;
+      if (remaining > DROPBOX_CHUNK_BYTES) {
+        const endExclusive = record.offset + DROPBOX_CHUNK_BYTES;
+        try {
+          await this.content(
+            "files/upload_session/append_v2",
+            {
+              cursor: { session_id: record.handle, offset: record.offset },
+              close: false,
+            },
+            input.bytes.slice(record.offset, endExclusive),
+            input.signal,
+          );
+          record = await this.saveUploadSession(
+            identity,
+            record.handle,
+            endExclusive,
+            input.signal,
+          );
+          continue;
+        } catch (error) {
+          const corrected = this.correctedOffset(error);
+          if (corrected === null || corrected > input.bytes.byteLength) throw error;
+          corrections += 1;
+          if (corrections > 4) {
+            throw new DesktopCloudError(
+              this.id,
+              "integrity",
+              "Dropbox upload session offset could not stabilize",
+            );
+          }
+          record = await this.saveUploadSession(
+            identity,
+            record.handle,
+            corrected,
+            input.signal,
+          );
+          continue;
+        }
+      }
+      try {
+        const finish = await this.content(
+          "files/upload_session/finish",
+          {
+            cursor: { session_id: record.handle, offset: record.offset },
+            commit: this.commit(input.relativePath, input.expected),
+          },
+          input.bytes.slice(record.offset),
+          input.signal,
+        );
+        const metadata = dropboxMetadata(await jsonObject(finish, this.id));
+        if (!metadata) {
+          throw new DesktopCloudError(
+            this.id,
+            "invalid-response",
+            "Dropbox upload session did not return file metadata",
+          );
+        }
+        return metadata;
+      } catch (error) {
+        const corrected = this.correctedOffset(error);
+        if (corrected === null || corrected > input.bytes.byteLength) throw error;
+        corrections += 1;
+        if (corrections > 4) {
+          throw new DesktopCloudError(
+            this.id,
+            "integrity",
+            "Dropbox upload session offset could not stabilize",
+          );
+        }
+        record = await this.saveUploadSession(
+          identity,
+          record.handle,
+          corrected,
+          input.signal,
+        );
+      }
     }
-    return metadata;
+    throw new DesktopCloudError(
+      this.id,
+      "invalid-response",
+      "Dropbox upload session ended without metadata",
+    );
   }
 
   async uploadFile(input: {
     readonly relativePath: string;
     readonly bytes: Uint8Array;
+    readonly sourceSha256?: string;
     readonly expected: DesktopCloudObject | null;
     readonly signal?: AbortSignal;
   }): Promise<DesktopCloudObject> {
     await this.ensureParentFolders(input.relativePath, input.signal);
-    const metadata = input.bytes.byteLength <= DROPBOX_SIMPLE_UPLOAD_BYTES
-      ? await this.uploadSimple(input)
-      : await this.uploadSession(input);
-    return cloudObject(this.rootPath, metadata);
+    if (input.bytes.byteLength <= this.simpleUploadThresholdBytes) {
+      return cloudObject(
+        this.rootPath,
+        await this.uploadSimple(input),
+      );
+    }
+    const identity = this.uploadIdentity(input);
+    let record = await this.uploadSessionStore?.load(
+      identity,
+      input.signal,
+    ) ?? null;
+    if (record && record.kind !== "dropbox-session") {
+      await this.uploadSessionStore?.delete(identity, input.signal);
+      record = null;
+    }
+    let restarted = false;
+    while (true) {
+      if (!record) {
+        record = await this.startUploadSession(input, identity);
+      }
+      try {
+        const metadata = await this.uploadSession(
+          input,
+          identity,
+          record,
+        );
+        await this.uploadSessionStore?.delete(identity, input.signal);
+        return cloudObject(this.rootPath, metadata);
+      } catch (error) {
+        if (!restarted && this.staleUploadSession(error)) {
+          await this.uploadSessionStore?.delete(identity, input.signal);
+          record = null;
+          restarted = true;
+          continue;
+        }
+        throw error;
+      }
+    }
   }
 
   async deleteFile(input: {
@@ -376,10 +575,37 @@ export class DropboxDesktopCloudProvider implements DesktopCloudProvider {
         `Dropbox file changed before delete: ${input.file.relativePath}`,
       );
     }
-    await this.api(
-      "files/delete_v2",
-      { path: input.file.id },
-      { signal: input.signal },
+
+    const trashRelativePath = this.trashRelativePath(
+      input.file,
+      input.expectedVersion,
+    );
+    await this.ensureParentFolders(trashRelativePath, input.signal);
+    const moved = await this.moveFile(
+      input.file.id,
+      dropboxPath(this.rootPath, trashRelativePath),
+      input.signal,
+    );
+    if (moved.revision === input.expectedVersion) return;
+
+    try {
+      await this.moveFile(
+        moved.id,
+        dropboxPath(this.rootPath, input.file.relativePath),
+        input.signal,
+      );
+    } catch (error) {
+      throw new DesktopCloudError(
+        this.id,
+        "version-conflict",
+        `Dropbox file changed during delete and was preserved at ${trashRelativePath}`,
+        { cause: error },
+      );
+    }
+    throw new DesktopCloudError(
+      this.id,
+      "version-conflict",
+      `Dropbox file changed during delete and was restored: ${input.file.relativePath}`,
     );
   }
 }

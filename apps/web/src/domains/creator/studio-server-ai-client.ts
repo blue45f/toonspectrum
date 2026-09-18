@@ -78,7 +78,7 @@ export function resolveActiveServerAiProviderLabel(
   if (preference === "auto") {
     return status?.configured ? "자동 무료 AI" : "자동 무료 AI → 내 무료 키";
   }
-  return status?.providers.find((provider) => provider.id === preference)?.label ?? "선택한 무료 AI";
+  return status?.providers?.find((provider) => provider.id === preference)?.label ?? "선택한 무료 AI";
 }
 
 export type StudioServerAiCompletion = {
@@ -98,12 +98,101 @@ export type StudioServerAiResult<T> =
   | { ok: true; data: T }
   | {
       ok: false;
-      code: "invalid_input" | "network_error" | "http_error" | "parse_error" | "free_exhausted";
+      code:
+        | "invalid_input"
+        | "network_error"
+        | "http_error"
+        | "parse_error"
+        | "free_exhausted"
+        | "login_required";
       error: string;
     };
 
+function parseStudioServerAiStatus(value: unknown): StudioServerAiStatus {
+  const source = isRecord(value) ? value : {};
+  const providers = Array.isArray(source.providers)
+    ? source.providers.flatMap((candidate) => {
+        if (!isRecord(candidate)) return [];
+        const id = provider(candidate.id);
+        const label = text(candidate.label, 120);
+        const model = text(candidate.model, 200);
+        if (!id || !label || !model) return [];
+        return [{
+          id,
+          label,
+          configured: candidate.configured === true,
+          model,
+        }];
+      })
+    : [];
+  const rawSelection = isRecord(source.selection) ? source.selection : {};
+  const order = Array.isArray(rawSelection.order)
+    ? rawSelection.order.flatMap((candidate) => {
+        const parsed = provider(candidate);
+        return parsed ? [parsed] : [];
+      })
+    : [];
+  const selectedProvider = source.provider === "none"
+    ? "none"
+    : provider(source.provider) ?? "none";
+  const rawCapabilities = Array.isArray(source.capabilities)
+    ? source.capabilities
+    : [];
+  const capabilities = rawCapabilities.flatMap((candidate) => {
+    const parsed = text(candidate, 80);
+    return parsed ? [parsed] : [];
+  });
+  const rawQuota = isRecord(source.quota) ? source.quota : null;
+  const quota = rawQuota
+    && typeof rawQuota.enforced === "boolean"
+    && rawQuota.timezone === "UTC"
+    && rawQuota.failureMode === "closed"
+    && count(rawQuota.dailyRequestLimit) !== undefined
+    && count(rawQuota.dailyTokenLimit) !== undefined
+    ? {
+        enforced: rawQuota.enforced,
+        timezone: "UTC" as const,
+        failureMode: "closed" as const,
+        dailyRequestLimit: count(rawQuota.dailyRequestLimit)!,
+        dailyTokenLimit: count(rawQuota.dailyTokenLimit)!,
+        ...(count(rawQuota.globalDailyRequestLimit) === undefined
+          ? {}
+          : { globalDailyRequestLimit: count(rawQuota.globalDailyRequestLimit) }),
+        ...(count(rawQuota.globalDailyTokenLimit) === undefined
+          ? {}
+          : { globalDailyTokenLimit: count(rawQuota.globalDailyTokenLimit) }),
+      }
+    : undefined;
+  return {
+    configured: source.configured === true,
+    provider: selectedProvider,
+    model: text(source.model, 200) ?? "",
+    providers,
+    selection: {
+      default: "auto",
+      order,
+      fallback: rawSelection.fallback === true,
+      ...(failoverReason(rawSelection.fallbackPolicy) === undefined
+        ? {}
+        : { fallbackPolicy: failoverReason(rawSelection.fallbackPolicy) }),
+    },
+    capabilities,
+    requiresAuth: source.requiresAuth !== false,
+    ...(typeof source.operatorFunded === "boolean"
+      ? { operatorFunded: source.operatorFunded }
+      : {}),
+    ...(typeof source.freePool === "boolean" ? { freePool: source.freePool } : {}),
+    ...(text(source.settingsHref, 500) === undefined
+      ? {}
+      : { settingsHref: text(source.settingsHref, 500) }),
+    ...(quota ? { quota } : {}),
+  };
+}
+
 export async function getStudioServerAiStatus(signal?: AbortSignal): Promise<StudioServerAiStatus> {
-  return api.get<StudioServerAiStatus>("/studio-ai/status", { signal });
+  return parseStudioServerAiStatus(
+    await api.get<unknown>("/studio-ai/status", { signal }),
+  );
 }
 
 const OPERATION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/u;
@@ -219,12 +308,15 @@ function httpErrorCode(error: unknown): string | undefined {
 const PERSONAL_FALLBACK_CODES = new Set([
   "FREE_AI_POOL_EXHAUSTED",
   "FREE_AI_POOL_UNAVAILABLE",
-  "FREE_AI_LOGIN_REQUIRED",
   "USER_AI_CONNECTION_REQUIRED",
 ]);
 
+function loginRequiredMessage(): string {
+  return "로그인하면 자동 무료 AI를 바로 사용할 수 있어요. 현재 입력은 그대로 유지됩니다. 로그인하지 않으려면 통합 AI 설정에서 개인 무료 API 키를 연결하세요.";
+}
+
 function exhaustedMessage(): string {
-  return "자동 무료 AI와 등록된 클라우드 BYOK 경로가 모두 무료 한도 또는 요청 제한 상태입니다. 통합 AI 설정에서 다른 클라우드 키·모델을 추가하거나 제한 해제 후 다시 시도하세요. 현재 이 AI 기능은 사용할 수 없습니다.";
+  return "현재 사용할 수 있는 자동 무료 AI와 개인 무료 키의 한도가 모두 소진됐어요. 통합 AI 설정에서 다른 무료 경로를 연결하거나 한도가 갱신된 뒤 다시 시도해 주세요.";
 }
 
 async function completeWithPersonalFreeAi(
@@ -306,8 +398,15 @@ export async function completeStudioServerText(
       : { ok: false, code: "parse_error", error: "자동 무료 AI 응답 형식을 확인하지 못했어요." };
   } catch (error) {
     const code = httpErrorCode(error);
+    if (code === "FREE_AI_LOGIN_REQUIRED") {
+      if (!personalAttempted && personalRoutes.length > 0) {
+        const personalResult = await completeWithPersonalFreeAi(input, operationId, signal);
+        if (personalResult.ok || personalResult.code !== "free_exhausted") return personalResult;
+      }
+      return { ok: false, code: "login_required", error: loginRequiredMessage() };
+    }
     if (code && PERSONAL_FALLBACK_CODES.has(code)) {
-      return personalAttempted
+      return personalAttempted || personalRoutes.length === 0
         ? { ok: false, code: "free_exhausted", error: exhaustedMessage() }
         : completeWithPersonalFreeAi(input, operationId, signal);
     }

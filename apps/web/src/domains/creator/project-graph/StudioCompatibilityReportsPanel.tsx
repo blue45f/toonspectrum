@@ -31,9 +31,9 @@ const GRADE_STYLES = Object.freeze({
 function reportSummary(report: CompatibilityReport, locale: Locale): string {
   const summary = report.summary;
   if (locale === "ko") {
-    return `보존 ${summary.preserved} · 변환/근사 ${summary.converted + summary.approximated} · 래스터화 ${summary.rasterized} · 제외/불투명/차단 ${summary.ignored + summary.opaquePreserved + summary.blocked}`;
+    return `보존 ${summary.preserved} · 변환 ${summary.converted} · 래스터화 ${summary.rasterized} · 제외/미지원 ${summary.excluded + summary.unsupported}`;
   }
-  return `Preserved ${summary.preserved} · converted/approximated ${summary.converted + summary.approximated} · rasterized ${summary.rasterized} · ignored/opaque/blocked ${summary.ignored + summary.opaquePreserved + summary.blocked}`;
+  return `Preserved ${summary.preserved} · converted ${summary.converted} · rasterized ${summary.rasterized} · excluded/unsupported ${summary.excluded + summary.unsupported}`;
 }
 
 export function StudioCompatibilityReportsPanel({
@@ -188,8 +188,8 @@ export function StudioCompatibilityReportsPanel({
                       <ul className="mt-3 space-y-2">
                         {report.items.slice(0, 100).map((item) => (
                           <li key={item.id} className="text-xs leading-5 text-fg-2">
-                            <strong className="text-fg">{item.sourceFeature}</strong>
-                            {` · ${item.disposition} · ${item.path}`}
+                            <strong className="text-fg">{item.feature}</strong>
+                            {` · ${item.outcome} · ${item.path}`}
                             <span className="block text-fg-3">{item.message}</span>
                           </li>
                         ))}

@@ -4,9 +4,8 @@ import { Injectable } from "@nestjs/common";
 
 import {
   canonicalJson,
-  parseScopeRef,
   reviewAnchorSchema,
-  scopeRefContains,
+  scopeContains,
   scopeRefSchema,
 } from "@toonspectrum/studio-project-model";
 import {
@@ -86,23 +85,6 @@ export interface StudioRevisionRecord {
   }[];
 }
 
-export interface StudioExternalFileBindingRecord {
-  readonly id: string;
-  readonly artifactId: string;
-  readonly provider: "local-file" | "filesystem-handle" | "google-drive" | "dropbox" | "onedrive";
-  readonly providerAccountId: string | null;
-  readonly remoteFileId: string;
-  readonly displayPath: string;
-  readonly syncMode: "import-only" | "export-only" | "bidirectional" | "backup-mirror";
-  readonly remoteVersion: string | null;
-  readonly remoteEtag: string | null;
-  readonly contentHash: string | null;
-  readonly lastSyncedRevisionId: string | null;
-  readonly lastSyncedAt: string | null;
-  readonly createdAt: string;
-  readonly updatedAt: string;
-}
-
 export interface StudioRevisionCommitResponse {
   readonly artifactId: string;
   readonly revisionId: string;
@@ -113,7 +95,7 @@ export interface StudioRevisionCommitResponse {
 }
 
 export class StudioProjectNotFoundError extends Error {
-  constructor(readonly target: "work" | "project" | "artifact" | "revision" | "review" | "comment" | "report" | "binding") {
+  constructor(readonly target: "work" | "project" | "artifact" | "revision" | "review" | "comment" | "report") {
     super(`studio_${target}_not_found`);
     this.name = "StudioProjectNotFoundError";
   }
@@ -127,7 +109,7 @@ export class StudioProjectForbiddenError extends Error {
 }
 
 export class StudioProjectIdentityConflictError extends Error {
-  constructor(readonly code: "project_exists" | "work_already_linked" | "artifact_exists" | "revision_exists" | "binding_exists") {
+  constructor(readonly code: "project_exists" | "work_already_linked" | "artifact_exists" | "revision_exists") {
     super(code);
     this.name = "StudioProjectIdentityConflictError";
   }
@@ -1013,7 +995,7 @@ export class StudioProjectGraphRepository {
           "stored artifact scope is invalid",
         );
       }
-      if (!scopeRefContains(parseScopeRef(artifactScope.data), parseScopeRef(input.command.scope))) {
+      if (!scopeContains(artifactScope.data, input.command.scope)) {
         throw new StudioRepositoryInvariantError(
           "scope_outside_artifact",
           "command scope must stay inside the artifact scope",
@@ -1706,7 +1688,7 @@ export class StudioProjectGraphRepository {
         );
       }
       const artifactScope = scopeRefSchema.safeParse(accessResult.row.projectScope);
-      if (!artifactScope.success || !scopeRefContains(parseScopeRef(artifactScope.data), parseScopeRef(anchor.scope))) {
+      if (!artifactScope.success || !scopeContains(artifactScope.data, anchor.scope)) {
         throw new StudioRepositoryInvariantError(
           "review_anchor_scope_mismatch",
           "comment scope must stay inside the reviewed artifact scope",
@@ -2192,7 +2174,7 @@ export class StudioProjectGraphRepository {
           ? { approvedBy: row.approvedBy, approvedAt: toIso(row.approvedAt) }
           : {}),
         createdAt: toIso(row.createdAt),
-      }) as unknown as CompatibilityReport));
+      })));
     } finally {
       client.release();
     }

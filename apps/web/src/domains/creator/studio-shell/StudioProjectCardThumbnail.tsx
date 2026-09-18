@@ -1,6 +1,11 @@
+import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Image as ImageIcon, LoaderCircle } from "lucide-react";
 import { Suspense, useEffect, useRef, useState, type ReactElement, type RefObject } from "react";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 import {
@@ -11,6 +16,11 @@ import {
 import { readStudioProjectDocuments } from "../studio-project-document-reader";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-reader";
 import type { ThumbElement, ThumbPageLike } from "../studio-page-thumbs";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const MAX_PREVIEW_DOCUMENTS = 6;
 
@@ -21,7 +31,7 @@ const LazyStudioPageThumbnail = lazyRetry(
   "StudioProjectCardThumbnail",
 );
 
-type Locale = "ko" | "en";
+type Locale = string;
 type PreviewPhase = "idle" | "loading" | "ready" | "empty";
 
 interface PreviewCandidate {
@@ -151,6 +161,7 @@ function useNearViewport(): {
   readonly nearViewport: boolean;
   readonly rootRef: RefObject<HTMLDivElement | null>;
 } {
+  useBilingualI18nRevision();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [nearViewport, setNearViewport] = useState(
     () => typeof globalThis.IntersectionObserver !== "function",
@@ -172,24 +183,26 @@ function useNearViewport(): {
   return { nearViewport, rootRef };
 }
 
-function PreviewLoading({ locale }: { readonly locale: Locale }) {
+function PreviewLoading({ locale: _locale }: { readonly locale: string }) {
+  const l = useBilingualLocalizer("studioProjectThumbnail.loading");
   return (
     <div className="grid h-full place-items-center bg-panel/70 text-fg-3">
       <div className="flex items-center gap-2 text-xs font-semibold">
         <LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
-        {locale === "ko" ? "최근 작업 불러오는 중" : "Loading recent work"}
+        {bt("최근 작업 불러오는 중", "Loading recent work")}
       </div>
     </div>
   );
 }
 
-function PreviewEmpty({ locale }: { readonly locale: Locale }) {
+function PreviewEmpty({ locale: _locale }: { readonly locale: string }) {
+  const l = useBilingualLocalizer("studioProjectThumbnail.empty");
   return (
     <div className="grid h-full place-items-center bg-panel/70 px-5 text-center text-fg-3">
       <div>
         <ImageIcon size={22} className="mx-auto" aria-hidden="true" />
         <p className="mt-2 text-xs font-semibold">
-          {locale === "ko" ? "작업을 시작하면 미리보기가 표시됩니다." : "A preview appears after you start working."}
+          {bt("작업을 시작하면 미리보기가 표시됩니다.", "A preview appears after you start working.")}
         </p>
       </div>
     </div>
@@ -202,9 +215,10 @@ export function StudioProjectCardThumbnail({
   project,
 }: {
   readonly authUserId: string | null;
-  readonly locale: Locale;
+  readonly locale: string;
   readonly project: StudioProjectLibraryEntry;
 }): ReactElement {
+  const l = useBilingualLocalizer("studioProjectThumbnail");
   const { nearViewport, rootRef } = useNearViewport();
   const [preview, setPreview] = useState<PreviewCandidate | null>(null);
   const [phase, setPhase] = useState<PreviewPhase>("idle");
@@ -218,6 +232,7 @@ export function StudioProjectCardThumbnail({
     if (!nearViewport) return;
     const storage = localStorageOrNull();
     if (!storage) {
+  const bt = useBilingual("StudioProjectCardThumbnail");
       setPhase("empty");
       return;
     }
@@ -261,15 +276,13 @@ export function StudioProjectCardThumbnail({
   const storedThumbnail = project.thumbnailUrl && !storedThumbnailFailed
     ? project.thumbnailUrl
     : null;
-  const previewLabel = locale === "ko"
-    ? `${project.title} 최근 작업 미리보기`
-    : `Recent work preview for ${project.title}`;
+  const previewLabel = bt(`${project.title} 최근 작업 미리보기`, `Recent work preview for ${project.title}`);
 
   return (
     <div
       ref={rootRef}
       className="relative -mx-4 -mt-4 mb-4 aspect-[16/10] overflow-hidden border-b border-line bg-panel/70"
-      data-project-preview-state={preview ? "autosave" : storedThumbnail ? "stored" : phase}
+      data-project-preview-state={preview ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectCardThumbnail", "en", "autosave") : storedThumbnail ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectCardThumbnail", "en", "stored") : phase}
     >
       {preview ? (
         <div role="img" aria-label={previewLabel} className="h-full w-full bg-white">
@@ -297,8 +310,8 @@ export function StudioProjectCardThumbnail({
       {preview || storedThumbnail ? (
         <span className="pointer-events-none absolute bottom-2 left-2 rounded-full border border-white/20 bg-black/65 px-2 py-1 text-[0.62rem] font-black text-white shadow-sm backdrop-blur-sm">
           {preview
-            ? locale === "ko" ? "최근 자동 저장" : "Latest autosave"
-            : locale === "ko" ? "프로젝트 미리보기" : "Project preview"}
+            ? bt("최근 자동 저장", "Latest autosave")
+            : bt("프로젝트 미리보기", "Project preview")}
         </span>
       ) : null}
     </div>

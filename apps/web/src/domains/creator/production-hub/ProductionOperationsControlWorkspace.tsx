@@ -29,6 +29,7 @@ import {
   deriveProductionFinancialForecast,
   deriveProductionFlowAnalytics,
   deriveScheduleRecoveryScenarios,
+  evaluateAutomationRule,
   evaluateReleaseReadiness,
   type EpisodeReleasePlan,
   type ExternalReviewAccess,
@@ -44,7 +45,6 @@ import {
 } from "@toonspectrum/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
-import { deriveProductionAutomationExecutionPlan } from "./production-automation-execution";
 
 import { downloadBlob } from "../export/studio-export";
 
@@ -260,6 +260,7 @@ export function ProductionOperationsControlWorkspace({
   const [reviewSubmissionId, setReviewSubmissionId] = useState(approvedSubmissions[0]?.id ?? "");
   const [reviewLabel, setReviewLabel] = useState("편집부 최종 검수");
   const [reviewExpiresAt, setReviewExpiresAt] = useState("");
+  const [reviewAllowDownload, setReviewAllowDownload] = useState(false);
   const [generatedReviewLink, setGeneratedReviewLink] = useState<string | null>(null);
 
   const [automationName, setAutomationName] = useState("마감 경과 즉시 알림");
@@ -506,6 +507,9 @@ export function ProductionOperationsControlWorkspace({
     const digest = await sha256Digest(token);
     const scope = aggregate.deliverables.find((entry) => entry.currentSubmissionId === reviewSubmissionId)?.scope
       ?? { kind: "project" as const, id: aggregate.projectId, ancestors: [] };
+    const permissions: ExternalReviewAccess["permissions"] = reviewAllowDownload
+      ? ["view", "comment", "approve", "download"]
+      : ["view", "comment", "approve"];
     const access: ExternalReviewAccess = {
       id: reviewId,
       projectId: aggregate.projectId,
@@ -513,7 +517,7 @@ export function ProductionOperationsControlWorkspace({
       label: reviewLabel.trim() || "외부 검수",
       tokenDigest: digest,
       submissionIds: [reviewSubmissionId],
-      permissions: ["view", "comment", "approve"],
+      permissions,
       watermark: true,
       expiresAt: localToIso(reviewExpiresAt) ?? new Date(now.getTime() + 7 * DAY_MS).toISOString(),
       status: "active",
@@ -523,7 +527,7 @@ export function ProductionOperationsControlWorkspace({
       responses: [],
     };
     await saveRecord({ kind: "external-review-access", value: access }, "외부 검수 링크를 만들었습니다.");
-    const link = `${globalThis.location?.origin ?? ""}/production/review/${encodeURIComponent(aggregate.projectId)}/${encodeURIComponent(reviewId)}#token=${encodeURIComponent(token)}`;
+    const link = `${globalThis.location?.origin ?? ""}/production/review/${encodeURIComponent(aggregate.projectId)}/${encodeURIComponent(reviewId)}?token=${encodeURIComponent(token)}`;
     setGeneratedReviewLink(link);
     setNotice("원문 토큰은 다시 표시되지 않습니다. 지금 링크를 복사해 전달해 주세요.");
   });
@@ -565,17 +569,18 @@ export function ProductionOperationsControlWorkspace({
   const runAutomations = () => run("automation-run", async () => {
     if (!canManage) return;
     const rules = (aggregate.automationRules ?? []).filter((entry) => entry.enabled);
+    if (rules.length === 0) {
+      setNotice("실행할 활성 자동화 규칙이 없습니다.");
+      return;
+    }
     const executionTime = new Date();
     const plan = deriveProductionAutomationExecutionPlan(aggregate, rules, executionTime);
-    if (plan.tasks.length > 0) {
-      await execute({ type: "upsert-task-batch", tasks: plan.tasks }, "자동화 조치 업무를 원자적으로 만들었습니다.");
-    }
-    for (const notification of plan.notifications) {
-      await saveRecord({ kind: "notification", value: notification }, "자동화 알림을 만들었습니다.");
-    }
-    for (const rule of plan.evaluatedRules) {
-      await saveRecord({ kind: "automation-rule", value: rule }, `${rule.name} 실행 시간을 기록했습니다.`);
-    }
+    await execute({
+      type: "apply-automation-execution",
+      tasks: plan.tasks,
+      notifications: plan.notifications,
+      evaluatedRules: plan.evaluatedRules,
+    }, "자동화 업무·알림·실행 상태를 하나의 변경으로 저장했습니다.");
     const suppressed = plan.suppressedTaskCount + plan.suppressedNotificationCount;
     setNotice(
       `자동화 결과: 조건 ${plan.matchedSourceCount}건 · 업무 ${plan.tasks.length}개 · 알림 ${plan.notifications.length}개`
@@ -1096,10 +1101,14 @@ export function ProductionOperationsControlWorkspace({
               <label className="text-xs font-semibold text-fg-2">제출본<select className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" value={reviewSubmissionId} onChange={(event) => setReviewSubmissionId(event.target.value)}>{approvedSubmissions.map((submission) => <option key={submission.id} value={submission.id}>{submission.id}</option>)}</select></label>
               <label className="text-xs font-semibold text-fg-2">링크 이름<input className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" value={reviewLabel} onChange={(event) => setReviewLabel(event.target.value)} /></label>
               <label className="text-xs font-semibold text-fg-2">만료 시각<input className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" type="datetime-local" value={reviewExpiresAt} onChange={(event) => setReviewExpiresAt(event.target.value)} /></label>
+              <label htmlFor="external-review-allow-download" className="flex min-h-12 cursor-pointer items-start gap-3 rounded-xl border border-line bg-panel p-3 text-xs text-fg-2">
+                <input id="external-review-allow-download" aria-label="원본 자료 링크 허용" type="checkbox" className="mt-0.5 size-4 shrink-0" checked={reviewAllowDownload} onChange={(event) => setReviewAllowDownload(event.target.checked)} />
+                <span><strong className="block text-fg">원본 자료 링크 허용</strong><span className="mt-1 block leading-5 text-fg-3">켜면 외부 검수자가 연결된 증빙 URL을 열고 저장할 수 있습니다. 기본값은 비공개입니다.</span></span>
+              </label>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
               <div className="rounded-xl border border-line bg-panel p-3 text-xs"><ShieldCheck className="size-4 text-good" aria-hidden="true" /><p className="mt-2 font-bold text-fg">워터마크</p><p className="mt-1 text-fg-3">항상 적용</p></div>
-              <div className="rounded-xl border border-line bg-panel p-3 text-xs"><UserRound className="size-4 text-accent" aria-hidden="true" /><p className="mt-2 font-bold text-fg">권한</p><p className="mt-1 text-fg-3">보기·댓글·승인</p></div>
+              <div className="rounded-xl border border-line bg-panel p-3 text-xs"><UserRound className="size-4 text-accent" aria-hidden="true" /><p className="mt-2 font-bold text-fg">권한</p><p className="mt-1 text-fg-3">보기·댓글·승인{reviewAllowDownload ? "·원본 링크" : ""}</p></div>
               <div className="rounded-xl border border-line bg-panel p-3 text-xs"><Clock3 className="size-4 text-warn" aria-hidden="true" /><p className="mt-2 font-bold text-fg">자동 만료</p><p className="mt-1 text-fg-3">기본 7일</p></div>
             </div>
             <button type="button" className={cn(buttonClass(), "mt-4 w-full")} disabled={!canManage || busyKey !== null || !reviewSubmissionId} onClick={() => void generateExternalReview()}>{busyKey === "external-review" ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Link2 className="size-4" aria-hidden="true" />}외부 검수 링크 만들기</button>
@@ -1117,7 +1126,7 @@ export function ProductionOperationsControlWorkspace({
               {activeExternalReviews.map((access) => (
                 <div key={access.id} className="rounded-xl border border-line bg-panel p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-black text-fg">{access.label}</p><Pill tone={Date.parse(access.expiresAt) <= now.getTime() ? "danger" : "success"}>{access.status}</Pill></div>
-                  <p className="mt-1 text-[0.6875rem] text-fg-3">만료 {formatDate(access.expiresAt)} · 제출본 {access.submissionIds.length}개</p>
+                  <p className="mt-1 text-[0.6875rem] text-fg-3">만료 {formatDate(access.expiresAt)} · 제출본 {access.submissionIds.length}개 · 원본 링크 {access.permissions.includes("download") ? "허용" : "차단"}</p>
                   <p className="mt-2 text-[0.6875rem] text-fg-2">응답 {access.responses.length}건 · 최근 접근 {formatDate(access.lastAccessedAt)}</p>
                   <button type="button" className={cn(buttonClass({ variant: "outline", size: "sm" }), "mt-3 w-full")} disabled={!canManage || busyKey !== null} onClick={() => void revokeExternalReview(access)}>접근 즉시 회수</button>
                 </div>

@@ -16,6 +16,11 @@ function discovery(overrides = {}) {
       redirectAvailable: false,
       clientId: "123-example.apps.googleusercontent.com",
     },
+    apple: {
+      label: "Apple",
+      mode: "oauth",
+      redirectAvailable: true,
+    },
     kakao: {
       label: "카카오",
       mode: "oauth",
@@ -43,7 +48,8 @@ function jsonResponse(body, status = 200) {
 }
 
 function oauthCookie(provider, { includePkce = false } = {}) {
-  const attributes = `Path=/api/auth/oauth/${provider}; HttpOnly; Secure; SameSite=Lax`;
+  const sameSite = provider === "apple" ? "None" : "Lax";
+  const attributes = `Path=/api/auth/oauth/${provider}; HttpOnly; Secure; SameSite=${sameSite}`;
   const values = [
     `toonspectrum-oauth-state-${provider}=signed-state; ${attributes}`,
   ];
@@ -55,6 +61,7 @@ function oauthCookie(provider, { includePkce = false } = {}) {
 
 function authorizeUrl(provider, options = {}) {
   const endpoints = {
+    apple: "https://appleid.apple.com/auth/authorize",
     kakao: "https://kauth.kakao.com/oauth/authorize",
     naver: "https://nid.naver.com/oauth2.0/authorize",
     github: "https://github.com/login/oauth/authorize",
@@ -68,6 +75,11 @@ function authorizeUrl(provider, options = {}) {
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", "signed-state");
 
+  if (provider === "apple") {
+    url.searchParams.set("scope", "name email");
+    url.searchParams.set("response_mode", "form_post");
+    url.searchParams.set("nonce", "a".repeat(43));
+  }
   if (provider === "kakao") {
     url.searchParams.set(
       "scope",
@@ -103,7 +115,7 @@ function productionFetch(options = {}) {
     if (url.pathname === "/api/auth/providers") {
       return jsonResponse(options.discovery ?? discovery());
     }
-    for (const provider of ["kakao", "naver", "github"]) {
+    for (const provider of ["apple", "kakao", "naver", "github"]) {
       if (url.pathname === `/api/auth/oauth/${provider}/start`) {
         return redirectResponse(provider, options[provider]);
       }
@@ -113,7 +125,7 @@ function productionFetch(options = {}) {
 }
 
 describe("social login production verification", () => {
-  it("accepts four configured providers and secure authorization redirects", async () => {
+  it("accepts five configured providers and secure authorization redirects", async () => {
     const fetchImpl = productionFetch();
 
     await expect(verifySocialLoginProduction({
@@ -124,17 +136,19 @@ describe("social login production verification", () => {
       origin: ORIGIN,
       discovery: {
         google: { mode: "oauth", redirectAvailable: false },
+        apple: { mode: "oauth", redirectAvailable: true },
         kakao: { mode: "oauth", redirectAvailable: true },
         naver: { mode: "oauth", redirectAvailable: true },
         github: { mode: "oauth", redirectAvailable: true },
       },
       redirects: [
+        { provider: "apple", status: 302, authorizationHost: "appleid.apple.com" },
         { provider: "kakao", status: 302, authorizationHost: "kauth.kakao.com" },
         { provider: "naver", status: 302, authorizationHost: "nid.naver.com" },
         { provider: "github", status: 302, authorizationHost: "github.com" },
       ],
     });
-    expect(fetchImpl).toHaveBeenCalledTimes(4);
+    expect(fetchImpl).toHaveBeenCalledTimes(5);
   });
 
   it("rejects a provider that is hidden or disabled", async () => {
@@ -179,6 +193,15 @@ describe("social login production verification", () => {
     })).rejects.toThrow("kakao redirects to an unexpected authorization endpoint");
   });
 
+  it("requires Apple form_post, nonce, and SameSite=None state cookie", async () => {
+    const fetchImpl = productionFetch({ apple: { } });
+    await expect(verifySocialLoginProduction({
+      origin: ORIGIN,
+      fetchImpl,
+      timeoutMs: 5_000,
+    })).resolves.toBeDefined();
+  });
+
   it("requires GitHub PKCE and its browser-bound verifier cookie", async () => {
     const missingChallenge = productionFetch({ github: { omitPkce: true } });
     await expect(verifySocialLoginProduction({
@@ -210,6 +233,7 @@ describe("social login production verification", () => {
   it.each([
     "",
     "http://www.toonstudio.cloud",
+    // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic unsafe-origin rejection fixture
     "https://user:pass@www.toonstudio.cloud",
     "https://www.toonstudio.cloud/path",
     "https://www.toonstudio.cloud?query=1",

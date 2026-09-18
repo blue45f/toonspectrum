@@ -84,6 +84,10 @@ describe("toonstudio.cloud production domain", () => {
       { key: "NAVER_OAUTH_CLIENT_SECRET", sync: false },
       { key: "GITHUB_OAUTH_CLIENT_ID", sync: false },
       { key: "GITHUB_OAUTH_CLIENT_SECRET", sync: false },
+      { key: "APPLE_SERVICE_ID", sync: false },
+      { key: "APPLE_TEAM_ID", sync: false },
+      { key: "APPLE_KEY_ID", sync: false },
+      { key: "APPLE_PRIVATE_KEY", sync: false },
     ]));
 
     const realtime = render.services?.find(({ name }) => name === "toonspectrum-studio-live");

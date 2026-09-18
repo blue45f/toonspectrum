@@ -103,6 +103,7 @@ describe("observePgPoolIdleErrors", () => {
     const tail = "TAIL_MUST_NOT_ESCAPE";
     const error = Object.assign(
       new Error(
+        // secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic redaction fixture
         `${connectionString}\npassword=secret postgresql://other:other-secret@example.net/db ${"x".repeat(700)}${tail}`
       ),
       { code: `secret-${"C".repeat(100)}` }
@@ -125,6 +126,7 @@ describe("observePgPoolIdleErrors", () => {
     const logger = { error: vi.fn() };
     observePgPoolIdleErrors(pool, {
       connectionString:
+        // secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic percent-encoding fixture
         "postgresql://artist:p%40ss@example.net/toonspectrum?sslmode=verify-full",
       logger,
     });

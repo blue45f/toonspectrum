@@ -15,7 +15,7 @@ export function shouldAppRouterOwnDocumentTitle({
 }: AppRouteTitleLocation): boolean {
   if (pathname === "/collaborate" || pathname.startsWith("/collaborate/")) return false;
   if (pathname.startsWith("/title/")) return false;
-  if (pathname === "/brand-film") return false;
+  if (pathname === "/brand-film" || pathname === "/product-tour") return false;
   if (pathname.startsWith("/create/")) return false;
   // Canonical showcase details render the same title-owning children as legacy /create URLs.
   if (/^\/showcase\/(?:work|series)\/[^/]+\/?$/u.test(pathname) || pathname === "/showcase/challenges") return false;

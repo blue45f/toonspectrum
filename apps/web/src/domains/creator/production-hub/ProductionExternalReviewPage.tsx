@@ -9,7 +9,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 
 import {
   getProductionExternalReview,
@@ -51,65 +51,10 @@ function isWebUrl(value: string): boolean {
   return /^https?:\/\//iu.test(value);
 }
 
-
-const TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,512}$/u;
-
-function reviewTokenStorageKey(projectId: string, reviewId: string): string {
-  return `toonstudio:external-review:${projectId}:${reviewId}`;
-}
-
-function storageToken(key: string): string {
-  try {
-    return globalThis.sessionStorage?.getItem(key) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function saveStorageToken(key: string, token: string): void {
-  try {
-    globalThis.sessionStorage?.setItem(key, token);
-  } catch {
-    // The review still works in memory when storage is unavailable.
-  }
-}
-
-function clearStorageToken(key: string): void {
-  try {
-    globalThis.sessionStorage?.removeItem(key);
-  } catch {
-    // Nothing else to clean up.
-  }
-}
-
-function tokenFromLocation(search: string, hash: string, storageKey: string): string {
-  const queryToken = new URLSearchParams(search).get("token") ?? "";
-  const fragmentToken = new URLSearchParams(hash.replace(/^#/u, "")).get("token") ?? "";
-  return [fragmentToken, queryToken, storageToken(storageKey)]
-    .map((value) => value.trim())
-    .find((value) => TOKEN_PATTERN.test(value)) ?? "";
-}
-
-function privacyMeta(name: "referrer" | "robots", content: string): () => void {
-  const selector = `meta[name="${name}"]`;
-  const existing = document.head.querySelector<HTMLMetaElement>(selector);
-  const previous = existing?.content ?? null;
-  const element = existing ?? document.createElement("meta");
-  element.name = name;
-  element.content = content;
-  if (!existing) document.head.append(element);
-  return () => {
-    if (previous === null) element.remove();
-    else element.content = previous;
-  };
-}
-
 export function ProductionExternalReviewPage() {
   const params = useParams<{ projectId: string; reviewId: string }>();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const storageKey = reviewTokenStorageKey(params.projectId ?? "unknown", params.reviewId ?? "unknown");
-  const [token] = useState(() => tokenFromLocation(location.search, location.hash, storageKey));
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") ?? "";
   const [view, setView] = useState<ProductionExternalReviewView | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -118,35 +63,6 @@ export function ProductionExternalReviewPage() {
   const [reviewerName, setReviewerName] = useState("");
   const [decision, setDecision] = useState<Decision>("comment");
   const [note, setNote] = useState("");
-
-  useEffect(() => {
-    const restoreReferrer = privacyMeta("referrer", "no-referrer");
-    const restoreRobots = privacyMeta("robots", "noindex,nofollow,noarchive");
-    const previousTitle = document.title;
-    document.title = "보안 외부 검수 · ToonStudio";
-    return () => {
-      restoreReferrer();
-      restoreRobots();
-      document.title = previousTitle;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (token) saveStorageToken(storageKey, token);
-    const query = new URLSearchParams(location.search);
-    const fragment = new URLSearchParams(location.hash.replace(/^#/u, ""));
-    const hadVisibleToken = query.has("token") || fragment.has("token");
-    if (!hadVisibleToken) return;
-    query.delete("token");
-    fragment.delete("token");
-    const nextSearch = query.toString();
-    const nextHash = fragment.toString();
-    navigate({
-      pathname: location.pathname,
-      search: nextSearch ? `?${nextSearch}` : "",
-      hash: nextHash ? `#${nextHash}` : "",
-    }, { replace: true });
-  }, [location.hash, location.pathname, location.search, navigate, storageKey, token]);
 
   useEffect(() => {
     if (!params.projectId || !params.reviewId || !token) {
@@ -162,7 +78,6 @@ export function ProductionExternalReviewPage() {
         if (active) setView(result);
       })
       .catch(async (cause: unknown) => {
-        clearStorageToken(storageKey);
         if (active) setError(await getApiErrorMessage(cause, "검수 링크가 만료되었거나 유효하지 않습니다."));
       })
       .finally(() => {
@@ -171,7 +86,7 @@ export function ProductionExternalReviewPage() {
     return () => {
       active = false;
     };
-  }, [params.projectId, params.reviewId, storageKey, token]);
+  }, [params.projectId, params.reviewId, token]);
 
   const allowedDecisions = useMemo<readonly Decision[]>(() => {
     if (!view) return [];
@@ -285,7 +200,13 @@ export function ProductionExternalReviewPage() {
                   <div className="mt-4 rounded-xl border border-line bg-panel p-4"><p className="text-xs font-black">검수 기준</p><ul className="mt-2 space-y-1.5 text-xs leading-5 text-fg-2">{submission.deliverable.completionCriteria.map((criterion) => <li key={criterion} className="flex gap-2"><CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-good" aria-hidden="true" /><span>{criterion}</span></li>)}</ul></div>
                 ) : null}
                 {submission.evidenceRefs.length ? (
-                  <div className="mt-4"><p className="text-xs font-black">검수 자료</p><div className="mt-2 flex flex-wrap gap-2">{submission.evidenceRefs.map((reference) => isWebUrl(reference) ? <a key={reference} href={reference} target="_blank" rel="noreferrer noopener" className={buttonClass({ variant: "outline", size: "sm" })}>자료 열기 <ExternalLink className="size-3.5" aria-hidden="true" /></a> : <span key={reference} className="rounded-lg border border-line bg-panel px-3 py-2 font-mono text-[0.6875rem] text-fg-2">{reference}</span>)}</div></div>
+                  <div className="mt-4"><p className="text-xs font-black">검수 자료</p><div className="mt-2 flex flex-wrap gap-2">{submission.evidenceRefs.map((reference) => isWebUrl(reference) ? <a key={reference} href={reference} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>자료 열기 <ExternalLink className="size-3.5" aria-hidden="true" /></a> : <span key={reference} className="rounded-lg border border-line bg-panel px-3 py-2 font-mono text-[0.6875rem] text-fg-2">{reference}</span>)}</div></div>
+                ) : null}
+                {submission.protectedEvidenceCount > 0 ? (
+                  <div className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-panel p-3 text-xs leading-5 text-fg-2">
+                    <ShieldCheck className="mt-0.5 size-4 shrink-0 text-good" aria-hidden="true" />
+                    <p>원본 검수 자료 {submission.protectedEvidenceCount}개는 다운로드 권한이 없어 링크를 제공하지 않습니다. 승인 여부는 표시된 제출본 정보와 검수 기준을 기준으로 판단해 주세요.</p>
+                  </div>
                 ) : null}
                 <p className="mt-4 break-all font-mono text-[0.625rem] text-fg-3">{submission.revisionRef.digest}</p>
               </div>
