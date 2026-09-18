@@ -5,6 +5,7 @@ import {
   BusinessPage,
   ContactPage,
   CopyrightPage,
+  CreatorSupportPage,
   CrawlerPolicyPage,
   DataSourcesPage,
   DesignSystemPage,
@@ -91,6 +92,7 @@ export const legalRoutes = defineAppRoutes([
   { id: "legal-contact", path: "/contact", element: <ContactPage /> },
   { id: "legal-business", path: "/business", element: <BusinessPage /> },
   { id: "legal-support-us", path: "/support-us", element: <SupportUsPage /> },
+  { id: "legal-creator-support", path: "/support-creators", element: <CreatorSupportPage /> },
   { id: "legal-support", path: "/support", element: <SupportPage /> },
   { id: "legal-feedback", path: "/feedback", element: <FeedbackPage /> },
 ]);

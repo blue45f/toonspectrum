@@ -42,5 +42,6 @@
   "route.fortune": "Character horoscope",
   "route.play": "Arcade",
   "route.unknown": "Page",
-  "route.pencafeSuffix": "fan cafe"
+  "route.pencafeSuffix": "fan cafe",
+  "route.creatorSupport": "Creator Support"
 }
