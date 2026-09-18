@@ -127,4 +127,45 @@ describe("P2P huddle consent and delivery", () => {
     expect(controller.snapshot().closed).toBe(false);
     expect(controller.snapshot().error).toContain("권한");
   });
+  it("creates media peer connections only for the current proximity scope", () => {
+    let inbound: ((sender: StudioLiveParticipant, raw: string) => void) | null = null;
+    const close = vi.fn();
+    const replaceTrack = vi.fn(async () => undefined);
+    const peer = {
+      connectionState: "new",
+      signalingState: "stable",
+      localDescription: null,
+      remoteDescription: null,
+      addTransceiver: vi.fn(() => ({ sender: { replaceTrack } })),
+      setLocalDescription: vi.fn(async () => undefined),
+      setRemoteDescription: vi.fn(async () => undefined),
+      addIceCandidate: vi.fn(async () => undefined),
+      close,
+      onicecandidate: null,
+      ontrack: null,
+      onnegotiationneeded: null,
+      onconnectionstatechange: null,
+    } as unknown as RTCPeerConnection;
+    const createPeerConnection = vi.fn(() => peer);
+    const port: StudioLiveDirectPort = {
+      getPeers: () => [B],
+      subscribe: (listener) => { inbound = listener; return () => { inbound = null; }; },
+      send: () => true,
+    };
+    const controller = new StudioP2pHuddleController(A, port, { createPeerConnection });
+    sessions.push(controller);
+    controller.start();
+    controller.setMediaPeerScope([]);
+    inbound?.(B, JSON.stringify({
+      kind: "state", epoch: "epoch-b", muted: false, camera: false, sharing: false, hand: false,
+    }));
+    expect(createPeerConnection).not.toHaveBeenCalled();
+
+    controller.setMediaPeerScope(["b"]);
+    expect(createPeerConnection).toHaveBeenCalledOnce();
+
+    controller.setMediaPeerScope([]);
+    expect(close).toHaveBeenCalledOnce();
+    expect(controller.snapshot().peers[0]?.connection).toBe("idle");
+  });
 });
