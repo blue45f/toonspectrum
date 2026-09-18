@@ -48,6 +48,7 @@ function responseError(payload: unknown, fallback: string): string {
 
 function providerLabel(provider: string): string {
   if (provider === "google") return "Google";
+  if (provider === "apple") return "Apple";
   if (provider === "kakao") return "카카오";
   if (provider === "naver") return "네이버";
   if (provider === "github") return "GitHub";

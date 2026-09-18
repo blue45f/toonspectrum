@@ -39,6 +39,7 @@ import {
   type ManagementSeverity,
   type ProductionManagementLens,
 } from "./production-management-overview";
+import { ProductionStudioRevisionWorkspace } from "./ProductionStudioRevisionWorkspace";
 import type { ProductionClientCommand } from "./production-api";
 import { ProductionRecoveryScenarioPanel } from "./ProductionRecoveryScenarioPanel";
 import { ProductionRiskIntelligencePanel } from "./ProductionRiskIntelligencePanel";
@@ -50,6 +51,7 @@ interface ProductionManagementWorkspaceProps {
   readonly aggregate: ProductionProjectAggregate;
   readonly roleLens: ProductionManagementLens;
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
+  readonly executeRecovery?: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly canEdit: boolean;
   readonly now?: Date;
 }
@@ -292,6 +294,7 @@ export function ProductionManagementWorkspace({
   aggregate,
   roleLens,
   execute,
+  executeRecovery = execute,
   canEdit,
   now,
 }: ProductionManagementWorkspaceProps) {
@@ -420,6 +423,13 @@ export function ProductionManagementWorkspace({
         />
       </div>
 
+      <ProductionStudioRevisionWorkspace
+        aggregate={aggregate}
+        execute={execute}
+        canEdit={canEdit}
+        roleLens={roleLens}
+      />
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
         <Section
           title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionManagementWorkspace", "ko", "오늘의 운영 판단")}
@@ -525,7 +535,7 @@ export function ProductionManagementWorkspace({
       <ProductionRecoveryScenarioPanel
         aggregate={aggregate}
         intelligence={overview.riskIntelligence}
-        execute={execute}
+        execute={executeRecovery}
         canEdit={canEdit}
         now={now}
       />

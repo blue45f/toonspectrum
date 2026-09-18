@@ -18,6 +18,8 @@ function primitive(id: string): BgPrimitive {
     color: "#ffffff",
     visible: true,
     locked: false,
+    castsShadow: true,
+    receivesShadow: true,
     parentId: null,
   };
 }

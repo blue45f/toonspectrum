@@ -245,6 +245,7 @@
     "@toonspectrum/studio-engine-registry": "workspace:*",
     "@toonspectrum/studio-engine-skia": "workspace:*",
     "@toonspectrum/studio-engine-vello": "workspace:*",
+    "@toonspectrum/studio-format-gateway": "workspace:*",
     "@toonspectrum/studio-project-model": "workspace:*",
     "ag-psd": "^31.0.1",
     "bezier-js": "^6.1.4",
@@ -354,7 +355,7 @@
     "yaml": "2.9.0"
   },
   "lint-staged": {
-    "*.{ts,tsx}": [
+    "*.{js,mjs,ts,tsx,mts,cts}": [
       "eslint --max-warnings=0 --no-warn-ignored --fix --cache --cache-strategy content --cache-location node_modules/.cache/eslint/staged/"
     ],
     "*": [

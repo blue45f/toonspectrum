@@ -75,7 +75,7 @@ Live checkout is fail-closed. It requires matching live keys, the supporter enab
 
 Before enabling live payments:
 
-- apply managed migration `0069` and runtime ACLs;
+- apply managed migration `0071` and runtime ACLs;
 - finish the Toss Payments merchant/PG onboarding required for live keys and settlement;
 - register the Toss webhook URL as `/api/supporter-payments/webhooks/toss`;
 - verify the public merchant/operator disclosures required for the actual business;

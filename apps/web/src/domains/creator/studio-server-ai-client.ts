@@ -78,7 +78,7 @@ export function resolveActiveServerAiProviderLabel(
   if (preference === "auto") {
     return status?.configured ? "자동 무료 AI" : "자동 무료 AI → 내 무료 키";
   }
-  return status?.providers.find((provider) => provider.id === preference)?.label ?? "선택한 무료 AI";
+  return status?.providers?.find((provider) => provider.id === preference)?.label ?? "선택한 무료 AI";
 }
 
 export type StudioServerAiCompletion = {
@@ -108,8 +108,91 @@ export type StudioServerAiResult<T> =
       error: string;
     };
 
+function parseStudioServerAiStatus(value: unknown): StudioServerAiStatus {
+  const source = isRecord(value) ? value : {};
+  const providers = Array.isArray(source.providers)
+    ? source.providers.flatMap((candidate) => {
+        if (!isRecord(candidate)) return [];
+        const id = provider(candidate.id);
+        const label = text(candidate.label, 120);
+        const model = text(candidate.model, 200);
+        if (!id || !label || !model) return [];
+        return [{
+          id,
+          label,
+          configured: candidate.configured === true,
+          model,
+        }];
+      })
+    : [];
+  const rawSelection = isRecord(source.selection) ? source.selection : {};
+  const order = Array.isArray(rawSelection.order)
+    ? rawSelection.order.flatMap((candidate) => {
+        const parsed = provider(candidate);
+        return parsed ? [parsed] : [];
+      })
+    : [];
+  const selectedProvider = source.provider === "none"
+    ? "none"
+    : provider(source.provider) ?? "none";
+  const rawCapabilities = Array.isArray(source.capabilities)
+    ? source.capabilities
+    : [];
+  const capabilities = rawCapabilities.flatMap((candidate) => {
+    const parsed = text(candidate, 80);
+    return parsed ? [parsed] : [];
+  });
+  const rawQuota = isRecord(source.quota) ? source.quota : null;
+  const quota = rawQuota
+    && typeof rawQuota.enforced === "boolean"
+    && rawQuota.timezone === "UTC"
+    && rawQuota.failureMode === "closed"
+    && count(rawQuota.dailyRequestLimit) !== undefined
+    && count(rawQuota.dailyTokenLimit) !== undefined
+    ? {
+        enforced: rawQuota.enforced,
+        timezone: "UTC" as const,
+        failureMode: "closed" as const,
+        dailyRequestLimit: count(rawQuota.dailyRequestLimit)!,
+        dailyTokenLimit: count(rawQuota.dailyTokenLimit)!,
+        ...(count(rawQuota.globalDailyRequestLimit) === undefined
+          ? {}
+          : { globalDailyRequestLimit: count(rawQuota.globalDailyRequestLimit) }),
+        ...(count(rawQuota.globalDailyTokenLimit) === undefined
+          ? {}
+          : { globalDailyTokenLimit: count(rawQuota.globalDailyTokenLimit) }),
+      }
+    : undefined;
+  return {
+    configured: source.configured === true,
+    provider: selectedProvider,
+    model: text(source.model, 200) ?? "",
+    providers,
+    selection: {
+      default: "auto",
+      order,
+      fallback: rawSelection.fallback === true,
+      ...(failoverReason(rawSelection.fallbackPolicy) === undefined
+        ? {}
+        : { fallbackPolicy: failoverReason(rawSelection.fallbackPolicy) }),
+    },
+    capabilities,
+    requiresAuth: source.requiresAuth !== false,
+    ...(typeof source.operatorFunded === "boolean"
+      ? { operatorFunded: source.operatorFunded }
+      : {}),
+    ...(typeof source.freePool === "boolean" ? { freePool: source.freePool } : {}),
+    ...(text(source.settingsHref, 500) === undefined
+      ? {}
+      : { settingsHref: text(source.settingsHref, 500) }),
+    ...(quota ? { quota } : {}),
+  };
+}
+
 export async function getStudioServerAiStatus(signal?: AbortSignal): Promise<StudioServerAiStatus> {
-  return api.get<StudioServerAiStatus>("/studio-ai/status", { signal });
+  return parseStudioServerAiStatus(
+    await api.get<unknown>("/studio-ai/status", { signal }),
+  );
 }
 
 const OPERATION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/u;

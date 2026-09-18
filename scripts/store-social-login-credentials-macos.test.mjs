@@ -38,7 +38,7 @@ describe("store-social-login-credentials-macos", () => {
 
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
-    expect(result.stdout.match(/: present/g)).toHaveLength(6);
+    expect(result.stdout.match(/: present/g)).toHaveLength(10);
   });
 
   it("rejects ambiguous extra arguments", async () => {

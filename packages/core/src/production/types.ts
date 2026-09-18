@@ -35,6 +35,33 @@ export interface RevisionRef {
   readonly createdAt: string;
 }
 
+export const PRODUCTION_STUDIO_DOCUMENT_ROLES = [
+  "story",
+  "thumbnail",
+  "lineart",
+  "background",
+  "color",
+  "lettering",
+  "final",
+] as const;
+export type ProductionStudioDocumentRole = (typeof PRODUCTION_STUDIO_DOCUMENT_ROLES)[number];
+
+export interface ProductionStudioRevisionLink {
+  readonly id: string;
+  readonly projectId: string;
+  readonly workId: string;
+  readonly episodeId: string | null;
+  readonly studioDocumentRef: string;
+  readonly documentRole: ProductionStudioDocumentRole;
+  readonly studioRevisionRef: RevisionRef;
+  readonly deliverableId: string;
+  readonly submissionId: string;
+  readonly linkedByAssignmentId: string;
+  readonly status: "submitted" | "approved" | "superseded";
+  readonly linkedAt: string;
+  readonly approvedAt: string | null;
+}
+
 export const COLLABORATION_MODELS = [
   "solo",
   "co-creator",
@@ -1560,6 +1587,7 @@ export interface ProductionProjectAggregate {
   readonly tasks: readonly ProductionTask[];
   readonly deliverables: readonly Deliverable[];
   readonly submissions: readonly Submission[];
+  readonly studioRevisionLinks?: readonly ProductionStudioRevisionLink[];
   readonly changeRequests: readonly ChangeRequest[];
   readonly scopePackages: readonly ScopePackage[];
   readonly scopePackageRevisionArchive: readonly ScopePackage[];

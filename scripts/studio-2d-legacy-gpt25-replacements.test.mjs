@@ -4,10 +4,11 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 const readJson = async (relative) => JSON.parse(await readFile(new URL(relative, import.meta.url), "utf8"));
-const [base, extra, replacements] = await Promise.all([
+const [base, extra, replacements, generatorSource] = await Promise.all([
   readJson("./data/studio-2d-background-atlas-v1.json"),
   readJson("./data/studio-2d-legacy-gpt25-extra-recipes-v1.json"),
   readJson("./data/studio-2d-legacy-gpt25-replacement-map-v1.json"),
+  readFile(new URL("./generate-studio-2d-background-atlas.mjs", import.meta.url), "utf8"),
 ]);
 
 const recipes = [...base.recipes, ...extra.recipes];
@@ -33,5 +34,9 @@ for (const row of rows) {
   assert.equal(row.outputBytes, output.byteLength);
   assert.equal(row.outputSha256, createHash("sha256").update(output).digest("hex"));
 }
+
+assert.doesNotMatch(generatorSource, /response_format/u);
+assert.match(generatorSource, /providerErrorType === "insufficient_quota"/u);
+assert.match(generatorSource, /providerErrorCode === "credit_balance_exhausted"/u);
 
 console.log(`OK: ${rows.length} legacy backgrounds have GPT Image 2.5 replacement recipes`);

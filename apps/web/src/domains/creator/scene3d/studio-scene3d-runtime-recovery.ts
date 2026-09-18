@@ -27,8 +27,7 @@ export interface StudioScene3dRuntimeFailure {
 export interface StudioScene3dRuntimeRecoveryPlan {
   readonly version: 1;
   readonly action: StudioScene3dRuntimeRecoveryAction;
-  readonly preservesDocumentAuthority: true;
-  readonly requiresUserConfirmation: boolean;
+  readonly preservesDocumentAuthority: true;  readonly requiresUserConfirmation: boolean;
   readonly mayChangeSelectedRuntime: boolean;
   readonly retryAfterMs: number | null;
   readonly message: string;

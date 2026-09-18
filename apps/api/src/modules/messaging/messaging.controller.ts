@@ -6,6 +6,7 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  Inject,
   Param,
   Patch,
   Post,
@@ -37,7 +38,10 @@ function requireMessagingUserId(userId: string | undefined): string {
 
 @Controller("messages")
 export class MessagingController {
-  constructor(private readonly service: MessagingService) {}
+  constructor(
+    @Inject(MessagingService)
+    private readonly service: MessagingService,
+  ) {}
 
   @Get("threads")
   listThreads(

@@ -18,7 +18,6 @@ function authority() {
       scene: createStudioVrmSceneDocument(),
       stageTransform: { position: [0, 0, 0], rotationY: 0 },
     }]),
-    viewportAspectRatio: 1,
     revision: 2,
     now: "2026-09-17T00:00:00.000Z",
   });

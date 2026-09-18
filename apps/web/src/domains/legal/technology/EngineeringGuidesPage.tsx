@@ -1,10 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   ArrowRight,
   Check,
@@ -200,8 +194,7 @@ export function EngineeringGuidesPage() {
             {bi("Toss 인증을 단순 유료 제외로 설명하지 않습니다.", "Toss authentication is not reduced to a pricing decision.")}
           </h2>
           <p className="mt-3 text-sm leading-7 text-fg-2">
-            {bi("현재 허용 공급자는 Google, Kakao, Naver와 GitHub입니다. Toss는 일반 웹 OAuth 어댑터와 적용 범위·심사·보안 운영 조건이 달라 현재 제품 범위에서 제외하며, 가격 하나만을 이유로 주장하지 않습니다.", "The current allowlist is Google, Kakao, Naver and GitHub. Toss remains outside the present scope because product, review and security operations differ from a general web OAuth adapter; price alone is not presented as the reason.")
-            }
+            {bi("현재 허용 공급자는 Google, Apple, Kakao, Naver와 GitHub입니다. Toss는 일반 웹 OAuth 어댑터와 적용 범위·심사·보안 운영 조건이 달라 현재 제품 범위에서 제외하며, 가격 하나만을 이유로 주장하지 않습니다.", "The current allowlist is Google, Apple, Kakao, Naver and GitHub. Toss remains outside the present scope because product, review and security operations differ from a general web OAuth adapter; price alone is not presented as the reason.")}
           </p>
         </article>
 

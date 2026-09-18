@@ -2,6 +2,7 @@ import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-co
 import { useCallback, useEffect, useState } from "react";
 
 import { getAdminRevenueCopy } from "./admin-revenue-copy";
+import { AdminCommercePayments } from "./AdminCommercePayments";
 import {
   adminFetch,
   formatNum,
@@ -78,14 +79,28 @@ export function AdminRevenue({ uid }: { uid: string }) {
   };
 
   if (error && !data) {
-    return <AdminNotice title={t("admin.revenue.loadError")} body={error} />;
+    return (
+      <div className="flex flex-col gap-6">
+        <AdminCommercePayments uid={uid} />
+        <AdminNotice title={t("admin.revenue.loadError")} body={error} />
+      </div>
+    );
   }
-  if (!data) return <AdminSpinner />;
+  if (!data) {
+    return (
+      <div className="flex flex-col gap-6">
+        <AdminCommercePayments uid={uid} />
+        <AdminSpinner />
+      </div>
+    );
+  }
 
   const summary = data.summary;
 
   return (
     <div className="flex flex-col gap-6">
+      <AdminCommercePayments uid={uid} />
+
       <StatGroup label={t("admin.revenue.summaryTitle")}>
         <Stat
           label={t("admin.revenue.filterPending")}

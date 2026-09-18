@@ -16,7 +16,7 @@ import {
   SkipForward,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { AuthorAvatar, SeriesForm } from "./creator-community-ui";
@@ -28,7 +28,6 @@ import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
 
 import { CoverImage } from "@/shared/components/cover-image";
 import { Container } from "@/shared/components/section";
-import { SharePageButton } from "@/shared/components/share-page-button";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
   canShareCreatorSeries,
@@ -48,6 +47,11 @@ import { deleteSeries, getSeries, type SeriesDetail, type WorkSummary } from "@/
 
 
 // 회차 행 — 목록형(웹툰 회차 리스트 스타일).
+const SharePageButton = lazy(async () => {
+  const module = await import("@/shared/components/share-page-button");
+  return { default: module.SharePageButton };
+});
+
 function EpisodeRow({ episode }: { episode: WorkSummary }) {
   return (
     <Link
@@ -304,15 +308,17 @@ export function CreateSeriesPage() {
                   {translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "최신화 보기")}</Link>
               )}
               {shareable && (
-                <SharePageButton
-                  path={sharePath}
-                  text={shareTitle}
-                  description={shareDescription}
-                  imageUrl={shareImage}
-                  label={translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "시리즈 공유")}
-                  actionLabel={translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "시리즈 감상하기")}
-                  className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
-                />
+                <Suspense fallback={null}>
+                  <SharePageButton
+                    path={sharePath}
+                    text={shareTitle}
+                    description={shareDescription}
+                    imageUrl={shareImage}
+                    label="시리즈 공유"
+                    actionLabel="시리즈 감상하기"
+                    className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
+                  />
+                </Suspense>
               )}
               {series.isOwner && (
                 <Link

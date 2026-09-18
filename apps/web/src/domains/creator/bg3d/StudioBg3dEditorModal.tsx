@@ -73,7 +73,6 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
       aria-labelledby="studio-bg3d-dialog-title"
       data-testid="studio-bg3d-dialog"
       data-studio-bg3d-workspace="professional-v2"
-      data-studio-bg3d-experience={experienceMode}
       hidden={!open}
       inert={!open ? true : undefined}
       className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.94)] p-2 text-fg sm:p-4"
@@ -159,7 +158,6 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
         >
           <StudioBg3dProfessionalWorkspace
             scopeKey={h.sharedStageSessionScopeKey ?? null}
-            experienceMode={experienceMode}
             outliner={<StudioBg3dSceneOutliner controller={h.outlinerController} variant="dock" />}
             viewport={<StudioBg3dEditorViewport h={h} />}
             inspector={(

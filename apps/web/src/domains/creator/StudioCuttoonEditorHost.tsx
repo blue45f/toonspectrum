@@ -17,6 +17,7 @@ import { useStudioAdjustmentLayerCommands } from "./useStudioAdjustmentLayerComm
 import { StudioColorProofProvider } from "./color/StudioColorProofContext";
 import { createStudio2dCanvasImage } from "./studio-2d-source-size";
 import { useStudioSmartShapeEditing } from "./useStudioSmartShapeEditing";
+import { useStudioResumeCheckpoint } from "./useStudioResumeCheckpoint";
 import { useStudioRecentColors } from "./useStudioRecentColors";
 import { copyStudioSmartShapeSnapshot } from "./studio-smart-shape-copy";
 /** Editor host extracted from the /studio page entry.
@@ -445,6 +446,7 @@ import {
   labelStudioCollaborationRole,
 } from "./studio-collaboration-lock-copy";
 import { createStudioDrawingAssistHandlers } from "./studio-drawing-assist-handlers";
+import { setStudioStrokeFocusActivity } from "./studio-stroke-focus-activity";
 import { shouldStartStudioSpacePan } from "./studio-space-pan-shortcut";
 import {
   markAllStudioTeamCommentThreadsRead,
@@ -1262,6 +1264,7 @@ import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-
 import { resolveStudioWorkspacePanelLayoutVisibility } from "./studio-workspace-presentation-layout";
 import {
   studio2dSurfaceNavigationHref,
+  studioWorkspaceDocumentIdentity,
   type Studio2dWorkspaceSurface,
   type StudioWorkspaceRoute,
 } from "./studio-workspace-route";
@@ -7209,6 +7212,34 @@ export function StudioCuttoonEditor({
     maximized,
     mobileImmersive,
   ]);
+
+  useStudioResumeCheckpoint({
+    activePageId: activePage.id,
+    documentKey: studioWorkspaceDocumentIdentity(studioRoute),
+    hydrated: workHydrated && autosaveChecked && !hasAutosave,
+    layoutKey: JSON.stringify([
+      activePage.id,
+      canvasH,
+      scale,
+      visibleLeftPanelOpen,
+      visibleRightPanelOpen,
+      canvasOnlyMode,
+      isFullscreen,
+      maximized,
+      mobileImmersive,
+    ]),
+    marqueeIds,
+    pages,
+    selectedId,
+    setCurrentPageId,
+    setMarqueeIds,
+    setSelectedId,
+    setZoom,
+    updateScrollPosRef,
+    viewport: scrollPos,
+    wrapRef,
+    zoom,
+  });
 
   // Hydration establishes the clean baseline for this document scope. Lifecycle persistence only
   // runs after a later local/CRDT generation (or when a deferred stroke still lives outside it).
@@ -15086,7 +15117,7 @@ const puppetWarpArmed =
   const writerRoomAiAbortRef = useRef<AbortController | null>(null);
   useEffect(() => () => writerRoomAiAbortRef.current?.abort(), []);
   const configuredServerAiProviders = useMemo(
-    () => serverAiStatus?.providers.filter((provider) => provider.configured) ?? [],
+    () => (serverAiStatus?.providers ?? []).filter((provider) => provider.configured),
     [serverAiStatus]
   );
   const activeServerAiProviderLabel = resolveActiveServerAiProviderLabel(serverAiProvider, serverAiStatus);
@@ -22634,6 +22665,7 @@ No text, logo, watermark, or copyrighted character.`;
   }
 
   function releaseDrawingPointerSession() {
+    setStudioStrokeFocusActivity("canvas-stroke", false);
     stopFixedRateStrokePump();
     hideStrokeGuide();
     stagePointerFrameMapperCacheRef.current?.invalidate();

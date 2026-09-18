@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: core-v3-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
@@ -42,6 +43,30 @@ jobs:
             !/artifacts/
             !/docs/
             !/tests/benchmarks/results/
+      - name: Collect changed pull-request files
+        if: github.event_name == 'pull_request'
+        id: changed
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          changed_file_path="$RUNNER_TEMP/core-lint-changed-files.txt"
+          : > "$changed_file_path"
+          page=1
+          while :; do
+            response="$(curl --fail-with-body --silent --show-error --retry 3 \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100&page=$page")"
+            count="$(jq 'length' <<< "$response")"
+            jq -r '.[].filename' <<< "$response" >> "$changed_file_path"
+            (( count < 100 )) && break
+            ((page += 1))
+          done
+          echo "file=$changed_file_path" >> "$GITHUB_OUTPUT"
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -55,13 +80,20 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
       - name: Restore ESLint result cache
-        uses: actions/cache@v4
+        id: eslint-cache
+        uses: actions/cache/restore@v4
         with:
-          path: node_modules/.cache/eslint/full
+          path: node_modules/.cache/eslint
           key: core-eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs') }}-${{ github.sha }}
           restore-keys: |
             core-eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs') }}-
-      - name: Strict lint
+      - name: Strict lint changed pull-request files
+        if: github.event_name == 'pull_request'
+        env:
+          LINT_CACHE_LOCATION: node_modules/.cache/eslint/quick/
+        run: node scripts/lint-changed.mjs --files-from="${{ steps.changed.outputs.file }}" --full-on-config
+      - name: Strict lint full repository
+        if: github.event_name != 'pull_request'
         run: pnpm run lint:strict
       - name: Import and dependency hygiene
         run: pnpm run quality:imports
@@ -93,18 +125,13 @@ jobs:
           node-version: 24
           cache: pnpm
       - name: Verify mandatory CI wiring before installing dependencies
-        run: >-
-          node --test
-          scripts/ci-core-gate.test.mjs
-          scripts/ci-core-regression-shards.test.mjs
-          scripts/ci-executed-gates.test.mjs
-          scripts/studio-bundle-temporary-allowance.test.mjs
-          scripts/ci-merge-reliability.test.mjs
+        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs scripts/lint-changed-policy.test.mjs scripts/run-core-vitest.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs scripts/ci-merge-reliability.test.mjs
       - name: Verify deduplicated PR workflow policy
         run: python3 scripts/verify-pr-workflow-fanout.py
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Restore TypeScript incremental state
-        uses: actions/cache@v4
+        id: typescript-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             **/*.tsbuildinfo
@@ -116,6 +143,13 @@ jobs:
           set -euo pipefail
           pnpm run typecheck
           pnpm run typecheck:cloudflare-realtime
+      - name: Save TypeScript incremental state on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.typescript-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            **/*.tsbuildinfo
+          key: core-ts-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json', 'apps/**/tsconfig*.json', 'deploy/**/tsconfig*.json', 'packages/**/tsconfig*.json') }}-${{ github.sha }}
 
   static:
     name: Core regression shard / ${{ matrix.shard }}
@@ -134,14 +168,57 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/apps/web/public/assets/
+            /apps/web/public/assets/reference-rebuild/
+            !/apps/web/public/vrm/
+            /apps/web/public/vrm/AvatarSample_B.vrm
+            /apps/web/public/vrm/sample.vrm
+            !/artifacts/
+            !/docs/
+            /docs/studio-selection-benchmark.md
+            /docs/FREE_INFRASTRUCTURE.md
+            /docs/architecture/frontend-layered-architecture.md
+            /docs/competitor-analysis.md
+            /docs/ranking-architecture.md
+            !/tests/benchmarks/results/
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Run ${{ matrix.shard }} regression contracts once
-        run: node scripts/ci-core-regression-shards.mjs "${{ matrix.shard }}"
+      - name: P2P browser verification cache regression
+        run: node --test scripts/verify-studio-p2p-huddle.test.mjs
+      - name: Studio offline drawing resilience contract
+        run: node --test scripts/studio-offline-resilience.test.mjs
+      - name: Repository contracts
+        run: |
+          set -euo pipefail
+          pnpm run validate:architecture
+          pnpm run verify:csp
+          pnpm run verify:toolchain-coverage
+      - name: Production menu verifier entry execution
+        run: node --test scripts/verify-studio-menus-ci.test.mjs
+      - name: API runtime follow-up policy
+        run: |
+          set -euo pipefail
+          node --experimental-strip-types --test scripts/api-followup-unit.test.mjs
+          node --test scripts/api-followup-ci-policy.test.mjs
+      - name: Run required Vitest regression portfolio
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t targets < scripts/ci-required-vitest-targets.txt
+          test "${#targets[@]}" -gt 0
+          pnpm exec vitest run "${targets[@]}" --pool=forks --maxWorkers=4
+      - name: Material brush execution and saved recipe regressions
+        run: pnpm run test:studio-material-brush
+      - name: Audit Studio brush quality portfolio
+        run: pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
 
   serial:
     name: Core serial performance regressions
@@ -170,6 +247,25 @@ jobs:
           path: artifacts/core
           retention-days: 7
           if-no-files-found: error
+
+  a11y:
+    name: Core accessibility smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run serious and critical accessibility smoke
+        run: pnpm run test:a11y
 
   build:
     name: Core production build
@@ -206,7 +302,7 @@ jobs:
   core:
     name: core
     if: ${{ always() && !cancelled() }}
-    needs: [lint, typecheck, static, serial, build]
+    needs: [lint, typecheck, static, serial, a11y, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
@@ -215,7 +311,7 @@ jobs:
           CORE_RESULTS: ${{ toJSON(needs) }}
         run: |
           node --input-type=module <<'NODE'
-          const required = ["lint", "typecheck", "static", "serial", "build"];
+          const required = ["lint", "typecheck", "static", "serial", "a11y", "build"];
           const results = JSON.parse(process.env.CORE_RESULTS ?? "null");
           if (!results || typeof results !== "object" || Array.isArray(results)) {
             throw new Error("core requires the GitHub needs object");

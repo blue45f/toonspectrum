@@ -94,12 +94,6 @@ function fxRequested(fx: StudioScene3dNprFxRequest | undefined): boolean {
   return Boolean(fx && Object.values(fx).some(Boolean));
 }
 
-function frozenDependencies(
-  ...dependencies: StudioScene3dNprPassId[]
-): readonly StudioScene3dNprPassId[] {
-  return Object.freeze(dependencies);
-}
-
 function dependencyMap(input: {
   readonly transparent: boolean;
   readonly fx: boolean;
@@ -108,20 +102,20 @@ function dependencyMap(input: {
   if (input.transparent) beautyDependencies.push("transparent-beauty");
   if (input.fx) beautyDependencies.push("fx-overlay");
   return Object.freeze({
-    "beauty-base": frozenDependencies(),
-    "transparent-beauty": frozenDependencies(),
-    depth: frozenDependencies(),
-    normal: frozenDependencies(),
-    "object-id": frozenDependencies(),
-    "material-id": frozenDependencies(),
-    shadow: frozenDependencies(),
-    ao: frozenDependencies("depth", "normal"),
-    emission: frozenDependencies(),
-    velocity: frozenDependencies(),
-    "fx-overlay": frozenDependencies("depth", "normal", "object-id"),
+    "beauty-base": Object.freeze([]),
+    "transparent-beauty": Object.freeze([]),
+    depth: Object.freeze([]),
+    normal: Object.freeze([]),
+    "object-id": Object.freeze([]),
+    "material-id": Object.freeze([]),
+    shadow: Object.freeze([]),
+    ao: Object.freeze(["depth", "normal"]),
+    emission: Object.freeze([]),
+    velocity: Object.freeze([]),
+    "fx-overlay": Object.freeze(["depth", "normal", "object-id"]),
     beauty: Object.freeze(beautyDependencies),
-    line: frozenDependencies("depth", "normal", "object-id", "material-id"),
-    tone: frozenDependencies("beauty", "shadow", "ao"),
+    line: Object.freeze(["depth", "normal", "object-id", "material-id"]),
+    tone: Object.freeze(["beauty", "shadow", "ao"]),
   });
 }
 
@@ -197,7 +191,7 @@ export function buildStudioScene3dNprRenderGraph(input: {
   const requested = Object.freeze([...(input.requestedPasses ?? DEFAULT_REQUESTED)]);
   const wantsFx = fxRequested(input.fx);
   const fxEnabled = wantsFx && input.babylonSpecialistAvailable === true;
-  const transparent = input.document.output.transparent;
+  const transparent = input.document.output.transparentBackground;
   const dependencies = dependencyMap({ transparent, fx: fxEnabled });
   const requestedWithFx = fxEnabled && requested.includes("beauty")
     ? Object.freeze([...requested, "fx-overlay"] as StudioScene3dNprPassId[])
