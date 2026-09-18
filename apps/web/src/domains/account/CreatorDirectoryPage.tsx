@@ -19,7 +19,6 @@ import {
   CREATOR_COLLABORATION_LABELS,
   CREATOR_ROLE_DEFINITIONS,
   CREATOR_SPECIALTY_DEFINITIONS,
-  creatorRoleAlias,
   creatorRoleDefinition,
   creatorText,
   type CreatorCollaborationStatus,
@@ -45,8 +44,7 @@ const EMPTY_FILTERS: DirectoryFilters = {
 function CreatorCard({ creator }: { readonly creator: CreatorDirectoryEntry }) {
   const profile = creator.creatorRoleProfile;
   const primary = creatorRoleDefinition(profile.primaryRole);
-  const displayRole = creatorRoleAlias(profile, profile.primaryRole)
-    ?? (primary ? creatorText(primary.label, "ko") : "창작자");
+  const displayRole = primary ? creatorText(primary.label, "ko") : "창작자";
   return (
     <article className="flex min-w-0 flex-col rounded-2xl border border-line bg-card p-4 shadow-sm">
       <div className="flex min-w-0 items-start gap-3">

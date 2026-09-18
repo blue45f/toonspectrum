@@ -430,7 +430,10 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       has("Vector Eraser", "vector/erase-to-intersection"),
       gap("Live Appearance"),
       gap("Pattern Along Path"),
-      has("Vectorize Raster", "image/vectorize-raster"),
+      part(
+        "Vectorize Raster",
+        "래스터 이미지 선택 시 인스펙터의 빠른 이미지 도구에서 벡터화할 수 있다. 메인 Vector 메뉴 진입점은 아직 없다.",
+      ),
     ],
     extras: [],
   },

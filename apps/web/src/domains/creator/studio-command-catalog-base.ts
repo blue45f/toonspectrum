@@ -30,7 +30,7 @@
  * - `studio-edit-controls.ts`         STUDIO_EDIT_MENU_COMMANDS, 20 entries
  * - `studio-quick-access-integration.ts` STUDIO_QUICK_ACCESS_COMMAND_IDS, 18
  * - `studio-quick-actions.ts`         QUICK_ACTION_IDS, 16
- * - `studio-app-settings.ts`          STUDIO_SHORTCUT_ACTIONS, 34
+ * - `studio-app-settings.ts`          STUDIO_SHORTCUT_ACTIONS, 43
  * - `StudioShortcutsHelp.tsx`         GROUPS, 37 rows
  */
 
@@ -287,7 +287,7 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     label: "커스터마이즈 키맵",
     file: "apps/web/src/domains/creator/studio-app-settings.ts",
     declarationRef: "studio-app-settings.ts:82-117 (STUDIO_SHORTCUT_ACTIONS)",
-    measuredCount: 42,
+    measuredCount: 43,
   },
   help: {
     label: "단축키 도움말",
@@ -1205,6 +1205,16 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
         keymap("toggle-chrome", { shortcut: "`" }),
         help("view.toggleCanvas", { shortcut: "`" }),
       ],
+    }),
+    defineCommand({
+      id: "window.quick-hud",
+      labels: [
+        ko("캔버스 퀵 HUD", "현재 포인터 근처에 6슬롯 퀵 HUD를 엽니다."),
+        en("Canvas Quick HUD"),
+      ],
+      aliases: [ours("퀵 HUD"), csp("Quick Access")],
+      shortcut: "Shift+Space",
+      origins: [keymap("quick-hud", { shortcut: "Shift+Space" })],
     }),
     defineCommand({
       id: "window.quick-access-palette",
