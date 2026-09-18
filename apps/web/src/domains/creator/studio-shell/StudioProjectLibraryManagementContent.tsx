@@ -7,12 +7,20 @@ import {
 } from "./StudioProjectLibraryManagementUi";
 import { StudioProjectLibraryEmptyVisual } from "./StudioProjectLibraryEmptyVisual";
 import type { StudioProjectLibraryManagementController } from "./useStudioProjectLibraryManagementController";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioProjectLibraryManagementContent", ko, en);
 
 export function StudioProjectLibraryManagementContent({
   controller,
 }: {
   readonly controller: StudioProjectLibraryManagementController;
 }) {
+  useBilingualI18nRevision();
   const {
     locale, authUserId, view, library, profiles, query, selectedIds, setSelection,
     busyProjectId, setSaveTarget, setDeleteRequest,
@@ -79,15 +87,15 @@ export function StudioProjectLibraryManagementContent({
             <FolderOpen size={24} className="mx-auto text-fg-3" aria-hidden="true" />
             <h2 className="mt-3 text-xl font-black text-fg">
               {query
-                ? locale === "ko" ? "검색 결과가 없습니다" : "No matching projects"
-                : locale === "ko" ? "표시할 작업이 없습니다" : "No work to show"}
+                ? bi("검색 결과가 없습니다", "No matching projects")
+                : bi("표시할 작업이 없습니다", "No work to show")}
             </h2>
             <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-fg-3">
               {view === "archived"
-                ? locale === "ko" ? "보관한 프로젝트가 없습니다." : "There are no archived projects."
+                ? bi("보관한 프로젝트가 없습니다.", "There are no archived projects.")
                 : view === "trash"
-                  ? locale === "ko" ? "휴지통이 비어 있습니다." : "Trash is empty."
-                  : locale === "ko" ? "검색어를 바꾸거나 필터를 초기화해 보세요." : "Try another search or clear the filters."}
+                  ? bi("휴지통이 비어 있습니다.", "Trash is empty.")
+                  : bi("검색어를 바꾸거나 필터를 초기화해 보세요.", "Try another search or clear the filters.")}
             </p>
           </section>
         )
@@ -98,18 +106,16 @@ export function StudioProjectLibraryManagementContent({
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
                   <h2 id="temporary-work-title" className="text-xl font-black text-fg">
-                    {locale === "ko" ? "임시 작업" : "Temporary work"}
+                    {bi("임시 작업", "Temporary work")}
                     <span className="ml-2 text-sm font-bold text-fg-3">{temporaryProjects.length}</span>
                   </h2>
                   <p className="mt-1 text-xs leading-5 text-fg-3">
-                    {locale === "ko"
-                      ? "이 기기에 자동저장된 작업입니다. 정식 저장을 누르면 그때 저장 위치를 선택합니다."
-                      : "Autosaved on this device. Choose a destination only when you explicitly save."}
+                    {bi("이 기기에 자동저장된 작업입니다. 정식 저장을 누르면 그때 저장 위치를 선택합니다.", "Autosaved on this device. Choose a destination only when you explicitly save.")}
                   </p>
                 </div>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft/20 px-3 py-1.5 text-[0.68rem] font-bold text-warning">
                   <HardDrive size={13} aria-hidden="true" />
-                  {locale === "ko" ? "복구 가능" : "Recoverable"}
+                  {bi("복구 가능", "Recoverable")}
                 </span>
               </div>
               <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -122,11 +128,11 @@ export function StudioProjectLibraryManagementContent({
             <section aria-labelledby="saved-projects-title">
               <div>
                 <h2 id="saved-projects-title" className="text-xl font-black text-fg">
-                  {locale === "ko" ? "프로젝트" : "Projects"}
+                  {bi("프로젝트", "Projects")}
                   <span className="ml-2 text-sm font-bold text-fg-3">{savedProjects.length}</span>
                 </h2>
                 <p className="mt-1 text-xs leading-5 text-fg-3">
-                  {locale === "ko" ? "파일 또는 개인 저장소와 연결한 정식 프로젝트입니다." : "Formally saved projects connected to a file or personal storage."}
+                  {bi("파일 또는 개인 저장소와 연결한 정식 프로젝트입니다.", "Formally saved projects connected to a file or personal storage.")}
                 </p>
               </div>
               <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -142,9 +148,7 @@ export function StudioProjectLibraryManagementContent({
       )}
 
       <footer className="mt-10 border-t border-line pt-5 text-xs leading-5 text-fg-3">
-        {locale === "ko"
-          ? "임시 자동저장, 정식 저장, 백업, 내보내기와 게시를 분리해 관리합니다. 휴지통의 완전 삭제만 되돌릴 수 없습니다."
-          : "Temporary autosave, explicit save, backup, export and publishing are managed separately. Only permanent deletion from Trash cannot be undone."}
+        {bi("임시 자동저장, 정식 저장, 백업, 내보내기와 게시를 분리해 관리합니다. 휴지통의 완전 삭제만 되돌릴 수 없습니다.", "Temporary autosave, explicit save, backup, export and publishing are managed separately. Only permanent deletion from Trash cannot be undone.")}
       </footer>
     </>
   );

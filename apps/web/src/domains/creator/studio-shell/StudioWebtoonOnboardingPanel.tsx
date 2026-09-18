@@ -17,17 +17,23 @@ import {
   type StudioWebtoonOnboardingProfile,
 } from "@/shared/lib/webtoon-production-onboarding";
 import { cn } from "@/shared/lib/utils";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = "ko" | "en";
+type Locale = string;
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioWebtoonOnboardingPanel", ko, en);;
 
 function localizedLabel(
   options: readonly { readonly id: string; readonly labelKo: string; readonly labelEn: string }[],
   id: string,
-  locale: Locale,
+  _locale,
 ): string {
   const option = options.find((item) => item.id === id);
   if (!option) return id;
-  return locale === "ko" ? option.labelKo : option.labelEn;
+  return bi(option.labelKo, option.labelEn);
 }
 
 function taskId(profile: StudioWebtoonOnboardingProfile, index: number): string {
@@ -41,6 +47,7 @@ export function StudioWebtoonOnboardingPanel({
   readonly projectId: string;
   readonly locale: Locale;
 }) {
+  useBilingualI18nRevision();
   const [profile, setProfile] = useState<StudioWebtoonOnboardingProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +59,7 @@ export function StudioWebtoonOnboardingPanel({
   }, [projectId]);
 
   const plan = useMemo(() => profile ? buildWebtoonOnboardingPlan(profile) : null, [profile]);
-  const tasks = plan ? (locale === "ko" ? plan.tasksKo : plan.tasksEn) : [];
+  const tasks = plan ? (bi(plan.tasksKo, plan.tasksEn)) : [];
   const completedCount = profile
     ? tasks.filter((_, index) => profile.completedTaskIds.includes(taskId(profile, index))).length
     : 0;
@@ -67,9 +74,7 @@ export function StudioWebtoonOnboardingPanel({
     } catch (cause) {
       setError(cause instanceof Error
         ? cause.message
-        : locale === "ko"
-          ? "온보딩 진행을 저장하지 못했습니다."
-          : "Onboarding progress could not be saved.");
+        : bi("온보딩 진행을 저장하지 못했습니다.", "Onboarding progress could not be saved."));
     }
   };
 
@@ -105,14 +110,14 @@ export function StudioWebtoonOnboardingPanel({
             <div className="min-w-0">
               <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">PROJECT ONBOARDING</p>
               <h2 id="webtoon-project-onboarding-title" className="mt-1 break-words text-xl font-black text-fg sm:text-2xl">
-                {locale === "ko" ? plan.titleKo : plan.titleEn}
+                {bi(plan.titleKo, plan.titleEn)}
               </h2>
               <p className="mt-2 max-w-3xl break-words text-sm leading-6 text-fg-2">
-                {locale === "ko" ? plan.summaryKo : plan.summaryEn}
+                {bi(plan.summaryKo, plan.summaryEn)}
               </p>
             </div>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2" aria-label={locale === "ko" ? "선택한 제작 조건" : "Selected production conditions"}>
+          <div className="mt-4 flex flex-wrap gap-2" aria-label={bi("선택한 제작 조건", "Selected production conditions")}>
             {badges.map((badge) => (
               <span key={badge} className="rounded-full border border-accent/25 bg-card px-3 py-1 text-xs font-bold text-fg-2">{badge}</span>
             ))}
@@ -122,12 +127,12 @@ export function StudioWebtoonOnboardingPanel({
           <div className="flex items-start gap-3">
             <Flag className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
             <div>
-              <p className="text-[0.65rem] font-bold text-fg-3">{locale === "ko" ? "첫 승인 마일스톤" : "First approval milestone"}</p>
-              <p className="mt-1 text-sm font-black text-fg">{locale === "ko" ? plan.milestoneKo : plan.milestoneEn}</p>
+              <p className="text-[0.65rem] font-bold text-fg-3">{bi("첫 승인 마일스톤", "First approval milestone")}</p>
+              <p className="mt-1 text-sm font-black text-fg">{bi(plan.milestoneKo, plan.milestoneEn)}</p>
             </div>
           </div>
           <Link href={recommendedHref} className={buttonClass({ variant: "outline", size: "sm", className: "mt-4 w-full min-w-0" })}>
-            {locale === "ko" ? "추천 작업공간 열기" : "Open recommended workspace"}
+            {bi("추천 작업공간 열기", "Open recommended workspace")}
           </Link>
         </div>
       </div>
@@ -137,12 +142,10 @@ export function StudioWebtoonOnboardingPanel({
           <div>
             <div className="flex items-center gap-2">
               <ListChecks size={18} className="text-accent" aria-hidden="true" />
-              <h3 className="text-lg font-black text-fg">{locale === "ko" ? "첫 작업 체크리스트" : "First-work checklist"}</h3>
+              <h3 className="text-lg font-black text-fg">{bi("첫 작업 체크리스트", "First-work checklist")}</h3>
             </div>
             <p className="mt-1 text-xs leading-5 text-fg-3">
-              {locale === "ko"
-                ? "기능을 둘러보는 대신 실제 제작 준비 항목을 완료하세요."
-                : "Complete real production setup instead of a generic feature tour."}
+              {bi("기능을 둘러보는 대신 실제 제작 준비 항목을 완료하세요.", "Complete real production setup instead of a generic feature tour.")}
             </p>
           </div>
           <p className="text-sm font-black text-accent">{completedCount} / {tasks.length} · {progress}%</p>
@@ -183,7 +186,7 @@ export function StudioWebtoonOnboardingPanel({
 
         <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Link href="/learn/process#production-onboarding" className={buttonClass({ variant: "quiet", className: "w-full min-w-0 sm:w-auto" })}>
-            {locale === "ko" ? "제작 과정과 트랙 다시 보기" : "Review the workflow and tracks"}
+            {bi("제작 과정과 트랙 다시 보기", "Review the workflow and tracks")}
           </Link>
           <button
             type="button"
@@ -192,12 +195,12 @@ export function StudioWebtoonOnboardingPanel({
             className={buttonClass({ className: "w-full min-w-0 sm:w-auto" })}
           >
             <CheckCircle2 size={17} aria-hidden="true" />
-            {locale === "ko" ? "초기 제작 준비 완료" : "Complete initial production setup"}
+            {bi("초기 제작 준비 완료", "Complete initial production setup")}
           </button>
         </div>
         {!allTasksComplete ? (
           <p className="mt-3 text-right text-xs leading-5 text-fg-3">
-            {locale === "ko" ? "모든 첫 작업을 확인하면 온보딩을 완료할 수 있습니다." : "Complete every first-work item to finish onboarding."}
+            {bi("모든 첫 작업을 확인하면 온보딩을 완료할 수 있습니다.", "Complete every first-work item to finish onboarding.")}
           </p>
         ) : null}
       </div>

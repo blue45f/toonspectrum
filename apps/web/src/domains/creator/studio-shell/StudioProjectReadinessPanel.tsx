@@ -24,6 +24,14 @@ import type {
   StudioProjectReadinessSectionId,
   StudioProjectReadinessStatus,
 } from "../studio-project-readiness";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioProjectReadinessPanel", ko, en);
 
 export type StudioProjectReadinessLocale = "ko" | "en";
 
@@ -46,11 +54,11 @@ const SECTION_LABELS: Readonly<
 
 function statusLabel(
   status: StudioProjectReadinessStatus,
-  locale: StudioProjectReadinessLocale,
+  _locale,
 ): string {
-  if (status === "ready") return locale === "ko" ? "준비됨" : "Ready";
-  if (status === "warning") return locale === "ko" ? "확인 필요" : "Review";
-  return locale === "ko" ? "해결 필요" : "Blocked";
+  if (status === "ready") return bi("준비됨", "Ready");
+  if (status === "warning") return bi("확인 필요", "Review");
+  return bi("해결 필요", "Blocked");
 }
 
 function statusClasses(status: StudioProjectReadinessStatus): string {
@@ -68,6 +76,7 @@ function ReadinessStatusIcon({
   readonly size?: number;
   readonly className?: string;
 }) {
+  useBilingualI18nRevision();
   if (status === "ready") {
     return <CheckCircle2 size={size} className={className} aria-hidden="true" />;
   }
@@ -114,6 +123,7 @@ export function StudioProjectReadinessPanel({
   readonly locale: StudioProjectReadinessLocale;
   readonly compact?: boolean;
 }) {
+  useBilingualI18nRevision();
   const [snapshot, setSnapshot] = useState<StudioProjectReadinessSnapshot | null>(
     () => readBrowserSnapshot(projectId),
   );
@@ -180,18 +190,14 @@ export function StudioProjectReadinessPanel({
               )}
               <h2 className="text-sm font-bold text-fg">
                 {failure
-                  ? (locale === "ko" ? "프로젝트 준비도 · 연결 데이터 없음" : "Project readiness · Source unavailable")
-                  : (locale === "ko" ? "프로젝트 준비도 · 검사 전" : "Project readiness · Not checked")}
+                  ? (bi("프로젝트 준비도 · 연결 데이터 없음", "Project readiness · Source unavailable"))
+                  : (bi("프로젝트 준비도 · 검사 전", "Project readiness · Not checked"))}
               </h2>
             </div>
             <p className="mt-2 max-w-3xl text-xs leading-5 text-fg-3">
               {failure
-                ? (locale === "ko"
-                    ? "현재 프로젝트의 스토리·제작·에셋·검토·현지화·출력 데이터가 아직 진단 경계에 연결되지 않았습니다. 준비 완료로 추정하지 않았으며 저장된 작업도 변경하지 않았습니다."
-                    : "This project has not yet supplied connected story, production, asset, review, localization and export data. It was not guessed ready and no saved work was changed.")
-                : (locale === "ko"
-                    ? "스토리·제작·권리·검토·현지화·출력 상태가 연결되면 실제 결과를 계산합니다. 데이터가 없을 때 준비 완료로 표시하지 않습니다."
-                    : "Readiness is calculated from connected story, production, rights, review, localization and export data. Missing data is never shown as ready.")}
+                ? (bi("현재 프로젝트의 스토리·제작·에셋·검토·현지화·출력 데이터가 아직 진단 경계에 연결되지 않았습니다. 준비 완료로 추정하지 않았으며 저장된 작업도 변경하지 않았습니다.", "This project has not yet supplied connected story, production, asset, review, localization and export data. It was not guessed ready and no saved work was changed."))
+                : (bi("스토리·제작·권리·검토·현지화·출력 상태가 연결되면 실제 결과를 계산합니다. 데이터가 없을 때 준비 완료로 표시하지 않습니다.", "Readiness is calculated from connected story, production, rights, review, localization and export data. Missing data is never shown as ready."))}
             </p>
             {failure ? (
               <p className="mt-2 rounded-lg border border-line bg-panel/60 px-2.5 py-2 text-[0.68rem] text-fg-3">
@@ -206,8 +212,8 @@ export function StudioProjectReadinessPanel({
           >
             <RefreshCw size={15} aria-hidden="true" />
             {failure
-              ? (locale === "ko" ? "다시 연결 확인" : "Check connection again")
-              : (locale === "ko" ? "상태 검사" : "Check status")}
+              ? (bi("다시 연결 확인", "Check connection again"))
+              : (bi("상태 검사", "Check status"))}
           </button>
         </div>
       </section>
@@ -220,9 +226,7 @@ export function StudioProjectReadinessPanel({
     <section className="mt-5 rounded-2xl border border-line bg-card p-4 sm:p-5" aria-live="polite">
       {failure ? (
         <div className="mb-4 rounded-xl border border-warning/40 bg-warning-soft/15 px-3 py-2 text-xs text-warning" role="alert">
-          {locale === "ko"
-            ? `최신 재검사에 실패해 ${new Date(snapshot.updatedAt).toLocaleString("ko-KR")}의 마지막 정상 결과를 유지합니다.`
-            : `The latest refresh failed, so the last valid result from ${new Date(snapshot.updatedAt).toLocaleString("en-US")} remains visible.`}
+          {bi(`최신 재검사에 실패해 ${new Date(snapshot.updatedAt).toLocaleString("ko-KR")}의 마지막 정상 결과를 유지합니다.`, `The latest refresh failed, so the last valid result from ${new Date(snapshot.updatedAt).toLocaleString("en-US")} remains visible.`)}
           <span className="ml-1 text-fg-3">({failure.code})</span>
         </div>
       ) : null}
@@ -237,13 +241,11 @@ export function StudioProjectReadinessPanel({
               {statusLabel(report.status, locale)}
             </span>
             <h2 className="text-sm font-bold text-fg">
-              {locale === "ko" ? `프로젝트 준비도 ${percentage}%` : `Project readiness ${percentage}%`}
+              {formatI18nTemplate(String(bi("프로젝트 준비도 {value0}%", "Project readiness {value0}%")), { value0: percentage })}
             </h2>
           </div>
           <p className="mt-2 text-xs leading-5 text-fg-3">
-            {locale === "ko"
-              ? `해결 필요 ${report.blockingCount}건 · 확인 필요 ${report.warningCount}건 · ${new Date(snapshot.updatedAt).toLocaleString("ko-KR")} 검사`
-              : `${report.blockingCount} blocker(s) · ${report.warningCount} warning(s) · checked ${new Date(snapshot.updatedAt).toLocaleString("en-US")}`}
+            {bi(`해결 필요 ${report.blockingCount}건 · 확인 필요 ${report.warningCount}건 · ${new Date(snapshot.updatedAt).toLocaleString("ko-KR")} 검사`, `${report.blockingCount} blocker(s) · ${report.warningCount} warning(s) · checked ${new Date(snapshot.updatedAt).toLocaleString("en-US")}`)}
           </p>
         </div>
         <button
@@ -252,7 +254,7 @@ export function StudioProjectReadinessPanel({
           className={buttonClass({ variant: "outline", size: "sm", className: "shrink-0 gap-2" })}
         >
           <RefreshCw size={14} aria-hidden="true" />
-          {locale === "ko" ? "다시 검사" : "Check again"}
+          {bi("다시 검사", "Check again")}
         </button>
       </div>
 
@@ -266,7 +268,7 @@ export function StudioProjectReadinessPanel({
                 className="rounded-xl border border-line bg-panel/55 p-3 transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
               >
                 <span className="flex items-center justify-between gap-2">
-                  <strong className="text-xs text-fg">{SECTION_LABELS[section.id][locale]}</strong>
+                  <strong className="text-xs text-fg">{bi((SECTION_LABELS[section.id]).ko, (SECTION_LABELS[section.id]).en)}</strong>
                   <ReadinessStatusIcon
                     status={section.status}
                     size={14}
@@ -297,7 +299,7 @@ export function StudioProjectReadinessPanel({
                 "size-2 shrink-0 rounded-full",
                 action.priority === "high" ? "bg-danger" : action.priority === "medium" ? "bg-warning" : "bg-accent",
               )} />
-              <span>{locale === "ko" ? action.messageKo : action.messageEn}</span>
+              <span>{bi(action.messageKo, action.messageEn)}</span>
             </Link>
           ))}
         </div>

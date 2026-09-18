@@ -18,8 +18,12 @@ import { PublicStoryHero } from "@/shared/components/public-story-hero";
 import {
   FriendlyQuickGuide,
 } from "@/shared/components/purpose-experience-stage";
-import { useI18n } from "@/shared/lib/i18n";
+
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("DiscoverHubPage", ko, en);
 
 const COPY = {
   ko: {
@@ -83,13 +87,14 @@ const COPY = {
 const ICONS = [Search, Compass, Sparkles, TrendingUp, CalendarDays, Shuffle, Swords, Library] as const;
 
 export function DiscoverHubPage() {
-  const language = useI18n((state) => state.lang);
-  const locale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
-  const copy = COPY[locale];
+  useBilingualI18nRevision();
+
+
+  const copy = bi((COPY).ko, (COPY).en);
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
 
-  useDocumentTitle(locale === "ko" ? "찾기" : "Discover");
+  useDocumentTitle(bi("찾기", "Discover"));
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -104,8 +109,8 @@ export function DiscoverHubPage() {
         title={copy.title}
         description={copy.body}
         image="world"
-        imageAlt={locale === "ko" ? "따뜻한 빛과 도시의 풍경이 펼쳐지는 웹툰 장면 콘셉트 아트" : "Webtoon concept art of a city scene in warm light"}
-        caption={locale === "ko" ? "READ THE SCENE · 웹툰 장면 콘셉트 아트" : "READ THE SCENE · Webtoon concept art"}
+        imageAlt={bi("따뜻한 빛과 도시의 풍경이 펼쳐지는 웹툰 장면 콘셉트 아트", "Webtoon concept art of a city scene in warm light")}
+        caption={bi("READ THE SCENE · 웹툰 장면 콘셉트 아트", "READ THE SCENE · Webtoon concept art")}
       >
             <form onSubmit={submit} role="search" className="mt-6 grid max-w-2xl gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
               <label className="flex min-h-12 min-w-0 items-center gap-3 rounded-2xl border border-line-strong bg-card/90 px-4 focus-within:border-accent/55 focus-within:ring-2 focus-within:ring-accent/25">
@@ -123,7 +128,7 @@ export function DiscoverHubPage() {
                 {copy.search}
               </button>
             </form>
-        <Link href="/research" className="mt-4 inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-accent">{locale === "ko" ? "내 웹툰을 위한 참고자료 찾기" : "Find references for your webtoon"}<ArrowRight size={14} aria-hidden="true" /></Link>
+        <Link href="/research" className="mt-4 inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-accent">{bi("내 웹툰을 위한 참고자료 찾기", "Find references for your webtoon")}<ArrowRight size={14} aria-hidden="true" /></Link>
       </PublicStoryHero>
 
       <FriendlyQuickGuide

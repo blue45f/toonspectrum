@@ -4,8 +4,14 @@ import { motion, useReducedMotion } from "motion/react";
 import Link from "@/compat/router-link";
 
 import "./studio-asset-visual-intro.css";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = "ko" | "en";
+type Locale = string;
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioAssetVisualIntro", ko, en);;
 
 const COPY = {
   ko: {
@@ -43,7 +49,8 @@ const COPY = {
 const CHIP_ICONS = [Brush, Image, UserRound, Box, Type, ShieldCheck] as const;
 
 export function StudioAssetVisualIntro({ locale }: { readonly locale: Locale }) {
-  const copy = COPY[locale];
+  useBilingualI18nRevision();
+  const copy = bi((COPY).ko, (COPY).en);
   const reducedMotion = useReducedMotion();
 
   return (

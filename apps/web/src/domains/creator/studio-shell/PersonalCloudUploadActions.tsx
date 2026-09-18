@@ -7,8 +7,15 @@ import type {
   PersonalCloudProviderId,
 } from "../save-first/personal-cloud-client";
 import type { PersonalCloudUploadProgress } from "../save-first/personal-cloud-upload";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = "ko" | "en";
+type Locale = string;
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("PersonalCloudUploadActions", ko, en);;
 
 interface ActiveUpload extends PersonalCloudUploadProgress {
   readonly provider: PersonalCloudProviderId;
@@ -16,7 +23,7 @@ interface ActiveUpload extends PersonalCloudUploadProgress {
 
 function phaseLabel(
   phase: PersonalCloudUploadProgress["phase"],
-  locale: Locale,
+  _locale,
 ): string {
   const labels = {
     preparing: { ko: "프로젝트 준비 중", en: "Preparing project" },
@@ -24,7 +31,7 @@ function phaseLabel(
     uploading: { ko: "업로드 중", en: "Uploading" },
     finalizing: { ko: "저장 확인 중", en: "Finalizing" },
   } as const;
-  return labels[phase][locale];
+  return bi((labels[phase]).ko, (labels[phase]).en);
 }
 
 function percentage(progress: PersonalCloudUploadProgress): number {
@@ -46,6 +53,7 @@ export function PersonalCloudUploadActions({
   readonly onAction: (provider: PersonalCloudProviderId) => void;
   readonly disabled?: boolean;
 }) {
+  useBilingualI18nRevision();
   return (
     <div>
       <div className="grid gap-2 sm:grid-cols-3">
@@ -71,16 +79,10 @@ export function PersonalCloudUploadActions({
                   : <Link2 size={14} className="shrink-0" aria-hidden="true" />}
               <span className="truncate">
                 {connected
-                  ? locale === "ko"
-                    ? `${connection.label}에 저장`
-                    : `Save to ${connection.label}`
+                  ? formatI18nTemplate(String(bi("{value0}에 저장", "Save to {value0}")), { value0: connection.label })
                   : connection.configured
-                    ? locale === "ko"
-                      ? `${connection.label} 연결`
-                      : `Connect ${connection.label}`
-                    : locale === "ko"
-                      ? `${connection.label} 설정 필요`
-                      : `${connection.label} needs setup`}
+                    ? formatI18nTemplate(String(bi("{value0} 연결", "Connect {value0}")), { value0: connection.label })
+                    : formatI18nTemplate(String(bi("{value0} 설정 필요", "{value0} needs setup")), { value0: connection.label })}
               </span>
             </button>
           );

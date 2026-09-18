@@ -31,6 +31,13 @@ import {
   type ProductStartDestinationId,
 } from "@/shared/lib/product-identity";
 import { useUi } from "@/shared/lib/ui-store";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("ProductIntentStart", ko, en);
 
 interface IntentVisual {
   readonly icon: LucideIcon;
@@ -76,9 +83,10 @@ const COPY = {
 } as const;
 
 export function ProductIntentStart() {
+  useBilingualI18nRevision();
   const language = useI18n((state) => state.lang);
   const locale = resolveProductLocale(language);
-  const copy = COPY[locale];
+  const copy = bi((COPY).ko, (COPY).en);
   const openSearch = useUi((state) => state.openCommandPalette);
   const prefersReducedMotion = useReducedMotion();
   const continuity = useSyncExternalStore(
@@ -121,14 +129,14 @@ export function ProductIntentStart() {
                 transition={{ duration: 0.4, delay: index * 0.045, ease: [0.16, 1, 0.3, 1] }}
                 whileHover={prefersReducedMotion ? undefined : { y: -4 }}
               >
-                <Link href={destination.href} title={destination.description[locale]}>
+                <Link href={destination.href} title={bi((destination.description).ko, (destination.description).en)}>
                   <span className="cf-intent-card-media" aria-hidden="true">
                     <img src={visual.image} alt="" loading="lazy" decoding="async" />
                     <span className="cf-intent-card-icon"><Icon size={18} /></span>
                   </span>
                   <span className="cf-intent-card-copy">
-                    <strong>{destination.label[locale]}</strong>
-                    <small>{destination.description[locale]}</small>
+                    <strong>{bi((destination.label).ko, (destination.label).en)}</strong>
+                    <small>{bi((destination.description).ko, (destination.description).en)}</small>
                   </span>
                   <ArrowRight size={15} aria-hidden="true" />
                 </Link>

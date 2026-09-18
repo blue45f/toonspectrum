@@ -56,8 +56,16 @@ import {
   StudioTaskSummary,
   type StudioTaskFlowStep,
 } from "./StudioTaskFlow";
+import {
+  formatI18nTemplate,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = "ko" | "en";
+type Locale = string;
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioDeferredSaveProjectCreatePage", ko, en);;
 
 const KIND_ICONS: Readonly<Record<StudioProjectKind, LucideIcon>> = {
   webtoon: PanelsTopLeft,
@@ -71,15 +79,15 @@ const KIND_ICONS: Readonly<Record<StudioProjectKind, LucideIcon>> = {
 };
 
 function localeFromLanguage(language: string): Locale {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  return language;
 }
 
-function projectTitle(option: StudioProjectCreateKindOption, locale: Locale): string {
-  return locale === "ko" ? option.titleKo : option.titleEn;
+function projectTitle(option: StudioProjectCreateKindOption, _locale): string {
+  return bi(option.titleKo, option.titleEn);
 }
 
-function defaultTitle(option: StudioProjectCreateKindOption, locale: Locale): string {
-  return locale === "ko" ? option.defaultTitleKo : option.defaultTitleEn;
+function defaultTitle(option: StudioProjectCreateKindOption, _locale): string {
+  return bi(option.defaultTitleKo, option.defaultTitleEn);
 }
 
 function requestedProjectKind(kind: string | null, templateId: string | null): StudioProjectKind | null {
@@ -104,7 +112,7 @@ function WebtoonOnboardingSelect<T extends string>({
   label,
   value,
   options,
-  locale,
+  locale: _locale,
   onChange,
 }: {
   readonly id: string;
@@ -114,6 +122,7 @@ function WebtoonOnboardingSelect<T extends string>({
   readonly locale: Locale;
   readonly onChange: (value: T) => void;
 }) {
+  useBilingualI18nRevision();
   return (
     <label className="min-w-0 text-xs font-bold text-fg-2" htmlFor={id}>
       {label}
@@ -125,7 +134,7 @@ function WebtoonOnboardingSelect<T extends string>({
       >
         {options.map((option) => (
           <option key={option.id} value={option.id}>
-            {locale === "ko" ? option.labelKo : option.labelEn}
+            {bi(option.labelKo, option.labelEn)}
           </option>
         ))}
       </select>
@@ -134,6 +143,7 @@ function WebtoonOnboardingSelect<T extends string>({
 }
 
 export function StudioDeferredSaveProjectCreatePage() {
+  useBilingualI18nRevision();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const language = useI18n((state) => state.lang);
@@ -164,7 +174,7 @@ export function StudioDeferredSaveProjectCreatePage() {
   const templates = STUDIO_PROJECT_CREATE_TEMPLATES[kind];
   const selectedTemplate = templates.find((option) => option.id === templateId) ?? templates[0];
   const selectedTemplateLabel = selectedTemplate
-    ? (locale === "ko" ? selectedTemplate.labelKo : selectedTemplate.labelEn)
+    ? (bi(selectedTemplate.labelKo, selectedTemplate.labelEn))
     : templateId;
   const visibleKinds = useMemo(
     () => STUDIO_PROJECT_CREATE_KINDS.filter((option) => option.featured || showMoreKinds),
@@ -180,28 +190,28 @@ export function StudioDeferredSaveProjectCreatePage() {
   const steps: readonly StudioTaskFlowStep[] = [
     {
       id: "kind",
-      label: locale === "ko" ? "만들 작업 선택" : "Choose work type",
+      label: bi("만들 작업 선택", "Choose work type"),
       description: projectTitle(selected, locale),
       state: "complete",
     },
     {
       id: "details",
-      label: locale === "ko" ? "이름과 시작 형식" : "Name and format",
+      label: bi("이름과 시작 형식", "Name and format"),
       description: selectedTemplateLabel,
       state: titleReady ? "complete" : "current",
     },
     ...(structuredWebtoonFlow ? [{
       id: "production-track",
-      label: locale === "ko" ? "제작 트랙 확인" : "Confirm production track",
-      description: locale === "ko" ? onboardingPlan.titleKo : onboardingPlan.titleEn,
+      label: bi("제작 트랙 확인", "Confirm production track"),
+      description: bi(onboardingPlan.titleKo, onboardingPlan.titleEn),
       state: "complete" as const,
     }] : []),
     {
       id: "start",
-      label: locale === "ko" ? "자동 저장하며 시작" : "Start with autosave",
+      label: bi("자동 저장하며 시작", "Start with autosave"),
       description: structuredWebtoonFlow
-        ? (locale === "ko" ? "프로젝트와 첫 제작 계획 생성" : "Create the project and first production plan")
-        : (locale === "ko" ? "기기 복구 저장 후 클라우드 연결" : "Device recovery first, cloud next"),
+        ? (bi("프로젝트와 첫 제작 계획 생성", "Create the project and first production plan"))
+        : (bi("기기 복구 저장 후 클라우드 연결", "Device recovery first, cloud next")),
       state: titleReady ? "current" : "upcoming",
     },
   ];
@@ -222,7 +232,7 @@ export function StudioDeferredSaveProjectCreatePage() {
         title,
         kind,
         templateId,
-        primaryLocale: locale === "ko" ? "ko-KR" : "en-US",
+        primaryLocale: getActiveI18nLocale(),
       }, window);
       ensureStudioSaveProfile(window.localStorage, result.project.id, {
         provider: "browser",
@@ -244,18 +254,14 @@ export function StudioDeferredSaveProjectCreatePage() {
     } catch (cause) {
       setError(cause instanceof Error
         ? cause.message
-        : locale === "ko"
-          ? "임시 작업을 시작하지 못했습니다."
-          : "The temporary work could not be started.");
+        : bi("임시 작업을 시작하지 못했습니다.", "The temporary work could not be started."));
       setCreating(false);
     }
   };
 
   const startLabel = structuredWebtoonFlow
-    ? (locale === "ko" ? "프로젝트와 제작 계획 만들기" : "Create project and production plan")
-    : locale === "ko"
-      ? `${selected.titleKo} 시작`
-      : `Start ${selected.titleEn}`;
+    ? (bi("프로젝트와 제작 계획 만들기", "Create project and production plan"))
+    : bi(`${selected.titleKo} 시작`, `Start ${selected.titleEn}`);
 
   return (
     <div data-route-ready="studio-new" className="min-h-[calc(100vh-4rem)] min-w-0 bg-bg">
@@ -267,28 +273,26 @@ export function StudioDeferredSaveProjectCreatePage() {
                 <Sparkles size={14} className="shrink-0" aria-hidden="true" /> <span className="break-words">TOONSTUDIO CREATE</span>
               </p>
               <h1 className="mt-2 break-words text-3xl font-black tracking-tight text-fg sm:text-4xl">
-                {locale === "ko" ? "바로 만들기 시작하세요" : "Start creating right away"}
+                {bi("바로 만들기 시작하세요", "Start creating right away")}
               </h1>
               <p className="mt-2 max-w-3xl break-words text-sm leading-6 text-fg-2 sm:text-base">
-                {locale === "ko"
-                  ? "작업 종류와 시작 형식만 고르면 됩니다. 시작하는 즉시 이 기기에 복구 저장되며, 프로젝트 저장 후에는 ToonStudio 클라우드에서 다른 기기와 팀 작업으로 이어갈 수 있습니다. 기존 파일과 외부 드라이브는 가져오기·백업 옵션입니다."
-                  : "Choose only the work type and starting format. Recovery storage begins on this device immediately, and a saved project can continue through ToonStudio Cloud across devices and teams. Existing files and external drives remain optional import and backup paths."}
+                {bi("작업 종류와 시작 형식만 고르면 됩니다. 시작하는 즉시 이 기기에 복구 저장되며, 프로젝트 저장 후에는 ToonStudio 클라우드에서 다른 기기와 팀 작업으로 이어갈 수 있습니다. 기존 파일과 외부 드라이브는 가져오기·백업 옵션입니다.", "Choose only the work type and starting format. Recovery storage begins on this device immediately, and a saved project can continue through ToonStudio Cloud across devices and teams. Existing files and external drives remain optional import and backup paths.")}
               </p>
             </div>
             <Link href="/studio/import" className={buttonClass({ variant: "outline", className: "w-full min-w-0 sm:w-auto" })}>
-              <span className="break-words">{locale === "ko" ? "기존 파일 가져오기" : "Import existing files"}</span>
+              <span className="break-words">{bi("기존 파일 가져오기", "Import existing files")}</span>
             </Link>
           </header>
 
           <StudioTaskFlow
             steps={steps}
-            ariaLabel={locale === "ko" ? "새 프로젝트 시작 단계" : "New project start steps"}
+            ariaLabel={bi("새 프로젝트 시작 단계", "New project start steps")}
             className="mt-5"
           />
 
           <section className="mt-7 min-w-0" aria-labelledby="project-kind-title">
             <h2 id="project-kind-title" className="break-words text-base font-black text-fg">
-              {locale === "ko" ? "1. 만들 작업" : "1. Project type"}
+              {bi("1. 만들 작업", "1. Project type")}
             </h2>
             <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {visibleKinds.map((option) => {
@@ -317,7 +321,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                     </span>
                     <b className="mt-3 block break-words text-base text-fg">{projectTitle(option, locale)}</b>
                     <span id={descriptionId} className="mt-1 block break-words text-xs leading-5 text-fg-3">
-                      {locale === "ko" ? option.descriptionKo : option.descriptionEn}
+                      {bi(option.descriptionKo, option.descriptionEn)}
                     </span>
                   </button>
                 );
@@ -330,7 +334,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                 onClick={() => setShowMoreKinds(true)}
                 className={buttonClass({ variant: "quiet", size: "sm", className: "mt-2 w-full min-w-0 sm:w-auto" })}
               >
-                <span className="break-words">{locale === "ko" ? "다른 작업 종류 보기" : "Show more project types"}</span>
+                <span className="break-words">{bi("다른 작업 종류 보기", "Show more project types")}</span>
               </button>
             ) : null}
           </section>
@@ -342,18 +346,16 @@ export function StudioDeferredSaveProjectCreatePage() {
               </span>
               <div className="min-w-0">
                 <h2 id="project-settings-title" className="break-words text-xl font-black text-fg">
-                  {locale === "ko" ? "2. 이름과 시작 형식" : "2. Name and starting format"}
+                  {bi("2. 이름과 시작 형식", "2. Name and starting format")}
                 </h2>
                 <p className="mt-1 break-words text-xs leading-5 text-fg-3">
-                  {locale === "ko"
-                    ? "공개 제목·소개·장르·연재 위치는 지금 정하지 않아도 됩니다."
-                    : "A public title, synopsis, genre and publishing destination are not required now."}
+                  {bi("공개 제목·소개·장르·연재 위치는 지금 정하지 않아도 됩니다.", "A public title, synopsis, genre and publishing destination are not required now.")}
                 </p>
               </div>
             </div>
             <div className="mt-5 grid min-w-0 gap-4 md:grid-cols-2">
               <label className="min-w-0 text-xs font-bold text-fg-2" htmlFor="studio-project-title">
-                {locale === "ko" ? "프로젝트 이름" : "Project name"}
+                {bi("프로젝트 이름", "Project name")}
                 <input
                   id="studio-project-title"
                   value={title}
@@ -369,12 +371,12 @@ export function StudioDeferredSaveProjectCreatePage() {
                 />
                 <span id="studio-project-title-help" className={cn("mt-2 block break-words text-[0.6875rem] leading-5", titleReady ? "text-fg-3" : "text-danger")}>
                   {titleReady
-                    ? (locale === "ko" ? "작업용 이름이며 공개 전 언제든 바꿀 수 있습니다." : "This is a working name and can change before publishing.")
-                    : (locale === "ko" ? "프로젝트 이름을 입력하면 시작할 수 있습니다." : "Enter a project name to continue.")}
+                    ? (bi("작업용 이름이며 공개 전 언제든 바꿀 수 있습니다.", "This is a working name and can change before publishing."))
+                    : (bi("프로젝트 이름을 입력하면 시작할 수 있습니다.", "Enter a project name to continue."))}
                 </span>
               </label>
               <label className="min-w-0 text-xs font-bold text-fg-2" htmlFor="studio-project-template">
-                {locale === "ko" ? "시작 템플릿" : "Starting template"}
+                {bi("시작 템플릿", "Starting template")}
                 <select
                   id="studio-project-template"
                   value={templateId}
@@ -386,7 +388,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                 >
                   {templates.map((option) => (
                     <option key={option.id} value={option.id}>
-                      {locale === "ko" ? option.labelKo : option.labelEn}
+                      {bi(option.labelKo, option.labelEn)}
                     </option>
                   ))}
                 </select>
@@ -404,12 +406,10 @@ export function StudioDeferredSaveProjectCreatePage() {
                   <div className="min-w-0">
                     <p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-accent">PRODUCTION ONBOARDING</p>
                     <h2 id="webtoon-production-onboarding-title" className="mt-1 break-words text-xl font-black text-fg">
-                      {locale === "ko" ? "실제 제작 단계에 맞춰 시작" : "Start from your real production stage"}
+                      {bi("실제 제작 단계에 맞춰 시작", "Start from your real production stage")}
                     </h2>
                     <p className="mt-1 max-w-3xl break-words text-xs leading-5 text-fg-3">
-                      {locale === "ko"
-                        ? "현재 가진 자료와 목표를 기준으로 첫 승인 마일스톤과 작업 체크리스트를 만듭니다. 기능 설명만 보고 끝나는 온보딩이 아닙니다."
-                        : "Create the first approval milestone and task checklist from the material and goal you already have."}
+                      {bi("현재 가진 자료와 목표를 기준으로 첫 승인 마일스톤과 작업 체크리스트를 만듭니다. 기능 설명만 보고 끝나는 온보딩이 아닙니다.", "Create the first approval milestone and task checklist from the material and goal you already have.")}
                     </p>
                   </div>
                 </div>
@@ -424,8 +424,8 @@ export function StudioDeferredSaveProjectCreatePage() {
                   })}
                 >
                   {webtoonOnboardingEnabled
-                    ? (locale === "ko" ? "제작 트랙 사용 중" : "Production track enabled")
-                    : (locale === "ko" ? "제작 트랙 설정" : "Set production track")}
+                    ? (bi("제작 트랙 사용 중", "Production track enabled"))
+                    : (bi("제작 트랙 설정", "Set production track"))}
                 </button>
               </div>
 
@@ -434,7 +434,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                   <div className="grid min-w-0 gap-4 md:grid-cols-2">
                     <WebtoonOnboardingSelect<WebtoonStartingPointId>
                       id="webtoon-onboarding-start"
-                      label={locale === "ko" ? "현재 가지고 있는 자료" : "What you already have"}
+                      label={bi("현재 가지고 있는 자료", "What you already have")}
                       value={webtoonSelection.startingPoint}
                       options={WEBTOON_STARTING_POINTS}
                       locale={locale}
@@ -442,7 +442,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                     />
                     <WebtoonOnboardingSelect<WebtoonOnboardingGoalId>
                       id="webtoon-onboarding-goal"
-                      label={locale === "ko" ? "프로젝트 목표" : "Project goal"}
+                      label={bi("프로젝트 목표", "Project goal")}
                       value={webtoonSelection.goal}
                       options={WEBTOON_ONBOARDING_GOALS}
                       locale={locale}
@@ -450,7 +450,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                     />
                     <WebtoonOnboardingSelect<WebtoonTeamModelId>
                       id="webtoon-onboarding-team"
-                      label={locale === "ko" ? "제작 인원" : "Team model"}
+                      label={bi("제작 인원", "Team model")}
                       value={webtoonSelection.teamModel}
                       options={WEBTOON_TEAM_MODELS}
                       locale={locale}
@@ -458,7 +458,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                     />
                     <WebtoonOnboardingSelect<WebtoonCadenceId>
                       id="webtoon-onboarding-cadence"
-                      label={locale === "ko" ? "예상 연재 주기" : "Publishing cadence"}
+                      label={bi("예상 연재 주기", "Publishing cadence")}
                       value={webtoonSelection.cadence}
                       options={WEBTOON_CADENCES}
                       locale={locale}
@@ -467,42 +467,38 @@ export function StudioDeferredSaveProjectCreatePage() {
                   </div>
                   <div className="mt-5 grid gap-4 rounded-2xl border border-accent/25 bg-accent-soft/20 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,.8fr)]">
                     <div>
-                      <p className="text-xs font-black text-accent">{locale === "ko" ? "추천 제작 트랙" : "Recommended production track"}</p>
-                      <h3 className="mt-1 text-lg font-black text-fg">{locale === "ko" ? onboardingPlan.titleKo : onboardingPlan.titleEn}</h3>
-                      <p className="mt-2 text-xs leading-5 text-fg-2">{locale === "ko" ? onboardingPlan.summaryKo : onboardingPlan.summaryEn}</p>
+                      <p className="text-xs font-black text-accent">{bi("추천 제작 트랙", "Recommended production track")}</p>
+                      <h3 className="mt-1 text-lg font-black text-fg">{bi(onboardingPlan.titleKo, onboardingPlan.titleEn)}</h3>
+                      <p className="mt-2 text-xs leading-5 text-fg-2">{bi(onboardingPlan.summaryKo, onboardingPlan.summaryEn)}</p>
                     </div>
                     <div className="rounded-xl bg-panel p-3">
-                      <p className="text-[0.65rem] font-bold text-fg-3">{locale === "ko" ? "첫 승인 마일스톤" : "First approval milestone"}</p>
-                      <p className="mt-1 text-sm font-bold text-fg">{locale === "ko" ? onboardingPlan.milestoneKo : onboardingPlan.milestoneEn}</p>
+                      <p className="text-[0.65rem] font-bold text-fg-3">{bi("첫 승인 마일스톤", "First approval milestone")}</p>
+                      <p className="mt-1 text-sm font-bold text-fg">{bi(onboardingPlan.milestoneKo, onboardingPlan.milestoneEn)}</p>
                     </div>
                   </div>
                   <Link href="/learn/process#production-onboarding" className={buttonClass({ variant: "quiet", size: "sm", className: "mt-3 w-full min-w-0 sm:w-auto" })}>
-                    <span className="break-words">{locale === "ko" ? "업계 제작 과정과 트랙 설명 보기" : "Review the industry workflow and tracks"}</span>
+                    <span className="break-words">{bi("업계 제작 과정과 트랙 설명 보기", "Review the industry workflow and tracks")}</span>
                   </Link>
                 </div>
               ) : (
                 <div className="mt-5 rounded-2xl bg-panel p-4 text-xs leading-5 text-fg-2">
-                  {locale === "ko"
-                    ? "바로 드로잉으로 시작하려면 지금 상태를 유지하세요. 기획·대본·콘티·완성 원고·연재 중 상태에서 이어가려면 제작 트랙을 설정하세요."
-                    : "Keep this off to open the drawing workspace immediately, or enable it to continue from planning, script, storyboard, finished art or a live series."}
+                  {bi("바로 드로잉으로 시작하려면 지금 상태를 유지하세요. 기획·대본·콘티·완성 원고·연재 중 상태에서 이어가려면 제작 트랙을 설정하세요.", "Keep this off to open the drawing workspace immediately, or enable it to continue from planning, script, storyboard, finished art or a live series.")}
                 </div>
               )}
             </section>
           ) : null}
 
-          <section className="mt-5 flex min-w-0 items-start gap-3 rounded-2xl border border-success/30 bg-success-soft/15 p-4" aria-label={locale === "ko" ? "자동 저장 안내" : "Autosave notice"}>
+          <section className="mt-5 flex min-w-0 items-start gap-3 rounded-2xl border border-success/30 bg-success-soft/15 p-4" aria-label={bi("자동 저장 안내", "Autosave notice")}>
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-card text-success">
               <ShieldCheck size={18} aria-hidden="true" />
             </span>
             <div className="min-w-0">
               <WorkflowTrustBadge state="device-saved" locale={locale} className="mb-2 w-fit max-w-full" />
               <h2 className="break-words text-sm font-black text-fg">
-                {locale === "ko" ? "그리는 동안 이 기기에 자동 저장됩니다" : "Your work is autosaved on this device while you draw"}
+                {bi("그리는 동안 이 기기에 자동 저장됩니다", "Your work is autosaved on this device while you draw")}
               </h2>
               <p className="mt-1 break-words text-xs leading-5 text-fg-2">
-                {locale === "ko"
-                  ? "‘임시 작업’에서 언제든 이어갈 수 있습니다. 프로젝트로 저장하면 ToonStudio 클라우드 동기화와 버전 복구를 사용할 수 있으며, Google Drive·Dropbox·OneDrive는 가져오기와 추가 백업에 선택적으로 사용할 수 있습니다."
-                  : "Resume it from Temporary work at any time. Saving as a project enables ToonStudio Cloud sync and version recovery; Google Drive, Dropbox and OneDrive remain optional import and extra-backup choices."}
+                {bi("‘임시 작업’에서 언제든 이어갈 수 있습니다. 프로젝트로 저장하면 ToonStudio 클라우드 동기화와 버전 복구를 사용할 수 있으며, Google Drive·Dropbox·OneDrive는 가져오기와 추가 백업에 선택적으로 사용할 수 있습니다.", "Resume it from Temporary work at any time. Saving as a project enables ToonStudio Cloud sync and version recovery; Google Drive, Dropbox and OneDrive remain optional import and extra-backup choices.")}
               </p>
             </div>
           </section>
@@ -510,10 +506,8 @@ export function StudioDeferredSaveProjectCreatePage() {
           {error ? (
             <RecoverableActionNotice
               tone="danger"
-              title={locale === "ko" ? "프로젝트를 시작하지 못했습니다" : "The project could not be started"}
-              description={locale === "ko"
-                ? `${error} 입력한 이름과 시작 형식은 그대로 유지되어 있습니다.`
-                : `${error} Your project name and starting format are still preserved.`}
+              title={bi("프로젝트를 시작하지 못했습니다", "The project could not be started")}
+              description={formatI18nTemplate(String(bi("{value0} 입력한 이름과 시작 형식은 그대로 유지되어 있습니다.", "{value0} Your project name and starting format are still preserved.")), { value0: error })}
               action={
                 <button
                   type="button"
@@ -522,7 +516,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                   className={buttonClass({ variant: "outline", size: "sm", className: "w-full min-w-0 gap-2 sm:w-auto" })}
                 >
                   <RefreshCw size={14} className="shrink-0" aria-hidden="true" />
-                  <span className="break-words">{locale === "ko" ? "다시 시도" : "Try again"}</span>
+                  <span className="break-words">{bi("다시 시도", "Try again")}</span>
                 </button>
               }
               className="mt-5"
@@ -531,26 +525,20 @@ export function StudioDeferredSaveProjectCreatePage() {
 
           <div className="mt-7 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <StudioTaskSummary
-              eyebrow={locale === "ko" ? "시작할 작업" : "Ready to start"}
-              title={`${title.trim() || (locale === "ko" ? "이름 없는 프로젝트" : "Untitled project")} · ${projectTitle(selected, locale)}`}
+              eyebrow={bi("시작할 작업", "Ready to start")}
+              title={`${title.trim() || (bi("이름 없는 프로젝트", "Untitled project"))} · ${projectTitle(selected, locale)}`}
               description={structuredWebtoonFlow
-                ? (locale === "ko"
-                    ? `${onboardingPlan.titleKo} · ${onboardingPlan.milestoneKo}`
-                    : `${onboardingPlan.titleEn} · ${onboardingPlan.milestoneEn}`)
-                : locale === "ko"
-                  ? `${selectedTemplateLabel} 템플릿을 적용하고 드로잉 도구로 시작합니다.`
-                  : `Apply the ${selectedTemplateLabel} template and open the drawing tool.`}
+                ? (bi(`${onboardingPlan.titleKo} · ${onboardingPlan.milestoneKo}`, `${onboardingPlan.titleEn} · ${onboardingPlan.milestoneEn}`))
+                : formatI18nTemplate(String(bi("{value0} 템플릿을 적용하고 드로잉 도구로 시작합니다.", "Apply the {value0} template and open the drawing tool.")), { value0: selectedTemplateLabel })}
               meta={<WorkflowTrustBadge state="device-saved" locale={locale} compact={false} />}
             />
             <div className="flex min-w-0 flex-col gap-3 lg:min-w-72">
               <DisabledReason id="studio-create-disabled-reason" visible={!titleReady}>
-                {locale === "ko"
-                  ? "프로젝트 이름을 입력하면 자동 저장되는 작업공간을 시작할 수 있습니다."
-                  : "Enter a project name to start an autosaved workspace."}
+                {bi("프로젝트 이름을 입력하면 자동 저장되는 작업공간을 시작할 수 있습니다.", "Enter a project name to start an autosaved workspace.")}
               </DisabledReason>
               <div className="flex min-w-0 flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-end">
                 <Link href="/studio" className={buttonClass({ variant: "quiet", className: "w-full min-w-0 sm:w-auto" })}>
-                  <span className="break-words">{locale === "ko" ? "내 작업으로" : "Back to My work"}</span>
+                  <span className="break-words">{bi("내 작업으로", "Back to My work")}</span>
                 </Link>
                 <button
                   type="button"
@@ -559,7 +547,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                   onClick={create}
                   className={buttonClass({ className: "w-full min-w-0 sm:min-w-44 sm:w-auto" })}
                 >
-                  <span className="break-words">{creating ? (locale === "ko" ? "준비 중…" : "Preparing…") : startLabel}</span>
+                  <span className="break-words">{creating ? (bi("준비 중…", "Preparing…")) : startLabel}</span>
                 </button>
               </div>
             </div>

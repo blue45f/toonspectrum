@@ -19,8 +19,14 @@ import {
 import { cn } from "@/shared/lib/utils";
 
 import type { StudioProjectSection } from "../studio-project-views";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = "ko" | "en";
+type Locale = string;
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioWebtoonProductionCompanion", ko, en);;
 type ProgressMap = Readonly<Record<string, readonly number[]>>;
 
 function progressKey(projectId: string, stageId: string): string {
@@ -51,8 +57,8 @@ function writeProgress(projectId: string, stageId: string, values: readonly numb
   }
 }
 
-function localizedStageTitle(stage: WebtoonProductionStageSupport, locale: Locale): string {
-  return locale === "ko" ? stage.titleKo : stage.titleEn;
+function localizedStageTitle(stage: WebtoonProductionStageSupport, _locale): string {
+  return bi(stage.titleKo, stage.titleEn);
 }
 
 export function StudioWebtoonProductionCompanion({
@@ -66,6 +72,7 @@ export function StudioWebtoonProductionCompanion({
   readonly view: string;
   readonly locale: Locale;
 }) {
+  useBilingualI18nRevision();
   const stages = useMemo(
     () => webtoonProductionStagesForProjectView(section, view),
     [section, view],
@@ -101,17 +108,15 @@ export function StudioWebtoonProductionCompanion({
           <div>
             <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">WEBTOON PRODUCTION COMPANION</p>
             <h2 id="webtoon-production-companion-title" className="mt-1 text-xl font-black text-fg sm:text-2xl">
-              {locale === "ko" ? "현재 화면과 연결된 실제 제작 단계" : "Production stages connected to this workspace"}
+              {bi("현재 화면과 연결된 실제 제작 단계", "Production stages connected to this workspace")}
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">
-              {locale === "ko"
-                ? "지금 사용하는 기능이 실제 연재 공정의 어디에 해당하는지, 무엇을 확인하고 어디로 넘겨야 하는지 함께 보여줍니다."
-                : "See where this workspace sits in a real serialization pipeline and what should be checked before handoff."}
+              {bi("지금 사용하는 기능이 실제 연재 공정의 어디에 해당하는지, 무엇을 확인하고 어디로 넘겨야 하는지 함께 보여줍니다.", "See where this workspace sits in a real serialization pipeline and what should be checked before handoff.")}
             </p>
           </div>
         </div>
         <Link href="/learn/process#episode-pipeline" className={buttonClass({ variant: "outline", size: "sm", className: "shrink-0 gap-2" })}>
-          {locale === "ko" ? "전체 제작 과정" : "Full workflow"}
+          {bi("전체 제작 과정", "Full workflow")}
           <ExternalLink size={14} aria-hidden="true" />
         </Link>
       </div>
@@ -201,7 +206,7 @@ export function StudioWebtoonProductionCompanion({
                       className: "gap-1.5",
                     })}
                   >
-                    {locale === "ko" ? action.labelKo : action.labelEn}
+                    {bi(action.labelKo, action.labelEn)}
                     <ArrowRight size={13} aria-hidden="true" />
                   </Link>
                 ))}

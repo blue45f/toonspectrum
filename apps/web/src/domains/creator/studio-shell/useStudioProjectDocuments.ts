@@ -18,8 +18,14 @@ import {
   type StudioProjectDocumentEntry,
   type StudioProjectDocumentState,
 } from "../studio-project-document-store";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = "ko" | "en";
+type Locale = string;
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("useStudioProjectDocuments", ko, en);;
 
 export interface StudioProjectDocumentsController {
   readonly state: StudioProjectDocumentState | null;
@@ -39,10 +45,8 @@ export interface StudioProjectDocumentsController {
   ) => StudioProjectDocumentEntry | null;
 }
 
-function storageError(locale: Locale): string {
-  return locale === "ko"
-    ? "이 기기에서 문서 목록을 저장하지 못했습니다. 현재 원고는 편집기 복구 기능으로 계속 보호됩니다."
-    : "The document list could not be stored on this device. Editor recovery still protects the current manuscript.";
+function storageError(_locale): string {
+  return bi("이 기기에서 문서 목록을 저장하지 못했습니다. 현재 원고는 편집기 복구 기능으로 계속 보호됩니다.", "The document list could not be stored on this device. Editor recovery still protects the current manuscript.");
 }
 
 function eventState(value: unknown, projectId: string): StudioProjectDocumentState | null {
@@ -60,6 +64,7 @@ export function useStudioProjectDocuments(
   locale: Locale,
   status?: StudioDocumentStatus,
 ): StudioProjectDocumentsController {
+  useBilingualI18nRevision();
   const [state, setState] = useState<StudioProjectDocumentState | null>(null);
   const [error, setError] = useState<string | null>(null);
 

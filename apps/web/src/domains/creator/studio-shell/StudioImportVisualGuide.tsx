@@ -2,8 +2,14 @@ import { ArrowDown, Cloud, FileImage, FolderOpen, Layers3, ShieldCheck } from "l
 import { motion, useReducedMotion } from "motion/react";
 
 import "./studio-import-visual-guide.css";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = "ko" | "en";
+type Locale = string;
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioImportVisualGuide", ko, en);;
 
 const COPY = {
   ko: {
@@ -46,7 +52,8 @@ const SOURCE_ICONS = [FileImage, Cloud, FolderOpen] as const;
 const STEP_ICONS = [FolderOpen, Layers3, ShieldCheck] as const;
 
 export function StudioImportVisualGuide({ locale }: { readonly locale: Locale }) {
-  const copy = COPY[locale];
+  useBilingualI18nRevision();
+  const copy = bi((COPY).ko, (COPY).en);
   const reducedMotion = useReducedMotion();
 
   return (

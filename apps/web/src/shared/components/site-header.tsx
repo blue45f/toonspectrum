@@ -27,6 +27,13 @@ import { cx } from "@/shared/lib/cx";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { keepInlineText } from "@/shared/lib/text";
 import { useUi } from "@/shared/lib/ui-store";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("site-header", ko, en);
 
 const MobileHeaderNavigation = lazy(() =>
   import("./site-header-mobile-nav").then((mod) => ({ default: mod.MobileHeaderNavigation }))
@@ -98,6 +105,7 @@ function isStudioWorkPurpose(pathname: string): boolean {
 /** Exact destination state for drawer/utility items. A child page must not make
  * both its purpose hub and the child destination announce aria-current="page". */
 function useDestinationActive() {
+  useBilingualI18nRevision();
   const path = usePathname();
   return (href: string, exact?: boolean) => {
     if (exact) return path === href;
@@ -130,6 +138,7 @@ function matchesMobileNavigationViewport() {
 const DESKTOP_NAVIGATION_QUERY = "(min-width: 1180px)";
 
 function useMobileNavigationViewport() {
+  useBilingualI18nRevision();
   const [isMobile, setIsMobile] = useState(matchesMobileNavigationViewport);
 
   useEffect(() => {
@@ -144,6 +153,7 @@ function useMobileNavigationViewport() {
 }
 
 function MobileNavigationFallback() {
+  useBilingualI18nRevision();
   return (
     <nav
       aria-hidden="true"
@@ -154,6 +164,7 @@ function MobileNavigationFallback() {
 
 /** Render the responsive site header for the active Studio or Spectrum context. */
 export function SiteHeader() {
+  useBilingualI18nRevision();
   const isActive = useDestinationActive();
   const pathname = usePathname();
   const language = useI18n((state) => state.lang);
@@ -181,8 +192,8 @@ export function SiteHeader() {
     ? SITE_NAVIGATION_ITEMS.production.description
     : SITE_NAVIGATION_ITEMS.home.description;
   const brandTagline = navigationContext === "studio"
-    ? (locale === "ko" ? "기획 · 제작 · 검수 · 내보내기" : "Plan · Produce · Review · Deliver")
-    : (locale === "ko" ? "찾기 · 읽기 · 나누기" : "Discover · Read · Share");
+    ? (bi("기획 · 제작 · 검수 · 내보내기", "Plan · Produce · Review · Deliver"))
+    : (bi("찾기 · 읽기 · 나누기", "Discover · Read · Share"));
   const isPurposeActive = (href: string, exact?: boolean) => purposeActive(pathname, href, exact);
 
   const closeMenu = useCallback(() => {
@@ -242,7 +253,7 @@ export function SiteHeader() {
           </Link>
 
           <nav
-            aria-label={locale === "ko" ? "주요 메뉴" : "Primary navigation"}
+            aria-label={bi("주요 메뉴", "Primary navigation")}
             className="ml-2 hidden items-center gap-0.5 rounded-2xl border border-line/60 bg-panel/60 p-1 shadow-sm min-[1180px]:flex"
           >
             {primaryNavigation.map((item) => {
@@ -281,7 +292,7 @@ export function SiteHeader() {
             </Link>
             <Link
               href="/sitemap"
-              title={locale === "ko" ? "목적별 전체 메뉴 보기" : "Browse every destination by purpose"}
+              title={bi("목적별 전체 메뉴 보기", "Browse every destination by purpose")}
               className="inline-flex min-h-9 items-center rounded-xl px-3 py-2 text-[0.82rem] font-semibold text-fg-2 transition-colors hover:bg-raised/70 hover:text-fg"
             >
               {t("nav.allMenu")}

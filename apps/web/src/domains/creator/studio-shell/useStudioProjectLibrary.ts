@@ -16,8 +16,14 @@ import {
   type StudioProjectLibraryState,
   type StudioProjectStatus,
 } from "../studio-project-library-store";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = "ko" | "en";
+type Locale = string;
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("useStudioProjectLibrary", ko, en);;
 
 export interface StudioProjectLibraryController {
   readonly state: StudioProjectLibraryState | null;
@@ -34,10 +40,8 @@ export interface StudioProjectLibraryController {
   readonly touch: (projectId: string, documentId?: string | null) => StudioProjectLibraryEntry | null;
 }
 
-function storageError(locale: Locale): string {
-  return locale === "ko"
-    ? "이 기기에서 프로젝트 목록을 저장하지 못했습니다. 브라우저 저장 공간과 개인정보 보호 설정을 확인해 주세요."
-    : "The project list could not be stored on this device. Check browser storage and privacy settings.";
+function storageError(_locale): string {
+  return bi("이 기기에서 프로젝트 목록을 저장하지 못했습니다. 브라우저 저장 공간과 개인정보 보호 설정을 확인해 주세요.", "The project list could not be stored on this device. Check browser storage and privacy settings.");
 }
 
 function eventState(value: unknown): StudioProjectLibraryState | null {
@@ -52,6 +56,7 @@ export function useStudioProjectLibrary(
   locale: Locale,
   status?: StudioProjectStatus,
 ): StudioProjectLibraryController {
+  useBilingualI18nRevision();
   const [state, setState] = useState<StudioProjectLibraryState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
