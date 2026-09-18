@@ -30,6 +30,8 @@ export interface HuddleDependencies {
   getUserMedia?: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
   getDisplayMedia?: () => Promise<MediaStream>;
   createStream?: (tracks: MediaStreamTrack[]) => MediaStream;
+  /** Optional RTC-only cohort gate. Virtual Space uses this to keep a huddle proximity-scoped. */
+  peerFilter?: (participant: StudioLiveParticipant) => boolean;
   id?: () => string; now?: () => number;
 }
 
@@ -67,7 +69,7 @@ export class StudioP2pHuddleController {
   snapshot(): HuddleSnapshot {
     return { ...this.state, peers: [...this.peers.values()].map((p) => ({ ...p })),
       messages: this.messages.map((m) => ({ ...m, targets: [...m.targets], sent: [...m.sent], received: [...m.received] })),
-      localStream: this.localStream, availablePeers: this.port.getPeers().length,
+      localStream: this.localStream, availablePeers: this.eligiblePeers().length,
       error: this.error, closed: this.closed };
   }
   subscribe(listener: () => void): () => void {
@@ -81,18 +83,31 @@ export class StudioP2pHuddleController {
   }
   private emit(): void { for (const listener of this.listeners) listener(); }
   private fail(message: string): void { this.error = message; this.emit(); }
+  private eligiblePeers(): StudioLiveParticipant[] {
+    return this.port.getPeers().filter((peer) =>
+      peer.sessionId !== this.self.sessionId
+      && peer.role !== "viewer"
+      && !this.blocked.has(peer.sessionId)
+      && (this.deps.peerFilter?.(peer) ?? true)
+    );
+  }
+  private isEligiblePeer(peer: StudioLiveParticipant): boolean {
+    return this.eligiblePeers().some((candidate) => candidate.sessionId === peer.sessionId);
+  }
+  /** Re-evaluate a dynamic cohort without reopening camera or microphone capture. */
+  refreshPeers(): void { this.sync(); }
   private send(id: string, packet: HuddlePacket): boolean {
     return !this.closed && this.port.send(id, JSON.stringify(packet));
   }
   private announce(id?: string): void {
     const packet: HuddlePacket = { kind: "state", epoch: this.epoch, ...this.state };
-    for (const peer of this.port.getPeers()) {
-      if (!this.blocked.has(peer.sessionId) && (!id || id === peer.sessionId)) this.send(peer.sessionId, packet);
+    for (const peer of this.eligiblePeers()) {
+      if (!id || id === peer.sessionId) this.send(peer.sessionId, packet);
     }
   }
   private sync(): void {
     if (this.closed) return;
-    const available = new Set(this.port.getPeers().map((p) => p.sessionId));
+    const available = new Set(this.eligiblePeers().map((p) => p.sessionId));
     for (const [id, peer] of this.peers) {
       if (!available.has(id) || this.now() - peer.lastSeen > 12_000) this.removePeer(id);
       else if (peer.reactionUntil < this.now()) peer.reaction = null;
@@ -106,8 +121,7 @@ export class StudioP2pHuddleController {
   }
   private receive(sender: StudioLiveParticipant, raw: string): void {
     const id = sender.sessionId;
-    if (this.closed || this.blocked.has(id) || id === this.self.sessionId || sender.role === "viewer"
-      || !this.port.getPeers().some((peer) => peer.sessionId === id)) return;
+    if (this.closed || !this.isEligiblePeer(sender)) return;
     const packet = parseHuddlePacket(raw);
     if (!packet) return;
     if (packet.kind === "state") { this.receiveState(sender, packet); return; }
