@@ -3,22 +3,19 @@ import {
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
   translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   CheckCircle2,
   Heart,
   LayoutTemplate,
   Search,
   Sparkles,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+  } from "lucide-react"; import { useEffect,
+  useMemo,
+  useState } from "react"; import { useBilingual,
+  Container } from "@/shared/components/section"; import { useI18n } from "@/shared/lib/i18n"; import { useBilingualLocalizer,
+  type BilingualText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
-import { Container } from "@/shared/components/section";
-import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import {
