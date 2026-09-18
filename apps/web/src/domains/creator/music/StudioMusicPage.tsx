@@ -69,6 +69,7 @@ import {
 } from "@toonspectrum/core/studio-music";
 import { useSession } from "@/compat/auth-session-store";
 import { getApiErrorMessage } from "@/infrastructure/api";
+import { getWork, updateWork } from "@/infrastructure/creator-client";
 import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
 import { completeAutomaticFreeText } from "@/domains/creator/studio-server-ai-client";
 import { cn } from "@/shared/lib/utils";

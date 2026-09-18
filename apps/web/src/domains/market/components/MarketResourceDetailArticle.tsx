@@ -208,7 +208,7 @@ export function MarketResourceDetailArticle({
 
         <div className="mt-3.5 flex flex-wrap items-center gap-2">
           <MarketWebtoonSpecBadge
-            format={record.entries.length > 0 && record.entries.every((entry) => entry.delivery.mode === "portable-json") ? translateCurrentStaticSourceText("domains.market.components.MarketResourceDetailArticle", "en", "portable-json") : undefined}
+            format={record.entries.length > 0 && record.entries.every((entry) => entry.delivery.mode === "portable-json") ? "portable-json" : undefined}
           />
           {record.kind.startsWith("3d") ? (
             <button
@@ -279,7 +279,7 @@ export function MarketResourceDetailArticle({
 
               <div
                 id="market-preview-panel"
-                role={previewItems.length > 1 ? translateCurrentStaticSourceText("domains.market.components.MarketResourceDetailArticle", "en", "tabpanel") : undefined}
+                role={previewItems.length > 1 ? "tabpanel" : undefined}
                 aria-labelledby={previewItems.length > 1 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketResourceDetailArticle", "en", "market-preview-tab-{v0}"), { v0: String(safePreviewIndex) }) : undefined}
                 tabIndex={previewItems.length > 1 ? 0 : undefined}
               >

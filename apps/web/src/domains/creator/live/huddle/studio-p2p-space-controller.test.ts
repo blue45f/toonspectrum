@@ -32,7 +32,6 @@ function pair() {
   const b = new StudioP2pSpaceController(B, port(B, A), { id: () => "epoch-b" });
   a.start();
   b.start();
-  a.flush();
   return { a, b, packets };
 }
 
@@ -41,6 +40,9 @@ describe("StudioP2pSpaceController", () => {
     const { a, b, packets } = pair();
     expect(a.snapshot().peers[0]?.participant.sessionId).toBe("b");
     expect(b.snapshot().peers[0]?.participant.sessionId).toBe("a");
+    const handshake = packets.filter(({ raw }) => JSON.parse(raw).kind === "space-state");
+    expect(handshake.some(({ from, to }) => from === "b" && to === "a")).toBe(true);
+    expect(handshake.some(({ from, to }) => from === "a" && to === "b")).toBe(true);
 
     a.enterZone("drawing");
     const remote = b.snapshot().peers[0];
