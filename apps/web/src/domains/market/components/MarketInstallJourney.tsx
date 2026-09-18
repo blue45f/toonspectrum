@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   CheckCircle2,
   CircleDashed,
@@ -64,7 +65,7 @@ function journeySteps({
       title: acquired ? "계정 보관 완료" : "내 보관함에 추가 (선택)",
       detail: acquired
         ? "계정 라이브러리에서 다시 찾을 수 있습니다. 계정 보관은 현재 기기 설치와 별도입니다."
-        : "무료 소장은 계정에 찾기 쉬운 링크와 권리 정보를 보관합니다. 설치 없이도 먼저 보관할 수 있습니다.",
+        : "내 에셋 보관은 계정에 찾기 쉬운 링크와 권리 정보를 보관합니다. 설치 없이도 먼저 보관할 수 있습니다.",
       state: acquired ? "complete" : "optional",
       icon: FolderOpen,
     },
@@ -120,15 +121,12 @@ export function MarketInstallJourney({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id="market-install-journey-heading" className="text-xs font-bold text-fg">
-            실제 다운로드·설치 흐름
-          </h2>
+            {translateCurrentStaticSourceText("domains.market.components.MarketInstallJourney", "ko", "실제 다운로드·설치 흐름")}</h2>
           <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">
-            소장, 기기 다운로드, 설치 또는 적용을 서로 다른 상태로 확인합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.market.components.MarketInstallJourney", "ko", "소장, 기기 다운로드, 설치 또는 적용을 서로 다른 상태로 확인합니다.")}</p>
         </div>
         <span className="shrink-0 rounded-full border border-good/30 bg-good/10 px-2 py-0.5 text-[0.6rem] font-bold text-good">
-          해시 검증
-        </span>
+          {translateCurrentStaticSourceText("domains.market.components.MarketInstallJourney", "ko", "해시 검증")}</span>
       </div>
 
       <ol className="mt-3 space-y-2">

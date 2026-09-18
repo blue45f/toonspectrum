@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 // 연재 시리즈 상세 — 회차 목록(episodeNo 순) + 첫화부터/최신화 보기 + 소유자 관리.
 import {
   ArrowLeft,
@@ -47,7 +51,7 @@ import { deleteSeries, getSeries, type SeriesDetail, type WorkSummary } from "@/
 function EpisodeRow({ episode }: { episode: WorkSummary }) {
   return (
     <Link
-      href={`/create/${episode.id}`}
+      href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "en", "/create/{v0}"), { v0: String(episode.id) })}
       className="group flex items-center gap-3 rounded-xl border border-line bg-card/50 px-3 py-2.5 transition-colors hover:border-line-strong hover:bg-card"
     >
       <span className="numeral w-10 shrink-0 text-center font-display text-lg font-bold text-accent">
@@ -68,7 +72,7 @@ function EpisodeRow({ episode }: { episode: WorkSummary }) {
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium text-fg group-hover:text-accent">
           {episode.title}
-          {episode.status === "draft" && <span className="ml-1.5 text-[0.7rem] text-warn">(초안)</span>}
+          {episode.status === "draft" && <span className="ml-1.5 text-[0.7rem] text-warn">{translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "(초안)")}</span>}
         </span>
         <span className="mt-0.5 block text-[0.72rem] text-fg-3">{relativeDate(episode.createdAt)}</span>
       </span>
@@ -191,7 +195,7 @@ export function CreateSeriesPage() {
     return (
       <Container size="wide" className="py-10">
         <ErrorState
-          title="시리즈를 불러오지 못했습니다."
+          title={translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "시리즈를 불러오지 못했습니다.")}
           message={error}
           onRetry={() => setReloadKey((value) => value + 1)}
         />
@@ -213,8 +217,7 @@ export function CreateSeriesPage() {
         className="mb-5 inline-flex items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg"
       >
         <ArrowLeft size={15} />
-        시리즈 목록
-      </Link>
+        {translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "시리즈 목록")}</Link>
 
       <header className="overflow-hidden rounded-2xl border border-line bg-panel/45 p-5 surface-hl sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row">
@@ -242,8 +245,7 @@ export function CreateSeriesPage() {
               </span>
               <span className="inline-flex items-center gap-1 text-xs text-fg-3">
                 <Layers size={12} />
-                <span className="numeral">{series.episodes}</span>화
-              </span>
+                <span className="numeral">{series.episodes}</span>{translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "화")}</span>
             </div>
             <h1 className="mt-2 text-pretty text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
               {series.title}
@@ -265,7 +267,7 @@ export function CreateSeriesPage() {
                 {series.tags.map((tag) => (
                   <Link
                     key={tag}
-                    href={`/create?tag=${encodeURIComponent(tag)}`}
+                    href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "en", "/create?tag={v0}"), { v0: String(encodeURIComponent(tag)) })}
                     className="inline-flex h-7 items-center rounded-full border border-line bg-card px-2.5 text-[0.72rem] text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
                   >
                     #{tag}
@@ -277,33 +279,29 @@ export function CreateSeriesPage() {
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-fg-3">
               <span className="inline-flex items-center gap-1">
                 <Eye size={13} />
-                <span className="numeral">{formatCount(series.views)}</span> 조회
-              </span>
+                <span className="numeral">{formatCount(series.views)}</span> {translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "조회")}</span>
               <span className="inline-flex items-center gap-1">
                 <Heart size={13} />
-                <span className="numeral">{formatCount(series.likes)}</span> 좋아요
-              </span>
-              {series.latestEpisodeAt && <span>{relativeDate(series.latestEpisodeAt)} 갱신</span>}
+                <span className="numeral">{formatCount(series.likes)}</span> {translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "좋아요")}</span>
+              {series.latestEpisodeAt && <span>{relativeDate(series.latestEpisodeAt)} {translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "갱신")}</span>}
             </div>
 
             <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
               {firstEpisode && (
                 <Link
-                  href={`/create/${firstEpisode.id}`}
+                  href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "en", "/create/{v0}"), { v0: String(firstEpisode.id) })}
                   className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}
                 >
                   <Play size={14} />
-                  첫화부터 보기
-                </Link>
+                  {translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "첫화부터 보기")}</Link>
               )}
               {latestEpisode && latestEpisode.id !== firstEpisode?.id && (
                 <Link
-                  href={`/create/${latestEpisode.id}`}
+                  href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "en", "/create/{v0}"), { v0: String(latestEpisode.id) })}
                   className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
                 >
                   <SkipForward size={14} />
-                  최신화 보기
-                </Link>
+                  {translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "최신화 보기")}</Link>
               )}
               {shareable && (
                 <SharePageButton
@@ -311,8 +309,8 @@ export function CreateSeriesPage() {
                   text={shareTitle}
                   description={shareDescription}
                   imageUrl={shareImage}
-                  label="시리즈 공유"
-                  actionLabel="시리즈 감상하기"
+                  label={translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "시리즈 공유")}
+                  actionLabel={translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "시리즈 감상하기")}
                   className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
                 />
               )}
@@ -322,8 +320,7 @@ export function CreateSeriesPage() {
                   className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}
                 >
                   <PenLine size={14} />
-                  다음화 만들기
-                </Link>
+                  {translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "다음화 만들기")}</Link>
               )}
               {series.isOwner && (
                 <div className="ml-auto flex items-center gap-2">
@@ -333,8 +330,7 @@ export function CreateSeriesPage() {
                     className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}
                   >
                     <Pencil size={14} />
-                    정보 수정
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "정보 수정")}</button>
                   <button
                     type="button"
                     onClick={onDelete}
@@ -346,8 +342,7 @@ export function CreateSeriesPage() {
                     })}
                   >
                     <Trash2 size={14} />
-                    삭제
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "삭제")}</button>
                 </div>
               )}
             </div>
@@ -372,17 +367,16 @@ export function CreateSeriesPage() {
       <section className="mt-7">
         <h2 className="flex items-center gap-1.5 text-sm font-bold text-fg">
           <Layers size={15} className="text-accent" />
-          회차 목록
-          <span className="numeral text-fg-3">{series.episodeList.length}</span>
+          {translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "회차 목록")}<span className="numeral text-fg-3">{series.episodeList.length}</span>
         </h2>
         {series.episodeList.length === 0 ? (
           <div className="mt-3 rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center">
             <PenLine size={24} className="mx-auto mb-2.5 text-fg-3" />
-            <p className="text-sm font-medium text-fg">아직 등록된 회차가 없습니다.</p>
+            <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "아직 등록된 회차가 없습니다.")}</p>
             <p className="mt-1 text-xs text-fg-3">
               {series.isOwner
-                ? "‘다음화 만들기’를 누르면 이 시리즈에 자동 연결된 상태로 스튜디오가 열립니다."
-                : "창작자가 첫 회차를 준비 중입니다."}
+                ? translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "‘다음화 만들기’를 누르면 이 시리즈에 자동 연결된 상태로 스튜디오가 열립니다.")
+                : translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "창작자가 첫 회차를 준비 중입니다.")}
             </p>
             {series.isOwner && (
               <Link
@@ -390,8 +384,7 @@ export function CreateSeriesPage() {
                 className={buttonClass({ size: "sm", variant: "outline", className: "mt-4 gap-1.5" })}
               >
                 <PenLine size={14} />
-                1화 만들기
-              </Link>
+                {translateCurrentStaticSourceText("domains.creator.CreateSeriesPage", "ko", "1화 만들기")}</Link>
             )}
           </div>
         ) : (

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Code2,
@@ -42,8 +46,7 @@ function DemoTag({ dark }: { dark?: boolean }) {
         dark ? "bg-[oklch(0.2_0.02_60/0.16)] text-on-accent" : "border border-line bg-raised text-fg-3"
       )}
     >
-      데모
-    </span>
+      {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "데모")}</span>
   );
 }
 
@@ -285,7 +288,7 @@ export function AuthModal({
     <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-hidden px-4 py-4 sm:pt-[12vh] sm:pb-6">
       <button
         type="button"
-        aria-label="닫기"
+        aria-label={translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "닫기")}
         tabIndex={-1}
         onClick={onClose}
         className="absolute inset-0 bg-[oklch(0.12_0.012_70/0.64)] backdrop-blur-sm"
@@ -294,14 +297,14 @@ export function AuthModal({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={mode === "login" ? "로그인" : "회원가입"}
+        aria-label={mode === "login" ? translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "로그인") : translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "회원가입")}
         data-auth-modal="true"
         className="relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-line-strong bg-panel shadow-2xl shadow-[oklch(0.1_0.02_70/0.5)] sm:max-h-[calc(100dvh-7rem)]"
         style={{ animation: "fade-up 0.22s var(--ease-out-expo)" }}
       >
         <button
           type="button"
-          aria-label="로그인 창 닫기"
+          aria-label={translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "로그인 창 닫기")}
           onClick={onClose}
           className="absolute right-2 top-2 flex size-11 items-center justify-center rounded-xl text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
         >
@@ -310,10 +313,10 @@ export function AuthModal({
         <div className="p-6">
           <div className="mb-1 flex items-center gap-2">
             <ToonSpectrumMark className="size-7 rounded-[0.55rem]" />
-            <span className="font-display text-lg font-bold">툰스펙트럼</span>
+            <span className="font-display text-lg font-bold">{translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "툰스펙트럼")}</span>
           </div>
           <p className="mb-5 text-sm text-fg-3">
-            {mode === "login" ? "다시 오셨네요. 로그인하세요." : "계정을 만들고 취향을 기록하세요."}
+            {mode === "login" ? translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "다시 오셨네요. 로그인하세요.") : translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "계정을 만들고 취향을 기록하세요.")}
           </p>
 
           <div className="mb-4 inline-flex rounded-lg border border-line bg-card p-0.5">
@@ -331,7 +334,7 @@ export function AuthModal({
                   mode === m ? "bg-raised text-fg" : "text-fg-3 hover:text-fg-2"
                 )}
               >
-                {m === "login" ? "로그인" : "회원가입"}
+                {m === "login" ? translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "로그인") : translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "회원가입")}
               </button>
             ))}
           </div>
@@ -341,8 +344,8 @@ export function AuthModal({
               <>
                 <input
                   {...register("name")}
-                  placeholder="닉네임"
-                  aria-label="닉네임"
+                  placeholder={translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "닉네임")}
+                  aria-label={translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "닉네임")}
                   className="h-11 rounded-xl border border-line bg-canvas px-3.5 text-sm outline-none focus:border-accent/60"
                 />
                 <Controller
@@ -351,7 +354,7 @@ export function AuthModal({
                   render={({ field }) => (
                     <div className="rounded-xl border border-line bg-canvas p-3">
                       <div className="mb-3 flex items-center justify-between gap-3">
-                        <span className="text-xs font-semibold text-fg-2">아바타</span>
+                        <span className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "아바타")}</span>
                         <button
                           type="button"
                           onClick={() => {
@@ -361,8 +364,7 @@ export function AuthModal({
                           className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[0.72rem] font-medium text-fg-2 transition-colors hover:border-accent/50 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                         >
                           <Sparkles size={13} />
-                          추천
-                        </button>
+                          {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "추천")}</button>
                       </div>
                       <div className="mb-3 flex items-center gap-3">
                         <div
@@ -395,8 +397,7 @@ export function AuthModal({
                           className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 text-[0.72rem] font-medium text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                         >
                           <ImagePlus size={13} />
-                          이미지 업로드
-                        </button>
+                          {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "이미지 업로드")}</button>
                         {avatarImage && (
                           <button
                             type="button"
@@ -407,10 +408,9 @@ export function AuthModal({
                             className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 text-[0.72rem] font-medium text-fg-3 transition-colors hover:border-bad/60 hover:text-bad focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                           >
                             <Trash2 size={13} />
-                            제거
-                          </button>
+                            {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "제거")}</button>
                         )}
-                        <span className="text-[0.68rem] text-fg-3">PNG/JPG/WebP · 180KB 이하</span>
+                        <span className="text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "PNG/JPG/WebP · 180KB 이하")}</span>
                       </div>
                       {imageErr && (
                         <p className="mb-3 text-xs text-bad" role="alert">
@@ -425,7 +425,7 @@ export function AuthModal({
                               key={preset.id}
                               type="button"
                               onClick={() => field.onChange(preset.id)}
-                              aria-label={`${preset.name} 아바타 선택`}
+                              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "{v0} 아바타 선택"), { v0: String(preset.name) })}
                               aria-pressed={active}
                               className={cn(
                                 "flex min-h-14 items-center gap-2 rounded-xl border bg-panel p-2 text-left transition-[border-color,background,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
@@ -460,10 +460,10 @@ export function AuthModal({
                 emailRef.current = el;
               }}
               type="email"
-              placeholder="이메일"
-              aria-label="이메일"
+              placeholder={translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "이메일")}
+              aria-label={translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "이메일")}
               aria-invalid={Boolean(errors.email)}
-              aria-describedby={errors.email ? "auth-email-error" : undefined}
+              aria-describedby={errors.email ? translateCurrentStaticSourceText("domains.auth.components.auth.modal", "en", "auth-email-error") : undefined}
               className="h-11 rounded-xl border border-line bg-canvas px-3.5 text-sm outline-none focus:border-accent/60"
             />
             {errors.email?.message && (
@@ -474,11 +474,11 @@ export function AuthModal({
             <input
               {...register("password")}
               type="password"
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
-              placeholder={mode === "signup" ? "비밀번호 (15자 이상)" : "비밀번호"}
-              aria-label="비밀번호"
+              autoComplete={mode === "signup" ? translateCurrentStaticSourceText("domains.auth.components.auth.modal", "en", "new-password") : translateCurrentStaticSourceText("domains.auth.components.auth.modal", "en", "current-password")}
+              placeholder={mode === "signup" ? translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "비밀번호 (15자 이상)") : translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "비밀번호")}
+              aria-label={translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "비밀번호")}
               aria-invalid={Boolean(errors.password)}
-              aria-describedby={errors.password ? "auth-password-error" : undefined}
+              aria-describedby={errors.password ? translateCurrentStaticSourceText("domains.auth.components.auth.modal", "en", "auth-password-error") : undefined}
               className="h-11 rounded-xl border border-line bg-canvas px-3.5 text-sm outline-none focus:border-accent/60"
             />
             {errors.password?.message && (
@@ -494,7 +494,7 @@ export function AuthModal({
                   onClick={() => { void requestEmailAction("resend"); }}
                   className="font-medium text-fg-3 hover:text-accent disabled:opacity-50"
                 >
-                  {emailAction === "resend" ? "전송 중…" : "인증 메일 다시 보내기"}
+                  {emailAction === "resend" ? translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "전송 중…") : translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "인증 메일 다시 보내기")}
                 </button>
                 <button
                   type="button"
@@ -502,7 +502,7 @@ export function AuthModal({
                   onClick={() => { void requestEmailAction("reset"); }}
                   className="font-medium text-fg-3 hover:text-accent disabled:opacity-50"
                 >
-                  {emailAction === "reset" ? "전송 중…" : "비밀번호를 잊으셨나요?"}
+                  {emailAction === "reset" ? translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "전송 중…") : translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "비밀번호를 잊으셨나요?")}
                 </button>
               </div>
             )}
@@ -522,7 +522,7 @@ export function AuthModal({
               className="mt-1 flex h-11 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-semibold text-on-accent transition-colors hover:bg-accent-2 disabled:opacity-50"
             >
               {mode === "login" ? <LogIn size={16} /> : <UserPlus size={16} />}
-              {isSubmitting ? "처리 중…" : mode === "login" ? "로그인" : "가입하고 시작"}
+              {isSubmitting ? translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "처리 중…") : mode === "login" ? translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "로그인") : translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "가입하고 시작")}
             </button>
           </form>
 
@@ -533,7 +533,7 @@ export function AuthModal({
             || providers.github) && (
             <>
               <div className="my-4 flex items-center gap-3 text-[0.7rem] text-fg-3">
-                <span className="h-px flex-1 bg-line" />또는<span className="h-px flex-1 bg-line" />
+                <span className="h-px flex-1 bg-line" />{translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "또는")}<span className="h-px flex-1 bg-line" />
               </div>
               <div className="flex flex-col gap-2">
                 {providerStatus === "loading" && (
@@ -541,21 +541,18 @@ export function AuthModal({
                     className="flex h-11 animate-pulse items-center justify-center rounded-xl border border-line bg-card text-xs text-fg-3"
                     role="status"
                   >
-                    소셜 로그인 확인 중…
-                  </div>
+                    {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "소셜 로그인 확인 중…")}</div>
                 )}
                 {providerStatus === "error" && (
                   <div className="rounded-xl border border-line bg-card p-3 text-center">
                     <p className="text-xs leading-relaxed text-fg-3" role="status">
-                      소셜 로그인 정보를 불러오지 못했어요. 이메일 로그인은 계속 사용할 수 있어요.
-                    </p>
+                      {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "소셜 로그인 정보를 불러오지 못했어요. 이메일 로그인은 계속 사용할 수 있어요.")}</p>
                     <button
                       type="button"
                       onClick={() => setProviderAttempt((value) => value + 1)}
                       className="mt-2 min-h-9 rounded-lg border border-line bg-panel px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                     >
-                      다시 확인
-                    </button>
+                      {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "다시 확인")}</button>
                   </div>
                 )}
                 {providers.kakao && (
@@ -564,8 +561,7 @@ export function AuthModal({
                     onClick={() => signIn("kakao")}
                     className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#FEE500] text-sm font-semibold text-[#191600] transition-opacity hover:opacity-90"
                   >
-                    카카오로 계속하기
-                    {providers.kakao.mode === "demo" && <DemoTag dark />}
+                    {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "카카오로 계속하기")}{providers.kakao.mode === "demo" && <DemoTag dark />}
                   </button>
                 )}
                 {providers.google &&
@@ -584,17 +580,15 @@ export function AuthModal({
                     <div
                       className="rounded-xl border border-line bg-card px-3.5 py-3"
                       role="status"
-                      aria-label="Google 로그인 설정 필요"
+                      aria-label={translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "Google 로그인 설정 필요")}
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-semibold text-fg-2">Google로 계속하기</span>
+                        <span className="text-sm font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "Google로 계속하기")}</span>
                         <span className="rounded-md border border-line bg-raised px-1.5 py-0.5 text-[0.62rem] font-bold text-fg-3">
-                          설정 필요
-                        </span>
+                          {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "설정 필요")}</span>
                       </div>
                       <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                        Google 로그인 설정이 아직 완료되지 않았어요. 지금은 이메일 로그인을 이용해 주세요.
-                      </p>
+                        {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "Google 로그인 설정이 아직 완료되지 않았어요. 지금은 이메일 로그인을 이용해 주세요.")}</p>
                     </div>
                   ))}
                 {providers.naver && (
@@ -603,8 +597,7 @@ export function AuthModal({
                     onClick={() => signIn("naver")}
                     className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#03C75A] text-sm font-semibold text-white transition-opacity hover:opacity-90"
                   >
-                    네이버로 계속하기
-                    {providers.naver.mode === "demo" && <DemoTag dark />}
+                    {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "네이버로 계속하기")}{providers.naver.mode === "demo" && <DemoTag dark />}
                   </button>
                 )}
                 {providers.github && (
@@ -614,21 +607,17 @@ export function AuthModal({
                     className="flex h-11 items-center justify-center gap-2 rounded-xl border border-line-strong bg-[oklch(0.22_0.015_70)] text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                   >
                     <Code2 size={17} aria-hidden="true" />
-                    GitHub로 계속하기
-                  </button>
+                    {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "GitHub로 계속하기")}</button>
                 )}
               </div>
               {(providers.kakao?.mode === "demo" || providers.naver?.mode === "demo") && (
                 <p className="mt-2 text-center text-[0.66rem] text-fg-3">
-                  데모 표시는 실제 소셜 연동이 아직 설정되지 않아 체험용 계정으로 로그인됨을 뜻해요.
-                </p>
+                  {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "데모 표시는 실제 소셜 연동이 아직 설정되지 않아 체험용 계정으로 로그인됨을 뜻해요.")}</p>
               )}
             </>
           )}
           <p className="mt-4 text-[0.7rem] leading-relaxed text-fg-3">
-            계정을 만들면 평점·리뷰·서재가 DB에 저장되어 어느 기기에서나 이어집니다. 비로그인 시 이
-            브라우저에만 저장돼요.
-          </p>
+            {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "계정을 만들면 평점·리뷰·서재가 DB에 저장되어 어느 기기에서나 이어집니다. 비로그인 시 이 브라우저에만 저장돼요.")}</p>
         </div>
       </div>
     </div>

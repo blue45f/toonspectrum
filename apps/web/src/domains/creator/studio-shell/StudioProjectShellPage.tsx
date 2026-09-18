@@ -1,4 +1,10 @@
 import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   BookOpen,
   Boxes,
@@ -23,6 +29,7 @@ import {
 import { useMemo } from "react";
 import { Navigate, useLocation, useParams } from "react-router-dom";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
@@ -41,8 +48,14 @@ import {
 import { resolveStudioProjectViewDestination } from "../studio-project-view-destinations";
 import { StudioProjectDiagnosticsBridge } from "./StudioProjectDiagnosticsBridge";
 import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 export type StudioProjectSection = StudioProjectSectionId;
+
+type Locale = string;
 
 type ProjectAction = Readonly<{
   title: BilingualText;
@@ -235,13 +248,13 @@ function InvalidProject({ locale: _locale }: { readonly locale?: string }) {
     <Container size="wide" className="py-10">
       <section className="rounded-3xl border border-line bg-card p-6" role="alert">
         <h1 className="text-xl font-bold text-fg">
-          {l("프로젝트를 찾을 수 없어요.", "Project not found.")}
+          {bt("프로젝트를 찾을 수 없어요.", "Project not found.")}
         </h1>
         <p className="mt-2 text-sm text-fg-3">
-          {l("저장된 작업은 변경하지 않았습니다. 내 작업에서 프로젝트를 다시 선택하세요.", "No saved work was changed. Choose the project again from My work.")}
+          {bt("저장된 작업은 변경하지 않았습니다. 내 작업에서 프로젝트를 다시 선택하세요.", "No saved work was changed. Choose the project again from My work.")}
         </p>
         <Link href="/studio" className={buttonClass({ className: "mt-5" })}>
-          {l("내 작업으로", "Go to My work")}
+          {bt("내 작업으로", "Go to My work")}
         </Link>
       </section>
     </Container>
@@ -249,7 +262,7 @@ function InvalidProject({ locale: _locale }: { readonly locale?: string }) {
 }
 
 export function StudioProjectShellPage({ section }: { readonly section: StudioProjectSection }) {
-  const l = useBilingualLocalizer("studioProjectShell");
+  const bt = useBilingual("StudioProjectShellPage");
   const { projectId = "" } = useParams<{ projectId: string }>();
   const location = useLocation();
   const language = useI18n((state) => state.lang);
@@ -291,7 +304,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <Link href="/studio" className="text-xs font-semibold text-accent hover:text-accent-2">
-              ← {l("내 작업", "My work")}
+              ← {bt("내 작업", "My work")}
             </Link>
             <p className="mt-4 text-[0.68rem] font-black uppercase tracking-[0.17em] text-accent">
               {definition.eyebrow}
@@ -303,18 +316,18 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
               {l(definition.description.ko, definition.description.en)}
             </p>
             <p className="mt-3 text-xs text-fg-3">
-              {l("프로젝트", "Project")} · {displayProjectId}
+              {bt("프로젝트", "Project")} · {displayProjectId}
             </p>
           </div>
           <Link href={workHref(displayProjectId)} className={buttonClass({ size: "lg", className: "gap-2" })}>
             <Brush size={17} aria-hidden="true" />
-            {l("원고 열기", "Open manuscript")}
+            {bt("원고 열기", "Open manuscript")}
           </Link>
         </div>
       </header>
 
       <nav
-        aria-label={l("프로젝트 메뉴", "Project navigation")}
+        aria-label={bt("프로젝트 메뉴", "Project navigation")}
         className="mt-5 overflow-x-auto rounded-2xl border border-line bg-card p-1.5"
       >
         <div className="flex min-w-max gap-1">
@@ -324,7 +337,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
               <Link
                 key={id}
                 href={projectSectionHref(displayProjectId, id)}
-                aria-current={active ? "page" : undefined}
+                aria-current={active ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectShellPage", "en", "page") : undefined}
                 className={cn(
                   "inline-flex min-h-10 items-center rounded-xl px-3.5 text-sm font-semibold transition-colors",
                   active ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
@@ -337,7 +350,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
           <Link
             href={projectSectionHref(displayProjectId, "settings")}
             aria-current={section === "settings" ? "page" : undefined}
-            aria-label={l("프로젝트 설정", "Project settings")}
+            aria-label={bt("프로젝트 설정", "Project settings")}
             className={cn(
               "ml-1 inline-flex size-10 items-center justify-center rounded-xl transition-colors",
               section === "settings"
@@ -351,7 +364,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
       </nav>
 
       <nav
-        aria-label={l(`${definition.label.ko} 세부 화면`, `${definition.label.en} views`)}
+        aria-label={bt(`${definition.label.ko} 세부 화면`, `${definition.label.en} views`)}
         className="mt-3 overflow-x-auto"
       >
         <div className="flex min-w-max gap-2">
@@ -362,7 +375,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
               <Link
                 key={view}
                 href={projectViewHref(displayProjectId, section, view, location.search)}
-                aria-current={active ? "page" : undefined}
+                aria-current={active ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectShellPage", "en", "page") : undefined}
                 className={cn(
                   "inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-semibold transition-colors",
                   active
@@ -370,7 +383,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
                     : "border-line bg-card text-fg-3 hover:border-line-strong hover:text-fg",
                 )}
               >
-                {l(viewLabel.labelKo, viewLabel.labelEn)}
+                {bt(viewLabel.labelKo, viewLabel.labelEn)}
               </Link>
             );
           })}
@@ -384,23 +397,23 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-              {destination.owner === "project-shell" ? "PROJECT OWNED" : "CONNECTED WORKSPACE"}
+              {destination.owner === "project-shell" ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectShellPage", "en", "PROJECT OWNED") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectShellPage", "en", "CONNECTED WORKSPACE")}
             </p>
             <h2 className="mt-1 text-lg font-black text-fg">
-              {l(destination.labelKo, destination.labelEn)}
+              {bt(destination.labelKo, destination.labelEn)}
             </h2>
             <p className="mt-1 text-sm leading-6 text-fg-2">
-              {l(destination.descriptionKo, destination.descriptionEn)}
+              {bt(destination.descriptionKo, destination.descriptionEn)}
             </p>
           </div>
           {destination.href ? (
             <Link href={destination.href} className={buttonClass({ className: "shrink-0 gap-2" })}>
-              {l(destination.ctaKo, destination.ctaEn)}
+              {bt(destination.ctaKo, destination.ctaEn)}
               <ArrowRight size={15} aria-hidden="true" />
             </Link>
           ) : (
             <span className="rounded-full border border-line bg-card px-3 py-2 text-xs font-bold text-fg-2">
-              {l(destination.ctaKo, destination.ctaEn)}
+              {bt(destination.ctaKo, destination.ctaEn)}
             </span>
           )}
         </div>
@@ -446,7 +459,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
                   {l(item.description.ko, item.description.en)}
                 </span>
                 <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">
-                  {l("열기", "Open")}
+                  {bt("열기", "Open")}
                   <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" aria-hidden="true" />
                 </span>
               </Link>
@@ -459,10 +472,10 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <strong className="text-sm text-fg">
-              {l("기능 이름을 몰라도 괜찮아요.", "You do not need to know feature names.")}
+              {bt("기능 이름을 몰라도 괜찮아요.", "You do not need to know feature names.")}
             </strong>
             <p className="mt-1 text-xs leading-5 text-fg-3">
-              {l("⌘K 검색이나 도우미에서 하려는 일을 입력하면 현재 프로젝트에 맞는 기능을 찾습니다.", "Use command search or the assistant to find the right action for this project.")}
+              {bt("⌘K 검색이나 도우미에서 하려는 일을 입력하면 현재 프로젝트에 맞는 기능을 찾습니다.", "Use command search or the assistant to find the right action for this project.")}
             </p>
           </div>
           <button
@@ -471,7 +484,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
             className={buttonClass({ variant: "outline", className: "shrink-0 gap-2" })}
           >
             <WandSparkles size={16} aria-hidden="true" />
-            {l("기능 검색", "Search commands")}
+            {bt("기능 검색", "Search commands")}
           </button>
         </div>
       </section>

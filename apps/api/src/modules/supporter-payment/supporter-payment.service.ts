@@ -590,4 +590,3 @@ export class SupporterPaymentService {
     }
   }
 }
-

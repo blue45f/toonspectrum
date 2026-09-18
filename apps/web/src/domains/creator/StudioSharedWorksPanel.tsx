@@ -1,4 +1,7 @@
 import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertCircle,
   CheckCircle2,
   ChevronRight,
@@ -119,11 +122,9 @@ function CurrentReadOnlyNotice({ work }: { work: StudioSharedWork }) {
     >
       <LockKeyhole className="mt-0.5 shrink-0 text-warn" size={16} aria-hidden="true" />
       <div className="min-w-0 text-xs leading-relaxed">
-        <p className="font-semibold text-fg">이 작품은 서버 저장이 제한됩니다</p>
+        <p className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "이 작품은 서버 저장이 제한됩니다")}</p>
         <p className="mt-0.5 text-fg-2">
-          {ROLE_LABEL[work.role]} 권한으로 열었습니다. 원고를 살펴볼 수 있지만 서버 원본은
-          덮어쓰지 않습니다.
-        </p>
+          {ROLE_LABEL[work.role]} {translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "권한으로 열었습니다. 원고를 살펴볼 수 있지만 서버 원본은 덮어쓰지 않습니다.")}</p>
       </div>
     </div>
   );
@@ -145,7 +146,7 @@ function SharedWorkRow({
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <p className="min-w-0 flex-1 truncate text-sm font-bold text-fg">{work.title}</p>
           <span className="inline-flex min-h-6 shrink-0 items-center rounded-full border border-line bg-raised px-2 text-xs font-semibold text-fg-2">
-            {work.format === "upload" ? "이미지 업로드" : "컷툰"}
+            {work.format === "upload" ? translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "이미지 업로드") : translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "컷툰")}
           </span>
           <span
             className={cn(
@@ -156,18 +157,17 @@ function SharedWorkRow({
             {ROLE_LABEL[work.role]}
           </span>
         </div>
-        <p className="mt-1 truncate text-xs text-fg-2">{work.owner.name} · 작품 소유자</p>
+        <p className="mt-1 truncate text-xs text-fg-2">{work.owner.name} {translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "· 작품 소유자")}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg-3">
-          <span className={work.access === "edit" ? "text-good" : "text-warn"}>{copy.detail}</span>
+          <span className={work.access === "edit" ? translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "en", "text-good") : translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "en", "text-warn")}>{copy.detail}</span>
           <span aria-hidden="true">·</span>
-          <time dateTime={work.updatedAt}>{formatUpdatedAt(work.updatedAt)} 수정</time>
+          <time dateTime={work.updatedAt}>{formatUpdatedAt(work.updatedAt)} {translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "수정")}</time>
         </div>
       </div>
       <span className="flex min-h-11 shrink-0 items-center gap-1.5 pl-2 text-xs font-semibold text-accent">
         {current ? (
           <>
-            <CheckCircle2 size={16} aria-hidden="true" /> 현재 작업
-          </>
+            <CheckCircle2 size={16} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "현재 작업")}</>
         ) : (
           <>
             <copy.Icon size={16} aria-hidden="true" />
@@ -242,8 +242,7 @@ export function StudioSharedWorksPanelView({
               id={headingId}
               tabIndex={-1}
             >
-              팀 작품
-            </h3>
+              {translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "팀 작품")}</h3>
             {!loading && !error && loggedIn ? (
               <span className="inline-flex min-h-6 items-center rounded-full bg-raised px-2 text-xs font-semibold tabular-nums text-fg-2">
                 {works.length}
@@ -251,14 +250,13 @@ export function StudioSharedWorksPanelView({
             ) : null}
           </div>
           <p className="mt-1 max-w-[38ch] text-xs leading-relaxed text-fg-3">
-            내가 소유하거나 참여 중인 작품을 역할에 맞는 모드로 엽니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "내가 소유하거나 참여 중인 작품을 역할에 맞는 모드로 엽니다.")}</p>
         </div>
         <button
-          aria-label="팀 작품 새로고침"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "팀 작품 새로고침")}
           className="grid size-11 shrink-0 place-items-center rounded-lg border border-line text-fg-2 transition-colors duration-150 hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none"
           disabled={!loggedIn || loading || loadingMore}
-          title="새로고침"
+          title={translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "새로고침")}
           type="button"
           onClick={onRetry}
         >
@@ -273,15 +271,14 @@ export function StudioSharedWorksPanelView({
       {!loggedIn ? (
         <div className="py-7 text-center">
           <UserRound className="mx-auto text-fg-3" size={25} aria-hidden="true" />
-          <p className="mt-2 text-sm font-semibold text-fg">로그인이 필요해요</p>
+          <p className="mt-2 text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "로그인이 필요해요")}</p>
           <p className="mt-1 text-xs leading-relaxed text-fg-3">
-            팀 작품은 초대를 수락한 계정에 안전하게 연결됩니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "팀 작품은 초대를 수락한 계정에 안전하게 연결됩니다.")}</p>
         </div>
       ) : loading && works.length === 0 ? (
         <div
           aria-busy="true"
-          aria-label="팀 작품 불러오는 중"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "팀 작품 불러오는 중")}
           className="mt-3 space-y-1"
         >
           {[0, 1, 2].map((index) => (
@@ -297,23 +294,21 @@ export function StudioSharedWorksPanelView({
       ) : error ? (
         <div className="py-7 text-center" role="alert">
           <AlertCircle className="mx-auto text-bad" size={25} aria-hidden="true" />
-          <p className="mt-2 text-sm font-semibold text-fg">팀 작품을 열지 못했어요</p>
+          <p className="mt-2 text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "팀 작품을 열지 못했어요")}</p>
           <p className="mx-auto mt-1 max-w-xs text-xs leading-relaxed text-fg-2">{error}</p>
           <Button className="mt-4 min-h-11" size="sm" type="button" variant="outline" onClick={onRetry}>
-            <RefreshCw size={15} aria-hidden="true" /> 다시 시도
-          </Button>
+            <RefreshCw size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "다시 시도")}</Button>
         </div>
       ) : works.length === 0 ? (
         <div className="py-7 text-center">
           <UsersRound className="mx-auto text-fg-3" size={25} aria-hidden="true" />
-          <p className="mt-2 text-sm font-semibold text-fg">참여 중인 팀 작품이 없어요</p>
+          <p className="mt-2 text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "참여 중인 팀 작품이 없어요")}</p>
           <p className="mx-auto mt-1 max-w-xs text-xs leading-relaxed text-fg-3">
-            팀 초대를 수락하면 여기에서 역할과 저장 가능 여부를 확인하고 바로 열 수 있습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "팀 초대를 수락하면 여기에서 역할과 저장 가능 여부를 확인하고 바로 열 수 있습니다.")}</p>
         </div>
       ) : (
         <ul
-          aria-label="내 팀 작품"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "내 팀 작품")}
           aria-busy={loading || loadingMore}
           className="mt-3 max-h-[min(18rem,42dvh)] divide-y divide-line overflow-y-auto overscroll-contain border-y border-line [scrollbar-gutter:stable]"
         >
@@ -341,7 +336,7 @@ export function StudioSharedWorksPanelView({
           ) : null}
           <Button
             aria-busy={loadingMore}
-            aria-label={loadingMore ? "팀 작품 더 불러오는 중" : "팀 작품 더 불러오기"}
+            aria-label={loadingMore ? translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "팀 작품 더 불러오는 중") : translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "팀 작품 더 불러오기")}
             className="min-h-11 w-full"
             disabled={loading || loadingMore}
             size="sm"
@@ -358,7 +353,7 @@ export function StudioSharedWorksPanelView({
             ) : (
               <ChevronRight className="rotate-90" size={15} aria-hidden="true" />
             )}
-            {loadingMore ? "더 불러오는 중" : loadMoreError ? "다시 불러오기" : "작품 더 불러오기"}
+            {loadingMore ? translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "더 불러오는 중") : loadMoreError ? translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "다시 불러오기") : translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "작품 더 불러오기")}
           </Button>
         </div>
       ) : paginationComplete ? (
@@ -368,8 +363,7 @@ export function StudioSharedWorksPanelView({
           className="mt-3 text-center text-xs text-fg-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
           tabIndex={-1}
         >
-          모든 팀 작품을 불러왔습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioSharedWorksPanel", "ko", "모든 팀 작품을 불러왔습니다.")}</p>
       ) : null}
 
       {currentWork ? <CurrentReadOnlyNotice work={currentWork} /> : null}

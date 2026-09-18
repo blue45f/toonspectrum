@@ -76,4 +76,3 @@ describe("creator support offers", () => {
     })).toEqual({ ok: true, spam: true, value: null });
   });
 });
-

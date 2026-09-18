@@ -81,4 +81,3 @@ COMMENT ON TABLE public.supporter_funding_setting IS
   'Public operating-cost goal and supporter-wall visibility settings managed by ToonSpectrum operators.';
 
 COMMIT;
-

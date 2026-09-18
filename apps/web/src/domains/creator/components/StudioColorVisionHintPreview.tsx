@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   STUDIO_COLOR_VISION_COACH_GRAYSCALE_SATURATION,
   STUDIO_COLOR_VISION_COACH_MATRIX,
@@ -62,7 +63,7 @@ function ColorVisionScene({
   filterId?: string;
 }): ReactElement {
   return (
-    <g transform={`translate(${x} 18)`} filter={filterId ? `url(#${filterId})` : undefined}>
+    <g transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioColorVisionHintPreview", "en", "translate({v0} 18)"), { v0: String(x) })} filter={filterId ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioColorVisionHintPreview", "en", "url(#{v0})"), { v0: String(filterId) }) : undefined}>
       <rect
         width="68"
         height="68"
@@ -113,7 +114,7 @@ export function StudioColorVisionHintPreview({
   const resultFilterId = restoreOriginal ? undefined : filterId;
 
   return (
-    <g data-preview-operation={`color-vision-${mode}`}>
+    <g data-preview-operation={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioColorVisionHintPreview", "en", "color-vision-{v0}"), { v0: String(mode) })}>
       {sourceFilterId || resultFilterId ? (
         <defs>
           <filter id={filterId} colorInterpolationFilters="linearRGB">
@@ -181,10 +182,10 @@ export function StudioColorVisionHintPreview({
         textAnchor="middle"
       >
         {mode === "original"
-          ? "ORIGINAL"
+          ? translateCurrentStaticSourceText("domains.creator.components.StudioColorVisionHintPreview", "en", "ORIGINAL")
           : mode === "grayscale"
-            ? "VALUE"
-            : `CVD ${mode === "protanopia" ? "P" : mode === "deuteranopia" ? "D" : "T"}`}
+            ? translateCurrentStaticSourceText("domains.creator.components.StudioColorVisionHintPreview", "en", "VALUE")
+            : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioColorVisionHintPreview", "en", "CVD {v0}"), { v0: String(mode === "protanopia" ? "P" : mode === "deuteranopia" ? "D" : "T") })}
       </text>
     </g>
   );

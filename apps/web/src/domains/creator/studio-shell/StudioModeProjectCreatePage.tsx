@@ -1,4 +1,10 @@
 import {
+  getCurrentUiLocale,
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   Box,
   Clapperboard,
@@ -14,6 +20,7 @@ import {
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -56,6 +63,7 @@ import {
   type StudioTaskFlowStep,
 } from "./StudioTaskFlow";
 
+type Locale = string;
 type Choice<T extends string> = {
   readonly id: T;
   readonly labelKo: string;
@@ -75,14 +83,18 @@ const KIND_ICONS: Readonly<Record<StudioProjectKind, LucideIcon>> = {
 
 const CREATE_DISABLED_REASON_ID = "studio-create-disabled-reason";
 
-type Localizer = (ko: string, en: string) => string;
-
-function localized(option: StudioProjectCreateKindOption, localize: Localizer): string {
-  return localize(option.titleKo, option.titleEn);
+function localized(
+  option: StudioProjectCreateKindOption,
+  bt: (ko: string, en: string) => string,
+): string {
+  return bt(option.titleKo, option.titleEn);
 }
 
-function defaultTitle(option: StudioProjectCreateKindOption, localize: Localizer): string {
-  return localize(option.defaultTitleKo, option.defaultTitleEn);
+function defaultTitle(
+  option: StudioProjectCreateKindOption,
+  bt: (ko: string, en: string) => string,
+): string {
+  return bt(option.defaultTitleKo, option.defaultTitleEn);
 }
 
 function requestedKind(kind: string | null, templateId: string | null): StudioProjectKind | null {
@@ -94,10 +106,14 @@ function requestedKind(kind: string | null, templateId: string | null): StudioPr
   )?.id ?? null;
 }
 
-function documentTitle(kind: StudioProjectKind, title: string): string {
-  if (kind === "webtoon") return "EP01 원고";
-  if (kind === "slides") return "발표 자료";
-  return `${title} 작업 문서`;
+function documentTitle(
+  kind: StudioProjectKind,
+  title: string,
+  bt: (ko: string, en: string) => string,
+): string {
+  if (kind === "webtoon") return bt("EP01 원고", "EP01 manuscript");
+  if (kind === "slides") return bt("발표 자료", "Presentation");
+  return bt(`${title} 작업 문서`, `${title} working document`);
 }
 
 function OnboardingSelect<T extends string>({
@@ -114,7 +130,7 @@ function OnboardingSelect<T extends string>({
   readonly locale?: string;
   readonly onChange: (next: T) => void;
 }) {
-  const l = useBilingualLocalizer("studioModeCreate.onboardingSelect");
+  const bt = useBilingual("StudioModeProjectCreatePage.onboardingSelect");
   return (
     <label className="text-xs font-bold text-fg-2" htmlFor={id}>
       {label}
@@ -126,7 +142,7 @@ function OnboardingSelect<T extends string>({
       >
         {choices.map((choice) => (
           <option key={choice.id} value={choice.id}>
-            {l(choice.labelKo, choice.labelEn)}
+            {bt(choice.labelKo, choice.labelEn)}
           </option>
         ))}
       </select>
@@ -135,11 +151,10 @@ function OnboardingSelect<T extends string>({
 }
 
 export function StudioModeProjectCreatePage() {
-  const l = useBilingualLocalizer("studioModeCreate");
+  const bt = useBilingual("StudioModeProjectCreatePage");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const language = useI18n((state) => state.lang);
-  const legacyLocale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  const locale = useI18n((state) => state.lang);
   const requestedTemplateId = searchParams.get("template");
   const requestedSelection = webtoonOnboardingSelectionFromSearchParams(searchParams);
   const requestedKindId = requestedKind(searchParams.get("kind"), requestedTemplateId);
@@ -152,7 +167,7 @@ export function StudioModeProjectCreatePage() {
 
   const [kind, setKind] = useState<StudioProjectKind>(initialKind.id);
   const [templateId, setTemplateId] = useState(initialTemplateId);
-  const [title, setTitle] = useState(() => defaultTitle(initialKind, l));
+  const [title, setTitle] = useState(() => defaultTitle(initialKind, bt));
   const [titleEdited, setTitleEdited] = useState(false);
   const [showMoreKinds, setShowMoreKinds] = useState(false);
   const [onboardingEnabled, setOnboardingEnabled] = useState(Boolean(requestedSelection));
@@ -164,7 +179,7 @@ export function StudioModeProjectCreatePage() {
 
   const templates = STUDIO_PROJECT_CREATE_TEMPLATES[kind];
   const selectedTemplate = templates.find((template) => template.id === templateId) ?? templates[0]!;
-  const selectedTemplateLabel = l(selectedTemplate.labelKo, selectedTemplate.labelEn);
+  const selectedTemplateLabel = bt(selectedTemplate.labelKo, selectedTemplate.labelEn);
   const modePlan = useMemo(
     () => resolveStudioModeCreationPlan(kind, selectedTemplate.id),
     [kind, selectedTemplate.id],
@@ -180,26 +195,26 @@ export function StudioModeProjectCreatePage() {
   const steps: readonly StudioTaskFlowStep[] = [
     {
       id: "kind",
-      label: l("만들 작업 선택", "Choose work type"),
+      label: bt("만들 작업 선택", "Choose work type"),
       description: modeName,
       state: "complete",
     },
     {
       id: "details",
-      label: l("이름과 시작 형식", "Name and format"),
+      label: bt("이름과 시작 형식", "Name and format"),
       description: selectedTemplateLabel,
       state: titleReady ? "complete" : "current",
     },
     ...(structuredWebtoon ? [{
       id: "production-track",
-      label: l("제작 트랙 확인", "Confirm production track"),
-      description: l(onboardingPlan.titleKo, onboardingPlan.titleEn),
+      label: bt("제작 트랙 확인", "Confirm production track"),
+      description: bt(onboardingPlan.titleKo, onboardingPlan.titleEn),
       state: "complete" as const,
     }] : []),
     {
       id: "start",
-      label: l("자동 저장하며 시작", "Start with autosave"),
-      description: l("이 기기에 복구 저장 후 작업 시작", "Start after creating device recovery storage"),
+      label: bt("자동 저장하며 시작", "Start with autosave"),
+      description: bt("이 기기에 복구 저장 후 작업 시작", "Start after creating device recovery storage"),
       state: titleReady ? "current" : "upcoming",
     },
   ];
@@ -207,7 +222,7 @@ export function StudioModeProjectCreatePage() {
   function chooseKind(option: StudioProjectCreateKindOption) {
     setKind(option.id);
     setTemplateId(STUDIO_PROJECT_CREATE_TEMPLATES[option.id][0]?.id ?? `${option.id}-blank`);
-    if (!titleEdited) setTitle(defaultTitle(option, l));
+    if (!titleEdited) setTitle(defaultTitle(option, bt));
     if (option.id !== "webtoon") setOnboardingEnabled(false);
     setError(null);
   }
@@ -222,9 +237,9 @@ export function StudioModeProjectCreatePage() {
         title: normalizedTitle,
         kind,
         templateId: selectedTemplate.id,
-        primaryLocale: language,
+        primaryLocale: locale,
         document: {
-          title: documentTitle(kind, normalizedTitle),
+          title: documentTitle(kind, normalizedTitle, bt),
           kind: modePlan.document.kind,
           defaultWorkspace: modePlan.document.workspace,
           width: modePlan.document.width,
@@ -252,13 +267,13 @@ export function StudioModeProjectCreatePage() {
       setCreating(false);
       setError(cause instanceof Error
         ? cause.message
-        : l("새 작업을 만들지 못했습니다.", "The new work could not be created."));
+        : bt("새 작업을 만들지 못했습니다.", "The new work could not be created."));
     }
   }
 
   const startLabel = structuredWebtoon
-    ? (l("프로젝트와 제작 계획 만들기", "Create project and production plan"))
-    : l(`${modeName} 시작`, `Start ${modeName}`);
+    ? (bt("프로젝트와 제작 계획 만들기", "Create project and production plan"))
+    : bt(`${modeName} 시작`, `Start ${modeName}`);
 
   return (
     <div data-route-ready="studio-new" data-studio-mode-create="true" className="min-h-[calc(100vh-4rem)] bg-bg">
@@ -267,30 +282,29 @@ export function StudioModeProjectCreatePage() {
           <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">
-                <Sparkles size={14} aria-hidden="true" /> TOONSTUDIO CREATE
-              </p>
+                <Sparkles size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioModeProjectCreatePage", "en", "TOONSTUDIO CREATE")}</p>
               <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-4xl">
-                {l("무엇을 만들지 고르면 작업공간도 바뀝니다", "Choose what to make — the workspace changes with it")}
+                {bt("무엇을 만들지 고르면 작업공간도 바뀝니다", "Choose what to make — the workspace changes with it")}
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2 sm:text-base">
-                {l("작업 종류와 시작 형식만 고르면 됩니다. 시작하는 즉시 이 기기에 복구 저장되며, 종류마다 패널·도구·AI 추천·제작 흐름과 내보내기 목표가 달라집니다.", "Choose the work type and starting format. Recovery storage begins on this device immediately, and each mode adapts panels, tools, AI, workflow and delivery.")}
+                {bt("작업 종류와 시작 형식만 고르면 됩니다. 시작하는 즉시 이 기기에 복구 저장되며, 종류마다 패널·도구·AI 추천·제작 흐름과 내보내기 목표가 달라집니다.", "Choose the work type and starting format. Recovery storage begins on this device immediately, and each mode adapts panels, tools, AI, workflow and delivery.")}
               </p>
             </div>
             <Link href="/studio/import" className={buttonClass({ variant: "outline" })}>
-              {l("기존 파일 가져오기", "Import existing files")}
+              {bt("기존 파일 가져오기", "Import existing files")}
             </Link>
           </header>
 
           <StudioTaskFlow
             steps={steps}
-            ariaLabel={l("새 프로젝트 시작 단계", "New project start steps")}
+            ariaLabel={bt("새 프로젝트 시작 단계", "New project start steps")}
             className="mt-5"
           />
 
           <section className="mt-7" aria-labelledby="studio-mode-kind-title">
             <p className="text-xs font-black text-accent">01</p>
             <h2 id="studio-mode-kind-title" className="mt-1 text-lg font-black text-fg">
-              {l("만들 작업", "What are you making?")}
+              {bt("만들 작업", "What are you making?")}
             </h2>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {visibleKinds.map((option) => {
@@ -310,9 +324,9 @@ export function StudioModeProjectCreatePage() {
                     <span className={cn("grid size-10 place-items-center rounded-xl", active ? "bg-accent text-on-accent" : "bg-panel text-fg-2")}>
                       <Icon size={19} aria-hidden="true" />
                     </span>
-                    <b className="mt-3 block text-sm text-fg">{localized(option, l)}</b>
+                    <b className="mt-3 block text-sm text-fg">{localized(option, bt)}</b>
                     <span className="mt-1 block text-xs leading-5 text-fg-3">
-                      {l(option.descriptionKo, option.descriptionEn)}
+                      {bt(option.descriptionKo, option.descriptionEn)}
                     </span>
                   </button>
                 );
@@ -320,7 +334,7 @@ export function StudioModeProjectCreatePage() {
             </div>
             {!showMoreKinds ? (
               <button type="button" onClick={() => setShowMoreKinds(true)} className={buttonClass({ variant: "quiet", size: "sm", className: "mt-2" })}>
-                {l("다른 작업 종류 보기", "Show more project types")}
+                {bt("다른 작업 종류 보기", "Show more project types")}
               </button>
             ) : null}
           </section>
@@ -334,10 +348,10 @@ export function StudioModeProjectCreatePage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-black text-accent">
-                        {l("실제 제작 단계에 맞춰 시작", "Start from your real production stage")}
+                        {bt("실제 제작 단계에 맞춰 시작", "Start from your real production stage")}
                       </p>
                       <p className="mt-1 text-xs leading-5 text-fg-3">
-                        {l("대본·콘티·팀 구성과 연재 주기를 알려주면 첫 제작 계획까지 준비합니다.", "Use your current material, goal, team and cadence to prepare the first production plan.")}
+                        {bt("대본·콘티·팀 구성과 연재 주기를 알려주면 첫 제작 계획까지 준비합니다.", "Use your current material, goal, team and cadence to prepare the first production plan.")}
                       </p>
                     </div>
                     <button
@@ -347,23 +361,23 @@ export function StudioModeProjectCreatePage() {
                       className={buttonClass({ variant: onboardingEnabled ? "solid" : "outline", size: "sm" })}
                     >
                       {onboardingEnabled
-                        ? (l("제작 계획 사용 중", "Production plan on"))
-                        : (l("제작 단계 설정하기", "Configure production"))}
+                        ? (bt("제작 계획 사용 중", "Production plan on"))
+                        : (bt("제작 단계 설정하기", "Configure production"))}
                     </button>
                   </div>
 
                   {onboardingEnabled ? (
                     <div className="mt-4">
                       <h3 className="text-base font-black text-fg">
-                        {l(onboardingPlan.titleKo, onboardingPlan.titleEn)}
+                        {bt(onboardingPlan.titleKo, onboardingPlan.titleEn)}
                       </h3>
                       <p className="mt-1 text-xs leading-5 text-fg-3">
-                        {l(onboardingPlan.summaryKo, onboardingPlan.summaryEn)}
+                        {bt(onboardingPlan.summaryKo, onboardingPlan.summaryEn)}
                       </p>
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
                         <OnboardingSelect<WebtoonStartingPointId>
                           id="studio-webtoon-starting-point"
-                          label={l("현재 가지고 있는 자료", "What you already have")}
+                          label={bt("현재 가지고 있는 자료", "What you already have")}
                           value={selection.startingPoint}
                           choices={WEBTOON_STARTING_POINTS}
                           locale={legacyLocale}
@@ -371,7 +385,7 @@ export function StudioModeProjectCreatePage() {
                         />
                         <OnboardingSelect<WebtoonOnboardingGoalId>
                           id="studio-webtoon-goal"
-                          label={l("이번 프로젝트 목표", "Project goal")}
+                          label={bt("이번 프로젝트 목표", "Project goal")}
                           value={selection.goal}
                           choices={WEBTOON_ONBOARDING_GOALS}
                           locale={legacyLocale}
@@ -379,7 +393,7 @@ export function StudioModeProjectCreatePage() {
                         />
                         <OnboardingSelect<WebtoonTeamModelId>
                           id="studio-webtoon-team"
-                          label={l("제작 인원", "Team model")}
+                          label={bt("제작 인원", "Team model")}
                           value={selection.teamModel}
                           choices={WEBTOON_TEAM_MODELS}
                           locale={legacyLocale}
@@ -387,7 +401,7 @@ export function StudioModeProjectCreatePage() {
                         />
                         <OnboardingSelect<WebtoonCadenceId>
                           id="studio-webtoon-cadence"
-                          label={l("제작 주기", "Cadence")}
+                          label={bt("제작 주기", "Cadence")}
                           value={selection.cadence}
                           choices={WEBTOON_CADENCES}
                           locale={legacyLocale}
@@ -402,9 +416,9 @@ export function StudioModeProjectCreatePage() {
 
             <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
               <p className="text-xs font-black text-accent">02</p>
-              <h2 className="mt-1 text-lg font-black text-fg">{l("시작 형식", "Starting format")}</h2>
+              <h2 className="mt-1 text-lg font-black text-fg">{bt("시작 형식", "Starting format")}</h2>
               <label className="mt-4 block text-xs font-bold text-fg-2" htmlFor="studio-mode-project-title">
-                {l("프로젝트 이름", "Project name")}
+                {bt("프로젝트 이름", "Project name")}
                 <input
                   id="studio-mode-project-title"
                   value={title}
@@ -417,7 +431,7 @@ export function StudioModeProjectCreatePage() {
                 />
               </label>
               <label className="mt-4 block text-xs font-bold text-fg-2" htmlFor="studio-mode-template">
-                {l("시작 템플릿", "Starting template")}
+                {bt("시작 템플릿", "Starting template")}
                 <select
                   id="studio-mode-template"
                   value={selectedTemplate.id}
@@ -426,21 +440,21 @@ export function StudioModeProjectCreatePage() {
                 >
                   {templates.map((template) => (
                     <option key={template.id} value={template.id}>
-                      {l(template.labelKo, template.labelEn)}
+                      {bt(template.labelKo, template.labelEn)}
                     </option>
                   ))}
                 </select>
               </label>
 
               <StudioTaskSummary
-                eyebrow={l("선택한 시작 설정", "Selected setup")}
-                title={title.trim() || (l("프로젝트 이름 없음", "Untitled project"))}
+                eyebrow={bt("선택한 시작 설정", "Selected setup")}
+                title={title.trim() || (bt("프로젝트 이름 없음", "Untitled project"))}
                 description={`${modeName} · ${selectedTemplateLabel}`}
                 className="mt-4"
                 meta={(
                   <>
                     <span className="rounded-full border border-good/30 bg-good/10 px-2 py-1 text-[0.65rem] font-bold text-fg-2">
-                      {l("이 기기에 저장됨", "Saved on this device")}
+                      {bt("이 기기에 저장됨", "Saved on this device")}
                     </span>
                     <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] font-bold text-fg-3">
                       {modePlan.document.workspace} · {modePlan.document.width} × {modePlan.document.height}
@@ -450,7 +464,7 @@ export function StudioModeProjectCreatePage() {
               />
 
               <DisabledReason id={CREATE_DISABLED_REASON_ID} visible={!titleReady} className="mt-3">
-                {l("프로젝트 이름을 입력하면 자동 저장되는 작업공간을 시작할 수 있습니다.", "Enter a project name to start an autosaved workspace.")}
+                {bt("프로젝트 이름을 입력하면 자동 저장되는 작업공간을 시작할 수 있습니다.", "Enter a project name to start an autosaved workspace.")}
               </DisabledReason>
 
               <button
@@ -460,11 +474,11 @@ export function StudioModeProjectCreatePage() {
                 onClick={create}
                 className={buttonClass({ variant: "solid", size: "lg", className: "mt-5 min-h-12 w-full gap-2" })}
               >
-                {creating ? (l("작업공간 만드는 중…", "Creating workspace…")) : startLabel}
+                {creating ? (bt("작업공간 만드는 중…", "Creating workspace…")) : startLabel}
                 {!creating ? <ArrowRight size={16} aria-hidden="true" /> : null}
               </button>
               <p className="mt-2 text-center text-[0.68rem] leading-5 text-fg-3">
-                {l("자동 복구 저장과 버전 기록이 즉시 시작됩니다. 저장 위치는 작업 중 언제든 연결할 수 있습니다.", "Recovery autosave and version history start immediately. You can connect another save destination later.")}
+                {bt("자동 복구 저장과 버전 기록이 즉시 시작됩니다. 저장 위치는 작업 중 언제든 연결할 수 있습니다.", "Recovery autosave and version history start immediately. You can connect another save destination later.")}
               </p>
               {error ? <p role="alert" className="mt-3 text-sm text-danger">{error}</p> : null}
             </div>

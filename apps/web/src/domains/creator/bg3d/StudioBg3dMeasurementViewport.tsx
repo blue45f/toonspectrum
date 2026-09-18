@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Three/R3F adapter for the renderer-independent BG3D measurement core.
  *
@@ -58,7 +62,7 @@ function MeasurementLine({
       </lineSegments>
       {[startWorld, endWorld].map((point, index) => (
         <mesh
-          key={`${id}:endpoint:${index}`}
+          key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementViewport", "en", "{v0}:endpoint:{v1}"), { v0: String(id), v1: String(index) })}
           position={[...point]}
           raycast={() => null}
           renderOrder={46}
@@ -74,7 +78,7 @@ function MeasurementLine({
         zIndexRange={[70, 20]}
       >
         <span
-          data-testid={`bg3d-measurement-guide-${id}`}
+          data-testid={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementViewport", "en", "bg3d-measurement-guide-{v0}"), { v0: String(id) })}
           className="block whitespace-nowrap rounded-full border border-accent/45 bg-panel/95 px-2 py-1 text-[0.62rem] font-bold tabular-nums text-fg shadow-md backdrop-blur"
         >
           {label}
@@ -138,8 +142,7 @@ function MeasurementGuideOverlay({
             zIndexRange={[70, 20]}
           >
             <span className="block whitespace-nowrap rounded-full border border-cool/50 bg-panel/95 px-2 py-1 text-[0.62rem] font-bold text-fg shadow-md backdrop-blur">
-              시작점
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementViewport", "ko", "시작점")}</span>
           </Html>
         </group>
       ) : null}

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
@@ -166,7 +170,7 @@ export function ProductionIntegrationsPanel({
   };
 
   if (loading) {
-    return <div className="rounded-2xl border border-line bg-card p-5 text-sm text-fg-2">무료 외부 연동 상태를 확인하는 중…</div>;
+    return <div className="rounded-2xl border border-line bg-card p-5 text-sm text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "무료 외부 연동 상태를 확인하는 중…")}</div>;
   }
 
   const projectPath = `/production/projects/${encodeURIComponent(aggregate.projectId)}/settings`;
@@ -178,13 +182,12 @@ export function ProductionIntegrationsPanel({
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-accent/25 bg-accent-soft/10 p-4">
-        <p className="text-sm font-black text-fg">비용 없는 경로를 기본값으로 사용합니다.</p>
+        <p className="text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "비용 없는 경로를 기본값으로 사용합니다.")}</p>
         <p className="mt-1 text-xs leading-5 text-fg-2">
-          ICS·mailto·Web Push·직접 웹훅·해시 증명은 별도 사용료가 없습니다. 전자서명은 자체 호스팅을 우선하고, 결제는 테스트 키만 기본 허용합니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "ICS·mailto·Web Push·직접 웹훅·해시 증명은 별도 사용료가 없습니다. 전자서명은 자체 호스팅을 우선하고, 결제는 테스트 키만 기본 허용합니다.")}</p>
         {capabilities ? (
           <p className="mt-2 text-[0.6875rem] leading-5 text-fg-3">
-            정책 {capabilities.costPolicy} · 오늘 남은 횟수: Calendar {capabilities.budget.remaining.googleCalendarSyncs ?? 0}, Gmail {capabilities.budget.remaining.gmailDrafts ?? 0}, Drive {capabilities.budget.remaining.googleDriveUploads ?? 0}, 알림 {capabilities.budget.remaining.notifications ?? 0}
+            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "정책 ")}{capabilities.costPolicy} {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "· 오늘 남은 횟수: Calendar ")}{capabilities.budget.remaining.googleCalendarSyncs ?? 0}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", ", Gmail ")}{capabilities.budget.remaining.gmailDrafts ?? 0}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", ", Drive ")}{capabilities.budget.remaining.googleDriveUploads ?? 0}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", ", 알림 ")}{capabilities.budget.remaining.notifications ?? 0}
           </p>
         ) : null}
       </div>
@@ -192,11 +195,10 @@ export function ProductionIntegrationsPanel({
       {error ? <p role="alert" className="rounded-xl border border-bad/30 bg-bad/10 px-3 py-2 text-xs text-fg">{error}</p> : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card title="일정 · Google Calendar" description="모든 마감은 ICS로 즉시 내보내고, 선택적으로 사용자의 Google Calendar에 동기화합니다.">
+        <Card title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "일정 · Google Calendar")} description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "모든 마감은 ICS로 즉시 내보내고, 선택적으로 사용자의 Google Calendar에 동기화합니다.")}>
           <div className="flex flex-wrap gap-2">
             <a href={productionCalendarIcsUrl(aggregate.projectId)} className={buttonClass({ variant: "outline", size: "sm" })}>
-              ICS 내려받기
-            </a>
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "ICS 내려받기")}</a>
             {capabilities?.calendar.googleConnected ? (
               <>
                 <button
@@ -208,7 +210,7 @@ export function ProductionIntegrationsPanel({
                   })}
                   className={buttonClass({ size: "sm" })}
                 >
-                  {busy === "calendar-sync" ? "동기화 중…" : "Google 일정 동기화"}
+                  {busy === "calendar-sync" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "동기화 중…") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "Google 일정 동기화")}
                 </button>
                 <button
                   type="button"
@@ -219,8 +221,7 @@ export function ProductionIntegrationsPanel({
                   })}
                   className={buttonClass({ variant: "quiet", size: "sm" })}
                 >
-                  연결 해제
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "연결 해제")}</button>
               </>
             ) : capabilities?.calendar.googleApiConfigured ? (
               <button
@@ -232,8 +233,7 @@ export function ProductionIntegrationsPanel({
                 })}
                 className={buttonClass({ size: "sm" })}
               >
-                Google 연결
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "Google 연결")}</button>
             ) : null}
           </div>
           <div className="mt-3 space-y-2">
@@ -243,30 +243,28 @@ export function ProductionIntegrationsPanel({
                   <p className="truncate text-sm font-semibold text-fg">{event.title}</p>
                   <p className="mt-1 text-xs text-fg-3">{new Date(event.startsAt).toLocaleString("ko-KR")}</p>
                 </div>
-                <a href={event.googleCalendarUrl} target="_blank" rel="noreferrer" className={buttonClass({ variant: "quiet", size: "sm" })}>추가</a>
+                <a href={event.googleCalendarUrl} target="_blank" rel="noreferrer" className={buttonClass({ variant: "quiet", size: "sm" })}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "추가")}</a>
               </div>
             ))}
-            {events.length === 0 ? <p className="text-xs text-fg-3">등록할 마감 일정이 없습니다.</p> : null}
+            {events.length === 0 ? <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "등록할 마감 일정이 없습니다.")}</p> : null}
           </div>
         </Card>
-        <Card title="이메일 초안" description="메일을 자동 발송하지 않고, mailto 또는 사용자가 연결한 Gmail의 초안으로만 만듭니다.">
+        <Card title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "이메일 초안")} description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "메일을 자동 발송하지 않고, mailto 또는 사용자가 연결한 Gmail의 초안으로만 만듭니다.")}>
           <label className="text-xs font-bold text-fg-2">
-            받는 사람
-            <input
+            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "받는 사람")}<input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="collaborator@example.com"
-              className={`${FIELD_CLASS} mt-1`}
+              placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "collaborator@example.com")}
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "{v0} mt-1"), { v0: String(FIELD_CLASS) })}
             />
           </label>
           <label className="mt-3 block text-xs font-bold text-fg-2">
-            메시지
-            <textarea
+            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "메시지")}<textarea
               value={messageBody}
               onChange={(event) => setMessageBody(event.target.value)}
               rows={5}
-              className={`${FIELD_CLASS} mt-1 py-2`}
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "{v0} mt-1 py-2"), { v0: String(FIELD_CLASS) })}
             />
           </label>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -279,8 +277,7 @@ export function ProductionIntegrationsPanel({
               })}
               className={buttonClass({ variant: "outline", size: "sm" })}
             >
-              mailto 초안
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "mailto 초안")}</button>
             <button
               type="button"
               disabled={!email.trim() || !capabilities?.email.googleConnected || busy !== null}
@@ -289,20 +286,19 @@ export function ProductionIntegrationsPanel({
               })}
               className={buttonClass({ size: "sm" })}
             >
-              {busy === "gmail" ? "초안 생성 중…" : "Gmail 초안 만들기"}
+              {busy === "gmail" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "초안 생성 중…") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "Gmail 초안 만들기")}
             </button>
           </div>
         </Card>
 
-        <Card title="Google Drive 백업" description="앱이 만든 파일만 볼 수 있는 drive.file 최소 권한으로 프로젝트 자료를 보관합니다.">
+        <Card title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "Google Drive 백업")} description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "앱이 만든 파일만 볼 수 있는 drive.file 최소 권한으로 프로젝트 자료를 보관합니다.")}>
           <div className="grid gap-2 sm:grid-cols-[1fr_1fr]">
             <label className="text-xs font-bold text-fg-2">
-              백업 종류
-              <select
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "백업 종류")}<select
                 value={driveArtifact}
                 onChange={(event) => setDriveArtifact(event.target.value as ProductionGoogleDriveArtifact)}
-                className={`${FIELD_CLASS} mt-1`}
-                aria-label="Google Drive 백업 종류"
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "{v0} mt-1"), { v0: String(FIELD_CLASS) })}
+                aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "Google Drive 백업 종류")}
               >
                 {Object.entries(DRIVE_ARTIFACT_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
@@ -310,12 +306,11 @@ export function ProductionIntegrationsPanel({
               </select>
             </label>
             <label className="text-xs font-bold text-fg-2">
-              선택 폴더 ID · 선택 사항
-              <input
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "선택 폴더 ID · 선택 사항")}<input
                 value={driveFolderId}
                 onChange={(event) => setDriveFolderId(event.target.value)}
-                placeholder="비우면 내 드라이브 최상위"
-                className={`${FIELD_CLASS} mt-1`}
+                placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "비우면 내 드라이브 최상위")}
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "{v0} mt-1"), { v0: String(FIELD_CLASS) })}
               />
             </label>
           </div>
@@ -333,7 +328,7 @@ export function ProductionIntegrationsPanel({
               })}
               className={buttonClass({ size: "sm" })}
             >
-              {busy === "drive-upload" ? "Drive에 저장 중…" : "Google Drive에 저장"}
+              {busy === "drive-upload" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "Drive에 저장 중…") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "Google Drive에 저장")}
             </button>
             {!capabilities?.drive.googleConnected && capabilities?.drive.googleApiConfigured ? (
               <button
@@ -345,8 +340,7 @@ export function ProductionIntegrationsPanel({
                 })}
                 className={buttonClass({ variant: "outline", size: "sm" })}
               >
-                Google 연결
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "Google 연결")}</button>
             ) : null}
             {driveFileLink ? (
               <a
@@ -355,16 +349,14 @@ export function ProductionIntegrationsPanel({
                 rel="noreferrer"
                 className={buttonClass({ variant: "quiet", size: "sm" })}
               >
-                저장된 파일 열기
-              </a>
+                {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "저장된 파일 열기")}</a>
             ) : null}
           </div>
           <p className="mt-3 text-xs leading-5 text-fg-3">
-            일반 JSON·ICS·CSV는 같은 앱 생성 파일을 갱신합니다. Google Sheet 변환은 원본 보존을 위해 새 문서로 만듭니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "일반 JSON·ICS·CSV는 같은 앱 생성 파일을 갱신합니다. Google Sheet 변환은 원본 보존을 위해 새 문서로 만듭니다.")}</p>
         </Card>
 
-        <Card title="알림" description="브라우저 Web Push는 별도 메시징 사업자 없이 VAPID로 동작하며, Discord·ntfy·HMAC 웹훅도 선택할 수 있습니다.">
+        <Card title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "알림")} description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "브라우저 Web Push는 별도 메시징 사업자 없이 VAPID로 동작하며, Discord·ntfy·HMAC 웹훅도 선택할 수 있습니다.")}>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -376,8 +368,7 @@ export function ProductionIntegrationsPanel({
               })}
               className={buttonClass({ variant: "outline", size: "sm" })}
             >
-              이 브라우저 알림 켜기
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "이 브라우저 알림 켜기")}</button>
             <button
               type="button"
               disabled={!productionPushSupported() || busy !== null}
@@ -386,15 +377,14 @@ export function ProductionIntegrationsPanel({
               })}
               className={buttonClass({ variant: "quiet", size: "sm" })}
             >
-              이 프로젝트 알림 끄기
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "이 프로젝트 알림 끄기")}</button>
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-[12rem_1fr]">
             <select
               value={notificationChannel}
               onChange={(event) => setNotificationChannel(event.target.value as NotificationChannel)}
               className={FIELD_CLASS}
-              aria-label="알림 채널"
+              aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "알림 채널")}
             >
               {availableNotificationChannels.map((channel) => <option key={channel} value={channel}>{channel}</option>)}
             </select>
@@ -411,34 +401,30 @@ export function ProductionIntegrationsPanel({
               })}
               className={buttonClass({ size: "sm" })}
             >
-              {busy === "notification" ? "전송 중…" : "테스트 알림 보내기"}
+              {busy === "notification" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "전송 중…") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "테스트 알림 보내기")}
             </button>
           </div>
         </Card>
-        <Card title="전자서명 · Documenso" description="오픈소스 Documenso 인스턴스 또는 API를 사용합니다. 연결되지 않은 경우 PDF를 내려받아 수동 서명하는 흐름을 유지합니다.">
+        <Card title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "전자서명 · Documenso")} description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "오픈소스 Documenso 인스턴스 또는 API를 사용합니다. 연결되지 않은 경우 PDF를 내려받아 수동 서명하는 흐름을 유지합니다.")}>
           <label className="block text-xs font-bold text-fg-2">
-            계약 PDF
-            <input
+            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "계약 PDF")}<input
               type="file"
               accept="application/pdf"
               onChange={(event) => setPdfFile(event.target.files?.[0] ?? null)}
-              className={`${FIELD_CLASS} mt-1 py-2 file:mr-3 file:rounded-lg file:border-0 file:bg-raised file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-fg`}
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "{v0} mt-1 py-2 file:mr-3 file:rounded-lg file:border-0 file:bg-raised file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-fg"), { v0: String(FIELD_CLASS) })}
             />
           </label>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <label className="text-xs font-bold text-fg-2">
-              서명자 이름
-              <input value={signerName} onChange={(event) => setSignerName(event.target.value)} className={`${FIELD_CLASS} mt-1`} />
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "서명자 이름")}<input value={signerName} onChange={(event) => setSignerName(event.target.value)} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "{v0} mt-1"), { v0: String(FIELD_CLASS) })} />
             </label>
             <label className="text-xs font-bold text-fg-2">
-              서명자 이메일
-              <input type="email" value={signerEmail} onChange={(event) => setSignerEmail(event.target.value)} className={`${FIELD_CLASS} mt-1`} />
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "서명자 이메일")}<input type="email" value={signerEmail} onChange={(event) => setSignerEmail(event.target.value)} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "{v0} mt-1"), { v0: String(FIELD_CLASS) })} />
             </label>
           </div>
           <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-fg-2">
             <input type="checkbox" checked={distribute} onChange={(event) => setDistribute(event.target.checked)} />
-            생성 직후 서명 요청 배포
-          </label>
+            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "생성 직후 서명 요청 배포")}</label>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -454,7 +440,7 @@ export function ProductionIntegrationsPanel({
               })}
               className={buttonClass({ size: "sm" })}
             >
-              {busy === "documenso" ? "서명 문서 생성 중…" : distribute ? "생성 후 배포" : "서명 초안 만들기"}
+              {busy === "documenso" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "서명 문서 생성 중…") : distribute ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "생성 후 배포") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "서명 초안 만들기")}
             </button>
             <button
               type="button"
@@ -465,17 +451,16 @@ export function ProductionIntegrationsPanel({
               })}
               className={buttonClass({ variant: "outline", size: "sm" })}
             >
-              수동 서명 패키지
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "수동 서명 패키지")}</button>
             <span className="text-xs text-fg-3">
               {capabilities?.signatures.documensoConfigured
-                ? capabilities.signatures.selfHosted ? "자체 호스팅 연결됨" : "Documenso API 연결됨"
-                : "미연결 · 수동 서명 사용"}
+                ? capabilities.signatures.selfHosted ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "자체 호스팅 연결됨") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "Documenso API 연결됨")
+                : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "미연결 · 수동 서명 사용")}
             </span>
           </div>
         </Card>
 
-        <Card title="출처 증명 · 세금계산서 준비" description="프로젝트 정본·기여·권리 정보를 SHA-256 manifest로 내보냅니다. 세금계산서 CSV는 발행 완료가 아니라 수동 신고·연동 준비 자료입니다.">
+        <Card title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "출처 증명 · 세금계산서 준비")} description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "프로젝트 정본·기여·권리 정보를 SHA-256 manifest로 내보냅니다. 세금계산서 CSV는 발행 완료가 아니라 수동 신고·연동 준비 자료입니다.")}>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -486,8 +471,7 @@ export function ProductionIntegrationsPanel({
               })}
               className={buttonClass({ variant: "outline", size: "sm" })}
             >
-              프로젝트 전체 백업
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "프로젝트 전체 백업")}</button>
             <button
               type="button"
               disabled={busy !== null}
@@ -497,24 +481,21 @@ export function ProductionIntegrationsPanel({
               })}
               className={buttonClass({ variant: "outline", size: "sm" })}
             >
-              해시·C2PA 초안 내려받기
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "해시·C2PA 초안 내려받기")}</button>
             <a href={productionTaxInvoiceCsvUrl(aggregate.projectId)} className={buttonClass({ variant: "outline", size: "sm" })}>
-              청구 CSV 내려받기
-            </a>
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "청구 CSV 내려받기")}</a>
           </div>
           <ul className="mt-3 space-y-2 text-xs leading-5 text-fg-2">
-            <li className="rounded-xl border border-line bg-panel px-3 py-2">• 현재 manifest는 위변조 확인용 해시 증명입니다. 신뢰 인증서가 붙은 공개 C2PA 서명은 아닙니다.</li>
-            <li className="rounded-xl border border-line bg-panel px-3 py-2">• CSV 생성만으로 국세청 전자세금계산서가 발행되거나 전송되지 않습니다.</li>
+            <li className="rounded-xl border border-line bg-panel px-3 py-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "• 현재 manifest는 위변조 확인용 해시 증명입니다. 신뢰 인증서가 붙은 공개 C2PA 서명은 아닙니다.")}</li>
+            <li className="rounded-xl border border-line bg-panel px-3 py-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "• CSV 생성만으로 국세청 전자세금계산서가 발행되거나 전송되지 않습니다.")}</li>
           </ul>
         </Card>
 
-        <Card title="결제 검증 · Toss Payments" description="기본은 테스트 키만 허용합니다. 운영 실결제는 서버에서 별도 명시 승인한 경우에만 열립니다.">
+        <Card title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "결제 검증 · Toss Payments")} description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "기본은 테스트 키만 허용합니다. 운영 실결제는 서버에서 별도 명시 승인한 경우에만 열립니다.")}>
           {aggregate.invoices.length > 0 ? (
             <div className="space-y-3">
               <label className="block text-xs font-bold text-fg-2">
-                청구서
-                <select
+                {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "청구서")}<select
                   value={invoiceId}
                   onChange={(event) => {
                     const nextId = event.target.value;
@@ -522,7 +503,7 @@ export function ProductionIntegrationsPanel({
                     const invoice = aggregate.invoices.find((entry) => entry.id === nextId);
                     if (invoice) setPaymentAmount(String(invoice.amountMinor));
                   }}
-                  className={`${FIELD_CLASS} mt-1`}
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "{v0} mt-1"), { v0: String(FIELD_CLASS) })}
                 >
                   {aggregate.invoices.map((invoice) => (
                     <option key={invoice.id} value={invoice.id}>{invoice.id} · {invoice.amountMinor.toLocaleString("ko-KR")} {invoice.currency}</option>
@@ -530,9 +511,9 @@ export function ProductionIntegrationsPanel({
                 </select>
               </label>
               <div className="grid gap-2 sm:grid-cols-3">
-                <input value={paymentKey} onChange={(event) => setPaymentKey(event.target.value)} placeholder="paymentKey" className={FIELD_CLASS} aria-label="Toss paymentKey" />
-                <input value={orderId} onChange={(event) => setOrderId(event.target.value)} placeholder="orderId" className={FIELD_CLASS} aria-label="Toss orderId" />
-                <input type="number" min={1} value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} placeholder="amount" className={FIELD_CLASS} aria-label="Toss amount" />
+                <input value={paymentKey} onChange={(event) => setPaymentKey(event.target.value)} placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "paymentKey")} className={FIELD_CLASS} aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "Toss paymentKey")} />
+                <input value={orderId} onChange={(event) => setOrderId(event.target.value)} placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "orderId")} className={FIELD_CLASS} aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "Toss orderId")} />
+                <input type="number" min={1} value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "amount")} className={FIELD_CLASS} aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "Toss amount")} />
               </div>
               <button
                 type="button"
@@ -547,11 +528,11 @@ export function ProductionIntegrationsPanel({
                 })}
                 className={buttonClass({ size: "sm" })}
               >
-                {busy === "toss" ? "결제 검증 중…" : capabilities?.payments.mode === "test" ? "테스트 결제 검증" : "결제 검증"}
+                {busy === "toss" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "결제 검증 중…") : capabilities?.payments.mode === "test" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "테스트 결제 검증") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "결제 검증")}
               </button>
-              <p className="text-xs text-fg-3">현재 모드: {capabilities?.payments.mode ?? "disabled"}</p>
+              <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "현재 모드: ")}{capabilities?.payments.mode ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "en", "disabled")}</p>
             </div>
-          ) : <p className="text-xs text-fg-3">검증할 청구서가 없습니다.</p>}
+          ) : <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionIntegrationsPanel", "ko", "검증할 청구서가 없습니다.")}</p>}
         </Card>
       </div>
     </div>

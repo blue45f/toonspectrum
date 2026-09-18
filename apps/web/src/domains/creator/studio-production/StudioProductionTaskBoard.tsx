@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   CheckCircle2,
   RotateCcw,
   Save,
@@ -235,7 +239,7 @@ function TaskEditor({
             </span>
           </div>
           <p className="mt-1 text-xs text-fg-2">
-            {task.owner || "미배정"} · 마감 {task.due}
+            {task.owner || translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "미배정")} {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "· 마감 ")}{task.due}
           </p>
         </div>
         <button
@@ -249,13 +253,13 @@ function TaskEditor({
           ) : (
             <CheckCircle2 className="size-4" aria-hidden="true" />
           )}
-          {task.status === "done" ? "재개" : "완료"}
+          {task.status === "done" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "재개") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "완료")}
         </button>
       </div>
       <div
         className="mt-3 h-2 overflow-hidden rounded-full bg-raised"
         role="progressbar"
-        aria-label={`${task.title} 진행률`}
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "{v0} 진행률"), { v0: String(task.title) })}
         aria-valuenow={task.progress}
         aria-valuemin={0}
         aria-valuemax={100}
@@ -265,13 +269,11 @@ function TaskEditor({
 
       <details className="mt-3 rounded-xl border border-line bg-card">
         <summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-bold">
-          단계·담당·의존성 편집
-        </summary>
+          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "단계·담당·의존성 편집")}</summary>
         <div className="border-t border-line p-3">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
-              작업 제목
-              <input
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "작업 제목")}<input
                 className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                 value={draft.title}
                 onChange={(event) => updateDraft({ title: event.currentTarget.value })}
@@ -280,8 +282,7 @@ function TaskEditor({
               />
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2">
-              상태
-              <select
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "상태")}<select
                 className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                 value={draft.status}
                 onChange={(event) => updateDraft({
@@ -295,8 +296,7 @@ function TaskEditor({
               </select>
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2">
-              우선순위
-              <select
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "우선순위")}<select
                 className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                 value={draft.priority}
                 onChange={(event) => updateDraft({
@@ -310,8 +310,7 @@ function TaskEditor({
               </select>
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2">
-              제작 단계
-              <select
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "제작 단계")}<select
                 className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                 value={draft.stage}
                 onChange={(event) => updateDraft({
@@ -331,8 +330,7 @@ function TaskEditor({
               </select>
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2">
-              주 담당 역할
-              <select
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "주 담당 역할")}<select
                 className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                 value={draft.role ?? ""}
                 onChange={(event) => {
@@ -341,15 +339,14 @@ function TaskEditor({
                 }}
                 disabled={!canEdit}
               >
-                <option value="">역할 미정</option>
+                <option value="">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "역할 미정")}</option>
                 {STUDIO_PRODUCTION_ROLES.map((role) => (
                   <option key={role} value={role}>{ROLE_LABELS[role]}</option>
                 ))}
               </select>
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2">
-              제작 범위
-              <select
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "제작 범위")}<select
                 className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                 value={draft.hierarchyNodeId ?? ""}
                 onChange={(event) => updateDraft({
@@ -357,15 +354,14 @@ function TaskEditor({
                 })}
                 disabled={!canEdit}
               >
-                <option value="">프로젝트 전체</option>
+                <option value="">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "프로젝트 전체")}</option>
                 {workspace.hierarchy.map((node) => (
                   <option key={node.id} value={node.id}>{node.title}</option>
                 ))}
               </select>
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2">
-              담당자 표시
-              <input
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "담당자 표시")}<input
                 className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                 value={draft.owner}
                 onChange={(event) => updateDraft({ owner: event.currentTarget.value })}
@@ -374,8 +370,7 @@ function TaskEditor({
               />
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2">
-              마감일
-              <input
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "마감일")}<input
                 type="date"
                 className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                 value={draft.due}
@@ -384,7 +379,7 @@ function TaskEditor({
               />
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
-              진행률 {draft.progress}%
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "진행률 ")}{draft.progress}%
               <input
                 type="range"
                 min={0}
@@ -395,8 +390,7 @@ function TaskEditor({
               />
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
-              선행 작업
-              <select
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "선행 작업")}<select
                 multiple
                 className="min-h-28 rounded-xl border border-line bg-panel p-2 text-sm text-fg"
                 value={[...draft.dependencyIds]}
@@ -413,8 +407,7 @@ function TaskEditor({
               </select>
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2">
-              실행 담당 배정
-              <select
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "실행 담당 배정")}<select
                 multiple
                 className="min-h-28 rounded-xl border border-line bg-panel p-2 text-sm text-fg"
                 value={[...draft.assigneeIds]}
@@ -431,8 +424,7 @@ function TaskEditor({
               </select>
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2">
-              검수 담당 배정
-              <select
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "검수 담당 배정")}<select
                 multiple
                 className="min-h-28 rounded-xl border border-line bg-panel p-2 text-sm text-fg"
                 value={[...draft.reviewerIds]}
@@ -451,8 +443,7 @@ function TaskEditor({
           </div>
           {draft.status === "blocked" ? (
             <label className="mt-3 grid gap-1 text-xs font-semibold text-fg-2">
-              차단 사유
-              <textarea
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "차단 사유")}<textarea
                 className="min-h-24 rounded-xl border border-line bg-panel p-3 text-sm text-fg"
                 value={draft.blockedReason}
                 onChange={(event) => updateDraft({ blockedReason: event.currentTarget.value })}
@@ -474,8 +465,7 @@ function TaskEditor({
               disabled={!canEdit}
             >
               <Trash2 className="size-4" aria-hidden="true" />
-              작업 삭제
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "작업 삭제")}</button>
             <button
               type="button"
               className={buttonClass({ size: "sm" })}
@@ -483,13 +473,11 @@ function TaskEditor({
               disabled={!canEdit || !draft.title.trim() || (protectedStage && !canChangeProtectedStage)}
             >
               <Save className="size-4" aria-hidden="true" />
-              작업 정보 저장
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "작업 정보 저장")}</button>
           </div>
           {draft.dependencyIds.some((id) => !taskById.has(id)) ? (
             <p className="mt-3 text-xs text-red-600" role="alert">
-              존재하지 않는 선행 작업이 포함되어 있습니다. 선택을 다시 저장해 주세요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "존재하지 않는 선행 작업이 포함되어 있습니다. 선택을 다시 저장해 주세요.")}</p>
           ) : null}
         </div>
       </details>
@@ -507,10 +495,9 @@ export function StudioProductionTaskBoard({
   if (workspace.tasks.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-line p-6 text-center">
-        <p className="text-sm font-bold">등록된 제작 작업이 없습니다</p>
+        <p className="text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "등록된 제작 작업이 없습니다")}</p>
         <p className="mx-auto mt-1 max-w-xl text-xs leading-relaxed text-fg-2">
-          필요한 작업을 추가한 뒤 제작 단계·담당 역할·선행 작업·검수자를 지정하세요.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionTaskBoard", "ko", "필요한 작업을 추가한 뒤 제작 단계·담당 역할·선행 작업·검수자를 지정하세요.")}</p>
       </div>
     );
   }

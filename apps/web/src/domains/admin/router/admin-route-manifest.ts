@@ -91,7 +91,6 @@ const LEGACY_TAB_ROUTE: Readonly<Record<string, AdminRouteId>> = {
   plans: "plans",
   revenue: "revenue",
   supporters: "supporters",
-  creatorSupport: "creatorSupport",
   campaigns: "campaigns",
   promos: "promos",
   announcements: "announcements",

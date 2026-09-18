@@ -1,6 +1,11 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
 import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
@@ -24,6 +29,8 @@ import {
   StudioProjectShellPage,
   type StudioProjectSection,
 } from "./StudioProjectShellPage";
+
+type Locale = string;
 
 const WEBTOON_ONBOARDING_PROFILE_PREFIX = "toonstudio:webtoon-onboarding:v1:";
 const LazyStudioWebtoonOnboardingPanel = lazy(async () => {
@@ -62,7 +69,7 @@ function StudioWebtoonOnboardingPanelSlot({
         <div
           className="min-h-28 animate-pulse rounded-3xl border border-accent/20 bg-accent-soft/15"
           aria-busy="true"
-          aria-label={l("제작 온보딩 불러오는 중", "Loading production onboarding")}
+          aria-label={bt("제작 온보딩 불러오는 중", "Loading production onboarding")}
         />
       )}
     >
@@ -97,7 +104,7 @@ function ProjectGraphPanelFallback({ locale }: { readonly locale: string }) {
     <div
       className="min-h-20 animate-pulse rounded-2xl border border-line bg-card/80"
       role="status"
-      aria-label={l("작품 버전 정보를 불러오는 중", "Loading project version data")}
+      aria-label={bt("작품 버전 정보를 불러오는 중", "Loading project version data")}
     />
   );
 }
@@ -125,6 +132,7 @@ function SectionWorkflow({
   readonly view: string;
   readonly locale: string;
 }) {
+  useBilingualI18nRevision();
   const showDelivery = section === "export" || (section === "settings" && view === "archive");
 
   return (
@@ -197,6 +205,7 @@ export function StudioProjectIntegratedPage({
 }: {
   readonly section: StudioProjectSection;
 }) {
+  const bt = useBilingual("StudioProjectIntegratedPage");
   const { projectId = "" } = useParams<{ projectId: string }>();
   const location = useLocation();
   const language = useI18n((state) => state.lang);

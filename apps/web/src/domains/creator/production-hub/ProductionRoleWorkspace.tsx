@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   ArrowRight,
   BadgeCheck,
@@ -225,7 +229,7 @@ function AssignmentAvatars({
   readonly aggregate: ProductionProjectAggregate;
   readonly assignmentIds: readonly string[];
 }) {
-  if (assignmentIds.length === 0) return <span className="text-[0.6875rem] text-bad">미배정</span>;
+  if (assignmentIds.length === 0) return <span className="text-[0.6875rem] text-bad">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "미배정")}</span>;
   return (
     <div className="flex items-center">
       {assignmentIds.slice(0, 3).map((assignmentId, index) => {
@@ -299,11 +303,11 @@ function TaskCard({
         </span>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {gate.blockers.length > 0 ? <Pill tone="danger">차단 {gate.blockers.length}</Pill> : null}
-        {gate.warnings.length > 0 ? <Pill tone="warning">주의 {gate.warnings.length}</Pill> : null}
+        {gate.blockers.length > 0 ? <Pill tone="danger">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "차단 ")}{gate.blockers.length}</Pill> : null}
+        {gate.warnings.length > 0 ? <Pill tone="warning">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "주의 ")}{gate.warnings.length}</Pill> : null}
         {task.dependencyTaskIds.length > 0 ? (
           <span className="inline-flex items-center gap-1 text-[0.6875rem] text-fg-3">
-            <GitBranch className="size-3" aria-hidden="true" /> 선행 {task.dependencyTaskIds.length}
+            <GitBranch className="size-3" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "선행 ")}{task.dependencyTaskIds.length}
           </span>
         ) : null}
       </div>
@@ -462,26 +466,26 @@ function TaskInspector({
 
       <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
         <div className="rounded-xl border border-line bg-panel p-3">
-          <p className="text-fg-3">입력 정본</p>
+          <p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "입력 정본")}</p>
           <p className="mt-1 font-black text-fg">{task.inputRevisionRefs.length}</p>
         </div>
         <div className="rounded-xl border border-line bg-panel p-3">
-          <p className="text-fg-3">산출물</p>
+          <p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "산출물")}</p>
           <p className="mt-1 font-black text-fg">{task.outputDeliverableIds.length}</p>
         </div>
         <div className="rounded-xl border border-line bg-panel p-3">
-          <p className="text-fg-3">선행 작업</p>
+          <p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "선행 작업")}</p>
           <p className="mt-1 font-black text-fg">
             {dependencyTasks.filter((entry) => entry && COMPLETED_DEPENDENCY_STATUSES.has(entry.status)).length}/{dependencyTasks.length}
           </p>
         </div>
         <div className="rounded-xl border border-line bg-panel p-3">
-          <p className="text-fg-3">예상 공수</p>
+          <p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "예상 공수")}</p>
           <p className="mt-1 font-black text-fg">{task.estimateHours?.likely ?? "—"}h</p>
         </div>
       </div>
       {(gate.blockers.length > 0 || gate.warnings.length > 0) ? (
-        <section className="mt-4 space-y-2" aria-label="작업 게이트">
+        <section className="mt-4 space-y-2" aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "작업 게이트")}>
           {gate.blockers.map((message) => (
             <div key={message} className="flex gap-2 rounded-xl border border-bad/30 bg-bad/10 p-3 text-xs leading-5 text-fg">
               <LockKeyhole className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden="true" />
@@ -497,21 +501,19 @@ function TaskInspector({
         </section>
       ) : (
         <div className="mt-4 flex items-center gap-2 rounded-xl border border-good/30 bg-good/10 p-3 text-xs font-semibold text-fg">
-          <CheckCircle2 className="size-4 text-good" aria-hidden="true" /> 다음 공정으로 이동할 준비가 됐습니다.
-        </div>
+          <CheckCircle2 className="size-4 text-good" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "다음 공정으로 이동할 준비가 됐습니다.")}</div>
       )}
 
-      <section className="mt-4 space-y-3" aria-label="담당자 배정">
+      <section className="mt-4 space-y-3" aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "담당자 배정")}>
         <label className="block text-xs font-bold text-fg">
-          주 담당자
-          <select
-            aria-label={`${task.title} 주 담당자`}
+          {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "주 담당자")}<select
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "{v0} 주 담당자"), { v0: String(task.title) })}
             value={task.assignmentIds[0] ?? ""}
             onChange={(event) => void changePrimaryAssignment("owner", event.target.value)}
             disabled={!canEdit}
             className="mt-1.5 min-h-10 w-full rounded-xl border border-line bg-panel px-3 text-xs font-semibold text-fg outline-none focus:border-accent"
           >
-            <option value="">담당자 미정</option>
+            <option value="">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "담당자 미정")}</option>
             {ownerOptions.map((assignment) => (
               <option key={assignment.id} value={assignment.id}>
                 {assignmentLabel(aggregate, assignment.id)} · {PRODUCTION_ROLE_LABELS[assignment.roleType]}
@@ -520,15 +522,14 @@ function TaskInspector({
           </select>
         </label>
         <label className="block text-xs font-bold text-fg">
-          주 검수자
-          <select
-            aria-label={`${task.title} 주 검수자`}
+          {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "주 검수자")}<select
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "{v0} 주 검수자"), { v0: String(task.title) })}
             value={task.reviewerAssignmentIds[0] ?? ""}
             onChange={(event) => void changePrimaryAssignment("reviewer", event.target.value)}
             disabled={!canEdit}
             className="mt-1.5 min-h-10 w-full rounded-xl border border-line bg-panel px-3 text-xs font-semibold text-fg outline-none focus:border-accent"
           >
-            <option value="">검수자 미정</option>
+            <option value="">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "검수자 미정")}</option>
             {reviewerOptions.map((assignment) => (
               <option key={assignment.id} value={assignment.id}>
                 {assignmentLabel(aggregate, assignment.id)} · {PRODUCTION_ROLE_LABELS[assignment.roleType]}
@@ -540,17 +541,17 @@ function TaskInspector({
 
       {dependencyTasks.length > 0 ? (
         <section className="mt-5">
-          <h3 className="text-xs font-black text-fg">선행 인수인계</h3>
+          <h3 className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "선행 인수인계")}</h3>
           <div className="mt-2 space-y-2">
             {dependencyTasks.map((dependency, index) => (
               <div key={task.dependencyTaskIds[index]} className="flex items-center gap-2 rounded-xl border border-line bg-panel p-2.5">
                 {dependency && COMPLETED_DEPENDENCY_STATUSES.has(dependency.status)
-                  ? <CheckCircle2 className="size-4 shrink-0 text-good" aria-label="완료" />
-                  : <CircleDashed className="size-4 shrink-0 text-warn" aria-label="대기" />}
+                  ? <CheckCircle2 className="size-4 shrink-0 text-good" aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "완료")} />
+                  : <CircleDashed className="size-4 shrink-0 text-warn" aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "대기")} />}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-semibold text-fg">{dependency?.title ?? task.dependencyTaskIds[index]}</p>
                   <p className="mt-0.5 text-[0.6875rem] text-fg-3">
-                    {dependency ? STATUS_LABELS[dependency.status] : "작업을 찾을 수 없음"}
+                    {dependency ? STATUS_LABELS[dependency.status] : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "작업을 찾을 수 없음")}
                   </p>
                 </div>
               </div>
@@ -560,7 +561,7 @@ function TaskInspector({
       ) : null}
 
       <section className="mt-5">
-        <h3 className="text-xs font-black text-fg">완료 기준</h3>
+        <h3 className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "완료 기준")}</h3>
         <ul className="mt-2 space-y-1.5">
           {task.completionCriteria.map((criterion) => (
             <li key={criterion} className="flex gap-2 rounded-lg bg-panel px-3 py-2 text-xs leading-5 text-fg-2">
@@ -594,8 +595,7 @@ function TaskInspector({
             disabled={!canEdit}
             onClick={() => void runTransition("changes-requested")}
           >
-            수정 요청
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "수정 요청")}</button>
         ) : null}
         {canBlock ? (
           <button
@@ -604,8 +604,7 @@ function TaskInspector({
             disabled={!canEdit}
             onClick={() => void runTransition("blocked")}
           >
-            차단 처리
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "차단 처리")}</button>
         ) : null}
       </div>
     </aside>
@@ -628,19 +627,17 @@ export function ProductionCrewCoverage({
         <div>
           <div className="flex items-center gap-2 text-accent">
             <Users className="size-4" aria-hidden="true" />
-            <p className="text-[0.6875rem] font-black uppercase tracking-[0.12em]">Crew map</p>
+            <p className="text-[0.6875rem] font-black uppercase tracking-[0.12em]">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "Crew map")}</p>
           </div>
-          <h2 className="mt-2 text-lg font-black text-fg">직군별 팀 커버리지</h2>
+          <h2 className="mt-2 text-lg font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "직군별 팀 커버리지")}</h2>
           <p className="mt-1 max-w-3xl text-xs leading-6 text-fg-2">
-            역할 배정은 실제 기여·권리·보상과 분리하면서, 작업 범위별 책임자와 검수 공백을 빠르게 확인합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "역할 배정은 실제 기여·권리·보상과 분리하면서, 작업 범위별 책임자와 검수 공백을 빠르게 확인합니다.")}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Pill tone={covered === PRODUCTION_DEPARTMENTS.length ? "success" : "warning"}>
-            {covered}/{PRODUCTION_DEPARTMENTS.length} 현재 커버
-          </Pill>
-          {scheduled > 0 ? <Pill tone="accent">충원 예정 {scheduled}</Pill> : null}
-          <Pill tone="accent">활성 셀 {activeCells}</Pill>
+          <Pill tone={covered === PRODUCTION_DEPARTMENTS.length ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "warning")}>
+            {covered}/{PRODUCTION_DEPARTMENTS.length} {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "현재 커버")}</Pill>
+          {scheduled > 0 ? <Pill tone="accent">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "충원 예정 ")}{scheduled}</Pill> : null}
+          <Pill tone="accent">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "활성 셀 ")}{activeCells}</Pill>
         </div>
       </header>
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -667,10 +664,10 @@ export function ProductionCrewCoverage({
                   <Icon className="size-4" aria-hidden="true" />
                 </span>
                 <Pill tone={workcell.coverage === "covered"
-                  ? "success"
+                  ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "success")
                   : workcell.coverage === "scheduled"
-                    ? "accent"
-                    : "warning"}>
+                    ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "accent")
+                    : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "warning")}>
                   {coverageLabel(workcell.coverage)}
                 </Pill>
               </div>
@@ -688,22 +685,21 @@ export function ProductionCrewCoverage({
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-semibold text-fg">{person}</p>
                         <p className="truncate text-[0.625rem] text-fg-3">
-                          {PRODUCTION_ROLE_LABELS[assignment.roleType]}{assignment.lead ? " · 리드" : ""}
+                          {PRODUCTION_ROLE_LABELS[assignment.roleType]}{assignment.lead ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", " · 리드") : ""}
                         </p>
                       </div>
-                      {scheduled ? <Pill tone="neutral">예정</Pill> : null}
+                      {scheduled ? <Pill tone="neutral">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "예정")}</Pill> : null}
                     </div>
                   );
                 })}
                 {assignments.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-xs text-fg-3">
-                    배정된 인력이 없습니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "배정된 인력이 없습니다.")}</p>
                 ) : null}
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-center text-[0.6875rem]">
-                <div className="rounded-lg bg-raised p-2"><p className="text-fg-3">열린 작업</p><p className="mt-1 font-black text-fg">{workcell.openTaskCount}</p></div>
-                <div className="rounded-lg bg-raised p-2"><p className="text-fg-3">예상 공수</p><p className="mt-1 font-black text-fg">{workcell.likelyHours}h</p></div>
+                <div className="rounded-lg bg-raised p-2"><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "열린 작업")}</p><p className="mt-1 font-black text-fg">{workcell.openTaskCount}</p></div>
+                <div className="rounded-lg bg-raised p-2"><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "예상 공수")}</p><p className="mt-1 font-black text-fg">{workcell.likelyHours}h</p></div>
               </div>
             </article>
           );
@@ -724,7 +720,7 @@ function DepartmentSidebar({
   readonly onChange: (value: DepartmentFilter) => void;
 }) {
   return (
-    <nav aria-label="직군 작업 셀" className="rounded-2xl border border-line bg-card p-2.5">
+    <nav aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "직군 작업 셀")} className="rounded-2xl border border-line bg-card p-2.5">
       <button
         type="button"
         aria-pressed={filter === "lens"}
@@ -747,7 +743,7 @@ function DepartmentSidebar({
         )}
       >
         <Workflow className="size-4" aria-hidden="true" />
-        <span className="min-w-0 flex-1">전체 직군</span>
+        <span className="min-w-0 flex-1">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "전체 직군")}</span>
         <span>{board.workcells.reduce((sum, entry) => sum + entry.openTaskCount, 0)}</span>
       </button>
       <div className="my-2 h-px bg-line" />
@@ -801,12 +797,11 @@ function PipelineView({
       <section className="rounded-2xl border border-line bg-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-black text-fg">웹툰 표준 공정</h2>
+            <h2 className="text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "웹툰 표준 공정")}</h2>
             <p className="mt-1 text-xs leading-6 text-fg-2">
-              선화와 배경은 콘티 뒤에 병렬로 진행하고, 채색부터 다시 하나의 통합 정본으로 합류합니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "선화와 배경은 콘티 뒤에 병렬로 진행하고, 채색부터 다시 하나의 통합 정본으로 합류합니다.")}</p>
           </div>
-          <Pill tone="accent">직군 간 인수인계 {WEBTOON_PRODUCTION_PIPELINE.length - 1}단계</Pill>
+          <Pill tone="accent">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "직군 간 인수인계 ")}{WEBTOON_PRODUCTION_PIPELINE.length - 1}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "단계")}</Pill>
         </div>
         <div className="mt-4 overflow-x-auto pb-2">
           <div className="grid min-w-[72rem] grid-cols-8 gap-2">
@@ -838,14 +833,14 @@ function PipelineView({
                     <span className="text-[0.625rem] font-black text-fg-3">{String(index + 1).padStart(2, "0")}</span>
                   </div>
                   <p className="mt-3 text-xs font-black text-fg">{stage.label}</p>
-                  <p className="mt-1 text-[0.625rem] text-fg-3">{stageTasks.length}작업 · 차단 {blocked}</p>
+                  <p className="mt-1 text-[0.625rem] text-fg-3">{stageTasks.length}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "작업 · 차단 ")}{blocked}</p>
                   <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-line">
                     <div className="h-full rounded-full bg-accent" style={{ width: `${progress}%` }} />
                   </div>
                   <p className="mt-2 line-clamp-2 text-[0.625rem] leading-4 text-fg-3">
                     {stage.dependsOnDepartmentKeys.length > 0
-                      ? `입력: ${stage.dependsOnDepartmentKeys.map((key) => productionDepartment(key).shortLabel).join(" + ")}`
-                      : "프로젝트·회차 기획 정본"}
+                      ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "입력: {v0}"), { v0: String(stage.dependsOnDepartmentKeys.map((key) => productionDepartment(key).shortLabel).join(" + ")) })
+                      : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "프로젝트·회차 기획 정본")}
                   </p>
                 </button>
               );
@@ -856,10 +851,10 @@ function PipelineView({
       <section className="rounded-2xl border border-line bg-card p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-black text-fg">공정별 작업 목록</h2>
-            <p className="mt-1 text-xs text-fg-2">카드를 선택하면 오른쪽 상세에서 담당·검수·상태를 변경합니다.</p>
+            <h2 className="text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "공정별 작업 목록")}</h2>
+            <p className="mt-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "카드를 선택하면 오른쪽 상세에서 담당·검수·상태를 변경합니다.")}</p>
           </div>
-          <Pill>{tasks.length}작업</Pill>
+          <Pill>{tasks.length}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "작업")}</Pill>
         </div>
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {tasks.map((task) => (
@@ -874,8 +869,8 @@ function PipelineView({
           ))}
           {tasks.length === 0 ? (
             <div className="col-span-full rounded-xl border border-dashed border-line p-8 text-center">
-              <p className="text-sm font-bold text-fg">표시할 공정 작업이 없습니다.</p>
-              <p className="mt-1 text-xs text-fg-3">회차 필터를 바꾸거나 직군 작업을 추가해 주세요.</p>
+              <p className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "표시할 공정 작업이 없습니다.")}</p>
+              <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "회차 필터를 바꾸거나 직군 작업을 추가해 주세요.")}</p>
             </div>
           ) : null}
         </div>
@@ -892,10 +887,9 @@ function EmptyInspector() {
   return (
     <aside className="rounded-2xl border border-dashed border-line bg-card p-6 text-center">
       <Layers3 className="mx-auto size-8 text-fg-3" aria-hidden="true" />
-      <p className="mt-3 text-sm font-black text-fg">작업을 선택해 주세요</p>
+      <p className="mt-3 text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "작업을 선택해 주세요")}</p>
       <p className="mt-1 text-xs leading-5 text-fg-3">
-        담당자, 입력 정본, 선행 작업, 검수자와 다음 단계 조건을 확인할 수 있습니다.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "담당자, 입력 정본, 선행 작업, 검수자와 다음 단계 조건을 확인할 수 있습니다.")}</p>
     </aside>
   );
 }
@@ -1015,15 +1009,12 @@ export function ProductionRoleWorkspace({
             <div className="max-w-3xl">
               <div className="flex items-center gap-2 text-accent">
                 <Workflow className="size-4" aria-hidden="true" />
-                <p className="text-[0.6875rem] font-black uppercase tracking-[0.14em]">Role-based production</p>
+                <p className="text-[0.6875rem] font-black uppercase tracking-[0.14em]">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "Role-based production")}</p>
               </div>
               <h1 className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
-                직군별 제작 셀과 인수인계를 한 화면에서
-              </h1>
+                {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "직군별 제작 셀과 인수인계를 한 화면에서")}</h1>
               <p className="mt-2 text-sm leading-7 text-fg-2">
-                스토리·콘티·선화·배경·채색·식자·편집 직군이 각자의 작업 queue를 가지면서,
-                승인된 산출물이 다음 직군의 고정 입력으로 이어집니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "스토리·콘티·선화·배경·채색·식자·편집 직군이 각자의 작업 queue를 가지면서, 승인된 산출물이 다음 직군의 고정 입력으로 이어집니다.")}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {autoAssignable.length > 0 ? (
@@ -1033,20 +1024,20 @@ export function ProductionRoleWorkspace({
                   disabled={!canEdit}
                   onClick={() => void autoAssign()}
                 >
-                  <UserCheck className="size-4" aria-hidden="true" /> 미배정 자동 배치 {autoAssignable.length}
+                  <UserCheck className="size-4" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "미배정 자동 배치 ")}{autoAssignable.length}
                 </button>
               ) : null}
-              <Pill tone={board.coverageGapDepartmentKeys.length > 0 ? "warning" : "success"}>
+              <Pill tone={board.coverageGapDepartmentKeys.length > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "success")}>
                 {board.coverageGapDepartmentKeys.length > 0
-                  ? `인력 공백 ${board.coverageGapDepartmentKeys.length}`
-                  : "핵심 직군 배치 완료"}
+                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "인력 공백 {v0}"), { v0: String(board.coverageGapDepartmentKeys.length) })
+                  : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "핵심 직군 배치 완료")}
               </Pill>
             </div>
           </div>
         </div>
         <div className="border-t border-line bg-panel/70 p-3 sm:px-5">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex rounded-xl border border-line bg-card p-1" role="group" aria-label="제작 보기 방식">
+            <div className="flex rounded-xl border border-line bg-card p-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "제작 보기 방식")}>
               {([
                 ["workcells", "직군 보드", ListFilter],
                 ["pipeline", "공정 흐름", GitBranch],
@@ -1068,14 +1059,14 @@ export function ProductionRoleWorkspace({
             </div>
             <label className="flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 text-xs text-fg-2">
               <PanelTopOpen className="size-4" aria-hidden="true" />
-              <span className="sr-only">회차 필터</span>
+              <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "회차 필터")}</span>
               <select
-                aria-label="제작 회차 필터"
+                aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "제작 회차 필터")}
                 value={episodeFilter}
                 onChange={(event) => setEpisodeFilter(event.target.value)}
                 className="bg-transparent font-semibold text-fg outline-none"
               >
-                <option value="all">전체 회차</option>
+                <option value="all">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "전체 회차")}</option>
                 {episodeIds.map((episodeId) => (
                   <option key={episodeId} value={episodeId}>{episodeId}</option>
                 ))}
@@ -1083,13 +1074,13 @@ export function ProductionRoleWorkspace({
             </label>
             <label className="relative ml-auto min-w-[13rem] flex-1 sm:max-w-sm">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-3" aria-hidden="true" />
-              <span className="sr-only">제작 작업 검색</span>
+              <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "제작 작업 검색")}</span>
               <input
                 type="search"
-                aria-label="제작 작업 검색"
+                aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "제작 작업 검색")}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="작업·담당자·회차 검색"
+                placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "작업·담당자·회차 검색")}
                 className="min-h-10 w-full rounded-xl border border-line bg-card pl-9 pr-3 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent"
               />
             </label>
@@ -1098,11 +1089,11 @@ export function ProductionRoleWorkspace({
       </section>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricTile label="활성 작업 셀" value={String(activeCellCount)} detail={`${PRODUCTION_DEPARTMENTS.length}개 직군 중`} icon={Workflow} tone="accent" />
-        <MetricTile label="차단 작업" value={String(blockedCount)} detail="선행·입력·담당 조건" icon={LockKeyhole} tone={blockedCount > 0 ? "danger" : "success"} />
-        <MetricTile label="검수 대기" value={String(reviewCount)} detail="내부·외부 검수 queue" icon={ClipboardCheck} tone={reviewCount > 0 ? "warning" : "neutral"} />
-        <MetricTile label="직군 공백" value={String(board.coverageGapDepartmentKeys.length)} detail="열린 작업이 있는 미충원 셀" icon={Users} tone={board.coverageGapDepartmentKeys.length > 0 ? "danger" : "success"} />
-        <MetricTile label="예상 잔여 공수" value={`${board.totalLikelyHours}h`} detail="열린 작업 likely 합계" icon={Clock3} />
+        <MetricTile label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "활성 작업 셀")} value={String(activeCellCount)} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "{v0}개 직군 중"), { v0: String(PRODUCTION_DEPARTMENTS.length) })} icon={Workflow} tone="accent" />
+        <MetricTile label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "차단 작업")} value={String(blockedCount)} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "선행·입력·담당 조건")} icon={LockKeyhole} tone={blockedCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "success")} />
+        <MetricTile label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "검수 대기")} value={String(reviewCount)} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "내부·외부 검수 queue")} icon={ClipboardCheck} tone={reviewCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "neutral")} />
+        <MetricTile label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "직군 공백")} value={String(board.coverageGapDepartmentKeys.length)} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "열린 작업이 있는 미충원 셀")} icon={Users} tone={board.coverageGapDepartmentKeys.length > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "success")} />
+        <MetricTile label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "예상 잔여 공수")} value={`${board.totalLikelyHours}h`} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "열린 작업 likely 합계")} icon={Clock3} />
       </div>
       {view === "crew" ? (
         <ProductionCrewCoverage aggregate={aggregate} at={at} />
@@ -1145,17 +1136,16 @@ export function ProductionRoleWorkspace({
               <div>
                 <h2 className="text-sm font-black text-fg">
                   {departmentFilter === "all"
-                    ? "전체 직군 작업"
+                    ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "전체 직군 작업")
                     : departmentFilter === "lens"
                       ? LENS_LABELS[roleLens]
                       : productionDepartment(departmentFilter).label}
                 </h2>
                 <p className="mt-1 text-xs text-fg-3">
-                  {visibleTasks.length}개 작업 · 카드를 선택해 담당과 단계 게이트를 편집합니다.
-                </p>
+                  {visibleTasks.length}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "개 작업 · 카드를 선택해 담당과 단계 게이트를 편집합니다.")}</p>
               </div>
-              <Pill tone={blockedCount > 0 ? "warning" : "success"}>
-                {blockedCount > 0 ? `프로젝트 차단 ${blockedCount}` : "공정 흐름 정상"}
+              <Pill tone={blockedCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "en", "success")}>
+                {blockedCount > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "프로젝트 차단 {v0}"), { v0: String(blockedCount) }) : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "공정 흐름 정상")}
               </Pill>
             </header>
             <div className="overflow-x-auto pb-1">
@@ -1183,8 +1173,7 @@ export function ProductionRoleWorkspace({
                         ))}
                         {tasks.length === 0 ? (
                           <div className="rounded-xl border border-dashed border-line p-5 text-center text-[0.6875rem] text-fg-3">
-                            작업 없음
-                          </div>
+                            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRoleWorkspace", "ko", "작업 없음")}</div>
                         ) : null}
                       </div>
                     </section>

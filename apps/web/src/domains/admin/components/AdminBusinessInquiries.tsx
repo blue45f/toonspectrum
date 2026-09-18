@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ExternalLink, Inbox, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -44,10 +48,10 @@ function InquiryCard({
             <span className="text-xs text-fg-3">{formatDate(item.createdAt)}</span>
           </div>
           <h2 className="mt-3 text-lg font-bold text-fg">
-            {item.organization || "개인 문의"} · {item.contactName}
+            {item.organization || translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "개인 문의")} · {item.contactName}
           </h2>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-fg-2">
-            <a href={`mailto:${item.email}`} className="font-semibold text-accent hover:underline">
+            <a href={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "en", "mailto:{v0}"), { v0: String(item.email) })} className="font-semibold text-accent hover:underline">
               {item.email}
             </a>
             {item.website ? (
@@ -57,14 +61,13 @@ function InquiryCard({
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 hover:text-accent hover:underline"
               >
-                웹사이트 <ExternalLink size={13} aria-hidden="true" />
+                {translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "웹사이트 ")}<ExternalLink size={13} aria-hidden="true" />
               </a>
             ) : null}
           </div>
         </div>
         <label className="grid gap-1 text-xs font-semibold text-fg-3">
-          처리 상태
-          <select
+          {translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "처리 상태")}<select
             value={item.status}
             disabled={disabled}
             onChange={(event) => void onStatusChange(item.id, event.target.value as BusinessInquiryStatus)}
@@ -81,7 +84,7 @@ function InquiryCard({
         {item.message}
       </p>
       <p className="mt-3 text-xs text-fg-3">
-        접수 경로: {item.sourcePath || "/business"} · 문의 ID: {item.id}
+        {translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "접수 경로: ")}{item.sourcePath || "/business"} {translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "· 문의 ID: ")}{item.id}
       </p>
     </article>
   );
@@ -135,19 +138,18 @@ export function AdminBusinessInquiries() {
     <section className="space-y-5" aria-labelledby="business-inquiries-title">
       <div className="flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-line bg-card p-5">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-accent">Private business inbox</p>
-          <h1 id="business-inquiries-title" className="mt-1 text-2xl font-bold text-fg">비즈니스 문의</h1>
-          <p className="mt-2 text-sm text-fg-2">투자·IR, 제휴, 콘텐츠/IP, 후원·스폰서십 문의를 비공개로 처리합니다.</p>
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "en", "Private business inbox")}</p>
+          <h1 id="business-inquiries-title" className="mt-1 text-2xl font-bold text-fg">{translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "비즈니스 문의")}</h1>
+          <p className="mt-2 text-sm text-fg-2">{translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "투자·IR, 제휴, 콘텐츠/IP, 후원·스폰서십 문의를 비공개로 처리합니다.")}</p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <label className="grid gap-1 text-xs font-semibold text-fg-3">
-            상태 필터
-            <select
+            {translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "상태 필터")}<select
               value={status}
               onChange={(event) => setStatus(event.target.value as BusinessInquiryStatus | "all")}
               className="min-h-10 rounded-xl border border-line bg-panel px-3 text-sm font-semibold text-fg outline-none focus:border-accent"
             >
-              <option value="all">전체 ({page.total})</option>
+              <option value="all">{translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "전체 (")}{page.total})</option>
               {BUSINESS_INQUIRY_STATUSES.map((item) => (
                 <option key={item} value={item}>{BUSINESS_INQUIRY_STATUS_LABELS[item]}</option>
               ))}
@@ -159,19 +161,18 @@ export function AdminBusinessInquiries() {
             disabled={loading}
             className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-panel px-3 text-sm font-semibold text-fg-2 hover:border-accent/50 hover:text-accent disabled:opacity-60"
           >
-            <RefreshCw size={15} className={loading ? "animate-spin" : ""} aria-hidden="true" /> 새로고침
-          </button>
+            <RefreshCw size={15} className={loading ? translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "en", "animate-spin") : ""} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "새로고침")}</button>
         </div>
       </div>
 
       {error ? <p role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p> : null}
 
       {loading && page.items.length === 0 ? (
-        <div className="rounded-2xl border border-line bg-card p-8 text-center text-sm text-fg-3">문의함을 불러오는 중…</div>
+        <div className="rounded-2xl border border-line bg-card p-8 text-center text-sm text-fg-3">{translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "문의함을 불러오는 중…")}</div>
       ) : page.items.length === 0 ? (
         <div className="rounded-2xl border border-line bg-card p-10 text-center">
           <Inbox size={30} className="mx-auto text-fg-3" aria-hidden="true" />
-          <p className="mt-3 font-semibold text-fg">해당 상태의 문의가 없습니다.</p>
+          <p className="mt-3 font-semibold text-fg">{translateCurrentStaticSourceText("domains.admin.components.AdminBusinessInquiries", "ko", "해당 상태의 문의가 없습니다.")}</p>
         </div>
       ) : (
         <div className="grid gap-4">

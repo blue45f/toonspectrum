@@ -174,4 +174,3 @@ export function SupporterTransparencyPanel() {
     </section>
   );
 }
-

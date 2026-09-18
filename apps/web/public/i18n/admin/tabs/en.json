@@ -2,6 +2,7 @@
   "admin.tabs.announcements": "Announcements & Banners",
   "admin.tabs.audit": "Audit Logs",
   "admin.tabs.campaigns": "Campaigns",
+  "admin.tabs.creatorSupport": "Creator support",
   "admin.tabs.dashboard": "Dashboard",
   "admin.tabs.inquiries": "Business inquiries",
   "admin.tabs.ops": "Operations",
@@ -10,7 +11,6 @@
   "admin.tabs.reports": "Reports & Moderation",
   "admin.tabs.revenue": "Settlement",
   "admin.tabs.security": "Security & IP",
-  "admin.tabs.traffic": "Live traffic",
   "admin.tabs.supporters": "Operating-cost support",
-  "admin.tabs.creatorSupport": "Creator support"
+  "admin.tabs.traffic": "Live traffic"
 }

@@ -1,9 +1,10 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
- * StudioLineWidthAdjustmentPanel.tsx
- *
- * Clip Studio Paint Correct Line Width Tool (선폭 수정 패널).
- * Provides interactive thickening, narrowing, scaling, and pressure adjustment
- * for vector and freehand drawn strokes in ToonSpectrum.
+ * Stroke-width adjustment controls.
+ * Uses ToonStudio task language and the shared Studio visual tokens.
  */
 
 import { Check, Edit3, Sparkles } from "lucide-react";
@@ -26,10 +27,10 @@ export interface StudioLineWidthAdjustmentPanelProps {
 }
 
 const ACTION_TABS: readonly { id: LineWidthAction; label: string }[] = [
-  { id: "thicken", label: "굵게 (+)" },
-  { id: "narrow", label: "가늘게 (-)" },
-  { id: "scale", label: "배율 (×)" },
-  { id: "fix", label: "고정 (=)" },
+  { id: "thicken", label: "굵게" },
+  { id: "narrow", label: "가늘게" },
+  { id: "scale", label: "배율" },
+  { id: "fix", label: "고정" },
 ];
 
 export function StudioLineWidthAdjustmentPanel({
@@ -60,34 +61,31 @@ export function StudioLineWidthAdjustmentPanel({
   return (
     <div
       className={cn(
-        "rounded-xl border border-line bg-panel/40 p-3 select-none text-xs space-y-2 text-slate-200 shadow-sm",
+        "space-y-2 rounded-xl border border-line bg-card p-3 text-xs text-fg shadow-sm select-none",
         className,
       )}
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-line/60">
         <div className="flex items-center gap-1.5 min-w-0">
-          <Edit3 size={14} className="text-cyan-400 shrink-0" aria-hidden />
-          <span className="font-semibold truncate">선폭 수정 (Line Width)</span>
-          <span className="px-1 py-0.2 text-[10px] rounded font-medium bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shrink-0">
-            CSP
-          </span>
+          <Edit3 size={14} className="shrink-0 text-accent" aria-hidden />
+          <span className="truncate font-semibold">선 굵기 조절</span>
         </div>
-        <span className="text-[10px] text-slate-400 font-mono">
+        <span className="font-mono text-[10px] text-fg-3">
           {currentWidth}px → {previewWidth}px
         </span>
       </div>
 
       {/* Preset Chips */}
       <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-        <Sparkles size={11} className="text-cyan-400 shrink-0" aria-hidden />
+        <Sparkles size={11} className="shrink-0 text-accent" aria-hidden />
         {LINE_WIDTH_PRESETS.map((preset) => (
           <button
             key={preset.label}
             type="button"
             onClick={() => handleApplyPreset(preset.options)}
             disabled={disabled}
-            className="px-2 py-0.5 rounded-full text-[10px] bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-slate-300 whitespace-nowrap transition-colors disabled:opacity-50"
+            className="whitespace-nowrap rounded-full border border-line bg-raised px-2 py-0.5 text-[10px] text-fg-2 transition-colors hover:border-accent/35 hover:text-fg disabled:opacity-50"
           >
             {preset.label}
           </button>
@@ -95,7 +93,7 @@ export function StudioLineWidthAdjustmentPanel({
       </div>
 
       {/* Action Mode Tabs */}
-      <div className="grid grid-cols-4 gap-1 p-0.5 rounded-lg bg-slate-950 border border-line/50">
+      <div className="grid grid-cols-4 gap-1 rounded-lg border border-line/60 bg-panel p-0.5">
         {ACTION_TABS.map((tab) => (
           <button
             key={tab.id}
@@ -105,8 +103,8 @@ export function StudioLineWidthAdjustmentPanel({
             className={cn(
               "py-1 rounded text-[10px] text-center font-medium transition-colors",
               action === tab.id
-                ? "bg-cyan-600 text-white shadow-sm"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60",
+                ? "bg-accent text-on-accent shadow-sm"
+                : "text-fg-3 hover:bg-raised hover:text-fg",
             )}
           >
             {tab.label}
@@ -116,9 +114,9 @@ export function StudioLineWidthAdjustmentPanel({
 
       {/* Value Slider & Controls */}
       <div className="space-y-1">
-        <div className="flex items-center justify-between text-[11px] text-slate-300">
+        <div className="flex items-center justify-between text-[11px] text-fg-2">
           <span>{action === "scale" ? "배율" : "변화 폭"}</span>
-          <span className="font-mono text-cyan-300">
+          <span className="font-mono text-accent">
             {action === "scale" ? `${value}x` : `${value}px`}
           </span>
         </div>
@@ -131,20 +129,20 @@ export function StudioLineWidthAdjustmentPanel({
           disabled={disabled}
           onChange={(e) => setValue(Number(e.target.value))}
           aria-label="선폭 조절 값"
-          className="w-full accent-cyan-400 cursor-pointer"
+          className="w-full cursor-pointer accent-accent"
         />
       </div>
 
       {/* Stylus Pressure Scaling Checkbox */}
-      <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 pt-0.5">
+      <label className="flex cursor-pointer items-center gap-1.5 pt-0.5 text-[11px] text-fg-2">
         <input
           type="checkbox"
           checked={scalePressures}
           disabled={disabled}
           onChange={(e) => setScalePressures(e.target.checked)}
-          className="rounded border-line bg-slate-900 text-cyan-500 focus:ring-cyan-400 size-3.5 cursor-pointer"
+          className="size-3.5 cursor-pointer rounded border-line bg-panel text-accent focus:ring-accent"
         />
-        <span>필압 다이내믹스 함께 스케일</span>
+        <span>필압 변화도 함께 조절</span>
       </label>
 
       {/* Apply Button */}
@@ -152,10 +150,10 @@ export function StudioLineWidthAdjustmentPanel({
         type="button"
         onClick={handleExecute}
         disabled={disabled}
-        className="w-full py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 active:scale-[0.98] text-white font-medium text-xs transition-transform flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent py-1.5 text-xs font-medium text-on-accent shadow-sm transition-transform hover:bg-accent-2 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Check size={13} aria-hidden />
-        <span>선택한 선에 선폭 적용</span>
+        <span>선택한 선에 적용</span>
       </button>
     </div>
   );

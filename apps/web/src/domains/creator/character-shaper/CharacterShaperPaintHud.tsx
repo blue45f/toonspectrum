@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { StudioVrmPaintMaterialControls } from "../vrm/StudioVrmPaintMaterialControls";
 /**
  * Character Shaper — 표면 드로잉 HUD.
@@ -133,7 +137,7 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
   return (
     <div
       role="toolbar"
-      aria-label="표면 드로잉 도구"
+      aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "표면 드로잉 도구")}
       data-character-shaper-paint-hud="true"
       className="flex max-w-full flex-wrap items-center gap-1.5 rounded-2xl border border-line/70 bg-panel/95 p-1.5 shadow-[0_12px_36px_oklch(0.05_0.01_70/0.4)] backdrop-blur"
     >
@@ -145,7 +149,7 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
         }} />
       <StudioVrmPaintMaterialControls runtime={h.texturePaintRuntime ?? null} snapshot={snapshot} disabled={disabled} />
       <StudioVrmTextureExportButton runtime={h.texturePaintRuntime ?? null} disabled={disabled || (snapshot?.targets?.length ?? 0) === 0} />
-      <div role="group" aria-label="도구" className="flex shrink-0 items-center gap-1">
+      <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "도구")} className="flex shrink-0 items-center gap-1">
         {tools.map((tool) => {
           const Icon = tool.icon;
           const active = activeTool === tool.id;
@@ -169,7 +173,7 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
       <span aria-hidden className="h-6 w-px shrink-0 bg-line/70" />
 
       <label className="flex min-w-0 shrink-0 items-center gap-1.5 text-[0.66rem] font-semibold text-fg-2">
-        <span className="shrink-0">굵기</span>
+        <span className="shrink-0">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "굵기")}</span>
         <input
           type="range"
           min={SIZE_MIN}
@@ -177,9 +181,9 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
           step={1}
           value={size}
           disabled={disabled}
-          aria-label="브러시 굵기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "브러시 굵기")}
           aria-keyshortcuts="[ ]"
-          aria-valuetext={`${size} px`}
+          aria-valuetext={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "en", "{v0} px"), { v0: String(size) })}
           className="h-11 w-24 min-w-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-45"
           onChange={(event) => update({ sizeTexels: clampSize(Number(event.currentTarget.value)) })}
         />
@@ -187,7 +191,7 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
       </label>
 
       <label className="flex min-w-0 shrink-0 items-center gap-1.5 text-[0.66rem] font-semibold text-fg-2">
-        <span className="shrink-0">농도</span>
+        <span className="shrink-0">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "농도")}</span>
         <input
           type="range"
           min={0.05}
@@ -195,7 +199,7 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
           step={0.05}
           value={settings.opacity}
           disabled={disabled}
-          aria-label="브러시 농도"
+          aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "브러시 농도")}
           aria-valuetext={`${Math.round(settings.opacity * 100)}%`}
           className="h-11 w-20 min-w-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-45"
           onChange={(event) => update({ opacity: Number(event.currentTarget.value) })}
@@ -210,8 +214,8 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
         hidden={isStudioVrmTexturePaintScalarChannel(channel)}
         value={settings.color}
         disabled={disabled}
-        aria-label="칠할 색"
-        title={`칠할 색 ${settings.color.toUpperCase()}`}
+        aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "칠할 색")}
+        title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "칠할 색 {v0}"), { v0: String(settings.color.toUpperCase()) })}
         className={cn(
           "size-11 shrink-0 cursor-pointer rounded-xl border border-line bg-card p-1 disabled:cursor-not-allowed disabled:opacity-45",
           STUDIO_FOCUS_RING,
@@ -221,11 +225,11 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
 
       <span aria-hidden className="h-6 w-px shrink-0 bg-line/70" />
 
-      <div role="group" aria-label="되돌리기" className="flex shrink-0 items-center gap-1">
+      <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "되돌리기")} className="flex shrink-0 items-center gap-1">
         <button
           type="button"
-          aria-label="드로잉 되돌리기"
-          title="드로잉 되돌리기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "드로잉 되돌리기")}
+          title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "드로잉 되돌리기")}
           disabled={!canUndo}
           onClick={() => h.handleTexturePaintUndo?.()}
           className={CHIP}
@@ -234,8 +238,8 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
         </button>
         <button
           type="button"
-          aria-label="드로잉 다시 실행"
-          title="드로잉 다시 실행"
+          aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "드로잉 다시 실행")}
+          title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "드로잉 다시 실행")}
           disabled={!canRedo}
           onClick={() => h.handleTexturePaintRedo?.()}
           className={CHIP}
@@ -244,8 +248,8 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
         </button>
         <button
           type="button"
-          aria-label={resetArmed ? "이 표면의 드로잉 전부 지우기 확인" : "이 표면의 드로잉 전부 지우기"}
-          title={resetArmed ? "한 번 더 누르면 이 표면의 드로잉이 모두 지워집니다" : "이 표면의 드로잉을 원본 텍스처로 되돌립니다"}
+          aria-label={resetArmed ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "이 표면의 드로잉 전부 지우기 확인") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "이 표면의 드로잉 전부 지우기")}
+          title={resetArmed ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "한 번 더 누르면 이 표면의 드로잉이 모두 지워집니다") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "이 표면의 드로잉을 원본 텍스처로 되돌립니다")}
           disabled={disabled}
           onClick={() => {
             if (!resetArmed) {
@@ -263,8 +267,8 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
 
       <button
         type="button"
-        aria-label="표면 드로잉 끝내기"
-        title="표면 드로잉 끝내기 (B)"
+        aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "표면 드로잉 끝내기")}
+        title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "표면 드로잉 끝내기 (B)")}
         aria-keyshortcuts="B"
         onClick={onExit}
         className={cn(CHIP, "ml-auto")}
@@ -274,7 +278,7 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
 
       <p
         role="status"
-        aria-label="표면 드로잉 상태"
+        aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "표면 드로잉 상태")}
         className={cn(
           "w-full min-w-0 px-1 text-[0.64rem] leading-relaxed",
           disabledReason ? "font-semibold text-warn" : "text-fg-3",
@@ -283,7 +287,7 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
         {disabledReason
           || (resetArmed ? "한 번 더 누르면 이 표면의 드로잉이 모두 지워집니다." : "")
           || status
-          || "뷰포트에서 칠할 표면을 누른 뒤 드래그하세요. [ ] 로 굵기를 바꿉니다."}
+          || translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperPaintHud", "ko", "뷰포트에서 칠할 표면을 누른 뒤 드래그하세요. [ ] 로 굵기를 바꿉니다.")}
       </p>
     </div>
   );

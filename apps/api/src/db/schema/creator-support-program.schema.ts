@@ -68,4 +68,3 @@ export const creatorSupportOffers = pgTable(
     index("idx_creator_support_offer_supporter_created").on(table.supporterId, table.createdAt),
   ],
 );
-

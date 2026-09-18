@@ -96,4 +96,3 @@ COMMENT ON TABLE public.creator_support_offer IS
   'Private non-monetary support offers routed to reviewed creator support projects.';
 
 COMMIT;
-

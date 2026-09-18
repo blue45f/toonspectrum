@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Compact product-state shell for the procedural artistic brush panel.
  *
@@ -309,11 +312,9 @@ export function StudioProceduralArtisticBrushController({
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-xs font-bold text-fg">
-            절차적 질감 생성기
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushController", "ko", "절차적 질감 생성기")}</span>
           <span className="block truncate text-[0.6rem] text-fg-3">
-            흐름장 · 해칭 · 매스 · 수채 채움 · 플랫 워시
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushController", "ko", "흐름장 · 해칭 · 매스 · 수채 채움 · 플랫 워시")}</span>
         </span>
         <span
           role="status"
@@ -360,12 +361,12 @@ export function StudioProceduralArtisticBrushController({
             error={error}
             capabilityStatus={
               capabilityStatus === "idle"
-                ? "checking"
+                ? translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushController", "en", "checking")
                 : capabilityStatus
             }
             capabilityMessage={
               cancelling
-                ? "렌더링 자원을 정리하며 취소하는 중입니다."
+                ? translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushController", "ko", "렌더링 자원을 정리하며 취소하는 중입니다.")
                 : capabilityMessage
             }
             disabled={disabled}

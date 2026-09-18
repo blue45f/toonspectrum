@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Brush engine mixer UI: stack diagnosis, portable trait imports, curated multi-source recipes,
  * watercolor programs and durable custom-brush saving.
@@ -100,8 +103,8 @@ export function StudioBrushEngineStackPanel({
 
   return (
     <MixerCard
-      title="현재 엔진 구성"
-      description="실제로 실행되는 캐리어·팁·재질·입력 매핑·물성 프로그램과 예상 비용입니다."
+      title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "현재 엔진 구성")}
+      description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "실제로 실행되는 캐리어·팁·재질·입력 매핑·물성 프로그램과 예상 비용입니다.")}
     >
       <ul className="flex flex-wrap gap-1.5">
         {entries.map((entry) => (
@@ -126,8 +129,7 @@ export function StudioBrushEngineStackPanel({
       <div className="mt-3 grid gap-2 sm:grid-cols-3">
         <div className="rounded-xl border border-line bg-bg-2/55 px-2.5 py-2">
           <span className="flex items-center gap-1 text-[0.62rem] font-semibold text-fg-3">
-            <Gauge size={12} aria-hidden /> 품질 안정도
-          </span>
+            <Gauge size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "품질 안정도")}</span>
           <strong className="mt-1 block text-sm tabular-nums text-fg">{quality.qualityScore}/100</strong>
           <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-raised" aria-hidden>
             <span
@@ -137,27 +139,24 @@ export function StudioBrushEngineStackPanel({
           </span>
         </div>
         <div className="rounded-xl border border-line bg-bg-2/55 px-2.5 py-2">
-          <span className="text-[0.62rem] font-semibold text-fg-3">조합 복잡도</span>
+          <span className="text-[0.62rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "조합 복잡도")}</span>
           <strong className="mt-1 block text-sm text-fg">
             {COMPLEXITY_LABELS[quality.complexityLevel]} · {quality.complexityScore}
           </strong>
           <span className="mt-0.5 block text-[0.62rem] text-fg-3">
-            모듈 {quality.activeModuleCount}개 · 매핑 {quality.mappedInputCount}개
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "모듈 ")}{quality.activeModuleCount}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "개 · 매핑 ")}{quality.mappedInputCount}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "개")}</span>
         </div>
         <div className="rounded-xl border border-line bg-bg-2/55 px-2.5 py-2">
-          <span className="text-[0.62rem] font-semibold text-fg-3">실시간 작업량</span>
+          <span className="text-[0.62rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "실시간 작업량")}</span>
           <strong className="mt-1 block text-sm tabular-nums text-fg">
-            {quality.estimatedMarksPerDab} mark/dab
-          </strong>
+            {quality.estimatedMarksPerDab} {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "en", "mark/dab")}</strong>
           <span className="mt-0.5 block text-[0.62rem] text-fg-3">
-            실제 팁 샘플과 레이어를 반영한 추정치
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "실제 팁 샘플과 레이어를 반영한 추정치")}</span>
         </div>
       </div>
 
       {quality.issues.length > 0 ? (
-        <ul className="mt-2 space-y-1.5" aria-label="브러시 품질 진단">
+        <ul className="mt-2 space-y-1.5" aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "브러시 품질 진단")}>
           {quality.issues.slice(0, 3).map((issue) => (
             <li
               key={issue.id}
@@ -178,8 +177,7 @@ export function StudioBrushEngineStackPanel({
         </ul>
       ) : (
         <p className="mt-2 flex items-center gap-1.5 text-[0.66rem] font-medium text-good">
-          <CheckCircle2 size={13} aria-hidden /> 현재 조합에서 즉시 수정할 품질 위험이 없습니다.
-        </p>
+          <CheckCircle2 size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "현재 조합에서 즉시 수정할 품질 위험이 없습니다.")}</p>
       )}
     </MixerCard>
   );
@@ -331,12 +329,12 @@ export function StudioBrushTraitImportControls({ settings, onSettingsChange }: T
 
   return (
     <MixerCard
-      title="다른 브러시에서 엔진 특성 가져오기"
-      description="캐리어와 재생 계약은 유지하고, 촉·재질·안료·반응을 섹션별 또는 다중 소스 레시피로 조합합니다."
+      title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "다른 브러시에서 엔진 특성 가져오기")}
+      description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "캐리어와 재생 계약은 유지하고, 촉·재질·안료·반응을 섹션별 또는 다중 소스 레시피로 조합합니다.")}
     >
       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
         <label className="relative block">
-          <span className="sr-only">브러시 소스 검색</span>
+          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "브러시 소스 검색")}</span>
           <Search
             size={14}
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
@@ -346,8 +344,8 @@ export function StudioBrushTraitImportControls({ settings, onSettingsChange }: T
             type="search"
             value={query}
             onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.currentTarget.value)}
-            aria-label="브러시 소스 검색"
-            placeholder="이름·매체·ID 검색"
+            aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "브러시 소스 검색")}
+            placeholder={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "이름·매체·ID 검색")}
             className={cn(
               "h-11 w-full rounded-xl border border-line bg-card pl-9 pr-3 text-xs text-fg placeholder:text-fg-3",
               STUDIO_FOCUS_RING,
@@ -355,20 +353,20 @@ export function StudioBrushTraitImportControls({ settings, onSettingsChange }: T
           />
         </label>
         <label className="block">
-          <span className="sr-only">소스 브러시</span>
+          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "소스 브러시")}</span>
           <select
             value={sourceId}
             onChange={(event: ChangeEvent<HTMLSelectElement>) => {
               setSourceId(event.currentTarget.value);
               setStatus(null);
             }}
-            aria-label="소스 브러시"
+            aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "소스 브러시")}
             className={cn(
               "h-11 w-full rounded-xl border border-line bg-card px-2.5 text-xs font-medium text-fg",
               STUDIO_FOCUS_RING,
             )}
           >
-            <option value="">소스 브러시 선택…</option>
+            <option value="">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "소스 브러시 선택…")}</option>
             {groupedItems.map(([mediaGroup, items]) => (
               <optgroup key={mediaGroup} label={STUDIO_BRUSH_MEDIA_LABELS[mediaGroup] ?? mediaGroup}>
                 {items.map((item) => (
@@ -417,11 +415,9 @@ export function StudioBrushTraitImportControls({ settings, onSettingsChange }: T
         <div className="flex items-center justify-between gap-2">
           <div>
             <p className="flex items-center gap-1.5 text-xs font-bold text-fg">
-              <Sparkles size={13} className="text-accent" aria-hidden /> 다중 엔진 빠른 레시피
-            </p>
+              <Sparkles size={13} className="text-accent" aria-hidden /> {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "다중 엔진 빠른 레시피")}</p>
             <p className="mt-0.5 text-[0.62rem] text-fg-3">
-              서로 다른 매체의 검증된 특성을 순서대로 합성합니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "서로 다른 매체의 검증된 특성을 순서대로 합성합니다.")}</p>
           </div>
           {previousSettings ? (
             <button
@@ -436,8 +432,7 @@ export function StudioBrushTraitImportControls({ settings, onSettingsChange }: T
                 STUDIO_FOCUS_RING,
               )}
             >
-              <RotateCcw size={12} aria-hidden /> 직전 조합
-            </button>
+              <RotateCcw size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "직전 조합")}</button>
           ) : null}
         </div>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -468,8 +463,7 @@ export function StudioBrushTraitImportControls({ settings, onSettingsChange }: T
                     </span>
                   ))}
                   <span className="rounded-md bg-accent-soft px-1.5 py-0.5 text-[0.56rem] font-semibold text-accent">
-                    {recipe.steps.length}단계
-                  </span>
+                    {recipe.steps.length}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "단계")}</span>
                 </span>
               </button>
             );
@@ -493,8 +487,7 @@ export function StudioBrushTraitImportControls({ settings, onSettingsChange }: T
             STUDIO_FOCUS_RING,
           )}
         >
-          <Gauge size={13} aria-hidden /> 품질 자동 안정화
-        </button>
+          <Gauge size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "품질 자동 안정화")}</button>
       ) : null}
 
       {status ? (
@@ -556,8 +549,8 @@ export function StudioBrushSaveAsCustomControls({ snapshot, baseBrushName }: Sav
 
   return (
     <MixerCard
-      title="커스텀 브러시로 저장"
-      description="캐리어·펜촉·질감·반응·엔진 프로그램과 레시피 결과를 하나의 재현 가능한 브러시로 저장합니다."
+      title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "커스텀 브러시로 저장")}
+      description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "캐리어·펜촉·질감·반응·엔진 프로그램과 레시피 결과를 하나의 재현 가능한 브러시로 저장합니다.")}
     >
       <form
         className="flex flex-col gap-2 sm:flex-row sm:items-center"
@@ -571,8 +564,8 @@ export function StudioBrushSaveAsCustomControls({ snapshot, baseBrushName }: Sav
           value={name}
           onChange={(event: ChangeEvent<HTMLInputElement>) => setName(event.currentTarget.value)}
           maxLength={40}
-          aria-label="새 브러시 이름"
-          placeholder="새 브러시 이름"
+          aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "새 브러시 이름")}
+          placeholder={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "새 브러시 이름")}
           className={cn(
             "h-11 min-w-0 flex-1 rounded-xl border border-line bg-card px-2.5 text-xs font-medium text-fg placeholder:text-fg-3",
             STUDIO_FOCUS_RING,
@@ -589,7 +582,7 @@ export function StudioBrushSaveAsCustomControls({ snapshot, baseBrushName }: Sav
           {saving
             ? <LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
             : <Save size={14} aria-hidden />}
-          {saving ? "저장 중" : "내 브러시에 저장"}
+          {saving ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "저장 중") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "내 브러시에 저장")}
         </button>
       </form>
       {status ? (
@@ -611,8 +604,8 @@ export function StudioBrushSaveAsCustomControls({ snapshot, baseBrushName }: Sav
 export function StudioBrushComposerIntro() {
   return (
     <StudioSectionHeader
-      title="엔진 믹서"
-      description="캐리어 위에 촉·종이·안료·입력 반응·물성 프로그램을 조합하고, 품질과 실시간 비용을 확인한 뒤 커스텀 브러시로 저장합니다."
+      title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "엔진 믹서")}
+      description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "캐리어 위에 촉·종이·안료·입력 반응·물성 프로그램을 조합하고, 품질과 실시간 비용을 확인한 뒤 커스텀 브러시로 저장합니다.")}
     />
   );
 }
@@ -683,7 +676,7 @@ export function StudioBrushWatercolorProgramControls({
           STUDIO_FOCUS_RING,
         )}
       >
-        <option value="">레인 기본값</option>
+        <option value="">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "레인 기본값")}</option>
         {Object.entries(options).map(([id, text]) => (
           <option key={id} value={id}>{text}</option>
         ))}
@@ -694,8 +687,8 @@ export function StudioBrushWatercolorProgramControls({
 
   return (
     <MixerCard
-      title="수채 엔진 프로그램"
-      description="블룸/과립/크로마토그래피와 마른 뒤 정착 베이크를 선택합니다. 두 물성 권위는 동시에 실행하지 않아 결과를 예측 가능하게 유지합니다."
+      title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "수채 엔진 프로그램")}
+      description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "블룸/과립/크로마토그래피와 마른 뒤 정착 베이크를 선택합니다. 두 물성 권위는 동시에 실행하지 않아 결과를 예측 가능하게 유지합니다.")}
     >
       <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
         {STUDIO_WATERCOLOR_PROGRAM_RECIPES.map((recipe) => {
@@ -744,8 +737,7 @@ export function StudioBrushWatercolorProgramControls({
             STUDIO_FOCUS_RING,
           )}
         >
-          <TriangleAlert size={13} aria-hidden /> 동시 저장된 두 프로그램을 블룸 하나로 정리
-        </button>
+          <TriangleAlert size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushEngineMixer", "ko", "동시 저장된 두 프로그램을 블룸 하나로 정리")}</button>
       ) : null}
     </MixerCard>
   );

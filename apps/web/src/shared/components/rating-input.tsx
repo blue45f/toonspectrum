@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Star } from "lucide-react";
 import { useState } from "react";
 
@@ -14,7 +18,7 @@ export function ScaleSwitcher({ className }: { className?: string }) {
   const scale = useApp((s) => s.ratingScale);
   const setScale = useApp((s) => s.setRatingScale);
   return (
-    <div className={cn("inline-flex rounded-lg border border-line bg-panel p-0.5", className)} role="group" aria-label="평점 표시 단위">
+    <div className={cn("inline-flex rounded-lg border border-line bg-panel p-0.5", className)} role="group" aria-label={translateCurrentStaticSourceText("shared.components.rating.input", "ko", "평점 표시 단위")}>
       {(["star", "ten", "hundred"] as RatingScale[]).map((s) => (
         <button
           key={s}
@@ -49,7 +53,7 @@ export function RatingInput({
 
   if (scale === "star") {
     return (
-      <div className={cn("flex items-center gap-3", className)} role="group" aria-label="별점 입력">
+      <div className={cn("flex items-center gap-3", className)} role="group" aria-label={translateCurrentStaticSourceText("shared.components.rating.input", "ko", "별점 입력")}>
         <div className="flex" onMouseLeave={() => setHover(null)}>
           {Array.from({ length: 5 }).map((_, i) => {
             const base = i + 1;
@@ -58,14 +62,14 @@ export function RatingInput({
                 {/* 왼쪽 절반 = 0.5 */}
                 <button
                   type="button"
-                  aria-label={`${base - 0.5}점`}
+                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.rating.input", "ko", "{v0}점"), { v0: String(base - 0.5) })}
                   onMouseEnter={() => setHover(base - 0.5)}
                   onClick={() => onChange(base - 0.5)}
                   className="absolute inset-y-0 left-0 z-10 w-1/2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 />
                 <button
                   type="button"
-                  aria-label={`${base}점`}
+                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.rating.input", "ko", "{v0}점"), { v0: String(base) })}
                   onMouseEnter={() => setHover(base)}
                   onClick={() => onChange(base)}
                   className="absolute inset-y-0 right-0 z-10 w-1/2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -93,7 +97,7 @@ export function RatingInput({
 
   if (scale === "ten") {
     return (
-      <div className={cn("flex flex-col gap-2", className)} role="group" aria-label="10점 평점 입력">
+      <div className={cn("flex flex-col gap-2", className)} role="group" aria-label={translateCurrentStaticSourceText("shared.components.rating.input", "ko", "10점 평점 입력")}>
         <div className="flex gap-1" onMouseLeave={() => setHover(null)}>
           {Array.from({ length: 10 }).map((_, i) => {
             const pt = i + 1;
@@ -102,7 +106,7 @@ export function RatingInput({
               <button
                 key={i}
                 type="button"
-                aria-label={`${pt}점`}
+                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.rating.input", "ko", "{v0}점"), { v0: String(pt) })}
                 onMouseEnter={() => setHover(pt / 2)}
                 onClick={() => onChange(pt / 2)}
                 className={cn(
@@ -131,7 +135,7 @@ export function RatingInput({
         step={5}
         value={Math.round(value * 20)}
         onChange={(e) => onChange(Number(e.target.value) / 20)}
-        aria-label="100점 평점"
+        aria-label={translateCurrentStaticSourceText("shared.components.rating.input", "ko", "100점 평점")}
         className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-raised accent-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         style={{
           background: `linear-gradient(90deg, var(--color-accent) ${value * 20}%, var(--color-raised) ${value * 20}%)`,

@@ -1,3 +1,7 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { PanelRightOpen, X } from "lucide-react";
 import { Suspense, useEffect, useId, useMemo, useRef, useState } from "react";
 
@@ -11,6 +15,10 @@ import type { StudioDocumentWorkspaceId } from "../studio-document-workspace";
 import type { StudioProjectSection } from "../studio-project-views";
 
 import { useStudioDocumentLayout } from "../studio-router/studio-document-layout-context";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const StudioProjectFeatureSuitePanel = lazyRetry(
   () => import("./StudioProjectFeatureSuitePanel").then((module) => ({
@@ -171,6 +179,7 @@ function ProjectionContent({
   readonly projectId: string;
   readonly projection: WorkspaceToolProjection;
 }) {
+  useBilingualI18nRevision();
   if (projection.kind === "suite") {
     return (
       <StudioProjectFeatureSuitePanel

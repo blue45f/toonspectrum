@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Check,
   CheckCircle2,
   MessageSquarePlus,
@@ -25,11 +30,14 @@ import {
   readStudioReviewHistory,
   type StudioReviewHistoryDocument,
 } from "../studio-review-history-store";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
+
+type Locale = string;
 
 const CURRENT_REVIEWER_ID = "project-owner";
 
@@ -62,6 +70,7 @@ function ReviewStat({
   readonly label: string;
   readonly value: string | number;
 }) {
+  useBilingualI18nRevision();
   return (
     <div className="rounded-xl border border-line bg-panel p-3">
       <p className="text-[0.65rem] text-fg-3">{label}</p>
@@ -72,7 +81,7 @@ function ReviewStat({
 
 function ReviewThreadCard({
   thread,
-  locale,
+  locale: _locale,
   canResolve,
   onResolve,
 }: {
@@ -102,8 +111,8 @@ function ReviewThreadCard({
         </div>
         <span className="text-[0.65rem] font-bold text-fg-3">
           {thread.status === "resolved"
-            ? (l("해결됨", "Resolved"))
-            : (l("열림", "Open"))}
+            ? (bt("해결됨", "Resolved"))
+            : (bt("열림", "Open"))}
         </span>
       </div>
       <p className="mt-2 text-sm leading-6 text-fg-2">{thread.messages.at(-1)?.body}</p>
@@ -114,7 +123,7 @@ function ReviewThreadCard({
           className={buttonClass({ variant: "quiet", size: "sm", className: "mt-2 gap-1.5" })}
         >
           <CheckCircle2 size={14} aria-hidden="true" />
-          {l("해결 완료", "Resolve")}
+          {bt("해결 완료", "Resolve")}
         </button>
       ) : null}
     </article>
@@ -129,7 +138,7 @@ export function StudioReviewPanel({
   readonly projectId: string;
   readonly locale: "ko" | "en";
 }) {
-  const l = useBilingualLocalizer("studioReview");
+  const bt = useBilingual("StudioReviewPanel");
   const workspace = useStudioProjectWorkspace(projectId, locale);
   const session = workspace.state?.reviewSession ?? null;
   const [kind, setKind] = useState<StudioReviewThreadKind>("comment");
@@ -169,7 +178,7 @@ export function StudioReviewPanel({
   const persist = (next: StudioReviewSession, success: string): boolean => {
     const result = workspace.update((current) => ({ ...current, reviewSession: next }));
     if (!result) {
-      setError(l("검토 상태를 저장하지 못했습니다.", "Review state could not be saved."));
+      setError(bt("검토 상태를 저장하지 못했습니다.", "Review state could not be saved."));
       return false;
     }
     setMessage(success);
@@ -185,7 +194,7 @@ export function StudioReviewPanel({
         : [...session.requiredReviewerIds, CURRENT_REVIEWER_ID];
       persist(
         submitStudioReview({ ...session, requiredReviewerIds }, new Date().toISOString()),
-        l("검토를 시작했습니다.", "Review started."),
+        bt("검토를 시작했습니다.", "Review started."),
       );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Review could not be submitted.");
@@ -194,7 +203,7 @@ export function StudioReviewPanel({
 
   const addThread = () => {
     if (!session || !body.trim() || !targetId.trim()) {
-      setError(l("대상과 내용을 입력해 주세요.", "Enter a target and message."));
+      setError(bt("대상과 내용을 입력해 주세요.", "Enter a target and message."));
       return;
     }
     const at = new Date().toISOString();
@@ -213,7 +222,7 @@ export function StudioReviewPanel({
         resolvedBy: null,
         resolvedAt: null,
       }, at);
-      if (persist(next, l("검토 내용을 추가했습니다.", "Review note added."))) {
+      if (persist(next, bt("검토 내용을 추가했습니다.", "Review note added."))) {
         setBody("");
       }
     } catch (cause) {
@@ -226,7 +235,7 @@ export function StudioReviewPanel({
     try {
       persist(
         resolveStudioReviewThread(session, threadId, CURRENT_REVIEWER_ID, new Date().toISOString()),
-        l("수정 내용을 해결했습니다.", "Review item resolved."),
+        bt("수정 내용을 해결했습니다.", "Review item resolved."),
       );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Review item could not be resolved.");
@@ -236,7 +245,7 @@ export function StudioReviewPanel({
   const decide = (decision: "approved" | "changes-requested") => {
     if (!session) return;
     if (decision === "approved" && !canCurrentReviewerApprove) {
-      setError(l("열린 수정 요청을 해결하거나 이미 기록된 승인을 확인해 주세요.", "Resolve open change requests or review the existing approval first."));
+      setError(bt("열린 수정 요청을 해결하거나 이미 기록된 승인을 확인해 주세요.", "Resolve open change requests or review the existing approval first."));
       return;
     }
     try {
@@ -247,8 +256,8 @@ export function StudioReviewPanel({
         decidedAt: new Date().toISOString(),
       });
       if (persist(next, decision === "approved"
-        ? (l("내 승인을 기록했습니다.", "Your approval was recorded."))
-        : (l("수정을 요청했습니다.", "Changes requested.")))) {
+        ? (bt("내 승인을 기록했습니다.", "Your approval was recorded."))
+        : (bt("수정을 요청했습니다.", "Changes requested.")))) {
         setDecisionNote("");
       }
     } catch (cause) {
@@ -265,7 +274,7 @@ export function StudioReviewPanel({
         createdAt: new Date().toISOString(),
       });
       const archived = archiveStudioReviewSession(window.localStorage, projectId, transition.previous);
-      if (persist(transition.next, l("승인본은 보관하고 새 초안을 시작했습니다.", "The approved version was archived and a new draft was created."))) {
+      if (persist(transition.next, bt("승인본은 보관하고 새 초안을 시작했습니다.", "The approved version was archived and a new draft was created."))) {
         setHistory(archived);
       }
     } catch (cause) {
@@ -276,7 +285,7 @@ export function StudioReviewPanel({
   if (!session) {
     return (
       <section className="rounded-3xl border border-line bg-card p-6 text-sm text-fg-2">
-        {workspace.error ?? (l("검토 상태를 불러오는 중입니다.", "Loading review state."))}
+        {workspace.error ?? (bt("검토 상태를 불러오는 중입니다.", "Loading review state."))}
       </section>
     );
   }
@@ -289,20 +298,19 @@ export function StudioReviewPanel({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            <ShieldCheck size={14} aria-hidden="true" /> REVIEW
-          </p>
+            <ShieldCheck size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioReviewPanel", "en", "REVIEW")}</p>
           <h2 id="review-workspace-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
-            {l("댓글·수정·승인을 한 흐름으로", "Comments, changes and approval in one flow")}
+            {bt("댓글·수정·승인을 한 흐름으로", "Comments, changes and approval in one flow")}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">
-            {l("승인된 결과는 자동으로 보호됩니다. 다시 수정할 때는 승인본을 보관하고 새 초안을 시작합니다.", "Approved work is protected automatically. Editing starts a new draft while the approved version stays archived.")}
+            {bt("승인된 결과는 자동으로 보호됩니다. 다시 수정할 때는 승인본을 보관하고 새 초안을 시작합니다.", "Approved work is protected automatically. Editing starts a new draft while the approved version stays archived.")}
           </p>
         </div>
         <span className={cn(
           "inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-bold",
           statusTone(session.status),
         )}>
-          {l(STATUS_LABELS[session.status].ko, STATUS_LABELS[session.status].en)}
+          {bt(STATUS_LABELS[session.status].ko, STATUS_LABELS[session.status].en)}
         </span>
       </div>
 
@@ -318,14 +326,14 @@ export function StudioReviewPanel({
       ) : null}
 
       <div className="mt-5 grid gap-3 sm:grid-cols-4">
-        <ReviewStat label={l("버전", "Version")} value={session.versionId} />
-        <ReviewStat label={l("열린 항목", "Open items")} value={openThreads} />
+        <ReviewStat label={bt("버전", "Version")} value={session.versionId} />
+        <ReviewStat label={bt("열린 항목", "Open items")} value={openThreads} />
         <ReviewStat
-          label={l("승인", "Approvals")}
+          label={bt("승인", "Approvals")}
           value={`${session.decisions.filter((item) => item.decision === "approved").length}/${session.requiredReviewerIds.length || 1}`}
         />
         <ReviewStat
-          label={l("보관된 승인본", "Archived approvals")}
+          label={bt("보관된 승인본", "Archived approvals")}
           value={history?.sessions.length ?? 0}
         />
       </div>
@@ -334,7 +342,7 @@ export function StudioReviewPanel({
         {session.status === "draft" ? (
           <button type="button" onClick={submit} className={buttonClass({ className: "gap-1.5" })}>
             <Send size={15} aria-hidden="true" />
-            {l("검토 시작", "Start review")}
+            {bt("검토 시작", "Start review")}
           </button>
         ) : null}
         {!immutable && session.status !== "draft" ? (
@@ -347,7 +355,7 @@ export function StudioReviewPanel({
                 className={buttonClass({ className: "gap-1.5" })}
               >
                 <Check size={15} aria-hidden="true" />
-                {l("승인", "Approve")}
+                {bt("승인", "Approve")}
               </button>
             ) : null}
             <button
@@ -355,25 +363,25 @@ export function StudioReviewPanel({
               onClick={() => decide("changes-requested")}
               className={buttonClass({ variant: "outline", className: "gap-1.5" })}
             >
-              {l("수정 요청", "Request changes")}
+              {bt("수정 요청", "Request changes")}
             </button>
           </>
         ) : null}
         {session.status === "approved" ? (
           <button type="button" onClick={startRevision} className={buttonClass({ className: "gap-1.5" })}>
             <RefreshCcw size={15} aria-hidden="true" />
-            {l("새 초안에서 수정", "Edit in a new draft")}
+            {bt("새 초안에서 수정", "Edit in a new draft")}
           </button>
         ) : null}
       </div>
 
       {(readiness?.openChangeRequestCount ?? 0) > 0 ? (
         <div className="mt-4 rounded-xl border border-warning/35 bg-warning-soft/15 p-3 text-xs leading-5 text-warning">
-          {l(`승인 전에 열린 수정 요청 ${readiness?.openChangeRequestCount ?? 0}개를 해결해 주세요.`, `Resolve ${readiness?.openChangeRequestCount ?? 0} open change requests before approval.`)}
+          {bt(`승인 전에 열린 수정 요청 ${readiness?.openChangeRequestCount ?? 0}개를 해결해 주세요.`, `Resolve ${readiness?.openChangeRequestCount ?? 0} open change requests before approval.`)}
         </div>
       ) : currentReviewerApproved && missingOtherApprovalCount > 0 ? (
         <div className="mt-4 rounded-xl border border-line bg-panel p-3 text-xs leading-5 text-fg-2">
-          {l(`내 승인은 기록됐습니다. 다른 검토자 ${missingOtherApprovalCount}명의 결정을 기다리고 있어요.`, `Your approval is recorded. Waiting for ${missingOtherApprovalCount} other reviewers.`)}
+          {bt(`내 승인은 기록됐습니다. 다른 검토자 ${missingOtherApprovalCount}명의 결정을 기다리고 있어요.`, `Your approval is recorded. Waiting for ${missingOtherApprovalCount} other reviewers.`)}
         </div>
       ) : null}
 
@@ -381,7 +389,7 @@ export function StudioReviewPanel({
         <div className="rounded-2xl border border-line bg-panel/55 p-4">
           <h3 className="flex items-center gap-2 text-sm font-black text-fg">
             <MessageSquarePlus size={16} className="text-accent" aria-hidden="true" />
-            {l("검토 내용 추가", "Add review item")}
+            {bt("검토 내용 추가", "Add review item")}
           </h3>
           <select
             value={kind}
@@ -389,23 +397,23 @@ export function StudioReviewPanel({
             onChange={(event) => setKind(event.target.value as StudioReviewThreadKind)}
             className="mt-3 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg"
           >
-            <option value="comment">{l("댓글", "Comment")}</option>
-            <option value="change-request">{l("수정 요청", "Change request")}</option>
-            <option value="paint-over">{l("덧그림 의견", "Paint-over")}</option>
+            <option value="comment">{bt("댓글", "Comment")}</option>
+            <option value="change-request">{bt("수정 요청", "Change request")}</option>
+            <option value="paint-over">{bt("덧그림 의견", "Paint-over")}</option>
           </select>
           <input
             value={targetId}
             disabled={immutable}
             onChange={(event) => setTargetId(event.target.value)}
-            aria-label={l("검토 대상", "Review target")}
+            aria-label={bt("검토 대상", "Review target")}
             className="mt-2 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg"
-            placeholder={l("예: 컷 34, 대사 12", "Example: panel 34, dialogue 12")}
+            placeholder={bt("예: 컷 34, 대사 12", "Example: panel 34, dialogue 12")}
           />
           <textarea
             value={body}
             disabled={immutable}
             onChange={(event) => setBody(event.target.value)}
-            aria-label={l("검토 내용", "Review message")}
+            aria-label={bt("검토 내용", "Review message")}
             rows={4}
             className="mt-2 w-full rounded-xl border border-line bg-card px-3 py-2 text-sm leading-6 text-fg"
           />
@@ -416,28 +424,28 @@ export function StudioReviewPanel({
             className={buttonClass({ size: "sm", className: "mt-2 w-full gap-1.5" })}
           >
             <MessageSquarePlus size={14} aria-hidden="true" />
-            {l("추가", "Add")}
+            {bt("추가", "Add")}
           </button>
           {!immutable && session.status !== "draft" ? (
             <textarea
               value={decisionNote}
               onChange={(event) => setDecisionNote(event.target.value)}
-              aria-label={l("승인 메모", "Decision note")}
+              aria-label={bt("승인 메모", "Decision note")}
               rows={2}
               className="mt-4 w-full rounded-xl border border-line bg-card px-3 py-2 text-xs leading-5 text-fg"
-              placeholder={l("승인 또는 수정 요청 메모", "Approval or change-request note")}
+              placeholder={bt("승인 또는 수정 요청 메모", "Approval or change-request note")}
             />
           ) : null}
         </div>
 
         <div className="rounded-2xl border border-line bg-panel/55 p-4">
           <h3 className="text-sm font-black text-fg">
-            {l("댓글·수정 요청", "Comments and change requests")}
+            {bt("댓글·수정 요청", "Comments and change requests")}
           </h3>
           <div className="mt-3 space-y-3">
             {session.threads.length === 0 ? (
               <p className="rounded-xl border border-dashed border-line p-5 text-center text-xs text-fg-3">
-                {l("아직 검토 내용이 없습니다.", "No review items yet.")}
+                {bt("아직 검토 내용이 없습니다.", "No review items yet.")}
               </p>
             ) : null}
             {session.threads.map((thread) => (

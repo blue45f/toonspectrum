@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Download, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -89,10 +92,9 @@ export function StudioRecoveryNotice({ blockedReason, autoRestore, onRestore, on
         <div className="flex min-w-0 items-center gap-3" role="status" aria-live="polite">
           <Loader2 size={17} className="shrink-0 animate-spin text-accent motion-reduce:animate-none" aria-hidden />
           <div className="min-w-0">
-            <h2 id={titleId} className="font-bold">마지막 작업을 이어 여는 중이에요</h2>
+            <h2 id={titleId} className="font-bold">{translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "마지막 작업을 이어 여는 중이에요")}</h2>
             <p className="mt-1 leading-relaxed text-fg-2">
-              안전하게 저장된 같은 그림이면 묻지 않고 자동으로 이어서 엽니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "안전하게 저장된 같은 그림이면 묻지 않고 자동으로 이어서 엽니다.")}</p>
           </div>
         </div>
       </section>
@@ -116,14 +118,14 @@ export function StudioRecoveryNotice({ blockedReason, autoRestore, onRestore, on
   return (
     <section
       data-studio-recovery-notice
-      data-studio-auto-resume-fallback={blockedReason === null ? "true" : undefined}
+      data-studio-auto-resume-fallback={blockedReason === null ? translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "en", "true") : undefined}
       aria-labelledby={titleId}
       aria-busy={busy !== null}
       className={cn("mb-3 min-w-0 rounded-xl border bg-panel p-3 text-xs text-fg", blockedReason ? "border-warning/35" : "border-accent/25")}
     >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
         <div className="min-w-0 flex-1 basis-48" role="status" aria-live="polite">
-          <h2 id={titleId} className="font-bold">{blockedReason ? "남겨 둔 그림을 보관해 주세요" : manualRestoreRequired ? "저장 상태를 확인해 주세요" : "자동으로 이어 열지 못했어요"}</h2>
+          <h2 id={titleId} className="font-bold">{blockedReason ? translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "남겨 둔 그림을 보관해 주세요") : manualRestoreRequired ? translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "저장 상태를 확인해 주세요") : translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "자동으로 이어 열지 못했어요")}</h2>
           <p className="mt-1 leading-relaxed text-fg-2">{description}</p>
         </div>
         <div className="flex max-w-full flex-wrap gap-2">
@@ -135,7 +137,7 @@ export function StudioRecoveryNotice({ blockedReason, autoRestore, onRestore, on
             className={cn(actionClass, "bg-accent text-on-accent hover:bg-accent-hover")}
           >
             {busy === "restore" ? <Loader2 size={15} className="animate-spin motion-reduce:animate-none" aria-hidden /> : blockedReason ? <Download size={15} aria-hidden /> : <RotateCcw size={15} aria-hidden />}
-            {busy === "restore" ? "그림 여는 중…" : blockedReason ? "백업 파일 받기" : manualRestoreRequired ? "이어서 그리기" : "다시 이어 열기"}
+            {busy === "restore" ? translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "그림 여는 중…") : blockedReason ? translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "백업 파일 받기") : manualRestoreRequired ? translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "이어서 그리기") : translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "다시 이어 열기")}
           </button>
           <a
             href={newDrawingHref}
@@ -152,13 +154,12 @@ export function StudioRecoveryNotice({ blockedReason, autoRestore, onRestore, on
             }}
             className={cn(actionClass, "border border-line bg-card text-fg-2 hover:bg-raised", busy && "pointer-events-none opacity-50")}
           >
-            새 그림 그리기 <span className="text-[0.65rem]">새 탭</span>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "새 그림 그리기 ")}<span className="text-[0.65rem]">{translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "새 탭")}</span>
           </a>
         </div>
       </div>
       <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">
-        새 탭에서 시작합니다. 현재 그림과 남겨 둔 작업은 유지돼요.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "새 탭에서 시작합니다. 현재 그림과 남겨 둔 작업은 유지돼요.")}</p>
       <button
         type="button"
         aria-expanded={expanded}
@@ -167,24 +168,22 @@ export function StudioRecoveryNotice({ blockedReason, autoRestore, onRestore, on
         onClick={() => setExpanded(!expanded)}
         className={cn(actionClass, "mt-1 text-fg-2 hover:bg-raised")}
       >
-        다른 방법 <span aria-hidden>{expanded ? "▴" : "▾"}</span>
+        {translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "다른 방법 ")}<span aria-hidden>{expanded ? "▴" : "▾"}</span>
       </button>
       {expanded && (
         <div id={detailsId} className="mt-1 border-t border-line pt-2">
           <p className="leading-relaxed text-fg-2">
-            현재 그림은 ‘파일 → 저장 기록’에 먼저 보관합니다. 실패하면 이어 열지 않아요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "현재 그림은 ‘파일 → 저장 기록’에 먼저 보관합니다. 실패하면 이어 열지 않아요.")}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {!blockedReason && (
               <button type="button" disabled={busy !== null} onClick={() => void run("backup")} className={cn(actionClass, "border border-line hover:bg-raised")}>
-                <Download size={14} aria-hidden /> 백업 파일 받기
-              </button>
+                <Download size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "백업 파일 받기")}</button>
             )}
             <button type="button" disabled={busy !== null} onClick={() => void run("delete")} className={cn(actionClass, "text-bad hover:bg-bad/10")}>
-              <Trash2 size={14} aria-hidden /> {busy === "delete" ? "삭제 확인 중…" : "이전 그림 삭제…"}
+              <Trash2 size={14} aria-hidden /> {busy === "delete" ? translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "삭제 확인 중…") : translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "이전 그림 삭제…")}
             </button>
           </div>
-          <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">백업에는 이전 그림이 담겨요. 삭제는 현재 캔버스가 아닌 이전 그림에 적용되며, 확인 후 되돌릴 수 없어요.</p>
+          <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.canvas.StudioRecoveryNotice", "ko", "백업에는 이전 그림이 담겨요. 삭제는 현재 캔버스가 아닌 이전 그림에 적용되며, 확인 후 되돌릴 수 없어요.")}</p>
         </div>
       )}
       {error && <p role="alert" className="mt-2 leading-relaxed text-bad">{error}</p>}

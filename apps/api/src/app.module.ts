@@ -7,6 +7,7 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { BusinessInquiryModule } from "./modules/business-inquiry/business-inquiry.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
 import { CommunityModule } from "./modules/community/community.module";
+import { CommerceModule } from "./modules/commerce/commerce.module";
 import { CreatorModule } from "./modules/creator/creator.module";
 import { CreatorSupportModule } from "./modules/creator-support/creator-support.module";
 import { CreatorMarketplaceModule } from "./modules/creator-marketplace/creator-marketplace.module";
@@ -16,6 +17,7 @@ import { FeedbackModule } from "./modules/feedback/feedback.module";
 import { FortuneModule } from "./modules/fortune/fortune.module";
 import { HealthModule } from "./modules/health/health.module";
 import { LegalModule } from "./modules/legal/legal.module";
+import { LearningModule } from "./modules/learning/learning.module";
 import { MeModule } from "./modules/me/me.module";
 import { MessagingModule } from "./modules/messaging/messaging.module";
 import { OgModule } from "./modules/og/og.module";
@@ -41,6 +43,7 @@ const studioRealtimeTicketModule =
     OgModule,
     PersonalCloudModule,
     CommunityModule,
+    CommerceModule,
     CatalogModule,
     AdminModule,
     TrafficAnalyticsModule,
@@ -58,6 +61,7 @@ const studioRealtimeTicketModule =
       : []),
     HealthModule,
     LegalModule,
+    LearningModule,
     FortuneModule,
     StudioAiModule,
     StudioMusicModule,

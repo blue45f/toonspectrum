@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /* Extracted from StudioBackground3D. Closures keep original identifiers via an `any` host bag. */
 // @ts-nocheck
 "use no memo";
@@ -440,8 +443,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                 {sharedStageResolution ? (
                   <Suspense fallback={(
                     <p className="mb-4 rounded-xl border border-line bg-raised/60 px-3 py-2.5 text-[0.68rem] text-fg-3">
-                      공유 3D 장면 상태를 불러오는 중이에요…
-                    </p>
+                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebarExtras", "ko", "공유 3D 장면 상태를 불러오는 중이에요…")}</p>
                   )}>
                     <StudioBg3dSharedStagePanel
                       resolution={sharedStageResolution}
@@ -482,8 +484,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                   <StudioBg3dSceneOutliner controller={h.outlinerController} variant="panel" />
                 </div>
                 <p className="hidden rounded-lg border border-line bg-raised/60 px-3 py-2.5 text-xs leading-relaxed text-fg-3 xl:block">
-                  장면 계층은 왼쪽 패널에서 관리할 수 있습니다. 선택한 객체의 상세 설정은 이 패널에서 이어서 편집하세요.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebarExtras", "ko", "장면 계층은 왼쪽 패널에서 관리할 수 있습니다. 선택한 객체의 상세 설정은 이 패널에서 이어서 편집하세요.")}</p>
               </section>
 
               <div inert={immersiveSceneActive || undefined}>
@@ -727,19 +728,15 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                     <div className="min-w-0">
                       <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
                         <Hexagon size={15} className="text-accent" aria-hidden />
-                        범용 3D 모델
-                      </h3>
+                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebarExtras", "ko", "범용 3D 모델")}</h3>
                       <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                        GLB·glTF·OBJ/MTL 모델을 가져와 전체 변환, 리그 포즈, 애니메이션과 재질 상태를 확인합니다.
-                      </p>
+                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebarExtras", "ko", "GLB·glTF·OBJ/MTL 모델을 가져와 전체 변환, 리그 포즈, 애니메이션과 재질 상태를 확인합니다.")}</p>
                     </div>
                     <span className="shrink-0 rounded-md border border-line bg-card px-2 py-1 text-[0.62rem] font-bold text-fg-3">
-                      VRM 별도
-                    </span>
+                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebarExtras", "ko", "VRM 별도")}</span>
                   </div>
                   <p className="mt-2 border-l-2 border-accent/55 pl-2.5 text-[0.65rem] leading-relaxed text-fg-3">
-                    VRM 아바타의 humanoid·표정·이용 조건과 섞지 않고, 일반 모델의 실제 본·스킨·모프 구조만 사용합니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebarExtras", "ko", "VRM 아바타의 humanoid·표정·이용 조건과 섞지 않고, 일반 모델의 실제 본·스킨·모프 구조만 사용합니다.")}</p>
                 </div>
 
                 {selectedGenericModelManifest ? (
@@ -762,8 +759,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                       onClick={() => handlePanelTabChange("shapes")}
                     >
                       <Move size={14} aria-hidden />
-                      선택 모델 세부 변환·리그 편집 열기
-                    </button>
+                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebarExtras", "ko", "선택 모델 세부 변환·리그 편집 열기")}</button>
                   </div>
                 ) : selectedCustomModel ? (
                   <div
@@ -771,18 +767,16 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                     className="mb-5 flex items-center gap-2 rounded-xl border border-line bg-card/55 px-3 py-3 text-xs text-fg-2"
                   >
                     <Loader2 size={14} className="shrink-0 animate-spin text-accent" aria-hidden />
-                    선택 모델의 검증된 구조를 준비하는 중입니다.
-                  </div>
+                    {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebarExtras", "ko", "선택 모델의 검증된 구조를 준비하는 중입니다.")}</div>
                 ) : (
                   <div className="mb-5 rounded-xl border border-dashed border-line bg-card/35 px-3 py-4 text-center">
                     <p className="text-xs font-bold text-fg-2">
                       {customModels.length > 0
-                        ? "장면이나 레이어 탭에서 범용 3D 모델 하나를 선택하세요."
-                        : "아래 라이브러리에서 범용 3D 파일을 가져오세요."}
+                        ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebarExtras", "ko", "장면이나 레이어 탭에서 범용 3D 모델 하나를 선택하세요.")
+                        : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebarExtras", "ko", "아래 라이브러리에서 범용 3D 파일을 가져오세요.")}
                     </p>
                     <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-                      모델을 선택하면 리그·스킨·애니메이션·모프·기기 예산과 라이선스 상태를 한곳에서 확인할 수 있습니다.
-                    </p>
+                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebarExtras", "ko", "모델을 선택하면 리그·스킨·애니메이션·모프·기기 예산과 라이선스 상태를 한곳에서 확인할 수 있습니다.")}</p>
                   </div>
                 )}
 
@@ -793,8 +787,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                         aria-live="polite"
                         className="rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3"
                       >
-                        3D 에셋 라이브러리를 불러오는 중입니다.
-                      </div>
+                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebarExtras", "ko", "3D 에셋 라이브러리를 불러오는 중입니다.")}</div>
                     )}
                   >
                     <LazyStudioBg3dAssetLibraryPanel
@@ -805,7 +798,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                       isUploading={isUploadingModel}
                       importProgress={modelImportProgress}
                       isRestoringScene={isRestoringScene}
-                      deviceProfileLabel={deviceQuality.profile === "mobile" ? "모바일" : "데스크톱"}
+                      deviceProfileLabel={deviceQuality.profile === "mobile" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebarExtras", "ko", "모바일") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebarExtras", "ko", "데스크톱")}
                       onFileChange={handleUploadModelFiles}
                       onCancelImport={() => modelImportAbortRef.current?.abort()}
                       onAdd={addCustomModelToScene}

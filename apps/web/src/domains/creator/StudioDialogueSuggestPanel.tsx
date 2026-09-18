@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 // AI 대사/나레이션 제안 패널 — 장면 상황을 짧게 설명하면 자연스러운 대사·나레이션 후보 여러 개를
 // 받는다(studio-ai-client.ts suggestDialogueLines 문서 참고). 결과가 이미지가 아니라 텍스트라
 // StudioAiCompositionPanel과 같은 이유로 AI 생성형 콘텐츠 최초 사용 고지(runWithAiNotice) 대상이
@@ -63,13 +66,12 @@ export function StudioDialogueSuggestPanel({
     <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel/50 p-3">
       <div className="flex items-center gap-1.5 text-sm font-medium text-fg-1">
         <MessageSquareQuote size={14} />
-        AI 대사/나레이션 제안
-      </div>
+        {translateCurrentStaticSourceText("domains.creator.StudioDialogueSuggestPanel", "ko", "AI 대사/나레이션 제안")}</div>
 
       {!configured ? (
         <AiRecoveryNotice
           code="not_configured"
-          message="상황과 기존 대사 맥락은 먼저 준비할 수 있어요. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요."
+          message={translateCurrentStaticSourceText("domains.creator.StudioDialogueSuggestPanel", "ko", "상황과 기존 대사 맥락은 먼저 준비할 수 있어요. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요.")}
           compact
         />
       ) : null}
@@ -80,7 +82,7 @@ export function StudioDialogueSuggestPanel({
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canGenerate) onGenerate();
         }}
-        placeholder="예: 오랜만에 만난 옛 친구를 알아보고 반가워하는 장면"
+        placeholder={translateCurrentStaticSourceText("domains.creator.StudioDialogueSuggestPanel", "ko", "예: 오랜만에 만난 옛 친구를 알아보고 반가워하는 장면")}
         rows={2}
         disabled={busy}
         className="h-14 w-full resize-none rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent disabled:opacity-60"
@@ -95,19 +97,18 @@ export function StudioDialogueSuggestPanel({
             disabled={busy}
             className="h-3 w-3 accent-accent"
           />
-          이 페이지에 이미 배치된 대사를 맥락으로 포함
-        </label>
+          {translateCurrentStaticSourceText("domains.creator.StudioDialogueSuggestPanel", "ko", "이 페이지에 이미 배치된 대사를 맥락으로 포함")}</label>
       )}
 
       <button
         type="button"
         onClick={onGenerate}
         disabled={!canGenerate}
-        title={!configured ? "로그인하거나 무료 AI 경로를 연결하면 실행할 수 있어요." : undefined}
+        title={!configured ? translateCurrentStaticSourceText("domains.creator.StudioDialogueSuggestPanel", "ko", "로그인하거나 무료 AI 경로를 연결하면 실행할 수 있어요.") : undefined}
         className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" /> : <Sparkles size={14} />}
-        {busy ? "구상하는 중…" : "대사 제안 받기"}
+        {busy ? translateCurrentStaticSourceText("domains.creator.StudioDialogueSuggestPanel", "ko", "구상하는 중…") : translateCurrentStaticSourceText("domains.creator.StudioDialogueSuggestPanel", "ko", "대사 제안 받기")}
       </button>
 
       <div ref={feedbackRef}>
@@ -132,16 +133,14 @@ export function StudioDialogueSuggestPanel({
                       onClick={() => onAddToScript(candidate)}
                       className="inline-flex min-h-11 items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
                     >
-                      <Plus size={11} /> 대사 스크립트에 추가
-                    </button>
+                      <Plus size={11} /> {translateCurrentStaticSourceText("domains.creator.StudioDialogueSuggestPanel", "ko", "대사 스크립트에 추가")}</button>
                     {canInsertToSelected && (
                       <button
                         type="button"
                         onClick={() => onInsertToSelected(candidate)}
                         className="inline-flex min-h-11 items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
                       >
-                        <MessageSquareQuote size={11} /> 선택한 말풍선에 삽입
-                      </button>
+                        <MessageSquareQuote size={11} /> {translateCurrentStaticSourceText("domains.creator.StudioDialogueSuggestPanel", "ko", "선택한 말풍선에 삽입")}</button>
                     )}
                   </div>
                 </div>
@@ -152,9 +151,7 @@ export function StudioDialogueSuggestPanel({
       </div>
 
       <p className="text-[0.6rem] leading-relaxed text-fg-3">
-        여러 개의 초안 후보예요 — 마음에 드는 걸 골라 다듬어 쓰세요. &quot;대사 스크립트에 추가&quot;는
-        말풍선 탭의 &quot;대사 한 번에&quot; 입력창에 채워 넣어요.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.StudioDialogueSuggestPanel", "ko", "여러 개의 초안 후보예요 — 마음에 드는 걸 골라 다듬어 쓰세요. &quot;대사 스크립트에 추가&quot;는 말풍선 탭의 &quot;대사 한 번에&quot; 입력창에 채워 넣어요.")}</p>
     </div>
   );
 }

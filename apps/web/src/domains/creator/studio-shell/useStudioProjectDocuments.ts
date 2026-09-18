@@ -1,3 +1,6 @@
+import {
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useT } from "@/shared/lib/i18n";
@@ -21,6 +24,10 @@ import {
   type StudioProjectDocumentEntry,
   type StudioProjectDocumentState,
 } from "../studio-project-document-store";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 export interface StudioProjectDocumentsController {
   readonly state: StudioProjectDocumentState | null;

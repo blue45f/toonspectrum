@@ -398,4 +398,3 @@ export class CreatorSupportService {
     return uid;
   }
 }
-

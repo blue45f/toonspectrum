@@ -1,12 +1,15 @@
+import {
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Box, Brush, Image, Library, ShieldCheck, Store, Type, UserRound } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
 import Link from "@/compat/router-link";
+import { useT } from "@/shared/lib/i18n";
+import { translateParallelBilingualCopy } from "@/shared/lib/i18n-bilingual-copy";
 
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { translateParallelBilingualCopy } from "@/shared/lib/i18n-bilingual-copy";
-
-import "./studio-asset-visual-intro.css";
 
 const COPY = {
   ko: {
@@ -43,10 +46,9 @@ const COPY = {
 
 const CHIP_ICONS = [Brush, Image, UserRound, Box, Type, ShieldCheck] as const;
 
-export function StudioAssetVisualIntro({ locale: _locale }: { readonly locale?: string }) {
+export function StudioAssetVisualIntro({ locale }: { readonly locale: string }) {
   const t = useT();
-  const language = useI18n((state) => state.lang);
-  const copy = translateParallelBilingualCopy(t, "studioAssetVisualIntro", COPY);
+  const copy = translateParallelBilingualCopy(t, "StudioAssetVisualIntro", COPY);
   const reducedMotion = useReducedMotion();
 
   return (

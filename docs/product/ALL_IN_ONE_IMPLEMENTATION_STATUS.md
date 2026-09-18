@@ -179,42 +179,8 @@
 - 일정 화면에서 이미 늦은 작업, 예측 위험, 단순 주의와 정상 상태를 텍스트와 시각 표현으로 함께 구분한다.
 - 마감 2일 재조정, 적합한 지원 인력 추가, 차단 입력 해소, 병목 선행 작업 우선 완료, 작업 범위 20% 분리 시나리오를 원본을 바꾸지 않고 비교한다.
 - 각 복구안은 위험 점수·예상 지연·프로젝트 고위험 건수·예측 초과 작업 수의 전후 값을 함께 보여준다.
-- 마감·지원 배정처럼 되돌릴 수 있는 변경만 사용자 클릭 후 원자적 배치로 적용하며, 근거 없는 차단 해소·완료 처리·범위 축소는 미리보기 전용으로 제한한다.
-- 같은 자동화 조건을 다시 실행해도 결정적 실행 키로 동일 업무·알림을 복제하지 않고, 시간 기반 경고는 날짜가 바뀐 경우에만 새 발생으로 처리한다.
-- 외부 검수 비밀 값은 URL 쿼리와 요청 본문에 남기지 않고 프래그먼트에서 한 번 회수한 뒤 주소창을 정리하며, API에는 Authorization 헤더로만 전달한다.
-- 규칙 기반 예측 모델, 위험 등록 권한, 복구 시나리오, 자동화 멱등성, 외부 검수 비밀 처리와 적용 권한을 단위·컴포넌트·모바일 브라우저 테스트로 회귀 방지한다.
-
-## 2026-09-17 자체 연재·게시 자동 인증 증분
-
-이번 증분에서 완료한 범위는 다음과 같다.
-
-- 시리즈 상태를 연재중·휴재·완결로 확장하고 API 입력 정규화, 웹 타입, 목록·상세 배지, 생성·수정 폼과 데이터베이스 제약을 일치시켰다.
-- 예약 게시, 승인된 immutable release, 기존 회차 supersede, 공개 취소와 독자 공개 범위를 release-governance 인증 lane으로 묶었다.
-- 공개·링크 공개·비공개 정책, 댓글·리믹스·메타데이터 투영을 reader-policy lane에서 검증한다.
-- 범용·WEBTOON·Tapas 패키지 3종을 고정 입력으로 생성하고 24개 artifact의 파일명·MIME·크기·SHA-256·공개 manifest를 Golden corpus로 보존한다.
-- 내부 canvas ID, 로컬 경로와 작업 파일명이 외부 manifest에 노출되지 않는지 byte-for-byte 확인한다.
-- 사용자 제공 CSV·수동 입력 통계는 원격 플랫폼 telemetry를 사용했다고 주장하지 않고 로컬에서만 정규화·비교한다.
-- 5개 publishing lane, 16개 실행 증거 파일, 총 134개 테스트를 통과하고 receipt를 CI 산출물로 남긴다.
-- 자동 인증이 통과해도 WEBTOON·Tapas 계정에 직접 게시했다고 주장하지 않도록 claim policy를 분리했다.
-
-직접 외부 플랫폼 계정 게시, 플랫폼 정책의 최신성, 대량 예약 연재와 실제 알림 전달은 별도 운영 release gate로 유지한다.
-
-## 2026-09-17 운영 안정성 자동 인증 증분
-
-이번 증분에서 완료한 범위는 다음과 같다.
-
-- performance-and-soak, file-roundtrip-integrity, fault-and-collaboration-recovery, accessibility-and-security의 4개 operational lane을 저장소 CI에 추가했다.
-- 18개 실행 테스트 파일에서 총 215개 테스트를 통과하며, 각 파일과 bounded artifact의 SHA-256을 receipt에 기록한다.
-- 리소스 예산 초과 시 원본을 평탄화하거나 삭제하지 않고 proxy·LOD·미리보기 품질 저하·live effect 일시 정지를 제안하는 계약을 검증한다.
-- 2026-08-07 Apple M2 Max 역사적 8시간 soak는 727,739 cycle, 29,109,560 command, 1,455,478 render, 오류 0과 최대 RSS 증가 167.6 MiB를 기록한다.
-- 동일 8시간 leak negative control은 RSS 1,628.1 MiB 증가와 11개 allocation failure를 보존해 검증기가 정상·비정상을 구분하는지 확인한다.
-- PSD·텍스트·조정 그래프·CLIP selection·workspace interchange의 5개 round-trip 파일에서 110개 테스트를 통과한다.
-- GPU device loss, Worker termination, queue completion inversion, torn journal, corrupt snapshot·blob, quota reject, offline retry의 7종 deterministic fault를 검증한다.
-- device loss 100회, Worker 종료 1,000회, reverse queue completion 64회와 crash reopen 64회에서 lost command·duplicate commit·stale apply가 0인지 확인한다.
-- 대비·대체 텍스트·읽기 순서·키보드·터치 타깃·모바일 focus isolation과 CSP·dependency advisory 예외 금지를 같은 lane에서 검증한다.
-- historical soak와 deterministic fault를 현재 commit의 실제 장치 인증으로 오인하지 않도록 currentCommitEightHourSoakCertified, realHardwareBrowserCertificationAllowed, professionalReplacementClaimAllowed를 false로 고정한다.
-
-현재 release commit의 8시간 soak, 물리 GPU·브라우저 process crash·OPFS quota, 실제 네트워크 분할, 실기기 스크린리더·펜 장치와 외부 전문 창작자 서명은 저장소 자동화가 대체하지 않는 release gate다.
+- 마감·지원 배정처럼 되돌릴 수 있는 변경만 사용자 클릭 후 적용하며, 근거 없는 차단 해소·완료 처리·범위 축소는 미리보기 전용으로 제한한다.
+- 규칙 기반 예측 모델, 위험 등록 권한, 복구 시나리오와 적용 권한을 단위·컴포넌트·모바일 브라우저 테스트로 회귀 방지한다.
 
 ## 올인원 공개 문구 사용 게이트
 

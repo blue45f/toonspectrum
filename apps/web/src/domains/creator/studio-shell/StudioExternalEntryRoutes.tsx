@@ -1,14 +1,15 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { CircleAlert, ExternalLink } from "lucide-react";
 import { Navigate, useParams } from "react-router-dom";
 
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
-import { useT } from "@/shared/lib/i18n";
-import {
-  defineBilingualText,
-  translateBilingualMap,
-  type BilingualText,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { useI18n } from "@/shared/lib/i18n";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 import {
   studioExternalJoinHref,
@@ -16,15 +17,18 @@ import {
   studioExternalReviewHref,
   validateStudioExternalToken,
 } from "../studio-route-registry";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 type EntryKind = "join" | "present" | "review";
 
-const COPY = {
-  title: defineBilingualText("studioExternalEntry", "title", "이 링크를 열 수 없어요", "This link cannot be opened"),
-  openStudio: defineBilingualText("studioExternalEntry", "openStudio", "ToonStudio로 이동", "Open ToonStudio"),
-} as const;
 
-const DESCRIPTIONS: Readonly<Record<EntryKind, BilingualText>> = {
+function InvalidExternalEntry({ kind }: { readonly kind: EntryKind }) {
+  const bt = useBilingual("StudioExternalEntryRoutes");
+  const title = bt("이 링크를 열 수 없어요", "This link cannot be opened");
+  const descriptions: Readonly<Record<EntryKind, Readonly<Record<Locale, string>>>> = {
     review: {
       ko: "검토 링크가 잘렸거나 만료됐을 수 있습니다. 링크를 보낸 사람에게 새 링크를 요청해 주세요.",
       en: "The review link may be incomplete or expired. Ask the sender for a new link.",
@@ -51,11 +55,11 @@ function InvalidExternalEntry({ kind }: { readonly kind: EntryKind }) {
           </span>
           <h1 className="mt-4 text-2xl font-black text-fg">{t(COPY.title)}</h1>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-fg-2">
-            {descriptions[kind]}
+            {bt(descriptions[kind].ko, descriptions[kind].en)}
           </p>
           <Link href="/studio" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent">
             <ExternalLink size={16} aria-hidden="true" />
-            {t(COPY.openStudio)}
+            {bt("ToonStudio로 이동", "Open ToonStudio")}
           </Link>
         </section>
       </Container>
@@ -64,11 +68,13 @@ function InvalidExternalEntry({ kind }: { readonly kind: EntryKind }) {
 }
 
 function ExternalEntry({ kind }: { readonly kind: EntryKind }) {
+  useBilingualI18nRevision();
   const params = useParams<{
     inviteToken?: string;
     presentationToken?: string;
     shareToken?: string;
   }>();
+  useI18n((state) => state.lang);
   const token = kind === "review"
     ? params.shareToken
     : kind === "present"
@@ -86,13 +92,16 @@ function ExternalEntry({ kind }: { readonly kind: EntryKind }) {
 }
 
 export function StudioExternalReviewRoute() {
+  useBilingualI18nRevision();
   return <ExternalEntry kind="review" />;
 }
 
 export function StudioExternalPresentationRoute() {
+  useBilingualI18nRevision();
   return <ExternalEntry kind="present" />;
 }
 
 export function StudioExternalJoinRoute() {
+  useBilingualI18nRevision();
   return <ExternalEntry kind="join" />;
 }

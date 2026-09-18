@@ -1,3 +1,9 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Boxes, Library, Palette, Search, ShieldCheck, Store } from "lucide-react";
 import { lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -7,13 +13,8 @@ import { MarketBrowsePage } from "@/domains/market/pages/MarketBrowsePage";
 import { MarketLibraryPage } from "@/domains/market/pages/MarketCloudLibraryPage";
 import { MarketManagePage } from "@/domains/market/pages/MarketOwnedResourcesPage";
 import { Container } from "@/shared/components/section";
-import { useI18n, useT } from "@/shared/lib/i18n";
-import {
-  defineBilingualText,
-  formatI18nTemplate,
-  translateBilingualMap,
-  type BilingualText,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { useI18n } from "@/shared/lib/i18n";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { StudioAssetGovernancePanel } from "./StudioAssetGovernancePanel";
@@ -25,10 +26,15 @@ import {
   resolveStudioAssetHubView,
   type AssetHubView,
 } from "./studio-asset-hub-view";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const CreatorEssentialsPage = lazy(() => import("./creator-essentials/CreatorEssentialsPage"));
 
-const VIEW_LABELS: Readonly<Record<AssetHubView, BilingualText>> = {
+const VIEW_LABELS: Readonly<Record<AssetHubView, Readonly<{ ko: string; en: string }>>> = {
   essentials: { ko: "무료 제작 소재", en: "Creator essentials" },
   overview: { ko: "소재 홈", en: "Materials home" },
   "series-kit": { ko: "Series Kit", en: "Series Kit" },
@@ -48,26 +54,6 @@ const VIEW_ICONS = {
   seller: Store,
 } as const;
 
-const COPY = {
-  projectConnected: defineBilingualText("studioAssetHub", "projectConnected", "프로젝트 {projectId}에 연결", "Connected to project {projectId}"),
-  materialViews: defineBilingualText("studioAssetHub", "materialViews", "소재 화면", "Material views"),
-  loadingEssentials: defineBilingualText("studioAssetHub", "loadingEssentials", "제작 소재 준비 중…", "Loading creator essentials…"),
-  missingSeriesTitle: defineBilingualText("studioAssetHub", "missingSeriesTitle", "프로젝트에서 Series Kit를 열어 주세요", "Open Series Kit from a project"),
-  missingSafetyTitle: defineBilingualText("studioAssetHub", "missingSafetyTitle", "확인할 프로젝트를 먼저 선택해 주세요", "Choose a project to check"),
-  missingSeriesBody: defineBilingualText(
-    "studioAssetHub",
-    "missingSeriesBody",
-    "Series Kit는 작품별 색상·글꼴·말풍선·출력 규칙을 관리합니다. 내 작업에서 프로젝트를 선택한 뒤 소재의 Series Kit를 열면 됩니다.",
-    "Series Kit manages project colors, typography, balloons and export defaults. Choose a project from My work, then open its Series Kit.",
-  ),
-  missingSafetyBody: defineBilingualText(
-    "studioAssetHub",
-    "missingSafetyBody",
-    "사용 목적, 구매 내역, 팀 좌석, 글꼴, AI 출처와 확장 기능 권한은 프로젝트마다 달라집니다. 내 작업에서 프로젝트를 선택하면 한 번에 확인할 수 있습니다.",
-    "Usage purpose, purchases, team seats, fonts, AI provenance and extension permissions differ per project. Choose a project from My work to review them together.",
-  ),
-  goToMyWork: defineBilingualText("studioAssetHub", "goToMyWork", "내 작업으로", "Go to My work"),
-} as const;
 
 /** Build a canonical link while preserving the optional project context. */
 function assetHubHref(view: AssetHubView, projectId: string | null): string {
@@ -79,8 +65,14 @@ function assetHubHref(view: AssetHubView, projectId: string | null): string {
   return serialized ? `/studio/assets?${serialized}` : "/studio/assets";
 }
 
-function MissingProjectView({ view }: { readonly view: "safety" | "series-kit" }) {
-  const t = useT();
+function MissingProjectView({
+  locale,
+  view,
+}: {
+  readonly locale: string;
+  readonly view: "safety" | "series-kit";
+}) {
+  const bt = useBilingual("StudioAssetHubPage");
   const seriesKit = view === "series-kit";
   return (
     <Container size="wide" className="py-8 sm:py-12">
@@ -89,13 +81,17 @@ function MissingProjectView({ view }: { readonly view: "safety" | "series-kit" }
           {seriesKit ? <Palette size={21} aria-hidden="true" /> : <ShieldCheck size={21} aria-hidden="true" />}
         </span>
         <h2 className="mt-4 text-xl font-black text-fg">
-          {t(seriesKit ? COPY.missingSeriesTitle : COPY.missingSafetyTitle)}
+          {seriesKit
+            ? bt("프로젝트에서 Series Kit를 열어 주세요", "Open Series Kit from a project")
+            : bt("확인할 프로젝트를 먼저 선택해 주세요", "Choose a project to check")}
         </h2>
         <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-fg-2">
-          {t(seriesKit ? COPY.missingSeriesBody : COPY.missingSafetyBody)}
+          {seriesKit
+            ? bt("Series Kit는 작품별 색상·글꼴·말풍선·출력 규칙을 관리합니다. 내 작업에서 프로젝트를 선택한 뒤 소재의 Series Kit를 열면 됩니다.", "Series Kit manages project colors, typography, balloons and export defaults. Choose a project from My work, then open its Series Kit.")
+            : bt("사용 목적, 구매 내역, 팀 좌석, 글꼴, AI 출처와 확장 기능 권한은 프로젝트마다 달라집니다. 내 작업에서 프로젝트를 선택하면 한 번에 확인할 수 있습니다.", "Usage purpose, purchases, team seats, fonts, AI provenance and extension permissions differ per project. Choose a project from My work to review them together.")}
         </p>
         <Link href="/studio" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm font-bold text-on-accent">
-          {t(COPY.goToMyWork)}
+          {bt("내 작업으로", "Go to My work")}
         </Link>
       </section>
     </Container>
@@ -104,16 +100,17 @@ function MissingProjectView({ view }: { readonly view: "safety" | "series-kit" }
 
 /** Render the one canonical Studio asset destination over existing server-backed capabilities. */
 export function StudioAssetHubPage() {
+  useBilingualI18nRevision();
   const [searchParams] = useSearchParams();
   const t = useT();
   const language = useI18n((state) => state.lang);
-  const legacyLocale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  const locale = language;
+  const bt = useBilingual("StudioAssetHubPage");
   const view = resolveStudioAssetHubView(searchParams.get("view"));
   const projectId = searchParams.get("project")?.trim() || null;
   const CurrentViewIcon = VIEW_ICONS[view];
 
-  const viewLabels = translateBilingualMap(t, "studioAssetHub.view", VIEW_LABELS);
-  const currentLabel = viewLabels[view];
+  const currentLabel = bt(VIEW_LABELS[view].ko, VIEW_LABELS[view].en);
   const visibleViews = projectId
     ? ASSET_HUB_VIEWS
     : ASSET_HUB_VIEWS.filter((candidate) => candidate !== "series-kit" && candidate !== "safety");
@@ -128,17 +125,17 @@ export function StudioAssetHubPage() {
                 <CurrentViewIcon size={18} aria-hidden="true" />
               </span>
               <div>
-                <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">TOONSTUDIO MATERIALS</p>
+                <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioAssetHubPage", "en", "TOONSTUDIO MATERIALS")}</p>
                 <p className="text-sm font-bold text-fg">{currentLabel}</p>
                 {projectId ? (
                   <p className="mt-0.5 text-xs text-fg-3">
-                    {formatI18nTemplate(t(COPY.projectConnected), { projectId })}
+                    {bt(`프로젝트 ${projectId}에 연결`, `Connected to project ${projectId}`)}
                   </p>
                 ) : null}
               </div>
             </div>
 
-            <nav aria-label={t(COPY.materialViews)} className="overflow-x-auto">
+            <nav aria-label={bt("소재 화면", "Material views")} className="overflow-x-auto">
               <div className="flex min-w-max gap-1 rounded-2xl border border-line bg-card p-1">
                 {visibleViews.map((candidate) => {
                   const active = candidate === view;
@@ -147,7 +144,7 @@ export function StudioAssetHubPage() {
                     <Link
                       key={candidate}
                       href={assetHubHref(candidate, projectId)}
-                      aria-current={active ? "page" : undefined}
+                      aria-current={active ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioAssetHubPage", "en", "page") : undefined}
                       className={cn(
                         "inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-xs font-bold transition-colors",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
@@ -157,7 +154,7 @@ export function StudioAssetHubPage() {
                       )}
                     >
                       <Icon size={15} aria-hidden="true" />
-                      {viewLabels[candidate]}
+                      {bt(VIEW_LABELS[candidate].ko, VIEW_LABELS[candidate].en)}
                     </Link>
                   );
                 })}
@@ -169,7 +166,7 @@ export function StudioAssetHubPage() {
 
       {view === "overview" ? <StudioAssetVisualIntro /> : null}
       {view === "overview" ? <StudioAssetsPage /> : null}
-      {view === "essentials" ? <Suspense fallback={<p role="status" className="p-8 text-sm text-fg-2">{t(COPY.loadingEssentials)}</p>}><CreatorEssentialsPage /></Suspense> : null}
+      {view === "essentials" ? <Suspense fallback={<p role="status" className="p-8 text-sm text-fg-2">{bt("제작 소재 준비 중…", "Loading creator essentials…")}</p>}><CreatorEssentialsPage /></Suspense> : null}
       {view === "series-kit" && projectId ? (
         <Container size="wide" className="py-7 sm:py-10">
           <StudioSeriesKitPanel projectId={projectId} locale={legacyLocale} />

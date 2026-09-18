@@ -20,7 +20,7 @@ vi.mock("../components/AdminTraffic", async () => { await traffic.promise; retur
 vi.mock("../components/AdminPlans", () => ({ AdminPlans: ({ uid }: { uid: string }) => <p>plans:{uid}</p> }));
 vi.mock("../components/AdminRevenue", () => ({ AdminRevenue: ({ uid }: { uid: string }) => <p>revenue:{uid}</p> }));
 vi.mock("../components/AdminSupporterPayments", () => ({ AdminSupporterPayments: ({ uid }: { uid: string }) => <p>supporters:{uid}</p> }));
-vi.mock("../components/AdminCreatorSupport", () => ({ AdminCreatorSupport: ({ uid }: { uid: string }) => <p>creatorSupport:{uid}</p> }));
+vi.mock("../components/AdminCreatorSupport", () => ({ AdminCreatorSupport: ({ uid }: { uid: string }) => <p>creator-support:{uid}</p> }));
 vi.mock("../components/AdminPromos", () => ({ AdminPromos: ({ userId }: { userId: string }) => <p>promos:{userId}</p> }));
 vi.mock("../components/AdminAnnouncements", () => ({ AdminAnnouncements: ({ userId }: { userId: string }) => <p>announcements:{userId}</p> }));
 vi.mock("../components/AdminReports", () => ({ AdminReports: ({ userId }: { userId: string }) => <p>reports:{userId}</p> }));
@@ -70,7 +70,7 @@ describe("AdminRouter access and real route transitions", () => {
     ["/admin/overview", "overview:actor-a"], ["/admin/analytics/traffic", "traffic:actor-a"],
     ["/admin/users/members", "members:actor-a:admin"], ["/admin/trust/cases", "reports:actor-a"],
     ["/admin/trust/community", "community:actor-a:admin"], ["/admin/monetization/plans", "plans:actor-a"],
-    ["/admin/monetization/revenue", "revenue:actor-a"], ["/admin/monetization/funding", "campaigns:actor-a"],
+    ["/admin/monetization/revenue", "revenue:actor-a"], ["/admin/monetization/supporters", "supporters:actor-a"], ["/admin/monetization/creator-support", "creator-support:actor-a"], ["/admin/monetization/funding", "campaigns:actor-a"],
     ["/admin/growth/promotions", "promos:actor-a"], ["/admin/engagement/announcements", "announcements:actor-a"],
     ["/admin/platform/operations", "ops:actor-a"], ["/admin/security/access", "security:actor-a"],
     ["/admin/security/audit", "audit:actor-a"],
