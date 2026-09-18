@@ -1,25 +1,44 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { LearningClassroomPage } from "./LearningClassroomPage";
-import { LearningResourceHub } from "./LearningResourceHub";
+import { LearningResourcesPage } from "./LearningResourcesPage";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
 
-describe("academy expansion pages", () => {
-  it("renders the external resource hub with safe source actions", () => {
-    render(<MemoryRouter initialEntries={["/learn/resources"]}><LearningResourceHub /></MemoryRouter>);
-    expect(screen.getByRole("heading", { name: /웹툰을 만드는 모든 과정/u })).toBeTruthy();
-    expect(screen.getAllByRole("link", { name: "원문 열기 ↗" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: "바로 실습 →" }).length).toBeGreaterThan(0);
+describe("academy product surfaces", () => {
+  it("renders the curated resource hub with role and production filters", () => {
+    render(<MemoryRouter initialEntries={["/learn/resources?role=artist"]}><LearningResourcesPage /></MemoryRouter>);
+    expect(screen.getByRole("heading", { name: /좋은 강의를 찾고/u })).toBeTruthy();
+    expect((screen.getByLabelText("직군") as HTMLSelectElement).value).toBe("artist");
+    expect(screen.getByLabelText("제작 단계")).toBeTruthy();
+    expect(screen.getAllByText("공식·검증 출처").length).toBeGreaterThan(0);
   });
 
-  it("renders the classroom curriculum as usable lesson links", () => {
+  it("builds a classroom curriculum and adds a locally managed assignment", () => {
     render(<MemoryRouter initialEntries={["/learn/classroom"]}><LearningClassroomPage /></MemoryRouter>);
-    expect(screen.getByRole("heading", { name: /강의 자료와 제작 도구/u })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "바로 수업에 쓸 수 있는 기본 커리큘럼" })).toBeTruthy();
-    expect(screen.getAllByRole("link", { name: "열기 →" })).toHaveLength(10);
+    fireEvent.click(screen.getByRole("button", { name: /스토리·콘티 집중/u }));
+    expect(screen.getByDisplayValue("스토리·콘티 집중 · 6주")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("강좌·자료"), { target: { value: "lesson:inking" } });
+    fireEvent.click(screen.getByRole("button", { name: "주차에 추가" }));
+    const addedLesson = screen.getByRole("link", { name: /선 굵기와 필압/u });
+    expect(addedLesson).toBeTruthy();
+    const removeButton = addedLesson.parentElement?.querySelector("button");
+    expect(removeButton).toBeTruthy();
+    fireEvent.click(removeButton as HTMLButtonElement);
+    expect(screen.queryByRole("link", { name: /선 굵기와 필압/u })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "주차 추가" }));
+    expect(screen.getByRole("option", { name: /7주차 · 새 학습 주차 7/u })).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("과제 이름"), { target: { value: "3컷 콘티 제출" } });
+    fireEvent.click(screen.getByRole("button", { name: "과제 추가" }));
+    expect(screen.getByRole("heading", { name: "3컷 콘티 제출" })).toBeTruthy();
   });
 });
