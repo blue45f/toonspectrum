@@ -274,13 +274,14 @@ export class MembershipWalletService {
         [userId],
       ),
       dbPool.query(
-        `SELECT entry.id, entry."entryType", entry.amount, entry."deltaAvailable",
-                entry."deltaReserved", entry.reason, entry."referenceKey", entry."createdAt"
+        `SELECT account.asset, entry.id, entry."entryType", entry.amount,
+                entry."deltaAvailable", entry."deltaReserved", entry.reason,
+                entry."referenceKey", entry."createdAt"
          FROM wallet_ledger_entry AS entry
          INNER JOIN wallet_account AS account ON account.id = entry."accountId"
-         WHERE entry."userId" = $1 AND account.asset = 'reward_point'
+         WHERE entry."userId" = $1
          ORDER BY entry."createdAt" DESC
-         LIMIT 50`,
+         LIMIT 100`,
         [userId],
       ),
     ]);
