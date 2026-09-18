@@ -1289,12 +1289,17 @@ export class MembershipWalletService {
       const expected = base.entitlements[key];
       if (typeof expected === "boolean" && typeof value === "boolean") {
         entitlements[key] = value as never;
-      } else if (
-        typeof expected === "number"
-        && Number.isFinite(Number(value))
-        && Number(value) >= 0
-      ) {
-        entitlements[key] = Number(value) as never;
+      } else if (typeof expected === "number") {
+        const numeric = Number(value);
+        const creditInteger = key === "credit.monthlyIncluded"
+          || key === "credit.dailyLimit";
+        if (
+          Number.isFinite(numeric)
+          && numeric >= 0
+          && (!creditInteger || (Number.isSafeInteger(numeric) && numeric <= 10_000_000))
+        ) {
+          entitlements[key] = numeric as never;
+        }
       }
     }
     return {
