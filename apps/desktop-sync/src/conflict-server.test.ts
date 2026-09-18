@@ -49,6 +49,8 @@ describe("desktop sync conflict loopback server", () => {
       expect(page.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
       expect(html).not.toContain(fixture.server.token);
       expect(html).not.toContain(fixture.local);
+      expect(html).not.toContain(".innerHTML");
+      expect(html).toContain("replaceChildren");
 
       await expect(fetch(`${fixture.server.origin}/api/report`))
         .resolves.toMatchObject({ status: 401 });
@@ -125,9 +127,9 @@ describe("desktop sync conflict loopback server", () => {
         }),
       });
       expect(response.status).toBe(422);
-      const body = await response.json() as { message: string };
-      expect(body.message).toBe("decision-invalid");
-      expect(body.message).not.toContain(maliciousResolution);
+      const body = await response.json() as { code: string };
+      expect(body.code).toBe("decision-invalid");
+      expect(body.code).not.toContain(maliciousResolution);
     } finally {
       await fixture.server.close();
     }

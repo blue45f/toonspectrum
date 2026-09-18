@@ -38,7 +38,265 @@ const CONFLICT_RESOLVER_CSS = `
 `;
 
 const CONFLICT_RESOLVER_SCRIPT = `
-const fragment=new URLSearchParams(location.hash.slice(1));const token=fragment.get("token")||"";history.replaceState(null,"",location.pathname);const root=document.querySelector("#conflicts");const statusNode=document.querySelector("#status");const applyButton=document.querySelector("#apply");const confirmNode=document.querySelector("#confirm");let report=null;const labels={"use-local":["로컬 버전 사용","클라우드의 같은 경로를 백업한 뒤 로컬 버전으로 교체합니다."],"use-remote":["클라우드 버전 사용","로컬의 같은 경로를 백업한 뒤 클라우드 버전으로 교체합니다."],"keep-both-local-primary":["둘 다 보관 · 로컬을 원본으로","클라우드 버전은 충돌 사본으로 보존하고 원래 경로는 로컬 버전을 사용합니다."],"keep-both-remote-primary":["둘 다 보관 · 클라우드를 원본으로","로컬 버전은 충돌 사본으로 보존하고 원래 경로는 클라우드 버전을 사용합니다."]};function headers(extra={}){return{"X-ToonStudio-Token":token,...extra}}function shortHash(value){return value?value.slice(0,12)+"…":"—"}function bytes(value){if(value===null)return"—";const units=["B","KiB","MiB","GiB"];let size=value,index=0;while(size>=1024&&index<units.length-1){size/=1024;index++}return size.toFixed(index?1:0)+" "+units[index]}function sideCard(conflict,side){const value=conflict[side];const section=document.createElement("section");section.className="side";section.innerHTML='<h3>'+(side==="local"?"이 기기":"클라우드")+'</h3><dl class="meta"><dt>상태</dt><dd>'+(value.exists?"파일 있음":"삭제됨")+'</dd><dt>크기</dt><dd>'+bytes(value.size)+'</dd><dt>해시</dt><dd title="'+(value.sha256||"")+'">'+shortHash(value.sha256)+'</dd><dt>버전</dt><dd>'+(value.version?shortHash(value.version):"—")+'</dd></dl>';if(value.exists&&/[.](png|jpe?g|webp|gif)$/i.test(conflict.relativePath)){const button=document.createElement("button");button.className="preview-button";button.type="button";button.textContent="미리보기 불러오기";button.addEventListener("click",async()=>{button.disabled=true;try{const response=await fetch('/api/preview?conflictId='+encodeURIComponent(conflict.id)+'&side='+side,{headers:headers()});if(!response.ok)throw new Error(await response.text());const image=document.createElement("img");image.className="preview";image.alt=(side==="local"?"로컬":"클라우드")+" 충돌 파일 미리보기";image.src=URL.createObjectURL(await response.blob());section.append(image);button.remove()}catch(error){button.disabled=false;button.textContent="미리보기 실패 · 다시 시도"}});section.append(button)}return section}function renderConflict(conflict,index){const article=document.createElement("article");article.className="conflict";const head=document.createElement("div");head.className="conflict-head";head.innerHTML='<div><div class="path">'+escapeHtml(conflict.relativePath)+'</div><div class="reason">충돌 원인: '+escapeHtml(conflict.reason)+'</div></div><span class="badge">'+(index+1)+' / '+report.conflicts.length+'</span>';article.append(head);const grid=document.createElement("div");grid.className="grid";grid.append(sideCard(conflict,"local"),sideCard(conflict,"remote"));article.append(grid);const choices=document.createElement("div");choices.className="choices";choices.setAttribute("role","radiogroup");choices.setAttribute("aria-label",conflict.relativePath+" 해결 방법");for(const value of conflict.allowedResolutions){const label=document.createElement("label");label.className="choice";const input=document.createElement("input");input.type="radio";input.name="decision-"+conflict.id;input.value=value;input.required=true;input.addEventListener("change",updateReady);const copy=document.createElement("span");copy.innerHTML='<strong>'+labels[value][0]+'</strong><span>'+labels[value][1]+'</span>';label.append(input,copy);choices.append(label)}article.append(choices);return article}function escapeHtml(value){const span=document.createElement("span");span.textContent=value;return span.innerHTML}function selectedDecisions(){return report.conflicts.map(conflict=>{const selected=document.querySelector('input[name="decision-'+CSS.escape(conflict.id)+'"]:checked');return selected?{conflictId:conflict.id,resolution:selected.value}:null}).filter(Boolean)}function updateReady(){applyButton.disabled=!(report&&selectedDecisions().length===report.conflicts.length&&confirmNode.checked)}confirmNode.addEventListener("change",updateReady);applyButton.addEventListener("click",async()=>{applyButton.disabled=true;statusNode.className="status";statusNode.textContent="양쪽 원본을 백업하고 선택한 해결 방법을 적용하는 중…";try{const response=await fetch("/api/apply",{method:"POST",headers:headers({"Content-Type":"application/json"}),body:JSON.stringify({reportId:report.reportId,decisions:selectedDecisions()})});const body=await response.json();if(!response.ok)throw new Error(body.message||"적용 실패");root.innerHTML='<section class="result"><h2>충돌 해결 완료</h2><p>양쪽 백업과 최종 동기화를 확인했습니다.</p><dl class="meta"><dt>영수증</dt><dd>'+shortHash(body.receipt.receiptSha256)+'</dd><dt>세션</dt><dd>'+escapeHtml(body.receipt.sessionId)+'</dd></dl></section>';document.querySelector("#footer").classList.add("hidden");statusNode.textContent="이 창을 닫아도 됩니다."}catch(error){statusNode.className="status error";statusNode.textContent=error instanceof Error?error.message:String(error);updateReady()}});async function load(){if(!token){statusNode.className="status error";statusNode.textContent="보안 토큰이 없어 해결 화면을 열 수 없습니다.";return}try{const response=await fetch("/api/report",{headers:headers()});if(!response.ok)throw new Error(await response.text());report=await response.json();document.querySelector("#count").textContent=String(report.conflicts.length);if(report.conflicts.length===0){root.innerHTML='<section class="result"><h2>충돌 없음</h2><p>현재 해결할 충돌이 없습니다.</p></section>';document.querySelector("#footer").classList.add("hidden");return}report.conflicts.forEach((conflict,index)=>root.append(renderConflict(conflict,index)));statusNode.textContent="모든 파일의 해결 방법을 선택하세요.";updateReady()}catch(error){statusNode.className="status error";statusNode.textContent=error instanceof Error?error.message:String(error)}}load();
+const fragment = new URLSearchParams(location.hash.slice(1));
+const token = fragment.get("token") || "";
+history.replaceState(null, "", location.pathname);
+
+const root = document.querySelector("#conflicts");
+const statusNode = document.querySelector("#status");
+const applyButton = document.querySelector("#apply");
+const confirmNode = document.querySelector("#confirm");
+let report = null;
+
+const labels = Object.freeze({
+  "use-local": ["로컬 버전 사용", "클라우드의 같은 경로를 백업한 뒤 로컬 버전으로 교체합니다."],
+  "use-remote": ["클라우드 버전 사용", "로컬의 같은 경로를 백업한 뒤 클라우드 버전으로 교체합니다."],
+  "keep-both-local-primary": ["둘 다 보관 · 로컬을 원본으로", "클라우드 버전은 충돌 사본으로 보존하고 원래 경로는 로컬 버전을 사용합니다."],
+  "keep-both-remote-primary": ["둘 다 보관 · 클라우드를 원본으로", "로컬 버전은 충돌 사본으로 보존하고 원래 경로는 클라우드 버전을 사용합니다."],
+});
+
+const errorMessages = Object.freeze({
+  "conflict-resolution-failed": "충돌 해결에 실패했습니다.",
+  "decision-invalid": "선택한 해결 방법이 유효하지 않습니다.",
+  "decision-missing": "모든 충돌의 해결 방법을 선택해 주세요.",
+  "integrity": "파일 무결성 검증에 실패했습니다. 다시 비교해 주세요.",
+  "invalid-json": "요청 형식이 올바르지 않습니다.",
+  "invalid-request": "요청 내용이 올바르지 않습니다.",
+  "no-conflicts": "현재 해결할 충돌이 없습니다.",
+  "request-too-large": "요청 데이터가 너무 큽니다.",
+  "stale-report": "파일이 변경되었습니다. 충돌 정보를 다시 불러와 주세요.",
+  "unresolved-after-apply": "적용 후에도 충돌이 남아 있습니다. 다시 비교해 주세요.",
+});
+
+function headers(extra = {}) {
+  return { "X-ToonStudio-Token": token, ...extra };
+}
+
+function shortHash(value) {
+  return value ? value.slice(0, 12) + "…" : "—";
+}
+
+function bytes(value) {
+  if (value === null) return "—";
+  const units = ["B", "KiB", "MiB", "GiB"];
+  let size = value;
+  let index = 0;
+  while (size >= 1024 && index < units.length - 1) {
+    size /= 1024;
+    index++;
+  }
+  return size.toFixed(index ? 1 : 0) + " " + units[index];
+}
+
+function createElement(tagName, className, text) {
+  const node = document.createElement(tagName);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = String(text);
+  return node;
+}
+
+function appendMetaRow(list, label, value, title) {
+  const term = createElement("dt", "", label);
+  const description = createElement("dd", "", value);
+  if (title) description.title = title;
+  list.append(term, description);
+}
+
+function responseErrorMessage(body, fallback) {
+  const code = body && typeof body === "object" && typeof body.code === "string"
+    ? body.code
+    : "";
+  return Object.prototype.hasOwnProperty.call(errorMessages, code)
+    ? errorMessages[code]
+    : fallback;
+}
+
+function sideCard(conflict, side) {
+  const value = conflict[side];
+  const section = createElement("section", "side");
+  section.append(createElement("h3", "", side === "local" ? "이 기기" : "클라우드"));
+
+  const meta = createElement("dl", "meta");
+  appendMetaRow(meta, "상태", value.exists ? "파일 있음" : "삭제됨");
+  appendMetaRow(meta, "크기", bytes(value.size));
+  appendMetaRow(meta, "해시", shortHash(value.sha256), value.sha256 || "");
+  appendMetaRow(meta, "버전", value.version ? shortHash(value.version) : "—");
+  section.append(meta);
+
+  if (value.exists && /[.](png|jpe?g|webp|gif)$/i.test(conflict.relativePath)) {
+    const button = createElement("button", "preview-button", "미리보기 불러오기");
+    button.type = "button";
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        const response = await fetch(
+          "/api/preview?conflictId=" + encodeURIComponent(conflict.id) + "&side=" + side,
+          { headers: headers() },
+        );
+        if (!response.ok) throw new Error("preview-failed");
+        const image = createElement("img", "preview");
+        image.alt = (side === "local" ? "로컬" : "클라우드") + " 충돌 파일 미리보기";
+        image.src = URL.createObjectURL(await response.blob());
+        section.append(image);
+        button.remove();
+      } catch {
+        button.disabled = false;
+        button.textContent = "미리보기 실패 · 다시 시도";
+      }
+    });
+    section.append(button);
+  }
+
+  return section;
+}
+
+function renderConflict(conflict, index) {
+  const article = createElement("article", "conflict");
+  const head = createElement("div", "conflict-head");
+  const copy = createElement("div");
+  copy.append(
+    createElement("div", "path", conflict.relativePath),
+    createElement("div", "reason", "충돌 원인: " + conflict.reason),
+  );
+  head.append(
+    copy,
+    createElement("span", "badge", (index + 1) + " / " + report.conflicts.length),
+  );
+  article.append(head);
+
+  const grid = createElement("div", "grid");
+  grid.append(sideCard(conflict, "local"), sideCard(conflict, "remote"));
+  article.append(grid);
+
+  const choices = createElement("div", "choices");
+  choices.setAttribute("role", "radiogroup");
+  choices.setAttribute("aria-label", conflict.relativePath + " 해결 방법");
+
+  for (const value of conflict.allowedResolutions) {
+    const labelCopy = labels[value];
+    if (!labelCopy) continue;
+
+    const label = createElement("label", "choice");
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = "decision-" + conflict.id;
+    input.value = value;
+    input.required = true;
+    input.addEventListener("change", updateReady);
+
+    const copyNode = createElement("span");
+    copyNode.append(
+      createElement("strong", "", labelCopy[0]),
+      createElement("span", "", labelCopy[1]),
+    );
+    label.append(input, copyNode);
+    choices.append(label);
+  }
+
+  article.append(choices);
+  return article;
+}
+
+function selectedDecisions() {
+  return report.conflicts
+    .map((conflict) => {
+      const selected = document.querySelector(
+        'input[name="decision-' + CSS.escape(conflict.id) + '"]:checked',
+      );
+      return selected
+        ? { conflictId: conflict.id, resolution: selected.value }
+        : null;
+    })
+    .filter(Boolean);
+}
+
+function updateReady() {
+  applyButton.disabled = !(
+    report
+    && selectedDecisions().length === report.conflicts.length
+    && confirmNode.checked
+  );
+}
+
+function renderSuccess(receipt) {
+  const result = createElement("section", "result");
+  result.append(
+    createElement("h2", "", "충돌 해결 완료"),
+    createElement("p", "", "양쪽 백업과 최종 동기화를 확인했습니다."),
+  );
+  const meta = createElement("dl", "meta");
+  appendMetaRow(meta, "영수증", shortHash(receipt.receiptSha256));
+  appendMetaRow(meta, "세션", receipt.sessionId);
+  result.append(meta);
+  root.replaceChildren(result);
+  document.querySelector("#footer").classList.add("hidden");
+  statusNode.textContent = "이 창을 닫아도 됩니다.";
+}
+
+confirmNode.addEventListener("change", updateReady);
+applyButton.addEventListener("click", async () => {
+  applyButton.disabled = true;
+  statusNode.className = "status";
+  statusNode.textContent = "양쪽 원본을 백업하고 선택한 해결 방법을 적용하는 중…";
+
+  try {
+    const response = await fetch("/api/apply", {
+      method: "POST",
+      headers: headers({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        reportId: report.reportId,
+        decisions: selectedDecisions(),
+      }),
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      statusNode.className = "status error";
+      statusNode.textContent = responseErrorMessage(body, "충돌 해결에 실패했습니다.");
+      updateReady();
+      return;
+    }
+    renderSuccess(body.receipt);
+  } catch {
+    statusNode.className = "status error";
+    statusNode.textContent = "충돌 해결에 실패했습니다. 다시 시도해 주세요.";
+    updateReady();
+  }
+});
+
+async function load() {
+  if (!token) {
+    statusNode.className = "status error";
+    statusNode.textContent = "보안 토큰이 없어 해결 화면을 열 수 없습니다.";
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/report", { headers: headers() });
+    if (!response.ok) throw new Error("report-load-failed");
+    report = await response.json();
+    document.querySelector("#count").textContent = String(report.conflicts.length);
+
+    if (report.conflicts.length === 0) {
+      const result = createElement("section", "result");
+      result.append(
+        createElement("h2", "", "충돌 없음"),
+        createElement("p", "", "현재 해결할 충돌이 없습니다."),
+      );
+      root.replaceChildren(result);
+      document.querySelector("#footer").classList.add("hidden");
+      return;
+    }
+
+    report.conflicts.forEach((conflict, index) => root.append(renderConflict(conflict, index)));
+    statusNode.textContent = "모든 파일의 해결 방법을 선택하세요.";
+    updateReady();
+  } catch {
+    statusNode.className = "status error";
+    statusNode.textContent = "충돌 정보를 불러오지 못했습니다. 다시 열어 주세요.";
+  }
+}
+
+load();
 `;
 
 function contentSecurityPolicy(): string {
@@ -379,13 +637,13 @@ export async function startDesktopSyncConflictServer(
                 && error.code === "stale-report"
                 ? 409
                 : 422;
-          jsonResponse(response, status, { message: safeErrorCode(error) });
+          jsonResponse(response, status, { code: safeErrorCode(error) });
         }
         return;
       }
       textResponse(response, 404, "not found");
     } catch (error) {
-      jsonResponse(response, 500, { message: safeErrorCode(error) });
+      jsonResponse(response, 500, { code: safeErrorCode(error) });
     }
   });
 
