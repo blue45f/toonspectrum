@@ -750,7 +750,7 @@ function StudioProductionHubWorkspace({
               <p className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-fg-3">
                 {SURFACE_META[surface].label}
               </p>
-              <Pill tone={releaseReady ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "success") : configured ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "warning") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "neutral")}>
+              <Pill tone={releaseReady ? "success" : configured ? "warning" : "neutral"}>
                 {releaseReady ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "내보낼 준비 완료") : configured ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "확인할 내용 있음") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "시작 전")}
               </Pill>
               <Pill>{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "변경 ")}{workspace.revision}</Pill>
@@ -791,7 +791,7 @@ function StudioProductionHubWorkspace({
                 <Link
                   key={item}
                   href={surfaceHref(item, scope)}
-                  aria-current={active ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "page") : undefined}
+                  aria-current={active ? "page" : undefined}
                   className={cn(
                     "inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-semibold transition-colors pointer-coarse:min-h-11",
                     active
@@ -812,7 +812,7 @@ function StudioProductionHubWorkspace({
       <div className="mx-auto max-w-[1920px] space-y-4 px-3 py-4 sm:px-5 sm:py-5">
         <ModeNotice mode={mode} />
 
-        {!showCollaborationUi && mode !== "demo" ? (
+        {!showCollaborationUi ? (
           <div
             className="rounded-xl border border-line bg-panel px-3 py-2.5 text-xs leading-relaxed text-fg-2"
             data-solo-workspace-notice
@@ -858,19 +858,19 @@ function StudioProductionHubWorkspace({
             detail={workspace.tasks.length === 0
               ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "제작 작업을 추가해 진행률을 관리하세요.")
               : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}/{v1} 작업 완료"), { v0: String(completed), v1: String(workspace.tasks.length) })}
-            tone={workspace.tasks.length > 0 && completed === workspace.tasks.length ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "success") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "neutral")}
+            tone={workspace.tasks.length > 0 && completed === workspace.tasks.length ? "success" : "neutral"}
           />
           <Metric
             label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "먼저 해결할 항목")}
             value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}건"), { v0: String(blocked) })}
             detail={blocked > 0 ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "다음 단계 전에 확인해 주세요") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "진행을 막는 항목이 없습니다")}
-            tone={blocked > 0 ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "danger") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "success")}
+            tone={blocked > 0 ? "danger" : "success"}
           />
           <Metric
             label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "확인할 의견")}
             value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}건"), { v0: String(openBlockers + openMajor) })}
             detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "중요 {v0} · 일반 {v1}"), { v0: String(openBlockers), v1: String(openMajor) })}
-            tone={openBlockers > 0 ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "danger") : openMajor > 0 ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "warning") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "success")}
+            tone={openBlockers > 0 ? "danger" : openMajor > 0 ? "warning" : "success"}
           />
           {showCollaborationUi ? (
             <Metric
