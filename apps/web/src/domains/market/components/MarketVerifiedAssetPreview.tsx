@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { findStudioMarketplaceCc0Asset } from "@/domains/creator/studio-marketplace-cc0-catalog";
+import { findGeneratedStudio2dAsset } from "@/domains/creator/studio-2d-generated-backgrounds";
 import { studioCc0AssetUrl } from "@/domains/creator/studio-cc0-asset-delivery";
 
 import type { StudioCc0Asset } from "@/domains/creator/studio-cc0-asset-delivery";
@@ -40,8 +41,23 @@ export function MarketVerifiedAssetPreview({ reference, compact = false }: {
       });
       return () => { current = false; };
     }
+    const normalizedReference = reference.replace(/^studio-asset:/u, "");
+    const generated = findGeneratedStudio2dAsset(normalizedReference);
+    if (generated) {
+      setPreview({
+        reference,
+        src: generated.src,
+        download: generated.src,
+        name: generated.title,
+        width: generated.width,
+        height: generated.height,
+        fileName: `${generated.id}.png`,
+        note: `${generated.width}×${generated.height}px · 전체 프레임 시각 검수 완료 · ToonSpectrum 1차 AI 생성 배경`,
+      });
+      return () => { current = false; };
+    }
     void import("@/domains/creator/studio-original-free-asset-packs").then(({ findStudioOriginalFreeAsset }) => {
-      const asset = findStudioOriginalFreeAsset(reference.replace(/^studio-asset:/u, ""));
+      const asset = findStudioOriginalFreeAsset(normalizedReference);
       if (current && asset) setPreview({ reference, src: `data:image/svg+xml,${encodeURIComponent(asset.svg)}`,
         download: `data:image/svg+xml,${encodeURIComponent(asset.svg)}`, name: asset.name,
         width: asset.width, height: asset.height, fileName: `${asset.id}.svg`, note: "실제 원본 SVG 미리보기 · 확대 가능한 벡터 · CC0" });

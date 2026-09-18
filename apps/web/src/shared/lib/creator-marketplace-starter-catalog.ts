@@ -7,6 +7,7 @@ import {
 } from "./creator-marketplace-resource-contract";
 import { sha256HexPortable } from "./sha256-portable";
 import { CREATOR_MARKETPLACE_CC0_STARTER_RECORDS } from "./creator-marketplace-cc0-starter.generated";
+import { CREATOR_MARKETPLACE_GPT25_STARTER_RECORDS } from "./creator-marketplace-gpt25-starter.generated";
 
 import type {
   CreatorMarketplaceJsonValue,
@@ -697,6 +698,7 @@ const OFFICIAL_STARTER_RECORDS = RAW_STARTER_DEFS.map(buildStarterRecord);
 export const CREATOR_MARKETPLACE_STARTER_RECORDS: readonly CreatorMarketplaceResourceRecord[] =
   Object.freeze([
     ...CREATOR_MARKETPLACE_CC0_STARTER_RECORDS,
+    ...CREATOR_MARKETPLACE_GPT25_STARTER_RECORDS,
     ...OFFICIAL_STARTER_RECORDS,
   ]);
 

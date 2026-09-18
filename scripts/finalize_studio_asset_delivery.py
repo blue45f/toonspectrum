@@ -167,8 +167,8 @@ def stage(output: Path) -> None: # NOSONAR python:S3776
         shutil.copytree(output / name, PUBLIC / name, dirs_exist_ok=True)
     for name in ('manifest.json', DELIVERY_REPORT_FILENAME, 'index.html', 'README.md', 'excluded-and-variants.json', 'browser-render-evidence.json'):
         shutil.copyfile(output / name, PUBLIC / name)
-    for review_sheet in output.glob('review-sheet-*.jpg'):
-        shutil.copyfile(review_sheet, PUBLIC / review_sheet.name)
+    # Contact sheets are reproducible QA artifacts. Keep them in the staging output only;
+    # publishing them under /public makes audit derivatives look like user-facing assets.
     audit = ROOT / 'data/studio-assets/delivery-20260906'
     audit.mkdir(parents=True, exist_ok=True)
     for name in (DELIVERY_REPORT_FILENAME, 'excluded-and-variants.json', 'existing-asset-audit.json'):

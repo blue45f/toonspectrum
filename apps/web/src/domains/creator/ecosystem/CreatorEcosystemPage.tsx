@@ -34,6 +34,7 @@ import {
   parseBetaFeedbackPackage,
   parsePreflightDocument,
   runPreflight,
+  SAMPLE_ILLUSTRATIONS,
   SAMPLE_WORKS,
   saveCreatorEcosystemState,
   SCENE_PACKS,
@@ -217,6 +218,48 @@ export function CreatorEcosystemPage() {
 
       <section className="mt-8"><SectionHeading icon={BookOpen} eyebrow="STARTER STORIES" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "완성형 샘플 작품")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "자체 제작한 이야기 구조와 장면 조합입니다. 원작 복제가 아닌 편집 가능한 연습 출발점으로 사용합니다.")} />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{SAMPLE_WORKS.map((work) => <article key={work.id} className={CARD}><span className="text-[0.65rem] font-black text-accent">{work.genre}</span><h3 className="mt-2 font-black text-fg">{work.title}</h3><p className="mt-2 text-xs leading-5 text-fg-3">{work.summary}</p><div className="mt-3 flex flex-wrap gap-1">{work.scenePackIds.map((id) => <span key={id} className="rounded-full bg-raised px-2 py-1 text-[0.62rem] text-fg-2">{SCENE_PACKS.find((pack) => pack.id === id)?.title}</span>)}</div><button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} mt-4 w-full"), { v0: String(BUTTON) })} onClick={() => { setState((current) => ({ ...current, installedScenePackIds: [...new Set([...current.installedScenePackIds, ...work.scenePackIds])] })); setNotice(`${work.title}에 필요한 장면 팩을 작업대에 추가했습니다.`); }}><PackagePlus size={15} /> {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "연습 구성 추가")}</button></article>)}</div>
+      </section>
+
+      <section className="mt-10">
+        <SectionHeading
+          icon={Sparkles}
+          eyebrow="CURATED ILLUSTRATIONS"
+          title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "검수 완료 샘플 일러스트")}
+          description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "재사용 소재라기보다 한 장면의 분위기·원근·광원 예시로 가치가 큰 결과물을 샘플 작품으로 큐레이션했습니다. 모두 1152×2048 원본 전체를 검수한 ToonSpectrum 1차 AI 생성 이미지이며, 같은 원본을 마켓 배경으로도 사용할 수 있습니다.")}
+        />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {SAMPLE_ILLUSTRATIONS.map((work) => (
+            <article key={work.id} className="overflow-hidden rounded-2xl border border-line bg-card">
+              <div className="aspect-[9/16] overflow-hidden bg-raised">
+                <img
+                  src={work.imageSrc}
+                  alt={work.title}
+                  loading="lazy"
+                  decoding="async"
+                  className="size-full object-cover transition-transform duration-300 hover:scale-[1.02]"
+                />
+              </div>
+              <div className="p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-accent-soft px-2 py-1 text-[0.62rem] font-black text-accent">{work.genre}</span>
+                  <span className="rounded-full bg-raised px-2 py-1 text-[0.62rem] font-bold text-fg-3">
+                    {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "AI 생성 · 검수 완료")}
+                  </span>
+                </div>
+                <h3 className="mt-3 font-black text-fg">{work.title}</h3>
+                <p className="mt-2 text-xs leading-5 text-fg-3">{work.summary}</p>
+                <p className="mt-3 text-[0.65rem] font-bold text-fg-3">{work.reviewLabel}</p>
+                <Link
+                  to={`/market/browse?kind=asset&search=${encodeURIComponent(work.marketSearch)}`}
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "en", "{v0} mt-4 w-full"), { v0: String(BUTTON) })}
+                >
+                  <PackagePlus size={15} />
+                  {translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "마켓에서 배경으로 사용")}
+                </Link>
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="mt-10"><SectionHeading icon={PackagePlus} eyebrow="SCENE RECIPES" title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "장면·연기·배경 팩")} description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "낱개 소재 수가 아니라 바로 수정 가능한 장면 목적, 카메라, 포즈, 표정, 소품을 묶어서 제공합니다.")} />

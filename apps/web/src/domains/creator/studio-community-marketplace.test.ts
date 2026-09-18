@@ -16,6 +16,7 @@ import {
 } from "./studio-community-marketplace";
 import { validateStudioCreatorPack } from "./studio-creator-pack-runtime";
 import { STUDIO_MARKETPLACE_CC0_ASSETS } from "./studio-marketplace-cc0-catalog.generated";
+import { CREATOR_MARKETPLACE_GPT25_STARTER_RECORDS } from "@/shared/lib/creator-marketplace-gpt25-starter.generated";
 
 import type {
   CreatorMarketplaceJsonValue,
@@ -318,6 +319,24 @@ describe("studio community marketplace projection", () => {
     expect(unsupported).toMatchObject({
       assets: [],
       unsupportedCount: 1,
+    });
+  });
+
+  it("검수 완료 GPT25 마켓 배경을 신뢰된 로컬 이미지 삽입 대상으로 투영한다", () => {
+    const generatedRecord = CREATOR_MARKETPLACE_GPT25_STARTER_RECORDS[0]!;
+    const projection = projectCreatorMarketplaceRecordToAssets(generatedRecord);
+
+    expect(projection).toMatchObject({
+      unsupportedCount: 0,
+      reason: null,
+    });
+    expect(projection.assets).toHaveLength(1);
+    expect(projection.assets[0]).toMatchObject({
+      id: "webtoon-action-highway-chase",
+      width: 1152,
+      height: 2048,
+      mediaType: "image/png",
+      recommended: true,
     });
   });
 

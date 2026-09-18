@@ -33,6 +33,14 @@ for (const row of rows) {
   assert.equal(output.readUInt32BE(20), 2048);
   assert.equal(row.outputBytes, output.byteLength);
   assert.equal(row.outputSha256, createHash("sha256").update(output).digest("hex"));
+  for (const extension of ["jpg", "png"]) {
+    const legacyPath = row.legacySrc.replace(/\.jpg$/u, `.${extension}`);
+    await assert.rejects(
+      readFile(new URL(`../apps/web/public${legacyPath}`, import.meta.url)),
+      (error) => Boolean(error && typeof error === "object" && "code" in error && error.code === "ENOENT"),
+      `${row.legacyId}: superseded ${extension} binary must stay deleted`,
+    );
+  }
 }
 
 assert.doesNotMatch(generatorSource, /response_format/u);

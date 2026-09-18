@@ -110,7 +110,7 @@ const PROFILES: Record<SiteRouteVisualKind, SiteRouteVisualProfile> = {
     eyebrow: t("3D 장면·카메라", "3D SCENE & CAMERA"),
     motion: "camera",
     density: "prominent",
-    image: "/assets/studio/backgrounds/webtoon_sf_research_lab.jpg",
+    image: "/assets/studio/generated-backgrounds/gpt25-v1/sf/gpt25-bg-sf-research-lab-vertical-depth/background.png",
     imagePosition: "50% 54%",
     video: FILM(12, 18),
     layers: [t("공간", "SPACE"), t("카메라", "CAMERA"), t("렌더", "RENDER")],

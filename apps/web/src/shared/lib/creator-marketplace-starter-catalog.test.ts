@@ -4,6 +4,7 @@ import {
   CREATOR_MARKETPLACE_RESOURCE_KINDS,
   CreatorMarketplaceResourceRecordSchema,
 } from "./creator-marketplace-resource-contract";
+import { CREATOR_MARKETPLACE_GPT25_STARTER_RECORDS } from "./creator-marketplace-gpt25-starter.generated";
 import {
   CREATOR_MARKETPLACE_STARTER_RECORDS,
   filterStarterMarketplaceResources,
@@ -50,6 +51,24 @@ describe("creator-marketplace-starter-catalog", () => {
     expect(firstPage.filter((record) => record.license === "cc0-1.0")).toHaveLength(24);
     for (const tag of ["배경", "2D 소품", "3D PBR", "재질", "연출 효과"]) {
       expect(firstPage.some((record) => record.tags.includes(tag))).toBe(true);
+    }
+  });
+
+  it("publishes every reviewed GPT25 background as a first-party AI asset", () => {
+    expect(CREATOR_MARKETPLACE_GPT25_STARTER_RECORDS).toHaveLength(20);
+    expect(new Set(CREATOR_MARKETPLACE_GPT25_STARTER_RECORDS.map((record) => record.packageId)).size).toBe(20);
+    for (const record of CREATOR_MARKETPLACE_GPT25_STARTER_RECORDS) {
+      expect(record.kind).toBe("asset");
+      expect(record.license).toBe("toonspectrum-standard");
+      expect(record.containsAi).toBe(true);
+      expect(record.tags).not.toEqual(expect.arrayContaining(["낮", "밤", "노을", "새벽", "흐림", "눈", "안개", "맑음", "비", "야간"]));
+      expect(record.provenance).toEqual({ origin: "original", authoredByPublisher: true });
+      expect(record.entries).toHaveLength(1);
+      const [entry] = record.entries;
+      expect(entry?.delivery.mode).toBe("builtin-ref");
+      if (entry?.delivery.mode === "builtin-ref") {
+        expect(entry.delivery.runtimeRef).toMatch(/^studio-asset:gpt25\/webtoon-/u);
+      }
     }
   });
 

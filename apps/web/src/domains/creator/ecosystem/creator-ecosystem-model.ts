@@ -14,6 +14,89 @@ export const SAMPLE_WORKS = Object.freeze([
   { id: "empty-seat-note", title: "빈자리의 쪽지", genre: "미스터리", summary: "같은 시간, 같은 좌석에 남는 쪽지의 비밀", scenePackIds: ["subway-two-shot", "close-reaction"] },
 ] as const);
 
+export const SAMPLE_ILLUSTRATIONS = Object.freeze([
+  {
+    "id": "webtoon-action-ruined-city",
+    "title": "붕괴한 도심 · 세로 원근",
+    "genre": "액션",
+    "summary": "붕괴한 도시의 깊은 원근과 안개 층을 활용한 재난·추격 배경 연출 예시",
+    "imageSrc": "/assets/studio/generated-backgrounds/gpt25-v1/action/gpt25-bg-action-ruined-city-vertical-depth/background.png",
+    "marketSearch": "붕괴한 도심 · 세로 원근",
+    "containsAi": true,
+    "reviewLabel": "1152×2048 · 전체 프레임 검수"
+  },
+  {
+    "id": "webtoon-bedroom",
+    "title": "도시 야경이 보이는 침실 · 세로 원근",
+    "genre": "일상",
+    "summary": "창밖 야경과 실내 광원을 분리해 감정 컷의 여백을 확보한 생활 공간 예시",
+    "imageSrc": "/assets/studio/generated-backgrounds/gpt25-v1/daily/gpt25-bg-daily-bedroom-night-vertical-depth/background.png",
+    "marketSearch": "도시 야경이 보이는 침실 · 세로 원근",
+    "containsAi": true,
+    "reviewLabel": "1152×2048 · 전체 프레임 검수"
+  },
+  {
+    "id": "webtoon-drama-hospital-corridor",
+    "title": "병원 복도 · 세로 원근",
+    "genre": "드라마",
+    "summary": "긴 소실점과 차가운 병원 조명으로 긴장감을 만드는 드라마 배경 예시",
+    "imageSrc": "/assets/studio/generated-backgrounds/gpt25-v1/drama/gpt25-bg-drama-hospital-corridor-vertical-depth/background.png",
+    "marketSearch": "병원 복도 · 세로 원근",
+    "containsAi": true,
+    "reviewLabel": "1152×2048 · 전체 프레임 검수"
+  },
+  {
+    "id": "webtoon-fantasy-dragon-peak",
+    "title": "용이 깃든 절벽 · 세로 원근",
+    "genre": "판타지",
+    "summary": "절벽과 하늘의 수직 깊이감을 강조한 판타지 스케일 연출 예시",
+    "imageSrc": "/assets/studio/generated-backgrounds/gpt25-v1/fantasy/gpt25-bg-fantasy-dragon-cliff-vertical-depth/background.png",
+    "marketSearch": "용이 깃든 절벽 · 세로 원근",
+    "containsAi": true,
+    "reviewLabel": "1152×2048 · 전체 프레임 검수"
+  },
+  {
+    "id": "webtoon-horror-foggy-cabin",
+    "title": "안개 속 오두막 · 세로 원근",
+    "genre": "공포",
+    "summary": "안개와 제한된 명암으로 시선을 오두막에 모으는 공포 분위기 예시",
+    "imageSrc": "/assets/studio/generated-backgrounds/gpt25-v1/horror/gpt25-bg-horror-fog-cabin-vertical-depth/background.png",
+    "marketSearch": "안개 속 오두막 · 세로 원근",
+    "containsAi": true,
+    "reviewLabel": "1152×2048 · 전체 프레임 검수"
+  },
+  {
+    "id": "webtoon-romance-cherry-blossom",
+    "title": "벚꽃 산책길 · 세로 원근",
+    "genre": "로맨스",
+    "summary": "세로 산책로와 벚꽃 레이어로 인물 합성 여백을 남긴 로맨스 배경 예시",
+    "imageSrc": "/assets/studio/generated-backgrounds/gpt25-v1/romance/gpt25-bg-romance-cherry-path-vertical-depth/background.png",
+    "marketSearch": "벚꽃 산책길 · 세로 원근",
+    "containsAi": true,
+    "reviewLabel": "1152×2048 · 전체 프레임 검수"
+  },
+  {
+    "id": "webtoon-sf-space-station",
+    "title": "우주 정거장 전망실 · 세로 원근",
+    "genre": "SF",
+    "summary": "전망창과 우주 원경을 이용해 공간 규모를 보여 주는 SF 배경 예시",
+    "imageSrc": "/assets/studio/generated-backgrounds/gpt25-v1/sf/gpt25-bg-sf-space-station-vertical-depth/background.png",
+    "marketSearch": "우주 정거장 전망실 · 세로 원근",
+    "containsAi": true,
+    "reviewLabel": "1152×2048 · 전체 프레임 검수"
+  },
+  {
+    "id": "webtoon-wuxia-palace-courtyard",
+    "title": "궁궐 안뜰 · 세로 원근",
+    "genre": "무협·사극",
+    "summary": "전통 건축의 축과 안뜰 깊이를 활용한 무협·사극 배경 예시",
+    "imageSrc": "/assets/studio/generated-backgrounds/gpt25-v1/wuxia/gpt25-bg-wuxia-palace-courtyard-vertical-depth/background.png",
+    "marketSearch": "궁궐 안뜰 · 세로 원근",
+    "containsAi": true,
+    "reviewLabel": "1152×2048 · 전체 프레임 검수"
+  }
+] as const);
+
 export const SCENE_PACKS = Object.freeze([
   { id: "cafe-dialogue", title: "카페 2인 대화", includes: ["아이레벨 투샷", "마주 앉기", "고백·갈등 표정", "낮·노을·야간 조명"] },
   { id: "office-two-shot", title: "사무실 회의 뒤 대화", includes: ["대칭 투샷", "회의 테이블", "생각·당황·갈등 연기", "문서 소품"] },
