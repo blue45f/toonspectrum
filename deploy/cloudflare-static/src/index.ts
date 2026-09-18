@@ -2,6 +2,7 @@ import {
   getStaticPolicyDocument,
   isPolicySlug,
 } from "../../../packages/core/src/legal-policy";
+import { parsePublicSharePath } from "../../../packages/core/src/public-share-path";
 
 import {
   CLOUDFLARE_LARGE_ASSET_CACHE_CONTROL,
@@ -9,6 +10,7 @@ import {
   cloudflareLargeAssetKey,
   cloudflareLargeAssetSidecarPath,
   isCloudflareOversizedAssetPath,
+  supportsCloudflareStaticSidecar,
   type CloudflareLargeAssetEncoding,
 } from "./large-static-assets";
 
@@ -192,7 +194,8 @@ function isOgPagePath(pathname: string): boolean {
   return hasExactlyOneEncodedSegment(pathname, "/title/")
     || pathname === "/market"
     || pathname === "/market/browse"
-    || hasExactlyOneEncodedSegment(pathname, "/market/resource/");
+    || hasExactlyOneEncodedSegment(pathname, "/market/resource/")
+    || parsePublicSharePath(pathname) !== null;
 }
 
 function isCrawlerRequest(request: Request): boolean {
@@ -240,6 +243,9 @@ function mapDynamicPath(requestUrl: URL): URLSearchParams | null {
     const slug = decodePathSegment(requestUrl.pathname.slice("/title/".length));
     if (!slug) return null;
     return new URLSearchParams({ slug });
+  }
+  if (parsePublicSharePath(requestUrl.pathname)) {
+    return new URLSearchParams({ publicPath: requestUrl.pathname });
   }
   return null;
 }
@@ -579,7 +585,11 @@ async function serveCompressedLargeAsset(
   const incoming = new URL(request.url);
   const descriptor = cloudflareLargeAssetDescriptor(incoming.pathname);
   const encoding = preferredLargeAssetEncoding(request);
-  if (!descriptor || !encoding) return null;
+  if (
+    !descriptor
+    || !encoding
+    || !supportsCloudflareStaticSidecar(incoming.pathname)
+  ) return null;
 
   const sidecarUrl = new URL(incoming);
   sidecarUrl.pathname = cloudflareLargeAssetSidecarPath(

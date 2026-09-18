@@ -49,10 +49,10 @@ describe("Studio brush browser harness catalogue boundary", () => {
       "const PRODUCT_BRUSH_CATALOG_COUNT = STUDIO_ALL_BRUSH_CATALOG_ITEMS.length;",
     );
     expect(harness).toContain("assertProductBrushCatalogContract()");
-    // 2026-08-14: the UI matrices audit the LISTED (quarantine-aware) catalogue — quarantined ids
-    // stay registered for persisted replay but are never selectable choices in the shipped UI.
+    // The shipped library combines the quarantine-aware classic catalogue with V6 recipes. The
+    // browser oracle must audit that exact artist-facing inventory, not the classic-only subset.
     expect(harness).toContain(
-      "assertUiBrushCatalogMatchesProductCatalog(\n        firstCatalog,\n        STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,\n        \"paint\",\n      )",
+      "assertUiBrushCatalogMatchesProductCatalog(\n        firstCatalog,\n        STUDIO_LIBRARY_PAINT_BRUSH_CATALOG_ITEMS,\n        \"paint\",\n      )",
     );
     expect(harness).toContain(
       "assertUiEraserQuickPickerMatchesProductCatalog(eraserCatalog)",

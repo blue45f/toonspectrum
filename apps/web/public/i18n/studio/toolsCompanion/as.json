@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "স্তৰ {count}",
   "studio.toolsCompanion.review.section.comments": "মন্তব্য {count}",
   "studio.toolsCompanion.review.section.history": "ৰেকৰ্ড {count}",
-  "studio.toolsCompanion.review.subtitle": "__পিএইচ০__ · __পিএইচ১__",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "পৰিদৰ্শন কনছ'ল",
   "studio.toolsCompanion.review.truncatedComments": "আৰু {count} মন্তব্য",
   "studio.toolsCompanion.review.truncatedLayers": "{count} স্তৰসমূহ",

@@ -39,6 +39,10 @@ import {
   stopChildProcess,
   waitForServer,
 } from "./lib/studio-verify-preview-harness.mjs";
+import {
+  evaluateStudioSoakHeapGrowth,
+  STUDIO_SOAK_HEAP_MAX_SLOPE_BYTES_PER_HOUR,
+} from "./lib/studio-memory-growth-policy.mjs";
 
 const MINUTES = Math.max(1, Number(process.env.TOONSPECTRUM_SOAK_MINUTES ?? "300") || 300);
 const PROFILE_ID = process.env.TOONSPECTRUM_SOAK_PROFILE?.trim() || "desktop";
@@ -47,8 +51,6 @@ const OUT = process.env.TOONSPECTRUM_SOAK_OUT?.trim()
   || `artifacts/studio-five-hour-soak/${PROFILE_ID}${WEBGPU ? "-webgpu" : ""}`;
 const CYCLE_TARGET_MS = Math.max(5_000, Number(process.env.TOONSPECTRUM_SOAK_CYCLE_MS ?? "30000") || 30_000);
 const INK_MIN_CHANGED_PIXELS = 120;
-const HEAP_MIN_ALLOWANCE_BYTES = 384 * 1024 * 1024;
-const HEAP_MULTIPLIER_ALLOWANCE = 2;
 const CHECKPOINT_MS = 10 * 60_000;
 
 interface HeapSample {
@@ -57,6 +59,9 @@ interface HeapSample {
   readonly totalBytes: number;
   readonly embedderBytes: number;
   readonly backingStorageBytes: number;
+  readonly documents: number | null;
+  readonly nodes: number | null;
+  readonly jsEventListeners: number | null;
 }
 
 interface GpuEvent {
@@ -188,16 +193,43 @@ async function gcHeap(cdp: CDPSession | null, startedAt: number): Promise<HeapSa
       embedderHeapUsedSize: number;
       backingStorageSize: number;
     };
+    const dom = await cdp.send("Memory.getDOMCounters").catch(() => null) as {
+      documents: number;
+      nodes: number;
+      jsEventListeners: number;
+    } | null;
     return {
       atMs: nowMs(startedAt),
       usedBytes: usage.usedSize,
       totalBytes: usage.totalSize,
       embedderBytes: usage.embedderHeapUsedSize,
       backingStorageBytes: usage.backingStorageSize,
+      documents: dom?.documents ?? null,
+      nodes: dom?.nodes ?? null,
+      jsEventListeners: dom?.jsEventListeners ?? null,
     };
   } catch {
     return null;
   }
+}
+
+function heapSlopeBytesPerHour(samples: readonly HeapSample[]): number | null {
+  if (samples.length < 2) return null;
+  const firstAt = samples[0]?.atMs ?? 0;
+  const points = samples.map((sample) => ({
+    x: (sample.atMs - firstAt) / 3_600_000,
+    y: sample.usedBytes,
+  }));
+  const meanX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
+  const meanY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+  let numerator = 0;
+  let denominator = 0;
+  for (const point of points) {
+    const dx = point.x - meanX;
+    numerator += dx * (point.y - meanY);
+    denominator += dx * dx;
+  }
+  return denominator > 0 ? numerator / denominator : null;
 }
 
 async function closeBrushSurfaces(page: Page): Promise<boolean> {
@@ -387,7 +419,15 @@ const report = {
   longTasks: [] as LongTaskSample[],
   runtimeErrors: [] as StudioInAppRuntimeError[],
   failures: [] as SoakFailure[],
-  checkpoints: [] as Array<{ atMs: number; cycle: number; heapBytes: number | null; failures: number }>,
+  checkpoints: [] as Array<{
+    atMs: number;
+    cycle: number;
+    heapBytes: number | null;
+    heapSlopeBytesPerHour: number | null;
+    domNodes: number | null;
+    eventListeners: number | null;
+    failures: number;
+  }>,
 };
 
 const writeReport = (): void => {
@@ -402,6 +442,8 @@ let preview: Awaited<ReturnType<typeof spawnPreview>> | null = null;
 let cdp: CDPSession | null = null;
 let page: Page | null = null;
 let baselineHeap: HeapSample | null = null;
+let heapGrowthFailureRecorded = false;
+let heapSlopeFailureRecorded = false;
 let consecutiveNoInk = 0;
 let consecutivePenBlocked = 0;
 let nextCheckpoint = CHECKPOINT_MS;
@@ -520,14 +562,26 @@ try {
         report.heapSamples.push(heap);
         if (!baselineHeap && cycle > 1) baselineHeap = heap;
         if (baselineHeap) {
-          const allowance = Math.max(
-            HEAP_MIN_ALLOWANCE_BYTES,
-            Math.round(baselineHeap.usedBytes * HEAP_MULTIPLIER_ALLOWANCE),
+          const assessment = evaluateStudioSoakHeapGrowth(
+            report.heapSamples,
+            baselineHeap,
           );
-          if (heap.usedBytes > baselineHeap.usedBytes + allowance) {
+          if (assessment?.absoluteExceeded && !heapGrowthFailureRecorded) {
+            heapGrowthFailureRecorded = true;
             report.failures.push({
-              atMs: heap.atMs, cycle, kind: "heap-growth",
-              detail: `GC heap ${Math.round(heap.usedBytes / 1048576)} MiB vs baseline ${Math.round(baselineHeap.usedBytes / 1048576)} MiB`,
+              atMs: heap.atMs,
+              cycle,
+              kind: "heap-growth",
+              detail: `GC heap grew ${Math.round(assessment.growthBytes / 1048576)} MiB from baseline; allowance ${Math.round(assessment.allowanceBytes / 1048576)} MiB`,
+            });
+          }
+          if (assessment?.slopeExceeded && !heapSlopeFailureRecorded) {
+            heapSlopeFailureRecorded = true;
+            report.failures.push({
+              atMs: heap.atMs,
+              cycle,
+              kind: "heap-growth-slope",
+              detail: `GC heap retained-growth slope ${Math.round(assessment.slopeBytesPerHour / 1048576)} MiB/h exceeds ${Math.round(STUDIO_SOAK_HEAP_MAX_SLOPE_BYTES_PER_HOUR / 1048576)} MiB/h`,
             });
           }
         }

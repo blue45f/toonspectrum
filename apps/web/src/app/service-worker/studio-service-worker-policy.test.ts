@@ -17,6 +17,7 @@ import {
   studioServiceWorkerCacheBucket,
   studioServiceWorkerCacheNames,
   studioServiceWorkerOfflineShellUrl,
+  studioServiceWorkerPressureAdjustedLimit,
   studioServiceWorkerStrategy,
   type StudioServiceWorkerRequestFacts,
 } from "./studio-service-worker-policy";
@@ -192,6 +193,13 @@ describe("planStudioServiceWorkerCacheTrim", () => {
     expect(planStudioServiceWorkerCacheTrim([1, 2, 3], 5)).toEqual([]);
     expect(planStudioServiceWorkerCacheTrim([1, 2, 3, 4, 5], 5)).toEqual([]);
     expect(planStudioServiceWorkerCacheTrim([1, 2, 3, 4, 5, 6, 7], 5)).toEqual([1, 2]);
+  });
+
+  it("tightens runtime cache caps under storage pressure", () => {
+    expect(studioServiceWorkerPressureAdjustedLimit(120, 70, 100)).toBe(120);
+    expect(studioServiceWorkerPressureAdjustedLimit(120, 85, 100)).toBe(90);
+    expect(studioServiceWorkerPressureAdjustedLimit(120, 95, 100)).toBe(60);
+    expect(studioServiceWorkerPressureAdjustedLimit(120, undefined, undefined)).toBe(120);
   });
 });
 

@@ -58,6 +58,10 @@ import type { StudioBg3dDestructiveMutationGuard } from "./studio-bg3d-destructi
 import type { StudioBg3dKtx2Renderer } from "./studio-bg3d-ktx2-renderer-runtime";
 import type { StudioBg3dImportProgress } from "./studio-bg3d-model-import";
 import type { StudioBg3dPlacementSessionState } from "./studio-bg3d-placement-session";
+import type {
+  StudioBg3dCanonicalDocumentMutation,
+  StudioBg3dCanonicalDocumentSnapshot,
+} from "./useStudioBg3dCanonicalDocumentState";
 import type { ChangeEvent, Dispatch, RefObject, SetStateAction } from "react";
 
 /** Authoritative live scene the editor advances between an event and React's next render. */
@@ -93,6 +97,9 @@ export interface StudioBg3dModelImportActionsContext {
   readonly sceneBaseDocument: StudioBg3dSceneDocument;
 
   readonly setCustomModels: Dispatch<SetStateAction<BgCustomModelInstance[]>>;
+  readonly replaceCanonicalDocumentState: (
+    mutation: StudioBg3dCanonicalDocumentMutation,
+  ) => StudioBg3dCanonicalDocumentSnapshot;
   readonly setDeletingModelId: Dispatch<SetStateAction<string | null>>;
   readonly setError: Dispatch<SetStateAction<string | null>>;
   readonly setGenericModelClassifications: Dispatch<
@@ -164,10 +171,10 @@ export function createStudioBg3dModelImportActions(
     modelRenderer,
     modelRootCacheRef,
     physicsRuntimeSourceRef,
+    replaceCanonicalDocumentState,
     placementSessionRef,
     sceneBaseDocument,
     sceneRestoreAbortRef,
-    setCustomModels,
     setDeletingModelId,
     setError,
     setGenericModelClassifications,
@@ -422,11 +429,7 @@ export function createStudioBg3dModelImportActions(
           );
           if (placements.length > 0) {
             const nextCustomModels = [...current.customModels, ...placements];
-            physicsRuntimeSourceRef.current = {
-              ...current,
-              customModels: nextCustomModels,
-            };
-            setCustomModels(nextCustomModels);
+            replaceCanonicalDocumentState({ customModels: nextCustomModels });
             setSelectedIds(new Set([placements[placements.length - 1].id]));
             setRefTick((n) => n + 1);
           }
@@ -538,7 +541,22 @@ export function createStudioBg3dModelImportActions(
           if (attachment) storageModelIdByAttachmentIdRef.current.delete(attachment.id);
           const cacheEntry = modelRootCacheRef.current.get(id);
           modelRootCacheRef.current.delete(id);
-          if (cacheEntry) requestAnimationFrame(() => cacheEntry.dispose());
+          if (cacheEntry) {
+            let disposed = false;
+            let frame = 0;
+            let fallback: ReturnType<typeof setTimeout> | null = null;
+            const dispose = () => {
+              if (disposed) return;
+              disposed = true;
+              if (frame !== 0) cancelAnimationFrame(frame);
+              if (fallback !== null) clearTimeout(fallback);
+              cacheEntry.dispose();
+            };
+            // Prefer the next frame so the active render can release references,
+            // but guarantee disposal when background-tab rAF is heavily throttled.
+            frame = requestAnimationFrame(dispose);
+            fallback = setTimeout(dispose, 250);
+          }
           setSelectedIds((current) => new Set(
             [...current].filter((entityId) => !plan.removedEntityIds.has(entityId)),
           ));

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Library, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -56,14 +60,10 @@ export function StudioBrushProductCataloguePanel({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">
-            <Library size={15} aria-hidden="true" /> STARTING BRUSHES
-          </p>
-          <h2 className="mt-1 text-sm font-black text-fg">시작 브러시 48종</h2>
+            <Library size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushProductCataloguePanel", "en", "STARTING BRUSHES")}</p>
+          <h2 className="mt-1 text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushProductCataloguePanel", "ko", "시작 브러시 48종")}</h2>
           <p className="mt-1 max-w-4xl text-xs leading-5 text-fg-3">
-            실제 렌더 결과·손맛·재질이 구분되는 대표만 남겼습니다. 비슷한 구현 변형과 이전
-            설계명은 별도 브러시로 노출하지 않으며, 브러시 선택과 전체 편집이 같은 목록·엔진 설명·특성 정보를
-            사용합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushProductCataloguePanel", "ko", "실제 렌더 결과·손맛·재질이 구분되는 대표만 남겼습니다. 비슷한 구현 변형과 이전 설계명은 별도 브러시로 노출하지 않으며, 브러시 선택과 전체 편집이 같은 목록·엔진 설명·특성 정보를 사용합니다.")}</p>
         </div>
         <button
           type="button"
@@ -71,14 +71,14 @@ export function StudioBrushProductCataloguePanel({
           onClick={() => setOpen((current) => !current)}
           className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-line bg-card px-4 py-2 text-sm font-bold text-fg hover:border-line-strong hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
         >
-          {open ? "시작 브러시 숨기기" : "48종 보기"}
+          {open ? translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushProductCataloguePanel", "ko", "시작 브러시 숨기기") : translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushProductCataloguePanel", "ko", "48종 보기")}
         </button>
       </div>
 
       {open ? (
         <div className="mt-5">
           <label className="relative block max-w-xl">
-            <span className="sr-only">제품 브러시 검색</span>
+            <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushProductCataloguePanel", "ko", "제품 브러시 검색")}</span>
             <Search
               size={16}
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
@@ -87,13 +87,12 @@ export function StudioBrushProductCataloguePanel({
             <input
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
-              placeholder="이름·재질·엔진·그룹 검색"
+              placeholder={translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushProductCataloguePanel", "ko", "이름·재질·엔진·그룹 검색")}
               className="min-h-11 w-full rounded-xl border border-line bg-panel pl-10 pr-3 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
             />
           </label>
           <p className="mt-2 text-xs text-fg-3">
-            {filtered.length} / {BRUSH_QUALITY_CATALOG.length}종
-          </p>
+            {filtered.length} / {BRUSH_QUALITY_CATALOG.length}{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushProductCataloguePanel", "ko", "종")}</p>
           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.map((entry) => {
               const recipeId = resolveProductBrushV6RecipeId(entry);
@@ -115,7 +114,7 @@ export function StudioBrushProductCataloguePanel({
                       </span>
                     </span>
                     <span className="rounded-full border border-line px-2 py-1 text-[0.62rem] font-bold text-fg-3">
-                      {entry.quick ? "기본" : "전문"}
+                      {entry.quick ? translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushProductCataloguePanel", "ko", "기본") : translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushProductCataloguePanel", "ko", "전문")}
                     </span>
                   </span>
                   <span className="mt-2 block text-xs leading-5 text-fg-3">
@@ -126,8 +125,8 @@ export function StudioBrushProductCataloguePanel({
                   </span>
                   <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">
                     {recipeId
-                      ? `${recipeNames.get(recipeId) ?? recipeId} 기반으로 시작`
-                      : "브러시 선택에서 사용하기"}
+                      ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushProductCataloguePanel", "ko", "{v0} 기반으로 시작"), { v0: String(recipeNames.get(recipeId) ?? recipeId) })
+                      : translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushProductCataloguePanel", "ko", "브러시 선택에서 사용하기")}
                     <ArrowRight
                       size={13}
                       className="transition-transform group-hover:translate-x-1"
@@ -143,8 +142,7 @@ export function StudioBrushProductCataloguePanel({
               className="mt-4 rounded-xl border border-line bg-panel/55 px-3 py-5 text-center text-sm text-fg-3"
               role="status"
             >
-              일치하는 제품 브러시가 없습니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushProductCataloguePanel", "ko", "일치하는 제품 브러시가 없습니다.")}</p>
           ) : null}
         </div>
       ) : null}

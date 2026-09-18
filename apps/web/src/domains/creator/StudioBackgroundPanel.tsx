@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioBackgroundPanel — PicsArt-class background editor.
  * Tabs: 채우기 (fill) · 크기 (canvas resizer). Friendly copy, icons, recent, search.
@@ -238,8 +242,7 @@ export function StudioBackgroundPanel({
 
       {preferenceAuthority === "memory-only" ? (
         <p role="status" className="rounded-lg border border-warning/40 bg-warning/10 px-2 py-1 text-[0.62rem] text-fg-2">
-          최근 배경은 저장소를 다시 연결하기 전까지 이번 탭에서만 유지됩니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioBackgroundPanel", "ko", "최근 배경은 저장소를 다시 연결하기 전까지 이번 탭에서만 유지됩니다.")}</p>
       ) : null}
 
       {/* Editor tabs */}
@@ -403,7 +406,7 @@ export function StudioBackgroundPanel({
               <div className="grid grid-cols-4 gap-1.5">
                 {recentItems.slice(0, 8).map((preset) => (
                   <button
-                    key={`recent-${preset.id}`}
+                    key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioBackgroundPanel", "en", "recent-{v0}"), { v0: String(preset.id) })}
                     type="button"
                     title={localizePresetLabel(preset)}
                     onClick={() => pick(preset)}

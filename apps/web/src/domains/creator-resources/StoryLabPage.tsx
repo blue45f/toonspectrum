@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef, useState } from "react";
 
 import { RESOURCE_BUTTON, RESOURCE_INPUT } from "./navigation";
@@ -79,45 +83,45 @@ export function StoryLabPage() {
   };
   const story = storyDraftView(workspace.story, draft);
   const conflicts = draft ? storyDraftConflicts(workspace.story, draft) : [];
-  return <ResourceLayout title="스토리 연구실" intro="인물, 욕망, 장애물과 선택을 차근차근 정리하세요. 외부 AI 호출 없이 직접 작성하는 기획 워크시트입니다.">
+  return <ResourceLayout title={translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "스토리 연구실")} intro={translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "인물, 욕망, 장애물과 선택을 차근차근 정리하세요. 외부 AI 호출 없이 직접 작성하는 기획 워크시트입니다.")}>
     <div className="grid gap-6 lg:grid-cols-2">
       <form className="space-y-5 rounded-2xl border border-line bg-panel p-5" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-        <p className="text-sm text-fg-2">작성한 항목 {STORY_FIELDS.filter((field) => story[field]?.trim()).length}/8 · 미저장 변경 {dirty}개</p>
+        <p className="text-sm text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "작성한 항목 ")}{STORY_FIELDS.filter((field) => story[field]?.trim()).length}{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "/8 · 미저장 변경 ")}{dirty}{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "개")}</p>
         <fieldset disabled={!ready || !draftReady || saving || corruptDraft} className="space-y-5">
-          <legend className="sr-only">웹툰 기획 항목</legend>
-          {STORY_FIELDS.map((field) => <label key={field} htmlFor={`story-${field}`} className="block text-sm font-semibold">{STORY_LABELS[field]}
-            <textarea id={`story-${field}`} className={`${RESOURCE_INPUT} mt-2 resize-y`} rows={field === "title" ? 1 : 3} maxLength={2000} value={story[field] ?? ""} onChange={(event) => remember(editStoryDraft(draft, workspace.story, field, event.target.value))} />
+          <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "웹툰 기획 항목")}</legend>
+          {STORY_FIELDS.map((field) => <label key={field} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "en", "story-{v0}"), { v0: String(field) })} className="block text-sm font-semibold">{STORY_LABELS[field]}
+            <textarea id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "en", "story-{v0}"), { v0: String(field) })} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "en", "{v0} mt-2 resize-y"), { v0: String(RESOURCE_INPUT) })} rows={field === "title" ? 1 : 3} maxLength={2000} value={story[field] ?? ""} onChange={(event) => remember(editStoryDraft(draft, workspace.story, field, event.target.value))} />
           </label>)}
         </fieldset>
         <div className="flex flex-wrap gap-3">
-          <button type="submit" className={RESOURCE_BUTTON} disabled={!ready || !draftReady || !writable || saving || !dirty || conflicts.length > 0 || corruptDraft}>{saving ? "저장 중…" : "기획서 저장"}</button>
-          {(dirty > 0 || corruptDraft) && <button type="button" className={RESOURCE_BUTTON} disabled={saving} onClick={discard}>임시 초안 지우기</button>}
+          <button type="submit" className={RESOURCE_BUTTON} disabled={!ready || !draftReady || !writable || saving || !dirty || conflicts.length > 0 || corruptDraft}>{saving ? translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "저장 중…") : translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "기획서 저장")}</button>
+          {(dirty > 0 || corruptDraft) && <button type="button" className={RESOURCE_BUTTON} disabled={saving} onClick={discard}>{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "임시 초안 지우기")}</button>}
         </div>
         <p role="status" className="text-sm leading-6 text-fg-2">{notice}</p>
         {draftError && <p role="alert" className="text-sm leading-6">{draftError}</p>}
-        <p className="text-xs leading-6 text-fg-2">임시 초안은 이 탭의 세션 저장소에 보관합니다. 새로고침·페이지 이동 후 복구할 수 있지만, 탭 종료·브라우저 정책·저장소 삭제 후 복구는 보장하지 않습니다. 중요 작업은 파일로 내보내세요.</p>
+        <p className="text-xs leading-6 text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "임시 초안은 이 탭의 세션 저장소에 보관합니다. 새로고침·페이지 이동 후 복구할 수 있지만, 탭 종료·브라우저 정책·저장소 삭제 후 복구는 보장하지 않습니다. 중요 작업은 파일로 내보내세요.")}</p>
       </form>
       <section className="space-y-5 rounded-2xl border border-line p-6" aria-labelledby="story-preview-title">
-        <h2 id="story-preview-title" className="text-xl font-bold">내 이야기의 중심 질문</h2>
-        <p className="whitespace-pre-wrap break-words rounded-xl bg-accent-soft p-5 text-lg leading-9">{story.protagonist || "[주인공]"}은(는) {story.desire || "[원하는 것]"}을 얻으려 하지만, {story.obstacle || "[장애물]"} 때문에 선택을 해야 한다. 실패하면 {story.stakes || "[잃는 것]"}이(가) 걸려 있다.</p>
-        <p className="text-sm leading-7 text-fg-2">위 문장은 입력한 내용을 배열한 템플릿입니다. 자동 평가나 AI 생성 결과가 아니므로 문장과 조사는 직접 다듬어 주세요.</p>
-        {draft && conflicts.length > 0 && <section aria-label="다른 탭과의 기획 충돌" className="space-y-4 rounded-xl border border-line p-4">
-          <h3 className="font-bold" role="alert">같은 항목이 다른 탭에서 변경되었습니다</h3>
-          <p className="text-sm text-fg-2">항목별로 내용을 선택한 후 저장하세요. 선택만으로 저장본을 덮어쓰지는 않습니다.</p>
+        <h2 id="story-preview-title" className="text-xl font-bold">{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "내 이야기의 중심 질문")}</h2>
+        <p className="whitespace-pre-wrap break-words rounded-xl bg-accent-soft p-5 text-lg leading-9">{story.protagonist || translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "[주인공]")}{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "은(는) ")}{story.desire || translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "[원하는 것]")}{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "을 얻으려 하지만, ")}{story.obstacle || translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "[장애물]")} {translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "때문에 선택을 해야 한다. 실패하면 ")}{story.stakes || translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "[잃는 것]")}{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "이(가) 걸려 있다.")}</p>
+        <p className="text-sm leading-7 text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "위 문장은 입력한 내용을 배열한 템플릿입니다. 자동 평가나 AI 생성 결과가 아니므로 문장과 조사는 직접 다듬어 주세요.")}</p>
+        {draft && conflicts.length > 0 && <section aria-label={translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "다른 탭과의 기획 충돌")} className="space-y-4 rounded-xl border border-line p-4">
+          <h3 className="font-bold" role="alert">{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "같은 항목이 다른 탭에서 변경되었습니다")}</h3>
+          <p className="text-sm text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "항목별로 내용을 선택한 후 저장하세요. 선택만으로 저장본을 덮어쓰지는 않습니다.")}</p>
           {conflicts.map((field) => <div key={field} className="space-y-2 border-t border-line pt-3">
             <h4 className="font-semibold">{STORY_LABELS[field]}</h4>
-            <p className="whitespace-pre-wrap break-words text-sm">저장본: {workspace.story[field] || "(비어 있음)"}</p>
-            <p className="whitespace-pre-wrap break-words text-sm">내 초안: {draft.story[field] || "(비어 있음)"}</p>
+            <p className="whitespace-pre-wrap break-words text-sm">{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "저장본: ")}{workspace.story[field] || translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "(비어 있음)")}</p>
+            <p className="whitespace-pre-wrap break-words text-sm">{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "내 초안: ")}{draft.story[field] || translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "(비어 있음)")}</p>
             <div className="flex flex-wrap gap-2">
-              <button type="button" className={RESOURCE_BUTTON} onClick={() => remember(resolveStoryConflict(draft, workspace.story, field, "saved"))}>저장본 유지</button>
-              <button type="button" className={RESOURCE_BUTTON} onClick={() => remember(resolveStoryConflict(draft, workspace.story, field, "draft"))}>내 초안 선택</button>
+              <button type="button" className={RESOURCE_BUTTON} onClick={() => remember(resolveStoryConflict(draft, workspace.story, field, "saved"))}>{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "저장본 유지")}</button>
+              <button type="button" className={RESOURCE_BUTTON} onClick={() => remember(resolveStoryConflict(draft, workspace.story, field, "draft"))}>{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "내 초안 선택")}</button>
             </div>
           </div>)}
         </section>}
-        <h3 className="font-bold">첫 화를 점검하는 세 가지 질문</h3>
-        <p className="leading-8 text-fg-2">주인공이 지금 무엇을 원하나요?<br />그 선택에 어떤 대가가 따르나요?<br />마지막 장면 뒤에 독자가 궁금해할 것은 무엇인가요?</p>
-        <button className={RESOURCE_BUTTON} onClick={() => downloadText("webtoon-story-plan.md", storyMarkdown(story))}>현재 기획서 내보내기</button>
-        <p className="text-sm leading-7 text-fg-2">고전·공개 소재를 각색하는 경우에도 사용한 원문, 번역문, 삽화의 권리를 각각 확인하고 창작 보드에 출처를 남기세요.</p>
+        <h3 className="font-bold">{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "첫 화를 점검하는 세 가지 질문")}</h3>
+        <p className="leading-8 text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "주인공이 지금 무엇을 원하나요?")}<br />{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "그 선택에 어떤 대가가 따르나요?")}<br />{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "마지막 장면 뒤에 독자가 궁금해할 것은 무엇인가요?")}</p>
+        <button className={RESOURCE_BUTTON} onClick={() => downloadText("webtoon-story-plan.md", storyMarkdown(story))}>{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "현재 기획서 내보내기")}</button>
+        <p className="text-sm leading-7 text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.StoryLabPage", "ko", "고전·공개 소재를 각색하는 경우에도 사용한 원문, 번역문, 삽화의 권리를 각각 확인하고 창작 보드에 출처를 남기세요.")}</p>
       </section>
     </div>
     <LocalSaveNotice error={error} writable={writable} saving={saving} />

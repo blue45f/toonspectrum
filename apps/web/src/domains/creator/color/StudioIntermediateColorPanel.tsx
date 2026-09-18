@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioIntermediateColorPanel.tsx
  *
@@ -65,10 +69,9 @@ export function StudioIntermediateColorPanel({
       <div className="flex items-center justify-between gap-2 pb-2 border-b border-line/60">
         <div className="flex items-center gap-1.5 min-w-0">
           <Grid size={14} className="text-indigo-400 shrink-0" aria-hidden />
-          <span className="font-semibold truncate">중간색 (Intermediate Color)</span>
+          <span className="font-semibold truncate">{translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "중간색 (Intermediate Color)")}</span>
           <span className="px-1 py-0.2 text-[10px] rounded font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
-            CSP
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "en", "CSP")}</span>
         </div>
 
         {/* Grid Size Selector */}
@@ -84,8 +87,8 @@ export function StudioIntermediateColorPanel({
                   ? "bg-indigo-600 text-white font-semibold"
                   : "bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700",
               )}
-              title={`${size}x${size} 그리드`}
-              aria-label={`${size}x${size} 그리드`}
+              title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "{v0}x{v1} 그리드"), { v0: String(size), v1: String(size) })}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "{v0}x{v1} 그리드"), { v0: String(size), v1: String(size) })}
             >
               {size}x{size}
             </button>
@@ -119,20 +122,19 @@ export function StudioIntermediateColorPanel({
                 value={corners.c00}
                 onChange={(e) => handleUpdateCorner("c00", e.target.value)}
                 className="absolute inset-0 opacity-0 cursor-pointer size-full"
-                aria-label="좌상단 코너 색상"
+                aria-label={translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "좌상단 코너 색상")}
               />
               <span className="block size-full" style={{ background: corners.c00 }} />
             </label>
-            <span className="text-slate-400 text-[10px]">좌상 (C00)</span>
+            <span className="text-slate-400 text-[10px]">{translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "좌상 (C00)")}</span>
           </div>
           <button
             type="button"
             onClick={() => handleSetCornerToActive("c00")}
             className="text-[9px] text-indigo-300 hover:text-white px-1 py-0.2 rounded bg-indigo-500/10 hover:bg-indigo-500/20"
-            title="현재 선택된 색으로 좌상단 코너 설정"
+            title={translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "현재 선택된 색으로 좌상단 코너 설정")}
           >
-            현재색
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "현재색")}</button>
         </div>
 
         {/* Top-Right */}
@@ -144,20 +146,19 @@ export function StudioIntermediateColorPanel({
                 value={corners.c10}
                 onChange={(e) => handleUpdateCorner("c10", e.target.value)}
                 className="absolute inset-0 opacity-0 cursor-pointer size-full"
-                aria-label="우상단 코너 색상"
+                aria-label={translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "우상단 코너 색상")}
               />
               <span className="block size-full" style={{ background: corners.c10 }} />
             </label>
-            <span className="text-slate-400 text-[10px]">우상 (C10)</span>
+            <span className="text-slate-400 text-[10px]">{translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "우상 (C10)")}</span>
           </div>
           <button
             type="button"
             onClick={() => handleSetCornerToActive("c10")}
             className="text-[9px] text-indigo-300 hover:text-white px-1 py-0.2 rounded bg-indigo-500/10 hover:bg-indigo-500/20"
-            title="현재 선택된 색으로 우상단 코너 설정"
+            title={translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "현재 선택된 색으로 우상단 코너 설정")}
           >
-            현재색
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "현재색")}</button>
         </div>
 
         {/* Bottom-Left */}
@@ -169,20 +170,19 @@ export function StudioIntermediateColorPanel({
                 value={corners.c01}
                 onChange={(e) => handleUpdateCorner("c01", e.target.value)}
                 className="absolute inset-0 opacity-0 cursor-pointer size-full"
-                aria-label="좌하단 코너 색상"
+                aria-label={translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "좌하단 코너 색상")}
               />
               <span className="block size-full" style={{ background: corners.c01 }} />
             </label>
-            <span className="text-slate-400 text-[10px]">좌하 (C01)</span>
+            <span className="text-slate-400 text-[10px]">{translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "좌하 (C01)")}</span>
           </div>
           <button
             type="button"
             onClick={() => handleSetCornerToActive("c01")}
             className="text-[9px] text-indigo-300 hover:text-white px-1 py-0.2 rounded bg-indigo-500/10 hover:bg-indigo-500/20"
-            title="현재 선택된 색으로 좌하단 코너 설정"
+            title={translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "현재 선택된 색으로 좌하단 코너 설정")}
           >
-            현재색
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "현재색")}</button>
         </div>
 
         {/* Bottom-Right */}
@@ -194,20 +194,19 @@ export function StudioIntermediateColorPanel({
                 value={corners.c11}
                 onChange={(e) => handleUpdateCorner("c11", e.target.value)}
                 className="absolute inset-0 opacity-0 cursor-pointer size-full"
-                aria-label="우하단 코너 색상"
+                aria-label={translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "우하단 코너 색상")}
               />
               <span className="block size-full" style={{ background: corners.c11 }} />
             </label>
-            <span className="text-slate-400 text-[10px]">우하 (C11)</span>
+            <span className="text-slate-400 text-[10px]">{translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "우하 (C11)")}</span>
           </div>
           <button
             type="button"
             onClick={() => handleSetCornerToActive("c11")}
             className="text-[9px] text-indigo-300 hover:text-white px-1 py-0.2 rounded bg-indigo-500/10 hover:bg-indigo-500/20"
-            title="현재 선택된 색으로 우하단 코너 설정"
+            title={translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "현재 선택된 색으로 우하단 코너 설정")}
           >
-            현재색
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "현재색")}</button>
         </div>
       </div>
 
@@ -228,7 +227,7 @@ export function StudioIntermediateColorPanel({
                 onClick={() => onSelectColor(cellHex)}
                 onPointerEnter={() => setHoveredCellColor(cellHex)}
                 onPointerLeave={() => setHoveredCellColor(null)}
-                aria-label={`${cellHex} 색상 선택`}
+                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "{v0} 색상 선택"), { v0: String(cellHex) })}
                 title={cellHex}
                 className={cn(
                   "aspect-square rounded-sm transition-transform hover:scale-110 relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400",
@@ -243,7 +242,7 @@ export function StudioIntermediateColorPanel({
 
       {/* Hover Info Readout */}
       <div className="flex items-center justify-between mt-2 pt-1 border-t border-line/40 text-[10px] text-slate-400 font-mono">
-        <span>선택 색상: {hoveredCellColor ?? activeColor}</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.color.StudioIntermediateColorPanel", "ko", "선택 색상: ")}{hoveredCellColor ?? activeColor}</span>
         <span
           className="size-3 rounded border border-white/30"
           style={{ background: hoveredCellColor ?? activeColor }}

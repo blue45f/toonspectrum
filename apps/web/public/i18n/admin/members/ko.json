@@ -21,6 +21,7 @@
   "admin.members.selfTag": "(나)",
   "admin.members.statusActive": "활성",
   "admin.members.statusDeleted": "탈퇴",
+  "admin.members.statusMerged": "통합됨",
   "admin.members.statusSuspended": "정지",
   "admin.members.suspend": "정지",
   "admin.members.title": "회원 관리"

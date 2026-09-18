@@ -83,6 +83,20 @@ describe("studio VRM pose naturalization", () => {
     expect(rotation(result.bones, "leftHand")[1]).toBe(d(10));
   });
 
+  it("softens sideways knee twist and ankle edge-roll without erasing the main bend", () => {
+    const bones: PoseBoneMap = {
+      leftUpperLeg: { rotation: [d(28), d(4), d(3)] },
+      leftLowerLeg: { rotation: [d(72), d(26), d(23)] },
+      leftFoot: { rotation: [d(30), d(38), d(36)] },
+    };
+    const result = naturalizeStudioVrmPose({ bones, intensity: 1 });
+    expect(rotation(result.bones, "leftLowerLeg")[0]).toBeCloseTo(d(72), 8);
+    expect(Math.abs(rotation(result.bones, "leftLowerLeg")[1])).toBeLessThan(d(26));
+    expect(Math.abs(rotation(result.bones, "leftLowerLeg")[2])).toBeLessThan(d(23));
+    expect(Math.abs(rotation(result.bones, "leftFoot")[1])).toBeLessThan(d(38));
+    expect(Math.abs(rotation(result.bones, "leftFoot")[2])).toBeLessThan(d(36));
+  });
+
   it("keeps every ordinary correction conservative and finite", () => {
     const bones: PoseBoneMap = {
       spine: { rotation: [d(12), d(-18), d(7)] },

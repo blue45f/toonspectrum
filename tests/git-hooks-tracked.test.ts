@@ -37,7 +37,10 @@ describe("tracked git hooks", () => {
     const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")) as {
       scripts: Record<string, string>;
     };
-    // husky still runs first so its own bookkeeping stays intact; the override is the point.
-    expect(pkg.scripts.prepare).toBe("husky && git config core.hooksPath .husky");
+    expect(pkg.scripts.prepare).toBe("node scripts/prepare-git-hooks.mjs");
+
+    const prepare = readFileSync(path.join(root, "scripts", "prepare-git-hooks.mjs"), "utf8");
+    expect(prepare).toContain('execFileSync(huskyBinary, [], { stdio: "inherit" });');
+    expect(prepare).toContain('execFileSync("git", ["config", "core.hooksPath", ".husky"], {');
   });
 });

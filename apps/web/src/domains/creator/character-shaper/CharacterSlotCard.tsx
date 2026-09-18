@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Character Shaper — one visual preset card (4:5 preview, name, one-line intent, badge).
  *
@@ -75,9 +78,9 @@ export function CharacterSlotCard({
       title={title}
       data-character-slot-card={entry.id}
       data-character-slot-card-availability={availability.status}
-      data-character-slot-card-selected={selected ? "true" : undefined}
-      data-character-slot-card-previewed={previewed ? "true" : undefined}
-      data-character-slot-card-runtime-thumbnail={runtimeThumbnail ? "true" : undefined}
+      data-character-slot-card-selected={selected ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterSlotCard", "en", "true") : undefined}
+      data-character-slot-card-previewed={previewed ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterSlotCard", "en", "true") : undefined}
+      data-character-slot-card-runtime-thumbnail={runtimeThumbnail ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterSlotCard", "en", "true") : undefined}
       className={cn(
         "group relative flex min-h-11 w-full min-w-0 flex-col overflow-hidden rounded-2xl border text-left",
         "transition-[transform,border-color,box-shadow,background-color] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
@@ -130,16 +133,15 @@ export function CharacterSlotCard({
         ) : (
           <CharacterSlotPreview spec={entry.preview} selected={selected} className="h-full w-full" title={entry.label} />
         )}
-        <span title={runtimeThumbnail ? "현재 선택한 전체 캐릭터 조합의 실제 이미지입니다." : "모양을 설명하는 도해입니다. 실제 적용 결과는 3D 화면에서 확인하세요."}
+        <span title={runtimeThumbnail ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterSlotCard", "ko", "현재 선택한 전체 캐릭터 조합의 실제 이미지입니다.") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterSlotCard", "ko", "모양을 설명하는 도해입니다. 실제 적용 결과는 3D 화면에서 확인하세요.")}
           className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 rounded-full border border-line/70 bg-panel/85 px-1.5 py-0.5 text-[0.58rem] font-semibold text-fg-2 backdrop-blur">
           {runtimeThumbnail ? <Image size={9} aria-hidden /> : <PencilRuler size={9} aria-hidden />}
-          {runtimeThumbnail ? "현재 조합 · 실제 3D" : "모양 도해"}
+          {runtimeThumbnail ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterSlotCard", "ko", "현재 조합 · 실제 3D") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterSlotCard", "ko", "모양 도해")}
         </span>
         {previewed ? (
           <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full border border-accent/60 bg-panel/90 px-1.5 py-0.5 text-[0.6rem] font-bold text-accent backdrop-blur">
             <Eye size={10} aria-hidden />
-            3D 미리보기
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterSlotCard", "ko", "3D 미리보기")}</span>
         ) : showBadge ? (
           <span
             className={cn(
@@ -153,8 +155,7 @@ export function CharacterSlotCard({
         ) : null}
         {previewed ? (
           <span className="absolute bottom-1.5 right-1.5 rounded-full border border-accent/50 bg-panel/90 px-2 py-0.5 text-[0.58rem] font-bold text-accent backdrop-blur">
-            클릭해 확정
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterSlotCard", "ko", "클릭해 확정")}</span>
         ) : null}
         {selected ? (
           <span aria-hidden className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-accent text-on-accent shadow-sm">

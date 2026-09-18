@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Play, Pause, RotateCw, RotateCcw, Compass } from "lucide-react";
 import { useState } from "react";
 
@@ -44,21 +48,19 @@ export function StudioBg3dTurntableController({
         disabled={disabled}
         aria-pressed={rotating}
         onClick={handleToggle}
-        className={`flex min-h-11 items-center gap-1 rounded-md px-2 py-1 text-[0.68rem] font-bold transition-all ${
-          rotating
+        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTurntableController", "en", "flex min-h-11 items-center gap-1 rounded-md px-2 py-1 text-[0.68rem] font-bold transition-all {v0}"), { v0: String(rotating
             ? "bg-accent text-accent-fg shadow-sm"
-            : "bg-raised text-fg hover:bg-line/40"
-        }`}
+            : "bg-raised text-fg hover:bg-line/40") })}
       >
         {rotating ? (
           <>
             <Pause className="size-3" />
-            <span>턴테이블 정지</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTurntableController", "ko", "턴테이블 정지")}</span>
           </>
         ) : (
           <>
             <Play className="size-3" />
-            <span>턴테이블 회전</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTurntableController", "ko", "턴테이블 회전")}</span>
           </>
         )}
       </button>
@@ -67,8 +69,8 @@ export function StudioBg3dTurntableController({
         type="button"
         disabled={disabled}
         onClick={handleToggleDirection}
-        title="회전 방향 전환"
-        aria-label="회전 방향 전환"
+        title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTurntableController", "ko", "회전 방향 전환")}
+        aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTurntableController", "ko", "회전 방향 전환")}
         aria-pressed={direction === "ccw"}
         className="grid size-11 shrink-0 place-items-center rounded border border-line bg-raised p-1 text-fg-2 hover:bg-line/40 hover:text-fg"
       >
@@ -79,8 +81,8 @@ export function StudioBg3dTurntableController({
         <Compass className="size-3 text-fg-3" />
         <input
           type="range"
-          aria-label="턴테이블 회전 속도"
-          aria-valuetext={`${speedRpm.toFixed(1)} RPM`}
+          aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTurntableController", "ko", "턴테이블 회전 속도")}
+          aria-valuetext={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTurntableController", "en", "{v0} RPM"), { v0: String(speedRpm.toFixed(1)) })}
           disabled={disabled}
           min="0.5"
           max="8.0"
@@ -89,7 +91,7 @@ export function StudioBg3dTurntableController({
           onChange={(e) => handleSpeed(Number(e.target.value))}
           className="h-11 w-16 cursor-pointer accent-accent"
         />
-        <span className="w-8 text-right font-mono text-[0.62rem] text-fg-3">{speedRpm.toFixed(1)} RPM</span>
+        <span className="w-8 text-right font-mono text-[0.62rem] text-fg-3">{speedRpm.toFixed(1)} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTurntableController", "en", "RPM")}</span>
       </div>
     </div>
   );

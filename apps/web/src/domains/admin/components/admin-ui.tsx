@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import type { ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils";
@@ -48,7 +49,7 @@ export function AdminNotice({ title, body }: { title: string; body: string }) {
 
 export function AdminSpinner() {
   return (
-    <div className="flex min-h-[30vh] items-center justify-center" role="status" aria-label="불러오는 중">
+    <div className="flex min-h-[30vh] items-center justify-center" role="status" aria-label={translateCurrentStaticSourceText("domains.admin.components.admin.ui", "ko", "불러오는 중")}>
       <span className="size-6 animate-spin rounded-full border-2 border-line border-t-accent" />
     </div>
   );

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 // 배치된 대사 일괄 편집 패널(코미포식) — 캔버스의 말풍선·텍스트 요소를 목록으로 보고
 // (1) 요소별 인라인 수정, (2) 전체/현재 페이지 찾아바꾸기, (3) 클릭으로 캔버스 선택을 제공한다.
 // 순수 계산은 studio-dialogue-batch, 상태 커밋(히스토리)은 StudioPage(메인 루프)가 담당한다.
@@ -767,7 +771,7 @@ export function StudioDialogueBatchPanel({
 
   return (
     <section
-      aria-label="대사 일괄 편집"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대사 일괄 편집")}
       data-studio-shortcut-boundary="true"
       className="fixed inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom)+var(--studio-mobile-keyboard-inset))] top-[calc(4.25rem+env(safe-area-inset-top))] z-[54] flex w-auto flex-col overflow-hidden rounded-xl border border-line bg-panel/95 shadow-xl backdrop-blur lg:absolute lg:inset-x-auto lg:bottom-auto lg:right-3 lg:top-3 lg:z-40 lg:max-h-[calc(100%-5rem)] lg:w-[min(21rem,calc(100%-1.5rem))]"
       style={{
@@ -776,8 +780,7 @@ export function StudioDialogueBatchPanel({
     >
       <div className="flex items-center justify-between gap-2 border-b border-line/60 px-3 py-2">
         <p className="text-xs font-bold text-fg">
-          대사 일괄 편집
-          <span className="ml-1.5 font-medium text-fg-4">{items.length}개</span>
+          {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대사 일괄 편집")}<span className="ml-1.5 font-medium text-fg-4">{items.length}{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "개")}</span>
         </p>
         <button
           type="button"
@@ -785,7 +788,7 @@ export function StudioDialogueBatchPanel({
             readAloudController.stop();
             onClose();
           }}
-          aria-label="대사 일괄 편집 닫기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대사 일괄 편집 닫기")}
           className="grid size-11 shrink-0 place-items-center rounded-lg border border-line text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           <X size={16} />
@@ -793,7 +796,7 @@ export function StudioDialogueBatchPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      <section className="border-b border-line/60 px-3 py-2.5" aria-label="대사 파일 입출력">
+      <section className="border-b border-line/60 px-3 py-2.5" aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대사 파일 입출력")}>
         <button
           type="button"
           onClick={() => setInterchangeOpen((open) => !open)}
@@ -802,8 +805,7 @@ export function StudioDialogueBatchPanel({
           className="flex min-h-11 w-full items-center gap-2 rounded-lg px-1 text-left text-[0.7rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           <FileText size={14} aria-hidden />
-          번역·대본 파일
-          <span className="ml-auto text-[0.6rem] font-medium text-fg-4">9종</span>
+          {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "번역·대본 파일")}<span className="ml-auto text-[0.6rem] font-medium text-fg-4">{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "9종")}</span>
           <ChevronDown
             size={14}
             aria-hidden
@@ -817,11 +819,10 @@ export function StudioDialogueBatchPanel({
           >
             <div className="grid grid-cols-2 gap-1.5">
               <label className="text-[0.6rem] font-medium text-fg-3">
-                내보내기 형식
-                <select
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "내보내기 형식")}<select
                   value={interchangeFormat}
                   onChange={(event) => setInterchangeFormat(event.target.value as StudioDialogueInterchangeFormat)}
-                  aria-label="대사 내보내기 형식"
+                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대사 내보내기 형식")}
                   className="mt-1 min-h-11 w-full rounded-lg border border-line bg-panel px-2 text-[0.66rem] text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   {INTERCHANGE_FORMATS.map((format) => (
@@ -830,17 +831,16 @@ export function StudioDialogueBatchPanel({
                 </select>
               </label>
               <label className="text-[0.6rem] font-medium text-fg-3">
-                가져오기 연결
-                <select
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "가져오기 연결")}<select
                   value={interchangeMatchMode}
                   onChange={(event) => setInterchangeMatchMode(event.target.value as StudioDialogueImportMatchMode)}
-                  aria-label="가져온 대사 연결 방식"
+                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "가져온 대사 연결 방식")}
                   className="mt-1 min-h-11 w-full rounded-lg border border-line bg-panel px-2 text-[0.66rem] text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >
-                  <option value="auto">ID→페이지→순서</option>
-                  <option value="id">ID만</option>
-                  <option value="page-order">페이지·컷 순서</option>
-                  <option value="document-order">문서 읽기 순서</option>
+                  <option value="auto">{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "ID→페이지→순서")}</option>
+                  <option value="id">{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "ID만")}</option>
+                  <option value="page-order">{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "페이지·컷 순서")}</option>
+                  <option value="document-order">{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "문서 읽기 순서")}</option>
                 </select>
               </label>
             </div>
@@ -851,13 +851,12 @@ export function StudioDialogueBatchPanel({
                 disabled={items.length === 0 || interchangeBusy}
                 className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-panel text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <Download size={13} aria-hidden /> 내보내기
-              </button>
+                <Download size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "내보내기")}</button>
               <label className={cx(
                 "flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent text-[0.66rem] font-semibold text-on-accent transition-opacity hover:opacity-90 focus-within:outline focus-within:outline-2 focus-within:outline-accent",
                 interchangeBusy && "cursor-wait opacity-50"
               )}>
-                <Upload size={13} aria-hidden /> {interchangeBusy ? "읽는 중" : "가져오기"}
+                <Upload size={13} aria-hidden /> {interchangeBusy ? translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "읽는 중") : translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "가져오기")}
                 <input
                   type="file"
                   accept=".csv,.tsv,.json,.fountain,.fdx,.srt,.vtt,.md,.txt,text/plain,text/csv,text/vtt,application/json,application/xml,text/xml"
@@ -872,9 +871,7 @@ export function StudioDialogueBatchPanel({
               </label>
             </div>
             <p className="text-[0.6rem] leading-relaxed text-fg-4">
-              ID가 있는 JSON/CSV는 가장 정확합니다. FDX는 적용 전 구조 손실을 확인하며,
-              SRT·VTT는 캔버스 좌표가 없어 순서로 연결합니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "ID가 있는 JSON/CSV는 가장 정확합니다. FDX는 적용 전 구조 손실을 확인하며, SRT·VTT는 캔버스 좌표가 없어 순서로 연결합니다.")}</p>
             {pendingFdxImport?.parsed.lossPreview ? (
               <section
                 aria-labelledby={fdxPreviewHeadingId}
@@ -886,8 +883,7 @@ export function StudioDialogueBatchPanel({
                       id={fdxPreviewHeadingId}
                       className="text-[0.68rem] font-bold text-fg"
                     >
-                      FDX 손실 미리보기
-                    </h3>
+                      {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "FDX 손실 미리보기")}</h3>
                     <p
                       className="mt-0.5 truncate text-[0.58rem] text-fg-3"
                       title={pendingFdxImport.fileName}
@@ -896,8 +892,7 @@ export function StudioDialogueBatchPanel({
                     </p>
                   </div>
                   <span className="shrink-0 rounded-full border border-warn/45 bg-panel/70 px-2 py-0.5 text-[0.56rem] font-semibold text-fg-2">
-                    적용 전 확인
-                  </span>
+                    {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "적용 전 확인")}</span>
                 </div>
 
                 <dl className="grid grid-cols-2 gap-1 text-[0.59rem] sm:grid-cols-4">
@@ -938,7 +933,7 @@ export function StudioDialogueBatchPanel({
                                   : "border-warn/35 bg-warn/10 text-fg-2"
                               )}
                             >
-                              {item.disposition === "dropped" ? "제외" : "문맥"}
+                              {item.disposition === "dropped" ? translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "제외") : translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "문맥")}
                             </span>
                             <strong className="min-w-0 truncate text-fg-2">
                               {item.sourceType} · {item.preview}
@@ -951,25 +946,21 @@ export function StudioDialogueBatchPanel({
                       (item) => item.disposition !== "mapped"
                     ).length > 12 ? (
                       <p className="px-1.5 py-1 text-[0.56rem] text-fg-4">
-                        나머지{" "}
+                        {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "나머지")}{" "}
                         {pendingFdxImport.parsed.lossPreview.items.filter(
                           (item) => item.disposition !== "mapped"
                         ).length - 12}
-                        개 항목은 요약 수치에 포함되어 있습니다.
-                      </p>
+                        {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "개 항목은 요약 수치에 포함되어 있습니다.")}</p>
                     ) : null}
                   </div>
                 ) : (
                   <p className="rounded-lg border border-good/35 bg-good/10 px-2 py-1.5 text-[0.6rem] text-good">
-                    지원 범위 밖에서 제외되는 문단이 없습니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "지원 범위 밖에서 제외되는 문단이 없습니다.")}</p>
                 )}
 
                 {pendingFdxImport.parsed.lossPreview.truncated ? (
                   <p className="text-[0.58rem] leading-relaxed text-warn">
-                    매우 큰 파일이라 상세 목록은 안전 예산에서 줄였습니다. 위 합계에는 전체
-                    분석 결과가 반영되어 있습니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "매우 큰 파일이라 상세 목록은 안전 예산에서 줄였습니다. 위 합계에는 전체 분석 결과가 반영되어 있습니다.")}</p>
                 ) : null}
 
                 <div className="grid grid-cols-2 gap-1.5">
@@ -979,25 +970,23 @@ export function StudioDialogueBatchPanel({
                     disabled={interchangeBusy}
                     className="min-h-11 rounded-lg border border-line bg-panel px-2 text-[0.64rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    취소
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "취소")}</button>
                   <button
                     type="button"
                     onClick={() => void confirmPendingFdxImport()}
                     disabled={interchangeBusy}
                     className="min-h-11 rounded-lg bg-accent px-2 text-[0.64rem] font-semibold text-on-accent transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-50"
                   >
-                    {interchangeBusy ? "적용 중" : "확인하고 적용"}
+                    {interchangeBusy ? translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "적용 중") : translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "확인하고 적용")}
                   </button>
                 </div>
                 <p className="text-[0.56rem] leading-relaxed text-fg-4">
-                  적용은 문서 기록 한 번으로 반영되며 실행 취소 한 번으로 되돌릴 수 있습니다.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "적용은 문서 기록 한 번으로 반영되며 실행 취소 한 번으로 되돌릴 수 있습니다.")}</p>
               </section>
             ) : null}
             {interchangeStatus && (
               <p
-                role={interchangeStatus.tone === "bad" ? "alert" : "status"}
+                role={interchangeStatus.tone === "bad" ? translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "en", "status")}
                 className={cx(
                   "rounded-lg border px-2 py-1.5 text-[0.62rem] leading-relaxed",
                   interchangeStatus.tone === "good" && "border-good/35 bg-good/10 text-good",
@@ -1019,16 +1008,16 @@ export function StudioDialogueBatchPanel({
             type="text"
             value={find}
             onChange={(e) => setFind(e.target.value)}
-            placeholder="찾기"
-            aria-label="찾을 대사"
+            placeholder={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "찾기")}
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "찾을 대사")}
             className={inputClass}
           />
           <input
             type="text"
             value={replaceWith}
             onChange={(e) => setReplaceWith(e.target.value)}
-            placeholder="바꾸기"
-            aria-label="바꿀 대사"
+            placeholder={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "바꾸기")}
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "바꿀 대사")}
             className={inputClass}
           />
         </div>
@@ -1056,27 +1045,24 @@ export function StudioDialogueBatchPanel({
               onChange={(e) => setCaseSensitive(e.target.checked)}
               className="accent-accent"
             />
-            대소문자 구분
-          </label>
+            {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대소문자 구분")}</label>
         </div>
         {find ? (
           <p className="text-[0.62rem] leading-snug text-fg-3" role="status">
             {plan.totalCount > 0 ? (
               <>
-                <span className="font-semibold text-fg-2">{plan.totalCount}건</span> · 요소{" "}
-                {plan.elementCount}개 · {plan.pageCount}페이지
-              </>
+                <span className="font-semibold text-fg-2">{plan.totalCount}{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "건")}</span> {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "· 요소")}{" "}
+                {plan.elementCount}{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "개 · ")}{plan.pageCount}{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "페이지")}</>
             ) : (
-              "일치하는 대사가 없어요."
+              translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "일치하는 대사가 없어요.")
             )}
             {plan.lockedSkipped > 0 && (
-              <span className="text-fg-4"> · 잠긴 요소 {plan.lockedSkipped}개 제외</span>
+              <span className="text-fg-4"> {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "· 잠긴 요소 ")}{plan.lockedSkipped}{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "개 제외")}</span>
             )}
           </p>
         ) : (
           <p className="text-[0.62rem] leading-snug text-fg-4">
-            찾을 문구를 입력하면 바꾸기 전에 매치 수를 미리 보여줘요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "찾을 문구를 입력하면 바꾸기 전에 매치 수를 미리 보여줘요.")}</p>
         )}
         <button
           type="button"
@@ -1089,16 +1075,15 @@ export function StudioDialogueBatchPanel({
               : "cursor-not-allowed bg-card text-fg-4"
           )}
         >
-          <Replace size={12} /> 모두 바꾸기
-        </button>
+          <Replace size={12} /> {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "모두 바꾸기")}</button>
         {onApplyFormat || onConvertTextToBubble ? (
           <div
             role="group"
-            aria-label="목록 대사 일괄 서식"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "목록 대사 일괄 서식")}
             className="space-y-1.5 border-t border-line/60 pt-2"
           >
             <div className="flex flex-wrap items-center gap-1">
-              <span className="text-[0.58rem] font-medium text-fg-3">서식 범위</span>
+              <span className="text-[0.58rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "서식 범위")}</span>
               <button
                 type="button"
                 aria-pressed={formatScope === "visible"}
@@ -1110,8 +1095,7 @@ export function StudioDialogueBatchPanel({
                     : "border-line bg-card text-fg-2 hover:bg-raised"
                 )}
               >
-                목록 전체
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "목록 전체")}</button>
               <button
                 type="button"
                 aria-pressed={formatScope === "selected"}
@@ -1125,16 +1109,14 @@ export function StudioDialogueBatchPanel({
                 )}
                 title={
                   formatSelectionCount > 1
-                    ? `캔버스에서 고른 대사 ${formatSelectionCount}개`
-                    : "캔버스/목록에서 고른 대사"
+                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "캔버스에서 고른 대사 {v0}개"), { v0: String(formatSelectionCount) })
+                    : translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "캔버스/목록에서 고른 대사")
                 }
               >
-                선택만
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "선택만")}</button>
               {formatSelectionCount > 1 ? (
                 <span className="text-[0.58rem] tabular-nums text-fg-3" role="status">
-                  {formatSelectionCount}개 선택
-                </span>
+                  {formatSelectionCount}{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "개 선택")}</span>
               ) : null}
             </div>
             <div className="grid grid-cols-4 gap-1">
@@ -1143,59 +1125,52 @@ export function StudioDialogueBatchPanel({
                 onClick={() => applyFormatToVisible({ fontStyle: "bold" }, "굵게")}
                 disabled={shown.every((item) => item.locked)}
                 className="flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-1 text-[0.62rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
-                title="굵게"
+                title={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "굵게")}
               >
-                굵게
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "굵게")}</button>
               <button
                 type="button"
                 onClick={() => applyFormatToVisible({ fontStyle: "italic" }, "기울임")}
                 disabled={shown.every((item) => item.locked)}
                 className="flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-1 text-[0.62rem] italic text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
-                title="기울임"
+                title={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "기울임")}
               >
-                기울임
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "기울임")}</button>
               <button
                 type="button"
                 onClick={() => applyFormatToVisible({ fontSize: 22 }, "22px")}
                 disabled={shown.every((item) => item.locked)}
                 className="flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
-                22px
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "en", "22px")}</button>
               <button
                 type="button"
                 onClick={() => applyFormatToVisible({ fontSize: 28 }, "28px")}
                 disabled={shown.every((item) => item.locked)}
                 className="flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
-                28px
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "en", "28px")}</button>
               <button
                 type="button"
                 onClick={() => applyFormatToVisible({ textColor: "#111111" }, "검정 글자")}
                 disabled={shown.every((item) => item.locked)}
                 className="flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
-                검정
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "검정")}</button>
               <button
                 type="button"
                 onClick={() => applyFormatToVisible({ textColor: "#c2410c" }, "강조 주황")}
                 disabled={shown.every((item) => item.locked)}
                 className="flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-accent hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
-                강조
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "강조")}</button>
               <button
                 type="button"
                 onClick={() => applyFormatToVisible({ align: "center" }, "가운데 정렬")}
                 disabled={shown.every((item) => item.locked)}
                 className="col-span-2 flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
-                가운데
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "가운데")}</button>
             </div>
             {onConvertTextToBubble || onConvertTextsToBubbles ? (
               <button
@@ -1203,10 +1178,9 @@ export function StudioDialogueBatchPanel({
                 onClick={convertAllVisibleTextToBubble}
                 disabled={!shown.some((item) => item.elType === "text" && !item.locked)}
                 className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft/40 px-2 text-[0.66rem] font-semibold text-fg hover:bg-accent-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
-                title="목록에 보이는 자유 텍스트를 한 번에 말풍선으로 바꿉니다"
+                title={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "목록에 보이는 자유 텍스트를 한 번에 말풍선으로 바꿉니다")}
               >
-                <MessageCircle size={13} aria-hidden /> 목록 텍스트 → 말풍선
-              </button>
+                <MessageCircle size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "목록 텍스트 → 말풍선")}</button>
             ) : null}
             {formatStatus ? (
               <p
@@ -1220,8 +1194,7 @@ export function StudioDialogueBatchPanel({
               </p>
             ) : (
               <p className="text-[0.58rem] leading-snug text-fg-4">
-                서식·말풍선 변환은 문서에 바로 저장되며 실행 취소 1회로 되돌립니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "서식·말풍선 변환은 문서에 바로 저장되며 실행 취소 1회로 되돌립니다.")}</p>
             )}
           </div>
         ) : null}
@@ -1235,12 +1208,10 @@ export function StudioDialogueBatchPanel({
         <div className="flex items-center justify-between gap-2">
           <p id={readAloudHeadingId} className="flex items-center gap-1.5 text-[0.7rem] font-semibold text-fg-2">
             <Volume2 size={14} aria-hidden />
-            대사 낭독 검수
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대사 낭독 검수")}</p>
           {speechAdapter.supported && (
             <span className="shrink-0 text-[0.6rem] tabular-nums text-fg-3">
-              {readAloudQueue.length}개
-            </span>
+              {readAloudQueue.length}{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "개")}</span>
           )}
         </div>
 
@@ -1249,8 +1220,7 @@ export function StudioDialogueBatchPanel({
             role="status"
             className="rounded-lg border border-line bg-card/45 px-2.5 py-2 text-[0.65rem] leading-relaxed text-fg-3"
           >
-            이 브라우저는 음성 낭독을 지원하지 않아요. 대사 편집은 그대로 사용할 수 있습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "이 브라우저는 음성 낭독을 지원하지 않아요. 대사 편집은 그대로 사용할 수 있습니다.")}</p>
         ) : (
           <>
             <div className="grid grid-cols-3 gap-1.5">
@@ -1258,18 +1228,17 @@ export function StudioDialogueBatchPanel({
                 type="button"
                 onClick={playShownDialogue}
                 disabled={readAloudQueue.length === 0 || !selectedVoice}
-                aria-label="검색된 대사 전체 낭독"
+                aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "검색된 대사 전체 낭독")}
                 aria-pressed={isActive}
                 aria-busy={playback.status === "playing"}
                 className="flex min-h-11 items-center justify-center gap-1 rounded-lg bg-accent px-2 text-[0.65rem] font-semibold text-on-accent transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <Play size={13} aria-hidden /> 전체 재생
-              </button>
+                <Play size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "전체 재생")}</button>
               <button
                 type="button"
                 onClick={togglePause}
                 disabled={!canPause}
-                aria-label={playback.status === "paused" ? "대사 낭독 계속" : "대사 낭독 일시 정지"}
+                aria-label={playback.status === "paused" ? translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대사 낭독 계속") : translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대사 낭독 일시 정지")}
                 aria-pressed={playback.status === "paused"}
                 className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.65rem] font-medium text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -1278,26 +1247,25 @@ export function StudioDialogueBatchPanel({
                 ) : (
                   <Pause size={13} aria-hidden />
                 )}
-                {playback.status === "paused" ? "계속" : "일시 정지"}
+                {playback.status === "paused" ? translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "계속") : translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "일시 정지")}
               </button>
               <button
                 type="button"
                 onClick={() => readAloudController.stop()}
                 disabled={!isActive}
-                aria-label="대사 낭독 중지"
+                aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대사 낭독 중지")}
                 className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.65rem] font-medium text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <Square size={12} aria-hidden /> 중지
-              </button>
+                <Square size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "중지")}</button>
             </div>
 
             <div className="grid grid-cols-[5.25rem_minmax(0,1fr)] gap-1.5">
               <label className="min-w-0 text-[0.6rem] font-medium text-fg-3">
-                속도 {readAloudRate.toFixed(1)}×
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "속도 ")}{readAloudRate.toFixed(1)}×
                 <select
                   value={readAloudRate}
                   onChange={(event) => setReadAloudRate(Number(event.target.value))}
-                  aria-label="대사 낭독 속도"
+                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대사 낭독 속도")}
                   className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2 text-[0.66rem] text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   {READ_ALOUD_RATES.map((rate) => (
@@ -1308,20 +1276,19 @@ export function StudioDialogueBatchPanel({
                 </select>
               </label>
               <label className="min-w-0 text-[0.6rem] font-medium text-fg-3">
-                시스템 음성
-                <select
+                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "시스템 음성")}<select
                   value={selectedVoice ? dialogueSpeechVoiceKey(selectedVoice) : ""}
                   onChange={(event) => setSelectedVoiceKey(event.target.value)}
-                  aria-label="대사 낭독 시스템 음성"
+                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대사 낭독 시스템 음성")}
                   disabled={selectableVoices.length === 0}
                   className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2 text-[0.66rem] text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   {selectableVoices.length === 0 ? (
-                    <option value="">기기 내 음성 없음</option>
+                    <option value="">{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "기기 내 음성 없음")}</option>
                   ) : (
                     selectableVoices.map((voice) => (
                       <option key={dialogueSpeechVoiceKey(voice)} value={dialogueSpeechVoiceKey(voice)}>
-                        {voice.name} · {voice.lang} · {isConfirmedLocalDialogueVoice(voice) ? "기기 내" : "온라인 가능"}
+                        {voice.name} · {voice.lang} · {isConfirmedLocalDialogueVoice(voice) ? translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "기기 내") : translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "온라인 가능")}
                       </option>
                     ))
                   )}
@@ -1338,18 +1305,17 @@ export function StudioDialogueBatchPanel({
                     readAloudController.stop();
                     setAllowOnlineVoices(event.target.checked);
                   }}
-                  aria-label="온라인 시스템 음성 허용"
+                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "온라인 시스템 음성 허용")}
                   className="mt-0.5 size-4 shrink-0 accent-[var(--color-accent)]"
                 />
                 <span>
-                  <span className="font-semibold">온라인 음성 허용</span>
+                  <span className="font-semibold">{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "온라인 음성 허용")}</span>
                   <span className="mt-0.5 block text-fg-3">
-                    선택하면 대사가 운영체제·브라우저의 음성 서비스로 전송될 수 있어요. ToonSpectrum 서버와 AI에는 보내지 않습니다.
-                  </span>
+                    {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "선택하면 대사가 운영체제·브라우저의 음성 서비스로 전송될 수 있어요. ToonSpectrum 서버와 AI에는 보내지 않습니다.")}</span>
                 </span>
               </label>
             ) : (
-              <p className="text-[0.6rem] leading-snug text-good">확인된 기기 내 음성만 사용합니다.</p>
+              <p className="text-[0.6rem] leading-snug text-good">{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "확인된 기기 내 음성만 사용합니다.")}</p>
             )}
 
             <p
@@ -1375,30 +1341,25 @@ export function StudioDialogueBatchPanel({
             type="text"
             value={listQuery}
             onChange={(e) => setListQuery(e.target.value)}
-            placeholder="목록에서 검색..."
-            aria-label="대사 목록 검색"
+            placeholder={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "목록에서 검색...")}
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대사 목록 검색")}
             className={cx(inputClass, "pl-6")}
           />
         </div>
         {items.length === 0 ? (
           <p className="rounded-lg border border-dashed border-line px-2 py-4 text-center text-[0.66rem] leading-relaxed text-fg-4">
-            아직 말풍선·텍스트가 없어요. 상단 도구의 말풍선 메뉴에서 대사를 넣으면 여기에서 한꺼번에
-            고칠 수 있어요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "아직 말풍선·텍스트가 없어요. 상단 도구의 말풍선 메뉴에서 대사를 넣으면 여기에서 한꺼번에 고칠 수 있어요.")}</p>
         ) : shown.length === 0 ? (
           <p className="rounded-lg border border-dashed border-line px-2 py-4 text-center text-[0.66rem] leading-relaxed text-fg-4">
-            검색과 일치하는 대사가 없어요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "검색과 일치하는 대사가 없어요.")}</p>
         ) : (
           <div className="space-y-2.5">
             {grouped.map((group) => (
-              <section key={group.pageId} aria-label={`${group.pageIndex + 1}페이지 대사`}>
+              <section key={group.pageId} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "{v0}페이지 대사"), { v0: String(group.pageIndex + 1) })}>
                 <p className="mb-1 flex items-center gap-1 text-[0.62rem] font-semibold uppercase tracking-wide text-fg-3">
-                  {group.pageIndex + 1}페이지
-                  {group.pageId === currentPageId && (
+                  {group.pageIndex + 1}{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "페이지")}{group.pageId === currentPageId && (
                     <span className="rounded-full border border-accent/40 bg-accent-soft/40 px-1.5 text-[0.55rem] font-medium normal-case text-accent">
-                      현재
-                    </span>
+                      {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "현재")}</span>
                   )}
                 </p>
                 <ul className="space-y-1.5">
@@ -1422,27 +1383,25 @@ export function StudioDialogueBatchPanel({
                           type="button"
                           onClick={() => focusDialogueEditor(item)}
                           className="min-h-11 min-w-0 flex-1 truncate rounded-md px-1 text-left text-[0.66rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                          aria-label={`${item.pageIndex + 1}페이지 ${dialogueItemTypeLabel(item)} "${dialogueExcerpt(item.text, 16)}" 선택하고 대사 편집`}
-                          title={item.locked ? "잠금을 풀면 편집할 수 있어요" : "선택하고 바로 대사 편집"}
+                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "{v0}페이지 {v1} \"{v2}\" 선택하고 대사 편집"), { v0: String(item.pageIndex + 1), v1: String(dialogueItemTypeLabel(item)), v2: String(dialogueExcerpt(item.text, 16)) })}
+                          title={item.locked ? translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "잠금을 풀면 편집할 수 있어요") : translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "선택하고 바로 대사 편집")}
                         >
                           {dialogueItemTypeLabel(item)}
                         </button>
                         {item.locked && (
                           <span className="shrink-0 rounded border border-line px-1 text-[0.55rem] text-fg-4">
-                            잠김
-                          </span>
+                            {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "잠김")}</span>
                         )}
                         {item.hidden && (
                           <span className="shrink-0 rounded border border-line px-1 text-[0.55rem] text-fg-4">
-                            숨김
-                          </span>
+                            {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "숨김")}</span>
                         )}
                         {speechAdapter.supported && (
                           <button
                             type="button"
                             onClick={() => playSingleDialogue(item)}
                             disabled={!selectedVoice || !(drafts[item.id] ?? item.text).trim()}
-                            aria-label={`${item.pageIndex + 1}페이지 ${dialogueItemTypeLabel(item)} 대사만 낭독하고 캔버스에서 선택`}
+                            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "{v0}페이지 {v1} 대사만 낭독하고 캔버스에서 선택"), { v0: String(item.pageIndex + 1), v1: String(dialogueItemTypeLabel(item)) })}
                             aria-pressed={isActive && playback.currentItemId === item.id}
                             aria-busy={
                               playback.status === "playing" && playback.currentItemId === item.id
@@ -1464,7 +1423,7 @@ export function StudioDialogueBatchPanel({
                               setStructureMenuId((current) => current === item.id ? null : item.id);
                               captureTextareaSelection(item.id);
                             }}
-                            aria-label={`${item.pageIndex + 1}페이지 ${dialogueItemTypeLabel(item)} "${dialogueExcerpt(item.text, 16)}" 구조 작업`}
+                            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "{v0}페이지 {v1} \"{v2}\" 구조 작업"), { v0: String(item.pageIndex + 1), v1: String(dialogueItemTypeLabel(item)), v2: String(dialogueExcerpt(item.text, 16)) })}
                             aria-expanded={structureMenuId === item.id}
                             className={cx(
                               "grid size-11 shrink-0 place-items-center rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
@@ -1523,7 +1482,7 @@ export function StudioDialogueBatchPanel({
                         }}
                         disabled={item.locked}
                         rows={Math.min(4, Math.max(1, (drafts[item.id] ?? item.text).split("\n").length))}
-                        aria-label={`${item.pageIndex + 1}페이지 ${dialogueItemTypeLabel(item)} 대사 수정`}
+                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "{v0}페이지 {v1} 대사 수정"), { v0: String(item.pageIndex + 1), v1: String(dialogueItemTypeLabel(item)) })}
                         className={cx(
                           inputClass,
                           "resize-y py-1 leading-snug disabled:cursor-not-allowed disabled:opacity-50"
@@ -1538,7 +1497,7 @@ export function StudioDialogueBatchPanel({
                         return (
                           <p
                             className="mt-1 rounded-md border border-line/50 bg-card/40 px-2 py-1 text-[0.62rem] leading-snug text-fg-3"
-                            aria-label={`${item.pageIndex + 1}페이지 루비 미리보기`}
+                            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "{v0}페이지 루비 미리보기"), { v0: String(item.pageIndex + 1) })}
                           >
                             {preview}
                           </p>
@@ -1547,7 +1506,7 @@ export function StudioDialogueBatchPanel({
                       {structureMenuId === item.id ? (
                         <div
                           role="group"
-                          aria-label={`${item.pageIndex + 1}페이지 대사 구조 편집`}
+                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "{v0}페이지 대사 구조 편집"), { v0: String(item.pageIndex + 1) })}
                           className="mt-1.5 rounded-lg border border-line bg-panel p-1.5"
                         >
                           <div className="grid grid-cols-2 gap-1">
@@ -1557,10 +1516,9 @@ export function StudioDialogueBatchPanel({
                                 onPointerDown={(event) => event.preventDefault()}
                                 onClick={() => splitAtCaret(item)}
                                 className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                                title="대사 입력 커서가 있는 위치에서 둘로 나눕니다"
+                                title={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대사 입력 커서가 있는 위치에서 둘로 나눕니다")}
                               >
-                                <Scissors size={13} aria-hidden /> 커서에서 나누기
-                              </button>
+                                <Scissors size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "커서에서 나누기")}</button>
                             ) : null}
                             {onMergeWithNext ? (
                               <button
@@ -1568,20 +1526,18 @@ export function StudioDialogueBatchPanel({
                                 onClick={() => mergeWithNext(item)}
                                 disabled={!nextDialogueById.get(item.id) || nextDialogueById.get(item.id)?.locked}
                                 className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
-                                title="같은 페이지의 다음 대사를 현재 대사 뒤에 합칩니다"
+                                title={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "같은 페이지의 다음 대사를 현재 대사 뒤에 합칩니다")}
                               >
-                                <Combine size={13} aria-hidden /> 다음과 합치기
-                              </button>
+                                <Combine size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "다음과 합치기")}</button>
                             ) : null}
                             {onConvertTextToBubble && item.elType === "text" ? (
                               <button
                                 type="button"
                                 onClick={() => convertTextToBubble(item)}
                                 className="col-span-2 flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                                title="자유 텍스트를 말풍선으로 바꿉니다. 한 번의 실행 취소로 되돌릴 수 있어요."
+                                title={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "자유 텍스트를 말풍선으로 바꿉니다. 한 번의 실행 취소로 되돌릴 수 있어요.")}
                               >
-                                <MessageCircle size={13} aria-hidden /> 텍스트 → 말풍선
-                              </button>
+                                <MessageCircle size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "텍스트 → 말풍선")}</button>
                             ) : null}
                           </div>
                           {(onApplyDialogueRuby || onClearDialogueRuby) &&
@@ -1590,8 +1546,7 @@ export function StudioDialogueBatchPanel({
                               {onApplyDialogueRuby ? (
                                 <>
                                   <label className="col-span-2 text-[0.58rem] font-medium text-fg-3">
-                                    루비 읽기
-                                    <input
+                                    {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "루비 읽기")}<input
                                       type="text"
                                       value={rubyReadingByItem[item.id] ?? ""}
                                       onChange={(event) =>
@@ -1601,9 +1556,9 @@ export function StudioDialogueBatchPanel({
                                         }))
                                       }
                                       onPointerDown={(event) => event.stopPropagation()}
-                                      placeholder="예: 한자"
+                                      placeholder={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "예: 한자")}
                                       maxLength={80}
-                                      aria-label={`${item.pageIndex + 1}페이지 선택 구간 루비 읽기`}
+                                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "{v0}페이지 선택 구간 루비 읽기"), { v0: String(item.pageIndex + 1) })}
                                       className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2 text-[0.66rem] text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                                     />
                                   </label>
@@ -1613,10 +1568,9 @@ export function StudioDialogueBatchPanel({
                                     onClick={() => applyRubyAtSelection(item)}
                                     disabled={!(rubyReadingByItem[item.id] ?? "").trim()}
                                     className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-2 text-[0.64rem] font-semibold text-on-accent hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
-                                    title="선택한 글자에 루비(후리가나)를 답니다"
+                                    title={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "선택한 글자에 루비(후리가나)를 답니다")}
                                   >
-                                    루비 달기
-                                  </button>
+                                    {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "루비 달기")}</button>
                                 </>
                               ) : null}
                               {onClearDialogueRuby ? (
@@ -1628,18 +1582,16 @@ export function StudioDialogueBatchPanel({
                                     "flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
                                     !onApplyDialogueRuby && "col-span-2"
                                   )}
-                                  title="선택 구간과 겹치는 루비를 지웁니다"
+                                  title={translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "선택 구간과 겹치는 루비를 지웁니다")}
                                 >
-                                  선택 루비 지우기
-                                </button>
+                                  {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "선택 루비 지우기")}</button>
                               ) : null}
                             </div>
                           ) : null}
                           {onTransferElement && pages.length > 1 ? (
                             <div className="mt-1.5 grid grid-cols-2 gap-1 border-t border-line/60 pt-1.5">
                               <label className="col-span-2 text-[0.58rem] font-medium text-fg-3">
-                                대상 페이지
-                                <select
+                                {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "대상 페이지")}<select
                                   value={
                                     transferTargetByItem[item.id] ??
                                     pages.find((page) => page.id !== item.pageId)?.id ??
@@ -1649,11 +1601,11 @@ export function StudioDialogueBatchPanel({
                                     ...current,
                                     [item.id]: event.target.value,
                                   }))}
-                                  aria-label={`${item.pageIndex + 1}페이지 대사 이동 대상`}
+                                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "{v0}페이지 대사 이동 대상"), { v0: String(item.pageIndex + 1) })}
                                   className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2 text-[0.66rem] text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                                 >
                                   {pages.map((page, pageIndex) => page.id === item.pageId ? null : (
-                                    <option key={page.id} value={page.id}>{pageIndex + 1}페이지</option>
+                                    <option key={page.id} value={page.id}>{pageIndex + 1}{translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "페이지")}</option>
                                   ))}
                                 </select>
                               </label>
@@ -1662,15 +1614,13 @@ export function StudioDialogueBatchPanel({
                                 onClick={() => transferElement(item, "move")}
                                 className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-2 text-[0.64rem] font-semibold text-on-accent hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                               >
-                                <ArrowRight size={13} aria-hidden /> 이동
-                              </button>
+                                <ArrowRight size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "이동")}</button>
                               <button
                                 type="button"
                                 onClick={() => transferElement(item, "copy")}
                                 className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                               >
-                                <Copy size={13} aria-hidden /> 복사
-                              </button>
+                                <Copy size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "복사")}</button>
                             </div>
                           ) : null}
                         </div>
@@ -1686,8 +1636,7 @@ export function StudioDialogueBatchPanel({
       </div>
 
       <p className="border-t border-line/60 px-3 py-1.5 text-[0.58rem] leading-snug text-fg-4">
-        ⌘/Ctrl+Enter 저장 후 다음 · Shift와 함께 누르면 이전 · ⋯에서 나누기·합치기·페이지 이동을 할 수 있어요.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.StudioDialogueBatchPanel", "ko", "⌘/Ctrl+Enter 저장 후 다음 · Shift와 함께 누르면 이전 · ⋯에서 나누기·합치기·페이지 이동을 할 수 있어요.")}</p>
     </section>
   );
 }

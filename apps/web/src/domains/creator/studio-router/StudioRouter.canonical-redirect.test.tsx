@@ -51,8 +51,8 @@ vi.mock("../studio-legacy-editor-adapter", async () => {
   };
 });
 
-vi.mock("../StudioUploadPublish", () => ({
-  StudioUploadPublish: ({ workId }: { readonly workId: string | null }) => (
+vi.mock("../StudioPublishingCommandCenter", () => ({
+  StudioPublishingCommandCenter: ({ workId }: { readonly workId: string | null }) => (
     <div data-testid="publish-surface" data-work-id={workId ?? ""} />
   ),
 }));

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Grid, SunMedium, Sparkles } from "lucide-react";
 import React, { useState } from "react";
 
@@ -57,10 +61,10 @@ export function StudioBg3dHalftoneScreentonePanel({
       <div className="flex items-center justify-between border-b border-line pb-2">
         <div className="flex items-center gap-1.5 font-bold text-fg">
           <Grid className="size-4 text-accent" />
-          <span>3D 스크린톤 & 망점 셰이더</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dHalftoneScreentonePanel", "ko", "3D 스크린톤 & 망점 셰이더")}</span>
         </div>
         <span className="rounded bg-accent/15 px-1.5 py-0.5 font-mono text-[0.68rem] text-accent font-semibold">
-          {config.frequencyLpi}선 / {config.angleDegrees}°
+          {config.frequencyLpi}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dHalftoneScreentonePanel", "ko", "선 / ")}{config.angleDegrees}°
         </span>
       </div>
 
@@ -71,11 +75,9 @@ export function StudioBg3dHalftoneScreentonePanel({
             key={preset.id}
             type="button"
             onClick={() => handleSelectPreset(preset)}
-            className={`flex flex-col items-start rounded-lg border p-2 text-left transition-all ${
-              selectedPresetId === preset.id
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dHalftoneScreentonePanel", "en", "flex flex-col items-start rounded-lg border p-2 text-left transition-all {v0}"), { v0: String(selectedPresetId === preset.id
                 ? "border-accent bg-accent/10 font-bold text-accent shadow-sm"
-                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
-            }`}
+                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
           >
             <span className="text-[0.72rem] leading-tight">{preset.name}</span>
             <span className="mt-0.5 text-[0.62rem] text-fg-3 line-clamp-1">{preset.description}</span>
@@ -88,7 +90,7 @@ export function StudioBg3dHalftoneScreentonePanel({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 font-bold text-fg">
             <SunMedium className="size-3.5 text-accent" />
-            <span className="text-[0.7rem]">조명 색온도 (Color Temperature)</span>
+            <span className="text-[0.7rem]">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dHalftoneScreentonePanel", "ko", "조명 색온도 (Color Temperature)")}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div
@@ -109,17 +111,17 @@ export function StudioBg3dHalftoneScreentonePanel({
           className="h-1.5 w-full cursor-pointer accent-accent"
         />
         <div className="flex justify-between text-[0.62rem] text-fg-3">
-          <span>촛불 (1800K)</span>
-          <span>노을 (3200K)</span>
-          <span>정오 태양 (5500K)</span>
-          <span>푸른 달빛 (8500K)</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dHalftoneScreentonePanel", "ko", "촛불 (1800K)")}</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dHalftoneScreentonePanel", "ko", "노을 (3200K)")}</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dHalftoneScreentonePanel", "ko", "정오 태양 (5500K)")}</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dHalftoneScreentonePanel", "ko", "푸른 달빛 (8500K)")}</span>
         </div>
       </div>
 
       {/* Manual Fine Tuning */}
       <div className="flex flex-col gap-2 rounded-lg border border-line bg-card p-2.5">
         <div className="flex items-center justify-between">
-          <span className="text-[0.68rem] text-fg-2">망점 선수 (LPI Density):</span>
+          <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dHalftoneScreentonePanel", "ko", "망점 선수 (LPI Density):")}</span>
           <div className="flex items-center gap-2">
             <input
               type="range"
@@ -139,7 +141,7 @@ export function StudioBg3dHalftoneScreentonePanel({
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="text-[0.68rem] text-fg-2">스크린톤 각도:</span>
+          <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dHalftoneScreentonePanel", "ko", "스크린톤 각도:")}</span>
           <div className="flex items-center gap-2">
             <input
               type="range"
@@ -165,7 +167,7 @@ export function StudioBg3dHalftoneScreentonePanel({
         className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90"
       >
         <Sparkles className="size-3.5" />
-        <span>3D 장면에 스크린톤 셰이더 적용</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dHalftoneScreentonePanel", "ko", "3D 장면에 스크린톤 셰이더 적용")}</span>
       </button>
     </div>
   );

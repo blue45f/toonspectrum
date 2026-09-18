@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { PaintBucket } from "lucide-react";
 import { Suspense } from "react";
 
@@ -198,7 +201,7 @@ export function StudioInspectorDrawingSection({
             >
               <Suspense
                 fallback={
-                  <StudioPanelLoading label="서브 도구와 도구 속성을 여는 중..." />
+                  <StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawingSection", "ko", "서브 도구와 도구 속성을 여는 중...")} />
                 }
               >
                 <StudioDrawingPaletteStack
@@ -212,9 +215,9 @@ export function StudioInspectorDrawingSection({
                     ) : undefined
                   }
                   mobilePrimaryPaletteId={
-                    isMobile ? "tool-properties" : undefined
+                    isMobile ? translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawingSection", "en", "tool-properties") : undefined
                   }
-                  defaultPresentation={isMobile ? "full" : "icon-popup"}
+                  defaultPresentation={isMobile ? translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawingSection", "en", "full") : translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawingSection", "en", "icon-popup")}
                   onLayoutChange={changeDrawingPaletteLayout}
                   onDraggingChange={setDrawingPaletteDragging}
                   subTools={
@@ -292,8 +295,7 @@ export function StudioInspectorDrawingSection({
               {drawMode === "shape" && (
                 <div className="space-y-1.5">
                   <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
-                    도형 종류
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawingSection", "ko", "도형 종류")}</p>
                   <Suspense fallback={<div className="h-20 rounded-xl bg-raised/40" aria-hidden />}>
                     <StudioShapePickerGrid
                       activeKind={drawShape}
@@ -306,8 +308,8 @@ export function StudioInspectorDrawingSection({
                     type="button"
                     aria-pressed={shapeFill}
                     disabled={drawShape === "line" || drawShape === "arrow"}
-                    title="채우기"
-                    aria-label="도형 채우기"
+                    title={translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawingSection", "ko", "채우기")}
+                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawingSection", "ko", "도형 채우기")}
                     onClick={() => setShapeFill((v) => !v)}
                     className={cn(
                       "grid size-11 place-items-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:size-9",
@@ -349,7 +351,7 @@ export function StudioInspectorDrawingSection({
                 {drawMode !== "pixel" ? (
                   <div className="space-y-1.5">
                     <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                      <span>크기</span>
+                      <span>{translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawingSection", "ko", "크기")}</span>
                       <span className="flex items-center gap-1.5">
                         <input
                           type="range"
@@ -375,7 +377,7 @@ export function StudioInspectorDrawingSection({
 
                 {/* 불투명도 슬라이더 — 요소 인스펙터와 같은 명칭을 쓴다(V5 §15 "모드가 달라도 동일 명칭"). */}
                 <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                  <span>불투명도</span>
+                  <span>{translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawingSection", "ko", "불투명도")}</span>
                   <span className="flex items-center gap-1.5">
                     <input
                       type="range"
@@ -453,7 +455,7 @@ export function StudioInspectorDrawingSection({
                 )}
 
                 {drawMode !== "pixel" ? (
-                  <StudioInspectorSection sectionId="tool.line-correction" loadingLabel="선 보정을 여는 중...">
+                  <StudioInspectorSection sectionId="tool.line-correction" loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawingSection", "ko", "선 보정을 여는 중...")}>
                     <div className="space-y-2">
                       <StudioLineCorrectionControls
                         stabilizer={stabilizer}
@@ -481,7 +483,7 @@ export function StudioInspectorDrawingSection({
                 ) : null}
 
                 {drawMode !== "shape" && drawMode !== "pixel" ? (
-                  <StudioInspectorSection sectionId="tool.brush-studio" loadingLabel="현재 브러시 편집을 여는 중...">
+                  <StudioInspectorSection sectionId="tool.brush-studio" loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawingSection", "ko", "현재 브러시 편집을 여는 중...")}>
                   <Suspense fallback={<div className="h-40 animate-pulse rounded-xl bg-raised/35 motion-reduce:animate-none" aria-hidden />}>
                     <StudioBrushStudio
                       brushId={brush}
@@ -517,7 +519,7 @@ export function StudioInspectorDrawingSection({
                   </Suspense>
                   </StudioInspectorSection>
                 ) : null}
-                <StudioInspectorSection sectionId="tool.brush-engines" loadingLabel="브러시 엔진을 여는 중...">
+                <StudioInspectorSection sectionId="tool.brush-engines" loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawingSection", "ko", "브러시 엔진을 여는 중...")}>
                 <StudioHokusaiNaturalMediaInspectorMount
                   visible={drawMode !== "shape" && drawMode !== "pixel"}
                   selected={selected} currentColor={color}
@@ -534,7 +536,7 @@ export function StudioInspectorDrawingSection({
                   onReplace={replaceDrawWithHokusaiNaturalMedia}
                 />
                 {drawMode !== "shape" && drawMode !== "pixel" ? (
-                  <StudioProceduralArtisticBrushInspectorSection key={`${currentPageId}:${masterEditMode ? "master" : "page"}`} currentColor={color} canvasHeight={canvasH} pageId={currentPageId} masterEditMode={masterEditMode} disabled={collaborationDocumentLocked || activeSurfaceReviewLocked} disabledReason={collaborationDocumentLocked ? "협업 문서 잠금을 해제한 뒤 절차적 질감을 만들 수 있어요." : activeSurfaceReviewLocked ? "표면 리뷰를 마친 뒤 절차적 질감을 만들 수 있어요." : null} onInsert={addProceduralArtisticBrushRaster} />
+                  <StudioProceduralArtisticBrushInspectorSection key={`${currentPageId}:${masterEditMode ? "master" : "page"}`} currentColor={color} canvasHeight={canvasH} pageId={currentPageId} masterEditMode={masterEditMode} disabled={collaborationDocumentLocked || activeSurfaceReviewLocked} disabledReason={collaborationDocumentLocked ? translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawingSection", "ko", "협업 문서 잠금을 해제한 뒤 절차적 질감을 만들 수 있어요.") : activeSurfaceReviewLocked ? translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawingSection", "ko", "표면 리뷰를 마친 뒤 절차적 질감을 만들 수 있어요.") : null} onInsert={addProceduralArtisticBrushRaster} />
                 ) : null}
                 </StudioInspectorSection>
                 {/* 대칭 그리기 자 (Symmetry Ruler) — RAW 픽셀 입력에는 적용하지 않는다. */}

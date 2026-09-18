@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   CheckCircle2,
   ClipboardCheck,
   LayoutGrid,
@@ -69,13 +73,13 @@ export const StudioToolBeltCreateModeUtilityButtons = memo(function StudioToolBe
       <StudioToolBeltHintTarget
         hint={hints.timelapse}
         disabled={masterEditMode}
-        unavailableReason={masterEditMode ? "마스터 편집 중에는 타임랩스를 녹화할 수 없습니다." : undefined}
+        unavailableReason={masterEditMode ? translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeUtilityButtons", "ko", "마스터 편집 중에는 타임랩스를 녹화할 수 없습니다.") : undefined}
       >
         <button
           type="button"
           onClick={() => setTimelapseOpen(true)}
           disabled={masterEditMode}
-          aria-label="타임랩스 녹화"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeUtilityButtons", "ko", "타임랩스 녹화")}
           className={cn(toolBtn(false), iconToolBtnTouch, "disabled:opacity-40")}
         >
           <Video
@@ -90,7 +94,7 @@ export const StudioToolBeltCreateModeUtilityButtons = memo(function StudioToolBe
         <button
           type="button"
           onClick={() => setStoryboardGridOpen(true)}
-          aria-label="스토리보드 그리드 보기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeUtilityButtons", "ko", "스토리보드 그리드 보기")}
           className={cn(toolBtn(false), iconToolBtnTouch)}
         >
           <LayoutGrid
@@ -112,7 +116,7 @@ export const StudioToolBeltCreateModeUtilityButtons = memo(function StudioToolBe
           type="button"
           onClick={() => setPageReviewOpen(true)}
           aria-pressed={pageReviewOpen}
-          aria-label={pageEditLocked ? "페이지 검토, 현재 편집 잠금" : "페이지 검토와 편집 잠금"}
+          aria-label={pageEditLocked ? translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeUtilityButtons", "ko", "페이지 검토, 현재 편집 잠금") : translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeUtilityButtons", "ko", "페이지 검토와 편집 잠금")}
           className={cn(toolBtn(pageReviewOpen || pageEditLocked), iconToolBtnTouch)}
         >
           <ClipboardCheck
@@ -154,7 +158,7 @@ export const StudioToolBeltCreateModeUtilityButtons = memo(function StudioToolBe
           aria-expanded={commentsOpen}
           aria-haspopup="dialog"
           aria-controls="studio-comments-review-dialog"
-          aria-label={`문서 댓글${openStudioCommentCount > 0 ? `, 열림 ${openStudioCommentCount}개` : ""}`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeUtilityButtons", "ko", "문서 댓글{v0}"), { v0: String(openStudioCommentCount > 0 ? `, 열림 ${openStudioCommentCount}개` : "") })}
           className={cn(
             toolBtn(commentsOpen),
             iconToolBtnTouch,
@@ -186,7 +190,7 @@ export const StudioToolBeltCreateModeUtilityButtons = memo(function StudioToolBe
             setTeamPanelOpen((prev) => !prev);
           }}
           aria-pressed={teamPanelOpen}
-          aria-label="팀 작업 공간"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeUtilityButtons", "ko", "팀 작업 공간")}
           className={cn(
             toolBtn(teamPanelOpen),
             iconToolBtnTouch,
@@ -199,7 +203,7 @@ export const StudioToolBeltCreateModeUtilityButtons = memo(function StudioToolBe
             aria-hidden
             className={studioToolIconClass({ tone: "accent" })}
           />
-          <span className="hidden sm:inline font-semibold text-[0.7rem] text-accent">팀 &amp; 실시간 공유</span>
+          <span className="hidden sm:inline font-semibold text-[0.7rem] text-accent">{translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeUtilityButtons", "ko", "팀 &amp; 실시간 공유")}</span>
           <span className="relative flex size-2 shrink-0">
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-75" />
             <span className="relative inline-flex size-2 rounded-full bg-accent" />
@@ -211,7 +215,7 @@ export const StudioToolBeltCreateModeUtilityButtons = memo(function StudioToolBe
           type="button"
           onClick={() => setContinuityOpen(true)}
           aria-pressed={continuityOpen}
-          aria-label="마감·품질 검사"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeUtilityButtons", "ko", "마감·품질 검사")}
           className={cn(toolBtn(continuityOpen), iconToolBtnTouch)}
         >
           <CheckCircle2
@@ -226,7 +230,7 @@ export const StudioToolBeltCreateModeUtilityButtons = memo(function StudioToolBe
         <button
           type="button"
           onClick={() => setScrollPreviewOpen(true)}
-          aria-label="세로 스크롤 미리보기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeUtilityButtons", "ko", "세로 스크롤 미리보기")}
           className={cn(toolBtn(false), iconToolBtnTouch)}
         >
           <Smartphone
@@ -240,7 +244,7 @@ export const StudioToolBeltCreateModeUtilityButtons = memo(function StudioToolBe
       <StudioToolBeltHintTarget
         hint={hints.timeline}
         disabled={masterEditMode}
-        unavailableReason={masterEditMode ? "마스터 편집 중에는 타임라인을 열 수 없습니다." : undefined}
+        unavailableReason={masterEditMode ? translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeUtilityButtons", "ko", "마스터 편집 중에는 타임라인을 열 수 없습니다.") : undefined}
       >
         <button
           type="button"
@@ -249,7 +253,7 @@ export const StudioToolBeltCreateModeUtilityButtons = memo(function StudioToolBe
           }}
           disabled={masterEditMode}
           aria-pressed={timelineOpen}
-          aria-label="다중 레이어 타임라인"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioToolBeltCreateModeUtilityButtons", "ko", "다중 레이어 타임라인")}
           className={cn(toolBtn(timelineOpen), iconToolBtnTouch, "disabled:opacity-40")}
         >
           <GanttChartSquare

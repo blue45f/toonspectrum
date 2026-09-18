@@ -9,6 +9,7 @@ import {
 } from "./verify-production-database-capabilities.mjs";
 import {
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
+  buildCreatorRoleWorkspaceRuntimeAclViolationSql,
   buildCreatorMarketplaceRuntimeAclViolationSql,
   buildMessagingRuntimeAclViolationSql,
   buildMigrationLedgerRuntimeAclViolationSql,
@@ -16,6 +17,8 @@ import {
   buildRuntimeCutoverLedgerAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
   buildStudioProductionRuntimeAclViolationSql,
+  buildStudioProjectGraphRuntimeAclViolationSql,
+  buildTrafficAnalyticsRuntimeAclViolationSql,
 } from "./run-production-database-migrations.mjs";
 
 test("loads the runtime health readiness relation and cutover contract", () => {
@@ -38,6 +41,8 @@ test("loads the runtime health readiness relation and cutover contract", () => {
   expect(contract.relationNames).toContain("personal_cloud_connection");
   expect(contract.relationNames).toContain("member_message_thread");
   expect(contract.relationNames).toContain("member_message_report");
+  expect(contract.relationNames).toContain("traffic_share_event");
+  expect(contract.relationNames).toContain("creator_role_workspace_preference");
   expect(contract.migrationIds).toEqual([
     "0017_creator_work_live_lock_revision",
     "0025_auth_lifecycle_contract",
@@ -50,6 +55,9 @@ test("loads the runtime health readiness relation and cutover contract", () => {
     "0034_creator_marketplace_package_moderation",
     "0051_personal_cloud_connections",
     "0059_member_messaging",
+    "0065_creator_series_lifecycle",
+    "0066_share_analytics_events",
+    "0067_creator_role_workspace_personalization",
   ]);
 });
 
@@ -59,10 +67,17 @@ test("generated verification covers runtime capabilities and exact migration che
     buildCreatorAssetObjectStorageRuntimeAclViolationSql("webdex_runtime"),
   );
   expect(sql).toContain(
+    buildTrafficAnalyticsRuntimeAclViolationSql("webdex_runtime"),
+  );
+  expect(sql).toContain(
+    buildCreatorRoleWorkspaceRuntimeAclViolationSql("webdex_runtime"),
+  );
+  expect(sql).toContain(
     buildCreatorMarketplaceRuntimeAclViolationSql("webdex_runtime"),
   );
   expect(sql).toContain(
     buildStudioProductionRuntimeAclViolationSql("webdex_runtime"),
+    buildStudioProjectGraphRuntimeAclViolationSql("webdex_runtime"),
   );
   expect(sql).toContain(
     buildPersonalCloudRuntimeAclViolationSql("webdex_runtime"),
@@ -133,6 +148,8 @@ test("generated verification covers runtime capabilities and exact migration che
     "runtime and migration database roles are not safely separated",
     "runtime database role owns the migration ledger",
     "runtime role lacks the exact creator object-storage privileges",
+    "runtime role lacks the exact traffic analytics privileges",
+    "runtime role lacks the exact creator role workspace privileges",
     "runtime role lacks the exact creator marketplace privileges",
     "runtime role lacks the exact Studio production privileges",
     "runtime role lacks the exact cutover-readiness ledger privileges",

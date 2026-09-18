@@ -76,6 +76,19 @@ describe("Studio AI generated asset fail-closed boundary", () => {
     expect(viewportSource).not.toContain("setAiNoticeOpen={setAiNoticeOpen}");
   });
 
+  it("keeps BYOK generation and wires the managed server fallback into the same product action", () => {
+    const value = functionSource("executeGenerateAsset");
+    expectInOrder(value, [
+      "const useByok = isStudioAiConfigured(aiSettings)",
+      "if (useByok)",
+      "await generateBackgroundImage",
+      'await import("@/infrastructure/creator-client")',
+      "await generateAsset",
+      "saveStudioAssetMutation",
+      "addRenderedImage",
+    ]);
+  });
+
   it("captures request provenance before image awaits and never derives it after completion", () => {
     for (const functionName of [
       "executeGenerateAsset",

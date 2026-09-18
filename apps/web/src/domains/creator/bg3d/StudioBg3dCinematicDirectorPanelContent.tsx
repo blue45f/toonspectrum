@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Activity,
   BrainCircuit,
   Camera,
@@ -263,9 +267,9 @@ export function StudioBg3dCinematicDirectorPanel({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2">
         <div className="flex items-center gap-1.5 font-bold text-fg">
           <Clapperboard className="size-4 text-accent" />
-          <span>시네마틱 카메라 & 컷 디렉터</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "시네마틱 카메라 & 컷 디렉터")}</span>
           <span className="rounded bg-raised px-1.5 py-0.5 text-[0.58rem] font-semibold text-fg-3">
-            {productionMode ? "장면 연동" : "리허설 덱"}
+            {productionMode ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "장면 연동") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "리허설 덱")}
           </span>
         </div>
         <button
@@ -275,21 +279,20 @@ export function StudioBg3dCinematicDirectorPanel({
           className="flex min-h-8 items-center gap-1 rounded bg-accent/15 px-2 py-1 text-[0.68rem] font-bold text-accent transition-all hover:bg-accent/25 disabled:opacity-45"
         >
           <Save className="size-3" />
-          <span>{productionMode ? "현재 장면을 컷으로 저장" : "현재 설정으로 컷 추가"}</span>
+          <span>{productionMode ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "현재 장면을 컷으로 저장") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "현재 설정으로 컷 추가")}</span>
         </button>
       </div>
 
-      <section className="grid gap-2 rounded-lg border border-line bg-card p-2.5" aria-label="카메라 전환 설정">
+      <section className="grid gap-2 rounded-lg border border-line bg-card p-2.5" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "카메라 전환 설정")}>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[0.68rem] font-bold text-fg-2">카메라 전환</span>
+          <span className="text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "카메라 전환")}</span>
           <span className="numeral text-[0.6rem] text-fg-3">
-            {productionMode ? `${continuityShots.length}컷` : `${localPlaybackPlan.totalSeconds.toFixed(1)}초 / ${continuityShots.length}컷`}
+            {productionMode ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "{v0}컷"), { v0: String(continuityShots.length) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "{v0}초 / {v1}컷"), { v0: String(localPlaybackPlan.totalSeconds.toFixed(1)), v1: String(continuityShots.length) })}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <label className="text-[0.62rem] font-semibold text-fg-3">
-            이동 시간
-            <input
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "이동 시간")}<input
               type="number"
               min="0"
               max="8"
@@ -301,8 +304,7 @@ export function StudioBg3dCinematicDirectorPanel({
             />
           </label>
           <label className="text-[0.62rem] font-semibold text-fg-3">
-            컷 유지
-            <input
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "컷 유지")}<input
               type="number"
               min="0.1"
               max="20"
@@ -314,8 +316,7 @@ export function StudioBg3dCinematicDirectorPanel({
             />
           </label>
           <label className="text-[0.62rem] font-semibold text-fg-3">
-            전환 곡선
-            <select
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "전환 곡선")}<select
               value={easing}
               disabled={disabled}
               onChange={(event) => setEasing(event.target.value as WebtoonShotTransitionEasing)}
@@ -327,8 +328,7 @@ export function StudioBg3dCinematicDirectorPanel({
             </select>
           </label>
           <label className="text-[0.62rem] font-semibold text-fg-3">
-            컷 비율
-            <select
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "컷 비율")}<select
               value={panelAspect}
               disabled={disabled}
               onChange={(event) => setPanelAspect(event.target.value as WebtoonPanelAspect)}
@@ -342,8 +342,8 @@ export function StudioBg3dCinematicDirectorPanel({
         </div>
       </section>
 
-      <section className="flex flex-col gap-1.5" aria-label="웹툰 연출 앵글 프리셋">
-        <span className="text-[0.68rem] font-medium text-fg-3">웹툰 연출 앵글 프리셋</span>
+      <section className="flex flex-col gap-1.5" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "웹툰 연출 앵글 프리셋")}>
+        <span className="text-[0.68rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "웹툰 연출 앵글 프리셋")}</span>
         <div className="grid grid-cols-2 gap-1.5">
           {WEBTOON_SHOT_ANGLE_PRESETS.map((preset) => (
             <button
@@ -363,11 +363,9 @@ export function StudioBg3dCinematicDirectorPanel({
                 );
                 onApplyShotBookmark?.(bookmark);
               }}
-              className={`flex flex-col items-start rounded-lg border p-2 text-left transition-all disabled:opacity-45 ${
-                selectedAngle === preset.kind
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "en", "flex flex-col items-start rounded-lg border p-2 text-left transition-all disabled:opacity-45 {v0}"), { v0: String(selectedAngle === preset.kind
                   ? "border-accent bg-accent/10 font-bold text-accent shadow-sm"
-                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
-              }`}
+                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
             >
               <span className="flex items-center gap-1">
                 <Camera className="size-3 text-accent" />
@@ -379,7 +377,7 @@ export function StudioBg3dCinematicDirectorPanel({
         </div>
       </section>
 
-      <section className={`rounded-lg border p-2.5 ${continuityTone}`} aria-label="컷 연속성 검사">
+      <section className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "en", "rounded-lg border p-2.5 {v0}"), { v0: String(continuityTone) })} aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "컷 연속성 검사")}>
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-1 text-[0.7rem] font-bold">
             {continuityReport.criticalCount > 0 || continuityReport.warningCount > 0 ? (
@@ -387,8 +385,7 @@ export function StudioBg3dCinematicDirectorPanel({
             ) : (
               <ShieldCheck className="size-3.5" />
             )}
-            컷 연속성 검사
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "컷 연속성 검사")}</span>
           <output className="numeral text-[0.68rem] font-bold" aria-live="polite">
             {formatStudioBg3dShotContinuitySummary(continuityReport)}
           </output>
@@ -406,13 +403,13 @@ export function StudioBg3dCinematicDirectorPanel({
               ))}
           </div>
         ) : (
-          <p className="mt-1 text-[0.59rem]">180도 축·화각·카메라 이동에서 큰 단절이 감지되지 않았습니다.</p>
+          <p className="mt-1 text-[0.59rem]">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "180도 축·화각·카메라 이동에서 큰 단절이 감지되지 않았습니다.")}</p>
         )}
       </section>
 
-      <section className="flex flex-col gap-1.5" aria-label="저장된 웹툰 컷 덱">
+      <section className="flex flex-col gap-1.5" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "저장된 웹툰 컷 덱")}>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[0.68rem] font-medium text-fg-3">저장된 웹툰 컷 덱</span>
+          <span className="text-[0.68rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "저장된 웹툰 컷 덱")}</span>
           <button
             type="button"
             disabled={disabled || continuityShots.length === 0}
@@ -420,7 +417,7 @@ export function StudioBg3dCinematicDirectorPanel({
             className="flex min-h-8 items-center gap-1 rounded border border-line bg-raised px-2 text-[0.62rem] font-bold text-fg-2 hover:text-fg disabled:opacity-45"
           >
             {isPlaying ? <Pause className="size-3" /> : <Play className="size-3" />}
-            {isPlaying ? "미리보기 정지" : "컷 순서 미리보기"}
+            {isPlaying ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "미리보기 정지") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "컷 순서 미리보기")}
           </button>
         </div>
         <div className="flex max-h-48 flex-col gap-1 overflow-y-auto">
@@ -431,28 +428,26 @@ export function StudioBg3dCinematicDirectorPanel({
             return (
               <div
                 key={shot.id}
-                className={`flex items-center gap-1.5 rounded border px-2 py-1.5 text-xs ${
-                  activeDeckIndex === index && isPlaying
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "en", "flex items-center gap-1.5 rounded border px-2 py-1.5 text-xs {v0}"), { v0: String(activeDeckIndex === index && isPlaying
                     ? "border-accent bg-accent/10"
                     : critical
                       ? "border-bad/40 bg-bad/5"
                       : warning
                         ? "border-warn/40 bg-warn/5"
-                        : "border-line bg-card"
-                }`}
+                        : "border-line bg-card") })}
               >
                 <span className="rounded bg-raised px-1 py-0.5 font-mono text-[0.62rem] font-bold text-fg-2">
                   #{index + 1}
                 </span>
                 <span className="min-w-0 flex-1 truncate font-medium text-fg">{shot.name}</span>
                 {incoming?.issues[0] ? (
-                  <span className={`max-w-28 truncate text-[0.55rem] ${critical ? "text-bad" : warning ? "text-warn" : "text-fg-3"}`}>
+                  <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "en", "max-w-28 truncate text-[0.55rem] {v0}"), { v0: String(critical ? "text-bad" : warning ? "text-warn" : "text-fg-3") })}>
                     {incoming.issues[0].label}
                   </span>
                 ) : null}
                 <button
                   type="button"
-                  aria-label={`${shot.name} 위로 이동`}
+                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "{v0} 위로 이동"), { v0: String(shot.name) })}
                   disabled={disabled || index === 0 || (productionMode && !onMoveProductionShot)}
                   onClick={() => handleMoveShot(index, index - 1)}
                   className="rounded p-1 text-fg-3 hover:bg-raised hover:text-fg disabled:opacity-30"
@@ -461,7 +456,7 @@ export function StudioBg3dCinematicDirectorPanel({
                 </button>
                 <button
                   type="button"
-                  aria-label={`${shot.name} 아래로 이동`}
+                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "{v0} 아래로 이동"), { v0: String(shot.name) })}
                   disabled={disabled || index === continuityShots.length - 1 || (productionMode && !onMoveProductionShot)}
                   onClick={() => handleMoveShot(index, index + 1)}
                   className="rounded p-1 text-fg-3 hover:bg-raised hover:text-fg disabled:opacity-30"
@@ -478,11 +473,10 @@ export function StudioBg3dCinematicDirectorPanel({
                   className="flex min-h-7 items-center gap-1 rounded bg-raised px-2 text-[0.6rem] text-accent hover:bg-accent hover:text-accent-fg disabled:opacity-40"
                 >
                   <Play className="size-2.5" />
-                  이동
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "이동")}</button>
                 <button
                   type="button"
-                  aria-label={`${shot.name} 삭제`}
+                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "{v0} 삭제"), { v0: String(shot.name) })}
                   disabled={disabled || (productionMode && !onRemoveProductionShot)}
                   onClick={() => handleRemoveShot(index)}
                   className="rounded p-1 text-fg-3 hover:bg-bad/10 hover:text-bad disabled:opacity-30"
@@ -503,21 +497,19 @@ export function StudioBg3dCinematicDirectorPanel({
           onClick={onUseCurrentFrameAsAiReference}
           className="flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-cool/45 bg-cool/10 text-[0.68rem] font-bold text-cool hover:bg-cool/15 disabled:opacity-45"
         >
-          <BrainCircuit className={`size-3.5 ${aiReferenceBusy ? "animate-pulse motion-reduce:animate-none" : ""}`} />
-          {aiReferenceBusy ? "현재 컷 참조 준비 중" : "현재 컷을 AI 구도·포즈 참조로 보내기"}
+          <BrainCircuit className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "en", "size-3.5 {v0}"), { v0: String(aiReferenceBusy ? "animate-pulse motion-reduce:animate-none" : "") })} />
+          {aiReferenceBusy ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "현재 컷 참조 준비 중") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "현재 컷을 AI 구도·포즈 참조로 보내기")}
         </button>
       ) : null}
 
-      <section className="flex flex-col gap-2 rounded-lg border border-line bg-card p-2.5" aria-label="카메라 셰이크">
+      <section className="flex flex-col gap-2 rounded-lg border border-line bg-card p-2.5" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "카메라 셰이크")}>
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-1 text-[0.7rem] font-bold text-fg">
             <Activity className="size-3.5 text-accent" />
-            카메라 셰이크 연출
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "카메라 셰이크 연출")}</span>
           <label className="flex items-center gap-1.5 text-[0.62rem] text-fg-3">
-            강도
-            <input
-              aria-label="카메라 셰이크 강도"
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "강도")}<input
+              aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "ko", "카메라 셰이크 강도")}
               type="range"
               min="0.2"
               max="2"
@@ -544,11 +536,9 @@ export function StudioBg3dCinematicDirectorPanel({
               type="button"
               disabled={disabled}
               onClick={() => handleTriggerShake(shake.id)}
-              className={`min-h-8 rounded border px-1.5 py-1 text-[0.62rem] font-medium transition-all disabled:opacity-45 ${
-                selectedShake === shake.id
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCinematicDirectorPanelContent", "en", "min-h-8 rounded border px-1.5 py-1 text-[0.62rem] font-medium transition-all disabled:opacity-45 {v0}"), { v0: String(selectedShake === shake.id
                   ? "border-accent bg-accent text-accent-fg"
-                  : "border-line bg-raised text-fg-2 hover:text-fg"
-              }`}
+                  : "border-line bg-raised text-fg-2 hover:text-fg") })}
             >
               {shake.label}
             </button>

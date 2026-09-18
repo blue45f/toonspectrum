@@ -49,7 +49,10 @@ describe("StudioAi3dGenerationPanel", () => {
       target: { value: "웹툰 교실용 학생 책상" },
     });
     fireEvent.click(screen.getByRole("button", { name: "3D 생성 시작" }));
-    await waitFor(() => expect(screen.getByText(/형상 생성 중/u)).not.toBeNull());
+    await waitFor(() => {
+      expect(screen.getByRole("status", { name: "현재 3D 생성 상태" }).textContent)
+        .toMatch(/형상 생성 중/u);
+    });
     const createCall = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
     expect(createCall).toBeDefined();
     expect(String(createCall?.[1]?.body)).toContain("웹툰 교실용 학생 책상");
@@ -68,6 +71,9 @@ describe("StudioAi3dGenerationPanel", () => {
     render(<StudioAi3dGenerationPanel client={client} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "취소" })).not.toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
-    await waitFor(() => expect(screen.getByText(/취소됨/u)).not.toBeNull());
+    await waitFor(() => {
+      expect(screen.getByRole("status", { name: "현재 3D 생성 상태" }).textContent)
+        .toMatch(/취소됨/u);
+    });
   });
 });

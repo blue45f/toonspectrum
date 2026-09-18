@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { RefreshCw } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
@@ -41,35 +45,33 @@ export function ReviewsPage() {
     <div>
       <section className="border-b border-line bg-ledger">
         <Container size="wide" className="py-7 sm:py-12 lg:py-16">
-          <p className="eyebrow text-accent">READER REVIEWS</p>
+          <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.community.ReviewsPage", "en", "READER REVIEWS")}</p>
           <h1 className="mt-2.5 text-pretty text-3xl font-bold leading-[1.1] sm:mt-3 sm:text-4xl lg:text-[2.9rem]">
-            독자들이 남긴 한 줄
-          </h1>
+            {translateCurrentStaticSourceText("domains.community.ReviewsPage", "ko", "독자들이 남긴 한 줄")}</h1>
           <p className="mt-3 max-w-xl text-pretty font-serif text-base italic leading-relaxed text-fg-2 sm:mt-4 sm:text-lg">
-            정주행의 끝에서, 누군가는 별점 대신 문장을 남겼다.
-          </p>
+            {translateCurrentStaticSourceText("domains.community.ReviewsPage", "ko", "정주행의 끝에서, 누군가는 별점 대신 문장을 남겼다.")}</p>
 
           <dl className="mt-6 flex flex-wrap items-end gap-x-9 gap-y-5 border-t border-line pt-5 sm:mt-9 sm:pt-6">
             <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-3">총 리뷰</dt>
+              <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.ReviewsPage", "ko", "총 리뷰")}</dt>
               <dd className="numeral tnum text-2xl text-fg">{total.toLocaleString("ko-KR")}</dd>
             </div>
             <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-3">평균 별점</dt>
+              <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.ReviewsPage", "ko", "평균 별점")}</dt>
               <dd className="flex items-center gap-2">
                 <Stars value={avg} size="sm" />
                 <span className="numeral tnum text-2xl text-fg">{avg.toFixed(2)}</span>
               </dd>
             </div>
             <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-3">스포일러 포함</dt>
+              <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.ReviewsPage", "ko", "스포일러 포함")}</dt>
               <dd className="numeral tnum text-2xl text-fg">
                 {spoilerPct}
                 <span className="ml-0.5 text-base text-fg-3">%</span>
               </dd>
             </div>
             <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-3">리뷰된 작품</dt>
+              <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.ReviewsPage", "ko", "리뷰된 작품")}</dt>
               <dd className="numeral tnum text-2xl text-fg">{distinctTitles.toLocaleString("ko-KR")}</dd>
             </div>
           </dl>
@@ -85,16 +87,14 @@ export function ReviewsPage() {
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-fg-3">
-                <span className="numeral text-fg-2">{feed.length.toLocaleString("ko-KR")}</span>개의 리뷰
-              </p>
+                <span className="numeral text-fg-2">{feed.length.toLocaleString("ko-KR")}</span>{translateCurrentStaticSourceText("domains.community.ReviewsPage", "ko", "개의 리뷰")}</p>
               <button
                 type="button"
                 onClick={reload}
                 className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}
               >
-                <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-                갱신
-              </button>
+                <RefreshCw size={14} className={loading ? translateCurrentStaticSourceText("domains.community.ReviewsPage", "en", "animate-spin") : ""} />
+                {translateCurrentStaticSourceText("domains.community.ReviewsPage", "ko", "갱신")}</button>
             </div>
 
             {loading ? (
@@ -115,11 +115,10 @@ export function ReviewsPage() {
                 ))}
               </div>
             ) : error ? (
-              <ErrorState title="리뷰 데이터를 불러오지 못했습니다." message={error} onRetry={reload} />
+              <ErrorState title={translateCurrentStaticSourceText("domains.community.ReviewsPage", "ko", "리뷰 데이터를 불러오지 못했습니다.")} message={error} onRetry={reload} />
             ) : feed.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line bg-card/40 p-12 text-center text-sm text-fg-3">
-                아직 등록된 리뷰가 없습니다. 리뷰가 작성되면 바로 이 피드에 반영됩니다.
-              </div>
+                {translateCurrentStaticSourceText("domains.community.ReviewsPage", "ko", "아직 등록된 리뷰가 없습니다. 리뷰가 작성되면 바로 이 피드에 반영됩니다.")}</div>
             ) : (
               <div className="columns-1 gap-4 sm:columns-2 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
                 {feed.map((review) => (
@@ -131,20 +130,19 @@ export function ReviewsPage() {
 
           <aside className="lg:sticky lg:top-[var(--site-header-sticky-offset,5rem)] lg:order-2">
             <div className="rounded-2xl border border-line bg-card p-5 surface-hl">
-              <p className="eyebrow text-accent">MOST REVIEWED</p>
-              <h2 className="mt-1.5 text-base font-bold tracking-tight text-fg">가장 많이 리뷰된 작품</h2>
-              <p className="mt-1 text-xs text-fg-3">독자들이 가장 많이 입을 연 다섯 작품</p>
+              <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.community.ReviewsPage", "en", "MOST REVIEWED")}</p>
+              <h2 className="mt-1.5 text-base font-bold tracking-tight text-fg">{translateCurrentStaticSourceText("domains.community.ReviewsPage", "ko", "가장 많이 리뷰된 작품")}</h2>
+              <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.ReviewsPage", "ko", "독자들이 가장 많이 입을 연 다섯 작품")}</p>
 
               <ol className="mt-5 flex flex-col gap-1">
                 {topReviewed.length === 0 && (
                   <li className="rounded-xl border border-dashed border-line bg-raised/30 px-3 py-5 text-center text-xs text-fg-3">
-                    아직 집계된 리뷰가 없습니다.
-                  </li>
+                    {translateCurrentStaticSourceText("domains.community.ReviewsPage", "ko", "아직 집계된 리뷰가 없습니다.")}</li>
                 )}
                 {topReviewed.map((item, index) => (
                   <li key={item.title.id}>
                     <Link
-                      href={`/title/${item.title.slug}`}
+                      href={formatI18nTemplate(translateCurrentStaticSourceText("domains.community.ReviewsPage", "en", "/title/{v0}"), { v0: String(item.title.slug) })}
                       className="group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-raised/60"
                     >
                       <span className="numeral w-5 shrink-0 text-center text-lg text-fg-3 group-hover:text-accent">
@@ -179,7 +177,7 @@ export function ReviewsPage() {
                       </span>
                       <span className="flex shrink-0 items-baseline gap-0.5 text-fg-3">
                         <span className="numeral tnum text-sm text-fg-2">{item.count}</span>
-                        <span className="text-[0.7rem]">개</span>
+                        <span className="text-[0.7rem]">{translateCurrentStaticSourceText("domains.community.ReviewsPage", "ko", "개")}</span>
                       </span>
                     </Link>
                   </li>

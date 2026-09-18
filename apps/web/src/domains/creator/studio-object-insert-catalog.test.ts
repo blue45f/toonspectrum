@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { PRIMITIVE_DEFS } from "./studio-background-3d-metadata";
+import { BG_SCENE_TEMPLATES } from "./studio-background-3d-scene-templates";
 import {
   filterStudioObjectInsertItems,
   findStudioObjectInsertItem,
@@ -32,7 +33,11 @@ describe("studio object insert catalog (Canva-style 3D elements)", () => {
     expect(props.every((item) => item.openTarget === "vrm-poser")).toBe(true);
 
     const scenes = items.filter((item) => item.kind === "bg3d-scene-template");
-    expect(scenes.length).toBeGreaterThanOrEqual(20);
+    expect(scenes).toHaveLength(BG_SCENE_TEMPLATES.length);
+    expect(new Set(scenes.map((item) => item.sourceId))).toEqual(
+      new Set(BG_SCENE_TEMPLATES.map((template) => template.id)),
+    );
+    expect(scenes.some((item) => item.sourceId === "fantasy_tavern")).toBe(true);
     expect(scenes.every((item) => item.openTarget === "bg3d-templates")).toBe(
       true,
     );

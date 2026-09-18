@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioAnimTimelinePanel — 페이지 하나의 다중 레이어 애니메이션 타임라인을 편집하는
  * 자체완결 플로팅 패널(StudioFrameAnimationPanel/StudioHistoryPanel과 같은 층위). 문서
@@ -150,22 +154,21 @@ export function StudioAnimTimelinePanel({
 
   return (
     <section
-      aria-label="다중 레이어 타임라인"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "다중 레이어 타임라인")}
       className="fixed inset-x-2 top-16 z-40 flex max-h-[calc(100svh-5rem)] w-auto flex-col overflow-hidden rounded-xl border border-line bg-panel/95 shadow-xl backdrop-blur sm:absolute sm:inset-x-auto sm:right-3 sm:top-3 sm:max-h-[calc(100%-5rem)] sm:w-[min(46rem,calc(100%-1.5rem))]"
     >
       {/* 헤더 */}
       <div className="flex items-center justify-between gap-2 border-b border-line/60 px-3 py-2">
         <p className="flex items-center gap-1.5 text-xs font-bold text-fg">
           <GanttChartSquare size={13} className="shrink-0 text-fg-3" aria-hidden />
-          다중 레이어 타임라인
-          <span className="font-medium text-fg-3">
-            {doc.frameCount}프레임 · {doc.fps}fps
+          {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "다중 레이어 타임라인")}<span className="font-medium text-fg-3">
+            {doc.frameCount}{translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "프레임 · ")}{doc.fps}fps
           </span>
         </p>
         <button
           type="button"
           onClick={onClose}
-          aria-label="다중 레이어 타임라인 패널 닫기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "다중 레이어 타임라인 패널 닫기")}
           className="grid size-11 shrink-0 place-items-center rounded-lg border border-line text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
         >
           <X size={13} />
@@ -176,7 +179,7 @@ export function StudioAnimTimelinePanel({
         {/* 툴바 */}
         <div className="space-y-1.5 rounded-xl border border-line bg-card/45 p-2.5">
           <StudioSliderRow
-            label="재생 속도 (fps)"
+            label={translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "재생 속도 (fps)")}
             min={MIN_FRAME_FPS}
             max={MAX_FRAME_FPS}
             step={1}
@@ -185,8 +188,7 @@ export function StudioAnimTimelinePanel({
             readout={`${doc.fps}`}
           />
           <label className={PANEL_LABEL_ROW}>
-            프레임 길이
-            <input
+            {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "프레임 길이")}<input
               type="number"
               min={MIN_TIMELINE_FRAME_COUNT}
               max={MAX_TIMELINE_FRAME_COUNT}
@@ -226,11 +228,11 @@ export function StudioAnimTimelinePanel({
                 className={cn(buttonClass({ size: "sm", variant: "outline", className: "min-h-11 min-w-11" }), "gap-1.5")}
               >
                 {playing ? <Pause size={13} /> : <Play size={13} />}
-                {playing ? "정지" : "재생"}
+                {playing ? translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "정지") : translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "재생")}
               </button>
             </StudioToolHintTarget>
             <span className="text-[0.72rem] tabular-nums text-fg-3">
-              재생헤드 {playhead + 1} / {doc.frameCount}
+              {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "재생헤드 ")}{playhead + 1} / {doc.frameCount}
             </span>
           </div>
 
@@ -238,7 +240,7 @@ export function StudioAnimTimelinePanel({
           <div className="space-y-1.5 border-t border-line/60 pt-2">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">
-                클립 ({clips.length}/{MAX_TIMELINE_CLIPS})
+                {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "클립 (")}{clips.length}/{MAX_TIMELINE_CLIPS})
               </p>
               <button
                 type="button"
@@ -246,8 +248,8 @@ export function StudioAnimTimelinePanel({
                 disabled={clips.length >= MAX_TIMELINE_CLIPS}
                 title={
                   clips.length >= MAX_TIMELINE_CLIPS
-                    ? `클립은 최대 ${MAX_TIMELINE_CLIPS}개까지 만들 수 있어요`
-                    : "전체 타임라인을 덮는 이름 있는 클립을 추가합니다"
+                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "클립은 최대 {v0}개까지 만들 수 있어요"), { v0: String(MAX_TIMELINE_CLIPS) })
+                    : translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "전체 타임라인을 덮는 이름 있는 클립을 추가합니다")
                 }
                 onClick={() => {
                   const id = createTimelineClipId();
@@ -266,13 +268,11 @@ export function StudioAnimTimelinePanel({
                 className={cn(buttonClass({ size: "sm", variant: "outline", className: "min-h-11 min-w-11" }), "gap-1 text-[0.7rem]")}
               >
                 <Plus size={12} />
-                클립 추가
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "클립 추가")}</button>
             </div>
             {clips.length === 0 ? (
               <p className="text-[0.68rem] leading-relaxed text-fg-3" role="status">
-                이름 있는 클립으로 노출 구간을 표시·선택할 수 있어요. 키프레임 데이터와는 별개입니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "이름 있는 클립으로 노출 구간을 표시·선택할 수 있어요. 키프레임 데이터와는 별개입니다.")}</p>
             ) : (
               <ul className="space-y-1.5" data-testid="timeline-clip-list">
                 {clips.map((clip) => {
@@ -288,7 +288,7 @@ export function StudioAnimTimelinePanel({
                       <button
                         type="button"
                         aria-pressed={isActive}
-                        title={isActive ? "전체 타임라인으로 돌아가기" : "이 클립 구간을 활성 노출로 사용"}
+                        title={isActive ? translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "전체 타임라인으로 돌아가기") : translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "이 클립 구간을 활성 노출로 사용")}
                         onClick={() =>
                           onDocChange(setActiveTimelineClip(doc, isActive ? null : clip.id))
                         }
@@ -299,14 +299,14 @@ export function StudioAnimTimelinePanel({
                             : "border-line bg-canvas text-fg-2 hover:bg-raised",
                         )}
                       >
-                        {isActive ? "활성" : "선택"}
+                        {isActive ? translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "활성") : translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "선택")}
                       </button>
                       <input
                         type="text"
                         value={clip.name}
                         maxLength={MAX_CLIP_NAME_LENGTH}
-                        aria-label={`클립 ${clip.id} 이름`}
-                        data-testid={`timeline-clip-rename-${clip.id}`}
+                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "클립 {v0} 이름"), { v0: String(clip.id) })}
+                        data-testid={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "en", "timeline-clip-rename-{v0}"), { v0: String(clip.id) })}
                         onChange={(event) => {
                           onDocChange(renameTimelineClip(doc, clip.id, event.target.value));
                         }}
@@ -326,8 +326,7 @@ export function StudioAnimTimelinePanel({
         {/* 그리드 */}
         {rows.length === 0 ? (
           <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
-            이 페이지에는 아직 레이어가 없어요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "이 페이지에는 아직 레이어가 없어요.")}</p>
         ) : (
           <div className="overflow-auto rounded-lg border border-line" style={{ maxHeight: "16rem" }}>
             <div
@@ -342,10 +341,10 @@ export function StudioAnimTimelinePanel({
               {/* 프레임 눈금자 — 5프레임마다 숫자, 클릭하면 그 프레임으로 스크럽 */}
               {Array.from({ length: doc.frameCount }, (_, col) => (
                 <button
-                  key={`ruler-${col}`}
+                  key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "en", "ruler-{v0}"), { v0: String(col) })}
                   type="button"
                   onClick={() => onScrub(col)}
-                  title={`프레임 ${col + 1}로 이동`}
+                  title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "프레임 {v0}로 이동"), { v0: String(col + 1) })}
                   className="sticky top-0 z-10 flex items-center justify-center border-b border-r border-line/50 bg-panel text-[0.62rem] tabular-nums text-fg-3 hover:bg-raised"
                   style={{ height: ROW_H_PX }}
                 >
@@ -430,8 +429,8 @@ export function StudioAnimTimelinePanel({
                           }}
                           title={
                             isKeyframe
-                              ? `프레임 ${col + 1} 키프레임 — 더블클릭/우클릭으로 삭제, 드래그로 이동`
-                              : `프레임 ${col + 1}${showGhostAdd ? " — 여기에 키프레임 추가" : ""}`
+                              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "프레임 {v0} 키프레임 — 더블클릭/우클릭으로 삭제, 드래그로 이동"), { v0: String(col + 1) })
+                              : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "프레임 {v0}{v1}"), { v0: String(col + 1), v1: String(showGhostAdd ? " — 여기에 키프레임 추가" : "") })
                           }
                           className={cn(
                             "group relative flex items-center justify-center border-b border-r border-line/30",
@@ -465,7 +464,7 @@ export function StudioAnimTimelinePanel({
                                 e.stopPropagation();
                                 onRemoveKeyframe(row.id, col);
                               }}
-                              aria-label={`${row.label} 프레임 ${col + 1} 키프레임 — 선택하려면 클릭, 삭제하려면 더블클릭/Delete, 이동하려면 드래그`}
+                              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "{v0} 프레임 {v1} 키프레임 — 선택하려면 클릭, 삭제하려면 더블클릭/Delete, 이동하려면 드래그"), { v0: String(row.label), v1: String(col + 1) })}
                               className={cn(
                                 "size-2.5 rounded-full border border-line-strong/60 bg-accent",
                                 canEdit ? "cursor-grab active:cursor-grabbing" : "cursor-default"
@@ -479,7 +478,7 @@ export function StudioAnimTimelinePanel({
                                 e.stopPropagation();
                                 onAddKeyframe(row.id);
                               }}
-                              aria-label={`${row.label} 프레임 ${col + 1}에 키프레임 추가`}
+                              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "{v0} 프레임 {v1}에 키프레임 추가"), { v0: String(row.label), v1: String(col + 1) })}
                               className="absolute inset-0 hidden items-center justify-center text-fg-3 hover:text-accent group-hover:flex"
                             >
                               <Plus size={12} />
@@ -512,8 +511,7 @@ export function StudioAnimTimelinePanel({
                 onClick={() => onFocusTrack(null)}
                 className="shrink-0 text-[0.7rem] text-fg-3 hover:text-fg"
               >
-                선택 해제
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "선택 해제")}</button>
             </div>
 
             <StudioToolHintTarget
@@ -538,16 +536,16 @@ export function StudioAnimTimelinePanel({
                 className={cn(buttonClass({ size: "sm", variant: "solid", className: "min-h-11 min-w-11" }), "w-full gap-1.5")}
               >
                 <GanttChartSquare size={13} />
-                현재 프레임({playhead + 1}) 키프레임 {replacingKeyframe ? "갱신" : "추가"}
+                {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "현재 프레임(")}{playhead + 1}{translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", ") 키프레임 ")}{replacingKeyframe ? translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "갱신") : translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "추가")}
               </button>
             </StudioToolHintTarget>
 
             {focusedKeyframe && focusedRow.eligible && !focusedRow.locked ? (
               <label className={PANEL_LABEL_ROW}>
-                이징 (프레임 {playhead + 1})
+                {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "이징 (프레임 ")}{playhead + 1})
                 <select
                   value={focusedKeyframeEase}
-                  aria-label={`프레임 ${playhead + 1} 키프레임 이징`}
+                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "프레임 {v0} 키프레임 이징"), { v0: String(playhead + 1) })}
                   data-testid="timeline-keyframe-ease"
                   onChange={(event) => {
                     const next = event.target.value;
@@ -566,18 +564,15 @@ export function StudioAnimTimelinePanel({
             ) : null}
             {!focusedRow.eligible && (
               <p className="text-[0.7rem] text-fg-3" role="status">
-                이미지 레이어이면서 단일-셀 프레임 애니메이션을 쓰지 않을 때만 트랙을 만들 수 있어요.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "이미지 레이어이면서 단일-셀 프레임 애니메이션을 쓰지 않을 때만 트랙을 만들 수 있어요.")}</p>
             )}
             {focusedRow.eligible && focusedRow.locked && (
               <p className="text-[0.7rem] text-fg-3" role="status">
-                잠긴 레이어예요. 잠금을 풀면 키프레임을 편집할 수 있어요.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "잠긴 레이어예요. 잠금을 풀면 키프레임을 편집할 수 있어요.")}</p>
             )}
             {focusedRow.eligible && !focusedRow.locked && !canAddKeyframe(doc, focusedRow.id) && (
               <p className="text-[0.7rem] text-fg-3" role="status">
-                키프레임은 트랙당 최대 {MAX_TIMELINE_FRAME_COUNT}장까지 만들 수 있어요.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "키프레임은 트랙당 최대 ")}{MAX_TIMELINE_FRAME_COUNT}{translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "장까지 만들 수 있어요.")}</p>
             )}
 
             <button
@@ -594,19 +589,17 @@ export function StudioAnimTimelinePanel({
                 })();
               }}
               disabled={!hasTrack(doc, focusedRow.id)}
-              title={hasTrack(doc, focusedRow.id) ? undefined : "삭제할 키프레임이 없어요"}
+              title={hasTrack(doc, focusedRow.id) ? undefined : translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "삭제할 키프레임이 없어요")}
               className={cn(buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 min-w-11 gap-1.5 text-bad hover:text-bad" }), "w-full")}
             >
               <Trash2 size={13} />
-              이 레이어 트랙 삭제
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "이 레이어 트랙 삭제")}</button>
 
             {/* 어니언스키닝 — StudioFrameAnimationPanel의 동일 블록을 이식(설정만 컨트롤, 실제 렌더는 StudioPage). */}
             <div className="space-y-1.5 border-t border-line/60 pt-2">
               <p className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">
                 <Ghost size={12} aria-hidden />
-                어니언스키닝
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "어니언스키닝")}</p>
               <StudioToolHintTarget
                 preferredSide="left"
                 hint={{
@@ -621,8 +614,7 @@ export function StudioAnimTimelinePanel({
                   active={onionSkin.enabled}
                   onClick={() => onOnionSkinChange({ ...onionSkin, enabled: !onionSkin.enabled })}
                 >
-                  어니언스키닝 사용
-                </StudioToggleChip>
+                  {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "어니언스키닝 사용")}</StudioToggleChip>
               </StudioToolHintTarget>
               {onionSkin.enabled && (
                 <>
@@ -637,7 +629,7 @@ export function StudioAnimTimelinePanel({
                     }}
                   >
                     <StudioSliderRow
-                      label="이전 프레임 수"
+                      label={translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "이전 프레임 수")}
                       min={0}
                       max={3}
                       step={1}
@@ -656,7 +648,7 @@ export function StudioAnimTimelinePanel({
                     }}
                   >
                     <StudioSliderRow
-                      label="다음 프레임 수"
+                      label={translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "다음 프레임 수")}
                       min={0}
                       max={3}
                       step={1}
@@ -675,7 +667,7 @@ export function StudioAnimTimelinePanel({
                     }}
                   >
                     <StudioSliderRow
-                      label="투명도"
+                      label={translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "투명도")}
                       min={0.1}
                       max={0.8}
                       step={0.05}
@@ -701,12 +693,10 @@ export function StudioAnimTimelinePanel({
                         onChange={(e) => onOnionSkinChange({ ...onionSkin, tint: e.target.checked })}
                         className="size-3.5 cursor-pointer accent-[var(--color-accent)]"
                       />
-                      색으로 구분 (이전=빨강 · 다음=파랑)
-                    </label>
+                      {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "색으로 구분 (이전=빨강 · 다음=파랑)")}</label>
                   </StudioToolHintTarget>
                   <p className="text-[0.7rem] text-fg-3" role="status">
-                    지금 위치 기준 {onionPreview.length}장이 겹쳐 보여요.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "지금 위치 기준 ")}{onionPreview.length}{translateCurrentStaticSourceText("domains.creator.StudioAnimTimelinePanel", "ko", "장이 겹쳐 보여요.")}</p>
                 </>
               )}
             </div>

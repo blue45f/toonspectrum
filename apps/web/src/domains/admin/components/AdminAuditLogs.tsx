@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { History, Search, FileText, X } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 
@@ -145,12 +146,12 @@ export function AdminAuditLogs({ userId }: AdminAuditLogsProps) {
               {t("admin.auditLogs.modalTitle")} ({selectedLog.id.slice(0, 8)})
             </h3>
             <div className="space-y-2 text-sm text-slate-300 bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs">
-              <p><span className="text-slate-500">Action:</span> {selectedLog.action}</p>
-              <p><span className="text-slate-500">Admin Email:</span> {selectedLog.adminEmail}</p>
-              <p><span className="text-slate-500">Target:</span> {selectedLog.targetType} / {selectedLog.targetId || "—"}</p>
-              <p><span className="text-slate-500">Time:</span> {formatDate(selectedLog.createdAt)}</p>
+              <p><span className="text-slate-500">{translateCurrentStaticSourceText("domains.admin.components.AdminAuditLogs", "en", "Action:")}</span> {selectedLog.action}</p>
+              <p><span className="text-slate-500">{translateCurrentStaticSourceText("domains.admin.components.AdminAuditLogs", "en", "Admin Email:")}</span> {selectedLog.adminEmail}</p>
+              <p><span className="text-slate-500">{translateCurrentStaticSourceText("domains.admin.components.AdminAuditLogs", "en", "Target:")}</span> {selectedLog.targetType} / {selectedLog.targetId || "—"}</p>
+              <p><span className="text-slate-500">{translateCurrentStaticSourceText("domains.admin.components.AdminAuditLogs", "en", "Time:")}</span> {formatDate(selectedLog.createdAt)}</p>
               <div className="pt-2">
-                <p className="text-slate-500 mb-1">Details Payload:</p>
+                <p className="text-slate-500 mb-1">{translateCurrentStaticSourceText("domains.admin.components.AdminAuditLogs", "en", "Details Payload:")}</p>
                 <pre className="p-3 bg-slate-900 rounded-lg text-indigo-300 overflow-x-auto border border-slate-800">
                   {JSON.stringify(selectedLog.details, null, 2)}
                 </pre>

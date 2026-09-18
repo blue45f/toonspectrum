@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { SlidersHorizontal, Target, Timer } from "lucide-react";
 
 import { cn } from "@/shared/lib/utils";
@@ -30,17 +34,15 @@ function SessionPlanner({
               <Timer size={20} aria-hidden="true" />
             </span>
             <div>
-              <p className="text-xs font-bold tracking-[0.14em] text-accent">SESSION PLANNER</p>
+              <p className="text-xs font-bold tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "en", "SESSION PLANNER")}</p>
               <h2 id="session-plan-title" className="mt-1 text-2xl font-bold text-fg">
-                오늘 쓸 시간만 먼저 고르기
-              </h2>
+                {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "ko", "오늘 쓸 시간만 먼저 고르기")}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-7 text-fg-2">
-                영감을 더 찾기 전에 끝낼 수 있는 범위를 정합니다. 선택한 시간은 아래 집중 타이머와 제작 산출물에 즉시 반영됩니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "ko", "영감을 더 찾기 전에 끝낼 수 있는 범위를 정합니다. 선택한 시간은 아래 집중 타이머와 제작 산출물에 즉시 반영됩니다.")}</p>
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3" role="group" aria-label="제작 세션 길이">
+          <div className="mt-6 grid gap-3 sm:grid-cols-3" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "ko", "제작 세션 길이")}>
             {SESSION_PRESETS.map((preset) => {
               const active = sessionPreset.id === preset.id;
               return (
@@ -55,7 +57,7 @@ function SessionPlanner({
                   )}
                 >
                   <span className="font-display text-3xl font-black tabular-nums text-fg">{preset.minutes}</span>
-                  <span className="ml-1 text-xs font-bold text-fg-3">MIN</span>
+                  <span className="ml-1 text-xs font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "en", "MIN")}</span>
                   <strong className="mt-3 block text-sm text-fg">{preset.label}</strong>
                   <span className="mt-1 block text-xs leading-5 text-fg-3">{preset.tagline}</span>
                 </button>
@@ -64,25 +66,25 @@ function SessionPlanner({
           </div>
         </div>
 
-        <aside className="rounded-2xl border border-accent/30 bg-accent-soft p-5" aria-label="선택한 제작 세션 결과">
+        <aside className="rounded-2xl border border-accent/30 bg-accent-soft p-5" aria-label={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "ko", "선택한 제작 세션 결과")}>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-bold tracking-[0.14em] text-accent">EXPECTED OUTPUT</p>
-              <p className="mt-1 text-lg font-bold text-fg">{sessionPreset.minutes}분 뒤 남길 것</p>
+              <p className="text-xs font-bold tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "en", "EXPECTED OUTPUT")}</p>
+              <p className="mt-1 text-lg font-bold text-fg">{sessionPreset.minutes}{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "ko", "분 뒤 남길 것")}</p>
             </div>
             <Target size={22} className="text-accent" aria-hidden="true" />
           </div>
           <dl className="mt-5 space-y-4 text-sm">
             <div>
-              <dt className="font-bold text-fg-3">산출물</dt>
+              <dt className="font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "ko", "산출물")}</dt>
               <dd className="mt-1 leading-6 text-fg">{sessionPreset.deliverable}</dd>
             </div>
             <div>
-              <dt className="font-bold text-fg-3">오늘의 제약</dt>
+              <dt className="font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "ko", "오늘의 제약")}</dt>
               <dd className="mt-1 leading-6 text-fg">{sessionPreset.constraint}</dd>
             </div>
             <div>
-              <dt className="font-bold text-fg-3">시작 규칙</dt>
+              <dt className="font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "ko", "시작 규칙")}</dt>
               <dd className="mt-1 leading-6 text-fg">{sessionPreset.start}</dd>
             </div>
           </dl>
@@ -114,17 +116,15 @@ function DirectingModePanel({
           <SlidersHorizontal size={20} aria-hidden="true" />
         </span>
         <div>
-          <p className="text-xs font-bold tracking-[0.14em] text-accent">DIRECTING MODE</p>
+          <p className="text-xs font-bold tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "en", "DIRECTING MODE")}</p>
           <h2 id="directing-mode-title" className="mt-1 text-2xl font-bold text-fg">
-            같은 소재를 내 방식으로 보기
-          </h2>
+            {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "ko", "같은 소재를 내 방식으로 보기")}</h2>
           <p className="mt-2 text-sm leading-7 text-fg-2">
-            추천을 숨겨진 알고리즘에 맡기지 않고, 오늘 집중할 연출 문법을 직접 선택합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "ko", "추천을 숨겨진 알고리즘에 맡기지 않고, 오늘 집중할 연출 문법을 직접 선택합니다.")}</p>
         </div>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="group" aria-label="연출 모드">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "ko", "연출 모드")}>
         {NOW_MODES.map((candidate) => {
           const active = modeId === candidate.id;
           return (
@@ -160,8 +160,8 @@ function DirectingModePanel({
           <p className="rounded-xl bg-raised/60 p-4 text-sm leading-7 text-fg-2 sm:col-span-3">{mode.note}</p>
         </div>
 
-        <aside aria-label={`${mode.label} 연출 신호`}>
-          <p className="text-xs font-bold tracking-[0.14em] text-accent">MODE SIGNAL</p>
+        <aside aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "ko", "{v0} 연출 신호"), { v0: String(mode.label) })}>
+          <p className="text-xs font-bold tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowPlanning", "en", "MODE SIGNAL")}</p>
           <div className="mt-4 space-y-4">
             {modeSignals.map((signal) => (
               <div key={signal.label}>
