@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { type ReactNode, lazy, Suspense, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 
@@ -123,13 +126,12 @@ export function AppShell({
       <SiteExperienceFrame enabled={enhancedSite}>
         {showSkipLink ? (
           <a href="#main-content" className="sr-only rounded-md focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-fg focus:px-4 focus:py-2 focus:font-semibold focus:text-canvas">
-            본문으로 건너뛰기
-          </a>
+            {translateCurrentStaticSourceText("app.AppShell", "ko", "본문으로 건너뛰기")}</a>
         ) : null}
         {header}
         {enhancedSite ? <SiteConnectionNotice /> : null}
         <PwaInstallNudge />
-        <main id="main-content" tabIndex={-1} className={mainClassName} data-public-experience={publicCreativeRoute ? "atelier" : publicExperience || undefined}>
+        <main id="main-content" tabIndex={-1} className={mainClassName} data-public-experience={publicCreativeRoute ? translateCurrentStaticSourceText("app.AppShell", "en", "atelier") : publicExperience || undefined}>
           {enhancedSite ? <Suspense fallback={null}><SiteCreationCompass /></Suspense> : null}
           <AppRouter />
           {publicCreativeRoute && pathname !== "/" ? (

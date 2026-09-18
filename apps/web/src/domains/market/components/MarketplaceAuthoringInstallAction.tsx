@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useMemo, useState, type ReactElement } from "react";
 
 import {
@@ -232,15 +236,15 @@ export function MarketplaceAuthoringInstallAction({
   return (
     <div
       data-testid="marketplace-authoring-install-action"
-      className={`rounded-xl border border-accent/30 bg-accent/5 p-3 ${className}`}
+      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringInstallAction", "en", "rounded-xl border border-accent/30 bg-accent/5 p-3 {v0}"), { v0: String(className) })}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <strong className="text-sm text-fg">제작 원본과 연결</strong>
+          <strong className="text-sm text-fg">{translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringInstallAction", "ko", "제작 원본과 연결")}</strong>
           <p className="mt-1 text-xs leading-5 text-fg-2">
             {envelope
-              ? "등록 당시 엔진·구성·호환성 manifest를 복구해 새 버전을 만듭니다."
-              : "구형 에셋 메타데이터로 업데이트 초안을 만들고 원본을 다시 연결합니다."}
+              ? translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringInstallAction", "ko", "등록 당시 엔진·구성·호환성 manifest를 복구해 새 버전을 만듭니다.")
+              : translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringInstallAction", "ko", "구형 에셋 메타데이터로 업데이트 초안을 만들고 원본을 다시 연결합니다.")}
           </p>
         </div>
         <button
@@ -249,7 +253,7 @@ export function MarketplaceAuthoringInstallAction({
           onClick={() => void open()}
           className="min-h-11 shrink-0 rounded-lg bg-accent px-4 text-xs font-bold text-accent-fg disabled:cursor-wait disabled:opacity-60"
         >
-          {busy ? "준비 중" : targetLabel}
+          {busy ? translateCurrentStaticSourceText("domains.market.components.MarketplaceAuthoringInstallAction", "ko", "준비 중") : targetLabel}
         </button>
       </div>
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}

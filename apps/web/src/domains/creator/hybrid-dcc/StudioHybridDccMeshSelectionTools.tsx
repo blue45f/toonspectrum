@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useEffectEvent, useId, useState, type RefObject } from "react";
 
 import {
@@ -122,16 +123,16 @@ export function StudioHybridDccMeshSelectionTools(props: Props) {
   }, [scopeRef]);
 
   return (
-    <section className="mt-2 overflow-hidden rounded-xl border border-line bg-panel" aria-label="메시 선택 작업대">
+    <section className="mt-2 overflow-hidden rounded-xl border border-line bg-panel" aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccMeshSelectionTools", "ko", "메시 선택 작업대")}>
       <button type="button" className="flex min-h-11 w-full items-center justify-between gap-2 px-3 text-left text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
-        <span>메시 선택 · 연결 영역 · 경계 · 최단 경로</span><span aria-hidden="true">{open ? "−" : "+"}</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccMeshSelectionTools", "ko", "메시 선택 · 연결 영역 · 경계 · 최단 경로")}</span><span aria-hidden="true">{open ? "−" : "+"}</span>
       </button>
       <div id={id} hidden={!open} className="space-y-3 border-t border-line p-3">
-        <p className="text-xs leading-relaxed text-fg-3">점은 모서리로, 선은 공유 정점으로, 면은 공유 모서리로 연결됩니다. 겹쳐 보이기만 하는 별도 부품은 연결하지 않습니다.</p>
-        {blocked ? <p role="status" className="text-xs text-fg-3">오브젝트를 선택하고 1·2·3 키로 점·선·면 모드에 들어가세요. 읽기 전용·작업 중·조형 모드에서는 사용할 수 없습니다.</p> : null}
+        <p className="text-xs leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccMeshSelectionTools", "ko", "점은 모서리로, 선은 공유 정점으로, 면은 공유 모서리로 연결됩니다. 겹쳐 보이기만 하는 별도 부품은 연결하지 않습니다.")}</p>
+        {blocked ? <p role="status" className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccMeshSelectionTools", "ko", "오브젝트를 선택하고 1·2·3 키로 점·선·면 모드에 들어가세요. 읽기 전용·작업 중·조형 모드에서는 사용할 수 없습니다.")}</p> : null}
         <fieldset disabled={Boolean(blocked)} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <legend className="sr-only">메시 선택 명령</legend>
+          <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccMeshSelectionTools", "ko", "메시 선택 명령")}</legend>
           {COMMANDS.map(([command, label, description]) => (
             <button key={command} type="button" className={CONTROL} title={description}
               disabled={(command === "loose" && mode !== "vertex") || (command === "path" && componentSelection?.elementIds.length !== 2)}
@@ -148,16 +149,16 @@ export function StudioHybridDccMeshSelectionTools(props: Props) {
                 sourceHash: selectedSource.sourceHash, mode: componentSelection.mode, ids: [...componentSelection.elementIds] });
               setNotice("현재 선택을 기억했습니다. 같은 원본 버전과 선택 모드에서 복원할 수 있습니다.");
             } catch (problem) { setError(problem instanceof Error ? problem.message : "선택을 기억하지 못했습니다."); }
-          }}>선택 기억</button>
+          }}>{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccMeshSelectionTools", "ko", "선택 기억")}</button>
           <button type="button" className={CONTROL} disabled={Boolean(blocked) || !savedMatches} onClick={() => {
             setError("");
             try { if (savedMatches && saved) apply(source(), saved.ids); }
             catch (problem) { setError(problem instanceof Error ? problem.message : "선택을 복원하지 못했습니다."); }
-          }}>기억한 선택 복원</button>
-          <span className="self-center text-xs tabular-nums text-fg-3">현재 {componentSelection?.elementIds.length ?? 0}개 선택</span>
+          }}>{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccMeshSelectionTools", "ko", "기억한 선택 복원")}</button>
+          <span className="self-center text-xs tabular-nums text-fg-3">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccMeshSelectionTools", "ko", "현재 ")}{componentSelection?.elementIds.length ?? 0}{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccMeshSelectionTools", "ko", "개 선택")}</span>
         </div>
-        {saved && !savedMatches ? <p className="text-xs text-fg-3">기억한 선택과 원본 버전 또는 모드가 달라 복원을 차단했습니다.</p> : null}
-        <p className="text-[11px] leading-relaxed text-fg-3">캔버스: A 전체 · Alt+A 해제 · Ctrl+I 반전 · L 연결 · Ctrl+키패드 ± 확장/축소. 현재 연결 방식은 한 번에 최대 512개 변경을 지원하며 한도를 넘으면 일부만 선택하지 않고 중단합니다.</p>
+        {saved && !savedMatches ? <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccMeshSelectionTools", "ko", "기억한 선택과 원본 버전 또는 모드가 달라 복원을 차단했습니다.")}</p> : null}
+        <p className="text-[11px] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccMeshSelectionTools", "ko", "캔버스: A 전체 · Alt+A 해제 · Ctrl+I 반전 · L 연결 · Ctrl+키패드 ± 확장/축소. 현재 연결 방식은 한 번에 최대 512개 변경을 지원하며 한도를 넘으면 일부만 선택하지 않고 중단합니다.")}</p>
         {error ? <p role="alert" className="text-xs text-fg-2">{error}</p> : null}
         {notice ? <p role="status" className="text-xs text-fg-2">{notice}</p> : null}
       </div>

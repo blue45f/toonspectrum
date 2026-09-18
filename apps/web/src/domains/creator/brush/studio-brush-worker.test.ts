@@ -5,6 +5,7 @@ import { processFreehandPoints } from "../studio-brush";
 import {
   disposeStudioBrushWorkerClient,
   processFreehandPointsInWorker,
+  STUDIO_BRUSH_WORKER_REQUEST_TIMEOUT_MS,
 } from "./studio-brush-worker-client";
 import {
   STUDIO_BRUSH_WORKER_PROTOCOL_VERSION,
@@ -45,6 +46,7 @@ function respond(worker: FakeBrushWorker, id: string, points: number[]): void {
 
 afterEach(() => {
   disposeStudioBrushWorkerClient();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   FakeBrushWorker.instances = [];
 });
@@ -92,6 +94,27 @@ describe("studio-brush-worker-protocol & client", () => {
 
     await expect(secondPromise).resolves.toEqual(replacementPoints);
     expect(FakeBrushWorker.instances).toHaveLength(2);
+  });
+
+  it("retires a stalled generation after the request deadline and drains it through the fallback", async () => {
+    vi.useFakeTimers();
+    installFakeWorker();
+    const raw = [0, 0, 10, 10, 20, 20];
+
+    const firstPromise = processFreehandPointsInWorker(raw, 2, "pen", 6, 71);
+    const stalled = FakeBrushWorker.instances[0];
+    expect(stalled).toBeDefined();
+
+    await vi.advanceTimersByTimeAsync(STUDIO_BRUSH_WORKER_REQUEST_TIMEOUT_MS);
+    await expect(firstPromise).resolves.toEqual(processFreehandPoints(raw, 2));
+    expect(stalled!.terminate).toHaveBeenCalledTimes(1);
+
+    const replacementPromise = processFreehandPointsInWorker(raw, 2, "pen", 6, 72);
+    const replacement = FakeBrushWorker.instances[1];
+    expect(replacement).toBeDefined();
+    const request = replacement!.postMessage.mock.calls[0]?.[0] as { id: string };
+    respond(replacement!, request.id, [0, 0, 20, 20]);
+    await expect(replacementPromise).resolves.toEqual([0, 0, 20, 20]);
   });
 
   it("retires the generation when postMessage throws synchronously", async () => {

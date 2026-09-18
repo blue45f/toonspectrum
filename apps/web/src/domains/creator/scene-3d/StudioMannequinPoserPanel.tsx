@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio 3D 데생 인형 포저 패널.
  *
@@ -239,16 +243,16 @@ export function StudioMannequinBodySection({
   return (
     <div className="space-y-4">
       <StudioSectionHeader
-        title="체형 프리셋"
-        description="다양한 등신 비율 및 신장 파라미터를 선택하세요."
+        title={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "체형 프리셋")}
+        description={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "다양한 등신 비율 및 신장 파라미터를 선택하세요.")}
       />
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="체형 프리셋">
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "체형 프리셋")}>
         {(Object.keys(STUDIO_MANNEQUIN_BODY_PRESETS) as StudioMannequinBodyPresetId[]).map(
           (presetId) => (
             <StudioPanelChip
               key={presetId}
               onClick={() => onApplyPreset(presetId)}
-              title={`${STUDIO_MANNEQUIN_BODY_PRESETS[presetId].label} 체형 프리셋 적용`}
+              title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "{v0} 체형 프리셋 적용"), { v0: String(STUDIO_MANNEQUIN_BODY_PRESETS[presetId].label) })}
             >
               {STUDIO_MANNEQUIN_BODY_PRESETS[presetId].label}
             </StudioPanelChip>
@@ -257,8 +261,8 @@ export function StudioMannequinBodySection({
       </div>
 
       <div className="space-y-1.5 pt-1">
-        <span className="text-xs font-semibold text-fg-2">재질·표면 스타일</span>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="재질 스타일">
+        <span className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "재질·표면 스타일")}</span>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "재질 스타일")}>
           {STUDIO_MANNEQUIN_MATERIAL_STYLES.map((style) => (
             <StudioToggleChip
               key={style.id}
@@ -273,7 +277,7 @@ export function StudioMannequinBodySection({
       </div>
 
       <div className="space-y-2 pt-1">
-        <span className="text-xs font-semibold text-fg-2">세부 체형 조절</span>
+        <span className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "세부 체형 조절")}</span>
         {BODY_SLIDERS.map(({ key, label, step, format }) => {
           const [min, max] = STUDIO_MANNEQUIN_PARAM_RANGES[key];
           return (
@@ -295,8 +299,8 @@ export function StudioMannequinBodySection({
 
       <div className="space-y-3 pt-3 border-t border-line/60">
         <StudioSectionHeader
-          title="해부학 비례"
-          description="흉곽·골반 깊이와 상완·전완·허벅지·종아리를 독립 조절해 같은 등신에서도 실제 인체에 가까운 테이퍼와 질량 분포를 만듭니다."
+          title={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "해부학 비례")}
+          description={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "흉곽·골반 깊이와 상완·전완·허벅지·종아리를 독립 조절해 같은 등신에서도 실제 인체에 가까운 테이퍼와 질량 분포를 만듭니다.")}
         />
         <div className="space-y-2">
           {ANATOMY_SLIDERS.map(({ key, label, step }) => {
@@ -322,10 +326,10 @@ export function StudioMannequinBodySection({
 
       <div className="space-y-3 pt-3 border-t border-line/60">
         <StudioSectionHeader
-          title="3D 헤드 모델 (Face Proportions)"
-          description="CSP 2.0 3D 헤드 모델: 웹툰/애니형, 턱선, 눈, 코 비율을 조절합니다."
+          title="얼굴 비율"
+          description="웹툰·애니 스타일의 머리 형태와 턱선·눈·코 비율을 조절합니다."
         />
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="헤드 프리셋">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "헤드 프리셋")}>
           {(Object.keys(STUDIO_MANNEQUIN_HEAD_PRESETS) as StudioMannequinHeadPresetId[]).map(
             (headId) => (
               <StudioPanelChip
@@ -338,7 +342,7 @@ export function StudioMannequinBodySection({
                     }),
                   )
                 }
-                title={`${STUDIO_MANNEQUIN_HEAD_PRESETS[headId].label} 헤드 프리셋 적용`}
+                title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "{v0} 헤드 프리셋 적용"), { v0: String(STUDIO_MANNEQUIN_HEAD_PRESETS[headId].label) })}
               >
                 {STUDIO_MANNEQUIN_HEAD_PRESETS[headId].label}
               </StudioPanelChip>
@@ -394,36 +398,33 @@ export function StudioMannequinPoseSection({
   return (
     <div className="space-y-3">
       <StudioSectionHeader
-        title="포즈 라이브러리"
-        description="카테고리별 프리셋을 고르고 뷰포트에서 핸들을 드래그해 다듬으세요."
+        title={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "포즈 라이브러리")}
+        description={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "카테고리별 프리셋을 고르고 뷰포트에서 핸들을 드래그해 다듬으세요.")}
         action={
           <div className="flex gap-1">
             <button
               type="button"
               onClick={onMirror}
               className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1 text-[0.7rem]" })}
-              title="포즈 좌우 반전"
+              title={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "포즈 좌우 반전")}
             >
-              <FlipHorizontal2 size={13} aria-hidden /> 미러
-            </button>
+              <FlipHorizontal2 size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "미러")}</button>
             <button
               type="button"
               onClick={onResetJoints}
               className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1 text-[0.7rem]" })}
-              title="모든 관절 초기화"
+              title={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "모든 관절 초기화")}
             >
-              <RotateCcw size={13} aria-hidden /> 초기화
-            </button>
+              <RotateCcw size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "초기화")}</button>
           </div>
         }
       />
-      <div className="flex flex-wrap gap-1" role="group" aria-label="포즈 카테고리">
+      <div className="flex flex-wrap gap-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "포즈 카테고리")}>
         <StudioToggleChip
           active={selectedCategory === "all"}
           onClick={() => onCategorySelect("all")}
         >
-          전체
-        </StudioToggleChip>
+          {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "전체")}</StudioToggleChip>
         {STUDIO_MANNEQUIN_POSE_CATEGORIES.map((cat) => (
           <StudioToggleChip
             key={cat.id}
@@ -434,12 +435,12 @@ export function StudioMannequinPoseSection({
           </StudioToggleChip>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="포즈 프리셋">
+      <div className="grid grid-cols-2 gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "포즈 프리셋")}>
         {filteredPresets.map((preset) => (
           <StudioPanelChip
             key={preset.id}
             onClick={() => onApplyPreset(preset.id)}
-            title={`${preset.label} 포즈 적용`}
+            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "{v0} 포즈 적용"), { v0: String(preset.label) })}
           >
             {preset.label}
           </StudioPanelChip>
@@ -474,35 +475,32 @@ export function StudioMannequinJointSection({
   return (
     <div className="space-y-3">
       <StudioSectionHeader
-        title="관절"
-        description="몸을 직접 드래그하면 관절이 회전하고, 손·발 원형 핸들을 드래그하면 IK로 팔다리가 따라옵니다. Alt+드래그는 비틀기, Shift는 정밀 조절, 더블클릭은 부위 확대입니다."
+        title={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "관절")}
+        description={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "몸을 직접 드래그하면 관절이 회전하고, 손·발 원형 핸들을 드래그하면 IK로 팔다리가 따라옵니다. Alt+드래그는 비틀기, Shift는 정밀 조절, 더블클릭은 부위 확대입니다.")}
         action={
           selectedJointId ? (
             <button
               type="button"
               onClick={onResetJoint}
               className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })}
-              title="선택한 관절 회전 초기화"
+              title={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "선택한 관절 회전 초기화")}
             >
-              <RotateCcw size={13} aria-hidden /> 초기화
-            </button>
+              <RotateCcw size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "초기화")}</button>
           ) : undefined
         }
       />
       <label className="flex items-center justify-between gap-2 text-xs text-fg-2">
-        관절 선택
-        <select
+        {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "관절 선택")}<select
           value={selectedJointId ?? ""}
           onChange={(event) => {
             const next = event.target.value;
             if (next) onSelectJoint(next as StudioMannequinJointId);
           }}
-          aria-label="편집할 관절 선택"
+          aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "편집할 관절 선택")}
           className="h-8 min-w-0 flex-1 rounded-md border border-line bg-card px-2 text-[0.72rem] text-fg outline-none focus:border-accent/60 pointer-coarse:min-h-11"
         >
           <option value="" disabled>
-            관절을 선택하세요
-          </option>
+            {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "관절을 선택하세요")}</option>
           {STUDIO_MANNEQUIN_JOINT_IDS.map((jointId) => (
             <option key={jointId} value={jointId}>
               {STUDIO_MANNEQUIN_JOINT_LABELS[jointId]}
@@ -531,8 +529,7 @@ export function StudioMannequinJointSection({
         </div>
       ) : (
         <p className="rounded-lg border border-dashed border-line/70 bg-card/60 p-3 text-[0.7rem] leading-relaxed text-fg-3">
-          선택된 관절이 없습니다. 뷰포트의 마네킹을 클릭하면 해당 부위 관절이 선택됩니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "선택된 관절이 없습니다. 뷰포트의 마네킹을 클릭하면 해당 부위 관절이 선택됩니다.")}</p>
       )}
     </div>
   );
@@ -588,21 +585,20 @@ export function StudioMannequinCameraSection({
   return (
     <div className="space-y-3">
       <StudioSectionHeader
-        title="카메라·캡처"
-        description="드래그 = 회전, 휠 = 줌, 우클릭 드래그 = 이동."
+        title={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "카메라·캡처")}
+        description={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "드래그 = 회전, 휠 = 줌, 우클릭 드래그 = 이동.")}
         action={
           <button
             type="button"
             onClick={onResetCamera}
             className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })}
-            title="카메라 초기 위치로"
+            title={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "카메라 초기 위치로")}
           >
-            <RotateCcw size={13} aria-hidden /> 리셋
-          </button>
+            <RotateCcw size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "리셋")}</button>
         }
       />
       <div className="space-y-1">
-        <span className="text-xs text-fg-2">실시간 웹캠 동작 인식 (Live Motion Tracking)</span>
+        <span className="text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "실시간 웹캠 동작 인식 (Live Motion Tracking)")}</span>
         <button
           type="button"
           onClick={onToggleWebcam}
@@ -621,27 +617,25 @@ export function StudioMannequinCameraSection({
           )}
           {webcamLoading
             ? webcamLoadingStage === "engine"
-              ? "엔진 준비 취소"
-              : "카메라 연결 취소"
+              ? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "엔진 준비 취소")
+              : translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "카메라 연결 취소")
             : webcamActive
-              ? "실시간 동작 인식 중지"
+              ? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "실시간 동작 인식 중지")
               : webcamError
-                ? "웹캠 동작 인식 다시 시도"
-                : "웹캠 실시간 동작 인식 시작"}
+                ? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "웹캠 동작 인식 다시 시도")
+                : translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "웹캠 실시간 동작 인식 시작")}
         </button>
 
         {webcamLoadingStage === "engine" ? (
           <p role="status" className="mt-1 text-[0.7rem] leading-relaxed text-fg-3">
-            동작 인식 엔진을 준비하고 있습니다. 처음 실행할 때는 모델을 내려받아 잠시 걸릴 수 있습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "동작 인식 엔진을 준비하고 있습니다. 처음 실행할 때는 모델을 내려받아 잠시 걸릴 수 있습니다.")}</p>
         ) : webcamLoadingStage === "camera" ? (
           <p role="status" className="mt-1 text-[0.7rem] leading-relaxed text-fg-3">
-            엔진 준비 완료. 브라우저의 카메라 권한을 허용해 주세요. 권한 창이 보이지 않으면 주소창의 카메라 아이콘을 확인하세요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "엔진 준비 완료. 브라우저의 카메라 권한을 허용해 주세요. 권한 창이 보이지 않으면 주소창의 카메라 아이콘을 확인하세요.")}</p>
         ) : null}
 
         {webcamActive && (
-          <div className="grid grid-cols-2 gap-1 pt-1.5" role="group" aria-label="모션 캡처 옵션">
+          <div className="grid grid-cols-2 gap-1 pt-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "모션 캡처 옵션")}>
             <button
               type="button"
               onClick={onTogglePoseFreeze}
@@ -652,7 +646,7 @@ export function StudioMannequinCameraSection({
               })}
             >
               {poseFrozen ? <Lock size={13} aria-hidden /> : <Unlock size={13} aria-hidden />}
-              {poseFrozen ? "포즈 고정됨" : "포즈 고정"}
+              {poseFrozen ? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "포즈 고정됨") : translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "포즈 고정")}
             </button>
             <button
               type="button"
@@ -664,7 +658,7 @@ export function StudioMannequinCameraSection({
               })}
             >
               <FlipHorizontal2 size={13} aria-hidden />
-              {mirrorMode ? "좌우 반전 ON" : "좌우 반전"}
+              {mirrorMode ? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "좌우 반전 ON") : translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "좌우 반전")}
             </button>
             <button
               type="button"
@@ -676,7 +670,7 @@ export function StudioMannequinCameraSection({
               })}
             >
               <Hand size={13} aria-hidden />
-              {fingerTracking ? "손가락 솔버 ON" : "손가락 솔버"}
+              {fingerTracking ? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "손가락 솔버 ON") : translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "손가락 솔버")}
             </button>
             <button
               type="button"
@@ -688,7 +682,7 @@ export function StudioMannequinCameraSection({
               })}
             >
               <ScanFace size={13} aria-hidden />
-              {facialTracking ? "표정 맵핑 ON" : "표정 맵핑"}
+              {facialTracking ? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "표정 맵핑 ON") : translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "표정 맵핑")}
             </button>
           </div>
         )}
@@ -700,8 +694,8 @@ export function StudioMannequinCameraSection({
         ) : null}
       </div>
       <div className="space-y-1">
-        <span className="text-xs text-fg-2">카메라 앵글 프리셋</span>
-        <div className="grid grid-cols-3 gap-1" role="group" aria-label="카메라 앵글">
+        <span className="text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "카메라 앵글 프리셋")}</span>
+        <div className="grid grid-cols-3 gap-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "카메라 앵글")}>
           {[
             { id: "front", label: "정면" },
             { id: "side", label: "측면" },
@@ -721,22 +715,20 @@ export function StudioMannequinCameraSection({
           ))}
         </div>
       </div>
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="투영 방식">
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "투영 방식")}>
         <StudioToggleChip
           active={projection === "perspective"}
           onClick={() => onProjectionChange("perspective")}
         >
-          원근
-        </StudioToggleChip>
+          {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "원근")}</StudioToggleChip>
         <StudioToggleChip
           active={projection === "orthographic"}
           onClick={() => onProjectionChange("orthographic")}
         >
-          직교
-        </StudioToggleChip>
+          {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "직교")}</StudioToggleChip>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="캡처 배율">
-        <span className="text-xs text-fg-2">캡처 배율</span>
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "캡처 배율")}>
+        <span className="text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "캡처 배율")}</span>
         {CAPTURE_SCALES.map((scale) => (
           <StudioToggleChip
             key={scale}
@@ -751,7 +743,7 @@ export function StudioMannequinCameraSection({
         type="button"
         onClick={onCapture}
         disabled={capturing || captureDisabled}
-        title={captureDisabled ? "SQLite 저장 상태를 확인한 뒤 캡처할 수 있습니다." : undefined}
+        title={captureDisabled ? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "SQLite 저장 상태를 확인한 뒤 캡처할 수 있습니다.") : undefined}
         className={buttonClass({ size: "md", variant: "solid", className: "w-full gap-1.5" })}
       >
         {capturing ? (
@@ -759,8 +751,7 @@ export function StudioMannequinCameraSection({
         ) : (
           <Camera size={15} aria-hidden />
         )}
-        캔버스로 캡처
-      </button>
+        {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "캔버스로 캡처")}</button>
     </div>
   );
 }
@@ -1600,8 +1591,7 @@ export function StudioMannequinPoserPanel({
           <div className="flex items-center gap-2">
             <h2 id={dialogTitleId} className="flex items-center gap-1.5 text-sm font-bold tracking-tight">
               <PersonStanding size={16} className="text-accent" aria-hidden />
-              3D 데생 인형
-            </h2>
+              {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "3D 데생 인형")}</h2>
             <span
               aria-live="polite"
               className={cn(
@@ -1610,11 +1600,11 @@ export function StudioMannequinPoserPanel({
               )}
             >
               {persistenceStatus === "loading"
-                ? "SQLite 불러오는 중"
+                ? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "SQLite 불러오는 중")
                 : persistenceStatus === "saving"
-                  ? "SQLite 저장 중"
+                  ? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "SQLite 저장 중")
                   : persistenceStatus === "memory-only"
-                    ? "현재 탭 메모리 임시"
+                    ? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "현재 탭 메모리 임시")
                     : ""}
             </span>
             <div className="hidden items-center gap-1 sm:flex">
@@ -1622,35 +1612,31 @@ export function StudioMannequinPoserPanel({
                 type="button"
                 onClick={handleExportJson}
                 className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1 text-[0.7rem]" })}
-                title="포즈 및 체형 JSON 다운로드"
+                title={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "포즈 및 체형 JSON 다운로드")}
               >
-                <Download size={13} aria-hidden /> 내보내기
-              </button>
+                <Download size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "내보내기")}</button>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1 text-[0.7rem]" })}
-                title="JSON 포즈 파일 불러오기"
+                title={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "JSON 포즈 파일 불러오기")}
               >
-                <Upload size={13} aria-hidden /> 가져오기
-              </button>
+                <Upload size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "가져오기")}</button>
               <button
                 type="button"
                 onClick={handleCopyShareLink}
                 className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1 text-[0.7rem]" })}
-                title="공유 해시 URL 복사"
+                title={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "공유 해시 URL 복사")}
               >
                 {copiedLink ? <Check size={13} className="text-accent" /> : <Share2 size={13} />}
-                공유
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "공유")}</button>
               <button
                 type="button"
                 onClick={() => setTab("pose")}
                 className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1 text-[0.7rem]" })}
-                title="MediaPipe 사진 포즈 스캐너 열기"
+                title={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "MediaPipe 사진 포즈 스캐너 열기")}
               >
-                <ImageIcon size={13} aria-hidden /> 사진 포즈
-              </button>
+                <ImageIcon size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "사진 포즈")}</button>
             </div>
           </div>
           <button
@@ -1663,13 +1649,13 @@ export function StudioMannequinPoserPanel({
             }
             title={
               persistenceStatus === "loading" || persistenceStatus === "idle"
-                ? "SQLite 상태를 불러온 뒤 닫을 수 있습니다."
+                ? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "SQLite 상태를 불러온 뒤 닫을 수 있습니다.")
                 : persistenceStatus === "memory-only"
-                  ? "현재 탭의 변경을 저장하지 않고 닫습니다. 먼저 JSON으로 내보내세요."
+                  ? translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "현재 탭의 변경을 저장하지 않고 닫습니다. 먼저 JSON으로 내보내세요.")
                   : undefined
             }
             className={buttonClass({ size: "icon", variant: "quiet" })}
-            aria-label="3D 데생 인형 닫기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "3D 데생 인형 닫기")}
           >
             <X size={16} aria-hidden />
           </button>
@@ -1690,7 +1676,7 @@ export function StudioMannequinPoserPanel({
                 ref={viewportRef}
                 className="h-full w-full"
                 data-studio-mannequin-viewport="true"
-                aria-label="3D 데생 인형 뷰포트 — 몸 드래그로 관절 회전, 손·발 핸들 드래그로 IK, 더블클릭으로 부위 확대"
+                aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "3D 데생 인형 뷰포트 — 몸 드래그로 관절 회전, 손·발 핸들 드래그로 IK, 더블클릭으로 부위 확대")}
               />
             )}
             {error ? (
@@ -1705,7 +1691,7 @@ export function StudioMannequinPoserPanel({
 
           {/* 컨트롤 */}
           <aside className="flex min-h-0 w-full flex-col border-t border-line/70 md:w-[320px] md:border-l md:border-t-0">
-            <nav className="flex gap-1 border-b border-line/60 p-2" aria-label="데생 인형 설정 탭">
+            <nav className="flex gap-1 border-b border-line/60 p-2" aria-label={translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "데생 인형 설정 탭")}>
               {TABS.map((entry) => (
                 <button
                   key={entry.id}
@@ -1759,7 +1745,7 @@ export function StudioMannequinPoserPanel({
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="min-w-0 truncate" title={photoPoseApplyStatus.sourceName}>
-                          사진 포즈 적용됨 · 관절 {photoPoseApplyStatus.appliedJointCount}개 · 신뢰도 {photoPoseApplyStatus.confidencePercent}%
+                          {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "사진 포즈 적용됨 · 관절 ")}{photoPoseApplyStatus.appliedJointCount}{translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "개 · 신뢰도 ")}{photoPoseApplyStatus.confidencePercent}%
                         </span>
                         {photoPoseUndoEntry?.after === pose ? (
                           <button
@@ -1767,8 +1753,7 @@ export function StudioMannequinPoserPanel({
                             onClick={handleUndoPhotoPose}
                             className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 text-[0.66rem]" })}
                           >
-                            1단계 실행 취소
-                          </button>
+                            {translateCurrentStaticSourceText("domains.creator.scene.3d.StudioMannequinPoserPanel", "ko", "1단계 실행 취소")}</button>
                         ) : null}
                       </div>
                     </div>

@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { motion } from "motion/react";
 import { useId } from "react";
 
@@ -73,7 +74,7 @@ export function Segmented<T extends string>({
           >
             {active && (
               <motion.span
-                layoutId={`seg-${groupId}`}
+                layoutId={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.ui.segmented", "en", "seg-{v0}"), { v0: String(groupId) })}
                 className="absolute inset-0 -z-10 rounded-full bg-accent"
                 transition={{ type: "spring", stiffness: 420, damping: 34 }}
               />
@@ -127,7 +128,7 @@ export function UnderlineTabs<T extends string>({
             {it.label}
             {active && (
               <motion.span
-                layoutId={`tab-${groupId}`}
+                layoutId={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.ui.segmented", "en", "tab-{v0}"), { v0: String(groupId) })}
                 className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-accent"
                 transition={{ type: "spring", stiffness: 420, damping: 34 }}
               />

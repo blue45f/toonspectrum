@@ -17,6 +17,7 @@ apps/web/src/app/studio-cross-origin-isolation.test.ts
 apps/web/src/app/studio-immersive-shell.test.ts
 apps/web/src/domains/creator/StudioColorHarmoniesPanel.test.tsx
 apps/web/src/domains/creator/StudioColorPopoverAdvanced.test.tsx
+apps/web/src/domains/creator/StudioContextHelpDialog.visual.test.tsx
 apps/web/src/domains/creator/StudioGroupUniformResizeProxy.test.tsx
 apps/web/src/domains/creator/StudioInspectorBatchRenameSection.test.tsx
 apps/web/src/domains/creator/StudioInspectorOrderAlignSection.test.tsx

@@ -100,10 +100,15 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "admin_content_reports",
   "admin_promos",
   "admin_security_policies",
+  "business_inquiry",
   "community_cafe_ban",
   "community_cafe_invite",
   "community_cafe_join_request",
   "community_cafe_moderation_log",
+  "commerce_entitlement",
+  "commerce_order",
+  "commerce_payment_event",
+  "commerce_product_price",
   "creator_asset_artifact",
   "creator_asset_artifact_set",
   "creator_asset_license_snapshot",
@@ -189,6 +194,10 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "studio_ai_comic_director_job_event",
   "studio_ai_comic_director_session",
   "studio_ai_visual_bible_revision",
+  "creator_support_application",
+  "creator_support_offer",
+  "supporter_funding_setting",
+  "supporter_payment",
 ]);
 
 const MODE_CONFIRMATIONS = Object.freeze({

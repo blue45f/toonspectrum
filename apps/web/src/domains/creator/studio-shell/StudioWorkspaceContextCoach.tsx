@@ -1,13 +1,24 @@
+import {
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Boxes, CheckCircle2, Move3d, Sparkles, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
 
-import { useI18n } from "@/shared/lib/i18n";
-import { resolveProductLocale } from "@/shared/lib/product-identity";
+
+
 
 import type { StudioWorkspaceSurface } from "../studio-workspace-route";
 
 import "./studio-workspace-context-coach.css";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioWorkspaceContextCoach", ko, en);
 
 type CoachSurface = Extract<StudioWorkspaceSurface, "bg3d" | "poser" | "character">;
 
@@ -57,9 +68,10 @@ function storageKey(surface: CoachSurface) {
 }
 
 export function StudioWorkspaceContextCoach({ surface }: { readonly surface: CoachSurface }) {
-  const language = useI18n((state) => state.lang);
-  const locale = resolveProductLocale(language);
-  const copy = COPY[locale];
+  useBilingualI18nRevision();
+
+
+  const copy = bi((COPY).ko, (COPY).en);
   const reducedMotion = useReducedMotion();
   const [visible, setVisible] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -93,7 +105,7 @@ export function StudioWorkspaceContextCoach({ surface }: { readonly surface: Coa
             <img src={surface === "bg3d" ? "/brand/production-os-workspace.svg" : surface === "poser" ? "/brand/theme-scenes/graphite-studio.svg" : "/brand/theme-scenes/blossom-studio.svg"} alt="" />
           </div>
           <div className="studio-context-coach__body">
-            <p><Sparkles size={13} aria-hidden="true" /> JUST-IN-TIME GUIDE</p>
+            <p><Sparkles size={13} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioWorkspaceContextCoach", "en", "JUST-IN-TIME GUIDE")}</p>
             <strong>{content.title}</strong>
             <span>{content.body}</span>
             <ol>

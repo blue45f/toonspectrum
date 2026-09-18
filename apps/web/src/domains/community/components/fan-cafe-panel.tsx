@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   BookOpenText,
   ImagePlus,
   MessageCircle,
@@ -439,9 +443,8 @@ export function FanCafePanel({
         <div>
           <p className="eyebrow flex items-center gap-1.5 text-accent">
             <UsersRound size={14} />
-            FAN CAFE
-          </p>
-          <h2 className="mt-2 text-xl font-bold tracking-tight text-fg">{targetLabel} 팬카페</h2>
+            {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "en", "FAN CAFE")}</p>
+          <h2 className="mt-2 text-xl font-bold tracking-tight text-fg">{targetLabel} {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페")}</h2>
           {compact && scope !== "all" && (
             <p className="mt-1 text-xs text-fg-3">
               <span className="rounded-full border border-line px-1.5 py-0.5 text-[0.65rem]">{COMMUNITY_SCOPE_LABEL_WITH_ALL[scope]}</span> {targetLabel}
@@ -453,18 +456,17 @@ export function FanCafePanel({
         </div>
         <div className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-line bg-canvas/45 px-3 py-2 text-xs text-fg-2">
           <BookOpenText size={14} className="text-accent" />
-          게시글 <span className="numeral text-fg">{posts.length}</span>
+          {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "게시글 ")}<span className="numeral text-fg">{posts.length}</span>
         </div>
       </div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs">
         <p className="text-fg-3">
-          마지막 동기화: {lastSyncedAt ? new Date(lastSyncedAt).toLocaleTimeString() : "로딩 전"}
+          {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "마지막 동기화: ")}{lastSyncedAt ? new Date(lastSyncedAt).toLocaleTimeString() : translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "로딩 전")}
         </p>
         {postPulse > 0 ? (
           <span className="inline-flex items-center gap-1 rounded-md border border-accent/35 bg-accent-soft px-2 py-1 text-xs text-accent">
             <Bell size={12} />
-            새 글 {postPulse}개 반영
-          </span>
+            {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "새 글 ")}{postPulse}{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "개 반영")}</span>
         ) : null}
         <div className="flex items-center gap-2">
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-canvas/40 px-2 py-1.5">
@@ -474,7 +476,7 @@ export function FanCafePanel({
               onChange={(event) => setAutoRefreshEnabled(event.target.checked)}
               className="size-3.5"
             />
-            <span className="text-fg-3">실시간 새로고침(30초)</span>
+            <span className="text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "실시간 새로고침(30초)")}</span>
           </label>
           <button
             type="button"
@@ -482,8 +484,7 @@ export function FanCafePanel({
             className="inline-flex items-center gap-1 rounded-lg border border-line bg-raised px-2 py-1.5 text-fg-3 transition-colors hover:bg-canvas/55 hover:text-fg"
           >
             <RefreshCw size={13} />
-            새로고침
-          </button>
+            {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "새로고침")}</button>
         </div>
       </div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -493,8 +494,8 @@ export function FanCafePanel({
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
             maxLength={80}
-            aria-label="팬카페 글 검색 (제목·본문 키워드)"
-            placeholder="제목·본문 키워드 검색"
+            aria-label={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페 글 검색 (제목·본문 키워드)")}
+            placeholder={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "제목·본문 키워드 검색")}
             className="h-full w-full min-w-0 border-none bg-transparent text-sm outline-none placeholder:text-fg-3"
           />
         </div>
@@ -507,8 +508,7 @@ export function FanCafePanel({
           )}
         >
           <Tag size={12} />
-          태그 전체
-        </button>
+          {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "태그 전체")}</button>
         <div className="inline-flex h-9 rounded-xl border border-line bg-raised/40">
           {COMMUNITY_SORT_OPTIONS.map((option) => (
             <button
@@ -531,7 +531,7 @@ export function FanCafePanel({
       </div>
       {postTagSuggests.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <span className="text-[0.68rem] text-fg-3">태그:</span>
+          <span className="text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "태그:")}</span>
           {postTagSuggests.map((tag) => {
             const active = selectedTag === tag;
             return (
@@ -567,7 +567,7 @@ export function FanCafePanel({
                     }}
                     className="size-3.5"
                   />
-                  <span>내 글만 보기</span>
+                  <span>{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "내 글만 보기")}</span>
                 </label>
               ) : null}
               <div className="mb-3 flex flex-wrap gap-1.5">
@@ -596,7 +596,7 @@ export function FanCafePanel({
               <div className="rounded-lg border border-dashed border-line bg-canvas/45 px-4 py-8 text-center">
                 <UsersRound className="mx-auto mb-2 text-accent" size={20} />
                 <p className="text-sm font-medium text-fg">{composeLock.message}</p>
-                <p className="mt-1 text-xs text-fg-3">읽기는 누구에게나 열려 있습니다.</p>
+                <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "읽기는 누구에게나 열려 있습니다.")}</p>
                 {composeLock.actionLabel && composeLock.onAction ? (
                   <button
                     type="button"
@@ -610,7 +610,7 @@ export function FanCafePanel({
             ) : userId ? (
             <div className="flex flex-col gap-3">
                 <label className="flex items-center gap-2 text-xs text-fg-3">
-                  <span>카테고리</span>
+                  <span>{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "카테고리")}</span>
                   <select
                     value={composeKind}
                     onChange={(event) => setComposeKind(event.target.value as FanCafePostKind)}
@@ -627,8 +627,8 @@ export function FanCafePanel({
                   value={title}
                   onChange={(event) => setTitle(event.target.value.slice(0, FAN_CAFE_POST_TITLE_MAX_LENGTH))}
                   maxLength={FAN_CAFE_POST_TITLE_MAX_LENGTH}
-                  aria-label="팬카페 글 제목"
-                  placeholder="팬카페 글 제목"
+                  aria-label={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페 글 제목")}
+                  placeholder={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페 글 제목")}
                   className="h-10 rounded-lg border border-line bg-canvas px-3 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent/60"
                 />
                 <div className="text-right text-[0.7rem] text-fg-3">
@@ -639,8 +639,8 @@ export function FanCafePanel({
                   onChange={(event) => setText(event.target.value.slice(0, FAN_CAFE_POST_TEXT_MAX_LENGTH))}
                   maxLength={FAN_CAFE_POST_TEXT_MAX_LENGTH}
                   rows={5}
-                  aria-label="팬카페 글 본문"
-                  placeholder="해석, 질문, 응원, 팬아트 메모를 남겨보세요."
+                  aria-label={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페 글 본문")}
+                  placeholder={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "해석, 질문, 응원, 팬아트 메모를 남겨보세요.")}
                   className="resize-none rounded-lg border border-line bg-canvas px-3 py-2.5 text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3 focus:border-accent/60"
                 />
                 <div className="text-right text-[0.7rem] text-fg-3">
@@ -650,8 +650,8 @@ export function FanCafePanel({
                   value={tags}
                   onChange={(event) => setTags(event.target.value.slice(0, FAN_CAFE_POST_TAGS_MAX_LENGTH))}
                   maxLength={FAN_CAFE_POST_TAGS_MAX_LENGTH}
-                  aria-label="팬카페 글 태그 (선택)"
-                  placeholder="#정주행 #해석 처럼 태그 추가"
+                  aria-label={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페 글 태그 (선택)")}
+                  placeholder={translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "#정주행 #해석 처럼 태그 추가")}
                   className="h-10 rounded-lg border border-line bg-canvas px-3 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent/60"
                 />
                 <input
@@ -675,9 +675,9 @@ export function FanCafePanel({
                     className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-raised/55 px-2.5 text-xs font-medium text-fg-2 transition-colors hover:bg-canvas/55 hover:text-fg disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     <ImagePlus size={14} />
-                    {attachBusy ? "이미지 처리 중..." : `이미지 첨부 ${images.length}/${ATTACHMENT_MAX_COUNT}`}
+                    {attachBusy ? translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "이미지 처리 중...") : formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "이미지 첨부 {v0}/{v1}"), { v0: String(images.length), v1: String(ATTACHMENT_MAX_COUNT) })}
                   </button>
-                  <span className="text-[0.65rem] text-fg-3">긴 변 1600px·장당 2MB로 자동 축소</span>
+                  <span className="text-[0.65rem] text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "긴 변 1600px·장당 2MB로 자동 축소")}</span>
                 </div>
                 {images.length > 0 && (
                   <ul className="flex flex-wrap gap-2">
@@ -685,12 +685,12 @@ export function FanCafePanel({
                       <li key={`${index}-${src.slice(-24)}`} className="relative">
                         <img
                           src={src}
-                          alt={`첨부 미리보기 ${index + 1}`}
+                          alt={formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "첨부 미리보기 {v0}"), { v0: String(index + 1) })}
                           className="size-16 rounded-lg border border-line object-cover"
                         />
                         <button
                           type="button"
-                          aria-label={`첨부 이미지 ${index + 1} 제거`}
+                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "첨부 이미지 {v0} 제거"), { v0: String(index + 1) })}
                           onClick={() => setImages((current) => current.filter((_, i) => i !== index))}
                           className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full border border-line bg-canvas text-fg-3 transition-colors hover:text-bad"
                         >
@@ -707,40 +707,37 @@ export function FanCafePanel({
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <Send size={15} />
-                  {isSubmittingPost ? "등록 중..." : "팬카페에 올리기"}
+                  {isSubmittingPost ? translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "등록 중...") : translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "팬카페에 올리기")}
                 </button>
               </div>
             ) : (
               <div className="rounded-lg border border-dashed border-line bg-canvas/45 px-4 py-8 text-center">
                 <Sparkles className="mx-auto mb-2 text-accent" size={20} />
-                <p className="text-sm font-medium text-fg">로그인하면 팬카페에 글을 쓸 수 있습니다.</p>
-                <p className="mt-1 text-xs text-fg-3">읽기는 누구에게나 열려 있습니다.</p>
+                <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "로그인하면 팬카페에 글을 쓸 수 있습니다.")}</p>
+                <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "읽기는 누구에게나 열려 있습니다.")}</p>
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
                   <button
                     type="button"
                     onClick={() => appendDemoActivity("blocked", "로그인 전 작성 차단", "약관 확인 후 로그인 필요")}
                     className="rounded-lg border border-line bg-raised px-3 py-2 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:text-fg"
                   >
-                    차단 로그 남기기
-                  </button>
+                    {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "차단 로그 남기기")}</button>
                   <a className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-on-accent" href="/terms">
-                    약관 보기
-                  </a>
+                    {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "약관 보기")}</a>
                 </div>
               </div>
             )
           ) : (
             <div className="rounded-lg border border-dashed border-line bg-canvas/45 px-4 py-8 text-center">
               <Sparkles className="mx-auto mb-2 text-accent" size={20} />
-              <p className="text-sm font-medium text-fg">현재 통합 피드에서는 작성이 제한돼요.</p>
-              <p className="mt-1 text-xs text-fg-3">작품·작가·펜카페 보드로 이동해 작성할 수 있습니다.</p>
+              <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "현재 통합 피드에서는 작성이 제한돼요.")}</p>
+              <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "작품·작가·펜카페 보드로 이동해 작성할 수 있습니다.")}</p>
               <button
                 type="button"
                 onClick={() => appendDemoActivity("blocked", "통합 피드 작성 차단", "대상 보드에서 작성 가능")}
                 className="mt-4 rounded-lg border border-line bg-raised px-3 py-2 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:text-fg"
               >
-                작성 제한 로그 남기기
-              </button>
+                {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "작성 제한 로그 남기기")}</button>
             </div>
           )}
           {error && <p className="mt-3 text-xs text-bad">{error}</p>}
@@ -755,8 +752,8 @@ export function FanCafePanel({
           ) : posts.length === 0 ? (
             <div className="rounded-xl border border-dashed border-line bg-card/50 px-5 py-12 text-center">
               <MessageCircle className="mx-auto mb-3 text-fg-3" size={22} />
-              <p className="text-sm font-medium text-fg">아직 팬카페 글이 없습니다.</p>
-              <p className="mt-1 text-xs text-fg-3">첫 해석이나 응원을 남겨보세요.</p>
+              <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "아직 팬카페 글이 없습니다.")}</p>
+              <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "첫 해석이나 응원을 남겨보세요.")}</p>
             </div>
           ) : (
             posts.map((post) => (
@@ -777,8 +774,7 @@ export function FanCafePanel({
               onClick={loadMore}
               className="rounded-lg border border-line bg-raised px-3 py-2 text-sm font-medium text-fg transition-colors hover:bg-canvas/55"
             >
-              더 보기
-            </button>
+              {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "더 보기")}</button>
           ) : null}
         </div>
       </div>

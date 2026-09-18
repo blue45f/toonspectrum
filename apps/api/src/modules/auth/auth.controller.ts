@@ -25,6 +25,7 @@ import {
   AccountMergeError,
   confirmAccountMerge,
   issueAccountMergeToken,
+  normalizeAccountMergeProfilePreference,
   previewAccountMerge,
 } from "../../server/account-merge";
 import {
@@ -1137,13 +1138,16 @@ export class AuthController {
           name: preview.source.name,
           email: preview.source.email,
           providers: preview.source.providers,
+          profile: preview.source.profile,
         },
         target: {
           name: preview.target.name,
           email: preview.target.email,
           providers: preview.target.providers,
+          profile: preview.target.profile,
         },
         affectedRecordCount: preview.affectedRecordCount,
+        deduplicatedRecordCount: preview.deduplicatedRecordCount,
         expiresAt: preview.expiresAt,
         warnings: preview.warnings,
       };
@@ -1154,7 +1158,7 @@ export class AuthController {
 
   @Post("account-merge/confirm")
   async confirmAccountMergeRequest(
-    @Body() body: { token?: unknown },
+    @Body() body: { token?: unknown; profilePreference?: unknown },
     @Headers("x-user-id") userId: string | undefined,
     @Headers("origin") origin: string | undefined,
     @Req() request: Request,
@@ -1173,6 +1177,11 @@ export class AuthController {
       const merged = await confirmAccountMerge(
         userId,
         typeof body?.token === "string" ? body.token.trim() : "",
+        {
+          profilePreference: normalizeAccountMergeProfilePreference(
+            body?.profilePreference,
+          ),
+        },
       );
       invalidateSessionUser(merged.sourceUserId);
       invalidateSessionUser(merged.targetUserId);
@@ -1199,10 +1208,16 @@ export class AuthController {
       this.logger.log({
         event: "auth.account-merge.completed",
         transferredRecordCount: merged.transferredRecordCount,
+        deduplicatedRecordCount: merged.deduplicatedRecordCount,
+        consolidatedQuotaRecordCount: merged.consolidatedQuotaRecordCount,
+        profilePreference: merged.profilePreference,
       });
       return {
         ok: true,
         transferredRecordCount: merged.transferredRecordCount,
+        deduplicatedRecordCount: merged.deduplicatedRecordCount,
+        consolidatedQuotaRecordCount: merged.consolidatedQuotaRecordCount,
+        profilePreference: merged.profilePreference,
         providers: merged.providers,
       };
     } catch (error: unknown) {

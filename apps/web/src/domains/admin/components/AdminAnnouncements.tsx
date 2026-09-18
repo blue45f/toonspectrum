@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   CalendarClock,
   Copy,
@@ -363,7 +364,7 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
             >
               <RefreshCw
                 size={14}
-                className={refreshing ? "animate-spin" : undefined}
+                className={refreshing ? translateCurrentStaticSourceText("domains.admin.components.AdminAnnouncements", "en", "animate-spin") : undefined}
               />
               {copy.common.refresh}
             </button>
@@ -689,8 +690,8 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
                     <option value="creator">
                       {t("admin.announcements.targetCreator")}
                     </option>
-                    <option value="operator">Operator</option>
-                    <option value="admin">Admin</option>
+                    <option value="operator">{translateCurrentStaticSourceText("domains.admin.components.AdminAnnouncements", "en", "Operator")}</option>
+                    <option value="admin">{translateCurrentStaticSourceText("domains.admin.components.AdminAnnouncements", "en", "Admin")}</option>
                   </select>
                 </label>
               </div>

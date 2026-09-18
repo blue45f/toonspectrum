@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { PenLine } from "lucide-react";
 import { useParams } from "react-router-dom";
 
@@ -37,20 +40,18 @@ export function PencafePage() {
         <div>
           <p className="eyebrow flex items-center gap-1.5 text-accent">
             <PenLine size={13} />
-            PENCAFE
-          </p>
-          <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">{targetLabel} 펜카페</h1>
+            {translateCurrentStaticSourceText("domains.community.PencafePage", "en", "PENCAFE")}</p>
+          <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">{targetLabel} {translateCurrentStaticSourceText("domains.community.PencafePage", "ko", "펜카페")}</h1>
           <p className="lede mt-2 max-w-xl text-pretty text-sm leading-relaxed text-fg-2">
-            펜카페/번역자/편집자 커뮤니티를 중심으로 대화, 정리, 번역 소식, 창작 노하우를 공유합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.community.PencafePage", "ko", "펜카페/번역자/편집자 커뮤니티를 중심으로 대화, 정리, 번역 소식, 창작 노하우를 공유합니다.")}</p>
         </div>
         {targetLabel && (
           <SharePageButton
             path={sharePath}
             text={shareTitle}
             description={shareDescription}
-            label="펜카페 공유"
-            actionLabel="펜카페 보기"
+            label={translateCurrentStaticSourceText("domains.community.PencafePage", "ko", "펜카페 공유")}
+            actionLabel={translateCurrentStaticSourceText("domains.community.PencafePage", "ko", "펜카페 보기")}
           />
         )}
       </header>

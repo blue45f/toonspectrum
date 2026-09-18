@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Eraser, Grid3X3, Pencil, Shapes } from "lucide-react";
 
 import type { DrawMode, DrawShapeKind } from "./studio-editor-tool-model";
@@ -37,11 +38,11 @@ export function StudioInspectorDrawModeControls({
 }: StudioInspectorDrawModeControlsProps) {
   return (
     <div data-testid="studio-inspector-context-drawing" className="contents">
-      <p className="text-xs font-semibold text-fg-3">그리기 도구 설정</p>
+      <p className="text-xs font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawModeControls", "ko", "그리기 도구 설정")}</p>
       <div
         className="flex gap-1 rounded-lg border border-line bg-card p-0.5"
         role="group"
-        aria-label="그리기 모드"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawModeControls", "ko", "그리기 모드")}
         data-testid="studio-inspector-draw-mode"
       >
         {DRAW_MODES.map(({ label, value, Icon }) => (
@@ -75,7 +76,7 @@ export function StudioInspectorDrawModeControls({
 
       {drawMode === "pixel" ? (
         <section
-          aria-label="픽셀 펜 특성"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawModeControls", "ko", "픽셀 펜 특성")}
           data-studio-pixel-pen-identity="true"
           className="rounded-xl border border-accent/35 bg-accent-soft/20 p-2.5"
         >
@@ -87,16 +88,14 @@ export function StudioInspectorDrawModeControls({
               <Grid3X3 size={17} strokeWidth={1.9} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-xs font-bold text-fg">픽셀 펜</span>
+              <span className="block text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawModeControls", "ko", "픽셀 펜")}</span>
               <span className="block text-[0.62rem] leading-relaxed text-fg-2">
-                안티앨리어싱 없는 원본 픽셀을 정확히 찍어요.
-              </span>
+                {translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawModeControls", "ko", "안티앨리어싱 없는 원본 픽셀을 정확히 찍어요.")}</span>
             </span>
             <span className="shrink-0 rounded-md border border-accent/35 bg-card px-1.5 py-1 text-[0.58rem] font-bold tabular-nums text-accent">
-              1px 고정
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawModeControls", "ko", "1px 고정")}</span>
           </div>
-          <div className="mt-2 flex flex-wrap gap-1" aria-label="픽셀 펜 고정 특성">
+          <div className="mt-2 flex flex-wrap gap-1" aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawModeControls", "ko", "픽셀 펜 고정 특성")}>
             {PIXEL_TRAITS.map(([label, description]) => (
               <span
                 key={label}
@@ -108,8 +107,7 @@ export function StudioInspectorDrawModeControls({
             ))}
           </div>
           <p className="mt-1.5 text-[0.62rem] leading-relaxed text-fg-3">
-            필압, 스탬프, 선 보정, 대칭은 적용하지 않습니다. 색상과 불투명도만 조절할 수 있어요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioInspectorDrawModeControls", "ko", "필압, 스탬프, 선 보정, 대칭은 적용하지 않습니다. 색상과 불투명도만 조절할 수 있어요.")}</p>
         </section>
       ) : null}
     </div>

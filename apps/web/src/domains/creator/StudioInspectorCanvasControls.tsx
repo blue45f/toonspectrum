@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * 페이지 ▸ 캔버스.
  *
@@ -505,7 +506,7 @@ export function StudioInspectorCanvasControls({
                 className="flex items-center justify-between gap-1.5 text-[0.65rem]"
               >
                 <span className="font-medium text-fg-2">
-                  {`${guideAxisLabel(guide.type)} ${t("studio.canvas.guideLabel")} #${index + 1} (${Math.round(guide.pos)}px)`}
+                  {formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorCanvasControls", "en", "{v0} {v1} #{v2} ({v3}px)"), { v0: String(guideAxisLabel(guide.type)), v1: String(t("studio.canvas.guideLabel")), v2: String(index + 1), v3: String(Math.round(guide.pos)) })}
                 </span>
                 <div className="flex items-center gap-1">
                   <input

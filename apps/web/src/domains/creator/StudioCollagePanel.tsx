@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioCollagePanel — PicsArt-class collage layout picker.
  * Layout tiles + gap/padding/border/canvas size + apply.
@@ -64,8 +68,8 @@ function CollagePreviewTile({
         width={55}
         height={55}
         rx={6}
-        fill={active ? "oklch(0.98 0.01 85 / 0.16)" : "oklch(0.22 0.01 66 / 0.55)"}
-        stroke={active ? "oklch(0.98 0.01 85 / 0.25)" : "oklch(0.35 0.012 64 / 0.5)"}
+        fill={active ? translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "en", "oklch(0.98 0.01 85 / 0.16)") : translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "en", "oklch(0.22 0.01 66 / 0.55)")}
+        stroke={active ? translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "en", "oklch(0.98 0.01 85 / 0.25)") : translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "en", "oklch(0.35 0.012 64 / 0.5)")}
         strokeWidth={0.8}
       />
       {rects.map((r, i) => (
@@ -76,7 +80,7 @@ function CollagePreviewTile({
           width={r.w}
           height={r.h}
           rx={1.5}
-          fill={active ? "currentColor" : "oklch(0.55 0.04 42 / 0.55)"}
+          fill={active ? translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "en", "oklch(0.55 0.04 42 / 0.55)")}
           opacity={active ? 0.9 : 0.85}
         />
       ))}
@@ -136,14 +140,13 @@ export function StudioCollagePanel({
       <div className="flex items-start gap-2 rounded-lg border border-line bg-card px-2 py-1.5">
         <Grid2X2 size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
         <div className="min-w-0">
-          <p className="text-[0.72rem] font-semibold text-fg">콜라주 레이아웃</p>
+          <p className="text-[0.72rem] font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "콜라주 레이아웃")}</p>
           <p className="text-[0.62rem] leading-snug text-fg-3">
-            PicsArt·Canva급 다중 사진 그리드. 간격·여백·테두리·맞춤을 조절한 뒤 적용하세요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "PicsArt·Canva급 다중 사진 그리드. 간격·여백·테두리·맞춤을 조절한 뒤 적용하세요.")}</p>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1" role="tablist" aria-label="콜라주 카테고리">
+      <div className="flex flex-wrap gap-1" role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "콜라주 카테고리")}>
         {STUDIO_COLLAGE_CATEGORY_CHIPS.map((chip) => (
           <button
             key={chip.id}
@@ -168,7 +171,7 @@ export function StudioCollagePanel({
       <div
         className="grid max-h-48 grid-cols-3 gap-1.5 overflow-y-auto pr-0.5 sm:grid-cols-4"
         role="listbox"
-        aria-label="콜라주 레이아웃"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "콜라주 레이아웃")}
       >
         {layouts.map((layout) => {
           const active = layout.id === selected.id;
@@ -178,7 +181,7 @@ export function StudioCollagePanel({
               type="button"
               role="option"
               aria-selected={active}
-              title={`${layout.label} · ${layout.hint} · ${layout.cells}칸`}
+              title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "{v0} · {v1} · {v2}칸"), { v0: String(layout.label), v1: String(layout.hint), v2: String(layout.cells) })}
               onClick={() => setSelectedId(layout.id)}
               className={cn(
                 "flex flex-col items-center gap-1 rounded-lg border p-1.5",
@@ -199,15 +202,14 @@ export function StudioCollagePanel({
                   active ? "text-on-accent/80" : "text-fg-3"
                 )}
               >
-                {layout.cells}컷
-              </span>
+                {layout.cells}{translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "컷")}</span>
             </button>
           );
         })}
       </div>
 
       <div className="grid gap-1.5 rounded-lg border border-line bg-card/80 p-2">
-        <p className="text-[0.64rem] font-semibold text-fg-2">캔버스 비율</p>
+        <p className="text-[0.64rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "캔버스 비율")}</p>
         <div className="flex flex-wrap gap-1">
           {STUDIO_COLLAGE_CANVAS_H_PRESETS.map((preset) => (
             <button
@@ -230,7 +232,7 @@ export function StudioCollagePanel({
 
         <label className="grid gap-0.5 text-[0.62rem] text-fg-3">
           <span className="flex justify-between">
-            <span>칸 간격</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "칸 간격")}</span>
             <span className="tabular-nums text-fg">{gap}px</span>
           </span>
           <input
@@ -240,12 +242,12 @@ export function StudioCollagePanel({
             value={gap}
             onChange={(e) => setGap(Number(e.target.value))}
             className="studio-range w-full"
-            aria-label="콜라주 칸 간격"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "콜라주 칸 간격")}
           />
         </label>
         <label className="grid gap-0.5 text-[0.62rem] text-fg-3">
           <span className="flex justify-between">
-            <span>바깥 여백</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "바깥 여백")}</span>
             <span className="tabular-nums text-fg">{padding}px</span>
           </span>
           <input
@@ -255,12 +257,12 @@ export function StudioCollagePanel({
             value={padding}
             onChange={(e) => setPadding(Number(e.target.value))}
             className="studio-range w-full"
-            aria-label="콜라주 바깥 여백"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "콜라주 바깥 여백")}
           />
         </label>
         <label className="grid gap-0.5 text-[0.62rem] text-fg-3">
           <span className="flex justify-between">
-            <span>칸 테두리</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "칸 테두리")}</span>
             <span className="tabular-nums text-fg">{borderWidth}px</span>
           </span>
           <input
@@ -270,39 +272,39 @@ export function StudioCollagePanel({
             value={borderWidth}
             onChange={(e) => setBorderWidth(Number(e.target.value))}
             className="studio-range w-full"
-            aria-label="콜라주 칸 테두리"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "콜라주 칸 테두리")}
           />
         </label>
 
         <div className="flex flex-wrap items-center gap-2 pt-0.5">
           <label className="flex items-center gap-1 text-[0.62rem] text-fg-3">
-            <span>칸 배경</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "칸 배경")}</span>
             <input
               type="color"
               value={cellBg}
               onChange={(e) => setCellBg(e.target.value)}
               className="h-7 w-9 cursor-pointer rounded border border-line bg-transparent"
-              aria-label="칸 배경색"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "칸 배경색")}
             />
           </label>
           <label className="flex items-center gap-1 text-[0.62rem] text-fg-3">
-            <span>캔버스</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "캔버스")}</span>
             <input
               type="color"
               value={canvasBg}
               onChange={(e) => setCanvasBg(e.target.value)}
               className="h-7 w-9 cursor-pointer rounded border border-line bg-transparent"
-              aria-label="캔버스 배경색"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "캔버스 배경색")}
             />
           </label>
           <label className="flex items-center gap-1 text-[0.62rem] text-fg-3">
-            <span>테두리</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "테두리")}</span>
             <input
               type="color"
               value={borderColor}
               onChange={(e) => setBorderColor(e.target.value)}
               className="h-7 w-9 cursor-pointer rounded border border-line bg-transparent"
-              aria-label="테두리 색"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "테두리 색")}
             />
           </label>
         </div>
@@ -319,8 +321,7 @@ export function StudioCollagePanel({
                 : "border-line text-fg-3 hover:bg-raised"
             )}
           >
-            채우기 (cover)
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "채우기 (cover)")}</button>
           <button
             type="button"
             aria-pressed={fit === "contain"}
@@ -332,8 +333,7 @@ export function StudioCollagePanel({
                 : "border-line text-fg-3 hover:bg-raised"
             )}
           >
-            안에 맞춤
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "안에 맞춤")}</button>
         </div>
 
         <label className="flex items-center gap-2 text-[0.64rem] text-fg-2">
@@ -344,9 +344,8 @@ export function StudioCollagePanel({
             className="accent-[var(--color-accent)]"
           />
           <Images size={12} aria-hidden />
-          캔버스 이미지 {Math.min(availableImages.length, selected.cells)}/
-          {selected.cells}장 자동 배치
-        </label>
+          {translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "캔버스 이미지 ")}{Math.min(availableImages.length, selected.cells)}/
+          {selected.cells}{translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "장 자동 배치")}</label>
         <label className="flex items-center gap-2 text-[0.64rem] text-fg-2">
           <input
             type="checkbox"
@@ -354,8 +353,7 @@ export function StudioCollagePanel({
             onChange={(e) => setReplaceExisting(e.target.checked)}
             className="accent-[var(--color-accent)]"
           />
-          기존 작업 지우고 적용
-        </label>
+          {translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "기존 작업 지우고 적용")}</label>
       </div>
 
       <button
@@ -369,8 +367,7 @@ export function StudioCollagePanel({
         )}
       >
         <Grid2X2 size={15} aria-hidden />
-        {selected.label} 적용 · {selected.cells}칸
-      </button>
+        {selected.label} {translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "적용 · ")}{selected.cells}{translateCurrentStaticSourceText("domains.creator.StudioCollagePanel", "ko", "칸")}</button>
     </div>
   );
 }

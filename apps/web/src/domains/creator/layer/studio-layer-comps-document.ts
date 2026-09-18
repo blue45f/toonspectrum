@@ -69,7 +69,7 @@ function commitLayerCompMetadata(
   try {
     options.validatePage({ ...page, layerComps });
   } catch {
-    options.reportError("페이지의 콤프 저장 용량을 넘어 변경하지 않았어요. 콤프 개수나 캡처할 레이어를 줄이거나 페이지 메모를 정리해 주세요.");
+    options.reportError("페이지의 레이어 보기 저장 용량을 넘어 변경하지 않았어요. 저장한 보기 수나 포함할 레이어를 줄이거나 페이지 메모를 정리해 주세요.");
     return false;
   }
   return options.commit(page.elements, { layerComps }, page.id);
@@ -92,8 +92,8 @@ async function withLayerCompLease(
   } catch {
     // A delivery failure must not invite another capture of an already accepted local comp.
     options.reportError(accepted
-      ? "콤프 변경은 이 기기에 반영됐지만 동기화를 완료하지 못했어요. 연결 상태를 확인해 주세요."
-      : "레이어 콤프를 변경하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+      ? "레이어 보기 변경은 이 기기에 반영됐지만 동기화를 완료하지 못했어요. 연결 상태를 확인해 주세요."
+      : "레이어 보기를 변경하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
     return accepted;
   } finally {
     if (acquired) options.release();
@@ -167,7 +167,7 @@ export function changeStudioLayerCompsTransaction(options: StudioLayerCompMetada
       return null;
     }
     const valid = parseStudioLayerComps(options.nextComps);
-    if (!valid) options.reportError("레이어 콤프가 저장 범위를 벗어나 변경하지 않았어요.");
+    if (!valid) options.reportError("레이어 보기가 저장 범위를 벗어나 변경하지 않았어요.");
     return valid;
   });
 }

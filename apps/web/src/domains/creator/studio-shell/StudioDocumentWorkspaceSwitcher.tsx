@@ -1,3 +1,4 @@
+import { resolveUiLocale } from "@/shared/lib/i18n-bilingual-copy";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import {
@@ -13,9 +14,12 @@ import { readStudioLaunchDensity } from "../studio-launch-mode";
 import { StudioDocumentWindowHub } from "./StudioDocumentWindowHub";
 
 import { useI18n } from "@/shared/lib/i18n";
+import { getActiveI18nLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
-function localeFromLanguage(language: string): "ko" | "en" {
-  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+
+
+function localeFromLanguage(_language): "ko" | "en" {
+  return getActiveI18nLocale();
 }
 
 /**
@@ -24,6 +28,7 @@ function localeFromLanguage(language: string): "ko" | "en" {
  * remain on the canonical URL while each tab or window chooses its own workspace projection.
  */
 export function StudioDocumentWorkspaceSwitcher() {
+  useBilingualI18nRevision();
   const location = useLocation();
   const navigate = useNavigate();
   const language = useI18n((state) => state.lang);

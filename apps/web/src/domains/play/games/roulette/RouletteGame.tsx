@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   filterByGenre,
   genreChips,
   pickRandom,
@@ -42,8 +46,7 @@ const HELP_STEPS: HelpStep[] = [
     title: "목표",
     desc: (
       <>
-        오늘 뭐 볼지 고민될 때, 룰렛이 인기 웹툰 중 <b className="text-fg">한 편</b>을 골라줘요.
-      </>
+        {translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "오늘 뭐 볼지 고민될 때, 룰렛이 인기 웹툰 중 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "한 편")}</b>{translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "을 골라줘요.")}</>
     ),
   },
   {
@@ -51,9 +54,8 @@ const HELP_STEPS: HelpStep[] = [
     title: "장르 고르기",
     desc: (
       <>
-        위쪽 <b className="text-fg">장르 칩</b>으로 범위를 좁혀요.{" "}
-        <span className="text-accent">전체</span>면 모든 인기작에서 뽑아요.
-      </>
+        {translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "위쪽 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "장르 칩")}</b>{translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "으로 범위를 좁혀요.")}{" "}
+        <span className="text-accent">{translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "전체")}</span>{translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "면 모든 인기작에서 뽑아요.")}</>
     ),
   },
   {
@@ -61,8 +63,7 @@ const HELP_STEPS: HelpStep[] = [
     title: "돌리기",
     desc: (
       <>
-        <b className="text-fg">스핀!</b> 버튼을 누르면 표지가 두구두구 돌다가 한 편에서 멈춰요.
-      </>
+        <b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "스핀!")}</b> {translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "버튼을 누르면 표지가 두구두구 돌다가 한 편에서 멈춰요.")}</>
     ),
   },
   {
@@ -70,9 +71,8 @@ const HELP_STEPS: HelpStep[] = [
     title: "결과 보기",
     desc: (
       <>
-        제목·작가·장르와 <b className="text-fg">추천 이유</b>가 떠요. 마음에 안 들면{" "}
-        <span className="text-accent">다시 돌리기</span>로 또 뽑아요.
-      </>
+        {translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "제목·작가·장르와 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "추천 이유")}</b>{translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "가 떠요. 마음에 안 들면")}{" "}
+        <span className="text-accent">{translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "다시 돌리기")}</span>{translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "로 또 뽑아요.")}</>
     ),
   },
 ];
@@ -145,18 +145,16 @@ export function RouletteGame({ onExit }: PlayGameProps) {
   if (loading) {
     return (
       <div className="grid min-h-[18rem] place-items-center text-sm text-fg-2">
-        웹툰 룰렛을 준비하는 중…
-      </div>
+        {translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "웹툰 룰렛을 준비하는 중…")}</div>
     );
   }
 
   if (titles.length === 0) {
     return (
       <div className="flex min-h-[18rem] flex-col items-center justify-center gap-3 text-sm text-fg-2">
-        <p>추천할 웹툰을 불러오지 못했어요.</p>
+        <p>{translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "추천할 웹툰을 불러오지 못했어요.")}</p>
         <Button variant="outline" onClick={onExit}>
-          다른 게임
-        </Button>
+          {translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "다른 게임")}</Button>
       </div>
     );
   }
@@ -172,12 +170,12 @@ export function RouletteGame({ onExit }: PlayGameProps) {
     <div className="flex flex-col gap-4">
       {/* 헤더 — 게임 방법 안내 */}
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-fg-2">웹툰 룰렛</span>
-        <GameHelp id="roulette" title="웹툰 룰렛" steps={HELP_STEPS} />
+        <span className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "웹툰 룰렛")}</span>
+        <GameHelp id="roulette" title={translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "웹툰 룰렛")} steps={HELP_STEPS} />
       </div>
 
       {/* 장르 칩 */}
-      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="장르 필터">
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "장르 필터")}>
         {chips.map((g) => {
           const active = g === genre;
           return (
@@ -204,8 +202,7 @@ export function RouletteGame({ onExit }: PlayGameProps) {
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-card/50 p-4">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-accent">
           <Sparkles className="h-3.5 w-3.5" />
-          오늘의 추천
-        </div>
+          {translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "오늘의 추천")}</div>
 
         <div
           className={cn(
@@ -222,8 +219,7 @@ export function RouletteGame({ onExit }: PlayGameProps) {
           )}
           {spinning && (
             <div className="absolute inset-0 grid place-items-center bg-black/30 text-sm font-semibold text-white">
-              두구두구…
-            </div>
+              {translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "두구두구…")}</div>
           )}
         </div>
 
@@ -251,21 +247,19 @@ export function RouletteGame({ onExit }: PlayGameProps) {
         ) : (
           !spinning && (
             <p className="max-w-xs text-center text-xs text-fg-3">
-              {activeGenre ? `'${activeGenre}' 장르에서` : "전체 인기작에서"} 한 편을 골라드려요.
-            </p>
+              {activeGenre ? formatI18nTemplate(translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "'{v0}' 장르에서"), { v0: String(activeGenre) }) : translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "전체 인기작에서")} {translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "한 편을 골라드려요.")}</p>
           )
         )}
 
         <div className="flex items-center gap-2">
           <Button variant="solid" disabled={spinning} onClick={spin}>
             <Dices className="mr-1 h-4 w-4" />
-            {result ? "다시 돌리기" : "스핀!"}
+            {result ? translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "다시 돌리기") : translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "스핀!")}
           </Button>
           {spins > 0 && (
             <Button variant="ghost" size="sm" disabled={spinning} onClick={restart}>
               <RotateCcw className="mr-1 h-4 w-4" />
-              초기화
-            </Button>
+              {translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "초기화")}</Button>
           )}
         </div>
       </div>
@@ -274,7 +268,7 @@ export function RouletteGame({ onExit }: PlayGameProps) {
       {history.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[0.7rem] font-medium text-fg-3">최근 추천 ({spins})</span>
+            <span className="text-[0.7rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "최근 추천 (")}{spins})</span>
           </div>
           <div className="flex gap-1.5 overflow-x-auto rounded-xl border border-line/60 bg-card/40 p-2">
             {history.map((t, i) => (
@@ -297,8 +291,7 @@ export function RouletteGame({ onExit }: PlayGameProps) {
 
       <div className="flex justify-center">
         <Button variant="quiet" size="sm" onClick={onExit}>
-          다른 게임
-        </Button>
+          {translateCurrentStaticSourceText("domains.play.games.roulette.RouletteGame", "ko", "다른 게임")}</Button>
       </div>
     </div>
   );

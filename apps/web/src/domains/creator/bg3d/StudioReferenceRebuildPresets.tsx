@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef, useState } from "react";
 
 import { createStudioReferenceRebuildWorker } from "./studio-reference-rebuild-worker-client";
@@ -94,28 +98,23 @@ export function StudioReferenceRebuildPresets({ disabled, onFile, onBusyChange }
   return (
     <details className="mt-3 rounded-xl border border-line bg-card/60">
       <summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-bold text-fg">
-        미리보기 참고 재제작 · 교실과 도서관
-      </summary>
+        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioReferenceRebuildPresets", "ko", "미리보기 참고 재제작 · 교실과 도서관")}</summary>
       <div className="space-y-2 border-t border-line p-3">
         <p className="text-xs leading-relaxed text-fg-3">
-          2개 장면과 재사용 모듈 4종입니다. ACON 원본 복원본이나 CC0 소재가 아닙니다.
-          위 이용 권리 기록의 현재 선택으로 기존 가져오기·검증 경로에 전달합니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioReferenceRebuildPresets", "ko", "2개 장면과 재사용 모듈 4종입니다. ACON 원본 복원본이나 CC0 소재가 아닙니다. 위 이용 권리 기록의 현재 선택으로 기존 가져오기·검증 경로에 전달합니다.")}</p>
         <label className="block text-xs font-semibold text-fg-2">
-          재제작 모델
-          <select value={selected} disabled={busy || disabled} onChange={(event) => setSelected(event.target.value)}
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioReferenceRebuildPresets", "ko", "재제작 모델")}<select value={selected} disabled={busy || disabled} onChange={(event) => setSelected(event.target.value)}
             className="mt-1 min-h-11 w-full rounded-lg border border-line bg-panel px-2 text-xs text-fg">
             {PRESETS.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
           </select>
         </label>
         <button type="button" disabled={disabled && !busy} onClick={() => { if (busy) { stop(); setMessage("모델 생성을 취소했습니다."); } else build(); }}
           className="min-h-11 w-full rounded-lg border border-accent/50 bg-accent-soft px-3 text-xs font-bold text-accent disabled:opacity-50">
-          {busy ? "생성 취소" : "GLB 생성 후 가져오기"}
+          {busy ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioReferenceRebuildPresets", "ko", "생성 취소") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioReferenceRebuildPresets", "ko", "GLB 생성 후 가져오기")}
         </button>
         <a className="inline-flex min-h-11 items-center text-xs font-semibold text-accent underline"
-          href={`/assets/reference-rebuild/index.html?asset=${encodeURIComponent(selected)}`} target="_blank" rel="noopener noreferrer">
-          실제 3D 검토실 열기 ↗
-        </a>
+          href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioReferenceRebuildPresets", "en", "/assets/reference-rebuild/index.html?asset={v0}"), { v0: String(encodeURIComponent(selected)) })} target="_blank" rel="noopener noreferrer">
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioReferenceRebuildPresets", "ko", "실제 3D 검토실 열기 ↗")}</a>
         {message ? <p role="status" aria-live="polite" className="text-xs leading-relaxed text-fg-3">{message}</p> : null}
       </div>
     </details>

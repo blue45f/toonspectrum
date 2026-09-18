@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Circle as KCircle,
   Ellipse,
@@ -233,7 +234,7 @@ export function StudioKonvaBubbleNode({
         length: el.tailHeight,
       }).map((dot, index) => (
         <Ellipse
-          key={`thought-dot-${index}`}
+          key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioKonvaBubbleNode", "en", "thought-dot-{v0}"), { v0: String(index) })}
           x={dot.x}
           y={dot.y}
           radiusX={dot.rx}
@@ -525,7 +526,7 @@ export function StudioKonvaBubbleNode({
       ) : el.variant === "scared" ? (
         <Path
           data={styled(scaredBubblePathData(el.width, el.height, bubbleTailSpec))}
-          fill={el.fill === "transparent" ? "transparent" : (el.fill === "#ffffff" ? "#f5f3ff" : el.fill)}
+          fill={el.fill === "transparent" ? translateCurrentStaticSourceText("domains.creator.StudioKonvaBubbleNode", "en", "transparent") : (el.fill === "#ffffff" ? translateCurrentStaticSourceText("domains.creator.StudioKonvaBubbleNode", "en", "#f5f3ff") : el.fill)}
           {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
           stroke="#7c3aed"
           strokeWidth={2}
@@ -572,7 +573,7 @@ export function StudioKonvaBubbleNode({
           ))}
           fill={el.fill}
           {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
-          stroke={theme === "soft" ? "#dc2626" : theme === "vivid" ? "#7f1d1d" : "#991b1b"}
+          stroke={theme === "soft" ? translateCurrentStaticSourceText("domains.creator.StudioKonvaBubbleNode", "en", "#dc2626") : theme === "vivid" ? "#7f1d1d" : "#991b1b"}
           strokeWidth={Math.max(bStrokeW, 3.5)}
           lineJoin="round"
           lineCap="round"
@@ -647,7 +648,7 @@ export function StudioKonvaBubbleNode({
               );
               return (
                 <KText
-                  key={`bubble-vcol-${column.index}-${itemIndex}`}
+                  key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioKonvaBubbleNode", "en", "bubble-vcol-{v0}-{v1}"), { v0: String(column.index), v1: String(itemIndex) })}
                   text={item.text}
                   x={item.x}
                   y={item.y}
@@ -668,7 +669,7 @@ export function StudioKonvaBubbleNode({
           )}
           {verticalRuby?.placements.map((placement) => (
             <KText
-              key={`bubble-vertical-ruby-${placement.spanIndex}-${placement.fragmentIndex}`}
+              key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioKonvaBubbleNode", "en", "bubble-vertical-ruby-{v0}-{v1}"), { v0: String(placement.spanIndex), v1: String(placement.fragmentIndex) })}
               name="studio-vertical-ruby"
               text={[...placement.ruby].join("\n")}
               x={placement.x}
@@ -706,7 +707,7 @@ export function StudioKonvaBubbleNode({
       )}
       {rubyOverlays.map((placement) => (
         <KText
-          key={`bubble-ruby-${placement.start}-${placement.end}-${placement.ruby}`}
+          key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioKonvaBubbleNode", "en", "bubble-ruby-{v0}-{v1}-{v2}"), { v0: String(placement.start), v1: String(placement.end), v2: String(placement.ruby) })}
           text={placement.ruby}
           // First-line approximation: y is relative to the text box top (verticalAlign middle
           // is not re-measured). Honest MVP — multi-line wrap is not modelled.
