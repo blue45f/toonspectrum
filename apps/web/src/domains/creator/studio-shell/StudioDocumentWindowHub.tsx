@@ -1,7 +1,6 @@
 import {
   formatI18nTemplate,
   translateBilingualValueForActiveLocale,
-  translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
