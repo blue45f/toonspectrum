@@ -41,6 +41,25 @@ export const CREATOR_LEVEL_AUTO_POLICIES = Object.freeze({
   professional: { verifiedCreator: true, publishedWorks: 20, activityPoints: 5_000 },
 } as const);
 
+export function automaticCreatorLevel(
+  metrics: CreatorLevelMetrics,
+): Exclude<MemberCreatorLevel, "partner"> {
+  if (!metrics.verifiedCreator) return "new";
+  if (
+    metrics.publishedWorks >= CREATOR_LEVEL_AUTO_POLICIES.professional.publishedWorks
+    && metrics.activityPoints >= CREATOR_LEVEL_AUTO_POLICIES.professional.activityPoints
+  ) return "professional";
+  if (
+    metrics.publishedWorks >= CREATOR_LEVEL_AUTO_POLICIES.trusted.publishedWorks
+    && metrics.activityPoints >= CREATOR_LEVEL_AUTO_POLICIES.trusted.activityPoints
+  ) return "trusted";
+  if (
+    metrics.publishedWorks >= CREATOR_LEVEL_AUTO_POLICIES.active.publishedWorks
+    && metrics.activityPoints >= CREATOR_LEVEL_AUTO_POLICIES.active.activityPoints
+  ) return "active";
+  return "verified";
+}
+
 export const MEMBER_TRUST_LEVELS = [
   "new",
   "verified",
