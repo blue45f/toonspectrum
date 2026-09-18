@@ -1,7 +1,8 @@
 import {
-  translateBilingualValueForLocale,
+  
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   BookOpen,
@@ -26,11 +27,6 @@ import {
   type EngineeringLocale,
   type EngineeringStatus,
 } from "./engineering-story-content";
-import { useEngineeringLocale } from "./use-engineering-locale";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringStoryUi", ko, en);

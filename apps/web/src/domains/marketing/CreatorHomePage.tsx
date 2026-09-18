@@ -1,8 +1,8 @@
 import {
   formatI18nTemplate,
-  translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision
 } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowDown, ArrowRight, Box, Brush, Check, Layers, LayoutGrid, MousePointer2, Play, Plus, Square, Type } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -17,10 +17,6 @@ import "./creator-home-spacing.css";
 
 import { useI18n } from "@/shared/lib/i18n";
 import Link from "@/compat/router-link";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("CreatorHomePage", ko, en);

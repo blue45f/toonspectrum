@@ -26,13 +26,10 @@ import {
 } from "../studio-localization-project-store";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
+import {  type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
-
-type Locale = string;
 
 interface LayoutDraft {
   sourceRemoved: boolean;
@@ -174,7 +171,7 @@ export function StudioLocalizationPanel({
     };
     window.addEventListener(STUDIO_LOCALIZATION_PROJECT_UPDATED_EVENT, handleUpdate);
     return () => window.removeEventListener(STUDIO_LOCALIZATION_PROJECT_UPDATED_EVENT, handleUpdate);
-  }, [l, projectId]);
+  }, [bt, projectId]);
 
   const selected = document.units.find((unit) => unit.id === selectedId) ?? null;
   useEffect(() => {

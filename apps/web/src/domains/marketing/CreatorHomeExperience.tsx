@@ -1,7 +1,6 @@
 import {
-  translateBilingualValueForLocale,
+  
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Accessibility,

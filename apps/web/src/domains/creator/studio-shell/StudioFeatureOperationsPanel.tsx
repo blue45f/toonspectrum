@@ -19,8 +19,6 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
-type Locale = string;
-
 const ICON_BY_TONE = {
   asset: BadgeCheck,
   governance: ShieldCheck,

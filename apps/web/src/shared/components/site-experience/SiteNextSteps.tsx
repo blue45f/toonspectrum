@@ -1,9 +1,9 @@
 import {
   formatI18nTemplate,
-  resolveUiLocale,
-  translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision
 } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, BookOpen, CalendarDays, Compass, Images, Library, MessageCircle, PenTool, Search, Sparkles, Store } from "lucide-react";
 import { useId } from "react";
@@ -15,11 +15,6 @@ import { useSiteExperience } from "./site-experience-context";
 import { EXPERIENCE_DESTINATIONS, nextExperienceDestinations } from "./site-experience-model";
 import Link from "@/compat/router-link";
 
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("SiteNextSteps", ko, en);

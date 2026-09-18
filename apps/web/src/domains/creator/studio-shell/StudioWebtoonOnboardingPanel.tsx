@@ -19,8 +19,6 @@ import {
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
-type Locale = string;
-
 function localizedLabel(
   options: readonly { readonly id: string; readonly labelKo: string; readonly labelEn: string }[],
   id: string,

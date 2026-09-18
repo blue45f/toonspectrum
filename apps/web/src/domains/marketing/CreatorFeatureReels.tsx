@@ -1,7 +1,8 @@
 import {
   formatI18nTemplate,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
@@ -24,10 +25,6 @@ import { useI18n } from "@/shared/lib/i18n";
 import { resolveProductLocale } from "@/shared/lib/product-identity";
 
 import "./creator-feature-reels.css";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("CreatorFeatureReels", ko, en);

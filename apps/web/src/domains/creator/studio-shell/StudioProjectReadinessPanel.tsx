@@ -1,7 +1,9 @@
 import {
-  translateBilingualValueForLocale,
+  
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   AlertTriangle,
@@ -29,11 +31,6 @@ import type {
   StudioProjectReadinessSectionId,
   StudioProjectReadinessStatus,
 } from "../studio-project-readiness";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioProjectReadinessPanel", ko, en);

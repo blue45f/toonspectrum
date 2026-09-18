@@ -10,12 +10,8 @@ import {
 import type { StudioAiAssistToolId } from "../ai/studio-ai-assist-ux";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
+import {  type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 export type StudioProjectAssistantSection =
   | "overview"
@@ -25,8 +21,6 @@ export type StudioProjectAssistantSection =
   | "review"
   | "export"
   | "settings";
-
-type Locale = string;
 
 type AssistantSuggestion = Readonly<{
   tool: StudioAiAssistToolId;

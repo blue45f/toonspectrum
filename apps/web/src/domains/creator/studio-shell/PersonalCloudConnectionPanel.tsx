@@ -17,11 +17,6 @@ import {
   PERSONAL_CLOUD_CONNECTION_PROVIDER_ORDER,
   type PersonalCloudConnectionsController,
 } from "./usePersonalCloudConnections";
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 function timeLabel(value: string | null, locale: string, bt: (ko: string, en: string) => string): string {
   if (!value || !Number.isFinite(Date.parse(value))) {
