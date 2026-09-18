@@ -1,6 +1,9 @@
 import {
   translateCurrentStaticSourceText,
+  useBilingual,
   useBilingualI18nRevision,
+  useBilingualLocalizer,
+  type BilingualText,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Check,
@@ -29,9 +32,9 @@ import {
   readStudioReviewHistory,
   type StudioReviewHistoryDocument,
 } from "../studio-review-history-store";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
+
 import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";

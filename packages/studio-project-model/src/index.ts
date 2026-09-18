@@ -30,3 +30,5 @@ export * from "./authority/document-authority";
 export * from "./capability/capability-ledger";
 export * from "./interchange/compatibility-report";
 export * from "./assets/asset-lockfile";
+
+export * from "./compat/project-graph-v3";

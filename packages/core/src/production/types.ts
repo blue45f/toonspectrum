@@ -988,6 +988,12 @@ export interface ProductionRiskPolicy {
   readonly minimumReadyBufferEpisodes: number;
   readonly autoOpenSeverity: "warning" | "high" | "critical";
   readonly notificationCooldownHours: number;
+  /** Backward-compatible stability window for automatically opening inferred risks. */
+  readonly autoOpenStableHours?: number;
+  /** Hysteresis applied while an existing automatic risk recovers below its trigger. */
+  readonly thresholdHysteresisPercent?: number;
+  /** Minimum evidence confidence for opening non-critical automatic risks. */
+  readonly autoOpenMinimumConfidence?: ProductionRiskConfidence;
   readonly autoResolveStableHours: number;
   readonly revision: number;
   readonly updatedAt: string;
@@ -1069,6 +1075,13 @@ export interface ProductionRiskResponse {
   readonly expectedEffect: string;
   readonly actualEffect: string | null;
   readonly status: ProductionRiskResponseStatus;
+  /** Optional on legacy records; transitions materialize the current revision. */
+  readonly revision?: number;
+  readonly cancellationReason?: string | null;
+  readonly approvedAt?: string | null;
+  readonly startedAt?: string | null;
+  readonly cancelledAt?: string | null;
+  readonly updatedAt?: string;
   readonly createdAt: string;
   readonly completedAt: string | null;
 }
