@@ -1,19 +1,15 @@
 import {
   translateCurrentStaticSourceText,
   useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Check,
   CheckCircle2,
   MessageSquarePlus,
   RefreshCcw,
   Send,
   ShieldCheck,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-
-import {
-  addStudioReviewThread,
+  } from "lucide-react"; import { useEffect,
+  useMemo,
+  useState } from "react"; import { addStudioReviewThread,
   recordStudioReviewDecision,
   resolveStudioReviewThread,
   startStudioRevision,
@@ -23,15 +19,13 @@ import {
   type StudioReviewStatus,
   type StudioReviewThread,
   type StudioReviewThreadKind,
-} from "../studio-review-workflow";
-import {
-  archiveStudioReviewSession,
+  } from "../studio-review-workflow"; import { archiveStudioReviewSession,
   readStudioReviewHistory,
   type StudioReviewHistoryDocument,
-} from "../studio-review-history-store";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
-import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
+  } from "../studio-review-history-store"; import { useBilingual,
+  buttonClass } from "@/shared/components/ui/button-utils"; import { useBilingualLocalizer,
+  type BilingualText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
