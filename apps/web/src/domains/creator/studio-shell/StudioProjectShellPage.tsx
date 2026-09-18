@@ -314,10 +314,20 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
               {bt("프로젝트", "Project")} · {displayProjectId}
             </p>
           </div>
-          <Link href={workHref(displayProjectId)} className={buttonClass({ size: "lg", className: "gap-2" })}>
-            <Brush size={17} aria-hidden="true" />
-            {bt("원고 열기", "Open manuscript")}
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/studio/p/${encodeURIComponent(displayProjectId)}/space`}
+              className={buttonClass({ size: "lg", variant: "outline", className: "gap-2" })}
+              data-studio-enter-virtual-space="true"
+            >
+              <Users size={17} aria-hidden="true" />
+              {bt("협업 스튜디오", "Enter Studio")}
+            </Link>
+            <Link href={workHref(displayProjectId)} className={buttonClass({ size: "lg", className: "gap-2" })}>
+              <Brush size={17} aria-hidden="true" />
+              {bt("원고 열기", "Open manuscript")}
+            </Link>
+          </div>
         </div>
       </header>
 
