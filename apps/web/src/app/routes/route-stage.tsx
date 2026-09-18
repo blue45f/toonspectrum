@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { AlertTriangle, Home, RefreshCw, Rows3 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type ReactNode } from "react";
 
@@ -17,6 +13,7 @@ import {
 import {
   formatI18nTemplate,
   translateBilingualValueForActiveLocale,
+  translateCurrentStaticSourceText,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 
