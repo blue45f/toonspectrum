@@ -1,7 +1,6 @@
 import {
-  translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
@@ -39,7 +38,6 @@ import Link from "@/compat/router-link";
 import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
-type Locale = string;
 
 const DESTINATION_LABELS: Readonly<
   Record<StudioAssetDestination, BilingualText>
@@ -104,7 +102,7 @@ function StatusCard({
   label,
   status,
   description,
-  locale,
+  locale: _locale,
 }: {
   readonly icon: typeof ShieldCheck;
   readonly label: string;
@@ -112,7 +110,7 @@ function StatusCard({
   readonly description: string;
   readonly locale?: string;
 }) {
-  const l = useBilingualLocalizer("studioAssetGovernance.status");
+  const bt = useBilingualLocalizer("studioAssetGovernance.status");
   return (
     <article className="rounded-2xl border border-line bg-panel p-4">
       <div className="flex items-start justify-between gap-3">
