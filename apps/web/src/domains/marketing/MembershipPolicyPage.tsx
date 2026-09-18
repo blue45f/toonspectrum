@@ -108,9 +108,9 @@ export function MembershipPolicyPage() {
               오래 창작할 수 있게.
             </h1>
             <p className="mt-5 max-w-3xl text-base leading-7 text-fg-2 sm:text-lg">
-              현재는 실제 결제를 받지 않습니다. 사용자에게 보이는 재화는 활동 포인트 하나로
-              운영하고, 멤버십은 저장공간·업로드·협업 같은 서비스 자원 한도를 정의하는
-              권한 등급으로 사용합니다.
+              현재는 실제 결제를 받지 않습니다. 활동 보상은 Reward Point로,
+              AI·렌더 같은 고비용 기능은 멤버십에 포함된 Studio Credit으로 분리합니다.
+              멤버십은 저장공간·업로드·협업 등 서비스 자원 한도도 함께 정의합니다.
             </p>
             <div className="mt-6 flex flex-wrap gap-2 text-xs font-bold">
               <span className="rounded-full border border-line bg-card px-3 py-2">
@@ -127,7 +127,7 @@ export function MembershipPolicyPage() {
         </header>
 
         {overview && (
-          <section className="mt-6 grid gap-4 sm:grid-cols-3" aria-label="내 멤버십 현황">
+          <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="내 멤버십 현황">
             <article className="rounded-2xl border border-line bg-panel p-5">
               <BadgeCheck className="text-accent" size={20} aria-hidden />
               <p className="mt-3 text-xs font-bold text-fg-3">현재 멤버십</p>
@@ -138,6 +138,16 @@ export function MembershipPolicyPage() {
               <p className="mt-3 text-xs font-bold text-fg-3">사용 가능 포인트</p>
               <p className="mt-1 text-2xl font-black tabular-nums text-fg">
                 {number.format(overview.wallet.points.available)} P
+              </p>
+            </article>
+            <article className="rounded-2xl border border-line bg-panel p-5">
+              <Sparkles className="text-accent" size={20} aria-hidden />
+              <p className="mt-3 text-xs font-bold text-fg-3">Studio Credit</p>
+              <p className="mt-1 text-2xl font-black tabular-nums text-fg">
+                {number.format(overview.wallet.studioCredits.available)} C
+              </p>
+              <p className="mt-1 text-xs text-fg-3">
+                월 {number.format(overview.creditCycle.monthlyIncluded)} C · 오늘 잔여 {number.format(overview.creditCycle.remainingToday)} C
               </p>
             </article>
             <article className="rounded-2xl border border-line bg-panel p-5">
@@ -175,6 +185,18 @@ export function MembershipPolicyPage() {
                     <dt className="text-fg-3">저장공간</dt>
                     <dd className="font-bold text-fg">
                       {formatBytes(Number(plan.entitlements["storage.bytes"]))}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-fg-3">월 Studio Credit</dt>
+                    <dd className="font-bold text-fg">
+                      {number.format(Number(plan.entitlements["credit.monthlyIncluded"]))} C
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-fg-3">일일 Credit 한도</dt>
+                    <dd className="font-bold text-fg">
+                      {number.format(Number(plan.entitlements["credit.dailyLimit"]))} C
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3">
@@ -253,11 +275,11 @@ export function MembershipPolicyPage() {
           <div className="space-y-4">
             <article className="rounded-3xl border border-line bg-panel p-6">
               <ShieldCheck className="text-accent" size={22} aria-hidden />
-              <h2 className="mt-4 text-xl font-black text-fg">지금은 크레딧을 따로 팔지 않습니다</h2>
+              <h2 className="mt-4 text-xl font-black text-fg">Studio Credit은 멤버십 포함분으로 운영합니다</h2>
               <p className="mt-3 text-sm leading-6 text-fg-2">
-                실제 결제가 없는 현재 단계에서는 포인트와 크레딧을 두 개의 잔액으로 보여주지
-                않습니다. 유료 AI·서버 렌더처럼 실제 비용형 기능이 생길 때만 별도 크레딧 도입을
-                다시 검토합니다.
+                AI·서버 렌더처럼 비용이 큰 작업에는 Studio Credit을 사용합니다. 매월 멤버십에
+                포함된 크레딧이 지급되며 다음 월로 이월되지 않습니다. 플랜 승급 시에는 해당 월
+                목표량과의 차액만 추가 지급됩니다. 현재는 실제 결제나 추가 크레딧 구매를 받지 않습니다.
               </p>
             </article>
             <article className="rounded-3xl border border-line bg-panel p-6">
@@ -277,7 +299,8 @@ export function MembershipPolicyPage() {
           <ul className="mt-5 grid gap-3 text-sm leading-6 text-fg-2 md:grid-cols-2">
             <li className="rounded-2xl bg-card/55 p-4">• 베타 무료 이용 중에도 저장공간·파일 크기·동시 처리량 같은 안전 한도는 유지됩니다.</li>
             <li className="rounded-2xl bg-card/55 p-4">• 표시된 파일 한도는 계정의 상위 한도입니다. PSD·3D·실시간 동기화 등 포맷별 안전 한도가 더 낮으면 해당 기능의 기술 한도가 우선합니다.</li>
-            <li className="rounded-2xl bg-card/55 p-4">• 활동 포인트는 {economy.pointExpiryDays === null ? "현재 만료되지 않습니다." : "유효기간이 적용됩니다."}</li>
+            <li className="rounded-2xl bg-card/55 p-4">• 활동 포인트는 지급일로부터 {economy.pointExpiryDays ?? "무기한"}일 동안 유효하며, 만료가 가까운 무료 재화부터 먼저 사용합니다.</li>
+            <li className="rounded-2xl bg-card/55 p-4">• 멤버십 Studio Credit은 월별로 새로 지급되고 이월되지 않으며, 플랜별 일일 사용 한도도 함께 적용됩니다.</li>
             <li className="rounded-2xl bg-card/55 p-4">• 같은 글·댓글·작품 ID는 중복 적립되지 않으며 활동별 하루 적립 횟수가 제한됩니다.</li>
             <li className="rounded-2xl bg-card/55 p-4">• 멤버십 상향은 포인트를 자동 소모하지 않으며, 현재는 베타·프로모션·운영 정책으로 별도 부여됩니다.</li>
           </ul>
