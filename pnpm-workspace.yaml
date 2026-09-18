@@ -53,6 +53,9 @@ overrides:
   'brace-expansion@>=3.0.0 <5.0.9': 5.0.9
   'js-yaml@>=4.0.0 <4.3.2': 4.3.2
   'postcss@>=8.0.0 <8.5.23': 8.5.23
+  # xcode@3.0.1 still requests uuid ^7; force only the vulnerable range onto the
+  # last CommonJS-compatible patched major for GHSA-w5hq-g745-h8pq.
+  'uuid@<11.1.1': 11.1.1
   'sharp@<0.35.4': 0.35.4
   # 이전에 루트 package.json 의 npm 전용 "overrides" 에 있던 핀. pnpm 워크스페이스는 그 블록을
   # 읽지 않으므로 실제 의존성 트리를 수정 버전의 tar로 수렴시킨다.
