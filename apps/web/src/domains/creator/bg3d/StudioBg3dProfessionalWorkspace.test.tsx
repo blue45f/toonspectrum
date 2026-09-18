@@ -89,15 +89,13 @@ describe("Studio BG3D professional workspace layout", () => {
     expect(screen.queryByRole("separator", { name: "장면 계층 패널 너비" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "캐릭터" }));
-    expect(screen.getByRole("button", { name: "캐릭터" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("separator", { name: "장면 계층 패널 너비" })).toHaveAttribute(
-      "aria-valuenow",
-      "260",
-    );
-    expect(screen.getByRole("separator", { name: "속성 패널 너비" })).toHaveAttribute(
-      "aria-valuenow",
-      "440",
-    );
+    expect(screen.getByRole("button", { name: "캐릭터" }).getAttribute("aria-pressed")).toBe("true");
+    expect(
+      screen.getByRole("separator", { name: "장면 계층 패널 너비" }).getAttribute("aria-valuenow"),
+    ).toBe("260");
+    expect(
+      screen.getByRole("separator", { name: "속성 패널 너비" }).getAttribute("aria-valuenow"),
+    ).toBe("440");
 
     await waitFor(() => {
       const serialized = window.localStorage.getItem(

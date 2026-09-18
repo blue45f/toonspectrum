@@ -157,6 +157,16 @@ export default function StudioP2pHuddleLauncher() {
             <button className={controlClass} type="button" disabled={busy || !mediaAvailable} aria-pressed={snapshot?.camera}
               onClick={() => void capture(() => controller.current?.setVideo(snapshot?.camera ? null : "camera") ?? Promise.resolve())}>
               <Video size={14} />{snapshot?.camera ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "카메라 끄기") : translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "카메라 켜기")}</button>
+            {snapshot?.camera ? <button className={controlClass} type="button" disabled={busy || !mediaAvailable}
+              aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "전·후면 카메라 전환")}
+              onClick={() => void capture(() => controller.current?.setVideo(
+                "camera",
+                snapshot.cameraFacing === "user" ? "environment" : "user",
+              ) ?? Promise.resolve())}>
+              <Video size={14} />{snapshot.cameraFacing === "user"
+                ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "후면 카메라")
+                : translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "전면 카메라")}
+            </button> : null}
             <button className={controlClass} type="button" disabled={busy || !navigator.mediaDevices?.getDisplayMedia} aria-pressed={snapshot?.sharing}
               onClick={() => void capture(() => controller.current?.setVideo(snapshot?.sharing ? null : "screen") ?? Promise.resolve())}>
               <MonitorUp size={14} />{snapshot?.sharing ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "공유 중지") : translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "화면 공유")}</button>

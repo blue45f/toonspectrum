@@ -15,9 +15,11 @@ export interface HuddlePeer extends HuddleState {
   stream: MediaStream | null; connection: RTCPeerConnectionState | "idle";
   reaction: HuddleReaction | null; reactionUntil: number;
 }
+export type HuddleCameraFacingMode = "user" | "environment";
 export interface HuddleSnapshot extends HuddleState {
   peers: HuddlePeer[]; messages: HuddleMessage[]; localStream: MediaStream | null;
   availablePeers: number; error: string | null; closed: boolean;
+  cameraFacing: HuddleCameraFacingMode;
 }
 interface Link {
   pc: RTCPeerConnection; audio: RTCRtpSender; video: RTCRtpSender;
@@ -49,6 +51,7 @@ export class StudioP2pHuddleController {
   private audioTrack: MediaStreamTrack | null = null;
   private videoTrack: MediaStreamTrack | null = null;
   private localStream: MediaStream | null = null;
+  private cameraFacing: HuddleCameraFacingMode = "user";
   private mediaGeneration = { audio: 0, video: 0 };
   private unsubscribe: (() => void) | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -70,7 +73,7 @@ export class StudioP2pHuddleController {
     return { ...this.state, peers: [...this.peers.values()].map((p) => ({ ...p })),
       messages: this.messages.map((m) => ({ ...m, targets: [...m.targets], sent: [...m.sent], received: [...m.received] })),
       localStream: this.localStream, availablePeers: this.eligiblePeers().length,
-      error: this.error, closed: this.closed };
+      error: this.error, closed: this.closed, cameraFacing: this.cameraFacing };
   }
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener); return () => { this.listeners.delete(listener); };
@@ -354,20 +357,29 @@ export class StudioP2pHuddleController {
       this.acceptCapture("audio", stream, generation, false);
     } catch { if (!this.closed && generation === this.mediaGeneration.audio) this.fail("마이크를 켜지 못했습니다. 브라우저 권한과 장치를 확인해 주세요."); }
   }
-  async setVideo(mode: "camera" | "screen" | null): Promise<void> {
+  async setVideo(
+    mode: "camera" | "screen" | null,
+    facingMode: HuddleCameraFacingMode = this.cameraFacing,
+  ): Promise<void> {
     const generation = ++this.mediaGeneration.video;
     if (!mode) { this.stopTrack("video"); this.publishMedia(); return; }
     if (this.closed || !this.unsubscribe) return;
     try {
       const constraints = { video: { width: { ideal: 640, max: 1280 }, height: { ideal: 360, max: 720 },
-        frameRate: { ideal: 15, max: 24 }, facingMode: { ideal: "user" } }, audio: false };
+        frameRate: { ideal: 15, max: 24 }, facingMode: { ideal: facingMode } }, audio: false };
       const stream = mode === "screen"
         ? await (this.deps.getDisplayMedia?.() ?? navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { max: 15 } }, audio: false }))
         : await (this.deps.getUserMedia?.(constraints) ?? navigator.mediaDevices.getUserMedia(constraints));
-      this.acceptCapture("video", stream, generation, mode === "screen");
+      this.acceptCapture("video", stream, generation, mode === "screen", mode === "camera" ? facingMode : undefined);
     } catch { if (!this.closed && generation === this.mediaGeneration.video) this.fail("영상을 켜지 못했거나 공유를 취소했습니다. 브라우저 권한을 확인해 주세요."); }
   }
-  private acceptCapture(kind: "audio" | "video", stream: MediaStream, generation: number, sharing: boolean): void {
+  private acceptCapture(
+    kind: "audio" | "video",
+    stream: MediaStream,
+    generation: number,
+    sharing: boolean,
+    facingMode?: HuddleCameraFacingMode,
+  ): void {
     const track = stream.getTracks().find((t) => t.kind === kind);
     if (this.closed || generation !== this.mediaGeneration[kind] || !track) {
       stream.getTracks().forEach((t) => t.stop()); return;
@@ -375,7 +387,10 @@ export class StudioP2pHuddleController {
     stream.getTracks().filter((t) => t !== track).forEach((t) => t.stop());
     this.stopTrack(kind);
     if (kind === "audio") { this.audioTrack = track; this.state.muted = false; }
-    else { this.videoTrack = track; this.state.camera = !sharing; this.state.sharing = sharing; }
+    else {
+      this.videoTrack = track; this.state.camera = !sharing; this.state.sharing = sharing;
+      if (!sharing && facingMode) this.cameraFacing = facingMode;
+    }
     track.onended = () => {
       if ((kind === "audio" ? this.audioTrack : this.videoTrack) !== track) return;
       this.stopTrack(kind); this.publishMedia();

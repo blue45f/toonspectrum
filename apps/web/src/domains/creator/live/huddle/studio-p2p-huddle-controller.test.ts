@@ -143,6 +143,32 @@ describe("P2P huddle consent and delivery", () => {
     expect(controller.snapshot().camera).toBe(true);
   });
 
+  it("switches mobile camera facing without overlapping video tracks", async () => {
+    const front = track("video");
+    const rear = track("video");
+    let request = 0;
+    const getUserMedia = vi.fn(async () => stream([request++ === 0 ? front : rear]));
+    const { controller } = single({ getUserMedia });
+
+    await controller.setVideo("camera", "user");
+    expect(controller.snapshot().cameraFacing).toBe("user");
+    expect(front.stop).not.toHaveBeenCalled();
+
+    await controller.setVideo("camera", "environment");
+    expect(front.stop).toHaveBeenCalledOnce();
+    expect(rear.stop).not.toHaveBeenCalled();
+    expect(controller.snapshot().cameraFacing).toBe("environment");
+    expect(getUserMedia).toHaveBeenLastCalledWith({
+      video: {
+        width: { ideal: 640, max: 1280 },
+        height: { ideal: 360, max: 720 },
+        frameRate: { ideal: 15, max: 24 },
+        facingMode: { ideal: "environment" },
+      },
+      audio: false,
+    });
+  });
+
   it("restarts ICE after a disconnected media link and keeps the session alive", () => {
     let inbound: ((sender: StudioLiveParticipant, raw: string) => void) | null = null;
     let connectionState: RTCPeerConnectionState = "new";

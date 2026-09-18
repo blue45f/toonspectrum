@@ -24,6 +24,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>웹툰 캐릭터 모션 추적과 P2P 화상 협업을 위해 카메라를 사용합니다.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>P2P 음성 협업에서 사용자가 마이크를 켠 경우에만 음성을 전송합니다.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
