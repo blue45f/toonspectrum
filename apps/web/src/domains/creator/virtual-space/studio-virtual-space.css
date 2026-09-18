@@ -91,3 +91,8 @@
 .studio-vspace-minimap-stage:hover .studio-vspace-minimap-self{scale:1.12}
 .studio-vspace-minimap-self,.studio-vspace-minimap-peer{transition:left .12s linear,top .12s linear,scale .18s}
 @media(max-width:639px){.studio-vspace-minimap{display:none}}
+
+.studio-vspace-reaction{animation:studio-vspace-reaction-pop .24s cubic-bezier(.16,1.25,.3,1),studio-vspace-reaction-float 2.2s ease-in-out .24s both;transform-origin:50% 100%}
+@keyframes studio-vspace-reaction-pop{from{opacity:0;scale:.55;translate:-50% 8px}to{opacity:1;scale:1;translate:-50% 0}}
+@keyframes studio-vspace-reaction-float{0%,75%{opacity:1;translate:-50% 0}100%{opacity:0;translate:-50% -10px}}
+@media(prefers-reduced-motion:reduce){.studio-vspace-reaction{animation:none}}

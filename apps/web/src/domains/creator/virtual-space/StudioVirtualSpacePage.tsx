@@ -69,7 +69,9 @@ import {
   type StudioVirtualSpaceZoneId,
 } from "./studio-virtual-space-model";
 import {
+  STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS,
   StudioVirtualSpacePresenceController,
+  type StudioVirtualSpaceReaction,
   type StudioVirtualSpaceSnapshot,
 } from "./studio-virtual-space-presence";
 import {
@@ -88,6 +90,21 @@ import "./studio-virtual-space.css";
 const KEYBOARD_MOVEMENT_KEYS = new Set(["arrowleft", "arrowright", "arrowup", "arrowdown", "a", "d", "w", "s"]);
 const MOBILE_CAMERA_SCALE = 0.72;
 const VIRTUAL_SPACE_POSITION_STORAGE_PREFIX = "toonspectrum:virtual-space-position:v1";
+const VIRTUAL_SPACE_REACTIONS: readonly {
+  readonly id: StudioVirtualSpaceReaction;
+  readonly emoji: string;
+  readonly labelKo: string;
+  readonly labelEn: string;
+}[] = [
+  { id: "wave", emoji: "👋", labelKo: "인사", labelEn: "Wave" },
+  { id: "heart", emoji: "❤️", labelKo: "좋아요", labelEn: "Love" },
+  { id: "sparkles", emoji: "✨", labelKo: "멋져요", labelEn: "Sparkles" },
+  { id: "thumbs-up", emoji: "👍", labelKo: "좋습니다", labelEn: "Thumbs up" },
+];
+
+function virtualSpaceReactionEmoji(reaction: StudioVirtualSpaceReaction | null | undefined): string | null {
+  return VIRTUAL_SPACE_REACTIONS.find((candidate) => candidate.id === reaction)?.emoji ?? null;
+}
 
 function virtualSpacePositionStorageKey(projectId: string): string {
   return `${VIRTUAL_SPACE_POSITION_STORAGE_PREFIX}:${projectId}`;
@@ -348,6 +365,7 @@ function ChibiAvatar({
   facing = "down",
   moving = false,
   nearby = false,
+  reaction = null,
 }: {
   readonly identity: string;
   readonly name: string;
@@ -357,6 +375,7 @@ function ChibiAvatar({
   readonly facing?: StudioVirtualSpaceFacing;
   readonly moving?: boolean;
   readonly nearby?: boolean;
+  readonly reaction?: StudioVirtualSpaceReaction | null;
 }) {
   const profile = useMemo(() => studioVirtualAvatarProfile(identity), [identity]);
   const art = useMemo(() => virtualAvatarArt(identity), [identity]);
@@ -368,6 +387,7 @@ function ChibiAvatar({
       : activity === "reviewing"
         ? "bg-cool"
         : "bg-good";
+  const reactionEmoji = virtualSpaceReactionEmoji(reaction);
 
   if (compact) {
     return (
@@ -410,6 +430,14 @@ function ChibiAvatar({
         />
       </span>
       <span className={cn("absolute bottom-2 right-0 z-30 size-3 rounded-full border-2 border-panel", activityTone)} />
+      {reactionEmoji ? (
+        <span
+          className="studio-vspace-reaction absolute -top-5 left-1/2 z-50 grid size-10 -translate-x-1/2 place-items-center rounded-2xl border border-white/30 bg-panel/95 text-xl shadow-xl backdrop-blur"
+          aria-hidden
+        >
+          {reactionEmoji}
+        </span>
+      ) : null}
       <span className="absolute -bottom-4 left-1/2 z-40 flex max-w-32 -translate-x-1/2 items-center gap-1 truncate rounded-full border border-line bg-panel/95 px-2 py-0.5 text-[0.58rem] font-black text-fg shadow-sm backdrop-blur">
         {self ? <Sparkles size={9} className="shrink-0 text-accent" aria-hidden /> : null}
         <span className="truncate">{name}</span>
@@ -641,6 +669,8 @@ function VirtualSpaceExperience({
     self: studioVirtualSpaceState(initial),
     peers: [],
     nearbyPeers: [],
+    selfReaction: null,
+    peerReactions: [],
     direct: false,
   }));
   const [activity, setActivity] = useState<StudioVirtualSpaceActivity>("available");
@@ -650,6 +680,7 @@ function VirtualSpaceExperience({
   const peersRef = useRef(snapshot.peers);
   const followingPeerIdRef = useRef<string | null>(null);
   const lastFollowPathAtRef = useRef(0);
+  const localReactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressedKeysRef = useRef(new Set<string>());
   const joystickRef = useRef<StudioVirtualSpacePoint>({ x: 0, y: 0 });
   const clickPathRef = useRef<readonly StudioVirtualSpacePoint[]>([]);
@@ -680,6 +711,13 @@ function VirtualSpaceExperience({
 
   useEffect(() => startStudioConnectivityRuntime(), []);
 
+  useEffect(() => () => {
+    if (localReactionTimerRef.current !== null) {
+      globalThis.clearTimeout(localReactionTimerRef.current);
+      localReactionTimerRef.current = null;
+    }
+  }, []);
+
   const openAssistant = useCallback(() => {
     globalThis.dispatchEvent(new CustomEvent("toonspectrum:command-palette:open"));
   }, []);
@@ -693,6 +731,8 @@ function VirtualSpaceExperience({
         ...current,
         peers: [],
         nearbyPeers: [],
+        selfReaction: null,
+        peerReactions: [],
         direct: false,
       }));
       return undefined;
@@ -945,6 +985,23 @@ function VirtualSpaceExperience({
     });
   }, [connectivity.serverAvailable, snapshot.nearbyPeers]);
 
+  const sendReaction = useCallback((reaction: StudioVirtualSpaceReaction) => {
+    const controller = controllerRef.current;
+    if (controller) {
+      controller.sendReaction(reaction);
+      setSnapshot(controller.snapshot());
+      return;
+    }
+    setSnapshot((current) => ({ ...current, selfReaction: reaction }));
+    if (localReactionTimerRef.current !== null) {
+      globalThis.clearTimeout(localReactionTimerRef.current);
+    }
+    localReactionTimerRef.current = globalThis.setTimeout(() => {
+      setSnapshot((current) => ({ ...current, selfReaction: null }));
+      localReactionTimerRef.current = null;
+    }, STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS);
+  }, []);
+
   const setPresenceActivity = (next: StudioVirtualSpaceActivity) => {
     setActivity(next);
     controllerRef.current?.setActivity(next);
@@ -1078,6 +1135,9 @@ function VirtualSpaceExperience({
                   const nearby = snapshot.nearbyPeers.some(
                     (candidate) => candidate.participant.sessionId === peer.participant.sessionId,
                   );
+                  const reaction = snapshot.peerReactions.find(
+                    (candidate) => candidate.sessionId === peer.participant.sessionId,
+                  )?.reaction ?? null;
                   return (
                     <button
                       key={peer.participant.sessionId}
@@ -1107,6 +1167,7 @@ function VirtualSpaceExperience({
                         facing={peer.state.facing}
                         moving={peer.state.moving}
                         nearby={nearby}
+                        reaction={reaction}
                       />
                     </button>
                   );
@@ -1122,6 +1183,7 @@ function VirtualSpaceExperience({
                     activity={snapshot.self.activity}
                     facing={snapshot.self.facing}
                     moving={moving}
+                    reaction={snapshot.selfReaction}
                   />
                 </div>
                 </div>
@@ -1164,6 +1226,20 @@ function VirtualSpaceExperience({
                       <span aria-hidden>×</span>
                     </button>
                   ) : null}
+                  <span className="inline-flex items-center gap-1 rounded-xl border border-line bg-card p-1" data-space-interactive="true">
+                    {VIRTUAL_SPACE_REACTIONS.map((reaction) => (
+                      <button
+                        key={reaction.id}
+                        type="button"
+                        className="grid size-7 place-items-center rounded-lg text-base transition hover:bg-raised"
+                        title={bt(reaction.labelKo, reaction.labelEn)}
+                        aria-label={bt(reaction.labelKo, reaction.labelEn)}
+                        onClick={() => sendReaction(reaction.id)}
+                      >
+                        {reaction.emoji}
+                      </button>
+                    ))}
+                  </span>
                   <button
                     type="button"
                     className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-accent/30 bg-accent-soft px-3 text-[0.7rem] font-black text-accent"
@@ -1193,6 +1269,19 @@ function VirtualSpaceExperience({
                 </button>
                 <div className="absolute left-1/2 top-3 z-50 -translate-x-1/2 rounded-full border border-line bg-panel/85 px-3 py-1.5 text-[0.65rem] font-black text-fg shadow-lg backdrop-blur lg:hidden">
                   {bt(currentZone.labelKo, currentZone.labelEn)}
+                </div>
+                <div className="absolute left-3 top-14 z-50 flex items-center gap-1 rounded-2xl border border-line bg-panel/85 p-1.5 shadow-lg backdrop-blur lg:hidden" data-space-interactive="true">
+                  {VIRTUAL_SPACE_REACTIONS.map((reaction) => (
+                    <button
+                      key={reaction.id}
+                      type="button"
+                      className="grid size-8 place-items-center rounded-xl text-lg active:scale-90"
+                      aria-label={bt(reaction.labelKo, reaction.labelEn)}
+                      onClick={() => sendReaction(reaction.id)}
+                    >
+                      {reaction.emoji}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>

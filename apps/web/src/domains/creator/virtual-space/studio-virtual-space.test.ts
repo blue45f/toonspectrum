@@ -145,6 +145,12 @@ describe("Studio virtual space P2P presence", () => {
     a.refresh();
     expect(b.snapshot().peers[0]?.state.moving).toBe(false);
 
+    a.sendReaction("wave");
+    expect(a.snapshot().selfReaction).toBe("wave");
+    expect(b.snapshot().peerReactions).toEqual([
+      expect.objectContaining({ sessionId: "creator-a", reaction: "wave" }),
+    ]);
+
     a.close();
     expect(b.snapshot().peers).toHaveLength(0);
     b.close();
