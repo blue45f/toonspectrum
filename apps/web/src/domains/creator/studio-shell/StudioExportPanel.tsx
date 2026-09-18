@@ -67,7 +67,7 @@ export function StudioExportPanel({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: string;
+  readonly locale: "ko" | "en";
 }) {
   const l = useBilingualLocalizer("studioExport");
   const workspace = useStudioProjectWorkspace(projectId, locale);
