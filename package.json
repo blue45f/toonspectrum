@@ -211,7 +211,11 @@
     "test:studio-2d-legacy-gpt25": "node scripts/studio-2d-legacy-gpt25-replacements.test.mjs",
     "render:creator-essential-props": "blender --background --python scripts/render-creator-essential-prop-thumbnails.py",
     "check:market-cc0-catalog": "tsx scripts/generate-market-cc0-catalog.mts --check && tsx scripts/generate-market-cc0-starter-records.mts --check",
-    "generate:studio-2d-legacy-gpt25": "node scripts/generate-studio-2d-legacy-gpt25-batch.mjs"
+    "generate:studio-2d-legacy-gpt25": "node scripts/generate-studio-2d-legacy-gpt25-batch.mjs",
+    "quality:imports": "knip --include unlisted,unresolved",
+    "quality:deadcode": "knip",
+    "quality:cycles": "knip --cycles",
+    "test:a11y": "playwright test --config playwright.a11y.config.ts"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",
@@ -293,6 +297,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@babel/core": "^7.29.7",
     "@cloudflare/vitest-pool-workers": "0.19.1",
     "@commitlint/cli": "^21.0.2",
@@ -326,12 +331,14 @@
     "gltf-validator": "2.0.0-dev.3.10",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
+    "knip": "^6.36.0",
     "lint-staged": "^17.0.7",
     "parse5": "8.0.1",
     "playwright": "1.62.1",
     "puppeteer-core": "^25.3.0",
     "redis": "^5.12.1",
     "tailwindcss": "^4.3.0",
+    "three-stdlib": "2.36.1",
     "tsx": "^4.22.3",
     "turbo": "^2.9.18",
     "typescript": "~6.0.3",
