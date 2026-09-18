@@ -74,16 +74,12 @@ export interface StudioVirtualSpacePresenceDependencies {
   readonly clearInterval?: (handle: unknown) => void;
 }
 
-const ZONES = new Set<StudioVirtualSpaceZoneId>([
-  "lounge",
-  "writers",
-  "storyboard",
-  "drawing",
-  "review",
-  "assets",
-  "assistant",
-  "live",
-]);
+function isSafeZoneId(value: unknown): value is StudioVirtualSpaceZoneId {
+  return typeof value === "string"
+    && value.length > 0
+    && value.length <= 64
+    && /^[a-z0-9][a-z0-9_-]*$/iu.test(value);
+}
 const FACINGS = new Set<StudioVirtualSpaceFacing>(["down", "left", "right", "up"]);
 const ACTIVITIES = new Set<StudioVirtualSpaceActivity>(["available", "focused", "reviewing", "away"]);
 const REACTIONS = new Set<StudioVirtualSpaceReaction>(["wave", "heart", "sparkles", "thumbs-up"]);
@@ -142,8 +138,7 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
   if (
     !isFiniteCoordinate(state.x)
     || !isFiniteCoordinate(state.y)
-    || typeof state.zoneId !== "string"
-    || !ZONES.has(state.zoneId as StudioVirtualSpaceZoneId)
+    || !isSafeZoneId(state.zoneId)
     || typeof state.facing !== "string"
     || !FACINGS.has(state.facing as StudioVirtualSpaceFacing)
     || typeof state.activity !== "string"
@@ -167,6 +162,7 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
         && Number(state.avatarIndex) < STUDIO_VIRTUAL_SPACE_AVATAR_COUNT
         ? Number(state.avatarIndex)
         : STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
+      state.zoneId as StudioVirtualSpaceZoneId,
     ),
   };
 }
@@ -269,9 +265,10 @@ export class StudioVirtualSpacePresenceController {
     activity: StudioVirtualSpaceActivity = this.self.activity,
     moving: boolean = this.self.moving,
     avatarIndex: number = this.self.avatarIndex,
+    zoneId?: StudioVirtualSpaceZoneId,
   ): void {
     if (this.closed) return;
-    const next = studioVirtualSpaceState(point, facing, activity, moving, avatarIndex);
+    const next = studioVirtualSpaceState(point, facing, activity, moving, avatarIndex, zoneId);
     if (
       next.x === this.self.x
       && next.y === this.self.y
@@ -289,15 +286,15 @@ export class StudioVirtualSpacePresenceController {
   }
 
   setActivity(activity: StudioVirtualSpaceActivity): void {
-    this.update(this.self, this.self.facing, activity, this.self.moving, this.self.avatarIndex);
+    this.update(this.self, this.self.facing, activity, this.self.moving, this.self.avatarIndex, this.self.zoneId);
   }
 
   setMoving(moving: boolean): void {
-    this.update(this.self, this.self.facing, this.self.activity, moving, this.self.avatarIndex);
+    this.update(this.self, this.self.facing, this.self.activity, moving, this.self.avatarIndex, this.self.zoneId);
   }
 
   setAvatarIndex(avatarIndex: number): void {
-    this.update(this.self, this.self.facing, this.self.activity, this.self.moving, avatarIndex);
+    this.update(this.self, this.self.facing, this.self.activity, this.self.moving, avatarIndex, this.self.zoneId);
   }
 
   sendReaction(reaction: StudioVirtualSpaceReaction): void {

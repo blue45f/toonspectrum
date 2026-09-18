@@ -288,6 +288,7 @@
     "paper": "0.12.18",
     "perfect-freehand": "1.2.3",
     "pg": "^8.21.0",
+    "phaser": "^3.90.0",
     "pixi.js": "^8.19.0",
     "polygon-clipping": "^0.15.7",
     "qrcode": "^1.5.4",
