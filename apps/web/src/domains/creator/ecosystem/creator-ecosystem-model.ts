@@ -1,4 +1,10 @@
-export const CREATOR_ECOSYSTEM_STORAGE_KEY = "toonspectrum:creator-ecosystem:v1";
+
+import {
+  translateBilingualValueForActiveLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("creator-ecosystem-model", ko, en);export const CREATOR_ECOSYSTEM_STORAGE_KEY = "toonspectrum:creator-ecosystem:v1";
 export const CREATOR_ECOSYSTEM_MAX_BYTES = 1_500_000;
 
 export const SAMPLE_WORKS = Object.freeze([
@@ -222,8 +228,8 @@ export function upsertDialogueSource(state: CreatorEcosystemState, idValue: stri
 export function setDialogueTranslation(state: CreatorEcosystemState, dialogueId: string, locale: string, translated: string, approved = false): CreatorEcosystemState {
   return { ...state, dialogue: state.dialogue.map((row) => row.id === dialogueId ? { ...row, translations: { ...row.translations, [locale]: { text: translated.trim().slice(0, 12_000), sourceRevision: row.sourceRevision, approved } } } : row) };
 }
-export function translationStatus(row: DialogueRecord, locale: string): "missing" | "stale" | "draft" | "approved" {
-  const translation = row.translations[locale];
+export function translationStatus(row: DialogueRecord, _locale): "missing" | "stale" | "draft" | "approved" {
+  const translation = bi((row.translations).ko, (row.translations).en);
   if (!translation) return "missing";
   if (translation.sourceRevision !== row.sourceRevision) return "stale";
   return translation.approved ? "approved" : "draft";

@@ -29,7 +29,7 @@ const LABELS = {
   ko: {
     "help-home": "도움말 홈 · 단계별 가이드",
     "command-search": "명령 · 속성 통합 검색",
-    "terminology-search": "CSP · Photoshop 용어 찾기",
+    "terminology-search": "다른 앱 용어 찾기",
     "current-tool": "현재 도구 도움말",
     "user-manual": "사용자 매뉴얼 (새 탭)",
     diagnostics: "기기 · 브라우저 진단…",
@@ -40,7 +40,7 @@ const LABELS = {
   en: {
     "help-home": "Help home and guided learning",
     "command-search": "Command search",
-    "terminology-search": "CSP · Photoshop terminology",
+    "terminology-search": "Other app terminology",
     "current-tool": "Current tool help",
     "user-manual": "User manual · Korean (new tab)",
     diagnostics: "Device and browser diagnosis…",

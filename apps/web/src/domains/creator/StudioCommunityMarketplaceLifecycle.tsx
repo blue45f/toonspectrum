@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ChevronDown, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -137,8 +141,7 @@ export function StudioOwnedReleaseLifecycleActions({
   if (release.hidden && release.delistedAt) {
     return (
       <p className="mt-2 rounded-md border border-bad/25 bg-bad/10 px-2 py-2 text-[0.56rem] leading-relaxed text-bad">
-        이 head는 관리자 숨김과 목록 내림 상태입니다. 관리자 숨김이 해제되기 전에는 다시 공개하거나 새 릴리스를 게시할 수 없습니다.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "이 head는 관리자 숨김과 목록 내림 상태입니다. 관리자 숨김이 해제되기 전에는 다시 공개하거나 새 릴리스를 게시할 수 없습니다.")}</p>
     );
   }
 
@@ -148,11 +151,10 @@ export function StudioOwnedReleaseLifecycleActions({
     <div className="mt-2">
       {release.hidden ? (
         <p className="mb-2 rounded-md border border-bad/25 bg-bad/10 px-2 py-2 text-[0.56rem] leading-relaxed text-bad">
-          관리자 숨김 중에도 이 head를 목록에서 내릴 수 있습니다. 숨김이 해제되기 전에는 다시 공개하거나 새 릴리스를 게시할 수 없습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "관리자 숨김 중에도 이 head를 목록에서 내릴 수 있습니다. 숨김이 해제되기 전에는 다시 공개하거나 새 릴리스를 게시할 수 없습니다.")}</p>
       ) : null}
       {armedAction === action ? (
-        <div role="group" aria-label={`${label} 확인: ${release.resource.name}`} className="flex gap-1.5">
+        <div role="group" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "{v0} 확인: {v1}"), { v0: String(label), v1: String(release.resource.name) })} className="flex gap-1.5">
           <button
             type="button"
             disabled={pending}
@@ -162,8 +164,7 @@ export function StudioOwnedReleaseLifecycleActions({
             }}
             className={cx("flex-1", ACTION)}
           >
-            취소
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "취소")}</button>
           <button
             type="button"
             disabled={pending}
@@ -176,7 +177,7 @@ export function StudioOwnedReleaseLifecycleActions({
                 : "border-warn/30 bg-warn/10 text-warn",
             )}
           >
-            {pending ? "처리 중…" : `${label} 확인`}
+            {pending ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "처리 중…") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "{v0} 확인"), { v0: String(label) })}
           </button>
         </div>
       ) : (
@@ -305,27 +306,24 @@ export function StudioOwnedPackageHistory({
       className="mt-2 rounded-md border border-line bg-panel"
     >
       <summary className={cx("flex min-h-11 cursor-pointer list-none items-center justify-between px-2.5 text-[0.58rem] font-bold text-fg-2 [&::-webkit-details-marker]:hidden", FOCUS)}>
-        내 릴리스 이력
-        <ChevronDown size={13} className="text-fg-3" aria-hidden />
+        {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "내 릴리스 이력")}<ChevronDown size={13} className="text-fg-3" aria-hidden />
       </summary>
       <div className="border-t border-line p-2">
         {state.status === "loading" || state.status === "idle" ? (
           <p role="status" className="flex items-center gap-1.5 text-[0.56rem] text-fg-2">
-            <LoaderCircle size={12} className="animate-spin" aria-hidden /> 이력을 불러오는 중…
-          </p>
+            <LoaderCircle size={12} className="animate-spin" aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "이력을 불러오는 중…")}</p>
         ) : null}
         {state.status === "error" ? (
           <div role="alert" className="text-[0.56rem] text-bad">
             <p>{state.error}</p>
             <button type="button" className={cx("mt-2", ACTION)} onClick={() => setRetryGeneration((value) => value + 1)}>
-              다시 시도
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "다시 시도")}</button>
           </div>
         ) : null}
         {state.status === "ready" ? (
           <>
             {state.page.items.length === 0 ? (
-              <p className="text-[0.56rem] text-fg-3">저장된 릴리스 이력이 없습니다.</p>
+              <p className="text-[0.56rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "저장된 릴리스 이력이 없습니다.")}</p>
             ) : (
               <ol className="space-y-1.5">
                 {state.page.items.map((release) => (
@@ -334,12 +332,12 @@ export function StudioOwnedPackageHistory({
                       <strong className="text-[0.6rem] text-fg">v{release.resource.resourceVersion}</strong>
                       <StudioOwnedLifecycleBadge release={release} />
                       {release.resource.id === head.resource.id ? (
-                        <span className="rounded-full border border-accent/30 bg-accent-soft px-1.5 py-0.5 text-[0.52rem] font-black text-accent">현재 헤드</span>
+                        <span className="rounded-full border border-accent/30 bg-accent-soft px-1.5 py-0.5 text-[0.52rem] font-black text-accent">{translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "현재 헤드")}</span>
                       ) : null}
-                      <span className="ml-auto text-[0.52rem] text-fg-3">릴리스 #{release.releaseOrdinal}</span>
+                      <span className="ml-auto text-[0.52rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "릴리스 #")}{release.releaseOrdinal}</span>
                     </div>
                     <p className="mt-1 whitespace-pre-wrap text-[0.56rem] leading-relaxed text-fg-2">
-                      {release.resource.releaseNotes ?? "릴리스 노트 없음"}
+                      {release.resource.releaseNotes ?? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "릴리스 노트 없음")}
                     </p>
                   </li>
                 ))}
@@ -348,7 +346,7 @@ export function StudioOwnedPackageHistory({
             {loadMoreError ? <p role="alert" className="mt-2 text-[0.56rem] text-bad">{loadMoreError}</p> : null}
             {state.page.hasMore ? (
               <button type="button" disabled={loadingMore} onClick={loadMore} className={cx("mt-2 w-full", ACTION)}>
-                {loadingMore ? "더 불러오는 중…" : loadMoreError ? "다시 불러오기" : "이전 릴리스 더 보기"}
+                {loadingMore ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "더 불러오는 중…") : loadMoreError ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "다시 불러오기") : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplaceLifecycle", "ko", "이전 릴리스 더 보기")}
               </button>
             ) : null}
           </>

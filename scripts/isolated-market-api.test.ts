@@ -42,6 +42,7 @@ describe("isolated market API target", () => {
     for (const rawApiUrl of [
       "http://127.0.0.1",
       "http://127.0.0.1:80",
+      // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
       "http://user:pass@127.0.0.1:43117",
       "http://localhost:43117",
       "http://[::1]:43117",

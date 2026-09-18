@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { playSfx } from "@toonspectrum/core/fx";
 import { Command } from "cmdk";
 import {
@@ -379,12 +383,12 @@ export function CommandPalette({
               {activePrefix}
               <span className="text-[10px] font-normal">
                 {activeMode === "commands"
-                  ? "명령"
+                  ? translateCurrentStaticSourceText("shared.components.command.palette", "ko", "명령")
                   : activeMode === "titles"
-                  ? "작품"
+                  ? translateCurrentStaticSourceText("shared.components.command.palette", "ko", "작품")
                   : activeMode === "studio"
-                  ? "도구"
-                  : "태그"}
+                  ? translateCurrentStaticSourceText("shared.components.command.palette", "ko", "도구")
+                  : translateCurrentStaticSourceText("shared.components.command.palette", "ko", "태그")}
               </span>
             </span>
           )}
@@ -397,7 +401,7 @@ export function CommandPalette({
               setResults([]);
               if (!value.trim()) setSearchLoading(false);
             }}
-            placeholder="작품 제목, 작가, 기능 명령, 스튜디오 도구 검색... (Tab으로 탭 전환)"
+            placeholder={translateCurrentStaticSourceText("shared.components.command.palette", "ko", "작품 제목, 작가, 기능 명령, 스튜디오 도구 검색... (Tab으로 탭 전환)")}
             className="h-14 flex-1 bg-transparent text-[0.95rem] text-fg outline-none placeholder:text-fg-3"
           />
 
@@ -410,7 +414,7 @@ export function CommandPalette({
                 inputRef.current?.focus();
               }}
               className="flex size-7 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg"
-              title="검색어 지우기"
+              title={translateCurrentStaticSourceText("shared.components.command.palette", "ko", "검색어 지우기")}
             >
               <X size={15} />
             </button>
@@ -479,14 +483,13 @@ export function CommandPalette({
                     )}
                   </p>
                   <p className="mt-1 text-xs text-fg-3">
-                    다른 키워드나 접두사(<code>&gt;</code> 명령어, <code>/</code> 도구)를 시도해보세요.
-                  </p>
+                    {translateCurrentStaticSourceText("shared.components.command.palette", "ko", "다른 키워드나 접두사(")}<code>&gt;</code> {translateCurrentStaticSourceText("shared.components.command.palette", "ko", "명령어, ")}<code>/</code> {translateCurrentStaticSourceText("shared.components.command.palette", "ko", "도구)를 시도해보세요.")}</p>
                   <button
                     type="button"
                     onClick={() => go(`/search?q=${encodeURIComponent(effectiveQuery)}`)}
                     className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3 py-1.5 text-xs font-semibold text-accent hover:bg-accent hover:text-on-accent"
                   >
-                    <span>통합 검색 결과 열기</span>
+                    <span>{translateCurrentStaticSourceText("shared.components.command.palette", "ko", "통합 검색 결과 열기")}</span>
                     <ExternalLink size={12} />
                   </button>
                 </div>
@@ -497,7 +500,7 @@ export function CommandPalette({
               <div className="px-3 py-2">
                 <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-fg-3">
                   <Tag size={12} className="text-accent" />
-                  <span>인기 탐색 태그</span>
+                  <span>{translateCurrentStaticSourceText("shared.components.command.palette", "ko", "인기 탐색 태그")}</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {TRENDING_TAGS.map((item) => (
@@ -525,8 +528,7 @@ export function CommandPalette({
                 heading={
                   <div className="flex items-center justify-between px-2 py-1">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-fg-3">
-                      최근 검색어
-                    </span>
+                      {translateCurrentStaticSourceText("shared.components.command.palette", "ko", "최근 검색어")}</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -535,16 +537,15 @@ export function CommandPalette({
                       }}
                       className="text-[10px] text-fg-3 hover:text-red-400"
                     >
-                      전체 삭제
-                    </button>
+                      {translateCurrentStaticSourceText("shared.components.command.palette", "ko", "전체 삭제")}</button>
                   </div>
                 }
               >
                 {recentSearches.slice(0, 5).map((searchQuery) => (
                   <Command.Item
                     forceMount
-                    key={`search-${searchQuery}`}
-                    value={`recent-query-${searchQuery}`}
+                    key={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.command.palette", "en", "search-{v0}"), { v0: String(searchQuery) })}
+                    value={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.command.palette", "en", "recent-query-{v0}"), { v0: String(searchQuery) })}
                     onSelect={() => {
                       setQ(searchQuery);
                       setMode("titles");
@@ -564,7 +565,7 @@ export function CommandPalette({
                         playSfx("tick");
                       }}
                       className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-400"
-                      title="검색어 삭제"
+                      title={translateCurrentStaticSourceText("shared.components.command.palette", "ko", "검색어 삭제")}
                     >
                       <X size={13} />
                     </button>
@@ -579,15 +580,14 @@ export function CommandPalette({
                 forceMount
                 heading={
                   <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-fg-3">
-                    최근 본 작품
-                  </div>
+                    {translateCurrentStaticSourceText("shared.components.command.palette", "ko", "최근 본 작품")}</div>
                 }
               >
                 {recentTitles.map((item) => (
                   <Command.Item
                     forceMount
-                    key={`recent-${item.id}`}
-                    value={`title-${item.id}`}
+                    key={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.command.palette", "en", "recent-{v0}"), { v0: String(item.id) })}
+                    value={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.command.palette", "en", "title-{v0}"), { v0: String(item.id) })}
                     onSelect={() => go(`/title/${item.slug}`, item.title)}
                     className="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 transition-colors data-[selected=true]:bg-raised"
                   >
@@ -623,8 +623,7 @@ export function CommandPalette({
                 forceMount
                 heading={
                   <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-fg-3">
-                    시스템 및 명령어
-                  </div>
+                    {translateCurrentStaticSourceText("shared.components.command.palette", "ko", "시스템 및 명령어")}</div>
                 }
               >
                 {filteredCommands.map((cmd) => {
@@ -680,8 +679,7 @@ export function CommandPalette({
                 forceMount
                 heading={
                   <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-fg-3">
-                    스튜디오 도구
-                  </div>
+                    {translateCurrentStaticSourceText("shared.components.command.palette", "ko", "스튜디오 도구")}</div>
                 }
               >
                 {filteredStudioTools.map((tool) => {
@@ -718,15 +716,15 @@ export function CommandPalette({
                 forceMount
                 heading={
                   <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-fg-3">
-                    작품 검색 결과 ({results.length})
+                    {translateCurrentStaticSourceText("shared.components.command.palette", "ko", "작품 검색 결과 (")}{results.length})
                   </div>
                 }
               >
                 {results.map((item) => (
                   <Command.Item
                     forceMount
-                    key={`search-res-${item.id}`}
-                    value={`title-${item.id}`}
+                    key={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.command.palette", "en", "search-res-{v0}"), { v0: String(item.id) })}
+                    value={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.command.palette", "en", "title-{v0}"), { v0: String(item.id) })}
                     onSelect={() => go(`/title/${item.slug}`, item.title)}
                     className="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 transition-colors data-[selected=true]:bg-raised"
                   >
@@ -760,7 +758,7 @@ export function CommandPalette({
                   onSelect={() => go(`/search?q=${encodeURIComponent(effectiveQuery)}`, effectiveQuery)}
                   className="mt-1 flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-accent transition-colors data-[selected=true]:bg-accent-soft"
                 >
-                  <span>'{effectiveQuery}' 전체 검색 페이지 열기</span>
+                  <span>'{effectiveQuery}{translateCurrentStaticSourceText("shared.components.command.palette", "ko", "' 전체 검색 페이지 열기")}</span>
                   <ExternalLink size={12} />
                 </Command.Item>
               </Command.Group>
@@ -772,8 +770,7 @@ export function CommandPalette({
                 forceMount
                 heading={
                   <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-fg-3">
-                    페이지 바로가기
-                  </div>
+                    {translateCurrentStaticSourceText("shared.components.command.palette", "ko", "페이지 바로가기")}</div>
                 }
               >
                 {filteredPages.map((page) => {
@@ -826,7 +823,7 @@ export function CommandPalette({
               <kbd className="rounded border border-line bg-card px-1 py-0.5 font-mono text-[9px] text-fg-2">
                 Tab
               </kbd>
-              <span>카테고리 전환</span>
+              <span>{translateCurrentStaticSourceText("shared.components.command.palette", "ko", "카테고리 전환")}</span>
             </span>
             <span className="flex items-center gap-1">
               <kbd className="rounded border border-line bg-card px-1 py-0.5 font-mono text-[9px] text-fg-2">
@@ -835,7 +832,7 @@ export function CommandPalette({
               <kbd className="rounded border border-line bg-card px-1 py-0.5 font-mono text-[9px] text-fg-2">
                 /
               </kbd>
-              <span>접두사 필터</span>
+              <span>{translateCurrentStaticSourceText("shared.components.command.palette", "ko", "접두사 필터")}</span>
             </span>
           </div>
 
@@ -844,19 +841,19 @@ export function CommandPalette({
               <kbd className="rounded border border-line bg-card px-1 py-0.5 font-mono text-[9px] text-fg-2">
                 ↑↓
               </kbd>
-              <span>이동</span>
+              <span>{translateCurrentStaticSourceText("shared.components.command.palette", "ko", "이동")}</span>
             </span>
             <span className="flex items-center gap-1">
               <kbd className="rounded border border-line bg-card px-1 py-0.5 font-mono text-[9px] text-fg-2">
                 ↵
               </kbd>
-              <span>실행</span>
+              <span>{translateCurrentStaticSourceText("shared.components.command.palette", "ko", "실행")}</span>
             </span>
             <span className="flex items-center gap-1">
               <kbd className="rounded border border-line bg-card px-1 py-0.5 font-mono text-[9px] text-fg-2">
                 Esc
               </kbd>
-              <span>닫기</span>
+              <span>{translateCurrentStaticSourceText("shared.components.command.palette", "ko", "닫기")}</span>
             </span>
           </div>
         </div>

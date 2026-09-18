@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { studioLiveAdjustmentDescriptorError } from "./contracts/studio-work-asset-contract";
 import { StudioLiveAdjustmentControls } from "./StudioLiveAdjustmentControls";
 import { ChevronDown } from "lucide-react";
@@ -627,7 +628,7 @@ function AdjustmentSection({
         <ChevronDown
           size={14}
           aria-hidden
-          className={open ? "shrink-0 rotate-180 transition-transform" : "shrink-0 transition-transform"}
+          className={open ? translateCurrentStaticSourceText("domains.creator.StudioImageAdjustmentsPanel", "en", "shrink-0 rotate-180 transition-transform") : translateCurrentStaticSourceText("domains.creator.StudioImageAdjustmentsPanel", "en", "shrink-0 transition-transform")}
         />
       </button>
       {open ? (
@@ -691,8 +692,8 @@ export function StudioImageAdjustmentsPanel({
     light: t("studio.imageAdjustments.section.light"),
     detail: t("studio.imageAdjustments.section.detail"),
     sketch: t("studio.imageAdjustments.section.sketch"),
-    colorMatch: "컬러 매치 (CSP 3.0)",
-    shadingAssist: "자동 음영 어시스트 (CSP 2.0)",
+    colorMatch: "색감 맞추기",
+    shadingAssist: "자동 명암",
   };
   if (selected.adjustmentLayer) return <>
     <StudioLiveAdjustmentControls selected={selected} onPatch={onPatch} />

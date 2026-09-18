@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useState, type ReactElement } from "react";
 
 import { findStoredBrushSnapshotForMarketplace } from "./marketplace-brush-publish-snapshot";
@@ -97,11 +100,11 @@ export function MarketplaceBrushPublishShortcut({
     <aside
       data-testid="brush-studio-marketplace-shortcut"
       className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 z-[195] max-w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-line bg-card/95 p-3 shadow-xl backdrop-blur sm:bottom-5 sm:right-5"
-      aria-label="브러시 마켓 등록"
+      aria-label={translateCurrentStaticSourceText("domains.creator.MarketplaceBrushPublishShortcut", "ko", "브러시 마켓 등록")}
     >
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <strong className="block truncate text-sm text-fg">마켓에 브러시 등록</strong>
+          <strong className="block truncate text-sm text-fg">{translateCurrentStaticSourceText("domains.creator.MarketplaceBrushPublishShortcut", "ko", "마켓에 브러시 등록")}</strong>
           <p
             role="status"
             aria-atomic="true"
@@ -119,7 +122,7 @@ export function MarketplaceBrushPublishShortcut({
           disabled={busy}
           className="min-h-11 shrink-0 rounded-xl bg-accent px-4 text-xs font-bold text-accent-fg disabled:cursor-wait disabled:opacity-60"
         >
-          {busy ? "준비 중" : "등록 준비"}
+          {busy ? translateCurrentStaticSourceText("domains.creator.MarketplaceBrushPublishShortcut", "ko", "준비 중") : translateCurrentStaticSourceText("domains.creator.MarketplaceBrushPublishShortcut", "ko", "등록 준비")}
         </button>
       </div>
     </aside>

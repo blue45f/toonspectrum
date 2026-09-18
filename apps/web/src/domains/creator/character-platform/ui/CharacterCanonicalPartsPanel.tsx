@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Boxes,
   Layers3,
   RotateCcw,
@@ -78,10 +82,8 @@ export function CharacterCanonicalPartsPanel({ workbench }: {
     return (
       <div className="rounded-2xl border border-dashed border-line bg-panel/50 p-4 text-[0.7rem] leading-relaxed text-fg-3">
         <div className="mb-2 flex items-center gap-2 font-bold text-fg-2">
-          <Boxes size={15} aria-hidden />Production Library
-        </div>
-        승인된 교체 파츠가 아직 없습니다. 품질 리포트, 라이선스, 원본 SHA-256, 리그/토폴로지 호환 조건을 모두 통과한 실제 메시만 이 라이브러리에 노출됩니다.
-      </div>
+          <Boxes size={15} aria-hidden />{translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "en", "Production Library")}</div>
+        {translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "승인된 교체 파츠가 아직 없습니다. 품질 리포트, 라이선스, 원본 SHA-256, 리그/토폴로지 호환 조건을 모두 통과한 실제 메시만 이 라이브러리에 노출됩니다.")}</div>
     );
   }
 
@@ -91,11 +93,10 @@ export function CharacterCanonicalPartsPanel({ workbench }: {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Boxes size={16} className="text-accent" aria-hidden />
-            <p className="text-[0.76rem] font-bold text-fg">Production Library</p>
+            <p className="text-[0.76rem] font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "en", "Production Library")}</p>
           </div>
           <p className="mt-1 text-[0.63rem] leading-relaxed text-fg-3">
-            실제 authored donor/GLB만 사용합니다. 적용 전 무결성·권리·호환성을 재검증하고 실패하면 현재 캐릭터를 그대로 유지합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "실제 authored donor/GLB만 사용합니다. 적용 전 무결성·권리·호환성을 재검증하고 실패하면 현재 캐릭터를 그대로 유지합니다.")}</p>
         </div>
         <button
           type="button"
@@ -107,21 +108,20 @@ export function CharacterCanonicalPartsPanel({ workbench }: {
             STUDIO_FOCUS_RING,
           )}
         >
-          <RotateCcw size={13} aria-hidden />모두 원본
-        </button>
+          <RotateCcw size={13} aria-hidden />{translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "모두 원본")}</button>
       </div>
 
-      <div className="grid grid-cols-3 gap-2" aria-label="Production Library 현황">
+      <div className="grid grid-cols-3 gap-2" aria-label={translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "Production Library 현황")}>
         <div className="rounded-xl border border-good/30 bg-good/8 p-2.5">
-          <span className="block text-[0.58rem] font-semibold text-fg-3">사용 가능</span>
+          <span className="block text-[0.58rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "사용 가능")}</span>
           <strong className="mt-0.5 block text-base text-good">{supportedCount}</strong>
         </div>
         <div className="rounded-xl border border-accent/30 bg-accent-soft/70 p-2.5">
-          <span className="block text-[0.58rem] font-semibold text-fg-3">적용 중</span>
+          <span className="block text-[0.58rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "적용 중")}</span>
           <strong className="mt-0.5 block text-base text-accent">{selectedOptions.length}</strong>
         </div>
         <div className="rounded-xl border border-warn/30 bg-warn/8 p-2.5">
-          <span className="block text-[0.58rem] font-semibold text-fg-3">호환 불가</span>
+          <span className="block text-[0.58rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "호환 불가")}</span>
           <strong className="mt-0.5 block text-base text-warn">{unavailableCount}</strong>
         </div>
       </div>
@@ -129,8 +129,7 @@ export function CharacterCanonicalPartsPanel({ workbench }: {
       {selectedOptions.length > 0 ? (
         <div className="rounded-2xl border border-accent/30 bg-accent-soft/45 p-2.5">
           <div className="mb-2 flex items-center gap-1.5 text-[0.64rem] font-bold text-accent">
-            <Layers3 size={13} aria-hidden />현재 조합
-          </div>
+            <Layers3 size={13} aria-hidden />{translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "현재 조합")}</div>
           <div className="flex flex-wrap gap-1.5">
             {selectedOptions.map((option) => (
               <button
@@ -143,7 +142,7 @@ export function CharacterCanonicalPartsPanel({ workbench }: {
                   "hover:bg-raised disabled:opacity-40",
                   STUDIO_FOCUS_RING,
                 )}
-                aria-label={`${SLOT_LABELS[option.part.slot]} ${option.part.label} 원본으로 복원`}
+                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "{v0} {v1} 원본으로 복원"), { v0: String(SLOT_LABELS[option.part.slot]), v1: String(option.part.label) })}
               >
                 <span className="text-accent">{SLOT_LABELS[option.part.slot]}</span>
                 <span className="max-w-28 truncate">{option.part.label}</span>
@@ -160,8 +159,8 @@ export function CharacterCanonicalPartsPanel({ workbench }: {
           type="search"
           value={query}
           onChange={(event) => setQuery(event.currentTarget.value)}
-          placeholder="파츠, 제작자, 라이선스 검색"
-          aria-label="Production Library 검색"
+          placeholder={translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "파츠, 제작자, 라이선스 검색")}
+          aria-label={translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "Production Library 검색")}
           className={cn(
             "h-11 w-full rounded-xl border border-line bg-panel pl-9 pr-3 text-sm text-fg placeholder:text-fg-3",
             STUDIO_FOCUS_RING,
@@ -169,7 +168,7 @@ export function CharacterCanonicalPartsPanel({ workbench }: {
         />
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto pb-1" role="group" aria-label="파츠 종류 필터">
+      <div className="flex gap-1.5 overflow-x-auto pb-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "파츠 종류 필터")}>
         <button
           type="button"
           aria-pressed={slotFilter === "all"}
@@ -180,7 +179,7 @@ export function CharacterCanonicalPartsPanel({ workbench }: {
             STUDIO_FOCUS_RING,
           )}
         >
-          전체 {workbench.options.length}
+          {translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "전체 ")}{workbench.options.length}
         </button>
         {presentSlots.map((slot) => {
           const count = workbench.options.filter((option) => option.part.slot === slot).length;
@@ -204,8 +203,7 @@ export function CharacterCanonicalPartsPanel({ workbench }: {
 
       {visibleOptions.length === 0 ? (
         <div className="rounded-xl border border-dashed border-line p-5 text-center text-[0.68rem] text-fg-3">
-          조건에 맞는 production part가 없습니다.
-        </div>
+          {translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "조건에 맞는 production part가 없습니다.")}</div>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {visibleOptions.map((option) => {
@@ -237,13 +235,13 @@ export function CharacterCanonicalPartsPanel({ workbench }: {
                       className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03] motion-reduce:transition-none"
                     />
                   ) : (
-                    <div className="grid h-full place-items-center text-[0.62rem] font-bold tracking-wider text-fg-3">3D PART</div>
+                    <div className="grid h-full place-items-center text-[0.62rem] font-bold tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "en", "3D PART")}</div>
                   )}
                   <span className={cn(
                     "absolute left-2 top-2 rounded-full border px-1.5 py-0.5 text-[0.54rem] font-extrabold backdrop-blur",
                     option.status === "supported" ? "border-good/45 bg-panel/85 text-good" : "border-warn/45 bg-panel/85 text-warn",
                   )}>
-                    {option.status === "supported" ? `Q${Math.round(option.part.quality.minimumScore)}` : "호환 불가"}
+                    {option.status === "supported" ? `Q${Math.round(option.part.quality.minimumScore)}` : translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "호환 불가")}
                   </span>
                   {selected ? (
                     <span className="absolute right-2 top-2 grid size-6 place-items-center rounded-full bg-accent text-on-accent shadow">
@@ -256,7 +254,7 @@ export function CharacterCanonicalPartsPanel({ workbench }: {
                   <span className="mt-0.5 block text-[0.58rem] font-semibold text-accent">{SLOT_LABELS[option.part.slot]}</span>
                   <span className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[0.55rem] text-fg-3">
                     <span>{bindingLabel(option.part.binding.kind)}</span>
-                    <span>{option.part.lods.length > 0 ? `LOD ${option.part.lods.length}` : "LOD 원본"}</span>
+                    <span>{option.part.lods.length > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "en", "LOD {v0}"), { v0: String(option.part.lods.length) }) : translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "LOD 원본")}</span>
                     <span className="truncate">{option.part.provenance.sourceLicense}</span>
                     <span className="truncate text-right">{option.part.provenance.creatorId}</span>
                   </span>
@@ -264,7 +262,7 @@ export function CharacterCanonicalPartsPanel({ workbench }: {
                     "mt-2 block min-h-7 text-[0.57rem] leading-snug",
                     option.status === "supported" ? selected ? "font-semibold text-accent" : "text-good" : "text-warn",
                   )}>
-                    {applying ? "SHA·리그·품질 검증 후 적용 중…" : selected ? "현재 캐릭터에 적용됨" : option.status === "supported" ? "즉시 미리보기 가능" : option.reason}
+                    {applying ? translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "SHA·리그·품질 검증 후 적용 중…") : selected ? translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "현재 캐릭터에 적용됨") : option.status === "supported" ? translateCurrentStaticSourceText("domains.creator.character.platform.ui.CharacterCanonicalPartsPanel", "ko", "즉시 미리보기 가능") : option.reason}
                   </span>
                 </span>
               </button>

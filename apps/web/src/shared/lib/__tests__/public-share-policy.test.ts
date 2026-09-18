@@ -26,6 +26,7 @@ describe("public share policy", () => {
       .toBe("https://cdn.example.com/cover.jpg");
     expect(publicShareImageUrl("//evil.example/cover.jpg")).toBeUndefined();
     expect(publicShareImageUrl("/\\evil.example/cover.jpg")).toBeUndefined();
+    // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
     expect(publicShareImageUrl("https://user:pass@example.com/cover.jpg")).toBeUndefined();
     expect(publicShareImageUrl("data:image/jpeg;base64,abc")).toBeUndefined();
     expect(publicShareImageUrl("http://example.com/cover.jpg")).toBeUndefined();

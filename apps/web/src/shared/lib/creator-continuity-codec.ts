@@ -7,7 +7,6 @@ import {
   isCreatorLaunchPace,
   validCreatorContinuityTimestamp,
   type CreatorContinuityState,
-  type CreatorDestinationId,
   type CreatorRecentDestination,
 } from "./creator-continuity-model";
 import {
@@ -24,12 +23,14 @@ const DESTINATION_BY_ID = new Map(
   CREATOR_DESTINATIONS.map((item) => [item.id, item] as const),
 );
 
-function storedSearch(value: unknown): string {
-  if (typeof value !== "string") return "";
+function storedLocation(value: unknown): { pathname: string; search: string } | null {
+  if (typeof value !== "string") return null;
   try {
-    return new URL(value, "https://toonstudio.local").search;
+    const url = new URL(value, "https://toonstudio.local");
+    if (url.origin !== "https://toonstudio.local") return null;
+    return { pathname: url.pathname, search: url.search };
   } catch {
-    return "";
+    return null;
   }
 }
 
@@ -45,19 +46,19 @@ export function parseCreatorContinuity(
     }
 
     const recent: CreatorRecentDestination[] = [];
-    const seen = new Set<CreatorDestinationId>();
+    const seen = new Set<string>();
     if (Array.isArray(value.recent)) {
       for (const candidate of value.recent) {
         if (!isRecord(candidate) || !isCreatorDestinationId(candidate.id)) continue;
-        if (seen.has(candidate.id) || !validCreatorContinuityTimestamp(candidate.visitedAt, now)) continue;
+        if (!validCreatorContinuityTimestamp(candidate.visitedAt, now)) continue;
         const destination = DESTINATION_BY_ID.get(candidate.id);
-        if (!destination) continue;
-        recent.push({
-          id: candidate.id,
-          href: safeCreatorDestinationHref(destination, storedSearch(candidate.href)),
-          visitedAt: candidate.visitedAt,
-        });
-        seen.add(candidate.id);
+        const location = storedLocation(candidate.href);
+        if (!destination || !location) continue;
+        const href = safeCreatorDestinationHref(destination, location.pathname, location.search);
+        const dedupeKey = candidate.id === "studio" ? `${candidate.id}:${href}` : candidate.id;
+        if (seen.has(dedupeKey)) continue;
+        recent.push({ id: candidate.id, href, visitedAt: candidate.visitedAt });
+        seen.add(dedupeKey);
         if (recent.length >= CREATOR_CONTINUITY_MAX_RECENT) break;
       }
     }

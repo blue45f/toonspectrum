@@ -22,6 +22,7 @@ for (const patch of [
   { contentWarning: "x".repeat(151) }, { kind: "trailer", videoUrl: "" }, { cover: "https://example.com/cover.jpg" },
 ]) test(`reject invalid field: ${JSON.stringify(patch).slice(0, 65)}`, () => assert.ok(validatePromotion({ ...input, ...patch }).error));
 for (const value of [null, [], true, 42, "text"]) test(`reject non-object payload: ${JSON.stringify(value)}`, () => assert.ok(validatePromotion(value).error));
+// secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic unsafe-URL rejection fixture
 for (const value of ["javascript:alert(1)", "data:text/html,hi", "http://example.com", "https://user:pass@example.com", "https://127.0.0.1/a", "https://10.0.0.1/a", "https://192.168.1.1/a", "https://172.16.0.1/a", "https://localhost/a", "https://test.local/a", "https://[::1]/", "https://example.com:8443", "https://example.com/a\nb", "https://example.com/" + "x".repeat(1001)]) test(`reject unsafe URL: ${value.slice(0, 70)}`, () => assert.equal(safePromotionUrl(value), null));
 for (const url of ["https://youtu.be/dQw4w9WgXcQ", "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "https://youtube.com/shorts/dQw4w9WgXcQ", "https://m.youtube.com/watch?v=dQw4w9WgXcQ", "https://www.youtube.com/embed/dQw4w9WgXcQ"]) test(`normalize YouTube: ${url}`, () => {
   const media = promotionVideo(url); assert.equal(media.provider, "YouTube"); assert.equal(media.embedUrl, "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ");

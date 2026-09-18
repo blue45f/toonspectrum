@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Profiler,
   Suspense,
@@ -489,14 +490,14 @@ export function StudioCanvasViewportStageHost({
             }
             data-studio-brush-cursor-brush={
               tool === "draw" && isStudioBrushCursorMode(drawMode)
-                ? drawMode === "eraser" && !eraserPresetActive ? "eraser" : brush
+                ? drawMode === "eraser" && !eraserPresetActive ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportStageHost", "en", "eraser") : brush
                 : undefined
             }
-            data-studio-comment-placement-active={commentPinArmed ? "true" : undefined}
+            data-studio-comment-placement-active={commentPinArmed ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportStageHost", "en", "true") : undefined}
             data-studio-vello-hub-authority={velloHubAuthority.status}
             data-studio-vello-hub-backend={velloHubAuthority.backendId ?? undefined}
             data-studio-frame-graph-document={
-              frameGraphOwnsDocumentPixels ? "vello-skia" : "konva-shadow"
+              frameGraphOwnsDocumentPixels ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportStageHost", "en", "vello-skia") : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportStageHost", "en", "konva-shadow")
             }
             className={cn(
               "relative rounded-sm shadow-[0_0_0_1px_oklch(0.3_0.012_64/0.55),0_18px_50px_oklch(0.08_0.01_70/0.45)]",
@@ -713,7 +714,7 @@ export function StudioCanvasViewportStageHost({
                 className="z-[9]"
                 document={studioCrdtDocument}
                 workId={authorizedWorkAssetScopeId}
-                surfaceId={`raster:${activePage.id}:ink`}
+                surfaceId={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportStageHost", "en", "raster:{v0}:ink"), { v0: String(activePage.id) })}
                 viewport={webGpuViewportSurface}
                 visibleDocumentRect={studioRasterVisibleDocumentRect}
                 handoff={{

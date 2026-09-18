@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "id": "gpt25-bg-action-ruined-city-vertical-depth",
+  "model": "gpt-image-2.5-sunburst",
+  "quality": "max",
+  "size": "1152x2048",
+  "promptSha256": "1dd073f8c1b7b12a93c9399d7b3bc3eafad1bc900aca7dcabc23edae0d337dc3",
+  "prompt": "premium 2D webtoon background illustration, hand-painted environment concept art, clean controlled linework, cel-shaded forms with painterly light, production-ready details, coherent perspective and architecture, material-specific textures, crisp edges near focal plane, subtle atmospheric depth, no photorealistic people. Scene: partially ruined modern city. Composition: 세로 웹툰 컷에 맞는 깊은 원근, 아래에서 위로 시선이 흐르는 S자 동선 (28mm lens, slightly low camera, strong vertical leading lines); large uncluttered staging area for two characters. Lighting and atmosphere: blue-hour dawn with soft atmospheric light, thin atmospheric fog. Palette: refined pastel palette with controlled saturation. Environment must be empty and immediately usable behind webtoon characters. Preserve believable scale, orthogonal lines, floor contact, material continuity, and several crop-safe regions. Output one complete background only. No characters, no silhouettes, no crowds, no readable text, no letters, no signs with glyphs, no logos, no watermark, no speech balloons, no UI, no frame border, no split panels, no duplicated furniture, no floating objects, no melted geometry, no impossible stairs, no fisheye distortion, no extreme blur, no low-resolution texture, no photographic collage.",
+  "negativePrompt": "No characters, no silhouettes, no crowds, no readable text, no letters, no signs with glyphs, no logos, no watermark, no speech balloons, no UI, no frame border, no split panels, no duplicated furniture, no floating objects, no melted geometry, no impossible stairs, no fisheye distortion, no extreme blur, no low-resolution texture, no photographic collage.",
+  "generatedAt": "2026-09-18T00:15:49.022886Z",
+  "outputSha256": "9bafc0aad76726aa32f25fdb85a6af5bede5b277a1823f652955f018441fd9e3",
+  "outputBytes": 3919129,
+  "reviewRequired": false,
+  "operatorFunded": false,
+  "generationChannel": "ChatGPT image generation"
+}

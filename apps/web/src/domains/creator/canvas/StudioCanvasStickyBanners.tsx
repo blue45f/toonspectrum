@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ImagePlus, Lock, MessageSquare } from "lucide-react";
 import {
   Fragment,
@@ -259,19 +262,17 @@ export function renderStudioCanvasStickyBanners({
               <MessageSquare size={15} aria-hidden />
             </span>
             <span className="min-w-0 flex-1 leading-relaxed">
-              캔버스에서 댓글을 연결할 위치를 선택하세요.
-              <span className="ml-1 text-fg-3">Esc로 취소</span>
+              {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "캔버스에서 댓글을 연결할 위치를 선택하세요.")}<span className="ml-1 text-fg-3">{translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "Esc로 취소")}</span>
             </span>
             <button
               type="button"
-              aria-label="댓글 핀 배치 취소"
+              aria-label={translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "댓글 핀 배치 취소")}
               onClick={() => {
                 stopStudioCommentPlacementSession();
               }}
               className="inline-flex min-h-11 shrink-0 items-center rounded-lg border border-line bg-card px-3 text-xs font-bold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
             >
-              취소
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "취소")}</button>
           </div>
         </div>
       ) : null}
@@ -283,23 +284,23 @@ export function renderStudioCanvasStickyBanners({
               {sourceHydrationPending
                 ? workHydrationFailed
                   ? workHydrationUnsupportedFormat
-                    ? "업로드형 작품은 별도 편집기가 필요해요"
+                    ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "업로드형 작품은 별도 편집기가 필요해요")
                     : remixId
-                      ? "리믹스 원본을 열지 못했어요"
-                      : "원고를 열지 못했어요"
+                      ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "리믹스 원본을 열지 못했어요")
+                      : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "원고를 열지 못했어요")
                   : remixId
-                    ? "리믹스 원본을 안전하게 불러오는 중"
-                    : "원고를 안전하게 불러오는 중"
-                : "공동 문서를 열지 못했어요"}
+                    ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "리믹스 원본을 안전하게 불러오는 중")
+                    : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "원고를 안전하게 불러오는 중")
+                : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "공동 문서를 열지 못했어요")}
             </strong>
             <span className="mt-1 block text-xs leading-relaxed text-fg-2">
               {sourceHydrationPending
                 ? workHydrationFailed
                   ? workHydrationUnsupportedFormat
-                    ? "원본을 보호하기 위해 컷툰 편집을 잠갔습니다. 업로드 편집 화면으로 이동해 주세요."
-                    : "빈 캔버스로 덮어쓰지 않도록 잠금을 유지합니다. 다시 불러와 주세요."
-                  : "불러오기가 끝날 때까지 편집·저장·가져오기·내보내기를 잠급니다."
-                : "이전 계정이나 다른 작품의 캔버스는 표시·내보내지 않습니다."}
+                    ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "원본을 보호하기 위해 컷툰 편집을 잠갔습니다. 업로드 편집 화면으로 이동해 주세요.")
+                    : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "빈 캔버스로 덮어쓰지 않도록 잠금을 유지합니다. 다시 불러와 주세요.")
+                  : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "불러오기가 끝날 때까지 편집·저장·가져오기·내보내기를 잠급니다.")
+                : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "이전 계정이나 다른 작품의 캔버스는 표시·내보내지 않습니다.")}
             </span>
             {sourceHydrationPending && workHydrationFailed && workHydrationError ? (
               <span role="alert" className="mt-2 block text-xs leading-relaxed text-warn">
@@ -331,9 +332,9 @@ export function renderStudioCanvasStickyBanners({
                 >
                   {workHydrationUnsupportedFormat
                     ? workId
-                      ? "업로드 편집기로 이동"
-                      : "원본 작품으로 이동"
-                    : "다시 불러오기"}
+                      ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "업로드 편집기로 이동")
+                      : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "원본 작품으로 이동")
+                    : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "다시 불러오기")}
                 </button>
                 {!workHydrationUnsupportedFormat && (
                   <button
@@ -343,8 +344,7 @@ export function renderStudioCanvasStickyBanners({
                     }}
                     className="min-h-11 rounded-lg border border-accent/40 bg-accent-soft px-4 text-xs font-semibold text-accent transition-colors hover:bg-accent/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                   >
-                    새 작업 공간으로 이동
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStickyBanners", "ko", "새 작업 공간으로 이동")}</button>
                 )}
               </div>
             ) : null}

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Scale, Sigma, Gauge, ShieldCheck, ArrowRight } from "lucide-react";
 
 import type { PlatformId } from "@/shared/lib/types";
@@ -61,38 +65,28 @@ export function GuidePage() {
     <Container size="prose" className="py-10 sm:py-14">
       {/* 헤더 */}
       <header>
-        <p className="eyebrow text-accent">투명 산식 · OPEN FORMULA</p>
+        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "투명 산식 · OPEN FORMULA")}</p>
         <h1 className="mt-2 text-pretty font-display text-3xl font-bold tracking-tight text-fg sm:text-4xl">
-          랭킹은 이렇게 매겨집니다
-        </h1>
+          {translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "랭킹은 이렇게 매겨집니다")}</h1>
         <p className="mt-3 text-base leading-relaxed text-fg-2">
-          툰스펙트럼의 모든 순위는 사람이 손으로 고르지 않습니다. 공개된 산식으로만 계산하고, 그 산식을
-          이 페이지에 그대로 적어둡니다. 어떤 작품이 왜 그 자리에 있는지 직접 검산할 수 있어야
-          한다고 믿기 때문입니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "툰스펙트럼의 모든 순위는 사람이 손으로 고르지 않습니다. 공개된 산식으로만 계산하고, 그 산식을 이 페이지에 그대로 적어둡니다. 어떤 작품이 왜 그 자리에 있는지 직접 검산할 수 있어야 한다고 믿기 때문입니다.")}</p>
       </header>
 
       {/* 정직성 원칙 */}
       <section className="mt-8 rounded-2xl border border-line bg-panel/40 p-5 sm:p-6">
         <h2 className="flex items-center gap-2 text-lg font-bold text-fg">
-          <span className="numeral text-accent">01</span> 실데이터와 추정값을 섞지 않습니다
-        </h2>
+          <span className="numeral text-accent">01</span> {translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "실데이터와 추정값을 섞지 않습니다")}</h2>
         <p className="mt-2.5 text-sm leading-relaxed text-fg-2">
-          네이버 웹툰의 <strong className="text-fg">별점은 실제 수집값</strong>입니다. 다만 네이버가
-          조회·관심 집계를 비공개로 전환하면서, 조회수·관심수 등 일부 보조 지표는{" "}
-          <strong className="text-fg">추정값(≈)</strong>으로 표기합니다. 다른 플랫폼의 평점·조회·완독률
-          중 일부도 마찬가지입니다. 추정값은 화면 어디서나 <code className="rounded bg-raised px-1 py-0.5 text-[0.8em] text-fg-2">≈</code>{" "}
-          기호로 분명히 구분하고, 위의 <strong className="text-fg">신뢰 계수</strong>로 순위 영향력도 낮춥니다.
-          가격·조회수를 부풀려 표시하지 않습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "네이버 웹툰의 ")}<strong className="text-fg">{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "별점은 실제 수집값")}</strong>{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "입니다. 다만 네이버가 조회·관심 집계를 비공개로 전환하면서, 조회수·관심수 등 일부 보조 지표는")}{" "}
+          <strong className="text-fg">{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "추정값(≈)")}</strong>{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "으로 표기합니다. 다른 플랫폼의 평점·조회·완독률 중 일부도 마찬가지입니다. 추정값은 화면 어디서나")}<code className="rounded bg-raised px-1 py-0.5 text-[0.8em] text-fg-2">≈</code>{" "}
+          {translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "기호로 분명히 구분하고, 위의 ")}<strong className="text-fg">{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "신뢰 계수")}</strong>{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "로 순위 영향력도 낮춥니다. 가격·조회수를 부풀려 표시하지 않습니다.")}</p>
       </section>
 
       {/* 4가지 핵심 장치 */}
       <section className="mt-10">
-        <h2 className="text-xl font-bold tracking-tight text-fg">순위를 떠받치는 4가지 장치</h2>
+        <h2 className="text-xl font-bold tracking-tight text-fg">{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "순위를 떠받치는 4가지 장치")}</h2>
         <p className="mt-1.5 text-sm leading-relaxed text-fg-2">
-          모든 축은 아래 네 가지를 조합해 만들어집니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "모든 축은 아래 네 가지를 조합해 만들어집니다.")}</p>
         <div className="mt-5 grid gap-3.5 sm:grid-cols-2">
           {PILLARS.map((p) => (
             <article key={p.title} className="flex flex-col rounded-2xl border border-line bg-card/30 p-5">
@@ -116,15 +110,14 @@ export function GuidePage() {
 
       {/* 도달 가중 표 */}
       <section className="mt-10">
-        <h2 className="text-xl font-bold tracking-tight text-fg">플랫폼 도달 가중</h2>
+        <h2 className="text-xl font-bold tracking-tight text-fg">{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "플랫폼 도달 가중")}</h2>
         <p className="mt-1.5 text-sm leading-relaxed text-fg-2">
-          작품이 연재되는 플랫폼들 중 가장 큰 값을 씁니다. 인기·급상승 점수에 곱으로 들어갑니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "작품이 연재되는 플랫폼들 중 가장 큰 값을 씁니다. 인기·급상승 점수에 곱으로 들어갑니다.")}</p>
         <div className="mt-4 overflow-hidden rounded-2xl border border-line">
           {reachRows.map((r, i) => (
             <div
               key={r.id}
-              className={`flex items-center gap-3 px-4 py-2.5 ${i % 2 ? "bg-card/20" : "bg-transparent"}`}
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.GuidePage", "en", "flex items-center gap-3 px-4 py-2.5 {v0}"), { v0: String(i % 2 ? "bg-card/20" : "bg-transparent") })}
             >
               <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: r.p.color }} />
               <span className="min-w-0 flex-1 truncate text-sm text-fg">{r.p.name}</span>
@@ -142,10 +135,9 @@ export function GuidePage() {
 
       {/* 8개 랭킹 축 */}
       <section className="mt-10">
-        <h2 className="text-xl font-bold tracking-tight text-fg">8개 랭킹 축</h2>
+        <h2 className="text-xl font-bold tracking-tight text-fg">{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "8개 랭킹 축")}</h2>
         <p className="mt-1.5 text-sm leading-relaxed text-fg-2">
-          하나의 점수로 줄 세우면 시야가 좁아집니다. 보는 관점마다 다른 축을 둡니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "하나의 점수로 줄 세우면 시야가 좁아집니다. 보는 관점마다 다른 축을 둡니다.")}</p>
         <ol className="mt-4 flex flex-col gap-2.5">
           {RANK_AXES.map((a, i) => (
             <li key={a.key} className="rounded-2xl border border-line bg-card/30 p-4">
@@ -164,26 +156,21 @@ export function GuidePage() {
 
       {/* 워크드 예시 */}
       <section className="mt-10 rounded-2xl border border-line bg-panel/40 p-5 sm:p-6">
-        <h2 className="text-lg font-bold text-fg">예: 왜 종합 1위가 군소 플랫폼 작품이 아닌가</h2>
+        <h2 className="text-lg font-bold text-fg">{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "예: 왜 종합 1위가 군소 플랫폼 작품이 아닌가")}</h2>
         <p className="mt-2.5 text-sm leading-relaxed text-fg-2">
-          각 플랫폼의 1위는 모두 인기 백분위 100에 가깝습니다. 백분위만 보면 전부 동점이라, 추정
-          지표가 큰 군소 플랫폼 작품이 우연히 종합 1위에 오를 수 있습니다. 도달 가중과 신뢰 계수를
-          곱으로 적용하면 이야기가 달라집니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "각 플랫폼의 1위는 모두 인기 백분위 100에 가깝습니다. 백분위만 보면 전부 동점이라, 추정 지표가 큰 군소 플랫폼 작품이 우연히 종합 1위에 오를 수 있습니다. 도달 가중과 신뢰 계수를 곱으로 적용하면 이야기가 달라집니다.")}</p>
         <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
           <div className="rounded-xl border border-line/70 bg-raised px-4 py-3">
-            <p className="text-sm font-semibold text-fg">네이버 웹툰 1위 (실데이터)</p>
-            <p className="numeral mt-1 text-sm text-fg-2">100 × 1.00(도달) × 1.05(신뢰) ≈ <strong className="text-fg">105</strong></p>
+            <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "네이버 웹툰 1위 (실데이터)")}</p>
+            <p className="numeral mt-1 text-sm text-fg-2">{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "100 × 1.00(도달) × 1.05(신뢰) ≈ ")}<strong className="text-fg">105</strong></p>
           </div>
           <div className="rounded-xl border border-line/70 bg-raised px-4 py-3">
-            <p className="text-sm font-semibold text-fg">레진 1위 (추정 지표)</p>
-            <p className="numeral mt-1 text-sm text-fg-2">100 × 0.62(도달) × 0.79(신뢰) ≈ <strong className="text-fg">49</strong></p>
+            <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "레진 1위 (추정 지표)")}</p>
+            <p className="numeral mt-1 text-sm text-fg-2">{translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "100 × 0.62(도달) × 0.79(신뢰) ≈ ")}<strong className="text-fg">49</strong></p>
           </div>
         </div>
         <p className="mt-3 text-sm leading-relaxed text-fg-3">
-          같은 '플랫폼 1위'라도 종합 점수는 두 배 넘게 벌어집니다. 군소 플랫폼이 무시되는 게 아니라,
-          장르·숨은 명작 같은 다른 축에서 정당하게 상위에 오릅니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "같은 '플랫폼 1위'라도 종합 점수는 두 배 넘게 벌어집니다. 군소 플랫폼이 무시되는 게 아니라, 장르·숨은 명작 같은 다른 축에서 정당하게 상위에 오릅니다.")}</p>
       </section>
 
       {/* CTA */}
@@ -192,14 +179,13 @@ export function GuidePage() {
           href="/ranking"
           className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
         >
-          통합 랭킹 보러가기 <ArrowRight size={15} />
+          {translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "통합 랭킹 보러가기 ")}<ArrowRight size={15} />
         </Link>
         <Link
           href="/about"
           className="inline-flex items-center gap-1.5 rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised"
         >
-          툰스펙트럼 소개
-        </Link>
+          {translateCurrentStaticSourceText("domains.catalog.GuidePage", "ko", "툰스펙트럼 소개")}</Link>
       </div>
     </Container>
   );

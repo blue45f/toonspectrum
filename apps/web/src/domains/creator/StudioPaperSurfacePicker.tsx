@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useId, useLayoutEffect, useRef } from "react";
 
 import { getStudioPaperBrushResponseSummaries } from "./brush/studio-paper-surface-brush-response";
@@ -12,6 +16,7 @@ import { getStudioPaperSurfacePreviewTile } from "./brush/studio-paper-surface-p
 import type { PaperGrainKind } from "./brush/studio-paper-texture";
 
 import { useT } from "@/shared/lib/i18n";
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
 export interface StudioPaperSurfacePickerProps {
@@ -69,13 +74,12 @@ function StudioPaperTexturePreview({
         width={240}
         height={56}
         role="img"
-        aria-label={`${label} 실제 결 확대 미리보기`}
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaperSurfacePicker", "ko", "{v0} 실제 결 확대 미리보기"), { v0: String(label) })}
         className="block h-14 w-full"
         style={studioPaperSurfaceSwatchStyle(paper)}
       />
       <span className="absolute bottom-1 right-1 rounded border border-line/80 bg-panel/90 px-1.5 py-0.5 text-[0.58rem] font-semibold text-fg-2 shadow-sm">
-        결 확대
-      </span>
+        {translateCurrentStaticSourceText("domains.creator.StudioPaperSurfacePicker", "ko", "결 확대")}</span>
     </div>
   );
 }
@@ -131,7 +135,7 @@ export function StudioPaperSurfacePicker({
                   key={entry.id}
                   type="button"
                   disabled={controlsDisabled}
-                  title={`${entry.description} 잘 맞는 도구: ${entry.bestFor}`}
+                  title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaperSurfacePicker", "ko", "{v0} 잘 맞는 도구: {v1}"), { v0: String(entry.description), v1: String(entry.bestFor) })}
                   aria-label={entry.label}
                   aria-pressed={active}
                   onClick={() => onPaperGrainKindChange(entry.id)}
@@ -166,7 +170,7 @@ export function StudioPaperSurfacePicker({
         <div className="flex items-center justify-between gap-2" aria-live="polite" aria-atomic="true">
           <p className="text-[0.68rem] font-bold text-fg-2">{activePaper.label}</p>
           <span className="text-[0.55rem] font-semibold text-fg-3">
-            미리보기 {paperGrainVisible ? "켜짐" : "꺼짐"}
+            {translateCurrentStaticSourceText("domains.creator.StudioPaperSurfacePicker", "ko", "미리보기 ")}{paperGrainVisible ? translateCurrentStaticSourceText("domains.creator.StudioPaperSurfacePicker", "ko", "켜짐") : translateCurrentStaticSourceText("domains.creator.StudioPaperSurfacePicker", "ko", "꺼짐")}
           </span>
         </div>
         <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-2">
@@ -206,7 +210,7 @@ export function StudioPaperSurfacePicker({
         </dl>
 
         <div className="mt-2.5 border-t border-line/50 pt-2">
-          <p className="text-[0.58rem] font-bold text-fg-2">브러시 성질별 반응</p>
+          <p className="text-[0.58rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioPaperSurfacePicker", "ko", "브러시 성질별 반응")}</p>
           <ul className="mt-1 divide-y divide-line/45">
             {brushResponses.map((response) => (
               <li key={response.id} className="py-1.5 first:pt-0 last:pb-0">
@@ -223,14 +227,14 @@ export function StudioPaperSurfacePicker({
         </div>
 
         <p className="mt-2 text-[0.58rem] leading-relaxed text-fg-3">
-          <span className="font-semibold text-fg-2">잘 맞는 도구</span> · {activePaper.bestFor}
+          <span className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioPaperSurfacePicker", "ko", "잘 맞는 도구")}</span> · {activePaper.bestFor}
         </p>
       </div>
 
       <div className="mt-2.5 border-t border-line/60 pt-2.5">
         <label
           htmlFor={previewToggleId}
-          aria-label="편집 화면에서 종이 결 미리보기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaperSurfacePicker", "ko", "편집 화면에서 종이 결 미리보기")}
           className={cn(
             "flex items-center gap-2.5 rounded-md py-1.5 text-fg-2",
             controlsDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
@@ -245,8 +249,7 @@ export function StudioPaperSurfacePicker({
               )}
             </span>
             <span className="mt-0.5 block text-[0.55rem] leading-relaxed text-fg-3">
-              화면 표시만 바꾸며 브러시의 종이 반응은 유지됩니다.
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.StudioPaperSurfacePicker", "ko", "화면 표시만 바꾸며 브러시의 종이 반응은 유지됩니다.")}</span>
           </span>
           <input
             id={previewToggleId}
@@ -256,9 +259,9 @@ export function StudioPaperSurfacePicker({
             disabled={controlsDisabled}
             onChange={(event) => onPaperGrainVisibleChange(event.currentTarget.checked)}
           />
-          <span
-            aria-hidden
-            className="relative h-5 w-9 shrink-0 rounded-full border border-line bg-raised transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-3.5 after:rounded-full after:bg-fg-3 after:transition-transform peer-checked:border-accent/70 peer-checked:bg-accent/25 peer-checked:after:translate-x-4 peer-checked:after:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent/60 motion-reduce:transition-none motion-reduce:after:transition-none"
+          <SwitchIndicator
+            checked={paperGrainVisible}
+            className="peer-focus-visible:ring-2 peer-focus-visible:ring-accent/60"
           />
         </label>
         <button
@@ -268,8 +271,7 @@ export function StudioPaperSurfacePicker({
           title={activePaper.tintBg}
           className="mt-1 w-full rounded-md border border-line bg-raised/50 px-2 py-1.5 text-left text-[0.6rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          배경도 {activePaper.shortLabel} 색으로 맞추기
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioPaperSurfacePicker", "ko", "배경도 ")}{activePaper.shortLabel} {translateCurrentStaticSourceText("domains.creator.StudioPaperSurfacePicker", "ko", "색으로 맞추기")}</button>
       </div>
     </section>
   );

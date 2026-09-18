@@ -1,4 +1,7 @@
 import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowDownToLine,
   ArrowUpToLine,
   Boxes,
@@ -99,8 +102,7 @@ export function StudioCanvasContextMenu({
                   aria-hidden
                   className={studioChromeIconClass({ tone: "accent" })}
                 />
-                3D 캐릭터 편집
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "3D 캐릭터 편집")}</button>
               <div className="my-1 h-px bg-line" />
             </>
           )}
@@ -120,8 +122,7 @@ export function StudioCanvasContextMenu({
                   aria-hidden
                   className={studioChromeIconClass({ tone: "accent" })}
                 />
-                3D 배경 편집
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "3D 배경 편집")}</button>
               <div className="my-1 h-px bg-line" />
             </>
           )}
@@ -136,8 +137,7 @@ export function StudioCanvasContextMenu({
               aria-hidden
               className={studioChromeIconClass({ tone: "default" })}
             />
-            이메레스로 저장
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "이메레스로 저장")}</button>
           <div className="my-1 h-px bg-line" />
           <button
             type="button"
@@ -150,8 +150,7 @@ export function StudioCanvasContextMenu({
               aria-hidden
               className={studioChromeIconClass({ tone: "default" })}
             />
-            복제하기 (⌘J)
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "복제하기 (⌘J)")}</button>
           <div className="my-1 h-px bg-line" />
           <button
             type="button"
@@ -164,8 +163,7 @@ export function StudioCanvasContextMenu({
               aria-hidden
               className={studioChromeIconClass({ tone: "default" })}
             />
-            맨 앞으로
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "맨 앞으로")}</button>
           <button
             type="button"
             onClick={() => runAndClose(() => onReorder("forward"), onClose)}
@@ -177,8 +175,7 @@ export function StudioCanvasContextMenu({
               aria-hidden
               className={studioChromeIconClass({ tone: "default" })}
             />
-            한 단계 앞으로
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "한 단계 앞으로")}</button>
           <button
             type="button"
             onClick={() => runAndClose(() => onReorder("backward"), onClose)}
@@ -190,8 +187,7 @@ export function StudioCanvasContextMenu({
               aria-hidden
               className={studioChromeIconClass({ tone: "default" })}
             />
-            한 단계 뒤로
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "한 단계 뒤로")}</button>
           <button
             type="button"
             onClick={() => runAndClose(() => onReorder("back"), onClose)}
@@ -203,8 +199,7 @@ export function StudioCanvasContextMenu({
               aria-hidden
               className={studioChromeIconClass({ tone: "default" })}
             />
-            맨 뒤로
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "맨 뒤로")}</button>
           <div className="my-1 h-px bg-line" />
           <button
             type="button"
@@ -226,7 +221,7 @@ export function StudioCanvasContextMenu({
                 className={studioChromeIconClass({ tone: "default" })}
               />
             )}
-            {locked ? "잠금 해제" : "위치 잠금"}
+            {locked ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "잠금 해제") : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "위치 잠금")}
           </button>
           <button
             type="button"
@@ -239,8 +234,7 @@ export function StudioCanvasContextMenu({
               aria-hidden
               className={studioChromeIconClass({ tone: "danger" })}
             />
-            삭제하기
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "삭제하기")}</button>
         </>
       ) : (
         <>
@@ -255,8 +249,7 @@ export function StudioCanvasContextMenu({
               aria-hidden
               className={studioChromeIconClass({ tone: "default" })}
             />
-            펜으로 그리기
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "펜으로 그리기")}</button>
           <button
             type="button"
             onClick={() => runAndClose(onAddSpeechBubble, onClose)}
@@ -268,8 +261,7 @@ export function StudioCanvasContextMenu({
               aria-hidden
               className={studioChromeIconClass({ tone: "default" })}
             />
-            말풍선 추가
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "말풍선 추가")}</button>
           <button
             type="button"
             onClick={() => runAndClose(onAddText, onClose)}
@@ -281,8 +273,7 @@ export function StudioCanvasContextMenu({
               aria-hidden
               className={studioChromeIconClass({ tone: "default" })}
             />
-            텍스트 추가
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "텍스트 추가")}</button>
           <div className="my-1 h-px bg-line" />
           <button
             type="button"
@@ -295,8 +286,7 @@ export function StudioCanvasContextMenu({
               aria-hidden
               className={studioChromeIconClass({ tone: "default" })}
             />
-            새 페이지 추가
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "새 페이지 추가")}</button>
           <button
             type="button"
             onClick={() => runAndClose(onEnableQuickShape, onClose)}
@@ -308,8 +298,7 @@ export function StudioCanvasContextMenu({
               aria-hidden
               className={studioChromeIconClass({ tone: "accent" })}
             />
-            스마트 도형 켜기
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasContextMenu", "ko", "스마트 도형 켜기")}</button>
         </>
       )}
     </div>

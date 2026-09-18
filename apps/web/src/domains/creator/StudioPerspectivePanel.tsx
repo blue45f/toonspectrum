@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Perspective Panel — 원근자(소실점 스냅) 인스펙터: on/off 토글 + 소실점
  * 목록(좌표 입력 + 삭제) + 추가 버튼. 캔버스 위 핸들 드래그는 StudioPerspectiveOverlay
@@ -115,15 +119,15 @@ export function StudioPerspectivePanel({
   return (
     <div className="pt-2.5 border-t border-line/35 space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-fg-3">원근자 (Perspective)</p>
+        <p className="text-xs font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "원근자 (Perspective)")}</p>
         <StudioToggleChip
           active={active}
           disabled={disabled}
           onClick={onToggleActive}
-          aria-label={`원근자 ${active ? "끄기" : "켜기"}`}
-          title={disabledReason ?? "소실점을 향해 선이 자동으로 정렬됩니다. (펜·직선 도구에 적용)"}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "원근자 {v0}"), { v0: String(active ? "끄기" : "켜기") })}
+          title={disabledReason ?? translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "소실점을 향해 선이 자동으로 정렬됩니다. (펜·직선 도구에 적용)")}
         >
-          {active ? "켜짐" : "꺼짐"}
+          {active ? translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "켜짐") : translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "꺼짐")}
         </StudioToggleChip>
       </div>
 
@@ -131,18 +135,17 @@ export function StudioPerspectivePanel({
         <div className="space-y-2 pl-1.5 border-l border-line/50 ml-1 py-1 animate-fade-in">
           {points.length === 0 ? (
             <p className="text-[0.7rem] leading-relaxed text-fg-3">
-              소실점을 추가하면 그 방향으로 선이 스냅돼요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "소실점을 추가하면 그 방향으로 선이 스냅돼요.")}</p>
           ) : (
             <ul className="space-y-1.5">
               {points.map((vp, index) => (
                 <li key={vp.id} className="flex items-center gap-1.5">
                   <span className="w-14 shrink-0 text-[0.68rem] font-semibold text-fg-3">
-                    소실점 {index + 1}
+                    {translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "소실점 ")}{index + 1}
                   </span>
                   <VpCoordInput
                     label="X"
-                    ariaLabel={`소실점 ${index + 1} X`}
+                    ariaLabel={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "소실점 {v0} X"), { v0: String(index + 1) })}
                     value={vp.x}
                     disabled={disabled}
                     onPreview={onPreviewPoint ? (next) => onPreviewPoint(vp.id, next, vp.y) : undefined}
@@ -150,7 +153,7 @@ export function StudioPerspectivePanel({
                   />
                   <VpCoordInput
                     label="Y"
-                    ariaLabel={`소실점 ${index + 1} Y`}
+                    ariaLabel={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "소실점 {v0} Y"), { v0: String(index + 1) })}
                     value={vp.y}
                     disabled={disabled || lockHorizon}
                     onPreview={
@@ -162,8 +165,8 @@ export function StudioPerspectivePanel({
                   />
                   <button
                     type="button"
-                    aria-label={`소실점 ${index + 1} 삭제`}
-                    title={disabledReason ?? "이 소실점 삭제"}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "소실점 {v0} 삭제"), { v0: String(index + 1) })}
+                    title={disabledReason ?? translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "이 소실점 삭제")}
                     disabled={disabled}
                     onClick={() => onRemovePoint(vp.id)}
                     className="grid size-6 shrink-0 place-items-center rounded border border-line text-fg-3 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:size-11"
@@ -179,28 +182,27 @@ export function StudioPerspectivePanel({
             type="button"
             onClick={onAddPoint}
             disabled={disabled || !canAdd}
-            title={disabledReason ?? (canAdd ? "소실점 추가" : `소실점은 최대 ${MAX_VANISHING_POINTS}개까지 추가할 수 있어요.`)}
+            title={disabledReason ?? (canAdd ? translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "소실점 추가") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "소실점은 최대 {v0}개까지 추가할 수 있어요."), { v0: String(MAX_VANISHING_POINTS) }))}
             className={cn(
               "flex w-full items-center justify-center gap-1 rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg-2 transition-colors pointer-coarse:min-h-11",
               canAdd && !disabled ? "hover:bg-raised cursor-pointer" : "cursor-not-allowed opacity-45"
             )}
           >
             <Plus className="size-3" aria-hidden />
-            소실점 추가
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "소실점 추가")}</button>
 
           <div className="space-y-1.5 rounded border border-line/50 bg-card/40 p-1.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[0.68rem] font-semibold text-fg-3">눈높이 (수평선)</span>
+              <span className="text-[0.68rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "눈높이 (수평선)")}</span>
               {onToggleLockHorizon && (
                 <StudioToggleChip
                   active={lockHorizon}
                   disabled={disabled}
                   onClick={() => onToggleLockHorizon(!lockHorizon)}
-                  aria-label={`눈높이 잠금 ${lockHorizon ? "끄기" : "켜기"}`}
-                  title={disabledReason ?? "켜면 소실점 세로 위치가 눈높이에 고정됩니다."}
+                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "눈높이 잠금 {v0}"), { v0: String(lockHorizon ? "끄기" : "켜기") })}
+                  title={disabledReason ?? translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "켜면 소실점 세로 위치가 눈높이에 고정됩니다.")}
                 >
-                  {lockHorizon ? "잠금" : "자유"}
+                  {lockHorizon ? translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "잠금") : translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "자유")}
                 </StudioToggleChip>
               )}
             </div>
@@ -208,7 +210,7 @@ export function StudioPerspectivePanel({
               <div className="flex items-center gap-1.5">
                 <VpCoordInput
                   label="Y"
-                  ariaLabel="눈높이 Y"
+                  ariaLabel={translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "눈높이 Y")}
                   value={resolvedEyeLevelY}
                   disabled={disabled}
                   onPreview={onPreviewEyeLevelY}
@@ -219,11 +221,10 @@ export function StudioPerspectivePanel({
                     type="button"
                     disabled={disabled || points.length === 0}
                     onClick={onAlignToEyeLevel}
-                    title={disabledReason ?? "모든 소실점을 눈높이로 맞춥니다."}
+                    title={disabledReason ?? translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "모든 소실점을 눈높이로 맞춥니다.")}
                     className="shrink-0 rounded border border-line px-1.5 py-1 text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11"
                   >
-                    맞추기
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "맞추기")}</button>
                 )}
               </div>
             )}
@@ -231,8 +232,7 @@ export function StudioPerspectivePanel({
 
           <p className="flex items-start gap-1 text-[0.68rem] leading-relaxed text-fg-3">
             <Sparkles className="mt-0.5 shrink-0 size-3 text-accent" aria-hidden />
-            소실점 1~3개 + 독립 눈높이로 1·2점 원근 수평선을 맞춥니다. 잠그면 VP가 수평선 위에 유지됩니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioPerspectivePanel", "ko", "소실점 1~3개 + 독립 눈높이로 1·2점 원근 수평선을 맞춥니다. 잠그면 VP가 수평선 위에 유지됩니다.")}</p>
         </div>
       )}
     </div>

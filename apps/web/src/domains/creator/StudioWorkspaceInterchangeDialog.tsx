@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   Check,
   Clipboard,
@@ -662,7 +666,7 @@ export function StudioWorkspaceInterchangeDialog({
         type="button"
         hidden={!open}
         tabIndex={-1}
-        aria-label="작업공간 가져오기·내보내기 닫기"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "작업공간 가져오기·내보내기 닫기")}
         onClick={closeDialog}
         className="fixed inset-0 z-[109] cursor-default bg-canvas/80 backdrop-blur-[1px]"
       />
@@ -696,8 +700,7 @@ export function StudioWorkspaceInterchangeDialog({
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 flex-wrap items-center gap-2">
               <h2 id={titleId} className="text-sm font-bold text-fg">
-                작업공간 가져오기·내보내기
-              </h2>
+                {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "작업공간 가져오기·내보내기")}</h2>
               <span
                 className={cn(
                   "rounded-full px-1.5 py-0.5 text-[0.6875rem] font-bold",
@@ -706,17 +709,16 @@ export function StudioWorkspaceInterchangeDialog({
                     : "bg-warn/15 text-warn",
                 )}
               >
-                {persistence.status === "persisted" ? "기기 저장" : "세션 전용"}
+                {persistence.status === "persisted" ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "기기 저장") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "세션 전용")}
               </span>
             </span>
             <p id={descriptionId} className="mt-1 text-[0.6875rem] leading-relaxed text-fg-3">
-              패널·팔레트·명령 배치만 이동합니다. 작품, 프로젝트, 계정, AI 설정은 포함하지 않습니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "패널·팔레트·명령 배치만 이동합니다. 작품, 프로젝트, 계정, AI 설정은 포함하지 않습니다.")}</p>
           </span>
           <button
             type="button"
             onClick={closeDialog}
-            aria-label="작업공간 가져오기·내보내기 닫기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "작업공간 가져오기·내보내기 닫기")}
             className={cn(
               "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg",
               FOCUS_CLASS,
@@ -733,7 +735,7 @@ export function StudioWorkspaceInterchangeDialog({
 
         <div
           role="tablist"
-          aria-label="작업공간 이동 방식"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "작업공간 이동 방식")}
           className="grid shrink-0 grid-cols-2 gap-1.5 border-b border-line bg-card/50 px-4 py-2"
         >
           {([
@@ -742,11 +744,11 @@ export function StudioWorkspaceInterchangeDialog({
           ] as const).map(([value, label, Icon]) => (
             <button
               key={value}
-              id={`${titleId}-tab-${value}`}
+              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-tab-{v1}"), { v0: String(titleId), v1: String(value) })}
               type="button"
               role="tab"
               aria-selected={tab === value}
-              aria-controls={`${titleId}-panel-${value}`}
+              aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-panel-{v1}"), { v0: String(titleId), v1: String(value) })}
               tabIndex={tab === value ? 0 : -1}
               onKeyDown={(event) => handleTabKeyDown(event, value)}
               onClick={() => selectTab(value)}
@@ -786,21 +788,19 @@ export function StudioWorkspaceInterchangeDialog({
           </div>
 
           <div
-            id={`${titleId}-panel-export`}
+            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-panel-export"), { v0: String(titleId) })}
             role="tabpanel"
-            aria-labelledby={`${titleId}-tab-export`}
+            aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-tab-export"), { v0: String(titleId) })}
             hidden={tab !== "export"}
             className="space-y-4"
           >
-            <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={`${titleId}-export-list`}>
+            <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-export-list"), { v0: String(titleId) })}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 id={`${titleId}-export-list`} className="text-xs font-bold text-fg">
-                    내보낼 작업공간
-                  </h3>
+                  <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-export-list"), { v0: String(titleId) })} className="text-xs font-bold text-fg">
+                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "내보낼 작업공간")}</h3>
                   <p className="mt-1 text-[0.6875rem] text-fg-3">
-                    현재 배치와 저장본을 합쳐 최대 24개까지 선택할 수 있습니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "현재 배치와 저장본을 합쳐 최대 24개까지 선택할 수 있습니다.")}</p>
                 </div>
                 <span className="rounded-full bg-raised px-2 py-1 text-[0.6875rem] font-bold text-fg-2">
                   {selectedExportKeys.length}/{STUDIO_WORKSPACE_INTERCHANGE_MAX_WORKSPACES}
@@ -817,8 +817,7 @@ export function StudioWorkspaceInterchangeDialog({
                       FOCUS_CLASS,
                     )}
                   >
-                    현재 배치만
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "현재 배치만")}</button>
                   <button
                     type="button"
                     onClick={() => {
@@ -835,8 +834,7 @@ export function StudioWorkspaceInterchangeDialog({
                       FOCUS_CLASS,
                     )}
                   >
-                    저장본 모두
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "저장본 모두")}</button>
                 </span>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -864,16 +862,15 @@ export function StudioWorkspaceInterchangeDialog({
               </div>
             </section>
 
-            <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={`${titleId}-export-scope`}>
-              <h3 id={`${titleId}-export-scope`} className="text-xs font-bold text-fg">
-                포함 범위
-              </h3>
+            <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-export-scope"), { v0: String(titleId) })}>
+              <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-export-scope"), { v0: String(titleId) })} className="text-xs font-bold text-fg">
+                {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "포함 범위")}</h3>
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <ToggleCard
                   pressed
                   disabled
                   label={SCOPE_LABELS.panels.label}
-                  detail="모든 파일에 필수로 포함됩니다."
+                  detail={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "모든 파일에 필수로 포함됩니다.")}
                   onPressedChange={() => undefined}
                 />
                 <ToggleCard
@@ -894,8 +891,7 @@ export function StudioWorkspaceInterchangeDialog({
             <aside className="flex items-start gap-2 rounded-xl border border-good/30 bg-good/10 px-3 py-2 text-[0.6875rem] leading-relaxed text-good">
               <ShieldCheck size={STUDIO_ICON_SIZE.contextMenu} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
               <span>
-                프로젝트 문서·그림·에셋·댓글·계정·토큰 필드는 차단되며 JSON은 64KB로 제한됩니다.
-              </span>
+                {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "프로젝트 문서·그림·에셋·댓글·계정·토큰 필드는 차단되며 JSON은 64KB로 제한됩니다.")}</span>
             </aside>
 
             <div className="grid gap-2 sm:grid-cols-2">
@@ -909,8 +905,7 @@ export function StudioWorkspaceInterchangeDialog({
                 )}
               >
                 <Download size={STUDIO_ICON_SIZE.contextMenu} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
-                JSON 파일 다운로드
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "JSON 파일 다운로드")}</button>
               <button
                 type="button"
                 onClick={() => void copyExport()}
@@ -921,21 +916,20 @@ export function StudioWorkspaceInterchangeDialog({
                 )}
               >
                 <Clipboard size={STUDIO_ICON_SIZE.contextMenu} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
-                JSON 복사
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "JSON 복사")}</button>
             </div>
           </div>
 
           <div
-            id={`${titleId}-panel-import`}
+            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-panel-import"), { v0: String(titleId) })}
             role="tabpanel"
-            aria-labelledby={`${titleId}-tab-import`}
+            aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-tab-import"), { v0: String(titleId) })}
             hidden={tab !== "import"}
             className="space-y-4"
           >
             <section
               className={cn(CARD_CLASS, "p-3")}
-              aria-labelledby={`${titleId}-import-file`}
+              aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-import-file"), { v0: String(titleId) })}
               aria-busy={importBusy}
               onDragOver={(event) => {
                 event.preventDefault();
@@ -956,11 +950,10 @@ export function StudioWorkspaceInterchangeDialog({
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <h3 id={`${titleId}-import-file`} className="text-xs font-bold text-fg">
-                    작업공간 파일
-                  </h3>
+                  <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-import-file"), { v0: String(titleId) })} className="text-xs font-bold text-fg">
+                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "작업공간 파일")}</h3>
                   <p className="mt-1 truncate text-[0.6875rem] text-fg-3">
-                    {importFileName || "툰스튜디오 작업공간 JSON · 최대 64KB · 선택하거나 이 영역에 놓기"}
+                    {importFileName || translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "툰스튜디오 작업공간 JSON · 최대 64KB · 선택하거나 이 영역에 놓기")}
                   </p>
                 </div>
                 <input
@@ -969,7 +962,7 @@ export function StudioWorkspaceInterchangeDialog({
                   accept=".json,application/json"
                   onChange={(event) => void handleFileChange(event)}
                   className="sr-only"
-                  aria-label="작업공간 JSON 파일 선택"
+                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "작업공간 JSON 파일 선택")}
                 />
                 <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex">
                   <button
@@ -982,8 +975,7 @@ export function StudioWorkspaceInterchangeDialog({
                     )}
                   >
                     <FileJson size={STUDIO_ICON_SIZE.contextMenu} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
-                    파일 선택
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "파일 선택")}</button>
                   <button
                     type="button"
                     onClick={() => void loadClipboardImport()}
@@ -994,7 +986,7 @@ export function StudioWorkspaceInterchangeDialog({
                     )}
                   >
                     <Clipboard size={STUDIO_ICON_SIZE.contextMenu} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
-                    {importBusy ? "검사 중…" : "JSON 붙여넣기"}
+                    {importBusy ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "검사 중…") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "JSON 붙여넣기")}
                   </button>
                 </div>
               </div>
@@ -1004,22 +996,19 @@ export function StudioWorkspaceInterchangeDialog({
               <aside className="flex items-start gap-2 rounded-xl border border-warn/35 bg-warn/10 px-3 py-2 text-[0.6875rem] leading-relaxed text-warn">
                 <AlertTriangle size={STUDIO_ICON_SIZE.contextMenu} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
                 <span>
-                  별도 빠른 액세스 세트는 전역 저장 영역이라 건너뜁니다. 방사형 빠른 실행과 상단 커맨드 바는 계획대로 적용됩니다.
-                </span>
+                  {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "별도 빠른 액세스 세트는 전역 저장 영역이라 건너뜁니다. 방사형 빠른 실행과 상단 커맨드 바는 계획대로 적용됩니다.")}</span>
               </aside>
             ) : null}
 
             {importDocument ? (
               <>
-                <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={`${titleId}-import-list`}>
+                <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-import-list"), { v0: String(titleId) })}>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h3 id={`${titleId}-import-list`} className="text-xs font-bold text-fg">
-                        가져올 작업공간
-                      </h3>
+                      <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-import-list"), { v0: String(titleId) })} className="text-xs font-bold text-fg">
+                        {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "가져올 작업공간")}</h3>
                       <p className="mt-1 text-[0.6875rem] text-fg-3">
-                        파일 안의 항목을 개별 선택할 수 있습니다.
-                      </p>
+                        {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "파일 안의 항목을 개별 선택할 수 있습니다.")}</p>
                     </div>
                     <span className="rounded-full bg-raised px-2 py-1 text-[0.6875rem] font-bold text-fg-2">
                       {selectedImportIds.length}/{importDocument.workspaces.length}
@@ -1031,7 +1020,7 @@ export function StudioWorkspaceInterchangeDialog({
                         key={workspace.id}
                         pressed={selectedImportIds.includes(workspace.id)}
                         label={workspace.name}
-                        detail={`ID ${workspace.id}`}
+                        detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "ID {v0}"), { v0: String(workspace.id) })}
                         onPressedChange={(pressed) => {
                           setSelectedImportIds((current) =>
                             toggleValue(current, workspace.id, pressed),
@@ -1044,15 +1033,14 @@ export function StudioWorkspaceInterchangeDialog({
                   </div>
                 </section>
 
-                <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={`${titleId}-import-action`}>
-                  <h3 id={`${titleId}-import-action`} className="text-xs font-bold text-fg">
-                    충돌 처리와 적용 방식
-                  </h3>
+                <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-import-action"), { v0: String(titleId) })}>
+                  <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-import-action"), { v0: String(titleId) })} className="text-xs font-bold text-fg">
+                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "충돌 처리와 적용 방식")}</h3>
                   <div className="mt-3 grid gap-2 lg:grid-cols-3">
                     <ActionCard
                       selected={importAction === "add"}
-                      label="안전하게 추가"
-                      detail="충돌을 자동 구분하고 현재 화면은 유지합니다."
+                      label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "안전하게 추가")}
+                      detail={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "충돌을 자동 구분하고 현재 화면은 유지합니다.")}
                       onSelect={() => {
                         setImportAction("add");
                         setDiscardConfirmed(false);
@@ -1061,8 +1049,8 @@ export function StudioWorkspaceInterchangeDialog({
                     />
                     <ActionCard
                       selected={importAction === "add-and-apply"}
-                      label="추가 후 바로 적용"
-                      detail="선택한 작업공간을 추가하고 화면 배치도 전환합니다."
+                      label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "추가 후 바로 적용")}
+                      detail={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "선택한 작업공간을 추가하고 화면 배치도 전환합니다.")}
                       onSelect={() => {
                         setImportAction("add-and-apply");
                         setDiscardConfirmed(false);
@@ -1071,8 +1059,8 @@ export function StudioWorkspaceInterchangeDialog({
                     />
                     <ActionCard
                       selected={importAction === "replace-same-name"}
-                      label="같은 이름 교체"
-                      detail="동일 이름의 저장본만 교체하고 없는 항목은 추가합니다."
+                      label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "같은 이름 교체")}
+                      detail={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "동일 이름의 저장본만 교체하고 없는 항목은 추가합니다.")}
                       onSelect={() => {
                         setImportAction("replace-same-name");
                         setDiscardConfirmed(false);
@@ -1084,13 +1072,12 @@ export function StudioWorkspaceInterchangeDialog({
                   {importAction === "add-and-apply" ? (
                     <div className="mt-3">
                       <label
-                        htmlFor={`${titleId}-apply-workspace`}
+                        htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-apply-workspace"), { v0: String(titleId) })}
                         className="text-[0.6875rem] font-bold text-fg-2"
                       >
-                        바로 적용할 작업공간
-                      </label>
+                        {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "바로 적용할 작업공간")}</label>
                       <select
-                        id={`${titleId}-apply-workspace`}
+                        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-apply-workspace"), { v0: String(titleId) })}
                         value={effectiveApplyWorkspaceId}
                         onChange={(event) => {
                           setApplyWorkspaceId(event.currentTarget.value);
@@ -1113,10 +1100,9 @@ export function StudioWorkspaceInterchangeDialog({
                   ) : null}
                 </section>
 
-                <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={`${titleId}-import-scope`}>
-                  <h3 id={`${titleId}-import-scope`} className="text-xs font-bold text-fg">
-                    가져올 범위
-                  </h3>
+                <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-import-scope"), { v0: String(titleId) })}>
+                  <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-import-scope"), { v0: String(titleId) })} className="text-xs font-bold text-fg">
+                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "가져올 범위")}</h3>
                   <div className="mt-3 grid gap-2 sm:grid-cols-3">
                     {IMPORT_SCOPES.map((scope) => (
                       <ToggleCard
@@ -1133,25 +1119,21 @@ export function StudioWorkspaceInterchangeDialog({
                     ))}
                   </div>
                   <p className="mt-2 text-[0.6875rem] leading-relaxed text-fg-3">
-                    파일에 없는 범위는 현재 배치를 유지합니다. 기기별 오버라이드는 교체 대상에는 유지하고 새 항목에는 복사하지 않습니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "파일에 없는 범위는 현재 배치를 유지합니다. 기기별 오버라이드는 교체 대상에는 유지하고 새 항목에는 복사하지 않습니다.")}</p>
                 </section>
 
-                <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={`${titleId}-plan`}>
+                <section className={cn(CARD_CLASS, "p-3")} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-plan"), { v0: String(titleId) })}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <h3 id={`${titleId}-plan`} className="text-xs font-bold text-fg">
-                        적용 전 계획
-                      </h3>
+                      <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "en", "{v0}-plan"), { v0: String(titleId) })} className="text-xs font-bold text-fg">
+                        {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "적용 전 계획")}</h3>
                       <p className="mt-1 text-[0.6875rem] text-fg-3">
-                        실제 저장 전에 충돌과 이름·ID 재매핑을 계산합니다.
-                      </p>
+                        {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "실제 저장 전에 충돌과 이름·ID 재매핑을 계산합니다.")}</p>
                     </div>
                     {plan ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-good/15 px-2 py-1 text-[0.6875rem] font-bold text-good">
                         <Check size={STUDIO_ICON_SIZE.subtab} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
-                        검증 완료
-                      </span>
+                        {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "검증 완료")}</span>
                     ) : null}
                   </div>
 
@@ -1177,9 +1159,9 @@ export function StudioWorkspaceInterchangeDialog({
                               {operation.workspace.name}
                             </span>
                             <span className="mt-0.5 block truncate text-[0.6875rem] text-fg-3">
-                              {operation.kind === "replace" ? "같은 이름 저장본 교체" : "새 작업공간 추가"}
-                              {operation.renamed ? " · 이름 자동 구분" : ""}
-                              {operation.idRemapped ? " · ID 안전 재매핑" : ""}
+                              {operation.kind === "replace" ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "같은 이름 저장본 교체") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "새 작업공간 추가")}
+                              {operation.renamed ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", " · 이름 자동 구분") : ""}
+                              {operation.idRemapped ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", " · ID 안전 재매핑") : ""}
                             </span>
                           </span>
                         </div>
@@ -1187,16 +1169,15 @@ export function StudioWorkspaceInterchangeDialog({
                     </div>
                   ) : (
                     <p className="mt-3 rounded-lg border border-line bg-raised px-3 py-2 text-xs text-fg-3">
-                      작업공간과 범위를 하나 이상 선택하면 계획을 계산합니다.
-                    </p>
+                      {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "작업공간과 범위를 하나 이상 선택하면 계획을 계산합니다.")}</p>
                   )}
                 </section>
 
                 {requiresDiscardConfirmation ? (
                   <ToggleCard
                     pressed={discardConfirmed}
-                    label="현재 저장 전 배치 변경을 버리고 바로 적용"
-                    detail="가져오기만 선택하면 현재 변경을 유지할 수 있습니다."
+                    label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "현재 저장 전 배치 변경을 버리고 바로 적용")}
+                    detail={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "가져오기만 선택하면 현재 변경을 유지할 수 있습니다.")}
                     onPressedChange={setDiscardConfirmed}
                   />
                 ) : null}
@@ -1216,7 +1197,7 @@ export function StudioWorkspaceInterchangeDialog({
                   )}
                 >
                   <PackageOpen size={STUDIO_ICON_SIZE.contextMenu} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
-                  {importAction === "add-and-apply" ? "계획대로 가져오고 적용" : "계획대로 가져오기"}
+                  {importAction === "add-and-apply" ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "계획대로 가져오고 적용") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "계획대로 가져오기")}
                 </button>
               </>
             ) : (
@@ -1224,11 +1205,9 @@ export function StudioWorkspaceInterchangeDialog({
                 <span>
                   <Upload size={40} strokeWidth={1.5} aria-hidden className="mx-auto text-fg-3" />
                   <span className="mt-3 block text-sm font-bold text-fg">
-                    파일을 선택해 먼저 안전 검사를 실행하세요.
-                  </span>
+                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "파일을 선택해 먼저 안전 검사를 실행하세요.")}</span>
                   <span className="mt-1 block text-[0.6875rem] leading-relaxed text-fg-3">
-                    형식·버전·용량·중복·민감 필드를 검증한 뒤에만 적용 계획을 표시합니다.
-                  </span>
+                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceInterchangeDialog", "ko", "형식·버전·용량·중복·민감 필드를 검증한 뒤에만 적용 계획을 표시합니다.")}</span>
                 </span>
               </div>
             )}

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Minus, Plus, RotateCcw } from "lucide-react";
 
 export interface StudioVrmForgeRangeControlProps {
@@ -80,7 +84,7 @@ export function StudioVrmForgeRangeControl({
       <div className="mt-2 grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center gap-1.5">
         <button
           type="button"
-          aria-label={`${label} 한 단계 줄이기`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmForgeRangeControl", "ko", "{v0} 한 단계 줄이기"), { v0: String(label) })}
           className="grid size-10 place-items-center rounded-lg border border-line bg-panel text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35"
           disabled={disabled || value <= minimum}
           onClick={() => commit(value - step)}
@@ -101,7 +105,7 @@ export function StudioVrmForgeRangeControl({
         />
         <button
           type="button"
-          aria-label={`${label} 한 단계 늘리기`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmForgeRangeControl", "ko", "{v0} 한 단계 늘리기"), { v0: String(label) })}
           className="grid size-10 place-items-center rounded-lg border border-line bg-panel text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35"
           disabled={disabled || value >= maximum}
           onClick={() => commit(value + step)}
@@ -112,10 +116,9 @@ export function StudioVrmForgeRangeControl({
 
       <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
         <label className="flex min-w-0 items-center gap-1.5 text-[0.58rem] font-semibold text-fg-3">
-          정확한 값
-          <input
+          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmForgeRangeControl", "ko", "정확한 값")}<input
             type="number"
-            aria-label={`${label} 정확한 값`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmForgeRangeControl", "ko", "{v0} 정확한 값"), { v0: String(label) })}
             min={minimum}
             max={maximum}
             step={step}
@@ -130,15 +133,14 @@ export function StudioVrmForgeRangeControl({
         </label>
         <button
           type="button"
-          aria-label={`${label} 기본값으로 복원`}
-          title={`기본값 ${displayValue(normalizedDefault, step, unit)}로 복원`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmForgeRangeControl", "ko", "{v0} 기본값으로 복원"), { v0: String(label) })}
+          title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmForgeRangeControl", "ko", "기본값 {v0}로 복원"), { v0: String(displayValue(normalizedDefault, step, unit)) })}
           className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-line bg-panel px-2 text-[0.58rem] font-bold text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-30"
           disabled={disabled || atDefault}
           onClick={() => commit(normalizedDefault)}
         >
           <RotateCcw size={11} aria-hidden />
-          초기화
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmForgeRangeControl", "ko", "초기화")}</button>
       </div>
     </div>
   );

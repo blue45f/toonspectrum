@@ -3,7 +3,7 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RouteStage } from "./route-stage";
-import { hasMeaningfulRouteContent } from "./route-stage-content";
+import { hasMeaningfulRouteContent, inspectRouteContent, routeStageTimeoutMs } from "./route-stage-content";
 
 afterEach(() => {
   cleanup();
@@ -44,9 +44,43 @@ describe("route stage semantic and recovery guarantees", () => {
       </RouteStage>,
     );
     await waitFor(() => {
-      expect(document.querySelector("[data-route-stage-key]")?.getAttribute("data-route-state"))
-        .toBe("ready");
+      const stage = document.querySelector("[data-route-stage-key]");
+      expect(stage?.getAttribute("data-route-state")).toBe("ready");
+      expect(stage?.getAttribute("data-route-readiness-source")).toBe("explicit");
     });
+  });
+
+
+  it("preserves explicit degraded, blocked and error states instead of collapsing them into ready", async () => {
+    const states = ["degraded", "blocked", "error"] as const;
+    for (const state of states) {
+      const attribute = `data-route-${state}`;
+      const { unmount } = render(
+        <RouteStage pathname="/production/projects/demo" search="" accessibleTitle="Production">
+          <section {...{ [attribute]: "demo" }}><h1>Production</h1></section>
+        </RouteStage>,
+      );
+      await waitFor(() => {
+        const stage = document.querySelector("[data-route-stage-key]");
+        expect(stage?.getAttribute("data-route-state")).toBe(state);
+        expect(stage?.getAttribute("data-route-readiness-source")).toBe("explicit");
+      });
+      unmount();
+    }
+  });
+
+  it("keeps explicit pending content pending even when loading copy is long", () => {
+    const root = document.createElement("div");
+    root.innerHTML = '<section data-route-pending="loader"><p>This loading explanation is intentionally longer than thirty two characters.</p><button>Cancel</button></section>';
+    expect(inspectRouteContent(root)).toEqual({ state: "pending", source: "explicit" });
+    expect(hasMeaningfulRouteContent(root)).toBe(false);
+  });
+
+  it("uses longer readiness budgets for production and heavyweight Studio surfaces", () => {
+    expect(routeStageTimeoutMs("/market/browse")).toBe(8_000);
+    expect(routeStageTimeoutMs("/production/projects/demo/overview")).toBe(10_000);
+    expect(routeStageTimeoutMs("/studio/canvas")).toBe(15_000);
+    expect(routeStageTimeoutMs("/studio/bg3d")).toBe(20_000);
   });
 
   it("shows an actionable recovery panel after an empty public route stalls", async () => {

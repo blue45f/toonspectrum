@@ -179,6 +179,7 @@ function buildLiveMenuGroups() {
     openContinuityCheck: vi.fn(),
     openProductionBible: vi.fn(),
     openQuickStart: vi.fn(),
+    applyWebtoonCanvasPreset: vi.fn(),
     openPublishPackage: vi.fn(),
     openPublishPreflight: vi.fn(),
     openAssetRightsAudit: vi.fn(),

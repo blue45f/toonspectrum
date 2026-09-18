@@ -252,6 +252,8 @@
   }
 }
 
+:root[data-design-theme="contrast"] [data-site-experience] .site-theme-mosaic { display: none; }
+
 @media (prefers-contrast: more), (forced-colors: active) {
   [data-site-experience] .site-theme-mosaic { display: none; }
 }

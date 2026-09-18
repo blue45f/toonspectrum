@@ -138,3 +138,6 @@ crates/**/target/
 # Local social-login credential vault exports (never commit)
 /oauth-production.env
 /toonstudio-oauth-production.env
+
+# Generated visual UX audit artifacts
+.qa/visual-ux/

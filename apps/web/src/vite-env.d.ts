@@ -35,4 +35,8 @@ interface ImportMetaEnv {
   // NotifyDesk — 인앱 알림 벨/인박스.
   readonly VITE_NOTIFYDESK_URL?: string;
   readonly VITE_NOTIFYDESK_PK?: string;
+  // Public supporter checkout is fail-closed. Both values must be present at build time.
+  // The URL must be an HTTPS provider-hosted checkout and must never contain secret credentials.
+  readonly VITE_SUPPORTER_HOSTED_CHECKOUT_ENABLED?: "true" | "false";
+  readonly VITE_SUPPORTER_HOSTED_CHECKOUT_URL?: string;
 }

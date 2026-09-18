@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { SlidersHorizontal, Wand2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -53,14 +57,14 @@ export function MarketFilterPreview({ filter, className }: MarketFilterPreviewPr
       role="region"
       aria-labelledby="market-filter-heading"
       aria-describedby="market-filter-preview-note"
-      className={`overflow-hidden rounded-xl border border-line bg-card ${className ?? ""}`}
+      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketFilterPreview", "en", "overflow-hidden rounded-xl border border-line bg-card {v0}"), { v0: String(className ?? "") })}
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5 bg-panel/50">
         <div className="flex items-center gap-2">
           <Wand2 className="h-4 w-4 text-accent" aria-hidden="true" />
-          <h2 id="market-filter-heading" className="text-xs font-semibold text-fg">필터 효과 참고 일러스트 ({filter.name})</h2>
+          <h2 id="market-filter-heading" className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.market.components.MarketFilterPreview", "ko", "필터 효과 참고 일러스트 (")}{filter.name})</h2>
           <span className="inline-flex min-h-6 items-center rounded bg-raised px-1.5 text-[0.65rem] text-fg-3">
-            엔진: {filter.engine}
+            {translateCurrentStaticSourceText("domains.market.components.MarketFilterPreview", "ko", "엔진: ")}{filter.engine}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -68,29 +72,23 @@ export function MarketFilterPreview({ filter, className }: MarketFilterPreviewPr
             type="button"
             onClick={() => setActiveSample("scene")}
             aria-pressed={activeSample === "scene"}
-            className={`inline-flex min-h-8 items-center rounded px-2.5 text-[0.65rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 pointer-coarse:min-h-11 pointer-coarse:px-3 ${
-              activeSample === "scene" ? "bg-accent text-on-accent" : "bg-card text-fg-2 hover:bg-raised"
-            }`}
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketFilterPreview", "en", "inline-flex min-h-8 items-center rounded px-2.5 text-[0.65rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 pointer-coarse:min-h-11 pointer-coarse:px-3 {v0}"), { v0: String(activeSample === "scene" ? "bg-accent text-on-accent" : "bg-card text-fg-2 hover:bg-raised") })}
           >
-            배경 씬
-          </button>
+            {translateCurrentStaticSourceText("domains.market.components.MarketFilterPreview", "ko", "배경 씬")}</button>
           <button
             type="button"
             onClick={() => setActiveSample("character")}
             aria-pressed={activeSample === "character"}
-            className={`inline-flex min-h-8 items-center rounded px-2.5 text-[0.65rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 pointer-coarse:min-h-11 pointer-coarse:px-3 ${
-              activeSample === "character" ? "bg-accent text-on-accent" : "bg-card text-fg-2 hover:bg-raised"
-            }`}
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketFilterPreview", "en", "inline-flex min-h-8 items-center rounded px-2.5 text-[0.65rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 pointer-coarse:min-h-11 pointer-coarse:px-3 {v0}"), { v0: String(activeSample === "character" ? "bg-accent text-on-accent" : "bg-card text-fg-2 hover:bg-raised") })}
           >
-            캐릭터 컷
-          </button>
+            {translateCurrentStaticSourceText("domains.market.components.MarketFilterPreview", "ko", "캐릭터 컷")}</button>
         </div>
       </div>
 
       {/* Interactive Split Comparison View */}
       <div
         role="group"
-        aria-label="필터 적용 예시와 원본 일러스트 비교"
+        aria-label={translateCurrentStaticSourceText("domains.market.components.MarketFilterPreview", "ko", "필터 적용 예시와 원본 일러스트 비교")}
         className="relative aspect-[16/8] w-full select-none overflow-hidden bg-canvas"
       >
         {/* Sample SVG Art */}
@@ -183,11 +181,9 @@ export function MarketFilterPreview({ filter, className }: MarketFilterPreviewPr
 
         {/* Labels */}
         <span className="absolute left-3 top-3 inline-flex min-h-6 items-center rounded bg-canvas px-2 text-[0.65rem] font-semibold text-fg shadow-sm">
-          효과 예시
-        </span>
+          {translateCurrentStaticSourceText("domains.market.components.MarketFilterPreview", "ko", "효과 예시")}</span>
         <span className="absolute right-3 top-3 inline-flex min-h-6 items-center rounded bg-canvas px-2 text-[0.65rem] font-semibold text-fg shadow-sm">
-          원본 일러스트
-        </span>
+          {translateCurrentStaticSourceText("domains.market.components.MarketFilterPreview", "ko", "원본 일러스트")}</span>
 
         {/* Interactive Slider Input Overlay */}
         <input
@@ -196,8 +192,8 @@ export function MarketFilterPreview({ filter, className }: MarketFilterPreviewPr
           max={100}
           value={sliderPosition}
           onChange={(e) => setSliderPosition(Number(e.target.value))}
-          aria-label="필터 전후 비교 슬라이더"
-          aria-valuetext={`왼쪽 효과 예시 ${sliderPosition}%, 오른쪽 원본 ${100 - sliderPosition}%`}
+          aria-label={translateCurrentStaticSourceText("domains.market.components.MarketFilterPreview", "ko", "필터 전후 비교 슬라이더")}
+          aria-valuetext={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketFilterPreview", "ko", "왼쪽 효과 예시 {v0}%, 오른쪽 원본 {v1}%"), { v0: String(sliderPosition), v1: String(100 - sliderPosition) })}
           className="absolute inset-x-4 bottom-3 z-20 h-8 w-[calc(100%-2rem)] cursor-ew-resize rounded-full bg-canvas/90 px-2 accent-accent shadow-sm backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas pointer-coarse:h-11"
         />
       </div>
@@ -205,7 +201,7 @@ export function MarketFilterPreview({ filter, className }: MarketFilterPreviewPr
       {/* Filter Parameters Inspection Chips */}
       <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-2.5 bg-panel/30">
         <SlidersHorizontal className="h-3.5 w-3.5 text-fg-3" aria-hidden="true" />
-        <span className="text-[0.68rem] text-fg-3">파라미터:</span>
+        <span className="text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.market.components.MarketFilterPreview", "ko", "파라미터:")}</span>
         {Object.entries(filter.values).map(([key, value]) => (
           <span key={key} className="rounded bg-raised px-2 py-0.5 text-[0.65rem] text-fg-2">
             <span className="text-fg-3">{key}:</span> <strong className="font-semibold text-fg">{String(value)}</strong>
@@ -213,8 +209,7 @@ export function MarketFilterPreview({ filter, className }: MarketFilterPreviewPr
         ))}
       </div>
       <p id="market-filter-preview-note" className="border-t border-line bg-panel/30 px-4 py-2 text-[0.68rem] leading-relaxed text-fg-3">
-        실제 Studio 렌더가 아닌, 브라우저에서 지원되는 일부 파라미터를 단순 적용한 참고 일러스트입니다.
-      </p>
+        {translateCurrentStaticSourceText("domains.market.components.MarketFilterPreview", "ko", "실제 Studio 렌더가 아닌, 브라우저에서 지원되는 일부 파라미터를 단순 적용한 참고 일러스트입니다.")}</p>
     </div>
   );
 }

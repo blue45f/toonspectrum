@@ -1,11 +1,12 @@
 // 연재 시리즈/챌린지/팔로우 공통 타입·순수 헬퍼 — 단위 테스트 대상 순수 로직.
 import { cleanTags, clampText, MAX_DESCRIPTION, normalizeMultiline } from "./shared";
 
-export type CreatorSeriesStatus = "ongoing" | "completed";
+export type CreatorSeriesStatus = "ongoing" | "hiatus" | "completed";
 export type CreatorSeriesSort = "recent" | "likes" | "views";
 export type CreatorChallengeState = "upcoming" | "ongoing" | "ended";
 
-const SERIES_STATUSES = new Set<CreatorSeriesStatus>(["ongoing", "completed"]);
+export const CREATOR_SERIES_STATUSES = ["ongoing", "hiatus", "completed"] as const;
+const SERIES_STATUSES = new Set<CreatorSeriesStatus>(CREATOR_SERIES_STATUSES);
 const SERIES_SORTS = new Set<CreatorSeriesSort>(["recent", "likes", "views"]);
 export const MAX_SERIES_TITLE = 80;
 

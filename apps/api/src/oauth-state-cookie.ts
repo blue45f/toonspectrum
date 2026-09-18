@@ -12,6 +12,10 @@ export function oauthPkceVerifierCookieName(provider: OAuthProviderId): string {
   return `toonspectrum-oauth-pkce-${provider}`;
 }
 
+export function oauthLinkSessionCookieName(provider: OAuthProviderId): string {
+  return `toonspectrum-oauth-link-session-${provider}`;
+}
+
 function oauthStateCookiePath(provider: OAuthProviderId): string {
   return `/api/auth/oauth/${provider}`;
 }
@@ -22,7 +26,7 @@ export function resolveOAuthStateCookieOptions(
   return {
     httpOnly: true,
     secure: true,
-    sameSite: "lax",
+    sameSite: provider === "apple" ? "none" : "lax",
     path: oauthStateCookiePath(provider),
     maxAge: OAUTH_STATE_COOKIE_TTL_MS,
   };
@@ -44,6 +48,18 @@ export function resolveOAuthPkceVerifierCookieOptions(
 }
 
 export function resolveOAuthPkceVerifierCookieClearOptions(
+  provider: OAuthProviderId,
+): CookieOptions {
+  return resolveOAuthStateCookieClearOptions(provider);
+}
+
+export function resolveOAuthLinkSessionCookieOptions(
+  provider: OAuthProviderId,
+): CookieOptions {
+  return resolveOAuthStateCookieOptions(provider);
+}
+
+export function resolveOAuthLinkSessionCookieClearOptions(
   provider: OAuthProviderId,
 ): CookieOptions {
   return resolveOAuthStateCookieClearOptions(provider);
@@ -86,4 +102,11 @@ export function resolveOAuthPkceVerifierCookieValue(
   provider: OAuthProviderId,
 ): string | null {
   return resolveCookieValue(cookieHeader, oauthPkceVerifierCookieName(provider));
+}
+
+export function resolveOAuthLinkSessionCookieValue(
+  cookieHeader: string | string[] | undefined,
+  provider: OAuthProviderId,
+): string | null {
+  return resolveCookieValue(cookieHeader, oauthLinkSessionCookieName(provider));
 }

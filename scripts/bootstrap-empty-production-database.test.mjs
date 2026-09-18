@@ -357,6 +357,7 @@ describe("bootstrap SQL and repository contract", () => {
 
   test("redacts raw URLs, decoded passwords and encoded password forms", () => {
     const url =
+      // secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic redaction fixture
       "postgresql://migrator:p%40ssword@db.example.test/app?sslmode=verify-full";
     const redacted = redactDatabaseSecrets(
       `failed for ${url}; password=p@ssword; encoded=p%40ssword`,
@@ -418,6 +419,13 @@ describe("bootstrap SQL and repository contract", () => {
       "0060_studio_ai_free_provider_expansion",
       "0061_member_messaging_cutover_marker",
       "0062_auth_identity_hardening",
+      "0063_creator_role_profile",
+      "0064_studio_project_graph_v3",
+      "0065_creator_series_lifecycle",
+      "0066_share_analytics_events",
+      "0067_creator_role_workspace_personalization",
+      "0068_business_inquiries",
+      "0069_account_consolidation",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
   });

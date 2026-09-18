@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { AdultOverlay } from "./adult-overlay";
 import { CoverImage } from "./cover-image";
 
@@ -63,7 +67,7 @@ export function TitlePoster({
       {title.coverImage && (
         <CoverImage
           src={title.coverImage}
-          alt={`${title.title} 표지`}
+          alt={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.title.poster", "ko", "{v0} 표지"), { v0: String(title.title) })}
           fallback={glyphNode}
           priority={priority}
           className="absolute inset-0 size-full object-cover contrast-[1.03] saturate-[1.04]"
@@ -93,11 +97,11 @@ export function TitlePoster({
             s.type
           )}
         >
-          {isNovel ? "NOVEL" : "TOON"}
+          {isNovel ? translateCurrentStaticSourceText("shared.components.title.poster", "en", "NOVEL") : translateCurrentStaticSourceText("shared.components.title.poster", "en", "TOON")}
         </span>
         {size !== "sm" && (
           <span className={cx("font-display font-semibold text-[oklch(0.95_0.01_85/0.62)]", s.type)}>
-            IDX {issue}
+            {translateCurrentStaticSourceText("shared.components.title.poster", "en", "IDX ")}{issue}
           </span>
         )}
       </div>
@@ -121,7 +125,7 @@ export function TitlePoster({
         {size !== "sm" && (
           <p className="truncate text-xs text-[oklch(0.92_0.01_85/0.72)]">
             {title.author}
-            {title.artist && title.artist !== title.author ? ` · 그림 ${title.artist}` : ""}
+            {title.artist && title.artist !== title.author ? formatI18nTemplate(translateCurrentStaticSourceText("shared.components.title.poster", "ko", " · 그림 {v0}"), { v0: String(title.artist) }) : ""}
           </p>
         )}
       </div>

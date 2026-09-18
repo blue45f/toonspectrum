@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArchiveRestore,
   Clock3,
   FileArchive,
@@ -277,12 +281,12 @@ function FileReport({
       </p>
       {report.maxFileBytes !== null ? (
         <p className="mt-1 text-[0.61rem] text-fg-3">
-          감사된 단일 파일 한도 {formatStudioFileBytes(report.maxFileBytes)}
+          {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "감사된 단일 파일 한도 ")}{formatStudioFileBytes(report.maxFileBytes)}
         </p>
       ) : null}
       {riskItems.length > 0 ? (
         <div className="mt-2 rounded-lg bg-raised/70 p-2.5">
-          <p className="text-[0.6rem] font-bold text-fg-2">예상 손실</p>
+          <p className="text-[0.6rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "예상 손실")}</p>
           <ul className="mt-1 space-y-1 text-[0.61rem] leading-relaxed text-fg-3">
             {riskItems.map((risk) => <li key={risk}>• {risk}</li>)}
           </ul>
@@ -290,7 +294,7 @@ function FileReport({
       ) : null}
       {recommendations.length > 0 ? (
         <div className="mt-2 rounded-lg border border-line/70 p-2.5">
-          <p className="text-[0.6rem] font-bold text-fg-2">이 파일을 여는 방법</p>
+          <p className="text-[0.6rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "이 파일을 여는 방법")}</p>
           <ul className="mt-1 space-y-1 text-[0.61rem] leading-relaxed text-fg-3">
             {recommendations.map((recommendation) => (
               <li key={recommendation}>• {recommendation}</li>
@@ -307,12 +311,10 @@ function FileReport({
           className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 text-[0.68rem] font-bold text-accent-contrast transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <Upload size={14} aria-hidden />
-          {studioFileControlAction(actionId).label} 열기
-        </button>
+          {studioFileControlAction(actionId).label} {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "열기")}</button>
       ) : (
         <p className="mt-3 rounded-lg border border-line bg-raised px-3 py-2 text-[0.62rem] leading-relaxed text-fg-3">
-          이 파일은 여기서 직접 열지 않습니다. 위 변환 권장안을 적용한 사본을 준비하세요.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "이 파일은 여기서 직접 열지 않습니다. 위 변환 권장안을 적용한 사본을 준비하세요.")}</p>
       )}
     </div>
   );
@@ -458,28 +460,24 @@ export function StudioFileControlCenter(): ReactElement {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[0.58rem] font-black uppercase tracking-[0.18em] text-accent">
-            File lifecycle
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "en", "File lifecycle")}</p>
           <h2 id={titleId} className="mt-1 text-sm font-black tracking-tight text-fg">
-            파일 제어 센터
-          </h2>
+            {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "파일 제어 센터")}</h2>
           <p className="mt-1 max-w-2xl text-[0.66rem] leading-relaxed text-fg-3">
-            저장 사본·명명 버전·복구·가져오기 손실을 한곳에서 확인합니다. 실행은 기존 프로젝트 명령에 위임해 저장 경로가 갈라지지 않습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "저장 사본·명명 버전·복구·가져오기 손실을 한곳에서 확인합니다. 실행은 기존 프로젝트 명령에 위임해 저장 경로가 갈라지지 않습니다.")}</p>
         </div>
         <div className="flex items-center gap-2">
           <a
             href="/studio/projects"
             className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-[0.64rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            <FolderOpen size={13} aria-hidden /> 프로젝트 라이브러리
-          </a>
+            <FolderOpen size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "프로젝트 라이브러리")}</a>
           <button
             type="button"
             data-project-center-control="true"
             data-project-keep-open
             onClick={() => void refreshHealth()}
-            aria-label="파일 제어 센터 상태 새로고침"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "파일 제어 센터 상태 새로고침")}
             className="grid size-9 place-items-center rounded-lg border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <RefreshCcw size={14} aria-hidden />
@@ -497,7 +495,7 @@ export function StudioFileControlCenter(): ReactElement {
               data-project-center-control="true"
               data-project-keep-open
               onClick={() => invokeAction(action.id)}
-              aria-label={`파일 센터 · ${action.label}`}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "파일 센터 · {v0}"), { v0: String(action.label) })}
               className="group min-h-[5.2rem] rounded-xl border border-line bg-card p-3 text-left transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <span className="flex items-center gap-2 text-[0.7rem] font-black text-fg">
@@ -517,7 +515,7 @@ export function StudioFileControlCenter(): ReactElement {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <ShieldCheck size={15} aria-hidden className="text-accent" />
-              <h3 className="text-[0.72rem] font-black text-fg">복구 준비 상태</h3>
+              <h3 className="text-[0.72rem] font-black text-fg">{translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "복구 준비 상태")}</h3>
             </div>
             <span
               className={cn(
@@ -527,27 +525,25 @@ export function StudioFileControlCenter(): ReactElement {
                   : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
               )}
             >
-              {online ? "온라인" : "오프라인"}
+              {online ? translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "온라인") : translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "오프라인")}
             </span>
           </div>
           <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
             <div className="rounded-lg bg-raised/70 p-2.5">
               <dt className="flex items-center gap-1.5 text-[0.6rem] font-bold text-fg-3">
-                <FileClock size={12} aria-hidden /> 복구 가능한 임시저장
-              </dt>
+                <FileClock size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "복구 가능한 임시저장")}</dt>
               <dd className="mt-1 text-[0.72rem] font-black text-fg">
                 {recoveryScan.storageUnavailable
-                  ? "저장소 확인 불가"
-                  : `${autosavesWithContent.length}개`}
+                  ? translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "저장소 확인 불가")
+                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "{v0}개"), { v0: String(autosavesWithContent.length) })}
               </dd>
               <dd className="mt-0.5 text-[0.58rem] text-fg-3">
-                최근 {formatDateTime(latestAutosave?.savedAt ?? null)}
+                {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "최근 ")}{formatDateTime(latestAutosave?.savedAt ?? null)}
               </dd>
             </div>
             <div className="rounded-lg bg-raised/70 p-2.5">
               <dt className="flex items-center gap-1.5 text-[0.6rem] font-bold text-fg-3">
-                <HardDrive size={12} aria-hidden /> 브라우저 보관 보호
-              </dt>
+                <HardDrive size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "브라우저 보관 보호")}</dt>
               <dd className="mt-1 text-[0.68rem] font-black text-fg">
                 {storageProtectionLabel(storageHealth)}
               </dd>
@@ -557,8 +553,7 @@ export function StudioFileControlCenter(): ReactElement {
             </div>
           </dl>
           <p className="mt-2 text-[0.6rem] leading-relaxed text-fg-3">
-            브라우저 보관 상태는 서버 초안 저장 성공을 뜻하지 않습니다. 장기 보관과 기기 이동에는 .toonproject.zip 사본을 함께 남기세요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "브라우저 보관 상태는 서버 초안 저장 성공을 뜻하지 않습니다. 장기 보관과 기기 이동에는 .toonproject.zip 사본을 함께 남기세요.")}</p>
           {storageHealth.status === "ready" && storageHealth.persisted === false ? (
             <button
               type="button"
@@ -571,19 +566,17 @@ export function StudioFileControlCenter(): ReactElement {
               {storageBusy
                 ? <Loader2 size={14} aria-hidden className="animate-spin" />
                 : <ShieldCheck size={14} aria-hidden />}
-              브라우저 저장 보호 요청
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "브라우저 저장 보호 요청")}</button>
           ) : null}
         </div>
 
         <div className="rounded-xl border border-line bg-card p-3">
           <div className="flex items-center gap-2">
             <FileSearch2 size={15} aria-hidden className="text-accent" />
-            <h3 className="text-[0.72rem] font-black text-fg">가져오기 호환성 사전검사</h3>
+            <h3 className="text-[0.72rem] font-black text-fg">{translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "가져오기 호환성 사전검사")}</h3>
           </div>
-          <p id={`${inputId}-help`} className="mt-1 text-[0.61rem] leading-relaxed text-fg-3">
-            파일 내용은 업로드하거나 읽지 않고, 파일명·MIME·용량을 감사된 형식 레지스트리와 비교합니다.
-          </p>
+          <p id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "en", "{v0}-help"), { v0: String(inputId) })} className="mt-1 text-[0.61rem] leading-relaxed text-fg-3">
+            {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "파일 내용은 업로드하거나 읽지 않고, 파일명·MIME·용량을 감사된 형식 레지스트리와 비교합니다.")}</p>
           <div
             onDragOver={(event) => event.preventDefault()}
             onDrop={onFileDrop}
@@ -593,18 +586,16 @@ export function StudioFileControlCenter(): ReactElement {
               id={inputId}
               type="file"
               onChange={onFileChange}
-              aria-describedby={`${inputId}-help`}
+              aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "en", "{v0}-help"), { v0: String(inputId) })}
               className="sr-only"
             />
             <label
               htmlFor={inputId}
               className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-line bg-card px-3 text-[0.67rem] font-bold text-fg-2 hover:bg-raised focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent"
             >
-              <Upload size={14} aria-hidden /> 파일 선택 또는 놓기
-            </label>
+              <Upload size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "파일 선택 또는 놓기")}</label>
             <p className="mt-2 text-[0.58rem] text-fg-3">
-              .toonproject.zip · JSON · PSD · ORA · CBZ · WILL 및 변환 필요 형식
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", ".toonproject.zip · JSON · PSD · ORA · CBZ · WILL 및 변환 필요 형식")}</p>
           </div>
           {report ? <FileReport report={report} onOpenImporter={invokeAction} /> : null}
         </div>
@@ -615,11 +606,10 @@ export function StudioFileControlCenter(): ReactElement {
           <div>
             <div className="flex items-center gap-2">
               <Clock3 size={14} aria-hidden className="text-accent" />
-              <h3 className="text-[0.7rem] font-black text-fg">최근 로컬 파일</h3>
+              <h3 className="text-[0.7rem] font-black text-fg">{translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "최근 로컬 파일")}</h3>
             </div>
             <p className="mt-1 text-[0.59rem] text-fg-3">
-              파일 내용이 아닌 이름·용량·형식만 이 브라우저에 최대 5개 저장합니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "파일 내용이 아닌 이름·용량·형식만 이 브라우저에 최대 5개 저장합니다.")}</p>
           </div>
           {recentFiles.length > 0 ? (
             <button
@@ -629,8 +619,7 @@ export function StudioFileControlCenter(): ReactElement {
               onClick={removeRecentFiles}
               className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line px-2.5 text-[0.62rem] font-bold text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              <Trash2 size={12} aria-hidden /> 기록 지우기
-            </button>
+              <Trash2 size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "기록 지우기")}</button>
           ) : null}
         </div>
         {recentFiles.length > 0 ? (
@@ -656,21 +645,19 @@ export function StudioFileControlCenter(): ReactElement {
                     onClick={() => {
                       if (file.actionId) invokeAction(file.actionId);
                     }}
-                    aria-label={`${file.name} 가져오기 선택기 열기`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "{v0} 가져오기 선택기 열기"), { v0: String(file.name) })}
                     className="shrink-0 rounded-md border border-line bg-card px-2 py-1.5 text-[0.57rem] font-bold text-fg-2 hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
-                    다시 선택
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "다시 선택")}</button>
                 ) : (
-                  <span className="shrink-0 text-[0.55rem] font-bold text-fg-3">변환 필요</span>
+                  <span className="shrink-0 text-[0.55rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "변환 필요")}</span>
                 )}
               </li>
             ))}
           </ul>
         ) : (
           <div className="mt-2 flex items-center gap-2 rounded-lg bg-raised/70 px-3 py-2.5 text-[0.62rem] text-fg-3">
-            <TriangleAlert size={13} aria-hidden /> 아직 검사한 로컬 파일이 없습니다.
-          </div>
+            <TriangleAlert size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioFileControlCenter", "ko", "아직 검사한 로컬 파일이 없습니다.")}</div>
         )}
       </div>
 

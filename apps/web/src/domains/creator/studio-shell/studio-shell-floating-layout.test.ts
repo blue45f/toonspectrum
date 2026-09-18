@@ -10,7 +10,9 @@ import {
   hideAllStudioShellFloatingSurfaces,
   isStudioShellFloatingSurfaceVisible,
   normalizeStudioShellFloatingVisibility,
+  setStudioShellFloatingAutoHideDuringStroke,
   setStudioShellFloatingSurfaceVisible,
+  showAllStudioShellFloatingSurfaces,
   studioShellFloatingSurfaceById,
   studioShellFloatingVisibilityEqual,
 } from "./studio-shell-floating-layout";
@@ -48,8 +50,9 @@ describe("studio shell floating layout registry", () => {
     expect(state).toEqual({
       version: 1,
       hidden: ["document-tools", "collaboration"],
+      autoHideDuringStroke: true,
     });
-    expect(Object.keys(state)).toEqual(["version", "hidden"]);
+    expect(Object.keys(state)).toEqual(["version", "hidden", "autoHideDuringStroke"]);
     expect(Object.isFrozen(state)).toBe(true);
     expect(Object.isFrozen(state.hidden)).toBe(true);
     expect(JSON.parse(encodeStudioShellFloatingVisibility(state))).toEqual(state);
@@ -81,6 +84,36 @@ describe("studio shell floating layout registry", () => {
       restored,
       DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY,
     )).toBe(true);
+
+    const autoHide = setStudioShellFloatingAutoHideWhileDrawing(restored, true);
+    expect(autoHide.autoHideWhileDrawing).toBe(true);
+    expect(studioShellFloatingVisibilityEqual(autoHide, restored)).toBe(false);
+    expect(setStudioShellFloatingSurfaceVisible(autoHide, "collaboration", false))
+      .toMatchObject({ autoHideWhileDrawing: true });
+  });
+
+  it("preserves the stroke-focus preference across visibility and preset changes", () => {
+    const disabled = setStudioShellFloatingAutoHideDuringStroke(
+      DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY,
+      false,
+    );
+    const hidden = setStudioShellFloatingSurfaceVisible(
+      disabled,
+      "collaboration",
+      false,
+    );
+
+    expect(hidden.autoHideDuringStroke).toBe(false);
+    expect(applyStudioShellFloatingPreset("production", disabled).autoHideDuringStroke)
+      .toBe(false);
+    expect(showAllStudioShellFloatingSurfaces(disabled)).toEqual({
+      version: 1,
+      hidden: [],
+      autoHideDuringStroke: false,
+    });
+    expect(hideAllStudioShellFloatingSurfaces(disabled).autoHideDuringStroke).toBe(false);
+    expect(normalizeStudioShellFloatingVisibility({ version: 1, hidden: [] }))
+      .toEqual(DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY);
   });
 
   it("provides deterministic presets and a recoverable hide-all state", () => {
@@ -101,6 +134,14 @@ describe("studio shell floating layout registry", () => {
       .toEqual(STUDIO_SHELL_FLOATING_VISIBILITY_IDS);
     expect(applyStudioShellFloatingPreset("all"))
       .toBe(DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY);
+    const autoHide = setStudioShellFloatingAutoHideWhileDrawing(
+      DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY,
+      true,
+    );
+    expect(applyStudioShellFloatingPreset("production", autoHide))
+      .toMatchObject({ hidden: ["collaboration"], autoHideWhileDrawing: true });
+    expect(hideAllStudioShellFloatingSurfaces(autoHide))
+      .toMatchObject({ autoHideWhileDrawing: true });
   });
 
   it("resolves known surfaces and rejects unknown runtime IDs", () => {

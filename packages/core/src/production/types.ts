@@ -1,4 +1,5 @@
-export const PRODUCTION_MODEL_VERSION = 1 as const;
+export const PRODUCTION_MODEL_VERSION = 2 as const;
+export const PRODUCTION_RISK_MODEL_VERSION = 2 as const;
 
 export const PRODUCTION_SCOPE_KINDS = [
   "project",
@@ -32,6 +33,33 @@ export interface RevisionRef {
   readonly revision: number;
   readonly digest: string;
   readonly createdAt: string;
+}
+
+export const PRODUCTION_STUDIO_DOCUMENT_ROLES = [
+  "story",
+  "thumbnail",
+  "lineart",
+  "background",
+  "color",
+  "lettering",
+  "final",
+] as const;
+export type ProductionStudioDocumentRole = (typeof PRODUCTION_STUDIO_DOCUMENT_ROLES)[number];
+
+export interface ProductionStudioRevisionLink {
+  readonly id: string;
+  readonly projectId: string;
+  readonly workId: string;
+  readonly episodeId: string | null;
+  readonly studioDocumentRef: string;
+  readonly documentRole: ProductionStudioDocumentRole;
+  readonly studioRevisionRef: RevisionRef;
+  readonly deliverableId: string;
+  readonly submissionId: string;
+  readonly linkedByAssignmentId: string;
+  readonly status: "submitted" | "approved" | "superseded";
+  readonly linkedAt: string;
+  readonly approvedAt: string | null;
 }
 
 export const COLLABORATION_MODELS = [
@@ -502,7 +530,15 @@ export interface ProductionTask {
   readonly inputRevisionRefs: readonly RevisionRef[];
   readonly outputDeliverableIds: readonly string[];
   readonly dependencyTaskIds: readonly string[];
+  readonly plannedStartAt?: string | null;
+  readonly baselineDueAt?: string | null;
   readonly dueAt: string | null;
+  readonly statusChangedAt?: string;
+  readonly startedAt?: string | null;
+  readonly completedAt?: string | null;
+  readonly progressPercent?: number | null;
+  readonly remainingEstimateHours?: number | null;
+  readonly linkedRiskIds?: readonly string[];
   readonly estimateHours: {
     readonly optimistic: number;
     readonly likely: number;
@@ -907,30 +943,192 @@ export interface AssetRequirement {
   readonly status: "identified" | "sourcing" | "ready" | "blocked" | "cancelled";
 }
 
+export type ProductionRiskCategory =
+  | "story"
+  | "visual"
+  | "schedule"
+  | "capacity"
+  | "review"
+  | "asset"
+  | "budget"
+  | "rights"
+  | "contract"
+  | "platform"
+  | "health"
+  | "security"
+  | "communication"
+  | "technical";
+
+export type ProductionRiskSeverity = "watch" | "warning" | "high" | "critical";
+export type ProductionRiskResponseStatus = "proposed" | "approved" | "in-progress" | "completed" | "cancelled";
+export type ProductionRiskStatus =
+  | "open"
+  | "monitoring"
+  | "mitigating"
+  | "occurred"
+  | "accepted"
+  | "resolved"
+  | "dismissed"
+  | "closed";
+export type ProductionRiskSource = "manual" | "automatic";
+export type ProductionRiskSignalState = "active" | "cleared" | "suppressed";
+export type ProductionRiskConfidence = "high" | "medium" | "low";
+
+export interface ProductionRiskPolicy {
+  readonly id: string;
+  readonly projectId: string;
+  readonly timezone: string;
+  readonly workdayEndLocal: string;
+  readonly dueSoonHours: number;
+  readonly blockedWarningHours: number;
+  readonly blockedCriticalHours: number;
+  readonly capacityWarningPercent: number;
+  readonly capacityCriticalPercent: number;
+  readonly defaultReviewSlaHours: number;
+  readonly minimumReadyBufferEpisodes: number;
+  readonly autoOpenSeverity: "warning" | "high" | "critical";
+  readonly notificationCooldownHours: number;
+  readonly autoResolveStableHours: number;
+  readonly revision: number;
+  readonly updatedAt: string;
+}
+
+export interface ProductionRiskEvidence {
+  readonly key: string;
+  readonly label: string;
+  readonly value: string | number | boolean | null;
+  readonly threshold: string | number | null;
+  readonly unit: string | null;
+  readonly sourceType: string;
+  readonly sourceId: string;
+  readonly observedAt: string;
+}
+
+export interface ProductionRiskSignal {
+  readonly id: string;
+  readonly projectId: string;
+  readonly fingerprint: string;
+  readonly ruleKey: string;
+  readonly scope: ScopeRef;
+  readonly sourceEntityType:
+    | "task"
+    | "episode"
+    | "assignment"
+    | "review"
+    | "asset"
+    | "milestone"
+    | "change-request"
+    | "project";
+  readonly sourceEntityId: string;
+  readonly category: ProductionRiskCategory;
+  readonly severity: ProductionRiskSeverity;
+  readonly priorityScore: number;
+  readonly confidence: ProductionRiskConfidence;
+  readonly title: string;
+  readonly summary: string;
+  readonly evidence: readonly ProductionRiskEvidence[];
+  readonly affectedTaskIds: readonly string[];
+  readonly affectedEpisodeIds: readonly string[];
+  readonly affectedMilestoneIds: readonly string[];
+  readonly linkedRiskId: string | null;
+  readonly state: ProductionRiskSignalState;
+  readonly firstDetectedAt: string;
+  readonly lastDetectedAt: string;
+  readonly clearedAt: string | null;
+  readonly suppression: {
+    readonly reason: string;
+    readonly suppressedByAssignmentId: string;
+    readonly suppressedAt: string;
+    readonly expiresAt: string | null;
+  } | null;
+}
+
+export interface ProductionRiskResponse {
+  readonly id: string;
+  readonly projectId: string;
+  readonly riskId: string;
+  readonly strategy: "avoid" | "mitigate" | "transfer" | "accept" | "escalate";
+  readonly actionType:
+    | "assign"
+    | "split-task"
+    | "reschedule"
+    | "resolve-dependency"
+    | "parallel-review"
+    | "outsource"
+    | "reduce-scope"
+    | "reuse-asset"
+    | "create-change-request"
+    | "manual";
+  readonly title: string;
+  readonly description: string;
+  readonly ownerAssignmentId: string | null;
+  readonly dueAt: string | null;
+  readonly linkedTaskId: string | null;
+  readonly linkedChangeRequestId: string | null;
+  readonly linkedChangeOrderId: string | null;
+  readonly expectedEffect: string;
+  readonly actualEffect: string | null;
+  readonly status: ProductionRiskResponseStatus;
+  readonly createdAt: string;
+  readonly completedAt: string | null;
+}
+
+export interface ProductionRiskAssessment {
+  readonly id: string;
+  readonly projectId: string;
+  readonly riskId: string;
+  readonly signalIds: readonly string[];
+  readonly probability: 1 | 2 | 3 | 4 | 5;
+  readonly impact: 1 | 2 | 3 | 4 | 5;
+  readonly exposureScore: number;
+  readonly priorityScore: number;
+  readonly confidence: ProductionRiskConfidence;
+  readonly rationale: readonly string[];
+  readonly assessedAt: string;
+}
+
 export interface ProductionRisk {
   readonly id: string;
   readonly projectId: string;
+  readonly revision: number;
   readonly scope: ScopeRef;
-  readonly category:
-    | "story"
-    | "visual"
-    | "schedule"
-    | "capacity"
-    | "budget"
-    | "rights"
-    | "contract"
-    | "platform"
-    | "health"
-    | "security";
+  readonly category: ProductionRiskCategory;
+  readonly source: ProductionRiskSource;
+  readonly signalIds: readonly string[];
   readonly title: string;
   readonly description: string;
   readonly probability: 1 | 2 | 3 | 4 | 5;
   readonly impact: 1 | 2 | 3 | 4 | 5;
+  readonly exposureScore: number;
+  readonly severity: ProductionRiskSeverity;
+  readonly priorityScore: number;
   readonly ownerAssignmentId: string | null;
+  readonly causeCodes: readonly string[];
+  readonly earlySignals: readonly string[];
   readonly mitigation: string;
+  readonly contingency: string;
   readonly trigger: string;
-  readonly status: "open" | "mitigating" | "accepted" | "resolved" | "closed";
+  readonly affectedTaskIds: readonly string[];
+  readonly affectedEpisodeIds: readonly string[];
+  readonly affectedMilestoneIds: readonly string[];
+  readonly baselineDueAt: string | null;
+  readonly forecastDueAt: string | null;
+  readonly varianceHours: number | null;
+  readonly status: ProductionRiskStatus;
+  /** @deprecated use responseDueAt */
   readonly dueAt: string | null;
+  readonly responseDueAt: string | null;
+  readonly nextReviewAt: string | null;
+  readonly acceptedReason: string | null;
+  readonly dismissedReason: string | null;
+  readonly resolutionSummary: string | null;
+  readonly detectedAt: string;
+  readonly lastEvaluatedAt: string;
+  readonly occurredAt: string | null;
+  readonly resolvedAt: string | null;
+  readonly closedAt: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
 }
 
 export interface DecisionRecord {
@@ -1134,6 +1332,225 @@ export interface ProductionDispute {
   readonly resolvedAt: string | null;
 }
 
+export type ResourceCalendarExceptionType =
+  | "time-off"
+  | "holiday"
+  | "overtime"
+  | "capacity-override";
+
+export interface ResourceCalendarException {
+  readonly id: string;
+  readonly type: ResourceCalendarExceptionType;
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly availableHours: number;
+  readonly reason: string;
+}
+
+export interface ResourceCalendar {
+  readonly id: string;
+  readonly projectId: string;
+  readonly assignmentId: string;
+  readonly timezone: string;
+  readonly weeklyHours: number;
+  readonly dailyHours: number;
+  readonly workingWeekdays: readonly number[];
+  readonly exceptions: readonly ResourceCalendarException[];
+  readonly revision: number;
+  readonly updatedAt: string;
+}
+
+export interface ScheduleBaselineItem {
+  readonly taskId: string;
+  readonly dueAt: string | null;
+  readonly assignmentIds: readonly string[];
+  readonly estimateLikelyHours: number | null;
+}
+
+export interface ScheduleBaseline {
+  readonly id: string;
+  readonly projectId: string;
+  readonly name: string;
+  readonly createdByAssignmentId: string;
+  readonly releaseAt: string | null;
+  readonly items: readonly ScheduleBaselineItem[];
+  readonly active: boolean;
+  readonly createdAt: string;
+}
+
+export type ReleasePlanStatus =
+  | "draft"
+  | "preflight"
+  | "ready"
+  | "scheduled"
+  | "published"
+  | "failed"
+  | "withdrawn";
+
+export interface EpisodeReleasePlan {
+  readonly id: string;
+  readonly projectId: string;
+  readonly episodeId: string;
+  readonly platformKey: string;
+  readonly locale: string;
+  readonly timezone: string;
+  readonly scheduledAt: string | null;
+  readonly status: ReleasePlanStatus;
+  readonly title: string;
+  readonly description: string;
+  readonly thumbnailRevisionRef: string | null;
+  readonly sourceSubmissionIds: readonly string[];
+  readonly requiredCheckKeys: readonly string[];
+  readonly passedCheckKeys: readonly string[];
+  readonly blockers: readonly string[];
+  readonly warnings: readonly string[];
+  readonly externalReleaseId: string | null;
+  readonly externalUrl: string | null;
+  readonly revision: number;
+  readonly updatedAt: string;
+}
+
+export type ExternalReviewPermission = "view" | "comment" | "approve" | "download";
+export type ExternalReviewDecision = "comment" | "approve" | "request-changes";
+
+export interface ExternalReviewResponse {
+  readonly id: string;
+  readonly reviewerName: string;
+  readonly decision: ExternalReviewDecision;
+  readonly note: string;
+  readonly createdAt: string;
+}
+
+export interface ExternalReviewAccess {
+  readonly id: string;
+  readonly projectId: string;
+  readonly scope: ScopeRef;
+  readonly label: string;
+  readonly tokenDigest: string;
+  readonly submissionIds: readonly string[];
+  readonly permissions: readonly ExternalReviewPermission[];
+  readonly watermark: boolean;
+  readonly expiresAt: string;
+  readonly status: "active" | "revoked" | "expired";
+  readonly createdByAssignmentId: string;
+  readonly createdAt: string;
+  readonly lastAccessedAt: string | null;
+  readonly responses: readonly ExternalReviewResponse[];
+}
+
+export type ProductionAutomationTrigger =
+  | "task-status-changed"
+  | "due-soon"
+  | "due-passed"
+  | "capacity-exceeded"
+  | "release-preflight-failed"
+  | "review-opened"
+  | "manual";
+
+export interface ProductionAutomationCondition {
+  readonly field:
+    | "task-status"
+    | "process-key"
+    | "days-to-due"
+    | "episode-state"
+    | "load-percent"
+    | "release-status";
+  readonly operator: "equals" | "not-equals" | "contains" | "gte" | "lte";
+  readonly value: string | number;
+}
+
+export type ProductionAutomationAction =
+  | {
+      readonly type: "notify";
+      readonly assignmentIds: readonly string[];
+      readonly urgency: "info" | "warning" | "critical";
+      readonly message: string;
+    }
+  | {
+      readonly type: "create-task";
+      readonly title: string;
+      readonly processKey: string;
+      readonly assignmentIds: readonly string[];
+      readonly dueInHours: number;
+    }
+  | {
+      readonly type: "request-status-transition";
+      readonly taskStatus: ProductionTaskStatus;
+    };
+
+export interface ProductionAutomationRule {
+  readonly id: string;
+  readonly projectId: string;
+  readonly name: string;
+  readonly trigger: ProductionAutomationTrigger;
+  readonly conditions: readonly ProductionAutomationCondition[];
+  readonly actions: readonly ProductionAutomationAction[];
+  readonly failurePolicy: "continue" | "stop" | "require-review";
+  readonly enabled: boolean;
+  readonly revision: number;
+  readonly lastEvaluatedAt: string | null;
+  readonly createdByAssignmentId: string;
+  readonly updatedAt: string;
+}
+
+export interface ProductionNotificationPolicy {
+  readonly id: string;
+  readonly projectId: string;
+  readonly assignmentId: string;
+  readonly channels: readonly ("in-app" | "email" | "push" | "webhook")[];
+  readonly digest: "immediate" | "daily" | "weekly";
+  readonly quietHoursStart: string | null;
+  readonly quietHoursEnd: string | null;
+  readonly dueSoonHours: number;
+  readonly escalationHours: number;
+  readonly enabled: boolean;
+  readonly updatedAt: string;
+}
+
+export interface ProductionNotification {
+  readonly id: string;
+  readonly projectId: string;
+  readonly assignmentId: string | null;
+  readonly type:
+    | "assignment"
+    | "mention"
+    | "review"
+    | "due-soon"
+    | "overdue"
+    | "blocker"
+    | "release"
+    | "automation";
+  readonly title: string;
+  readonly body: string;
+  readonly href: string;
+  readonly urgency: "info" | "warning" | "critical";
+  readonly sourceType: string;
+  readonly sourceId: string;
+  readonly status: "unread" | "read" | "dismissed";
+  readonly createdAt: string;
+  readonly readAt: string | null;
+}
+
+export interface ProductionSavedViewSort {
+  readonly field: string;
+  readonly direction: "asc" | "desc";
+}
+
+export interface ProductionSavedView {
+  readonly id: string;
+  readonly projectId: string;
+  readonly ownerAssignmentId: string | null;
+  readonly name: string;
+  readonly resource: "tasks" | "episodes" | "reviews" | "schedule" | "portfolio";
+  readonly filters: Readonly<Record<string, string>>;
+  readonly sort: readonly ProductionSavedViewSort[];
+  readonly columns: readonly string[];
+  readonly density: "comfortable" | "compact";
+  readonly shared: boolean;
+  readonly dashboardWidgets: readonly string[];
+  readonly updatedAt: string;
+}
+
 export interface ProductionAuditEvent {
   readonly id: string;
   readonly projectId: string;
@@ -1170,6 +1587,7 @@ export interface ProductionProjectAggregate {
   readonly tasks: readonly ProductionTask[];
   readonly deliverables: readonly Deliverable[];
   readonly submissions: readonly Submission[];
+  readonly studioRevisionLinks?: readonly ProductionStudioRevisionLink[];
   readonly changeRequests: readonly ChangeRequest[];
   readonly scopePackages: readonly ScopePackage[];
   readonly scopePackageRevisionArchive: readonly ScopePackage[];
@@ -1186,7 +1604,11 @@ export interface ProductionProjectAggregate {
   readonly cutPlans: readonly CutPlan[];
   readonly planningSnapshots: readonly PlanningSnapshot[];
   readonly assetRequirements: readonly AssetRequirement[];
+  readonly riskPolicy: ProductionRiskPolicy;
+  readonly riskSignals: readonly ProductionRiskSignal[];
   readonly risks: readonly ProductionRisk[];
+  readonly riskResponses: readonly ProductionRiskResponse[];
+  readonly riskAssessments: readonly ProductionRiskAssessment[];
   readonly decisions: readonly DecisionRecord[];
   readonly proposals: readonly ProcurementProposal[];
   readonly agreements: readonly ProductionAgreement[];
@@ -1196,6 +1618,14 @@ export interface ProductionProjectAggregate {
   readonly invoices: readonly ProductionInvoice[];
   readonly paymentRecords: readonly PaymentRecord[];
   readonly disputes: readonly ProductionDispute[];
+  readonly resourceCalendars?: readonly ResourceCalendar[];
+  readonly scheduleBaselines?: readonly ScheduleBaseline[];
+  readonly releasePlans?: readonly EpisodeReleasePlan[];
+  readonly externalReviewAccesses?: readonly ExternalReviewAccess[];
+  readonly automationRules?: readonly ProductionAutomationRule[];
+  readonly notificationPolicies?: readonly ProductionNotificationPolicy[];
+  readonly notifications?: readonly ProductionNotification[];
+  readonly savedViews?: readonly ProductionSavedView[];
   readonly auditEvents: readonly ProductionAuditEvent[];
   readonly createdAt: string;
   readonly updatedAt: string;
