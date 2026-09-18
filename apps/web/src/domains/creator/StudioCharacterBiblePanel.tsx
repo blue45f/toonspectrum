@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   BookOpenText,
   ChevronDown,
   ChevronUp,
@@ -206,7 +202,9 @@ function CharacterFieldEditor({ entry, meta, onPatch }: CharacterFieldEditorProp
 
   return (
     <div
-      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "en", "min-w-0 border-t px-0 py-3 transition-colors sm:px-3 {v0}"), { v0: String(locked ? "border-accent/45 bg-accent-soft/10" : "border-line") })}
+      className={`min-w-0 border-t px-0 py-3 transition-colors sm:px-3 ${
+        locked ? "border-accent/45 bg-accent-soft/10" : "border-line"
+      }`}
     >
       <div className="flex items-center gap-2">
         <label htmlFor={id} className="min-w-0 flex-1 text-xs font-semibold text-fg-2">
@@ -216,7 +214,7 @@ function CharacterFieldEditor({ entry, meta, onPatch }: CharacterFieldEditorProp
           type="button"
           aria-pressed={locked}
           aria-label={`${meta.label} ${locked ? "잠금 해제" : "AI 제약으로 잠그기"}`}
-          title={locked ? translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "AI 제약 해제") : translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "AI가 바꾸지 못하도록 잠그기")}
+          title={locked ? "AI 제약 해제" : "AI가 바꾸지 못하도록 잠그기"}
           onClick={() =>
             onPatch({
               lockedFields: locked
@@ -224,12 +222,14 @@ function CharacterFieldEditor({ entry, meta, onPatch }: CharacterFieldEditorProp
                 : [...entry.lockedFields, meta.field],
             })
           }
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "en", "inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg border px-2 text-[0.68rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(locked
+          className={`inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg border px-2 text-[0.68rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+            locked
               ? "border-accent/45 bg-accent-soft text-accent hover:bg-accent-soft/70"
-              : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg") })}
+              : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+          }`}
         >
           {locked ? <Lock size={12} aria-hidden /> : <LockOpen size={12} aria-hidden />}
-          {locked ? translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "잠김") : translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "잠금")}
+          {locked ? "잠김" : "잠금"}
         </button>
       </div>
 
@@ -240,12 +240,13 @@ function CharacterFieldEditor({ entry, meta, onPatch }: CharacterFieldEditorProp
           key={`${entry.id}:${meta.field}`}
           rows={meta.kind === "list" ? 2 : 3}
           {...sharedProps}
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "en", "{v0} resize-y"), { v0: String(CONTROL_CLASS) })}
+          className={`${CONTROL_CLASS} resize-y`}
         />
       )}
       {meta.kind === "list" && (
         <p id={hintId} className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "쉼표 또는 줄바꿈으로 구분 · 최대 ")}{STUDIO_CHARACTER_BIBLE_MAX_LIST_ITEMS}{translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "개")}</p>
+          쉼표 또는 줄바꿈으로 구분 · 최대 {STUDIO_CHARACTER_BIBLE_MAX_LIST_ITEMS}개
+        </p>
       )}
     </div>
   );
@@ -350,16 +351,19 @@ export function StudioCharacterBiblePanel({
           </span>
           <div className="min-w-0 flex-1">
             <h2 id="studio-character-bible-title" className="text-base font-bold tracking-tight text-fg">
-              {translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "캐릭터 바이블")}</h2>
+              캐릭터 바이블
+            </h2>
             <p className="mt-0.5 max-w-[70ch] text-xs leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "외형·말투·관계를 한곳에 정리해 컷과 장면 사이의 캐릭터 일관성을 지킵니다.")}</p>
+              외형·말투·관계를 한곳에 정리해 컷과 장면 사이의 캐릭터 일관성을 지킵니다.
+            </p>
           </div>
           <span className="hidden rounded-full border border-line bg-card px-2.5 py-1 text-[0.68rem] tabular-nums text-fg-3 sm:inline-flex">
-            {bible.characters.length}/{STUDIO_CHARACTER_BIBLE_MAX_CHARACTERS}{translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "명")}</span>
+            {bible.characters.length}/{STUDIO_CHARACTER_BIBLE_MAX_CHARACTERS}명
+          </span>
           <button
             type="button"
             onClick={onClose}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "캐릭터 바이블 닫기")}
+            aria-label="캐릭터 바이블 닫기"
             className="grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <X size={15} aria-hidden />
@@ -376,9 +380,10 @@ export function StudioCharacterBiblePanel({
           <aside className="flex max-h-48 shrink-0 flex-col border-b border-line bg-card/35 md:max-h-none md:min-h-0 md:border-b-0 md:border-r">
             <div className="flex shrink-0 items-center gap-2 px-3 py-3">
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "등장인물")}</p>
+                <p className="text-xs font-semibold text-fg-2">등장인물</p>
                 <p className="mt-0.5 text-[0.65rem] tabular-nums text-fg-3">
-                  {bible.characters.length}{translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "명 · 선택해 편집")}</p>
+                  {bible.characters.length}명 · 선택해 편집
+                </p>
               </div>
               <button
                 type="button"
@@ -386,7 +391,8 @@ export function StudioCharacterBiblePanel({
                 disabled={bible.characters.length >= STUDIO_CHARACTER_BIBLE_MAX_CHARACTERS}
                 className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
               >
-                <Plus size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "추가")}</button>
+                <Plus size={14} aria-hidden /> 추가
+              </button>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
@@ -394,11 +400,11 @@ export function StudioCharacterBiblePanel({
                 <div className="grid min-h-28 place-items-center rounded-xl border border-dashed border-line px-3 text-center">
                   <div>
                     <UserRound size={20} className="mx-auto text-fg-3" aria-hidden />
-                    <p className="mt-1.5 text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "등장인물을 먼저 추가하세요")}</p>
+                    <p className="mt-1.5 text-xs font-semibold text-fg-2">등장인물을 먼저 추가하세요</p>
                   </div>
                 </div>
               ) : (
-                <ol className="space-y-1" aria-label={translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "캐릭터 목록")}>
+                <ol className="space-y-1" aria-label="캐릭터 목록">
                   {bible.characters.map((character, index) => {
                     const selected = character.id === selectedCharacter?.id;
                     return (
@@ -409,29 +415,33 @@ export function StudioCharacterBiblePanel({
                             setRequestedCharacterId(character.id);
                             setError(null);
                           }}
-                          aria-current={selected ? translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "en", "true") : undefined}
-                          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "en", "flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(selected
+                          aria-current={selected ? "true" : undefined}
+                          className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                            selected
                               ? "border-accent/45 bg-accent-soft/20"
-                              : "border-transparent text-fg-2 hover:border-line hover:bg-raised") })}
+                              : "border-transparent text-fg-2 hover:border-line hover:bg-raised"
+                          }`}
                         >
                           <span
-                            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "en", "grid size-7 shrink-0 place-items-center rounded-lg text-[0.65rem] font-bold tabular-nums {v0}"), { v0: String(selected ? "bg-accent text-on-accent" : "bg-raised text-fg-3") })}
+                            className={`grid size-7 shrink-0 place-items-center rounded-lg text-[0.65rem] font-bold tabular-nums ${
+                              selected ? "bg-accent text-on-accent" : "bg-raised text-fg-3"
+                            }`}
                             aria-hidden
                           >
                             {String(index + 1).padStart(2, "0")}
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-xs font-semibold text-fg">
-                              {character.name || translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "이름 없는 캐릭터")}
+                              {character.name || "이름 없는 캐릭터"}
                             </span>
                             <span className="mt-0.5 block truncate text-[0.65rem] text-fg-3">
-                              {character.role || translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "역할 미정")}
+                              {character.role || "역할 미정"}
                             </span>
                           </span>
                           {character.lockedFields.length > 0 && (
                             <span
                               className="inline-flex shrink-0 items-center gap-0.5 text-[0.6rem] tabular-nums text-accent"
-                              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "{v0}개 필드 잠김"), { v0: String(character.lockedFields.length) })}
+                              aria-label={`${character.lockedFields.length}개 필드 잠김`}
                             >
                               <Lock size={10} aria-hidden /> {character.lockedFields.length}
                             </span>
@@ -452,15 +462,17 @@ export function StudioCharacterBiblePanel({
                   <span className="mx-auto grid size-12 place-items-center rounded-2xl border border-line bg-card text-fg-3">
                     <BookOpenText size={22} aria-hidden />
                   </span>
-                  <h3 className="mt-3 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "처음 등장하는 순간부터 설정을 고정하세요")}</h3>
+                  <h3 className="mt-3 text-sm font-bold text-fg">처음 등장하는 순간부터 설정을 고정하세요</h3>
                   <p className="mt-1.5 text-xs leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "인물을 추가한 뒤 외형·말투·관계를 기록하세요. AI 생성 전 잠근 항목은 변경 금지 조건으로 사용됩니다.")}</p>
+                    인물을 추가한 뒤 외형·말투·관계를 기록하세요. AI 생성 전 잠근 항목은 변경 금지 조건으로 사용됩니다.
+                  </p>
                   <button
                     type="button"
                     onClick={addCharacter}
                     className="mt-4 inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
-                    <Plus size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "첫 캐릭터 만들기")}</button>
+                    <Plus size={14} aria-hidden /> 첫 캐릭터 만들기
+                  </button>
                 </div>
               </div>
             ) : (
@@ -469,21 +481,22 @@ export function StudioCharacterBiblePanel({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="truncate text-base font-bold text-fg">
-                        {selectedCharacter.name || translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "이름 없는 캐릭터")}
+                        {selectedCharacter.name || "이름 없는 캐릭터"}
                       </h3>
                       <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.65rem] tabular-nums text-fg-3">
-                        {translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "잠금 ")}{lockedCount}/9
+                        잠금 {lockedCount}/9
                       </span>
                     </div>
                     <p className="mt-1 text-xs leading-relaxed text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "변경 내용을 입력하는 즉시 현재 문서에 반영합니다.")}</p>
+                      변경 내용을 입력하는 즉시 현재 문서에 반영합니다.
+                    </p>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => moveCharacter(selectedIndex - 1)}
                       disabled={selectedIndex <= 0}
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "{v0} 위로 이동"), { v0: String(selectedCharacter.name || "캐릭터") })}
+                      aria-label={`${selectedCharacter.name || "캐릭터"} 위로 이동`}
                       className="grid size-9 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35"
                     >
                       <ChevronUp size={15} aria-hidden />
@@ -492,7 +505,7 @@ export function StudioCharacterBiblePanel({
                       type="button"
                       onClick={() => moveCharacter(selectedIndex + 1)}
                       disabled={selectedIndex < 0 || selectedIndex >= bible.characters.length - 1}
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "{v0} 아래로 이동"), { v0: String(selectedCharacter.name || "캐릭터") })}
+                      aria-label={`${selectedCharacter.name || "캐릭터"} 아래로 이동`}
                       className="grid size-9 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35"
                     >
                       <ChevronDown size={15} aria-hidden />
@@ -500,7 +513,7 @@ export function StudioCharacterBiblePanel({
                     <button
                       type="button"
                       onClick={deleteCharacter}
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "{v0} 삭제"), { v0: String(selectedCharacter.name || "캐릭터") })}
+                      aria-label={`${selectedCharacter.name || "캐릭터"} 삭제`}
                       className="grid size-9 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:border-bad/45 hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bad"
                     >
                       <Trash2 size={14} aria-hidden />
@@ -511,15 +524,16 @@ export function StudioCharacterBiblePanel({
                 <p className="my-4 flex items-start gap-2 rounded-lg border border-accent/30 bg-accent-soft/10 px-3 py-2.5 text-xs leading-relaxed text-fg-2">
                   <Lock size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
                   <span>
-                    <strong className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "잠근 항목은 AI 제약으로 전달됩니다.")}</strong>{" "}
-                    {translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "캐릭터 설정이 확정된 항목만 잠그면 시나리오와 이미지 생성에서 임의 변경을 줄일 수 있어요.")}</span>
+                    <strong className="font-semibold text-fg">잠근 항목은 AI 제약으로 전달됩니다.</strong>{" "}
+                    캐릭터 설정이 확정된 항목만 잠그면 시나리오와 이미지 생성에서 임의 변경을 줄일 수 있어요.
+                  </span>
                 </p>
 
                 <div key={selectedCharacter.id}>
                   {FIELD_GROUPS.map((group) => (
-                    <section key={group.title} className="mt-5 first:mt-0" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "en", "character-bible-{v0}"), { v0: String(group.title) })}>
+                    <section key={group.title} className="mt-5 first:mt-0" aria-labelledby={`character-bible-${group.title}`}>
                       <div className="mb-1">
-                        <h4 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "en", "character-bible-{v0}"), { v0: String(group.title) })} className="text-sm font-bold text-fg">
+                        <h4 id={`character-bible-${group.title}`} className="text-sm font-bold text-fg">
                           {group.title}
                         </h4>
                         <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">{group.description}</p>
@@ -543,8 +557,8 @@ export function StudioCharacterBiblePanel({
         </div>
 
         <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-line px-4 py-2 text-[0.65rem] leading-relaxed text-fg-3 sm:px-5">
-          <span>{translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "바이블은 현재 작품 문서와 함께 저장됩니다.")}</span>
-          <span className="hidden sm:inline">{translateCurrentStaticSourceText("domains.creator.StudioCharacterBiblePanel", "ko", "Esc로 닫기")}</span>
+          <span>바이블은 현재 작품 문서와 함께 저장됩니다.</span>
+          <span className="hidden sm:inline">Esc로 닫기</span>
         </footer>
       </div>
     </div>

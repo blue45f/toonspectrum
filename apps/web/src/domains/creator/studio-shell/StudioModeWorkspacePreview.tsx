@@ -1,9 +1,4 @@
 import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Box,
   Clapperboard,
   Image as ImageIcon,
@@ -59,7 +54,7 @@ export function StudioModeWorkspacePreview({
   compact = false,
 }: {
   readonly profile: StudioModeProfile;
-  readonly locale: string;
+  readonly locale: "ko" | "en";
   readonly compact?: boolean;
 }) {
   const Icon = SHELL_ICON[profile.shell];
@@ -78,9 +73,10 @@ export function StudioModeWorkspacePreview({
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-[0.62rem] font-black uppercase tracking-[0.16em] text-accent">
             <Icon size={13} aria-hidden="true" />
-            {studioModeLabel(profile, locale)} {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioModeWorkspacePreview", "en", "workspace")}</p>
-          <p className="mt-1 text-sm font-black text-fg">{translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioModeWorkspacePreview", profile.headline)}</p>
-          {!compact ? <p className="mt-1 text-xs leading-5 text-fg-3">{translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioModeWorkspacePreview", profile.description)}</p> : null}
+            {studioModeLabel(profile, locale)} workspace
+          </p>
+          <p className="mt-1 text-sm font-black text-fg">{profile.headline[locale]}</p>
+          {!compact ? <p className="mt-1 text-xs leading-5 text-fg-3">{profile.description[locale]}</p> : null}
         </div>
         <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
           <Sparkles size={14} aria-hidden="true" />
@@ -137,18 +133,18 @@ export function StudioModeWorkspacePreview({
       {!compact ? (
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <div>
-            <p className="text-[0.6rem] font-black uppercase tracking-wide text-fg-3">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioModeWorkspacePreview", "제작 흐름", "Workflow")}</p>
+            <p className="text-[0.6rem] font-black uppercase tracking-wide text-fg-3">{locale === "ko" ? "제작 흐름" : "Workflow"}</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {profile.workflow.map((item, index) => (
                 <span key={item.id} className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] font-semibold text-fg-2">
-                  {index + 1}. {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioModeWorkspacePreview", item.label)}
+                  {index + 1}. {item.label[locale]}
                 </span>
               ))}
             </div>
           </div>
           <div>
-            <p className="text-[0.6rem] font-black uppercase tracking-wide text-fg-3">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioModeWorkspacePreview", "주요 도구", "Key tools")}</p>
-            <p className="mt-1.5 text-xs leading-5 text-fg-2">{profile.keyTools.map((tool) => translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioModeWorkspacePreview", tool)).join(" · ")}</p>
+            <p className="text-[0.6rem] font-black uppercase tracking-wide text-fg-3">{locale === "ko" ? "주요 도구" : "Key tools"}</p>
+            <p className="mt-1.5 text-xs leading-5 text-fg-2">{profile.keyTools.map((tool) => tool[locale]).join(" · ")}</p>
           </div>
           <div>
             <p className="text-[0.6rem] font-black uppercase tracking-wide text-fg-3">AI</p>

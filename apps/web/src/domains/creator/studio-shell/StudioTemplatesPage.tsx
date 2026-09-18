@@ -1,10 +1,4 @@
 import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   CheckCircle2,
   Heart,
@@ -119,7 +113,7 @@ function TemplatePreview({
               : "border-line bg-panel text-fg-3 hover:text-fg",
           )}
         >
-          <Heart size={18} fill={favorite ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioTemplatesPage", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioTemplatesPage", "en", "none")} aria-hidden="true" />
+          <Heart size={18} fill={favorite ? "currentColor" : "none"} aria-hidden="true" />
         </button>
       </div>
 
@@ -200,7 +194,7 @@ function TemplatePreview({
       )}>
         <CheckCircle2
           size={18}
-          className={statusReady ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioTemplatesPage", "en", "mt-0.5 shrink-0 text-success") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioTemplatesPage", "en", "mt-0.5 shrink-0 text-warning")}
+          className={statusReady ? "mt-0.5 shrink-0 text-success" : "mt-0.5 shrink-0 text-warning"}
           aria-hidden="true"
         />
         <div>
@@ -275,7 +269,8 @@ export function StudioTemplatesPage() {
       <Container size="wide" className="py-8 sm:py-12">
         <header className="max-w-4xl">
           <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">
-            <Sparkles size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioTemplatesPage", "en", "TOONSTUDIO TEMPLATES")}</p>
+            <Sparkles size={15} aria-hidden="true" /> TOONSTUDIO TEMPLATES
+          </p>
           <h1 className="mt-3 text-3xl font-black tracking-tight text-fg sm:text-5xl">
             {bt("무엇을 만들지만 고르세요", "Choose what you want to make")}
           </h1>
@@ -381,7 +376,7 @@ export function StudioTemplatesPage() {
                           aria-label={bt("즐겨찾기 전환", "Toggle favorite")}
                           className="grid size-9 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-panel hover:text-accent"
                         >
-                          <Heart size={15} fill={favorite ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioTemplatesPage", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioTemplatesPage", "en", "none")} aria-hidden="true" />
+                          <Heart size={15} fill={favorite ? "currentColor" : "none"} aria-hidden="true" />
                         </button>
                       </div>
                       <p className="mt-2 line-clamp-3 text-xs leading-5 text-fg-2">

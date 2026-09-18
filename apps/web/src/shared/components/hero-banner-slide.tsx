@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight } from "lucide-react";
 
 import { AvailabilityDots } from "./availability";
@@ -24,7 +20,7 @@ export function HeroBannerSlide({ title }: { title: Title }) {
   const isRestricted = title.ageRating === "19";
 
   return (
-    <Link href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.hero.banner.slide", "en", "/title/{v0}"), { v0: String(title.slug) })} className="group/slide relative block">
+    <Link href={`/title/${title.slug}`} className="group/slide relative block">
       <div className="absolute inset-0" aria-hidden>
         {title.coverImage && !isRestricted ? (
           // Ken Burns — 배경 표지가 14s 왕복으로 느리게 확대·팬(시네마틱 호흡). 캐러셀 래퍼가
@@ -62,7 +58,7 @@ export function HeroBannerSlide({ title }: { title: Title }) {
           </div>
           <p className="truncate text-xs text-fg-2">
             {title.author}
-            {title.artist && title.artist !== title.author ? formatI18nTemplate(translateCurrentStaticSourceText("shared.components.hero.banner.slide", "ko", " · 그림 {v0}"), { v0: String(title.artist) }) : ""}
+            {title.artist && title.artist !== title.author ? ` · 그림 ${title.artist}` : ""}
           </p>
           <RatingInline
             value={title.stats.ratingAvg}
@@ -78,9 +74,11 @@ export function HeroBannerSlide({ title }: { title: Title }) {
             <AvailabilityDots availability={title.availability} max={4} />
             <span className="numeral text-[0.72rem] text-fg-2 tnum">
               {statsAreEstimated(title) && <span aria-hidden>≈</span>}
-              {formatCount(title.stats.views)} {translateCurrentStaticSourceText("shared.components.hero.banner.slide", "ko", "조회")}</span>
+              {formatCount(title.stats.views)} 조회
+            </span>
             <span className="ml-auto inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-[0.78rem] font-semibold text-on-accent transition-transform duration-150 ease-out-expo group-hover/slide:translate-x-0.5">
-              {translateCurrentStaticSourceText("shared.components.hero.banner.slide", "ko", "보러가기")}<ArrowRight size={14} />
+              보러가기
+              <ArrowRight size={14} />
             </span>
           </div>
         </div>

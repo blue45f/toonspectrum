@@ -1,8 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { CheckCircle2, Palette, RotateCcw, Save, Type } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -143,7 +138,8 @@ export function StudioSeriesKitPanel({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            <Palette size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSeriesKitPanel", "en", "SERIES KIT")}</p>
+            <Palette size={14} aria-hidden="true" /> SERIES KIT
+          </p>
           <h2 id="series-kit-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
             {bt("작품 전체의 스타일을 한곳에서", "One style system for the whole project")}
           </h2>
@@ -188,20 +184,20 @@ export function StudioSeriesKitPanel({
                 <div className="flex items-center gap-3">
                   <input
                     type="color"
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSeriesKitPanel", "en", "{v0} color"), { v0: String(color.label) })}
+                    aria-label={`${color.label} color`}
                     value={color.value.slice(0, 7)}
                     onChange={(event) => updateColor(color.id, { value: event.target.value })}
                     className="size-11 shrink-0 cursor-pointer rounded-lg border border-line bg-transparent p-1"
                   />
                   <div className="min-w-0 flex-1">
                     <input
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSeriesKitPanel", "en", "{v0} label"), { v0: String(color.id) })}
+                      aria-label={`${color.id} label`}
                       value={color.label}
                       onChange={(event) => updateColor(color.id, { label: event.target.value })}
                       className="w-full border-0 bg-transparent text-sm font-bold text-fg outline-none"
                     />
                     <input
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSeriesKitPanel", "en", "{v0} hex"), { v0: String(color.label) })}
+                      aria-label={`${color.label} hex`}
                       value={color.value}
                       onChange={(event) => updateColor(color.id, { value: event.target.value })}
                       className="mt-1 w-full border-0 bg-transparent font-mono text-xs text-fg-3 outline-none"
@@ -222,7 +218,7 @@ export function StudioSeriesKitPanel({
                   <label className="text-[0.65rem] font-bold text-fg-3">{style.label}</label>
                   <input
                     value={style.fontId}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSeriesKitPanel", "en", "{v0} font"), { v0: String(style.label) })}
+                    aria-label={`${style.label} font`}
                     onChange={(event) => updateTextStyle(style.id, { fontId: event.target.value })}
                     className="mt-1 min-h-10 w-full rounded-lg border border-line bg-panel px-2 text-xs text-fg"
                   />

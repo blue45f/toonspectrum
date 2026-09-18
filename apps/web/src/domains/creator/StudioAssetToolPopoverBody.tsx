@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Bookmark,
   Clapperboard,
   Folder,
@@ -192,11 +188,11 @@ export function StudioAssetToolPopoverBody({
     <>
               <StudioMenuPopoverHeader
                 icon={Folder}
-                title={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "템플릿 · 에셋")}
-                description={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "컷 템플릿·콜라주·요소·장면·클립·효과·내 에셋을 한 메뉴에서 고릅니다.")}
+                title="템플릿 · 에셋"
+                description="컷 템플릿·콜라주·요소·장면·클립·효과·내 에셋을 한 메뉴에서 고릅니다."
               />
               <StudioMenuSubtabs
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "에셋 메뉴 구역")}
+                aria-label="에셋 메뉴 구역"
                 activeId={menu}
                 onSelect={(id) => {
                   if (id === "asset") preloadStudioAssetMenuPanel();
@@ -215,9 +211,11 @@ export function StudioAssetToolPopoverBody({
               />
               {menu === "template" && (
                 <div className="grid gap-1.5 lg:max-h-80 lg:overflow-y-auto lg:pr-1">
-                  <p className="px-1 text-[0.66rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "캔버스 템플릿")}</p>
+                  <p className="px-1 text-[0.66rem] font-medium text-fg-3">캔버스 템플릿</p>
                   <p className="rounded-xl border border-line bg-card/75 px-2.5 py-2 text-[0.62rem] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "캔버스 전체를 바꾸는 템플릿은 ")}<strong className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "클릭·탭으로 적용")}</strong>{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "합니다. 위치를 고르는 도형·말풍선·에셋은 각 라이브러리에서 끌어 놓을 수 있어요.")}</p>
+                    캔버스 전체를 바꾸는 템플릿은 <strong className="font-semibold text-fg-2">클릭·탭으로 적용</strong>합니다.
+                    위치를 고르는 도형·말풍선·에셋은 각 라이브러리에서 끌어 놓을 수 있어요.
+                  </p>
                   {TEMPLATE_GROUPS.map((group) => (
                     <div key={group.group} className="grid gap-1">
                       <p className="px-1 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{group.group}</p>
@@ -236,9 +234,9 @@ export function StudioAssetToolPopoverBody({
                   ))}
                   {/* 코미Po!식 정형 컷 레이아웃 — 프레임(+말풍선)을 한 번에 배치 */}
                   <div className="grid gap-1 border-t border-line pt-1.5">
-                    <p className="px-1 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "컷 템플릿 · 정형 레이아웃")}</p>
+                    <p className="px-1 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">컷 템플릿 · 정형 레이아웃</p>
                     {panelLayoutsLoading && panelLayoutPresets.length === 0 && (
-                      <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "컷 레이아웃을 불러오는 중...")}</p>
+                      <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">컷 레이아웃을 불러오는 중...</p>
                     )}
                     {panelLayoutsError && (
                       <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{panelLayoutsError}</p>
@@ -258,7 +256,7 @@ export function StudioAssetToolPopoverBody({
                 </div>
               )}
               {menu === "collage" && (
-                <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "콜라주 패널을 여는 중...")} />}>
+                <Suspense fallback={<StudioPanelLoading label="콜라주 패널을 여는 중..." />}>
                   <StudioCollagePanel
                     canvasW={CANVAS_W}
                     availableImages={elements
@@ -273,7 +271,7 @@ export function StudioAssetToolPopoverBody({
                 </Suspense>
               )}
               {menu === "elements" && (
-                <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "요소 패널을 여는 중...")} />}>
+                <Suspense fallback={<StudioPanelLoading label="요소 패널을 여는 중..." />}>
                   <StudioElementsPanel
                     onAdd={(item) => {
                       addCatalogElement(item);
@@ -294,16 +292,17 @@ export function StudioAssetToolPopoverBody({
               )}
               {menu === "emeres" && (
                 <>
-                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "이메레스 · 스케치 밑그림 틀")}</p>
+                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">이메레스 · 스케치 밑그림 틀</p>
                   <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "선택한 틀이 반투명·잠금 밑그림으로 깔리고 펜 모드로 바뀌어요. 그 위에 따라 그린 뒤, 레이어 패널에서 밑그림을 숨기거나 지우세요.")}</p>
+                    선택한 틀이 반투명·잠금 밑그림으로 깔리고 펜 모드로 바뀌어요. 그 위에 따라 그린 뒤, 레이어 패널에서 밑그림을 숨기거나 지우세요.
+                  </p>
                   {emeresUnderlayCount > 0 && (
                     <button
                       type="button"
                       onClick={removeEmeresUnderlays}
                       className="mb-2 flex w-full items-center justify-center gap-1 rounded-lg border border-bad/40 py-1 text-[0.64rem] font-semibold text-bad transition-colors hover:bg-bad/10"
                     >
-                      <Trash2 size={11} /> {translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "밑그림 전부 지우기 (")}{emeresUnderlayCount})
+                      <Trash2 size={11} /> 밑그림 전부 지우기 ({emeresUnderlayCount})
                     </button>
                   )}
                   <div className="mb-2 flex rounded-lg border border-line bg-card p-0.5">
@@ -318,7 +317,7 @@ export function StudioAssetToolPopoverBody({
                           emeresTab === tab ? "bg-accent text-white" : "text-fg-3 hover:bg-raised"
                         )}
                       >
-                        {tab === "catalog" ? translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "기본 틀") : translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "내가 만든 틀")}
+                        {tab === "catalog" ? "기본 틀" : "내가 만든 틀"}
                       </button>
                     ))}
                   </div>
@@ -328,18 +327,19 @@ export function StudioAssetToolPopoverBody({
                         <div id="emeres-similar-strip" className="mb-2 rounded-lg border border-accent/30 bg-accent/5 p-2">
                           <div className="mb-1 flex items-center justify-between gap-2">
                             <p className="truncate text-[0.66rem] font-semibold text-fg-2">
-                              {translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "en", "&ldquo;")}{emeresSimilarAnchor.label}{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "&rdquo;과(와) 비슷한 스타일")}</p>
+                              &ldquo;{emeresSimilarAnchor.label}&rdquo;과(와) 비슷한 스타일
+                            </p>
                             <button
                               type="button"
                               onClick={() => setEmeresSimilarAnchorId(null)}
-                              aria-label={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "비슷한 스타일 닫기")}
+                              aria-label="비슷한 스타일 닫기"
                               className="shrink-0 p-0.5 text-fg-3 hover:text-fg-2"
                             >
                               <X size={12} />
                             </button>
                           </div>
                           {emeresSimilarSiblings.length === 0 ? (
-                            <p className="text-[0.64rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "같은 카테고리의 다른 틀이 없어요.")}</p>
+                            <p className="text-[0.64rem] text-fg-3">같은 카테고리의 다른 틀이 없어요.</p>
                           ) : (
                             <div className="flex gap-1.5 overflow-x-auto pb-1">
                               {emeresSimilarSiblings.map((sib) => (
@@ -364,7 +364,7 @@ export function StudioAssetToolPopoverBody({
                         <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
                         <input
                           type="text"
-                          placeholder={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "이메레스 검색...")}
+                          placeholder="이메레스 검색..."
                           value={emeresSearchQuery}
                           onChange={(e) => setEmeresSearchQuery(e.target.value)}
                           className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
@@ -373,7 +373,7 @@ export function StudioAssetToolPopoverBody({
                           <button
                             type="button"
                             onClick={() => setEmeresSearchQuery("")}
-                            aria-label={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "검색어 지우기")} className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
+                            aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
                           >
                             <X size={12} />
                           </button>
@@ -392,22 +392,22 @@ export function StudioAssetToolPopoverBody({
                                 emeresCategoryFilter === category ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
                               )}
                             >
-                              {category === "all" ? translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "전체") : category}
+                              {category === "all" ? "전체" : category}
                             </button>
                           ))}
                         </div>
                       )}
                       <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
                         {studioEmeresAssetsLoading && !studioEmeresAssetsLoaded && (
-                          <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "이메레스 틀을 불러오는 중...")}</p>
+                          <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">이메레스 틀을 불러오는 중...</p>
                         )}
                         {studioEmeresAssetsError && (
                           <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{studioEmeresAssetsError}</p>
                         )}
                         {studioOptionalAssets.emeresSections.length > 0 && emeresSectionsFiltered.length === 0 && (
                           <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-                            <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "검색 결과가 없습니다.")}</p>
-                            <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "다른 검색어로 찾아보세요.")}</p>
+                            <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
+                            <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
                           </div>
                         )}
                         {emeresSectionsFiltered.map((section) => (
@@ -432,7 +432,8 @@ export function StudioAssetToolPopoverBody({
                                       aria-controls="emeres-similar-strip"
                                       className="mt-0.5 block w-full truncate text-center text-[0.6rem] font-medium text-accent hover:underline"
                                     >
-                                      {translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "비슷한 스타일 더보기")}</button>
+                                      비슷한 스타일 더보기
+                                    </button>
                                   )}
                                 </div>
                               ))}
@@ -442,21 +443,21 @@ export function StudioAssetToolPopoverBody({
                       </div>
                     </>
                   ) : (
-                    <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "내가 만든 틀을 여는 중...")} />}>
+                    <Suspense fallback={<StudioPanelLoading label="내가 만든 틀을 여는 중..." />}>
                       <StudioEmeresLibraryPanel onPickItem={addEmeresLibraryItem} />
                     </Suspense>
                   )}
                 </>
               )}
               {menu === "scene" && (
-                <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "장면 템플릿을 여는 중…")} />}>
+                <Suspense fallback={<StudioPanelLoading label="장면 템플릿을 여는 중…" />}>
                   <StudioSceneTemplateBrowser templates={sceneTemplates.templates} categories={sceneTemplates.categories}
                     loading={sceneTemplatesLoading} error={sceneTemplatesError} onAdd={addSceneTemplate} />
                 </Suspense>
               )}
               {menu === "clip" && (
                 <>
-                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "재사용 클립 보관함")}</p>
+                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">재사용 클립 보관함</p>
                   <button
                     type="button"
                     onClick={() => void saveSelectionAsClip()}
@@ -465,12 +466,14 @@ export function StudioAssetToolPopoverBody({
                       "mb-2 w-full rounded-lg py-1.5 text-xs font-semibold transition-colors",
                       selected ? "bg-accent text-on-accent hover:opacity-90" : "cursor-not-allowed bg-card text-fg-3"
                     )}
-                    title={selected ? translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "선택한 요소(그룹)를 클립으로 저장") : translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "먼저 캔버스에서 요소를 선택하세요")}
+                    title={selected ? "선택한 요소(그룹)를 클립으로 저장" : "먼저 캔버스에서 요소를 선택하세요"}
                   >
-                    {translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "+ 선택을 클립으로 저장")}</button>
+                    + 선택을 클립으로 저장
+                  </button>
                   {clips.length === 0 ? (
                     <p className="rounded-lg border border-dashed border-line px-2 py-4 text-center text-[0.66rem] leading-relaxed text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "저장된 클립이 없어요. 포즈 캐릭터나 말풍선 세트를 저장해 다른 컷·회차에서 재사용하세요.")}</p>
+                      저장된 클립이 없어요. 포즈 캐릭터나 말풍선 세트를 저장해 다른 컷·회차에서 재사용하세요.
+                    </p>
                   ) : (
                     <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
                       {clips.map((c) => (
@@ -479,15 +482,15 @@ export function StudioAssetToolPopoverBody({
                             type="button"
                             onClick={() => insertClip(c)}
                             className="min-w-0 flex-1 truncate text-left text-xs font-medium text-fg transition-colors hover:text-accent"
-                            title={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "이 클립을 캔버스에 넣기")}
+                            title="이 클립을 캔버스에 넣기"
                           >
                             {c.name}
-                            <span className="ml-1 text-[0.66rem] text-fg-3">{(c.els as unknown[]).length}{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "개")}</span>
+                            <span className="ml-1 text-[0.66rem] text-fg-3">{(c.els as unknown[]).length}개</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => void deleteClip(c.id)}
-                            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "{v0} 클립 삭제"), { v0: String(c.name) })}
+                            aria-label={`${c.name} 클립 삭제`}
                             className="shrink-0 text-fg-3 transition-colors hover:text-bad"
                           >
                             <X size={12} />
@@ -507,14 +510,15 @@ export function StudioAssetToolPopoverBody({
                   >
                     <span className="inline-flex items-center gap-1.5 font-semibold text-fg">
                       <Shapes size={13} className="text-accent" aria-hidden />
-                      {translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "도형 · 프레임 · 배지 요소")}</span>
-                    <span className="text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "요소 탭 →")}</span>
+                      도형 · 프레임 · 배지 요소
+                    </span>
+                    <span className="text-[0.62rem] text-fg-3">요소 탭 →</span>
                   </button>
                   <div className="relative mb-2">
                     <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
                     <input
                       type="text"
-                      placeholder={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "효과 검색...")}
+                      placeholder="효과 검색..."
                       value={fxSearchQuery}
                       onChange={(e) => setFxSearchQuery(e.target.value)}
                       className="min-h-11 w-full rounded-lg border border-line bg-card py-1 pl-8 pr-11 text-xs placeholder:text-fg-3 outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/40"
@@ -523,7 +527,7 @@ export function StudioAssetToolPopoverBody({
                       <button
                         type="button"
                         onClick={() => setFxSearchQuery("")}
-                        aria-label={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "검색어 지우기")} className="absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg-2"
+                        aria-label="검색어 지우기" className="absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg-2"
                       >
                         <X size={12} />
                       </button>
@@ -546,7 +550,7 @@ export function StudioAssetToolPopoverBody({
                     ))}
                   </div>
                   {fxSectionVisible("raster") && fxRasterFiltered.length > 0 && (
-                    <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "장면 소품을 여는 중...")} />}>
+                    <Suspense fallback={<StudioPanelLoading label="장면 소품을 여는 중..." />}>
                       <StudioRasterAssetGrid
                         assets={fxRasterFiltered}
                         busyId={builtinRasterBusyId}
@@ -559,14 +563,14 @@ export function StudioAssetToolPopoverBody({
                     </Suspense>
                   )}
                   {sfxLoading && !sfxPacks && fxSectionVisible("sfx") && (
-                    <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "효과음을 불러오는 중...")}</p>
+                    <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">효과음을 불러오는 중...</p>
                   )}
                   {sfxError && fxSectionVisible("sfx") && (
                     <p className="mb-2 rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{sfxError}</p>
                   )}
                   {fxSectionVisible("sfx") && fxSfxFiltered.length > 0 && (
                     <>
-                      <p className="mb-1 text-[0.66rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "효과음")}</p>
+                      <p className="mb-1 text-[0.66rem] font-medium text-fg-3">효과음</p>
                       <div className="mb-2 flex flex-wrap gap-1">
                         {fxSfxFiltered.map((s) => (
                           <button
@@ -584,7 +588,7 @@ export function StudioAssetToolPopoverBody({
                   )}
                   {fxSectionVisible("emoji") && fxEmojisFiltered.length > 0 && (
                     <>
-                      <p className="mb-1 text-[0.66rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "이모지")}</p>
+                      <p className="mb-1 text-[0.66rem] font-medium text-fg-3">이모지</p>
                       <div className="grid grid-cols-8 gap-1 mb-2">
                         {fxEmojisFiltered.map((em) => (
                           <button
@@ -598,7 +602,7 @@ export function StudioAssetToolPopoverBody({
                                 emoji: em,
                               });
                             }}
-                            title={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "클릭해 추가하거나 캔버스로 끌어다 원하는 위치에 놓으세요")}
+                            title="클릭해 추가하거나 캔버스로 끌어다 원하는 위치에 놓으세요"
                             className="grid size-9 place-items-center rounded-md text-lg hover:bg-raised pointer-coarse:size-11"
                           >
                             {em}
@@ -608,27 +612,27 @@ export function StudioAssetToolPopoverBody({
                     </>
                   )}
                   {studioStickerAssetsLoading && !studioStickerAssetsLoaded && (
-                    <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "스티커 에셋을 불러오는 중...")}</p>
+                    <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">스티커 에셋을 불러오는 중...</p>
                   )}
                   {studioStickerAssetsError && (
                     <p className="mb-2 rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">
                       {studioStickerAssetsError}
                     </p>
                   )}
-                  <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "스티커 패널을 여는 중...")} />}>
+                  <Suspense fallback={<StudioPanelLoading label="스티커 패널을 여는 중..." />}>
                     {fxSectionVisible("comic") && fxComicFiltered.length > 0 && (
-                      <StudioStickerGrid title={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "만화 스티커")} items={fxComicFiltered} onAdd={addFxOverlay} />
+                      <StudioStickerGrid title="만화 스티커" items={fxComicFiltered} onAdd={addFxOverlay} />
                     )}
                     {fxSectionVisible("creature") && fxCreatureFiltered.length > 0 && (
-                      <StudioStickerGrid title={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "동물·캐릭터")} items={fxCreatureFiltered} onAdd={addFxOverlay} />
+                      <StudioStickerGrid title="동물·캐릭터" items={fxCreatureFiltered} onAdd={addFxOverlay} />
                     )}
                     {fxSectionVisible("prop") && fxPropFiltered.length > 0 && (
-                      <StudioStickerGrid title={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "소품·오브젝트")} items={fxPropFiltered} onAdd={addFxOverlay} />
+                      <StudioStickerGrid title="소품·오브젝트" items={fxPropFiltered} onAdd={addFxOverlay} />
                     )}
                   </Suspense>
                   {fxSectionVisible("lines") && fxLinePresetsFiltered.length > 0 && (
                     <>
-                      <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "만화 선 효과")}</p>
+                      <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 선 효과</p>
                       <div className="grid grid-cols-2 gap-2 mb-2">
                         {fxLinePresetsFiltered.map((preset) => (
                           <button
@@ -650,7 +654,7 @@ export function StudioAssetToolPopoverBody({
                   )}
                   {fxSectionVisible("overlay") && fxOverlaysFiltered.length > 0 && (
                     <>
-                      <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "만화 특수 효과")}</p>
+                      <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 특수 효과</p>
                       <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto pr-1">
                         {fxOverlaysFiltered.map((fx) => (
                           <button
@@ -671,14 +675,14 @@ export function StudioAssetToolPopoverBody({
                   )}
                   {!fxPickerHasResults && fxQuery !== "" && (
                     <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-                      <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "검색 결과가 없습니다.")}</p>
-                      <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">{translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "다른 검색어로 찾아보세요.")}</p>
+                      <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
+                      <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
                     </div>
                   )}
                 </>
               )}
               {menu === "asset" && (
-                <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverBody", "ko", "에셋 보관함을 여는 중...")} />}>
+                <Suspense fallback={<StudioPanelLoading label="에셋 보관함을 여는 중..." />}>
                   <StudioAssetMenuPanel
                     assetTab={assetTab}
                     setAssetTab={setAssetTab}

@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { MoreHorizontal } from "lucide-react";
 import { useState, type ReactNode, type RefObject, type SyntheticEvent } from "react";
 
@@ -63,8 +59,8 @@ export function StudioDrawingPaletteFloatingSurface({
     <StudioFloatingSurface
       ref={surfaceRef}
       id={popupId}
-      surfaceId={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteFloatingSurface", "en", "drawing-palette:{v0}"), { v0: String(id) })}
-      label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteFloatingSurface", "ko", "{v0} 팝업"), { v0: String(label) })}
+      surfaceId={`drawing-palette:${id}`}
+      label={`${label} 팝업`}
       layout={layout}
       defaultLayout={DEFAULT_STUDIO_DRAWING_PALETTE_FLOATING_LAYOUTS[id]}
       minWidth={280}
@@ -85,8 +81,8 @@ export function StudioDrawingPaletteFloatingSurface({
           aria-expanded={optionsOpen}
           aria-controls={optionsId}
           onClick={onToggleOptions}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteFloatingSurface", "ko", "{v0} 팔레트 옵션"), { v0: String(label) })}
-          title={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteFloatingSurface", "ko", "위치·높이·창 배치 옵션")}
+          aria-label={`${label} 팔레트 옵션`}
+          title="위치·높이·창 배치 옵션"
           className={cn(
             "grid size-10 place-items-center text-fg-2 hover:bg-card hover:text-fg",
             optionsOpen && "bg-accent-soft text-accent",
@@ -109,7 +105,7 @@ export function StudioDrawingPaletteFloatingSurface({
         <div
           id={optionsId}
           role="menu"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteFloatingSurface", "ko", "{v0} 팔레트 옵션"), { v0: String(label) })}
+          aria-label={`${label} 팔레트 옵션`}
           className="shrink-0 border-b border-line bg-card/55"
         >
           {options}

@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio QuickShape Panel — 프리핸드→도형 자동 스냅.
  * 심리 설계: "대충 그려도 된다" 안심 카피 + 부드러운 상태 피드백 + warm-ink 카드.
@@ -48,7 +45,7 @@ export function StudioQuickShapePanel({
   return (
     <div
       data-studio-smart-shape="true"
-      data-studio-smart-shape-active={active ? translateCurrentStaticSourceText("domains.creator.StudioQuickShapePanel", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioQuickShapePanel", "en", "false")}
+      data-studio-smart-shape-active={active ? "true" : "false"}
       className={cn(
         "relative overflow-hidden rounded-2xl border transition-[border-color,box-shadow,background] duration-200 ease-out",
         active
@@ -112,7 +109,7 @@ export function StudioQuickShapePanel({
           >
             <span className="inline-flex items-center gap-1">
               <Sparkles className="size-3.5" aria-hidden />
-              <span className="text-[0.65rem] font-semibold">{active ? translateCurrentStaticSourceText("domains.creator.StudioQuickShapePanel", "en", "ON") : translateCurrentStaticSourceText("domains.creator.StudioQuickShapePanel", "en", "OFF")}</span>
+              <span className="text-[0.65rem] font-semibold">{active ? "ON" : "OFF"}</span>
             </span>
           </StudioToggleChip>
         </div>
@@ -165,7 +162,8 @@ export function StudioQuickShapePanel({
         ) : null}
         {onCorrectCurrentStroke ? <button type="button" onClick={onCorrectCurrentStroke}
           className="min-h-11 w-full rounded-xl border border-accent/40 bg-accent-soft px-3 py-2 text-sm font-semibold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
-          {translateCurrentStaticSourceText("domains.creator.StudioQuickShapePanel", "ko", "현재 스트로크 교정…")}</button> : null}
+          현재 스트로크 교정…
+        </button> : null}
         {onOpenTutorial ? (
           <button
             type="button"

@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -53,11 +52,13 @@ export function LiveAutoRefresh({ onRefresh, loading = false }: LiveAutoRefreshP
           <button
             key={sec}
             onClick={() => setIntervalSec(sec)}
-            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.LiveAutoRefresh", "en", "px-2 py-0.5 rounded-md font-semibold transition-all {v0}"), { v0: String(intervalSec === sec
+            className={`px-2 py-0.5 rounded-md font-semibold transition-all ${
+              intervalSec === sec
                 ? "bg-indigo-600 text-white shadow-sm"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800") })}
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+            }`}
           >
-            {sec === 0 ? translateCurrentStaticSourceText("domains.admin.components.LiveAutoRefresh", "en", "Off") : t("admin.refresh.seconds").replace("{sec}", String(sec))}
+            {sec === 0 ? "Off" : t("admin.refresh.seconds").replace("{sec}", String(sec))}
           </button>
         ))}
       </div>

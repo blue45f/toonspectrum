@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Histogram Graph
  * 레벨/톤 커브 패널 위에 놓이는 256칸 히스토그램 — StudioHistogramGraph는 상태 없는 순수
@@ -88,7 +84,8 @@ export function StudioHistogramGraph({
           className
         )}
       >
-        {translateCurrentStaticSourceText("domains.creator.StudioHistogramGraph", "ko", "히스토그램 데이터 없음")}</div>
+        히스토그램 데이터 없음
+      </div>
     );
   }
 
@@ -158,21 +155,22 @@ export function StudioHistogramSection({ source, channel }: StudioHistogramSecti
   return (
     <div className="space-y-1" data-studio-histogram-section="true">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.6rem] font-semibold text-fg-4">{translateCurrentStaticSourceText("domains.creator.StudioHistogramGraph", "ko", "히스토그램 (")}{CHANNEL_KOREAN[histogramChannel]})</p>
+        <p className="text-[0.6rem] font-semibold text-fg-4">히스토그램 ({CHANNEL_KOREAN[histogramChannel]})</p>
         <StudioToggleChip
           active={logScale}
           onClick={() => setLogScale((prev) => !prev)}
-          title={translateCurrentStaticSourceText("domains.creator.StudioHistogramGraph", "ko", "세로축을 로그 스케일로 바꿔 빈도가 낮은 톤 구간도 보이게 합니다.")}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioHistogramGraph", "ko", "히스토그램 로그 스케일")}
+          title="세로축을 로그 스케일로 바꿔 빈도가 낮은 톤 구간도 보이게 합니다."
+          aria-label="히스토그램 로그 스케일"
         >
-          {translateCurrentStaticSourceText("domains.creator.StudioHistogramGraph", "ko", "로그")}</StudioToggleChip>
+          로그
+        </StudioToggleChip>
       </div>
       <StudioHistogramGraph histogram={histogram} channel={histogramChannel} logScale={logScale} />
       {histogram && histogram.sampledPixels > 0 ? (
         <p className="text-[0.6rem] tabular-nums text-fg-4">
-          {translateCurrentStaticSourceText("domains.creator.StudioHistogramGraph", "ko", "평균 ")}{histogram.mean.toFixed(1)} {translateCurrentStaticSourceText("domains.creator.StudioHistogramGraph", "ko", "· 중앙값 ")}{histogram.median}
-          {histogram.clippedLow > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHistogramGraph", "ko", " · 0 잘림 {v0}"), { v0: String(histogram.clippedLow) }) : ""}
-          {histogram.clippedHigh > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHistogramGraph", "ko", " · 255 잘림 {v0}"), { v0: String(histogram.clippedHigh) }) : ""}
+          평균 {histogram.mean.toFixed(1)} · 중앙값 {histogram.median}
+          {histogram.clippedLow > 0 ? ` · 0 잘림 ${histogram.clippedLow}` : ""}
+          {histogram.clippedHigh > 0 ? ` · 255 잘림 ${histogram.clippedHigh}` : ""}
         </p>
       ) : null}
     </div>

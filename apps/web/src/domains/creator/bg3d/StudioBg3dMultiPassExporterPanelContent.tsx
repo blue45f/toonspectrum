@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   CheckSquare,
   Cpu,
   Download,
@@ -83,25 +79,28 @@ export function StudioBg3dMultiPassExporterPanel({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2">
         <div className="flex items-center gap-1.5 font-bold text-fg">
           <Layers className="size-4 text-accent" />
-          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "멀티패스 레이어 자동 분리 내보내기")}</span>
+          <span>멀티패스 레이어 자동 분리 내보내기</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="rounded bg-accent/15 px-1.5 py-0.5 font-mono text-[0.62rem] font-semibold text-accent">
-            {planned.totalPasses}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "개 패스")}</span>
+            {planned.totalPasses}개 패스
+          </span>
           <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-[0.58rem] text-fg-3">
             {planned.captureProfile.toUpperCase()}
           </span>
         </div>
       </div>
 
-      <section className="grid gap-2 rounded-lg border border-line bg-card p-2.5" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "멀티패스 빠른 프리셋")}>
+      <section className="grid gap-2 rounded-lg border border-line bg-card p-2.5" aria-label="멀티패스 빠른 프리셋">
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-1 text-[0.68rem] font-bold text-fg-2">
             <Sparkles className="size-3.5 text-accent" />
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "작업 목적 프리셋")}</span>
+            작업 목적 프리셋
+          </span>
           {activePreset === "custom" ? (
             <span className="rounded bg-raised px-1.5 py-0.5 text-[0.55rem] font-semibold text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "사용자 설정")}</span>
+              사용자 설정
+            </span>
           ) : null}
         </div>
         <div className="grid grid-cols-4 gap-1">
@@ -111,9 +110,11 @@ export function StudioBg3dMultiPassExporterPanel({
               type="button"
               disabled={disabled}
               onClick={() => applyPreset(preset)}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "en", "min-h-8 rounded border px-1.5 text-[0.6rem] font-bold transition-colors disabled:opacity-45 {v0}"), { v0: String(activePreset === preset
+              className={`min-h-8 rounded border px-1.5 text-[0.6rem] font-bold transition-colors disabled:opacity-45 ${
+                activePreset === preset
                   ? "border-accent bg-accent text-accent-fg"
-                  : "border-line bg-raised text-fg-2 hover:text-fg") })}
+                  : "border-line bg-raised text-fg-2 hover:text-fg"
+              }`}
             >
               {PRESET_LABELS[preset]}
             </button>
@@ -121,8 +122,8 @@ export function StudioBg3dMultiPassExporterPanel({
         </div>
       </section>
 
-      <section className="flex flex-col gap-1.5" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "추출할 웹툰 렌더 패스 선택")}>
-        <span className="text-[0.68rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "추출할 웹툰 렌더 패스 선택")}</span>
+      <section className="flex flex-col gap-1.5" aria-label="추출할 웹툰 렌더 패스 선택">
+        <span className="text-[0.68rem] font-medium text-fg-3">추출할 웹툰 렌더 패스 선택</span>
         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
           {WEBTOON_RENDER_PASSES.map((pass) => {
             const configKey = MULTIPASS_CONFIG_KEY_BY_KIND[pass.kind];
@@ -134,9 +135,11 @@ export function StudioBg3dMultiPassExporterPanel({
                 disabled={disabled}
                 aria-pressed={isChecked}
                 onClick={() => togglePass(configKey)}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "en", "flex min-h-16 items-start gap-2 rounded-lg border p-2 text-left transition-all disabled:opacity-45 {v0}"), { v0: String(isChecked
+                className={`flex min-h-16 items-start gap-2 rounded-lg border p-2 text-left transition-all disabled:opacity-45 ${
+                  isChecked
                     ? "border-accent/80 bg-accent/5 text-fg"
-                    : "border-line bg-card text-fg-3 opacity-65 hover:opacity-100") })}
+                    : "border-line bg-card text-fg-3 opacity-65 hover:opacity-100"
+                }`}
               >
                 {isChecked ? (
                   <CheckSquare className="mt-0.5 size-4 shrink-0 text-accent" />
@@ -149,10 +152,12 @@ export function StudioBg3dMultiPassExporterPanel({
                     <span className="rounded bg-raised px-1 py-0.5 font-mono text-[0.5rem] text-fg-2">
                       {pass.blendMode.toUpperCase()}
                     </span>
-                    <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "en", "rounded px-1 py-0.5 font-mono text-[0.5rem] {v0}"), { v0: String(pass.source === "artifact-v2"
+                    <span className={`rounded px-1 py-0.5 font-mono text-[0.5rem] ${
+                      pass.source === "artifact-v2"
                         ? "bg-cool/10 text-cool"
-                        : "bg-accent/10 text-accent") })}>
-                      {pass.source === "artifact-v2" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "en", "ARTIFACT V2") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "en", "LT")}
+                        : "bg-accent/10 text-accent"
+                    }`}>
+                      {pass.source === "artifact-v2" ? "ARTIFACT V2" : "LT"}
                     </span>
                   </span>
                   <span className="mt-0.5 block text-[0.57rem] leading-relaxed text-fg-3">
@@ -160,7 +165,7 @@ export function StudioBg3dMultiPassExporterPanel({
                   </span>
                   <span className="mt-1 flex gap-2 font-mono text-[0.5rem] text-fg-3">
                     <span>{pass.pixelFormat}</span>
-                    <span>{pass.bytesPerPixel}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "en", "B/px")}</span>
+                    <span>{pass.bytesPerPixel}B/px</span>
                     <span>{ROLE_LABELS[pass.productionRole]}</span>
                   </span>
                 </span>
@@ -170,9 +175,9 @@ export function StudioBg3dMultiPassExporterPanel({
         </div>
       </section>
 
-      <section className="grid gap-2 rounded-lg border border-line bg-card p-2.5" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "멀티패스 내보내기 규격")}>
+      <section className="grid gap-2 rounded-lg border border-line bg-card p-2.5" aria-label="멀티패스 내보내기 규격">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "해상도")}</span>
+          <span className="text-[0.68rem] font-semibold text-fg-2">해상도</span>
           <div className="flex flex-wrap gap-1">
             {[
               { label: "세로 원고", width: 1440, height: 2560 },
@@ -188,9 +193,11 @@ export function StudioBg3dMultiPassExporterPanel({
                   resolutionWidth: resolution.width,
                   resolutionHeight: resolution.height,
                 }))}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "en", "min-h-7 rounded px-1.5 text-[0.58rem] font-bold disabled:opacity-45 {v0}"), { v0: String(config.resolutionWidth === resolution.width && config.resolutionHeight === resolution.height
+                className={`min-h-7 rounded px-1.5 text-[0.58rem] font-bold disabled:opacity-45 ${
+                  config.resolutionWidth === resolution.width && config.resolutionHeight === resolution.height
                     ? "bg-accent text-accent-fg"
-                    : "border border-line bg-raised text-fg-2 hover:text-fg") })}
+                    : "border border-line bg-raised text-fg-2 hover:text-fg"
+                }`}
               >
                 {resolution.label}
               </button>
@@ -199,7 +206,8 @@ export function StudioBg3dMultiPassExporterPanel({
         </div>
         <div className="grid grid-cols-2 gap-2">
           <label className="text-[0.58rem] font-semibold text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "너비 px")}<input
+            너비 px
+            <input
               type="number"
               min="1"
               max="16384"
@@ -213,7 +221,8 @@ export function StudioBg3dMultiPassExporterPanel({
             />
           </label>
           <label className="text-[0.58rem] font-semibold text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "높이 px")}<input
+            높이 px
+            <input
               type="number"
               min="1"
               max="16384"
@@ -240,7 +249,8 @@ export function StudioBg3dMultiPassExporterPanel({
               }))}
               className="size-3.5 accent-accent"
             />
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "투명 배경")}</label>
+            투명 배경
+          </label>
           <div className="flex gap-1">
             {(["png-zip", "psd", "clip-studio-layers"] as const).map((format) => (
               <button
@@ -248,32 +258,35 @@ export function StudioBg3dMultiPassExporterPanel({
                 type="button"
                 disabled={disabled}
                 onClick={() => setConfig((current) => ({ ...current, format }))}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "en", "min-h-7 rounded px-1.5 font-mono text-[0.58rem] uppercase disabled:opacity-45 {v0}"), { v0: String(config.format === format
+                className={`min-h-7 rounded px-1.5 font-mono text-[0.58rem] uppercase disabled:opacity-45 ${
+                  config.format === format
                     ? "bg-accent font-bold text-accent-fg"
-                    : "border border-line bg-raised text-fg-2 hover:text-fg") })}
+                    : "border border-line bg-raised text-fg-2 hover:text-fg"
+                }`}
               >
-                {format === "png-zip" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "en", "ZIP(PNG)") : format === "psd" ? "PSD" : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "en", "CLIP")}
+                {format === "png-zip" ? "ZIP(PNG)" : format === "psd" ? "PSD" : "CLIP"}
               </button>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="grid gap-1 rounded-lg border border-line bg-raised/60 p-2.5" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "멀티패스 예산")}>
+      <section className="grid gap-1 rounded-lg border border-line bg-raised/60 p-2.5" aria-label="멀티패스 예산">
         <div className="flex items-center justify-between gap-2 text-[0.62rem]">
           <span className="flex items-center gap-1 font-semibold text-fg-2">
             <Cpu className="size-3.5 text-accent" />
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "실행 계획")}</span>
+            실행 계획
+          </span>
           <span className="font-mono text-fg-3">
-            {planned.recommendedExecution === "worker" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "Worker 순차 렌더") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "즉시 렌더 가능")}
+            {planned.recommendedExecution === "worker" ? "Worker 순차 렌더" : "즉시 렌더 가능"}
           </span>
         </div>
         <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[0.58rem] text-fg-3">
-          <dt>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "예상 다운로드")}</dt>
+          <dt>예상 다운로드</dt>
           <dd className="numeral text-right text-fg-2">~{planned.estimatedFileSizeMb}MB</dd>
-          <dt>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "예상 작업 메모리")}</dt>
+          <dt>예상 작업 메모리</dt>
           <dd className="numeral text-right text-fg-2">~{planned.estimatedWorkingSetMb}MB</dd>
-          <dt>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "출력 규격")}</dt>
+          <dt>출력 규격</dt>
           <dd className="numeral text-right text-fg-2">{planned.exportResolution[0]} × {planned.exportResolution[1]}</dd>
         </dl>
         {planned.warnings.map((warning) => (
@@ -291,7 +304,7 @@ export function StudioBg3dMultiPassExporterPanel({
         className="flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.68rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90 disabled:opacity-45"
       >
         <Download className="size-3.5" />
-        <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMultiPassExporterPanelContent", "ko", "레이어별 패스 렌더링 & 다운로드 시작")}</span>
+        <span>레이어별 패스 렌더링 & 다운로드 시작</span>
       </button>
     </div>
   );

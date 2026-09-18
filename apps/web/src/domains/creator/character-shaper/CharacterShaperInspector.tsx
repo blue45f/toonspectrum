@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Character Shaper — the precision inspector for the active slot.
  *
@@ -274,7 +270,7 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
   /* ---------------------------------------------------------------------- */
 
   const renderFaceShape = () => (
-    <Section title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "얼굴 비율")} hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "두상·볼·턱을 직접 조절합니다. 카드 프리셋 위에 그대로 얹힙니다.")}>
+    <Section title="얼굴 비율" hint="두상·볼·턱을 직접 조절합니다. 카드 프리셋 위에 그대로 얹힙니다.">
       {FACE_KEYS.map((key) => {
         const limit = AVATAR_FORGE_FACE_LIMITS[key];
         return (
@@ -297,8 +293,8 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
 
   const renderMorphs = (ids: readonly AvatarForgeSemanticFaceMorphId[]) => (
     <Section
-      title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "{v0} 세부 조절"), { v0: String(meta.label) })}
-      hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "모델이 가진 셰이프키(또는 적응형 얼굴 메시)를 직접 씁니다. −1은 줄이기, +1은 키우기입니다.")}
+      title={`${meta.label} 세부 조절`}
+      hint="모델이 가진 셰이프키(또는 적응형 얼굴 메시)를 직접 씁니다. −1은 줄이기, +1은 키우기입니다."
     >
       {ids.map((id) => {
         const supported = binding.profile.semanticMorphs?.[id] != null;
@@ -336,10 +332,10 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
       .filter((swatch, index, list) => swatch.color !== "" && list.findIndex((item) => item.color === swatch.color) === index)
       .slice(0, 8);
     return (
-      <Section title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "눈동자 색")} hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "텍스처를 유지한 채 홍채 메시만 물들입니다. 비우면 모델 원본 색으로 돌아갑니다.")}>
-        {binding.profile.irisTintable ? null : <Note tone="warn">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "이 모델에서는 홍채 메시를 찾지 못해 색을 바꿀 수 없습니다.")}</Note>}
+      <Section title="눈동자 색" hint="텍스처를 유지한 채 홍채 메시만 물들입니다. 비우면 모델 원본 색으로 돌아갑니다.">
+        {binding.profile.irisTintable ? null : <Note tone="warn">이 모델에서는 홍채 메시를 찾지 못해 색을 바꿀 수 없습니다.</Note>}
         <CharacterColorControl
-          label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "눈동자 색")}
+          label="눈동자 색"
           value={binding.recipe.colors.iris}
           swatches={swatches}
           allowClear
@@ -363,9 +359,9 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
     const originalHairCount = binding.profile.originalHairMeshCount ?? 0;
     return (
       <>
-        <Section title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "앞머리")} hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "스타일과 따로 조합합니다.")}>
+        <Section title="앞머리" hint="스타일과 따로 조합합니다.">
           <CharacterChipGroup
-            label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "앞머리 형태")}
+            label="앞머리 형태"
             value={binding.snapshot.hairBangStyle ?? hair.bangStyle}
             disabled={locked}
             columns={3}
@@ -377,9 +373,9 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
             onSelect={(id) => binding.commitHairParams({ bangStyle: id }, `헤어: 앞머리 ${id}`)}
           />
         </Section>
-        <Section title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "헤어 팔레트")}>
+        <Section title="헤어 팔레트">
           <CharacterChipGroup
-            label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "헤어 팔레트")}
+            label="헤어 팔레트"
             value={activePalette?.id ?? null}
             disabled={locked}
             columns={2}
@@ -398,7 +394,7 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
             }}
           />
           <CharacterColorControl
-            label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "헤어 기본색")}
+            label="헤어 기본색"
             value={baseColor}
             disabled={locked}
             onCommit={(color) => {
@@ -407,7 +403,7 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
             }}
           />
           <CharacterColorControl
-            label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "모발 끝 색")}
+            label="모발 끝 색"
             value={tipColor}
             disabled={locked}
             onCommit={(color) => {
@@ -416,7 +412,7 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
             }}
           />
         </Section>
-        <Section title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "헤어 형태")}>
+        <Section title="헤어 형태">
           {HAIR_KEYS.map((key) => {
             const limit = AVATAR_FORGE_HAIR_LIMITS[key];
             const value = typeof hair[key] === "number" ? hair[key] : DEFAULT_AVATAR_FORGE_STATE.hair[key];
@@ -436,11 +432,11 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
             );
           })}
           <ToggleRow
-            label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "원본 헤어 감추기")}
+            label="원본 헤어 감추기"
             hint={
               originalHairCount > 0
-                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "모델이 가진 헤어 메시 {v0}개를 숨기고 절차형 헤어만 남깁니다."), { v0: String(originalHairCount) })
-                : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "이 모델에는 감출 원본 헤어 메시가 없습니다.")
+                ? `모델이 가진 헤어 메시 ${originalHairCount}개를 숨기고 절차형 헤어만 남깁니다.`
+                : "이 모델에는 감출 원본 헤어 메시가 없습니다."
             }
             checked={Boolean(replaceOriginal)}
             disabled={locked || originalHairCount === 0}
@@ -461,9 +457,9 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
     const disabled = locked || proportionBusy;
     return (
       <>
-        <Section title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "실루엣 프리셋")} hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "두신 비율은 그대로 두고 어깨·몸통·팔·다리만 바꿉니다.")}>
+        <Section title="실루엣 프리셋" hint="두신 비율은 그대로 두고 어깨·몸통·팔·다리만 바꿉니다.">
           <CharacterChipGroup
-            label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "실루엣 프리셋")}
+            label="실루엣 프리셋"
             value={binding.snapshot.bodyPresetId ?? forgeState?.bodyPresetId ?? null}
             disabled={disabled}
             columns={2}
@@ -479,8 +475,8 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
             }}
           />
         </Section>
-        <Section title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "비율 정밀 조절")} hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "관절 간격을 직접 옮깁니다. 두신 수는 머리 크기 배수로 정해집니다.")}>
-          {proportionBusy ? <Note tone="warn">{proportionMessage || translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "체형 리그를 적용하는 중입니다.")}</Note> : null}
+        <Section title="비율 정밀 조절" hint="관절 간격을 직접 옮깁니다. 두신 수는 머리 크기 배수로 정해집니다.">
+          {proportionBusy ? <Note tone="warn">{proportionMessage || "체형 리그를 적용하는 중입니다."}</Note> : null}
           {STUDIO_VRM_PROPORTION_KEYS.map((key: StudioVrmProportionKey) => {
             const limit = STUDIO_VRM_PROPORTION_LIMITS[key];
             return (
@@ -507,7 +503,7 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
             );
           })}
         </Section>
-        <Section title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "정밀 제작")} hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "Blender 파이프라인으로 만든 캐릭터 패키지를 이 셰이퍼로 가져옵니다.")}>
+        <Section title="정밀 제작" hint="Blender 파이프라인으로 만든 캐릭터 패키지를 이 셰이퍼로 가져옵니다.">
           <CharacterShaperBlenderPackage h={h} disabled={locked} />
         </Section>
       </>
@@ -529,15 +525,15 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
     );
     return (
       <>
-        <Section title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "입힌 옷")} hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "셰이퍼가 입힌 옷의 색과 품을 조절합니다.")}>
+        <Section title="입힌 옷" hint="셰이퍼가 입힌 옷의 색과 품을 조절합니다.">
           {equipped.length === 0 ? (
-            <Note>{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "아직 이 슬롯에 입힌 옷이 없습니다. 왼쪽 카드에서 하나 골라 보세요.")}</Note>
+            <Note>아직 이 슬롯에 입힌 옷이 없습니다. 왼쪽 카드에서 하나 골라 보세요.</Note>
           ) : (
             equipped.map(({ wardrobeSlot, equip }) => (
               <div key={wardrobeSlot} className="space-y-2">
                 <p className="text-[0.66rem] font-bold text-fg-3">{WARDROBE_SLOT_LABELS[wardrobeSlot]}</p>
                 <CharacterColorControl
-                  label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "{v0} 색"), { v0: String(WARDROBE_SLOT_LABELS[wardrobeSlot]) })}
+                  label={`${WARDROBE_SLOT_LABELS[wardrobeSlot]} 색`}
                   value={equip.color ?? null}
                   disabled={locked}
                   onCommit={(color) => {
@@ -547,8 +543,8 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
                 />
                 {typeof equip.fit === "number" ? (
                   <CharacterRangeControl
-                    label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "{v0} 품"), { v0: String(WARDROBE_SLOT_LABELS[wardrobeSlot]) })}
-                    hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "몸에 붙게(작게) 또는 헐렁하게(크게)")}
+                    label={`${WARDROBE_SLOT_LABELS[wardrobeSlot]} 품`}
+                    hint="몸에 붙게(작게) 또는 헐렁하게(크게)"
                     value={equip.fit}
                     min={WARDROBE_FIT_MIN}
                     max={WARDROBE_FIT_MAX}
@@ -563,20 +559,20 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
             ))
           )}
         </Section>
-        <Section title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "모델 원본 의상")} hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "모델이 원래 입고 있던 메시를 켜고 끄거나 색을 덮습니다.")}>
+        <Section title="모델 원본 의상" hint="모델이 원래 입고 있던 메시를 켜고 끄거나 색을 덮습니다.">
           {meshes.length === 0 ? (
-            <Note>{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "이 모델에는 이 부위로 분류된 원본 의상 메시가 없습니다.")}</Note>
+            <Note>이 모델에는 이 부위로 분류된 원본 의상 메시가 없습니다.</Note>
           ) : (
             <>
               {presentCostumeSlots.map((costumeSlot) => (
-                <div key={costumeSlot} role="group" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "{v0} 색 덮기"), { v0: String(COSTUME_SLOT_LABELS[costumeSlot]) })} className="flex flex-wrap items-center gap-1">
+                <div key={costumeSlot} role="group" aria-label={`${COSTUME_SLOT_LABELS[costumeSlot]} 색 덮기`} className="flex flex-wrap items-center gap-1">
                   <span className="mr-1 text-[0.66rem] font-bold text-fg-3">{COSTUME_SLOT_LABELS[costumeSlot]}</span>
                   {COSTUME_PALETTES.slice(0, 6).map((palette) => (
                     <button
                       key={palette.id}
                       type="button"
                       disabled={locked}
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "{v0} {v1}으로 덮기"), { v0: String(COSTUME_SLOT_LABELS[costumeSlot]), v1: String(palette.label) })}
+                      aria-label={`${COSTUME_SLOT_LABELS[costumeSlot]} ${palette.label}으로 덮기`}
                       title={`${palette.label} ${palette.color.toUpperCase()}`}
                       onClick={() => h.recolorCostumeSlot(costumeSlot, palette.color)}
                       className={cn(SWATCH_TONE, STUDIO_FOCUS_RING, "disabled:cursor-not-allowed disabled:opacity-45")}
@@ -599,7 +595,7 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
                         type="button"
                         aria-pressed={!hidden}
                         disabled={locked}
-                        title={hidden ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "{v0} 다시 표시"), { v0: String(entry.label) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "{v0} 숨기기"), { v0: String(entry.label) })}
+                        title={hidden ? `${entry.label} 다시 표시` : `${entry.label} 숨기기`}
                         onClick={() => h.toggleCostumeMesh(entry.key)}
                         className={cn(
                           "flex w-full min-h-11 items-center gap-2 rounded-xl border px-2.5 text-left text-[0.7rem] font-semibold",
@@ -612,7 +608,7 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
                       >
                         {hidden ? <EyeOff size={14} aria-hidden /> : <Eye size={14} aria-hidden />}
                         <span className="min-w-0 flex-1 truncate">{entry.label}</span>
-                        <span className="shrink-0 text-[0.62rem] font-bold">{hidden ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "숨김") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "표시")}</span>
+                        <span className="shrink-0 text-[0.62rem] font-bold">{hidden ? "숨김" : "표시"}</span>
                       </button>
                     </li>
                   );
@@ -628,9 +624,9 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
   const renderAccessory = () => {
     const items: readonly PropInstance[] = Array.isArray(h.vrmPropItems) ? h.vrmPropItems : [];
     return (
-      <Section title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "장착한 액세서리")} hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "여러 개를 함께 달 수 있습니다. 카드로 추가하고 여기서 다듬습니다.")}>
+      <Section title="장착한 액세서리" hint="여러 개를 함께 달 수 있습니다. 카드로 추가하고 여기서 다듬습니다.">
         {items.length === 0 ? (
-          <Note>{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "아직 장착한 액세서리가 없습니다.")}</Note>
+          <Note>아직 장착한 액세서리가 없습니다.</Note>
         ) : (
           items.map((item) => {
             const label = propDefById(item.propId)?.label ?? item.propId;
@@ -642,8 +638,8 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
                   <button
                     type="button"
                     disabled={locked}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "{v0} 빼기"), { v0: String(label) })}
-                    title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "{v0} 빼기"), { v0: String(label) })}
+                    aria-label={`${label} 빼기`}
+                    title={`${label} 빼기`}
                     onClick={() => h.removeVrmProp(item.uid)}
                     className={cn(
                       "grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-panel text-fg-3",
@@ -656,7 +652,7 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
                 </div>
                 {typeof scale === "number" ? (
                   <CharacterRangeControl
-                    label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "{v0} 크기"), { v0: String(label) })}
+                    label={`${label} 크기`}
                     value={scale}
                     min={0.2}
                     max={4}
@@ -673,7 +669,7 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
                 ) : null}
                 {item.color !== null ? (
                   <CharacterColorControl
-                    label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "{v0} 색"), { v0: String(label) })}
+                    label={`${label} 색`}
                     value={item.color}
                     disabled={locked}
                     onCommit={(color) => {
@@ -699,9 +695,9 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
     const active = named.filter((action) => (weights[action.name as string] ?? 0) > 0);
     const shown = active.length > 0 ? active : named.slice(0, 6);
     return (
-      <Section title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "표정 세기")} hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "지금 켜진 표정의 강도를 하나씩 조절합니다.")}>
+      <Section title="표정 세기" hint="지금 켜진 표정의 강도를 하나씩 조절합니다.">
         {shown.length === 0 ? (
-          <Note>{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "이 모델에는 조절할 수 있는 표정이 없습니다.")}</Note>
+          <Note>이 모델에는 조절할 수 있는 표정이 없습니다.</Note>
         ) : (
           shown.map((action) => {
             const name = action.name as string;
@@ -731,20 +727,24 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
     const bodyRotation = typeof h.bodyRotation === "number" ? h.bodyRotation : 0;
     const degrees = Math.round((bodyRotation * 180) / Math.PI);
     return (
-      <Section title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "포즈 다듬기")} hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "좌우 반전, 초기화, 몸 방향, 그리고 현재 포즈 저장.")}>
+      <Section title="포즈 다듬기" hint="좌우 반전, 초기화, 몸 방향, 그리고 현재 포즈 저장.">
         <div className="grid grid-cols-2 gap-1.5">
           <button type="button" className={ROW_BUTTON} disabled={locked} onClick={() => h.handleMirrorPose("all")}>
-            {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "좌우 반전")}</button>
+            좌우 반전
+          </button>
           <button type="button" className={ROW_BUTTON} disabled={locked} onClick={() => h.handleResetActivePose()}>
             <RotateCcw size={13} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "포즈 초기화")}</button>
+            포즈 초기화
+          </button>
           <button type="button" className={ROW_BUTTON} disabled={locked} onClick={() => h.handleMirrorPose("arms")}>
-            {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "팔만 반전")}</button>
+            팔만 반전
+          </button>
           <button type="button" className={ROW_BUTTON} disabled={locked} onClick={() => h.handleMirrorPose("legs")}>
-            {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "다리만 반전")}</button>
+            다리만 반전
+          </button>
         </div>
         <label className="flex items-center gap-2 rounded-xl border border-line/80 bg-card/70 p-2.5 text-[0.72rem] font-bold text-fg-2">
-          <span className="w-16 shrink-0">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "몸 방향")}</span>
+          <span className="w-16 shrink-0">몸 방향</span>
           <input
             type="range"
             min="-180"
@@ -752,8 +752,8 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
             step="1"
             value={degrees}
             disabled={locked}
-            aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "몸 방향")}
-            aria-valuetext={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "{v0}도"), { v0: String(degrees) })}
+            aria-label="몸 방향"
+            aria-valuetext={`${degrees}도`}
             className="h-11 min-w-0 flex-1 accent-accent disabled:cursor-not-allowed disabled:opacity-45"
             onChange={h.handleBodyRotationChange}
           />
@@ -761,7 +761,8 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
         </label>
         <button type="button" className={cn(ROW_BUTTON, "w-full")} disabled={locked} onClick={() => h.handleSavePose()}>
           <Check size={13} aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "현재 포즈 저장")}</button>
+          현재 포즈 저장
+        </button>
       </Section>
     );
   };
@@ -773,9 +774,9 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
     const sideLabel = (side: "left" | "right") => (side === "left" ? "왼손" : "오른손");
     return (
       <>
-        <Section title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "어느 손에 적용할지")} hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "카드로 고른 손 모양이 이 선택을 따릅니다.")}>
+        <Section title="어느 손에 적용할지" hint="카드로 고른 손 모양이 이 선택을 따릅니다.">
           <CharacterChipGroup
-            label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "적용할 손")}
+            label="적용할 손"
             value={binding.handSide}
             disabled={locked}
             columns={3}
@@ -784,13 +785,13 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
           />
         </Section>
         <Section
-          title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "손가락 말아쥐기")}
-          hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "다섯 손가락을 함께 굽히거나, 아래에서 손가락 하나씩 따로 굽힙니다.")}
+          title="손가락 말아쥐기"
+          hint="다섯 손가락을 함께 굽히거나, 아래에서 손가락 하나씩 따로 굽힙니다."
         >
           {sides.map((side) => (
             <CharacterRangeControl
               key={side}
-              label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "{v0} 전체 굽힘"), { v0: String(sideLabel(side)) })}
+              label={`${sideLabel(side)} 전체 굽힘`}
               value={readStudioVrmFingerCurlDegrees(fingerEdits, side, "index")}
               min={0}
               max={60}
@@ -804,9 +805,9 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
         </Section>
         {sides.map((side) => (
           <Section
-            key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "en", "fingers-{v0}"), { v0: String(side) })}
-            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "{v0} 손가락 하나씩"), { v0: String(sideLabel(side)) })}
-            hint={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "검지만 펴는 손짓처럼 손가락마다 각도가 달라야 하는 포즈를 만듭니다.")}
+            key={`fingers-${side}`}
+            title={`${sideLabel(side)} 손가락 하나씩`}
+            hint="검지만 펴는 손짓처럼 손가락마다 각도가 달라야 하는 포즈를 만듭니다."
             collapsible
             defaultOpen={false}
           >
@@ -933,7 +934,7 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
           {onClose ? (
             <button
               type="button"
-              aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "정밀 조절 닫기")}
+              aria-label="정밀 조절 닫기"
               onClick={onClose}
               className={cn(
                 "grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2",
@@ -970,7 +971,8 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
           </div>
         ) : (
           <p className="mt-2.5 rounded-xl border border-dashed border-line bg-card/50 px-2.5 py-3 text-[0.66rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "카드에 마우스를 올리거나 하나 선택하면 여기에서 크게 볼 수 있습니다.")}</p>
+            카드에 마우스를 올리거나 하나 선택하면 여기에서 크게 볼 수 있습니다.
+          </p>
         )}
         {busyReason ? (
           <p role="status" className="mt-2 text-[0.64rem] font-semibold leading-relaxed text-warn">
@@ -984,18 +986,18 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
           renderSection()
         ) : (
           <div className="px-3 py-3">
-            <Note>{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "모델을 불러오면 이 슬롯의 정밀 조절이 열립니다.")}</Note>
+            <Note>모델을 불러오면 이 슬롯의 정밀 조절이 열립니다.</Note>
           </div>
         )}
 
-        <section className="border-t border-line/60 px-3 py-3" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "이 모델에서 되는 것")}>
-          <h3 className="text-[0.78rem] font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "이 모델에서 되는 것")}</h3>
+        <section className="border-t border-line/60 px-3 py-3" aria-label="이 모델에서 되는 것">
+          <h3 className="text-[0.78rem] font-bold text-fg">이 모델에서 되는 것</h3>
           <dl className="mt-2 space-y-1">
             {capabilityLines.map((line) => (
               <div key={line.label} className="flex items-start justify-between gap-2 text-[0.66rem] leading-relaxed">
                 <dt className="shrink-0 font-semibold text-fg-2">{line.label}</dt>
                 <dd className={cn("min-w-0 text-right", line.ok ? "text-fg-3" : "text-warn")}>
-                  {line.ok ? "" : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperInspector", "ko", "제한: ")}
+                  {line.ok ? "" : "제한: "}
                   {line.value}
                 </dd>
               </div>

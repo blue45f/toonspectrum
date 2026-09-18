@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Loader2, RefreshCw, Trash2, Upload } from "lucide-react";
 
 import { cx } from "@/shared/lib/cx";
@@ -58,12 +54,15 @@ export function StudioBg3dUserTemplateLibraryPanel({
           id="bg3d-user-template-library-title"
           className="flex items-center gap-1.5 text-xs font-bold text-fg"
         >
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "내 템플릿")}</h4>
+          내 템플릿
+        </h4>
         <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-semibold text-fg-3">
-          {entries.length}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "개")}</span>
+          {entries.length}개
+        </span>
       </div>
       <p className="mb-3 text-[0.66rem] leading-relaxed text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "현재 장면을 이 브라우저의 SQLite/OPFS에 저장하고 다시 불러올 수 있습니다.")}</p>
+        현재 장면을 이 브라우저의 SQLite/OPFS에 저장하고 다시 불러올 수 있습니다.
+      </p>
       <button
         type="button"
         className={cx(
@@ -78,14 +77,16 @@ export function StudioBg3dUserTemplateLibraryPanel({
         ) : (
           <Upload size={14} aria-hidden />
         )}
-        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "현재 장면을 내 템플릿으로 저장")}</button>
+        현재 장면을 내 템플릿으로 저장
+      </button>
 
       {status === "idle" || status === "loading" ? (
         <div
           role="status"
           className="mb-3 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3"
         >
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "템플릿을 불러오는 중입니다.")}</div>
+          템플릿을 불러오는 중입니다.
+        </div>
       ) : null}
       {status === "error" ? (
         <div
@@ -93,7 +94,7 @@ export function StudioBg3dUserTemplateLibraryPanel({
           className="mb-3 rounded-xl border border-danger/40 bg-danger/5 px-3 py-3 text-xs leading-relaxed text-fg-2"
         >
           <p>
-            {notice?.message ?? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "템플릿 목록을 불러오지 못했습니다.")}
+            {notice?.message ?? "템플릿 목록을 불러오지 못했습니다."}
           </p>
           <button
             type="button"
@@ -101,7 +102,8 @@ export function StudioBg3dUserTemplateLibraryPanel({
             onClick={onRetry}
           >
             <RefreshCw size={13} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "다시 불러오기")}</button>
+            다시 불러오기
+          </button>
         </div>
       ) : null}
 
@@ -115,7 +117,8 @@ export function StudioBg3dUserTemplateLibraryPanel({
       ) : null}
       {status === "ready" && entries.length === 0 ? (
         <div className="rounded-xl border border-dashed border-line bg-card/45 px-3 py-4 text-center text-xs leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "저장된 템플릿이 없습니다.")}</div>
+          저장된 템플릿이 없습니다.
+        </div>
       ) : null}
 
       {status === "ready" && entries.length > 0 ? (
@@ -127,7 +130,7 @@ export function StudioBg3dUserTemplateLibraryPanel({
             >
               <button
                 type="button"
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "{v0} 적용"), { v0: String(entry.name) })}
+                aria-label={`${entry.name} 적용`}
                 className="grid min-h-[5rem] w-full gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={status !== "ready" || applyDisabled || busy}
                 onClick={() => onApply(entry)}
@@ -147,14 +150,14 @@ export function StudioBg3dUserTemplateLibraryPanel({
                         : "bg-raised text-fg-3",
                     )}
                   >
-                    {entry.commercialUse ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "상업 이용 가능") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "상업 이용 확인 필요")}
+                    {entry.commercialUse ? "상업 이용 가능" : "상업 이용 확인 필요"}
                   </span>
                 </span>
               </button>
               <button
                 type="button"
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "{v0} 템플릿 삭제"), { v0: String(entry.name) })}
-                title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "템플릿 삭제")}
+                aria-label={`${entry.name} 템플릿 삭제`}
+                title="템플릿 삭제"
                 className="absolute right-1.5 top-1.5 grid size-11 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50 sm:size-7"
                 disabled={status !== "ready" || busy}
                 onClick={(event) => {

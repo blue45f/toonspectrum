@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense } from "react";
 
 import { StudioRenderSurface } from "../render/StudioRenderSurface";
@@ -218,8 +217,8 @@ export function StudioCanvasViewportDomOverlays({
               className="pointer-events-none absolute inset-x-4 top-4 z-[30] rounded-md border border-red-400/50 bg-red-950/90 px-4 py-3 text-sm font-medium text-red-50 shadow-lg"
             >
               {velloHubAuthority.visibleCanvasCount === 1
-                ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportDomOverlays", "ko", "Vello 렌더러를 계속 사용할 수 없어 마지막 정확 프레임을 유지했습니다. 다른 렌더러로 자동 전환하지 않았습니다.")
-                : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportDomOverlays", "ko", "Vello 렌더러를 사용할 수 없어 가속 문서 표면으로 전환하지 않았습니다. 같은 작업을 다른 엔진으로 재실행하지 않았습니다.")}
+                ? "Vello 렌더러를 계속 사용할 수 없어 마지막 정확 프레임을 유지했습니다. 다른 렌더러로 자동 전환하지 않았습니다."
+                : "Vello 렌더러를 사용할 수 없어 가속 문서 표면으로 전환하지 않았습니다. 같은 작업을 다른 엔진으로 재실행하지 않았습니다."}
             </div>
           ) : null}
           <StudioPixiSceneOverlayHost

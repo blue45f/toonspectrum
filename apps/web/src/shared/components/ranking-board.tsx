@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertCircle,
   BookOpen,
   Flag,
@@ -223,13 +219,13 @@ export function RankingBoard({
       <section className="rounded-2xl border border-line bg-panel/60 p-4 surface-hl sm:p-5">
         <div className="mb-3 flex flex-col gap-1.5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="eyebrow mb-1.5 text-accent">{translateCurrentStaticSourceText("shared.components.ranking.board", "en", "RANKING AXES")}</p>
-            <h2 className="text-lg font-semibold text-fg">{translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "랭킹 산식 축")}</h2>
-            <p className="text-sm text-fg-3">{translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "축 하나가 바뀌면 전체 정렬 기준이 즉시 교체됩니다.")}</p>
+            <p className="eyebrow mb-1.5 text-accent">RANKING AXES</p>
+            <h2 className="text-lg font-semibold text-fg">랭킹 산식 축</h2>
+            <p className="text-sm text-fg-3">축 하나가 바뀌면 전체 정렬 기준이 즉시 교체됩니다.</p>
           </div>
           <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-xs text-fg-2">
             <span className="size-1.5 rounded-full bg-accent" />
-            {translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "현재 ")}{axisDetail.label}
+            현재 {axisDetail.label}
           </span>
         </div>
 
@@ -279,14 +275,15 @@ export function RankingBoard({
           <div className="min-w-0">
             <p className="text-sm font-medium text-fg">{axisDetail.desc}</p>
             <p className="mt-0.5 font-mono text-xs leading-relaxed text-fg-3">
-              <span className="eyebrow mr-1.5 text-[0.6rem] text-accent">{translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "산식")}</span>
+              <span className="eyebrow mr-1.5 text-[0.6rem] text-accent">산식</span>
               {axisDetail.formula}
             </p>
             <Link
               href="/guide"
               className="mt-1 inline-flex items-center gap-1 text-[0.72rem] font-medium text-accent hover:underline"
             >
-              {translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "산정 방식 자세히 보기")}<ArrowUpRight size={12} />
+              산정 방식 자세히 보기
+              <ArrowUpRight size={12} />
             </Link>
           </div>
         </div>
@@ -315,13 +312,14 @@ export function RankingBoard({
         <div className="grid min-w-0 gap-2 sm:flex sm:flex-wrap">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex h-8 items-center rounded-full border border-accent/35 bg-accent-soft px-3 text-[0.7rem] font-semibold text-accent">
-              {translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "장르·운영 조건")}</span>
+              장르·운영 조건
+            </span>
           </div>
 
           <Select
             value={genre}
             onValueChange={setGenre}
-            ariaLabel={translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "장르 필터")}
+            ariaLabel="장르 필터"
             triggerClassName="h-10 min-w-36 rounded-lg border border-line bg-card px-2.5 text-sm text-fg-2"
             options={[
               { value: "all", label: "전체 장르" },
@@ -329,7 +327,7 @@ export function RankingBoard({
             ]}
           />
           <div className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-3 text-xs text-fg-2 transition-colors focus-within:border-accent/50">
-            <span className="whitespace-nowrap text-fg-3">{translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "플랫폼")}</span>
+            <span className="whitespace-nowrap text-fg-3">플랫폼</span>
             {(() => {
               // 카탈로그에 실존하는 플랫폼만 노출(빈 플랫폼 옵션 방지). 커버리지 미수신 시 전체 노출.
               const present = rankingMeta?.availablePlatforms;
@@ -346,7 +344,7 @@ export function RankingBoard({
                 <Select
                   value={platform}
                   onValueChange={(value) => setPlatform(value as PlatformId | "all")}
-                  ariaLabel={translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "플랫폼 필터")}
+                  ariaLabel="플랫폼 필터"
                   triggerClassName="min-w-28 text-sm font-medium text-fg"
                   options={items.map((item) => ({ value: item.value, label: item.label }))}
                 />
@@ -377,7 +375,7 @@ export function RankingBoard({
           />
           <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-card px-3 text-xs text-fg-2">
             <Star size={14} className="text-accent" />
-            <span className="whitespace-nowrap">{translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "평점 ")}{minRating.toFixed(1)}+</span>
+            <span className="whitespace-nowrap">평점 {minRating.toFixed(1)}+</span>
             <input
               type="range"
               min="0"
@@ -386,7 +384,7 @@ export function RankingBoard({
               value={minRating}
               onChange={(event) => setMinRating(Number(event.target.value))}
               className="h-1 w-24 accent-[oklch(0.72_0.185_42)]"
-              aria-label={translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "최소 평점")}
+              aria-label="최소 평점"
             />
           </label>
           <button
@@ -401,7 +399,8 @@ export function RankingBoard({
             )}
           >
             <TrendingUp size={14} />
-            {translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "상승작")}</button>
+            상승작
+          </button>
         </div>
         <div className="grid min-w-0 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end xl:justify-end">
           <div
@@ -418,7 +417,7 @@ export function RankingBoard({
             <span className="truncate">
               {state === "error"
                 ? error
-                : formatI18nTemplate(translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "스냅샷 산식 · 신뢰 {v0}/100 · 업데이트 {v1}"), { v0: String(rankingMeta?.reliability.confidence ?? 0), v1: String(formatUpdatedAt(rankingMeta?.generatedAt)) })}
+                : `스냅샷 산식 · 신뢰 ${rankingMeta?.reliability.confidence ?? 0}/100 · 업데이트 ${formatUpdatedAt(rankingMeta?.generatedAt)}`}
             </span>
           </div>
           <button
@@ -428,16 +427,17 @@ export function RankingBoard({
               setRefreshKey((current) => current + 1);
             }}
             className="inline-flex size-10 items-center justify-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
-            title={translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "랭킹 새로고침")}
-            aria-label={translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "랭킹 새로고침")}
+            title="랭킹 새로고침"
+            aria-label="랭킹 새로고침"
           >
             <RefreshCw size={14} className={cn(isRefreshing && "animate-spin")} />
           </button>
           <span className="inline-flex h-10 items-center rounded-xl border border-line bg-card px-3 text-sm text-fg-3" aria-live="polite">
-            <span className="mr-1 text-fg">{translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "다음 갱신:")}</span>
+            <span className="mr-1 text-fg">다음 갱신:</span>
             <span className="numeral mr-1 text-fg">{refreshLabel}</span>
             <span>·</span>
-            <span className="numeral mr-1 text-fg">{visibleRanked.length}</span>{translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "편")}{clientFilterCount > 0 && <span className="ml-1 text-fg-3">/ {ranked.length}</span>}
+            <span className="numeral mr-1 text-fg">{visibleRanked.length}</span>편
+            {clientFilterCount > 0 && <span className="ml-1 text-fg-3">/ {ranked.length}</span>}
           </span>
           <button
             type="button"
@@ -452,7 +452,8 @@ export function RankingBoard({
             )}
           >
             <SlidersHorizontal size={14} />
-            {translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "필터")}{clientFilterCount > 0 && (
+            필터
+            {clientFilterCount > 0 && (
               <span className="rounded-full bg-accent/20 px-1.5 text-[0.68rem] text-accent">
                 {clientFilterCount}
               </span>
@@ -491,15 +492,15 @@ export function RankingBoard({
       ) : state === "error" ? (
         <div className="rounded-xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] px-5 py-12 text-center">
           <AlertCircle className="mx-auto mb-3 text-bad" size={24} />
-          <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "랭킹을 불러오지 못했습니다.")}</p>
+          <p className="text-sm font-medium text-fg">랭킹을 불러오지 못했습니다.</p>
           <p className="mt-1 text-sm text-fg-3">{error}</p>
         </div>
       ) : visibleRanked.length === 0 ? (
         <div className="rounded-xl border border-line bg-panel/30 px-5 py-14 text-center">
           <BookOpen className="mx-auto mb-3 text-fg-3" size={24} />
-          <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "해당 조건의 작품이 없습니다.")}</p>
+          <p className="text-sm font-medium text-fg">해당 조건의 작품이 없습니다.</p>
           <p className="mt-1 text-sm text-fg-3">
-            {clientFilterCount > 0 ? translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "찜·장르·이용가 필터를 넓혀보세요.") : translateCurrentStaticSourceText("shared.components.ranking.board", "ko", "장르나 플랫폼 필터를 넓혀보세요.")}
+            {clientFilterCount > 0 ? "찜·장르·이용가 필터를 넓혀보세요." : "장르나 플랫폼 필터를 넓혀보세요."}
           </p>
         </div>
       ) : view === "list" ? (
@@ -530,7 +531,7 @@ export function RankingBoard({
             return (
               <Link
                 key={r.title.id}
-                href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.ranking.board", "en", "/title/{v0}"), { v0: String(r.title.slug) })}
+                href={`/title/${r.title.slug}`}
                 className={cn(
                   "group flex items-center gap-3 rounded-xl border border-line bg-card px-3 py-2 transition-colors hover:border-line-strong",
                   i < RANK_ENTRY_STAGGER_CAP && RANK_ENTRY_ANIMATION_CLASS

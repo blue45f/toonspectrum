@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   CheckCircle2,
   CircleDashed,
@@ -121,12 +120,15 @@ export function MarketInstallJourney({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id="market-install-journey-heading" className="text-xs font-bold text-fg">
-            {translateCurrentStaticSourceText("domains.market.components.MarketInstallJourney", "ko", "실제 다운로드·설치 흐름")}</h2>
+            실제 다운로드·설치 흐름
+          </h2>
           <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.market.components.MarketInstallJourney", "ko", "소장, 기기 다운로드, 설치 또는 적용을 서로 다른 상태로 확인합니다.")}</p>
+            소장, 기기 다운로드, 설치 또는 적용을 서로 다른 상태로 확인합니다.
+          </p>
         </div>
         <span className="shrink-0 rounded-full border border-good/30 bg-good/10 px-2 py-0.5 text-[0.6rem] font-bold text-good">
-          {translateCurrentStaticSourceText("domains.market.components.MarketInstallJourney", "ko", "해시 검증")}</span>
+          해시 검증
+        </span>
       </div>
 
       <ol className="mt-3 space-y-2">

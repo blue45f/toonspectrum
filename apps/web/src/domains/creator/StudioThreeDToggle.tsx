@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useId, type ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils";
@@ -21,7 +18,7 @@ export function StudioThreeDToggleIndicator({
     <span
       aria-hidden="true"
       data-studio-three-d-toggle-indicator="true"
-      data-state={checked ? translateCurrentStaticSourceText("domains.creator.StudioThreeDToggle", "en", "on") : translateCurrentStaticSourceText("domains.creator.StudioThreeDToggle", "en", "off")}
+      data-state={checked ? "on" : "off"}
       className={cn(
         "relative block h-6 w-11 shrink-0 rounded-full border transition-colors duration-150 motion-reduce:transition-none",
         checked ? "border-accent bg-accent" : "border-line-strong bg-raised",
@@ -74,7 +71,7 @@ export function StudioThreeDToggleControl({
       aria-labelledby={labelId}
       aria-describedby={hasDescription ? descriptionId : undefined}
       data-studio-three-d-toggle="true"
-      data-state={checked ? translateCurrentStaticSourceText("domains.creator.StudioThreeDToggle", "en", "on") : translateCurrentStaticSourceText("domains.creator.StudioThreeDToggle", "en", "off")}
+      data-state={checked ? "on" : "off"}
       disabled={disabled}
       className={cn(
         "group flex min-h-11 w-full min-w-0 cursor-pointer items-center justify-between gap-3 text-left transition-[color,background-color,border-color] duration-150 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45",
@@ -123,7 +120,7 @@ export function StudioThreeDStatePill({
     <span
       aria-label={accessibleLabel}
       data-studio-three-d-state-pill="true"
-      data-state={active ? translateCurrentStaticSourceText("domains.creator.StudioThreeDToggle", "en", "on") : translateCurrentStaticSourceText("domains.creator.StudioThreeDToggle", "en", "off")}
+      data-state={active ? "on" : "off"}
       className={cn(
         "inline-flex min-h-6 min-w-12 shrink-0 items-center justify-center rounded-full border px-2 text-[0.625rem] font-bold leading-none",
         active
@@ -131,7 +128,7 @@ export function StudioThreeDStatePill({
           : "border-line bg-raised text-fg-3",
       )}
     >
-      {active ? translateCurrentStaticSourceText("domains.creator.StudioThreeDToggle", "ko", "켜짐") : translateCurrentStaticSourceText("domains.creator.StudioThreeDToggle", "ko", "꺼짐")}
+      {active ? "켜짐" : "꺼짐"}
     </span>
   );
 }

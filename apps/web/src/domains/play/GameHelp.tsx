@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 // 놀이터 게임 공용 "게임 방법" 안내 — 첫 진입 시 규칙 오버레이를 띄우고,
 // 작은 "방법" 칩 버튼으로 언제든 다시 열 수 있게 한다. 게임별로 title+steps만 주입.
 
@@ -144,16 +140,17 @@ export function GameHelp({
           "inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[0.7rem] font-medium text-fg-2 transition hover:border-accent/60 hover:text-accent",
           className,
         )}
-        aria-label={translateCurrentStaticSourceText("domains.play.GameHelp", "ko", "게임 방법 보기")}
+        aria-label="게임 방법 보기"
       >
-        <HelpCircle className="h-3.5 w-3.5" /> {translateCurrentStaticSourceText("domains.play.GameHelp", "ko", "방법")}</button>
+        <HelpCircle className="h-3.5 w-3.5" /> 방법
+      </button>
 
       {open && (
         <div className="fixed inset-0 z-[60] grid place-items-center p-4">
           {/* 백드롭(클릭/Enter/Space로 닫힘 — 실제 button이라 a11y 충족) */}
           <button
             type="button"
-            aria-label={translateCurrentStaticSourceText("domains.play.GameHelp", "ko", "닫기")}
+            aria-label="닫기"
             onClick={close}
             tabIndex={-1}
             className="absolute inset-0 cursor-default bg-black/70 backdrop-blur-sm"
@@ -162,12 +159,13 @@ export function GameHelp({
             ref={dialogRef}
             role="dialog"
             aria-modal="true"
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.play.GameHelp", "ko", "{v0} 게임 방법"), { v0: String(title) })}
+            aria-label={`${title} 게임 방법`}
             tabIndex={-1}
             className="relative w-full max-w-sm rounded-2xl border border-line bg-card p-5 shadow-2xl outline-none"
           >
             <h3 className="mb-3 flex items-center gap-2 text-base font-bold text-fg">
-              <HelpCircle className="h-5 w-5 text-accent" /> {title} {translateCurrentStaticSourceText("domains.play.GameHelp", "ko", "— 이렇게 해요")}</h3>
+              <HelpCircle className="h-5 w-5 text-accent" /> {title} — 이렇게 해요
+            </h3>
             <ul className="space-y-2.5 text-[0.82rem] leading-relaxed text-fg-2">
               {steps.map((s) => (
                 <li key={s.title}>
@@ -179,7 +177,8 @@ export function GameHelp({
               ))}
             </ul>
             <Button ref={primaryBtnRef} variant="solid" className="mt-4 w-full" onClick={close}>
-              {translateCurrentStaticSourceText("domains.play.GameHelp", "ko", "알겠어요, 시작!")}</Button>
+              알겠어요, 시작!
+            </Button>
           </div>
         </div>
       )}

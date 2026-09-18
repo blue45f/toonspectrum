@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Check, ChevronDown, Lightbulb, SunMedium } from "lucide-react";
 import { useId } from "react";
 
@@ -118,10 +114,10 @@ function StudioBg3dDirectionalLightEditor({
   };
 
   return (
-    <section aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-title"), { v0: String(idPrefix) })} className="border-t border-line/70 pt-3">
+    <section aria-labelledby={`${idPrefix}-title`} className="border-t border-line/70 pt-3">
       <div className="mb-1 flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <h4 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-title"), { v0: String(idPrefix) })} className="flex items-center gap-1.5 text-xs font-bold text-fg">
+          <h4 id={`${idPrefix}-title`} className="flex items-center gap-1.5 text-xs font-bold text-fg">
             <SunMedium size={14} className="shrink-0 text-accent" aria-hidden />
             {label}
           </h4>
@@ -137,15 +133,15 @@ function StudioBg3dDirectionalLightEditor({
       </div>
 
       <StudioBg3dLightColorField
-        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-color"), { v0: String(idPrefix) })}
-        label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "{v0} 색상"), { v0: String(label) })}
+        id={`${idPrefix}-color`}
+        label={`${label} 색상`}
         value={light.color}
         disabled={disabled}
         onChange={(color) => onUpdate({ color })}
       />
       <LtRangeControl
-        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-intensity"), { v0: String(idPrefix) })}
-        label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "{v0} 세기"), { v0: String(label) })}
+        id={`${idPrefix}-intensity`}
+        label={`${label} 세기`}
         min={0}
         max={20}
         step={0.05}
@@ -155,8 +151,8 @@ function StudioBg3dDirectionalLightEditor({
         onChange={(intensity) => onUpdate({ intensity })}
       />
       <LtRangeControl
-        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-azimuth"), { v0: String(idPrefix) })}
-        label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "{v0} 방위각"), { v0: String(label) })}
+        id={`${idPrefix}-azimuth`}
+        label={`${label} 방위각`}
         min={STUDIO_BG3D_LIGHT_AZIMUTH_MIN_DEG}
         max={STUDIO_BG3D_LIGHT_AZIMUTH_MAX_DEG}
         step={1}
@@ -166,8 +162,8 @@ function StudioBg3dDirectionalLightEditor({
         onChange={(azimuthDeg) => updateDirection({ azimuthDeg })}
       />
       <LtRangeControl
-        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-elevation"), { v0: String(idPrefix) })}
-        label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "{v0} 고도각"), { v0: String(label) })}
+        id={`${idPrefix}-elevation`}
+        label={`${label} 고도각`}
         min={STUDIO_BG3D_LIGHT_ELEVATION_MIN_DEG}
         max={STUDIO_BG3D_LIGHT_ELEVATION_MAX_DEG}
         step={1}
@@ -177,7 +173,7 @@ function StudioBg3dDirectionalLightEditor({
         onChange={(elevationDeg) => updateDirection({ elevationDeg })}
       />
       <LtToggleRow
-        label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "{v0} 그림자"), { v0: String(label) })}
+        label={`${label} 그림자`}
         checked={light.castsShadow}
         disabled={disabled}
         onChange={(castsShadow) => onUpdate({ castsShadow })}
@@ -219,11 +215,11 @@ export function StudioBg3dLightingStudio({
             <Lightbulb size={15} aria-hidden />
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "조명 스튜디오")}</span>
+            <span className="block truncate text-xs font-bold text-fg">조명 스튜디오</span>
             <span className="block truncate text-[0.625rem] tabular-nums text-fg-3">
-              {activePreset?.label ?? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "사용자 조명")} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "· 키 ")}{lighting.key.intensity.toFixed(2)}
-              {" · "}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "필 ")}{lighting.fill.intensity.toFixed(2)}
-              {" · "}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "노출 ")}{exposure.toFixed(2)}
+              {activePreset?.label ?? "사용자 조명"} · 키 {lighting.key.intensity.toFixed(2)}
+              {" · "}필 {lighting.fill.intensity.toFixed(2)}
+              {" · "}노출 {exposure.toFixed(2)}
             </span>
           </span>
         </span>
@@ -237,22 +233,24 @@ export function StudioBg3dLightingStudio({
       <div id={panelId} className="border-t border-line/70 px-3 pb-3 pt-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "스튜디오 라이트 프리셋")}</h3>
+            <h3 className="text-xs font-bold text-fg">스튜디오 라이트 프리셋</h3>
             <p className="mt-0.5 text-[0.625rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "배경·안개·시간대는 유지하고 조명과 렌더 노출만 바꿉니다.")}</p>
+              배경·안개·시간대는 유지하고 조명과 렌더 노출만 바꿉니다.
+            </p>
           </div>
           <span className="shrink-0 rounded-full border border-line bg-panel px-2 py-1 text-[0.5625rem] font-semibold text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "비파괴")}</span>
+            비파괴
+          </span>
         </div>
 
-        <div className="mt-2 grid min-w-0 grid-cols-2 gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "스튜디오 조명 프리셋")}>
+        <div className="mt-2 grid min-w-0 grid-cols-2 gap-1.5" role="group" aria-label="스튜디오 조명 프리셋">
           {STUDIO_BG3D_LIGHTING_STUDIO_PRESETS.map((preset) => {
             const selected = preset.id === activePreset?.id;
             return (
               <button
                 key={preset.id}
                 type="button"
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "{v0} 조명 프리셋 적용"), { v0: String(preset.label) })}
+                aria-label={`${preset.label} 조명 프리셋 적용`}
                 aria-pressed={selected}
                 title={preset.description}
                 disabled={disabled}
@@ -280,21 +278,23 @@ export function StudioBg3dLightingStudio({
           })}
         </div>
 
-        <section aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-ambient-title"), { v0: String(panelId) })} className="mt-3 border-t border-line/70 pt-3">
-          <h4 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-ambient-title"), { v0: String(panelId) })} className="text-xs font-bold text-fg">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "주변광")}</h4>
+        <section aria-labelledby={`${panelId}-ambient-title`} className="mt-3 border-t border-line/70 pt-3">
+          <h4 id={`${panelId}-ambient-title`} className="text-xs font-bold text-fg">
+            주변광
+          </h4>
           <p className="mt-0.5 text-[0.625rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "장면 전체의 어두운 면을 열어 주는 기본광입니다.")}</p>
+            장면 전체의 어두운 면을 열어 주는 기본광입니다.
+          </p>
           <StudioBg3dLightColorField
-            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-ambient-color"), { v0: String(panelId) })}
-            label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "주변광 색상")}
+            id={`${panelId}-ambient-color`}
+            label="주변광 색상"
             value={lighting.ambientColor}
             disabled={disabled}
             onChange={(ambientColor) => onUpdateLighting({ ambientColor })}
           />
           <LtRangeControl
-            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-ambient-intensity"), { v0: String(panelId) })}
-            label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "주변광 세기")}
+            id={`${panelId}-ambient-intensity`}
+            label="주변광 세기"
             min={0}
             max={10}
             step={0.05}
@@ -306,30 +306,32 @@ export function StudioBg3dLightingStudio({
         </section>
 
         <StudioBg3dDirectionalLightEditor
-          idPrefix={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-key"), { v0: String(panelId) })}
-          label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "키 라이트")}
-          description={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "형태와 주된 그림자 방향을 결정하는 핵심광입니다.")}
+          idPrefix={`${panelId}-key`}
+          label="키 라이트"
+          description="형태와 주된 그림자 방향을 결정하는 핵심광입니다."
           light={lighting.key}
           disabled={disabled}
           onUpdate={(patch) => updateDirectionalLight("key", patch)}
         />
         <StudioBg3dDirectionalLightEditor
-          idPrefix={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-fill"), { v0: String(panelId) })}
-          label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "필 라이트")}
-          description={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "키 라이트 반대편의 명암 대비를 조절하는 보조광입니다.")}
+          idPrefix={`${panelId}-fill`}
+          label="필 라이트"
+          description="키 라이트 반대편의 명암 대비를 조절하는 보조광입니다."
           light={lighting.fill}
           disabled={disabled}
           onUpdate={(patch) => updateDirectionalLight("fill", patch)}
         />
 
-        <section aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-render-title"), { v0: String(panelId) })} className="border-t border-line/70 pt-3">
-          <h4 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-render-title"), { v0: String(panelId) })} className="text-xs font-bold text-fg">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "렌더 노출")}</h4>
+        <section aria-labelledby={`${panelId}-render-title`} className="border-t border-line/70 pt-3">
+          <h4 id={`${panelId}-render-title`} className="text-xs font-bold text-fg">
+            렌더 노출
+          </h4>
           <p className="mt-0.5 text-[0.625rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "라이트 세기는 유지한 채 최종 화면의 전체 밝기를 조정합니다.")}</p>
+            라이트 세기는 유지한 채 최종 화면의 전체 밝기를 조정합니다.
+          </p>
           <LtRangeControl
-            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "en", "{v0}-exposure"), { v0: String(panelId) })}
-            label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLightingStudio", "ko", "노출")}
+            id={`${panelId}-exposure`}
+            label="노출"
             min={0.1}
             max={8}
             step={0.05}

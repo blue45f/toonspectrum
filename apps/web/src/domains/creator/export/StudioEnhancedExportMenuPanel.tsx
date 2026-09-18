@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Download,
   PackageCheck,
   RotateCcw,
@@ -236,9 +232,12 @@ export function StudioEnhancedExportMenuPanel(
               id="studio-verified-download-package-title"
               className="block text-[0.72rem] font-bold text-fg"
             >
-              {translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "ko", "검증 다운로드 패키지")}</span>
+              검증 다운로드 패키지
+            </span>
             <span className="mt-0.5 block text-[0.61rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "ko", "페이지별 이미지와 순서·크기·SHA-256을 기록한 manifest.json을 하나의 ZIP으로 저장합니다.")}</span>
+              페이지별 이미지와 순서·크기·SHA-256을 기록한 manifest.json을
+              하나의 ZIP으로 저장합니다.
+            </span>
           </span>
           <ShieldCheck
             size={16}
@@ -258,9 +257,9 @@ export function StudioEnhancedExportMenuPanel(
 
         <label className="mt-2 block rounded-lg border border-line/70 bg-panel/70 px-2 py-1.5">
           <span className="flex items-center justify-between gap-2 text-[0.61rem] font-semibold text-fg-2">
-            <span>{translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "ko", "손실 압축 품질")}</span>
+            <span>손실 압축 품질</span>
             <span className="tabular-nums text-fg-3">
-              {lossless ? translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "ko", "무손실") : `${qualityPercent}%`}
+              {lossless ? "무손실" : `${qualityPercent}%`}
             </span>
           </span>
           <input
@@ -273,15 +272,15 @@ export function StudioEnhancedExportMenuPanel(
             onChange={(event) =>
               setQualityPercent(Number(event.currentTarget.value))
             }
-            aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "ko", "검증 패키지 이미지 품질")}
+            aria-label="검증 패키지 이미지 품질"
             className="mt-1 h-5 w-full accent-accent disabled:opacity-40"
           />
         </label>
 
         {packageStatus ? (
           <div
-            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "en", "mt-2 rounded-lg border px-2 py-1.5 text-[0.61rem] leading-relaxed {v0}"), { v0: String(statusClass) })}
-            role={packageStatus.tone === "warn" ? translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "en", "status")}
+            className={`mt-2 rounded-lg border px-2 py-1.5 text-[0.61rem] leading-relaxed ${statusClass}`}
+            role={packageStatus.tone === "warn" ? "alert" : "status"}
           >
             <div className="flex items-center justify-between gap-2">
               <span>{packageStatus.text}</span>
@@ -295,7 +294,7 @@ export function StudioEnhancedExportMenuPanel(
               <div
                 className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/20"
                 role="progressbar"
-                aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "ko", "검증 다운로드 패키지 진행률")}
+                aria-label="검증 다운로드 패키지 진행률"
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={packageStatus.percent}
@@ -326,25 +325,27 @@ export function StudioEnhancedExportMenuPanel(
               <Download size={14} aria-hidden />
             )}
             {packageBusy
-              ? translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "ko", "패키지 생성 중")
+              ? "패키지 생성 중"
               : packageStatus?.tone === "warn"
-                ? translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "ko", "다시 시도")
-                : translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "ko", "페이지 ZIP 다운로드")}
+                ? "다시 시도"
+                : "페이지 ZIP 다운로드"}
           </button>
           {packageBusy ? (
             <button
               type="button"
               onClick={cancelPackage}
               className="grid min-h-11 min-w-11 place-items-center rounded-lg border border-line bg-panel text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-              aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "ko", "검증 다운로드 패키지 생성 취소")}
-              title={translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "ko", "패키지 생성 취소")}
+              aria-label="검증 다운로드 패키지 생성 취소"
+              title="패키지 생성 취소"
             >
               <X size={15} aria-hidden />
             </button>
           ) : null}
         </div>
         <p className="mt-1.5 text-[0.57rem] leading-relaxed text-fg-4">
-          {translateCurrentStaticSourceText("domains.creator.export.StudioEnhancedExportMenuPanel", "ko", "기존 PDF·CBZ·웹툰 연합 스크롤은 그대로 유지됩니다. 이 패키지는 전달·업로드·장기 보관 전 파일 무결성을 확인해야 할 때 사용하세요.")}</p>
+          기존 PDF·CBZ·웹툰 연합 스크롤은 그대로 유지됩니다. 이 패키지는
+          전달·업로드·장기 보관 전 파일 무결성을 확인해야 할 때 사용하세요.
+        </p>
       </section>
       )}
     />

@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { CheckCircle2, CircleAlert, ShieldX } from "lucide-react";
 
 import { useMarketProductionProfile } from "../hooks/use-market-production-profile";
@@ -50,7 +49,7 @@ export function MarketProductionFitBadge({
   return (
     <span
       title={title}
-      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketProductionFitBadge", "ko", "{v0}. 충족 {v1}개, 확인 {v2}개, 차단 {v3}개"), { v0: String(meta.label), v1: String(evaluation.passCount), v2: String(evaluation.reviewCount), v3: String(evaluation.blockCount) })}
+      aria-label={`${meta.label}. 충족 ${evaluation.passCount}개, 확인 ${evaluation.reviewCount}개, 차단 ${evaluation.blockCount}개`}
       className={cn(
         "inline-flex min-h-6 max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold",
         meta.className,

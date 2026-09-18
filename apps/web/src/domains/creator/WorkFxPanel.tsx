@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * WorkFxPanel — 작성자 전용 "효과툰" 설정 패널. 작품에 배경음악·스크롤 모션·분위기
  * 오버레이, 컷별 SE 스팅어·BGM 무드 전환, 그리고 컷 연출 마크(요소 단위 시간차 오버레이,
@@ -141,30 +137,35 @@ export function WorkFxPanel({
         className="flex w-full items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium text-fg-2 transition-colors hover:text-fg"
       >
         <Music4 size={13} className="text-accent" />
-        {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "효과툰 설정 (배경음악·모션·분위기·컷 연출)")}<span className="ml-auto text-[0.7rem] text-fg-3">{summary.length ? summary.join(" · ") : translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "효과 없음")}</span>
+        효과툰 설정 (배경음악·모션·분위기·컷 연출)
+        <span className="ml-auto text-[0.7rem] text-fg-3">{summary.length ? summary.join(" · ") : "효과 없음"}</span>
       </button>
       {open && (
         <div className="flex flex-col gap-3 border-t border-line px-3.5 py-3">
           <p className="rounded-lg border border-line bg-panel/40 px-2.5 py-2 text-[0.7rem] leading-relaxed text-fg-3">
             <Settings2 size={11} className="mr-1 inline text-accent" />
-            {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "정적인 만화에 동적인 느낌을 더해요. 독자가 스크롤하면 컷이 등장하고, 화면 위로 분위기 효과가 흐르며, 배경음악을 켤 수 있어요. (배경음악은 독자가 재생 버튼을 눌러야 들려요.)")}</p>
+            정적인 만화에 동적인 느낌을 더해요. 독자가 스크롤하면 컷이 등장하고, 화면 위로 분위기 효과가
+            흐르며, 배경음악을 켤 수 있어요. (배경음악은 독자가 재생 버튼을 눌러야 들려요.)
+          </p>
 
           <a
-            href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "en", "/music?workId={v0}"), { v0: String(encodeURIComponent(work.id)) })}
+            href={`/music?workId=${encodeURIComponent(work.id)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2 text-sm font-medium text-accent hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent"
           >
             <Music4 size={15} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "이 작품의 AI BGM · OST 만들기 (새 창)")}</a>
+            이 작품의 AI BGM · OST 만들기 (새 창)
+          </a>
 
           <label className="flex flex-col gap-1 text-xs text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "배경음악")}<select
+            배경음악
+            <select
               value={fx.bgmMood}
               onChange={(e) => patch({ bgmMood: e.target.value })}
               className="h-9 rounded-lg border border-line bg-canvas px-2 text-sm text-fg outline-none focus:border-accent/50"
             >
-              <option value="">{translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "사용 안 함")}</option>
+              <option value="">사용 안 함</option>
               {BGM_MOODS.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.label} — {m.description}
@@ -173,7 +174,8 @@ export function WorkFxPanel({
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "또는 내 오디오 URL (있으면 우선)")}<input
+            또는 내 오디오 URL (있으면 우선)
+            <input
               type="url"
               value={fx.bgmUrl}
               onChange={(e) => patch({ bgmUrl: e.target.value.trim() })}
@@ -183,7 +185,8 @@ export function WorkFxPanel({
           </label>
 
           <label className="flex flex-col gap-1 text-xs text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "스크롤 등장 효과")}<select
+            스크롤 등장 효과
+            <select
               value={fx.reveal}
               onChange={(e) => patch({ reveal: e.target.value })}
               className="h-9 rounded-lg border border-line bg-canvas px-2 text-sm text-fg outline-none focus:border-accent/50"
@@ -196,7 +199,8 @@ export function WorkFxPanel({
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "분위기 오버레이")}<select
+            분위기 오버레이
+            <select
               value={fx.ambient}
               onChange={(e) => patch({ ambient: e.target.value })}
               className="h-9 rounded-lg border border-line bg-canvas px-2 text-sm text-fg outline-none focus:border-accent/50"
@@ -211,26 +215,30 @@ export function WorkFxPanel({
 
           {cutCount > 0 && (
             <div className="rounded-lg border border-line bg-panel/40 px-2.5 py-2">
-              <p className="mb-1.5 text-[0.72rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "컷별 효과 (선택)")}</p>
+              <p className="mb-1.5 text-[0.72rem] font-semibold text-fg-2">컷별 효과 (선택)</p>
               <p className="mb-2 text-[0.72rem] leading-snug text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "특정 컷만 다르게 연출해요. 등장은 비워두면 작품 기본을 따르고, 강조·효과음은 그 컷이 보일 때 한 번 재생돼요. BGM 전환은 그 컷부터 배경음악 분위기를 바꿔요(자동 생성 무드 BGM 전용 — 내 오디오 URL을 쓰면 적용되지 않아요). 컷 효과음·BGM 전환은 독자 감상 화면에서 들리고, 모션툰 영상(WebM) 내보내기에는 아직 담기지 않아요.")}</p>
+                특정 컷만 다르게 연출해요. 등장은 비워두면 작품 기본을 따르고, 강조·효과음은 그 컷이
+                보일 때 한 번 재생돼요. BGM 전환은 그 컷부터 배경음악 분위기를 바꿔요(자동 생성 무드
+                BGM 전용 — 내 오디오 URL을 쓰면 적용되지 않아요). 컷 효과음·BGM 전환은 독자 감상
+                화면에서 들리고, 모션툰 영상(WebM) 내보내기에는 아직 담기지 않아요.
+              </p>
               <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
                 {Array.from({ length: cutCount }, (_, i) => {
                   const c = cutAt(i);
                   return (
                     <div key={i} className="flex items-start gap-1.5">
-                      <span className="numeral w-9 shrink-0 pt-1.5 text-[0.72rem] text-fg-3">{i + 1}{translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "컷")}</span>
+                      <span className="numeral w-9 shrink-0 pt-1.5 text-[0.72rem] text-fg-3">{i + 1}컷</span>
                       <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
                         <select
                           value={c.reveal}
                           onChange={(e) => patchCut(i, { reveal: e.target.value })}
                           className={CUT_SELECT_CLASS}
-                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "{v0}컷 등장 효과"), { v0: String(i + 1) })}
+                          aria-label={`${i + 1}컷 등장 효과`}
                         >
-                          <option value="">{translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "등장: 기본")}</option>
+                          <option value="">등장: 기본</option>
                           {REVEAL_PRESETS.filter((p) => p.id !== "none").map((p) => (
                             <option key={p.id} value={p.id}>
-                              {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "등장: ")}{p.label}
+                              등장: {p.label}
                             </option>
                           ))}
                         </select>
@@ -238,11 +246,11 @@ export function WorkFxPanel({
                           value={c.emphasis}
                           onChange={(e) => patchCut(i, { emphasis: e.target.value })}
                           className={CUT_SELECT_CLASS}
-                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "{v0}컷 강조 효과"), { v0: String(i + 1) })}
+                          aria-label={`${i + 1}컷 강조 효과`}
                         >
                           {EMPHASIS_PRESETS.map((p) => (
                             <option key={p.id} value={p.id}>
-                              {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "강조: ")}{p.label}
+                              강조: {p.label}
                             </option>
                           ))}
                         </select>
@@ -252,12 +260,12 @@ export function WorkFxPanel({
                             patchCut(i, { sfx: e.target.value ? { preset: e.target.value } : undefined })
                           }
                           className={CUT_SELECT_CLASS}
-                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "{v0}컷 효과음"), { v0: String(i + 1) })}
+                          aria-label={`${i + 1}컷 효과음`}
                         >
-                          <option value="">{translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "효과음: 없음")}</option>
+                          <option value="">효과음: 없음</option>
                           {SFX_STINGER_PRESETS.map((p) => (
                             <option key={p.id} value={p.id}>
-                              {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "효과음: ")}{p.label}
+                              효과음: {p.label}
                             </option>
                           ))}
                         </select>
@@ -267,13 +275,13 @@ export function WorkFxPanel({
                             patchCut(i, { bgmShift: e.target.value ? { mood: e.target.value } : undefined })
                           }
                           className={CUT_SELECT_CLASS}
-                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "{v0}컷 BGM 전환"), { v0: String(i + 1) })}
+                          aria-label={`${i + 1}컷 BGM 전환`}
                         >
-                          <option value="">{translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "BGM 전환: 없음")}</option>
-                          <option value={CUT_BGM_SILENCE}>{translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "BGM 전환: 음악 멈춤")}</option>
+                          <option value="">BGM 전환: 없음</option>
+                          <option value={CUT_BGM_SILENCE}>BGM 전환: 음악 멈춤</option>
                           {BGM_MOODS.map((m) => (
                             <option key={m.id} value={m.id}>
-                              {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "BGM 전환: ")}{m.label}
+                              BGM 전환: {m.label}
                             </option>
                           ))}
                         </select>
@@ -289,38 +297,46 @@ export function WorkFxPanel({
             <div className="rounded-lg border border-line bg-panel/40 px-2.5 py-2">
               <p className="mb-1.5 flex items-center gap-1 text-[0.72rem] font-semibold text-fg-2">
                 <Target size={12} className="text-accent" />
-                {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "컷 연출 마크 — 요소 타이밍 (선택)")}</p>
+                컷 연출 마크 — 요소 타이밍 (선택)
+              </p>
               <p className="mb-2 text-[0.72rem] leading-snug text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "컷 이미지에서 강조하고 싶은 자리(말풍선·효과음 등)를 클릭해 마크를 찍으면, 독자 화면에서 컷이 등장한 뒤 지연 시간 순서대로 그 영역 위에 포커스 링·플래시 같은 오버레이 연출이 한 번씩 재생돼요(컷당 최대")}{SEQ_MAX_MARKS}{translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "개). 플랫하게 내보낸 이미지 위에 얹는 연출이라 그림 속 요소가 실제로 분리되어 움직이지는 않고, 움직임 줄이기 설정을 켠 독자와 모션툰 영상(WebM) 내보내기에는 적용되지 않아요.")}</p>
+                컷 이미지에서 강조하고 싶은 자리(말풍선·효과음 등)를 클릭해 마크를 찍으면, 독자
+                화면에서 컷이 등장한 뒤 지연 시간 순서대로 그 영역 위에 포커스 링·플래시 같은
+                오버레이 연출이 한 번씩 재생돼요(컷당 최대 {SEQ_MAX_MARKS}개). 플랫하게 내보낸
+                이미지 위에 얹는 연출이라 그림 속 요소가 실제로 분리되어 움직이지는 않고, 움직임
+                줄이기 설정을 켠 독자와 모션툰 영상(WebM) 내보내기에는 적용되지 않아요.
+              </p>
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
                 <label className="flex items-center gap-1.5 text-[0.72rem] text-fg-2">
-                  {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "편집할 컷")}<select
+                  편집할 컷
+                  <select
                     value={markCut}
                     onChange={(e) => setMarkCutIndex(Number(e.target.value))}
                     className={CUT_SELECT_CLASS}
-                    aria-label={translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "연출 마크를 편집할 컷")}
+                    aria-label="연출 마크를 편집할 컷"
                   >
                     {Array.from({ length: cutCount }, (_, i) => {
                       const count = cutAt(i).seq?.marks.length ?? 0;
                       return (
                         <option key={i} value={i}>
-                          {i + 1}{translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "컷")}{count > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", " · 마크 {v0}"), { v0: String(count) }) : ""}
+                          {i + 1}컷{count > 0 ? ` · 마크 ${count}` : ""}
                         </option>
                       );
                     })}
                   </select>
                 </label>
                 <span className="numeral text-[0.72rem] text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "마크 ")}{marks.length}/{SEQ_MAX_MARKS}
+                  마크 {marks.length}/{SEQ_MAX_MARKS}
                 </span>
                 {seedMarks.length > 0 && (
                   <button
                     type="button"
                     onClick={() => setCutMarks(markCut, seedMarks)}
                     className="ml-auto rounded-md border border-line bg-card px-2 py-1 text-[0.72rem] text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
-                    title={translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "스튜디오에서 게시한 말풍선·텍스트 좌표로 이 컷의 마크를 새로 채웁니다(기존 마크 대체).")}
+                    title="스튜디오에서 게시한 말풍선·텍스트 좌표로 이 컷의 마크를 새로 채웁니다(기존 마크 대체)."
                   >
-                    {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "말풍선·텍스트로 자동 제안 (")}{seedMarks.length}{translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "개)")}</button>
+                    말풍선·텍스트로 자동 제안 ({seedMarks.length}개)
+                  </button>
                 )}
               </div>
               <div className="max-h-80 overflow-y-auto rounded-lg border border-line bg-canvas/60">
@@ -328,11 +344,11 @@ export function WorkFxPanel({
                   type="button"
                   onClick={addMarkAtClick}
                   disabled={marks.length >= SEQ_MAX_MARKS}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "{v0}컷 이미지 — 클릭한 위치에 연출 마크 추가"), { v0: String(markCut + 1) })}
+                  aria-label={`${markCut + 1}컷 이미지 — 클릭한 위치에 연출 마크 추가`}
                   title={
                     marks.length >= SEQ_MAX_MARKS
-                      ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "컷당 마크는 최대 {v0}개예요. 아래 목록에서 지우고 다시 찍어주세요."), { v0: String(SEQ_MAX_MARKS) })
-                      : translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "클릭한 위치에 연출 마크를 추가해요.")
+                      ? `컷당 마크는 최대 ${SEQ_MAX_MARKS}개예요. 아래 목록에서 지우고 다시 찍어주세요.`
+                      : "클릭한 위치에 연출 마크를 추가해요."
                   }
                   className="relative block w-full cursor-crosshair disabled:cursor-not-allowed"
                 >
@@ -358,7 +374,8 @@ export function WorkFxPanel({
               </div>
               {marks.length === 0 ? (
                 <p className="mt-2 text-[0.72rem] text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "아직 마크가 없어요. 위 컷 이미지를 클릭해 첫 마크를 찍어보세요.")}</p>
+                  아직 마크가 없어요. 위 컷 이미지를 클릭해 첫 마크를 찍어보세요.
+                </p>
               ) : (
                 <div className="mt-2 space-y-1.5">
                   {marks.map((m, idx) => (
@@ -372,8 +389,8 @@ export function WorkFxPanel({
                           const next = SEQ_MARK_ANIMS.find((a) => a.id === e.target.value);
                           if (next) updateMark(idx, { anim: next.id });
                         }}
-                        className={CUT_SELECT_CLASS + translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "en", " flex-1")}
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "{v0}컷 마크 {v1} 연출 종류"), { v0: String(markCut + 1), v1: String(idx + 1) })}
+                        className={CUT_SELECT_CLASS + " flex-1"}
+                        aria-label={`${markCut + 1}컷 마크 ${idx + 1} 연출 종류`}
                       >
                         {SEQ_MARK_ANIMS.map((a) => (
                           <option key={a.id} value={a.id}>
@@ -382,7 +399,8 @@ export function WorkFxPanel({
                         ))}
                       </select>
                       <label className="flex shrink-0 items-center gap-1 text-[0.72rem] text-fg-3">
-                        {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "지연")}<input
+                        지연
+                        <input
                           type="number"
                           min={0}
                           max={SEQ_MAX_DELAY_MS}
@@ -397,7 +415,7 @@ export function WorkFxPanel({
                             });
                           }}
                           className="numeral h-8 w-[4.5rem] rounded-md border border-line bg-canvas px-1.5 text-[0.72rem] text-fg outline-none focus:border-accent/50"
-                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "{v0}컷 마크 {v1} 지연 시간 (밀리초)"), { v0: String(markCut + 1), v1: String(idx + 1) })}
+                          aria-label={`${markCut + 1}컷 마크 ${idx + 1} 지연 시간 (밀리초)`}
                         />
                         ms
                       </label>
@@ -405,9 +423,10 @@ export function WorkFxPanel({
                         type="button"
                         onClick={() => removeMark(idx)}
                         className="shrink-0 rounded-md border border-line bg-card px-2 py-1.5 text-[0.72rem] text-fg-3 transition-colors hover:border-bad/50 hover:text-bad"
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "{v0}컷 마크 {v1} 삭제"), { v0: String(markCut + 1), v1: String(idx + 1) })}
+                        aria-label={`${markCut + 1}컷 마크 ${idx + 1} 삭제`}
                       >
-                        {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "삭제")}</button>
+                        삭제
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -417,7 +436,8 @@ export function WorkFxPanel({
 
           {(fx.bgmMood || fx.bgmUrl) && (
             <label className="flex items-center gap-2 text-xs text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "기본 음량")}<input
+              기본 음량
+              <input
                 type="range"
                 min={0}
                 max={1}
@@ -433,7 +453,9 @@ export function WorkFxPanel({
           {error && <p className="text-xs text-bad">{error}</p>}
           {savedMsg && !error && (
             <p className="text-xs text-good">
-              {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "효과 설정을 저장했어요. 저장한 연출은 아래 모션툰 영상 내보내기 패널에서 영상(WebM) 한 편으로 만들 수 있어요.")}</p>
+              효과 설정을 저장했어요. 저장한 연출은 아래 모션툰 영상 내보내기 패널에서 영상(WebM)
+              한 편으로 만들 수 있어요.
+            </p>
           )}
           <div className="flex justify-end">
             <button
@@ -442,7 +464,8 @@ export function WorkFxPanel({
               disabled={saving}
               className={buttonClass({ size: "sm", variant: "solid" })}
             >
-              {translateCurrentStaticSourceText("domains.creator.WorkFxPanel", "ko", "효과 설정 저장")}</button>
+              효과 설정 저장
+            </button>
           </div>
         </div>
       )}

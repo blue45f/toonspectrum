@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Trash2, AlertTriangle } from "lucide-react";
 import { useRef, useState } from "react";
@@ -104,7 +101,7 @@ export function ReviewForm({ titleId }: { titleId: string }) {
     >
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-semibold text-fg">
-          {existing ? translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "내 리뷰 수정") : translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "이 작품 평가하기")}
+          {existing ? "내 리뷰 수정" : "이 작품 평가하기"}
         </h3>
         <ScaleSwitcher />
       </div>
@@ -116,13 +113,14 @@ export function ReviewForm({ titleId }: { titleId: string }) {
       />
 
       <label htmlFor="review-text" className="sr-only">
-        {translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "리뷰 내용")}</label>
+        리뷰 내용
+      </label>
       <textarea
         id="review-text"
         {...register("text")}
         rows={3}
         maxLength={500}
-        placeholder={translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "이 작품, 한 줄로 어땠나요? 스포일러는 아래 토글을 켜주세요.")}
+        placeholder="이 작품, 한 줄로 어땠나요? 스포일러는 아래 토글을 켜주세요."
         className="w-full resize-none rounded-xl border border-line bg-canvas px-3.5 py-3 text-sm leading-relaxed text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent/60"
       />
 
@@ -135,7 +133,7 @@ export function ReviewForm({ titleId }: { titleId: string }) {
               field.value.includes(t) ? field.value.filter((x) => x !== t) : [...field.value, t].slice(0, 5)
             );
           return (
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "태그 선택")}>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="태그 선택">
               {SUGGESTED.map((t) => {
                 const on = field.value.includes(t);
                 return (
@@ -175,7 +173,7 @@ export function ReviewForm({ titleId }: { titleId: string }) {
               )}
             >
               <AlertTriangle size={14} />
-              {translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "스포일러 포함 ")}{field.value ? translateCurrentStaticSourceText("domains.community.components.review.form", "en", "ON") : translateCurrentStaticSourceText("domains.community.components.review.form", "en", "OFF")}
+              스포일러 포함 {field.value ? "ON" : "OFF"}
             </button>
           )}
         />
@@ -183,25 +181,28 @@ export function ReviewForm({ titleId }: { titleId: string }) {
         <div className="flex items-center gap-2">
           {existing && (
             <Button type="button" variant="quiet" size="sm" onClick={() => remove(titleId)}>
-              <Trash2 size={15} /> {translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "삭제")}</Button>
+              <Trash2 size={15} /> 삭제
+            </Button>
           )}
           <Button type="submit" size="sm" disabled={rating === 0 || isSubmitting}>
             {saved ? (
               <>
-                <Check size={15} /> {translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "저장됨")}</>
+                <Check size={15} /> 저장됨
+              </>
             ) : existing ? (
-              translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "수정 저장")
+              "수정 저장"
             ) : (
-              translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "리뷰 등록")
+              "리뷰 등록"
             )}
           </Button>
         </div>
       </div>
       <p className="text-[0.7rem] text-fg-3">
         {loggedIn
-          ? translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "평가는 계정에 저장되어 어느 기기에서나 이어집니다.")
-          : translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "평가는 이 브라우저에만 저장됩니다 (localStorage). 로그인하면 계정에 동기화돼요.")}{" "}
-        {translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "별점은 ")}{`'`}{translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "내 서재")}{`'`}{translateCurrentStaticSourceText("domains.community.components.review.form", "ko", "의 취향 분석에 반영돼요.")}</p>
+          ? "평가는 계정에 저장되어 어느 기기에서나 이어집니다."
+          : "평가는 이 브라우저에만 저장됩니다 (localStorage). 로그인하면 계정에 동기화돼요."}{" "}
+        별점은 {`'`}내 서재{`'`}의 취향 분석에 반영돼요.
+      </p>
     </form>
   );
 }

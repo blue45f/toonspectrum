@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * 신뢰성 상태 레일 — 저장·GPU·저장소 상태와 Safe Mode 를 사용자가 보는 곳에 띄운다.
  *
@@ -125,7 +121,7 @@ function SignalRow({ signal }: { signal: StudioReliabilitySignal }) {
       data-studio-reliability-level={signal.level}
       role="status"
       aria-live="polite"
-      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "en", "pointer-events-auto flex w-full max-w-[min(30rem,100%)] min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-2.5 py-1.5 text-xs shadow-sm backdrop-blur-md {v0}"), { v0: String(levelClassName(signal.level)) })}
+      className={`pointer-events-auto flex w-full max-w-[min(30rem,100%)] min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-2.5 py-1.5 text-xs shadow-sm backdrop-blur-md ${levelClassName(signal.level)}`}
     >
       <span className="min-w-0 flex-1 font-semibold leading-relaxed">{signal.title}</span>
       {signal.detail ? (
@@ -194,9 +190,10 @@ export function StudioReliabilityStatusRail() {
           className="pointer-events-auto flex w-full max-w-[min(30rem,100%)] flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/40 bg-warning-soft/30 p-2.5 text-xs text-warning shadow-sm backdrop-blur-md"
         >
           <span className="min-w-0 flex-1 leading-relaxed">
-            <strong className="font-bold">{translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "ko", "안전 모드")}</strong>
+            <strong className="font-bold">안전 모드</strong>
             <span className="ml-1.5 font-medium">
-              {translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "ko", "그림과 문서는 그대로예요. 화질과 속도만 낮췄습니다.")}</span>
+              그림과 문서는 그대로예요. 화질과 속도만 낮췄습니다.
+            </span>
             <span className="mt-1 block text-[0.68rem] font-medium opacity-85">
               {safeMode.reasons.map(describeStudioSafeModeReason).join(" · ")}
             </span>
@@ -207,7 +204,8 @@ export function StudioReliabilityStatusRail() {
             onClick={exitStudioSafeModeManually}
             className="ml-auto min-h-11 shrink-0 rounded-lg bg-accent/20 px-3 py-2 font-bold text-accent hover:bg-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "ko", "안전 모드 해제")}</button>
+            안전 모드 해제
+          </button>
         </div>
       ) : null}
 
@@ -221,9 +219,11 @@ export function StudioReliabilityStatusRail() {
           data-studio-destructive-outcome={destructive.outcome}
           role="status"
           aria-live="polite"
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "en", "pointer-events-auto flex w-full max-w-[min(30rem,100%)] min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-2.5 py-1.5 text-xs shadow-sm backdrop-blur-md {v0}"), { v0: String(destructive.outcome === "committed"
+          className={`pointer-events-auto flex w-full max-w-[min(30rem,100%)] min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-2.5 py-1.5 text-xs shadow-sm backdrop-blur-md ${
+            destructive.outcome === "committed"
               ? "border-line bg-card/95 text-fg-2"
-              : "border-danger/40 bg-danger-soft/25 text-danger") })}
+              : "border-danger/40 bg-danger-soft/25 text-danger"
+          }`}
         >
           <span className="min-w-0 flex-1 font-medium leading-relaxed">
             {destructive.summary}
@@ -238,14 +238,16 @@ export function StudioReliabilityStatusRail() {
               }}
               className="ml-auto min-h-11 shrink-0 rounded-lg bg-accent/20 px-3 py-2 font-bold text-accent hover:bg-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "ko", "실행 취소")}</button>
+              실행 취소
+            </button>
           ) : (
             <button
               type="button"
               onClick={() => dismissStudioDestructiveActionRecord(destructive.id)}
               className="ml-auto min-h-11 shrink-0 rounded-lg bg-line px-3 py-2 font-medium text-fg-3 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "ko", "닫기")}</button>
+              닫기
+            </button>
           )}
         </div>
       ) : null}
@@ -260,7 +262,8 @@ export function StudioReliabilityStatusRail() {
           className="pointer-events-auto flex w-full max-w-[min(30rem,100%)] min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-warning/40 bg-warning-soft/25 px-2.5 py-1.5 text-xs text-fg-2 shadow-sm backdrop-blur-md"
         >
           <span className="min-w-0 flex-1 font-medium leading-relaxed">
-            {record.provider} {translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "ko", "엔진이 획을 확정하지 못해 미리보기를 중단했습니다. 그린 획은 보존돼 있습니다 (")}{record.reason}).
+            {record.provider} 엔진이 획을 확정하지 못해 미리보기를 중단했습니다. 그린 획은 보존돼 있습니다
+            ({record.reason}).
           </span>
           <button
             type="button"
@@ -277,7 +280,8 @@ export function StudioReliabilityStatusRail() {
             }}
             className="ml-auto min-h-11 shrink-0 rounded-lg bg-accent/20 px-3 py-2 font-bold text-accent hover:bg-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "ko", "획 복구")}</button>
+            획 복구
+          </button>
           <button
             type="button"
             data-studio-rejected-stroke-dismiss
@@ -287,7 +291,8 @@ export function StudioReliabilityStatusRail() {
             }}
             className="min-h-11 shrink-0 rounded-lg bg-line px-3 py-2 font-medium text-fg-3 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "ko", "버리기")}</button>
+            버리기
+          </button>
         </div>
       ))}
       {rejectedStrokeNotice ? (
@@ -312,27 +317,27 @@ export function StudioReliabilityStatusRail() {
             data-studio-reliability-detail
             className="pointer-events-auto w-full max-w-[min(20rem,100%)] rounded-xl border border-line/60 bg-panel/95 p-2.5 text-xs shadow-lg backdrop-blur-md"
           >
-            <p className="mb-1.5 font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "ko", "저장·GPU·저장소 상태")}</p>
+            <p className="mb-1.5 font-bold text-fg-2">저장·GPU·저장소 상태</p>
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
               {RELIABILITY_CHANNEL_LABELS.map(([channel, label]) => (
                 <div key={channel} className="contents">
                   <dt className="font-semibold text-fg-3">{label}</dt>
                   <dd
                     data-studio-reliability-detail-channel={channel}
-                    className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "en", "min-w-0 font-medium {v0}"), { v0: String(status[channel] ? "text-warning" : "text-fg-2") })}
+                    className={`min-w-0 font-medium ${status[channel] ? "text-warning" : "text-fg-2"}`}
                   >
-                    {status[channel]?.title ?? translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "ko", "이상 없음")}
+                    {status[channel]?.title ?? "이상 없음"}
                   </dd>
                 </div>
               ))}
-              <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "ko", "안전 모드")}</dt>
+              <dt className="font-semibold text-fg-3">안전 모드</dt>
               <dd
                 data-studio-reliability-detail-channel="safe-mode"
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "en", "min-w-0 font-medium {v0}"), { v0: String(safeMode.active ? "text-warning" : "text-fg-2") })}
+                className={`min-w-0 font-medium ${safeMode.active ? "text-warning" : "text-fg-2"}`}
               >
                 {safeMode.active
                   ? safeMode.reasons.map(describeStudioSafeModeReason).join(" · ")
-                  : translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "ko", "꺼짐")}
+                  : "꺼짐"}
               </dd>
             </dl>
           </div>
@@ -343,7 +348,7 @@ export function StudioReliabilityStatusRail() {
           data-studio-reliability-chip
           aria-expanded={detailOpen}
           aria-controls={RELIABILITY_DETAIL_ID}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "ko", "저장·GPU·저장소 상태 · {v0}"), { v0: String(toneSummary(tone)) })}
+          aria-label={`저장·GPU·저장소 상태 · ${toneSummary(tone)}`}
           onClick={() => setDetailOpen((open) => !open)}
           onKeyDown={(event) => {
             if (event.key === "Escape" && detailOpen) {
@@ -351,11 +356,11 @@ export function StudioReliabilityStatusRail() {
               setDetailOpen(false);
             }
           }}
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "en", "pointer-events-auto grid size-11 shrink-0 place-items-center rounded-full border backdrop-blur-md backdrop-saturate-150 transition-colors hover:bg-raised/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(toneChipClassName(tone)) })}
+          className={`pointer-events-auto grid size-11 shrink-0 place-items-center rounded-full border backdrop-blur-md backdrop-saturate-150 transition-colors hover:bg-raised/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${toneChipClassName(tone)}`}
         >
           <span
             aria-hidden
-            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioReliabilityStatusRail", "en", "size-2.5 rounded-full {v0} {v1}"), { v0: String(toneDotClassName(tone)), v1: String(tone === "quiet" ? "" : "motion-safe:animate-pulse") })}
+            className={`size-2.5 rounded-full ${toneDotClassName(tone)} ${tone === "quiet" ? "" : "motion-safe:animate-pulse"}`}
           />
         </button>
       </div>

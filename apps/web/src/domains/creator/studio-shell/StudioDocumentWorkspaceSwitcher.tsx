@@ -1,4 +1,3 @@
-import { resolveUiLocale } from "@/shared/lib/i18n-bilingual-copy";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import {

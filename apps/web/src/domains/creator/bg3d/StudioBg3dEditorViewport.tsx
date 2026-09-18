@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /* Extracted from StudioBackground3D. Closures keep original identifiers via an `any` host bag. */
 // @ts-nocheck
 "use no memo";
@@ -363,7 +359,8 @@ export function StudioBg3dEditorViewport({ h }) {
               data-testid="bg3d-scroll-handle"
               className="sticky top-0 z-40 flex h-11 min-h-11 shrink-0 touch-pan-y items-center justify-center border-b border-line bg-panel px-3 text-xs font-medium text-fg-2 lg:hidden"
             >
-              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "위아래로 밀어 도구와 안내 보기")}</div>
+              위아래로 밀어 도구와 안내 보기
+            </div>
             {/* Mobile rows need 304+34px; the tablet rail needs 650+62px including padding. */}
             <div className="relative mx-auto flex h-full max-h-full min-h-[338px] w-full max-w-[min(92vw,960px)] shrink-0 items-center justify-center p-2 sm:min-h-[712px] sm:p-5 lg:max-h-[calc(100dvh-12rem)] lg:min-h-[420px]">
               <div
@@ -386,7 +383,8 @@ export function StudioBg3dEditorViewport({ h }) {
                     data-testid="studio-bg3d-engine-probing"
                     className="flex h-full w-full items-center justify-center p-6 text-center text-sm text-fg-3"
                   >
-                    {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "선택한 3D 엔진을 확인하고 있습니다.")}</div>
+                    선택한 3D 엔진을 확인하고 있습니다.
+                  </div>
                 ) : engineRuntime.plan.status !== "available" ? (
                   <div
                     role="alert"
@@ -397,7 +395,9 @@ export function StudioBg3dEditorViewport({ h }) {
                       {engineRuntime.deviceLostMessage ?? engineRuntime.plan.notice}
                     </p>
                     <p className="max-w-md text-xs leading-relaxed text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "자동으로 다른 엔진을 실행하지 않습니다. 보기 탭의 3D 렌더 엔진에서 WebGPU 또는 WebGL2를 직접 선택해 주세요.")}</p>
+                      자동으로 다른 엔진을 실행하지 않습니다. 보기 탭의 3D 렌더 엔진에서
+                      WebGPU 또는 WebGL2를 직접 선택해 주세요.
+                    </p>
                     <StudioBg3dEngineRecoveryActions
                       preference={engineRuntime.preference}
                       onPreferenceChange={engineRuntime.setPreference}
@@ -573,14 +573,16 @@ export function StudioBg3dEditorViewport({ h }) {
                     <Crosshair className="hidden shrink-0 text-accent sm:block" size={17} aria-hidden />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-bold text-fg">
-                        {placementPreviewAsset.name} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "배치")}</p>
+                        {placementPreviewAsset.name} 배치
+                      </p>
                       <p className="truncate text-[0.66rem] font-medium text-fg-3">
-                        {placementSession.placement.targetKind === "surface" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "표면") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "바닥")} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "· 클릭 확정 · Shift 축 고정 · [ ] 15° 회전")}</p>
+                        {placementSession.placement.targetKind === "surface" ? "표면" : "바닥"} · 클릭 확정 · Shift 축 고정 · [ ] 15° 회전
+                      </p>
                     </div>
                     <button
                       type="button"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "3D 배치 왼쪽으로 15도 회전")}
-                      title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "왼쪽 15° ([)")}
+                      aria-label="3D 배치 왼쪽으로 15도 회전"
+                      title="왼쪽 15° ([)"
                       className={VIEWPORT_BTN}
                       onClick={() => rotateCustomModelPlacement("counter-clockwise")}
                     >
@@ -588,8 +590,8 @@ export function StudioBg3dEditorViewport({ h }) {
                     </button>
                     <button
                       type="button"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "3D 배치 오른쪽으로 15도 회전")}
-                      title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "오른쪽 15° (])")}
+                      aria-label="3D 배치 오른쪽으로 15도 회전"
+                      title="오른쪽 15° (])"
                       className={VIEWPORT_BTN}
                       onClick={() => rotateCustomModelPlacement("clockwise")}
                     >
@@ -597,8 +599,8 @@ export function StudioBg3dEditorViewport({ h }) {
                     </button>
                     <button
                       type="button"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "3D 모델 배치 취소")}
-                      title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "배치 취소 (Esc)")}
+                      aria-label="3D 모델 배치 취소"
+                      title="배치 취소 (Esc)"
                       className={cx(VIEWPORT_BTN, "text-bad hover:text-bad")}
                       onClick={() => cancelCustomModelPlacement("3D 모델 배치를 취소했습니다.")}
                     >
@@ -693,13 +695,13 @@ export function StudioBg3dEditorViewport({ h }) {
                         })
                       }
                     >
-                      {transformSpace === "local" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "로컬 축") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "글로벌 축")}
+                      {transformSpace === "local" ? "로컬 축" : "글로벌 축"}
                     </button>
                   </StudioToolHintTarget>
                   <StudioToolHintTarget hint={quadViewHint} preferredSide="right">
                     <button
                       type="button"
-                      aria-label={isQuadView ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "단일 뷰로 복귀") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "4분할 뷰 열기")}
+                      aria-label={isQuadView ? "단일 뷰로 복귀" : "4분할 뷰 열기"}
                       aria-pressed={isQuadView}
                       disabled={physicsInteractionLocked || placementActive}
                       className={cx(
@@ -719,12 +721,12 @@ export function StudioBg3dEditorViewport({ h }) {
                   <StudioToolHintTarget
                     hint={BG3D_VIEWPORT_HINTS.undo}
                     disabled={!canUndo}
-                    unavailableReason={!canUndo ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "되돌릴 3D 장면 변경이 없습니다.") : undefined}
+                    unavailableReason={!canUndo ? "되돌릴 3D 장면 변경이 없습니다." : undefined}
                     preferredSide="right"
                   >
                     <button
                       type="button"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "실행 취소")}
+                      aria-label="실행 취소"
                       disabled={!canUndo || physicsInteractionLocked}
                       className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
                       onClick={doUndo}
@@ -735,12 +737,12 @@ export function StudioBg3dEditorViewport({ h }) {
                   <StudioToolHintTarget
                     hint={BG3D_VIEWPORT_HINTS.redo}
                     disabled={!canRedo}
-                    unavailableReason={!canRedo ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "다시 적용할 3D 장면 변경이 없습니다.") : undefined}
+                    unavailableReason={!canRedo ? "다시 적용할 3D 장면 변경이 없습니다." : undefined}
                     preferredSide="right"
                   >
                     <button
                       type="button"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "다시 실행")}
+                      aria-label="다시 실행"
                       disabled={!canRedo || physicsInteractionLocked}
                       className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
                       onClick={doRedo}
@@ -777,7 +779,7 @@ export function StudioBg3dEditorViewport({ h }) {
                   >
                     <button
                       type="button"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "바닥에 접지")}
+                      aria-label="바닥에 접지"
                       disabled={Boolean(groundSelectionDisabledReason)}
                       className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
                       onClick={groundSelectedEntity}
@@ -797,7 +799,7 @@ export function StudioBg3dEditorViewport({ h }) {
                   >
                     <button
                       type="button"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "배치 정리")}
+                      aria-label="배치 정리"
                       disabled={!canPlaceSelectedModelRecipe}
                       className={cx(
                         "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-line/70 bg-panel/80 px-1.5 text-[0.65rem] font-semibold text-fg-2 shadow-sm backdrop-blur transition-colors",
@@ -806,7 +808,8 @@ export function StudioBg3dEditorViewport({ h }) {
                       )}
                       onClick={placeSelectedModelRecipe}
                     >
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "배치 정리")}</button>
+                      배치 정리
+                    </button>
                   </StudioToolHintTarget>
                   <StudioToolHintTarget
                     hint={BG3D_VIEWPORT_HINTS.originGround}
@@ -816,7 +819,7 @@ export function StudioBg3dEditorViewport({ h }) {
                   >
                     <button
                       type="button"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "원점 · 바닥 정렬")}
+                      aria-label="원점 · 바닥 정렬"
                       disabled={Boolean(centerGroundSelectionDisabledReason)}
                       className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
                       onClick={centerAndGroundSelectedEntity}
@@ -832,7 +835,7 @@ export function StudioBg3dEditorViewport({ h }) {
                   >
                     <button
                       type="button"
-                      aria-label={surfaceSnapArmed ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "표면 붙이기 취소") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "표면에 붙이기")}
+                      aria-label={surfaceSnapArmed ? "표면 붙이기 취소" : "표면에 붙이기"}
                       aria-pressed={surfaceSnapArmed}
                       data-testid="bg3d-surface-snap-toggle"
                       disabled={Boolean(surfaceSnapDisabledReason) && !surfaceSnapArmed}
@@ -866,7 +869,7 @@ export function StudioBg3dEditorViewport({ h }) {
                   >
                     <button
                       type="button"
-                      aria-label={measurementActive ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "줄자 측정 취소") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "줄자 측정 시작")}
+                      aria-label={measurementActive ? "줄자 측정 취소" : "줄자 측정 시작"}
                       aria-pressed={measurementActive}
                       data-testid="bg3d-measurement-toggle"
                       disabled={Boolean(measurementDisabledReason) && !measurementActive}
@@ -893,7 +896,7 @@ export function StudioBg3dEditorViewport({ h }) {
                   >
                     <button
                       type="button"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "법선 정렬")}
+                      aria-label="법선 정렬"
                       aria-pressed={surfaceSnapAlignNormal}
                       data-testid="bg3d-surface-snap-align-normal"
                       className={cx(
@@ -904,7 +907,8 @@ export function StudioBg3dEditorViewport({ h }) {
                       )}
                       onClick={() => setSurfaceSnapAlignNormal((prev) => !prev)}
                     >
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "법선 정렬")}</button>
+                      법선 정렬
+                    </button>
                   </StudioToolHintTarget>
                   <StudioToolHintTarget
                     hint={BG3D_VIEWPORT_HINTS.focus}
@@ -914,7 +918,7 @@ export function StudioBg3dEditorViewport({ h }) {
                   >
                     <button
                       type="button"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "선택 객체 화면 맞춤")}
+                      aria-label="선택 객체 화면 맞춤"
                       disabled={Boolean(focusSelectionDisabledReason)}
                       className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
                       onClick={focusSelectedEntity}
@@ -935,7 +939,7 @@ export function StudioBg3dEditorViewport({ h }) {
                   <StudioToolHintTarget hint={BG3D_VIEWPORT_HINTS.zoomIn} preferredSide="left">
                     <button
                       type="button"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "확대")}
+                      aria-label="확대"
                       className={VIEWPORT_BTN}
                       onClick={() => zoomCameraBy(0.82)}
                     >
@@ -945,7 +949,7 @@ export function StudioBg3dEditorViewport({ h }) {
                   <StudioToolHintTarget hint={BG3D_VIEWPORT_HINTS.zoomOut} preferredSide="left">
                     <button
                       type="button"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "축소")}
+                      aria-label="축소"
                       className={VIEWPORT_BTN}
                       onClick={() => zoomCameraBy(1.22)}
                     >
@@ -955,7 +959,7 @@ export function StudioBg3dEditorViewport({ h }) {
                   <StudioToolHintTarget hint={BG3D_VIEWPORT_HINTS.resetView} preferredSide="left">
                     <button
                       type="button"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "시점 초기화")}
+                      aria-label="시점 초기화"
                       className={VIEWPORT_BTN}
                       onClick={() => applyCameraPreset("default")}
                     >
@@ -965,7 +969,7 @@ export function StudioBg3dEditorViewport({ h }) {
                   <StudioToolHintTarget hint={lineArtPreviewHint} preferredSide="left">
                     <button
                       type="button"
-                      aria-label={lineArtPreview ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "선화 미리보기 끄기") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "선화 미리보기 켜기")}
+                      aria-label={lineArtPreview ? "선화 미리보기 끄기" : "선화 미리보기 켜기"}
                       aria-pressed={lineArtPreview}
                       className={cx(VIEWPORT_BTN, lineArtPreview && "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent")}
                       onClick={() => setLineArtPreview((v) => !v)}
@@ -994,7 +998,7 @@ export function StudioBg3dEditorViewport({ h }) {
                   >
                     <button
                       type="button"
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "구도 가이드 전환 · 현재: {v0}"), { v0: String(compositionGuideMode) })}
+                      aria-label={`구도 가이드 전환 · 현재: ${compositionGuideMode}`}
                       aria-pressed={compositionGuideMode !== "none"}
                       data-testid="bg3d-composition-guide-toggle"
                       className={cx(
@@ -1018,7 +1022,7 @@ export function StudioBg3dEditorViewport({ h }) {
                   >
                     <button
                       type="button"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "웹툰 프로 툴 열기")}
+                      aria-label="웹툰 프로 툴 열기"
                       data-testid="bg3d-prosuite-quick-open"
                       className={cx(
                         VIEWPORT_BTN,
@@ -1085,7 +1089,7 @@ export function StudioBg3dEditorViewport({ h }) {
                 && !isCapturing
                 && !immersiveSceneActive ? (
                   <div
-                    role={sharedStageResolution.phase === "ready" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "en", "status") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "en", "alert")}
+                    role={sharedStageResolution.phase === "ready" ? "status" : "alert"}
                     data-testid="studio-bg3d-shared-stage-status"
                     className="rounded-lg border border-line/80 bg-panel/92 px-2.5 py-2 text-[0.68rem] font-semibold leading-relaxed text-fg-2 shadow-lg"
                   >
@@ -1139,7 +1143,8 @@ export function StudioBg3dEditorViewport({ h }) {
                     </div>
                     {!viewportHinted ? (
                       <span className="rounded-full border border-line/70 bg-panel/85 px-3 py-1 text-center text-[0.66rem] font-medium text-fg-3 shadow-sm backdrop-blur">
-                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "끌어서 회전 · 오른쪽 드래그로 이동 · 도형 클릭으로 선택")}</span>
+                        끌어서 회전 · 오른쪽 드래그로 이동 · 도형 클릭으로 선택
+                      </span>
                     ) : null}
                   </div>
                 ) : null}
@@ -1152,13 +1157,17 @@ export function StudioBg3dEditorViewport({ h }) {
                     {/* 컨트롤 패널은 lg 미만에서 뷰포트 "아래"에 쌓인다(lg:border-l). 방향을
                         말하면 휴대폰과 태블릿에서 틀린 안내가 되므로 탭 이름만 부른다. */}
                     <span className="rounded-full border border-line/70 bg-panel/90 px-3 py-1 text-center text-[0.66rem] font-semibold text-fg-2 shadow-sm backdrop-blur sm:hidden">
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "템플릿 · 도형 · 에셋 탭에서 장면을 채워보세요")}</span>
+                      템플릿 · 도형 · 에셋 탭에서 장면을 채워보세요
+                    </span>
                     <div className="hidden max-w-[18rem] rounded-2xl border border-line/70 bg-panel/92 px-4 py-4 text-center shadow-lg backdrop-blur sm:block">
                       <div className="mx-auto grid size-12 place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent">
                         <Boxes size={22} aria-hidden />
                       </div>
                       <p className="mt-3 text-sm font-bold leading-relaxed text-fg">
-                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorViewport", "ko", "&ldquo;템플릿&rdquo; 탭에서 완성된 공간을 통째로, &ldquo;도형&rdquo; 탭에서 상자·원기둥·평면을 하나씩, &ldquo;에셋&rdquo; 탭에서 캐릭터·소품을 놓아 장면을 잡아보세요.")}</p>
+                        &ldquo;템플릿&rdquo; 탭에서 완성된 공간을 통째로,
+                        &ldquo;도형&rdquo; 탭에서 상자·원기둥·평면을 하나씩,
+                        &ldquo;에셋&rdquo; 탭에서 캐릭터·소품을 놓아 장면을 잡아보세요.
+                      </p>
                     </div>
                   </div>
                 ) : null}

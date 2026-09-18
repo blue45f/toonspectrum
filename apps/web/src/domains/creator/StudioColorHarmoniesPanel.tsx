@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioColorHarmoniesPanel.tsx
  *
@@ -96,17 +92,17 @@ export function StudioColorHarmoniesPanel({
       <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-line bg-card/40 p-1.5">
         <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[0.65rem] text-fg-2">
           <span aria-hidden className="size-4 shrink-0 rounded border border-line-strong" style={{ backgroundColor: baseColor }} />
-          {translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "기준 ")}<span className="font-mono" data-studio-harmony-base>{baseColor}</span>
+          기준 <span className="font-mono" data-studio-harmony-base>{baseColor}</span>
         </span>
         <button
           type="button"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "배색 기준색 고정")}
+          aria-label="배색 기준색 고정"
           aria-pressed={lockedBase !== null}
           onClick={() => setLockedBase(lockedBase === null ? currentColor : null)}
           className="flex min-h-11 items-center gap-1 rounded-lg border border-line px-2 text-[0.65rem] text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           {lockedBase === null ? <UnlockKeyhole className="size-3.5" aria-hidden /> : <LockKeyhole className="size-3.5" aria-hidden />}
-          {lockedBase === null ? translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "기준 고정") : translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "고정됨")}
+          {lockedBase === null ? "기준 고정" : "고정됨"}
         </button>
         {lockedBase !== null && (
           <button
@@ -115,11 +111,12 @@ export function StudioColorHarmoniesPanel({
             onClick={() => setLockedBase(currentColor)}
             className="min-h-11 rounded-lg border border-line px-2 text-[0.65rem] text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "현재 색을 기준으로")}</button>
+            현재 색을 기준으로
+          </button>
         )}
       </div>
       <p className="text-[0.62rem] leading-relaxed text-fg-3">
-        {lockedBase === null ? translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "현재 색에 맞춰 배색합니다. 기준을 고정하면 같은 배색의 색들을 이어서 고를 수 있어요.") : translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "색을 골라도 기준색과 배색을 유지합니다.")}
+        {lockedBase === null ? "현재 색에 맞춰 배색합니다. 기준을 고정하면 같은 배색의 색들을 이어서 고를 수 있어요." : "색을 골라도 기준색과 배색을 유지합니다."}
       </p>
       {/* Visual Harmony Ribbon Preview */}
       <div className="relative overflow-hidden rounded-lg border border-line/60 p-1 bg-raised/40 shadow-inner">
@@ -137,7 +134,7 @@ export function StudioColorHarmoniesPanel({
       {/* Harmony Mode Pills (6 Rules) */}
       <div
         role="tablist"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "색상 조화 규칙")}
+        aria-label="색상 조화 규칙"
         className="grid grid-cols-3 gap-1 rounded-xl border border-line/70 bg-raised/50 p-1 backdrop-blur-sm"
       >
         {harmonies.map((h, index) => {
@@ -162,9 +159,11 @@ export function StudioColorHarmoniesPanel({
                 selectMode(harmonies[next]!.mode);
                 tabRefs.current[next]?.focus();
               }}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "en", "min-h-11 rounded-lg px-1.5 py-1 text-[0.62rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent {v0}"), { v0: String(isActive
+              className={`min-h-11 rounded-lg px-1.5 py-1 text-[0.62rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                isActive
                   ? "bg-card text-accent font-semibold shadow-sm border border-accent/40 scale-[1.02]"
-                  : "text-fg-3 hover:bg-card/60 hover:text-fg") })}
+                  : "text-fg-3 hover:bg-card/60 hover:text-fg"
+              }`}
             >
               {h.label.split(" (")[0]}
             </button>
@@ -179,21 +178,22 @@ export function StudioColorHarmoniesPanel({
           {selectedHarmony.description}
         </p>
         <span className="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 text-[0.56rem] font-mono font-semibold text-accent">
-          {selectedHarmony.colors.length}{translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "색 조화")}</span>
+          {selectedHarmony.colors.length}색 조화
+        </span>
       </div>
 
       {/* Swatches Grid with Painter Chips */}
-      <div className="flex flex-wrap items-center justify-center gap-2 pt-0.5" role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "조화 배색 목록")}>
+      <div className="flex flex-wrap items-center justify-center gap-2 pt-0.5" role="radiogroup" aria-label="조화 배색 목록">
         {selectedHarmony.colors.map((hex, idx) => {
           const isSelected = idx === selectedIndex;
           const isBase = idx === baseIndex;
           return (
-            <div key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "en", "{v0}-slot-{v1}"), { v0: String(activeMode), v1: String(idx) })} className="flex flex-col items-center gap-1">
+            <div key={`${activeMode}-slot-${idx}`} className="flex flex-col items-center gap-1">
               <button
                 type="button"
                 role="radio"
                 aria-checked={isSelected}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "조화 색상 {v0} 선택"), { v0: String(hex) })}
+                aria-label={`조화 색상 ${hex} 선택`}
                 tabIndex={idx === focusIndex ? 0 : -1}
                 ref={(node) => { swatchRefs.current[idx] = node; }}
                 onFocus={() => setSwatchIndex(idx)}
@@ -206,7 +206,9 @@ export function StudioColorHarmoniesPanel({
                   selectSwatch(next);
                   swatchRefs.current[next]?.focus();
                 }}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "en", "group relative size-11 cursor-pointer rounded-xl border border-line-strong shadow-md transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transform-none motion-reduce:transition-none {v0}"), { v0: String(isSelected ? "ring-2 ring-accent ring-offset-2 ring-offset-panel" : "") })}
+                className={`group relative size-11 cursor-pointer rounded-xl border border-line-strong shadow-md transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transform-none motion-reduce:transition-none ${
+                  isSelected ? "ring-2 ring-accent ring-offset-2 ring-offset-panel" : ""
+                }`}
                 style={{ backgroundColor: hex }}
               >
                 {/* Glossy top reflection */}
@@ -227,7 +229,7 @@ export function StudioColorHarmoniesPanel({
               </button>
               <div className="flex flex-col items-center">
                 <span className="font-mono text-[0.58rem] font-medium text-fg-2 tracking-tight">{hex}</span>
-                <span className="text-[0.52rem] text-fg-3">{isBase ? translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "기준색") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "조화 {v0}"), { v0: String(idx + 1) })}</span>
+                <span className="text-[0.52rem] text-fg-3">{isBase ? "기준색" : `조화 ${idx + 1}`}</span>
               </div>
             </div>
           );
@@ -239,15 +241,15 @@ export function StudioColorHarmoniesPanel({
       {onSaveAsPalette && (
         <button
           type="button"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "이 조화 배색을 내 팔레트로 저장")}
+          aria-label="이 조화 배색을 내 팔레트로 저장"
           onClick={handleSavePalette}
           className="mt-1 flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-accent/40 bg-accent/10 px-3 py-1.5 text-[0.66rem] font-semibold text-accent transition-colors hover:bg-accent/20 hover:border-accent/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           <Sparkles className="size-3" aria-hidden />
-          {savedBadge ? translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "내 팔레트에 저장했어요!") : translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "이 조화 배색을 내 팔레트로 저장")}
+          {savedBadge ? "내 팔레트에 저장했어요!" : "이 조화 배색을 내 팔레트로 저장"}
         </button>
       )}
-      <span role="status" aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "팔레트 저장 상태")} aria-live="polite" className="sr-only">{savedBadge ? translateCurrentStaticSourceText("domains.creator.StudioColorHarmoniesPanel", "ko", "내 팔레트에 저장했습니다.") : ""}</span>
+      <span role="status" aria-label="팔레트 저장 상태" aria-live="polite" className="sr-only">{savedBadge ? "내 팔레트에 저장했습니다." : ""}</span>
     </div>
   );
 }

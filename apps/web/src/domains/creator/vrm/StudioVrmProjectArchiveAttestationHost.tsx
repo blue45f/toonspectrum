@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { LoaderCircle } from "lucide-react";
 import {
   Component,
@@ -157,7 +153,7 @@ function ArchiveAttestationLoadingDialog({
 
   return createPortal(
     <div
-      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationHost", "en", "fixed inset-0 flex items-end justify-center sm:items-center sm:p-4 {v0}"), { v0: String(STUDIO_Z_CLASS.legal) })}
+      className={`fixed inset-0 flex items-end justify-center sm:items-center sm:p-4 ${STUDIO_Z_CLASS.legal}`}
     >
       <button
         type="button"
@@ -183,22 +179,25 @@ function ArchiveAttestationLoadingDialog({
           </span>
           <div className="min-w-0 flex-1">
             <h2 id="studio-vrm-archive-attestation-loading-title" className="text-sm font-bold text-fg">
-              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationHost", "ko", "VRM 이용 조건 불러오는 중")}</h2>
+              VRM 이용 조건 불러오는 중
+            </h2>
             <p
               id="studio-vrm-archive-attestation-loading-description"
               aria-live="polite"
               className="mt-1 text-xs leading-relaxed text-fg-2"
             >
-              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationHost", "ko", "archive에 포함될 모델의 확인 화면을 준비하고 있습니다.")}</p>
+              archive에 포함될 모델의 확인 화면을 준비하고 있습니다.
+            </p>
           </div>
         </div>
         <button
           type="button"
           data-autofocus="true"
           onClick={onCancel}
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationHost", "en", "mt-4 min-h-11 w-full rounded-xl border border-line bg-card px-4 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg {v0} {v1}"), { v0: String(STUDIO_EASE), v1: String(STUDIO_FOCUS_RING) })}
+          className={`mt-4 min-h-11 w-full rounded-xl border border-line bg-card px-4 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg ${STUDIO_EASE} ${STUDIO_FOCUS_RING}`}
         >
-          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationHost", "ko", "취소")}</button>
+          취소
+        </button>
       </section>
     </div>,
     document.body,

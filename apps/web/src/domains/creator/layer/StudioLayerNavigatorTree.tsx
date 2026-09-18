@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { ChevronDown, ChevronRight, Eye, EyeOff, Folder, GripVertical, Lock, LockOpen, MoreHorizontal, Search, Layers3, Check, Minus } from "lucide-react";
 
 import {
@@ -115,12 +111,12 @@ export function StudioLayerNavigatorTree({
             <Layers3 size={22} className="mx-auto text-fg-3" aria-hidden />
           )}
           <p className="mt-2 text-xs font-semibold text-fg-2">
-            {filterActive ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "조건에 맞는 레이어가 없습니다") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "아직 레이어가 없습니다")}
+            {filterActive ? "조건에 맞는 레이어가 없습니다" : "아직 레이어가 없습니다"}
           </p>
           <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
             {filterActive
-              ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "검색어나 필터를 지우고 다시 확인해 보세요.")
-              : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "이미지, 말풍선, 텍스트 또는 선화를 추가하면 이곳에서 관리할 수 있어요.")}
+              ? "검색어나 필터를 지우고 다시 확인해 보세요."
+              : "이미지, 말풍선, 텍스트 또는 선화를 추가하면 이곳에서 관리할 수 있어요."}
           </p>
           {filterActive ? (
             <button
@@ -133,7 +129,8 @@ export function StudioLayerNavigatorTree({
                 "mt-3"
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "필터 지우기")}</button>
+              필터 지우기
+            </button>
           ) : null}
         </div>
       </div>
@@ -143,7 +140,7 @@ export function StudioLayerNavigatorTree({
   return (
     <ul
       role="tree"
-      aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "레이어 트리")}
+      aria-label="레이어 트리"
       aria-multiselectable="true"
       className="flex flex-col gap-0.5"
       onKeyDown={(event) => {
@@ -200,7 +197,7 @@ export function StudioLayerNavigatorTree({
                   : "border-line/65"
             )}
             data-studio-layer-group-selection={
-              allChildrenSelected ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "en", "all") : partiallySelected ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "en", "partial") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "en", "none")
+              allChildrenSelected ? "all" : partiallySelected ? "partial" : "none"
             }
           >
             <div
@@ -213,7 +210,9 @@ export function StudioLayerNavigatorTree({
               aria-selected={allChildrenSelected}
               aria-expanded={node.empty ? undefined : node.expanded}
               aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Shift+ArrowUp Shift+ArrowDown Shift+Home Shift+End Shift+Space Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G Control+] Meta+] Shift+Control+] Shift+Meta+] Control+[ Meta+[ Shift+Control+[ Shift+Meta+[ Alt+ArrowUp Alt+ArrowDown Shift+Alt+ArrowUp Shift+Alt+ArrowDown"
-              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "{v0}, 그룹, {v1}개 레이어{v2}"), { v0: String(node.group.name), v1: String(node.entries.length), v2: String(groupStatus ? `, ${groupStatus}` : "") })}
+              aria-label={`${node.group.name}, 그룹, ${node.entries.length}개 레이어${
+                groupStatus ? `, ${groupStatus}` : ""
+              }`}
               tabIndex={tabStopKey === key ? 0 : -1}
               onFocus={() => setFocusedKey(key)}
               onKeyDown={(event) => handleTreeItemKeyDown(event, target)}
@@ -274,8 +273,8 @@ export function StudioLayerNavigatorTree({
                   )}
                   aria-label={
                     node.expanded
-                      ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "{v0} 그룹 접기"), { v0: String(node.group.name) })
-                      : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "{v0} 그룹 펼치기"), { v0: String(node.group.name) })
+                      ? `${node.group.name} 그룹 접기`
+                      : `${node.group.name} 그룹 펼치기`
                   }
                 >
                   {node.expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -293,9 +292,9 @@ export function StudioLayerNavigatorTree({
                   onGroupDragStart?.(event, node.group, target.itemIds)
                 }
                 onDragEnd={() => onGroupDragEnd?.()}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "{v0} 그룹 끌어 순서 변경"), { v0: String(node.group.name) })}
+                aria-label={`${node.group.name} 그룹 끌어 순서 변경`}
                 aria-describedby={dragHelpId}
-                title={canDragGroup ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "끌어서 그룹 블록 순서 변경") : undefined}
+                title={canDragGroup ? "끌어서 그룹 블록 순서 변경" : undefined}
                 className={cn(
                   "hidden size-6 shrink-0 cursor-grab place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-25 [@media(pointer:fine)]:grid",
                   focusRing
@@ -341,7 +340,7 @@ export function StudioLayerNavigatorTree({
                     aria-hidden
                     className="shrink-0 rounded bg-raised px-1 py-0.5 text-[0.62rem] font-normal tabular-nums text-fg-3 lg:text-[0.56rem]"
                   >
-                    {node.empty ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "비어 있음") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "{v0}개"), { v0: String(node.entries.length) })}
+                    {node.empty ? "비어 있음" : `${node.entries.length}개`}
                   </span>
                 </>
               )}
@@ -377,8 +376,8 @@ export function StudioLayerNavigatorTree({
                 )}
                 aria-label={
                   node.group.locked
-                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "{v0} 그룹 잠금 해제"), { v0: String(node.group.name) })
-                    : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "{v0} 그룹 잠금"), { v0: String(node.group.name) })
+                    ? `${node.group.name} 그룹 잠금 해제`
+                    : `${node.group.name} 그룹 잠금`
                 }
                 aria-pressed={node.group.locked === true}
               >
@@ -404,7 +403,7 @@ export function StudioLayerNavigatorTree({
                   focusRing
                 )}
                 aria-label={
-                  node.group.hidden ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "{v0} 그룹 표시"), { v0: String(node.group.name) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "{v0} 그룹 숨김"), { v0: String(node.group.name) })
+                  node.group.hidden ? `${node.group.name} 그룹 표시` : `${node.group.name} 그룹 숨김`
                 }
               >
                 {node.group.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
@@ -424,7 +423,7 @@ export function StudioLayerNavigatorTree({
                   coarseTarget,
                   focusRing
                 )}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "{v0} 그룹 작업"), { v0: String(node.group.name) })}
+                aria-label={`${node.group.name} 그룹 작업`}
               >
                 <MoreHorizontal size={15} />
               </button>
@@ -432,7 +431,7 @@ export function StudioLayerNavigatorTree({
             {node.expanded && node.entries.length > 0 ? (
               <ul
                 role="group"
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorTree", "ko", "{v0} 그룹 레이어"), { v0: String(node.group.name) })}
+                aria-label={`${node.group.name} 그룹 레이어`}
                 className="flex flex-col gap-0.5 border-t border-line/45 p-1 pl-3"
               >
                 {node.entries.map((entry) =>

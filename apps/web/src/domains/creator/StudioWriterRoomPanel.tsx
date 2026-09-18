@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
@@ -193,7 +189,7 @@ function TextField({ id, label, value, onChange, placeholder, maxLength, hint, r
           maxLength={maxLength}
           rows={rows}
           aria-describedby={hintId}
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "{v0} resize-y"), { v0: String(FIELD_CLASS) })}
+          className={`${FIELD_CLASS} resize-y`}
         />
       ) : (
         <input
@@ -237,38 +233,42 @@ function CharacterPicker({
   return (
     <fieldset className="min-w-0">
       <div className="flex min-h-8 items-center justify-between gap-2">
-        <legend className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "등장인물 참조")}</legend>
+        <legend className="text-xs font-semibold text-fg-2">등장인물 참조</legend>
         {onOpenCharacterBible && (
           <button
             type="button"
             onClick={onOpenCharacterBible}
             className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-[0.68rem] font-semibold text-accent transition-colors hover:bg-accent-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            <UserRoundCog size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "바이블 편집")}</button>
+            <UserRoundCog size={13} aria-hidden /> 바이블 편집
+          </button>
         )}
       </div>
       {characters.length === 0 && missingIds.length === 0 ? (
         <div className="mt-1.5 flex min-h-11 items-center justify-between gap-3 rounded-lg border border-dashed border-line px-3 text-xs text-fg-3">
-          <span>{translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "캐릭터 바이블에 등장인물을 먼저 등록하세요.")}</span>
+          <span>캐릭터 바이블에 등장인물을 먼저 등록하세요.</span>
           {onOpenCharacterBible && (
             <button
               type="button"
               onClick={onOpenCharacterBible}
               className="min-h-9 shrink-0 rounded-lg border border-line px-2.5 font-semibold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "열기")}</button>
+              열기
+            </button>
           )}
         </div>
       ) : (
-        <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2" aria-label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "등장인물 선택")}>
+        <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2" aria-label="등장인물 선택">
           {characters.map((character) => {
             const checked = selectedIds.includes(character.id);
             return (
               <label
                 key={character.id}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent {v0}"), { v0: String(checked
+                className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent ${
+                  checked
                     ? "border-accent/50 bg-accent-soft text-fg"
-                    : "border-line bg-card text-fg-2 hover:bg-raised") })}
+                    : "border-line bg-card text-fg-2 hover:bg-raised"
+                }`}
               >
                 <input
                   id={`${id}-${character.id}`}
@@ -281,7 +281,7 @@ function CharacterPicker({
                 />
                 <span className="min-w-0 flex-1 truncate">
                   <strong className="font-semibold text-fg">
-                    {character.name || translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "이름 없는 캐릭터")}
+                    {character.name || "이름 없는 캐릭터"}
                   </strong>
                   {character.role && <span className="ml-1 text-fg-3">· {character.role}</span>}
                 </span>
@@ -302,7 +302,7 @@ function CharacterPicker({
                 }
                 className="size-4"
               />
-              <span className="min-w-0 truncate">{translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "삭제된 캐릭터 참조 · ")}{characterId}</span>
+              <span className="min-w-0 truncate">삭제된 캐릭터 참조 · {characterId}</span>
             </label>
           ))}
         </div>
@@ -344,9 +344,11 @@ function ReferencePicker({
             return (
               <label
                 key={option.id}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent {v0}"), { v0: String(checked
+                className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent ${
+                  checked
                     ? "border-accent/50 bg-accent-soft text-fg"
-                    : "border-line bg-card text-fg-2 hover:bg-raised") })}
+                    : "border-line bg-card text-fg-2 hover:bg-raised"
+                }`}
               >
                 <input
                   id={`${id}-${option.id}`}
@@ -375,7 +377,7 @@ function ReferencePicker({
                 }
                 className="size-4"
               />
-              {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "누락된 참조 · ")}{missingId}
+              누락된 참조 · {missingId}
             </label>
           ))}
         </div>
@@ -405,7 +407,7 @@ function SelectReference({ id, label, value, options, onChange, emptyLabel }: Se
         className={FIELD_CLASS}
       >
         <option value="">{emptyLabel}</option>
-        {!hasCurrent && <option value={value}>{translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "누락된 참조 · ")}{value}</option>}
+        {!hasCurrent && <option value={value}>누락된 참조 · {value}</option>}
         {options.map((option) => (
           <option key={option.id} value={option.id}>
             {option.label}
@@ -460,13 +462,14 @@ function ItemFrame({
           <span className="block truncate text-xs font-semibold text-fg">{label}</span>
           {detail && <span className="mt-0.5 block truncate text-[0.65rem] text-fg-3">{detail}</span>}
         </span>
-        <span className="text-[0.65rem] tabular-nums text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "순서 ")}{order}</span>
+        <span className="text-[0.65rem] tabular-nums text-fg-3">순서 {order}</span>
       </summary>
       <div className="border-t border-line bg-card/30 px-3 py-3 sm:px-4 sm:py-4">
         <div className="mb-4 flex flex-wrap items-end gap-2">
-          <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "{v0}-order"), { v0: String(id) })} className="w-24 text-[0.68rem] font-semibold text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "정렬 순서")}<input
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "{v0}-order"), { v0: String(id) })}
+          <label htmlFor={`${id}-order`} className="w-24 text-[0.68rem] font-semibold text-fg-3">
+            정렬 순서
+            <input
+              id={`${id}-order`}
               type="number"
               min={0}
               max={STUDIO_WRITER_ROOM_LIMITS.maxOrder}
@@ -476,15 +479,15 @@ function ItemFrame({
                   onOrderChange(clampOrder(event.currentTarget.valueAsNumber));
                 }
               }}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "{v0} tabular-nums"), { v0: String(FIELD_CLASS) })}
+              className={`${FIELD_CLASS} tabular-nums`}
             />
           </label>
-          <div className="ml-auto flex items-center gap-1" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "{v0} 순서와 삭제"), { v0: String(label) })}>
+          <div className="ml-auto flex items-center gap-1" aria-label={`${label} 순서와 삭제`}>
             <button
               type="button"
               onClick={() => onMove(-1)}
               disabled={index === 0}
-              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "{v0} 위로 이동"), { v0: String(label) })}
+              aria-label={`${label} 위로 이동`}
               className={ICON_BUTTON_CLASS}
             >
               <ArrowUp size={15} aria-hidden />
@@ -493,7 +496,7 @@ function ItemFrame({
               type="button"
               onClick={() => onMove(1)}
               disabled={index >= count - 1}
-              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "{v0} 아래로 이동"), { v0: String(label) })}
+              aria-label={`${label} 아래로 이동`}
               className={ICON_BUTTON_CLASS}
             >
               <ArrowDown size={15} aria-hidden />
@@ -501,8 +504,8 @@ function ItemFrame({
             <button
               type="button"
               onClick={() => askBeforeDelete(deleteLabel, onDelete)}
-              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "{v0} 삭제"), { v0: String(deleteLabel) })}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "{v0} hover:border-bad/45 hover:bg-bad/10 hover:text-bad focus-visible:outline-bad"), { v0: String(ICON_BUTTON_CLASS) })}
+              aria-label={`${deleteLabel} 삭제`}
+              className={`${ICON_BUTTON_CLASS} hover:border-bad/45 hover:bg-bad/10 hover:text-bad focus-visible:outline-bad`}
             >
               <Trash2 size={15} aria-hidden />
             </button>
@@ -538,12 +541,13 @@ export function StudioWriterRoomCollectionHeader({
       <button
         type="button"
         onClick={onAdd}
-        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "{v0} bg-accent text-on-accent hover:border-accent hover:bg-accent-hover hover:text-on-accent"), { v0: String(BUTTON_CLASS) })}
+        className={`${BUTTON_CLASS} bg-accent text-on-accent hover:border-accent hover:bg-accent-hover hover:text-on-accent`}
       >
         <Plus size={14} aria-hidden /> {addLabel}
       </button>
       <span className="w-full text-right text-[0.65rem] tabular-nums text-fg-3 sm:w-auto sm:self-center">
-        {count.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "개")}</span>
+        {count.toLocaleString("ko-KR")}개
+      </span>
     </div>
   );
 }
@@ -579,25 +583,25 @@ function TextStageEditor<Content extends StudioWriterRoomPremise | StudioWriterR
   return (
     <div className="mx-auto max-w-4xl space-y-5 px-4 py-5 sm:px-6">
       <TextField
-        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-{v0}-text"), { v0: String(stage) })}
-        label={premise ? translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "작품을 설명하는 한 문장") : translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "전체 이야기")}
+        id={`writer-room-${stage}-text`}
+        label={premise ? "작품을 설명하는 한 문장" : "전체 이야기"}
         value={content.text}
         onChange={(text) => onChange({ ...content, text })}
         placeholder={
           premise
-            ? translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "예: 기억을 잃을수록 강해지는 퇴마사가 사라진 형을 찾기 위해 금지된 도시로 들어간다.")
-            : translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "도입, 상승, 위기, 절정, 결말의 인과와 주인공의 감정 변화를 적어보세요.")
+            ? "예: 기억을 잃을수록 강해지는 퇴마사가 사라진 형을 찾기 위해 금지된 도시로 들어간다."
+            : "도입, 상승, 위기, 절정, 결말의 인과와 주인공의 감정 변화를 적어보세요."
         }
         maxLength={STUDIO_WRITER_ROOM_LIMITS.maxTextLength}
         rows={premise ? 4 : 12}
         hint={
           premise
-            ? translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "주인공 + 목표 + 장애물 + 차별점이 드러나면 다음 단계의 기준이 선명해집니다.")
-            : translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "결말을 숨기지 않고 적어야 이후 장면과 복선을 안정적으로 검토할 수 있어요.")
+            ? "주인공 + 목표 + 장애물 + 차별점이 드러나면 다음 단계의 기준이 선명해집니다."
+            : "결말을 숨기지 않고 적어야 이후 장면과 복선을 안정적으로 검토할 수 있어요."
         }
       />
       <CharacterPicker
-        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-{v0}-characters"), { v0: String(stage) })}
+        id={`writer-room-${stage}-characters`}
         selectedIds={content.characterIds}
         characters={characters}
         onChange={(characterIds) => onChange({ ...content, characterIds })}
@@ -624,21 +628,21 @@ function EpisodeOutlineEditor({
     <div className="mx-auto max-w-4xl space-y-5 px-4 py-5 sm:px-6">
       <TextField
         id="writer-room-episode-title"
-        label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "회차 제목")}
+        label="회차 제목"
         value={content.title}
         onChange={(title) => onChange({ ...content, title })}
-        placeholder={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "예: 12화 · 문이 열린 밤")}
+        placeholder="예: 12화 · 문이 열린 밤"
         maxLength={STUDIO_WRITER_ROOM_LIMITS.maxShortTextLength}
       />
       <TextField
         id="writer-room-episode-summary"
-        label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "회차 흐름과 마지막 훅")}
+        label="회차 흐름과 마지막 훅"
         value={content.summary}
         onChange={(summary) => onChange({ ...content, summary })}
-        placeholder={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "이번 회차에서 달성할 목표, 중간 전환, 마지막 컷의 질문이나 충격을 적어보세요.")}
+        placeholder="이번 회차에서 달성할 목표, 중간 전환, 마지막 컷의 질문이나 충격을 적어보세요."
         maxLength={STUDIO_WRITER_ROOM_LIMITS.maxTextLength}
         rows={9}
-        hint={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "독자가 다음 회차를 눌러야 할 이유를 마지막 한두 문장에 구체적으로 남기세요.")}
+        hint="독자가 다음 회차를 눌러야 할 이유를 마지막 한두 문장에 구체적으로 남기세요."
       />
       <CharacterPicker
         id="writer-room-episode-characters"
@@ -670,52 +674,52 @@ function BeatsEditor({ items, characters, onChange, onOpenCharacterBible }: Beat
   return (
     <section className="mx-auto my-4 max-w-5xl overflow-hidden rounded-xl border border-line bg-card/20">
       <StudioWriterRoomCollectionHeader
-        title={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "감정과 사건의 비트")}
-        description={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "한 비트에는 독자의 기대나 감정이 한 번 변하는 사건 하나만 둡니다.")}
+        title="감정과 사건의 비트"
+        description="한 비트에는 독자의 기대나 감정이 한 번 변하는 사건 하나만 둡니다."
         count={items.length}
         onAdd={add}
-        addLabel={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "비트 추가")}
+        addLabel="비트 추가"
       />
       {sorted.length === 0 ? (
         <EmptyCollection
-          title={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "첫 비트를 추가하세요")}
-          description={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "도입 정보, 갈등 상승, 반전, 감정 보상, 다음 화 훅 순서로 시작하면 편합니다.")}
+          title="첫 비트를 추가하세요"
+          description="도입 정보, 갈등 상승, 반전, 감정 보상, 다음 화 훅 순서로 시작하면 편합니다."
         />
       ) : (
         sorted.map((beat, index) => (
           <ItemFrame
             key={beat.id}
-            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-beat-{v0}"), { v0: String(beat.id) })}
+            id={`writer-room-beat-${beat.id}`}
             index={index}
             count={sorted.length}
             order={beat.order}
-            label={beat.title || translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "제목 없는 비트")}
-            detail={beat.summary || translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "사건과 감정 변화를 입력하세요.")}
-            deleteLabel={beat.title || translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "이 비트")}
+            label={beat.title || "제목 없는 비트"}
+            detail={beat.summary || "사건과 감정 변화를 입력하세요."}
+            deleteLabel={beat.title || "이 비트"}
             onOrderChange={(order) => onChange(updateItem(items, beat.id, { order }))}
             onMove={(delta) => onChange(moveItem(items, beat.id, delta))}
             onDelete={() => onChange(items.filter((item) => item.id !== beat.id))}
             defaultOpen={!beat.title && !beat.summary}
           >
             <TextField
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-beat-{v0}-title"), { v0: String(beat.id) })}
-              label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "비트 제목")}
+              id={`writer-room-beat-${beat.id}-title`}
+              label="비트 제목"
               value={beat.title}
               onChange={(title) => onChange(updateItem(items, beat.id, { title }))}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "예: 금지 구역의 첫 경고")}
+              placeholder="예: 금지 구역의 첫 경고"
               maxLength={STUDIO_WRITER_ROOM_LIMITS.maxShortTextLength}
             />
             <TextField
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-beat-{v0}-summary"), { v0: String(beat.id) })}
-              label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "사건과 감정 변화")}
+              id={`writer-room-beat-${beat.id}-summary`}
+              label="사건과 감정 변화"
               value={beat.summary}
               onChange={(summary) => onChange(updateItem(items, beat.id, { summary }))}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "무슨 일이 일어나고, 그 전후로 인물이나 독자의 감정이 어떻게 달라지는지 적어보세요.")}
+              placeholder="무슨 일이 일어나고, 그 전후로 인물이나 독자의 감정이 어떻게 달라지는지 적어보세요."
               maxLength={STUDIO_WRITER_ROOM_LIMITS.maxTextLength}
               rows={5}
             />
             <CharacterPicker
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-beat-{v0}-characters"), { v0: String(beat.id) })}
+              id={`writer-room-beat-${beat.id}-characters`}
               selectedIds={beat.characterIds}
               characters={characters}
               onChange={(characterIds) =>
@@ -769,28 +773,28 @@ function ScenesEditor({
   return (
     <section className="mx-auto my-4 max-w-5xl overflow-hidden rounded-xl border border-line bg-card/20">
       <StudioWriterRoomCollectionHeader
-        title={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "장면 설계")}
-        description={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "같은 장소와 시간 안에서 이어지는 행동을 한 장면으로 묶습니다.")}
+        title="장면 설계"
+        description="같은 장소와 시간 안에서 이어지는 행동을 한 장면으로 묶습니다."
         count={items.length}
         onAdd={add}
-        addLabel={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "장면 추가")}
+        addLabel="장면 추가"
       />
       {sorted.length === 0 ? (
         <EmptyCollection
-          title={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "비트를 장면으로 옮겨보세요")}
-          description={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "장소나 시간이 바뀌면 새 장면으로 나누고, 필요한 비트를 연결하세요.")}
+          title="비트를 장면으로 옮겨보세요"
+          description="장소나 시간이 바뀌면 새 장면으로 나누고, 필요한 비트를 연결하세요."
         />
       ) : (
         sorted.map((scene, index) => (
           <ItemFrame
             key={scene.id}
-            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-scene-{v0}"), { v0: String(scene.id) })}
+            id={`writer-room-scene-${scene.id}`}
             index={index}
             count={sorted.length}
             order={scene.order}
-            label={scene.heading || translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "제목 없는 장면")}
+            label={scene.heading || "제목 없는 장면"}
             detail={[scene.location, scene.time].filter(Boolean).join(" · ") || scene.summary}
-            deleteLabel={scene.heading || translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "이 장면")}
+            deleteLabel={scene.heading || "이 장면"}
             onOrderChange={(order) => onChange(updateItem(items, scene.id, { order }))}
             onMove={(delta) => onChange(moveItem(items, scene.id, delta))}
             onDelete={() => onChange(items.filter((item) => item.id !== scene.id))}
@@ -798,49 +802,49 @@ function ScenesEditor({
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <TextField
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-scene-{v0}-heading"), { v0: String(scene.id) })}
-                label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "장면 제목")}
+                id={`writer-room-scene-${scene.id}-heading`}
+                label="장면 제목"
                 value={scene.heading}
                 onChange={(heading) => onChange(updateItem(items, scene.id, { heading }))}
-                placeholder={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "예: 지하철 막차 — 플랫폼")}
+                placeholder="예: 지하철 막차 — 플랫폼"
                 maxLength={STUDIO_WRITER_ROOM_LIMITS.maxShortTextLength}
               />
               <TextField
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-scene-{v0}-location"), { v0: String(scene.id) })}
-                label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "장소")}
+                id={`writer-room-scene-${scene.id}-location`}
+                label="장소"
                 value={scene.location}
                 onChange={(location) => onChange(updateItem(items, scene.id, { location }))}
-                placeholder={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "예: 폐쇄된 4번 승강장")}
+                placeholder="예: 폐쇄된 4번 승강장"
                 maxLength={STUDIO_WRITER_ROOM_LIMITS.maxShortTextLength}
               />
               <TextField
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-scene-{v0}-time"), { v0: String(scene.id) })}
-                label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "시간")}
+                id={`writer-room-scene-${scene.id}-time`}
+                label="시간"
                 value={scene.time}
                 onChange={(time) => onChange(updateItem(items, scene.id, { time }))}
-                placeholder={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "예: 자정 직전 · 비 오는 밤")}
+                placeholder="예: 자정 직전 · 비 오는 밤"
                 maxLength={STUDIO_WRITER_ROOM_LIMITS.maxShortTextLength}
               />
             </div>
             <TextField
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-scene-{v0}-summary"), { v0: String(scene.id) })}
-              label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "장면 안의 행동과 변화")}
+              id={`writer-room-scene-${scene.id}-summary`}
+              label="장면 안의 행동과 변화"
               value={scene.summary}
               onChange={(summary) => onChange(updateItem(items, scene.id, { summary }))}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "장면 시작 상태, 핵심 행동, 끝났을 때 달라진 점을 적어보세요.")}
+              placeholder="장면 시작 상태, 핵심 행동, 끝났을 때 달라진 점을 적어보세요."
               maxLength={STUDIO_WRITER_ROOM_LIMITS.maxTextLength}
               rows={5}
             />
             <ReferencePicker
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-scene-{v0}-beats"), { v0: String(scene.id) })}
-              label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "이 장면이 수행하는 비트")}
+              id={`writer-room-scene-${scene.id}-beats`}
+              label="이 장면이 수행하는 비트"
               selectedIds={scene.beatIds}
               options={beatOptions}
               onChange={(beatIds) => onChange(updateItem(items, scene.id, { beatIds }))}
-              emptyText={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "비트 단계에서 항목을 만들면 이 장면에 연결할 수 있어요.")}
+              emptyText="비트 단계에서 항목을 만들면 이 장면에 연결할 수 있어요."
             />
             <CharacterPicker
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-scene-{v0}-characters"), { v0: String(scene.id) })}
+              id={`writer-room-scene-${scene.id}-characters`}
               selectedIds={scene.characterIds}
               characters={characters}
               onChange={(characterIds) =>
@@ -892,28 +896,28 @@ function PanelsEditor({
   return (
     <section className="mx-auto my-4 max-w-5xl overflow-hidden rounded-xl border border-line bg-card/20">
       <StudioWriterRoomCollectionHeader
-        title={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "세로 스크롤 컷 플랜")}
-        description={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "한 컷에는 독자가 한눈에 읽을 수 있는 핵심 행동 하나만 둡니다.")}
+        title="세로 스크롤 컷 플랜"
+        description="한 컷에는 독자가 한눈에 읽을 수 있는 핵심 행동 하나만 둡니다."
         count={items.length}
         onAdd={add}
-        addLabel={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "컷 추가")}
+        addLabel="컷 추가"
       />
       {sorted.length === 0 ? (
         <EmptyCollection
-          title={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "첫 컷을 설계하세요")}
-          description={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "와이드 전경, 인물 반응, 손이나 소품의 인서트처럼 시선 흐름을 번갈아 구성해 보세요.")}
+          title="첫 컷을 설계하세요"
+          description="와이드 전경, 인물 반응, 손이나 소품의 인서트처럼 시선 흐름을 번갈아 구성해 보세요."
         />
       ) : (
         sorted.map((panel, index) => (
           <ItemFrame
             key={panel.id}
-            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-panel-{v0}"), { v0: String(panel.id) })}
+            id={`writer-room-panel-${panel.id}`}
             index={index}
             count={sorted.length}
             order={panel.order}
-            label={panel.shot || formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "컷 {v0}"), { v0: String(index + 1) })}
-            detail={panel.action || translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "화면에 보일 핵심 행동을 입력하세요.")}
-            deleteLabel={panel.shot || formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "컷 {v0}"), { v0: String(index + 1) })}
+            label={panel.shot || `컷 ${index + 1}`}
+            detail={panel.action || "화면에 보일 핵심 행동을 입력하세요."}
+            deleteLabel={panel.shot || `컷 ${index + 1}`}
             onOrderChange={(order) => onChange(updateItem(items, panel.id, { order }))}
             onMove={(delta) => onChange(moveItem(items, panel.id, delta))}
             onDelete={() => onChange(items.filter((item) => item.id !== panel.id))}
@@ -921,33 +925,33 @@ function PanelsEditor({
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <SelectReference
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-panel-{v0}-scene"), { v0: String(panel.id) })}
-                label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "연결 장면")}
+                id={`writer-room-panel-${panel.id}-scene`}
+                label="연결 장면"
                 value={panel.sceneId}
                 options={sceneOptions}
                 onChange={(sceneId) => onChange(updateItem(items, panel.id, { sceneId }))}
-                emptyLabel={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "장면 미연결")}
+                emptyLabel="장면 미연결"
               />
               <TextField
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-panel-{v0}-shot"), { v0: String(panel.id) })}
-                label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "샷과 구도")}
+                id={`writer-room-panel-${panel.id}-shot`}
+                label="샷과 구도"
                 value={panel.shot}
                 onChange={(shot) => onChange(updateItem(items, panel.id, { shot }))}
-                placeholder={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "예: 로우 앵글 미디엄 클로즈업")}
+                placeholder="예: 로우 앵글 미디엄 클로즈업"
                 maxLength={STUDIO_WRITER_ROOM_LIMITS.maxShortTextLength}
               />
             </div>
             <TextField
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-panel-{v0}-action"), { v0: String(panel.id) })}
-              label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "화면에 보이는 행동")}
+              id={`writer-room-panel-${panel.id}-action`}
+              label="화면에 보이는 행동"
               value={panel.action}
               onChange={(action) => onChange(updateItem(items, panel.id, { action }))}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "독자가 실제 그림에서 확인할 수 있는 동작, 표정, 소품 변화를 적어보세요.")}
+              placeholder="독자가 실제 그림에서 확인할 수 있는 동작, 표정, 소품 변화를 적어보세요."
               maxLength={STUDIO_WRITER_ROOM_LIMITS.maxTextLength}
               rows={5}
             />
             <CharacterPicker
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-panel-{v0}-characters"), { v0: String(panel.id) })}
+              id={`writer-room-panel-${panel.id}-characters`}
               selectedIds={panel.characterIds}
               characters={characters}
               onChange={(characterIds) =>
@@ -991,16 +995,16 @@ function DialogueEditor({ items, panels, characters, onChange }: DialogueEditorP
   return (
     <section className="overflow-hidden rounded-xl border border-line bg-card/20">
       <StudioWriterRoomCollectionHeader
-        title={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "컷별 대사")}
-        description={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "말풍선 하나에 한 호흡을 두고, 화자의 바이블 말투와 대조해 검토합니다.")}
+        title="컷별 대사"
+        description="말풍선 하나에 한 호흡을 두고, 화자의 바이블 말투와 대조해 검토합니다."
         count={items.length}
         onAdd={add}
-        addLabel={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "대사 추가")}
+        addLabel="대사 추가"
       />
       {sorted.length === 0 ? (
         <EmptyCollection
-          title={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "대사를 컷에 연결하세요")}
-          description={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "화자가 없는 내레이션도 추가할 수 있습니다.")}
+          title="대사를 컷에 연결하세요"
+          description="화자가 없는 내레이션도 추가할 수 있습니다."
         />
       ) : (
         sorted.map((dialogue, index) => {
@@ -1008,13 +1012,13 @@ function DialogueEditor({ items, panels, characters, onChange }: DialogueEditorP
           return (
             <ItemFrame
               key={dialogue.id}
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-dialogue-{v0}"), { v0: String(dialogue.id) })}
+              id={`writer-room-dialogue-${dialogue.id}`}
               index={index}
               count={sorted.length}
               order={dialogue.order}
-              label={speaker?.name || (dialogue.characterId ? translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "삭제된 화자") : translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "내레이션"))}
-              detail={dialogue.text || translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "대사를 입력하세요.")}
-              deleteLabel={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "{v0} 대사"), { v0: String(speaker?.name || "이") })}
+              label={speaker?.name || (dialogue.characterId ? "삭제된 화자" : "내레이션")}
+              detail={dialogue.text || "대사를 입력하세요."}
+              deleteLabel={`${speaker?.name || "이"} 대사`}
               onOrderChange={(order) => onChange(updateItem(items, dialogue.id, { order }))}
               onMove={(delta) => onChange(moveItem(items, dialogue.id, delta))}
               onDelete={() => onChange(items.filter((item) => item.id !== dialogue.id))}
@@ -1022,21 +1026,22 @@ function DialogueEditor({ items, panels, characters, onChange }: DialogueEditorP
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <SelectReference
-                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-dialogue-{v0}-panel"), { v0: String(dialogue.id) })}
-                  label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "연결 컷")}
+                  id={`writer-room-dialogue-${dialogue.id}-panel`}
+                  label="연결 컷"
                   value={dialogue.panelId}
                   options={panelOptions}
                   onChange={(panelId) =>
                     onChange(updateItem(items, dialogue.id, { panelId }))
                   }
-                  emptyLabel={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "컷 미연결")}
+                  emptyLabel="컷 미연결"
                 />
                 <label
-                  htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-dialogue-{v0}-speaker"), { v0: String(dialogue.id) })}
+                  htmlFor={`writer-room-dialogue-${dialogue.id}-speaker`}
                   className="block text-xs font-semibold text-fg-2"
                 >
-                  {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "화자")}<select
-                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-dialogue-{v0}-speaker"), { v0: String(dialogue.id) })}
+                  화자
+                  <select
+                    id={`writer-room-dialogue-${dialogue.id}-speaker`}
                     value={dialogue.characterId ?? ""}
                     onChange={(event) =>
                       onChange(
@@ -1047,27 +1052,27 @@ function DialogueEditor({ items, panels, characters, onChange }: DialogueEditorP
                     }
                     className={FIELD_CLASS}
                   >
-                    <option value="">{translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "내레이션 / 화자 없음")}</option>
+                    <option value="">내레이션 / 화자 없음</option>
                     {dialogue.characterId &&
                       !characters.some((character) => character.id === dialogue.characterId) && (
                         <option value={dialogue.characterId}>
-                          {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "삭제된 화자 · ")}{dialogue.characterId}
+                          삭제된 화자 · {dialogue.characterId}
                         </option>
                       )}
                     {characters.map((character) => (
                       <option key={character.id} value={character.id}>
-                        {character.name || translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "이름 없는 캐릭터")}
+                        {character.name || "이름 없는 캐릭터"}
                       </option>
                     ))}
                   </select>
                 </label>
               </div>
               <TextField
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-dialogue-{v0}-text"), { v0: String(dialogue.id) })}
-                label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "대사 또는 내레이션")}
+                id={`writer-room-dialogue-${dialogue.id}-text`}
+                label="대사 또는 내레이션"
                 value={dialogue.text}
                 onChange={(text) => onChange(updateItem(items, dialogue.id, { text }))}
-                placeholder={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "말풍선 한 개에 들어갈 한 호흡을 적어보세요.")}
+                placeholder="말풍선 한 개에 들어갈 한 호흡을 적어보세요."
                 maxLength={STUDIO_WRITER_ROOM_LIMITS.maxDialogueLength}
                 rows={4}
               />
@@ -1108,16 +1113,16 @@ function SfxEditor({ items, panels, onChange }: SfxEditorProps) {
   return (
     <section className="overflow-hidden rounded-xl border border-line bg-card/20">
       <StudioWriterRoomCollectionHeader
-        title={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "효과음 레터링")}
-        description={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "프리셋을 고르거나 직접 입력하고, 장면의 강도에 맞춰 크기와 강조를 지정합니다.")}
+        title="효과음 레터링"
+        description="프리셋을 고르거나 직접 입력하고, 장면의 강도에 맞춰 크기와 강조를 지정합니다."
         count={items.length}
         onAdd={add}
-        addLabel={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "효과음 추가")}
+        addLabel="효과음 추가"
       />
       {sorted.length === 0 ? (
         <EmptyCollection
-          title={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "소리의 리듬을 추가하세요")}
-          description={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "충격음뿐 아니라 정적, 움직임, 환경음을 배치하면 스크롤의 속도가 살아납니다.")}
+          title="소리의 리듬을 추가하세요"
+          description="충격음뿐 아니라 정적, 움직임, 환경음을 배치하면 스크롤의 속도가 살아납니다."
         />
       ) : (
         sorted.map((sfx, index) => {
@@ -1125,13 +1130,13 @@ function SfxEditor({ items, panels, onChange }: SfxEditorProps) {
           return (
             <ItemFrame
               key={sfx.id}
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-sfx-{v0}"), { v0: String(sfx.id) })}
+              id={`writer-room-sfx-${sfx.id}`}
               index={index}
               count={sorted.length}
               order={sfx.order}
-              label={sfx.customText || preset?.text || translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "효과음")}
+              label={sfx.customText || preset?.text || "효과음"}
               detail={`${EMPHASIS_LABELS[sfx.style.emphasis]} · ${SCALE_LABELS[sfx.style.scale]}`}
-              deleteLabel={sfx.customText || preset?.label || translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "이 효과음")}
+              deleteLabel={sfx.customText || preset?.label || "이 효과음"}
               onOrderChange={(order) => onChange(updateItem(items, sfx.id, { order }))}
               onMove={(delta) => onChange(moveItem(items, sfx.id, delta))}
               onDelete={() => onChange(items.filter((item) => item.id !== sfx.id))}
@@ -1139,19 +1144,20 @@ function SfxEditor({ items, panels, onChange }: SfxEditorProps) {
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <SelectReference
-                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-sfx-{v0}-panel"), { v0: String(sfx.id) })}
-                  label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "연결 컷")}
+                  id={`writer-room-sfx-${sfx.id}-panel`}
+                  label="연결 컷"
                   value={sfx.panelId}
                   options={panelOptions}
                   onChange={(panelId) => onChange(updateItem(items, sfx.id, { panelId }))}
-                  emptyLabel={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "컷 미연결")}
+                  emptyLabel="컷 미연결"
                 />
                 <label
-                  htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-sfx-{v0}-preset"), { v0: String(sfx.id) })}
+                  htmlFor={`writer-room-sfx-${sfx.id}-preset`}
                   className="block text-xs font-semibold text-fg-2"
                 >
-                  {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "효과음 프리셋")}<select
-                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-sfx-{v0}-preset"), { v0: String(sfx.id) })}
+                  효과음 프리셋
+                  <select
+                    id={`writer-room-sfx-${sfx.id}-preset`}
                     value={sfx.presetId ?? ""}
                     onChange={(event) =>
                       onChange(
@@ -1162,7 +1168,7 @@ function SfxEditor({ items, panels, onChange }: SfxEditorProps) {
                     }
                     className={FIELD_CLASS}
                   >
-                    <option value="">{translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "프리셋 없음 · 직접 입력")}</option>
+                    <option value="">프리셋 없음 · 직접 입력</option>
                     {SFX_CATEGORIES.map((category) => (
                       <optgroup key={category.id} label={category.label}>
                         {SFX_LIBRARY.filter((candidate) => candidate.category === category.id).map(
@@ -1178,21 +1184,22 @@ function SfxEditor({ items, panels, onChange }: SfxEditorProps) {
                 </label>
               </div>
               <TextField
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-sfx-{v0}-custom-text"), { v0: String(sfx.id) })}
-                label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "직접 입력 효과음")}
+                id={`writer-room-sfx-${sfx.id}-custom-text`}
+                label="직접 입력 효과음"
                 value={sfx.customText}
                 onChange={(customText) => onChange(updateItem(items, sfx.id, { customText }))}
-                placeholder={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "프리셋 문구를 바꾸거나 새로운 효과음을 입력하세요.")}
+                placeholder="프리셋 문구를 바꾸거나 새로운 효과음을 입력하세요."
                 maxLength={STUDIO_WRITER_ROOM_LIMITS.maxSfxTextLength}
-                hint={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "직접 입력 문구가 있으면 프리셋보다 우선해 사용합니다.")}
+                hint="직접 입력 문구가 있으면 프리셋보다 우선해 사용합니다."
               />
               <div className="grid gap-4 sm:grid-cols-2">
                 <label
-                  htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-sfx-{v0}-emphasis"), { v0: String(sfx.id) })}
+                  htmlFor={`writer-room-sfx-${sfx.id}-emphasis`}
                   className="block text-xs font-semibold text-fg-2"
                 >
-                  {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "강조 강도")}<select
-                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-sfx-{v0}-emphasis"), { v0: String(sfx.id) })}
+                  강조 강도
+                  <select
+                    id={`writer-room-sfx-${sfx.id}-emphasis`}
                     value={sfx.style.emphasis}
                     onChange={(event) =>
                       onChange(
@@ -1215,11 +1222,12 @@ function SfxEditor({ items, panels, onChange }: SfxEditorProps) {
                   </select>
                 </label>
                 <label
-                  htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-sfx-{v0}-scale"), { v0: String(sfx.id) })}
+                  htmlFor={`writer-room-sfx-${sfx.id}-scale`}
                   className="block text-xs font-semibold text-fg-2"
                 >
-                  {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "글자 크기")}<select
-                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-sfx-{v0}-scale"), { v0: String(sfx.id) })}
+                  글자 크기
+                  <select
+                    id={`writer-room-sfx-${sfx.id}-scale`}
                     value={sfx.style.scale}
                     onChange={(event) =>
                       onChange(
@@ -1528,12 +1536,14 @@ export function StudioWriterRoomPanel({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 id="studio-writer-room-title" className="text-base font-bold tracking-tight text-fg">
-                  {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "Writer Room")}</h2>
+                  Writer Room
+                </h2>
                 <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.65rem] tabular-nums text-fg-3">
-                  {completedCount}/{STUDIO_WRITER_ROOM_STAGES.length} {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "완료")}</span>
+                  {completedCount}/{STUDIO_WRITER_ROOM_STAGES.length} 완료
+                </span>
                 {pendingCount > 0 && (
                   <span className="rounded-full border border-cool/35 bg-cool/10 px-2 py-0.5 text-[0.65rem] tabular-nums text-cool">
-                    {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "제안 ")}{pendingCount}
+                    제안 {pendingCount}
                   </span>
                 )}
               </div>
@@ -1541,12 +1551,13 @@ export function StudioWriterRoomPanel({
                 id="studio-writer-room-description"
                 className="mt-0.5 max-w-[70ch] text-xs leading-relaxed text-fg-3"
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "기획에서 대사까지 한 흐름으로 설계하고, AI 제안은 승인한 항목만 반영합니다.")}</p>
+                기획에서 대사까지 한 흐름으로 설계하고, AI 제안은 승인한 항목만 반영합니다.
+              </p>
             </div>
             <button
               type="button"
               onClick={onClose}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "Writer Room 닫기")}
+              aria-label="Writer Room 닫기"
               className={ICON_BUTTON_CLASS}
             >
               <X size={16} aria-hidden />
@@ -1556,7 +1567,7 @@ export function StudioWriterRoomPanel({
             <div
               className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-raised"
               role="progressbar"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "Writer Room 진행률")}
+              aria-label="Writer Room 진행률"
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={progressPercent}
@@ -1574,31 +1585,35 @@ export function StudioWriterRoomPanel({
 
         <nav
           className="shrink-0 overflow-x-auto border-b border-line bg-card/35 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "Writer Room 단계")}
+          aria-label="Writer Room 단계"
         >
-          <div className="flex min-w-max px-2 sm:px-4" role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "작가실 단계")}>
+          <div className="flex min-w-max px-2 sm:px-4" role="tablist" aria-label="작가실 단계">
             {STUDIO_WRITER_ROOM_STAGES.map((stage, index) => {
               const selected = stage === activeStage;
               const complete = document.completion[stage];
               return (
                 <button
                   key={stage}
-                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-tab-{v0}"), { v0: String(stage) })}
+                  id={`writer-room-tab-${stage}`}
                   type="button"
                   role="tab"
                   aria-selected={selected}
-                  aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-panel-{v0}"), { v0: String(stage) })}
+                  aria-controls={`writer-room-panel-${stage}`}
                   tabIndex={selected ? 0 : -1}
                   onClick={() => selectStage(stage)}
                   onKeyDown={onStageKeyDown}
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "relative inline-flex min-h-12 items-center gap-1.5 px-3 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent sm:px-4 {v0}"), { v0: String(selected ? "text-fg" : "text-fg-3 hover:text-fg") })}
+                  className={`relative inline-flex min-h-12 items-center gap-1.5 px-3 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent sm:px-4 ${
+                    selected ? "text-fg" : "text-fg-3 hover:text-fg"
+                  }`}
                 >
                   <span
-                    className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "grid size-5 place-items-center rounded-full text-[0.62rem] tabular-nums {v0}"), { v0: String(complete
+                    className={`grid size-5 place-items-center rounded-full text-[0.62rem] tabular-nums ${
+                      complete
                         ? "bg-good/15 text-good"
                         : selected
                           ? "bg-accent text-on-accent"
-                          : "bg-raised text-fg-3") })}
+                          : "bg-raised text-fg-3"
+                    }`}
                     aria-hidden
                   >
                     {complete ? <Check size={11} /> : index + 1}
@@ -1630,9 +1645,11 @@ export function StudioWriterRoomPanel({
             </p>
           </div>
           <label
-            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent {v0}"), { v0: String(document.completion[activeStage]
+            className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent ${
+              document.completion[activeStage]
                 ? "border-good/40 bg-good/10 text-good"
-                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
+                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+            }`}
           >
             <input
               type="checkbox"
@@ -1655,7 +1672,8 @@ export function StudioWriterRoomPanel({
               }}
               className="size-4 accent-[var(--color-good)]"
             />
-            {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "단계 완료")}</label>
+            단계 완료
+          </label>
           {onRequestAi ? (
             <>
               <button
@@ -1669,21 +1687,22 @@ export function StudioWriterRoomPanel({
                 ) : (
                   <Sparkles size={14} aria-hidden />
                 )}
-                {effectiveAiBusy ? translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "초안 만드는 중…") : translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "AI 검토 초안")}
+                {effectiveAiBusy ? "초안 만드는 중…" : "AI 검토 초안"}
               </button>
               {effectiveAiBusy && onCancelAi ? (
                 <button type="button" onClick={onCancelAi} className={BUTTON_CLASS}>
-                  {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "생성 취소")}</button>
+                  생성 취소
+                </button>
               ) : null}
               {onAiDirectionChange ? (
                 <label className="basis-full text-[0.68rem] font-semibold text-fg-2">
-                  {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "AI에 추가로 요청할 방향 ")}<span className="font-normal text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "(선택)")}</span>
+                  AI에 추가로 요청할 방향 <span className="font-normal text-fg-3">(선택)</span>
                   <input
                     type="text"
                     value={aiDirection}
                     onChange={(event) => onAiDirectionChange(event.currentTarget.value.slice(0, 2_000))}
                     maxLength={2_000}
-                    placeholder={translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "예: 15세 이용가, 미스터리 톤, 마지막 컷에 강한 훅")}
+                    placeholder="예: 15세 이용가, 미스터리 톤, 마지막 컷에 강한 훅"
                     disabled={effectiveAiBusy}
                     className={FIELD_CLASS}
                   />
@@ -1692,7 +1711,8 @@ export function StudioWriterRoomPanel({
             </>
           ) : (
             <span className="inline-flex min-h-9 items-center rounded-lg border border-line px-2.5 text-[0.68rem] text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "직접 작성 모드")}</span>
+              직접 작성 모드
+            </span>
           )}
         </div>
 
@@ -1716,9 +1736,9 @@ export function StudioWriterRoomPanel({
 
         <div className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-cols-[minmax(0,1fr)_23rem] xl:overflow-hidden">
           <div
-            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-panel-{v0}"), { v0: String(activeStage) })}
+            id={`writer-room-panel-${activeStage}`}
             role="tabpanel"
-            aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "writer-room-tab-{v0}"), { v0: String(activeStage) })}
+            aria-labelledby={`writer-room-tab-${activeStage}`}
             tabIndex={0}
             className="min-h-0 bg-canvas focus:outline-none xl:overflow-y-auto"
           >
@@ -1738,7 +1758,8 @@ export function StudioWriterRoomPanel({
           style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
         >
           <span className="hidden min-w-0 flex-1 truncate text-[0.68rem] text-fg-3 sm:block">
-            {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "변경 내용은 현재 작품 문서와 함께 저장됩니다. · Esc로 닫기")}</span>
+            변경 내용은 현재 작품 문서와 함께 저장됩니다. · Esc로 닫기
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -1746,9 +1767,10 @@ export function StudioWriterRoomPanel({
               if (previous) selectStage(previous);
             }}
             disabled={activeIndex <= 0}
-            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "{v0} flex-1 sm:flex-none"), { v0: String(BUTTON_CLASS) })}
+            className={`${BUTTON_CLASS} flex-1 sm:flex-none`}
           >
-            <ArrowLeft size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "이전")}</button>
+            <ArrowLeft size={14} aria-hidden /> 이전
+          </button>
           {activeIndex < STUDIO_WRITER_ROOM_STAGES.length - 1 ? (
             <button
               type="button"
@@ -1756,17 +1778,18 @@ export function StudioWriterRoomPanel({
                 const next = STUDIO_WRITER_ROOM_STAGES[activeIndex + 1];
                 if (next) selectStage(next);
               }}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "{v0} flex-1 bg-accent text-on-accent hover:border-accent hover:bg-accent-hover hover:text-on-accent sm:flex-none"), { v0: String(BUTTON_CLASS) })}
+              className={`${BUTTON_CLASS} flex-1 bg-accent text-on-accent hover:border-accent hover:bg-accent-hover hover:text-on-accent sm:flex-none`}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "다음 ")}<ArrowRight size={14} aria-hidden />
+              다음 <ArrowRight size={14} aria-hidden />
             </button>
           ) : (
             <button
               type="button"
               onClick={onClose}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "en", "{v0} flex-1 bg-accent text-on-accent hover:border-accent hover:bg-accent-hover hover:text-on-accent sm:flex-none"), { v0: String(BUTTON_CLASS) })}
+              className={`${BUTTON_CLASS} flex-1 bg-accent text-on-accent hover:border-accent hover:bg-accent-hover hover:text-on-accent sm:flex-none`}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioWriterRoomPanel", "ko", "Writer Room 닫기")}</button>
+              Writer Room 닫기
+            </button>
           )}
         </footer>
       </div>

@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   Clapperboard,
   Palette,
@@ -71,7 +67,7 @@ function ActionCard({
       disabled={action.disabled || !action.onClick}
       aria-label={
         action.id === "director"
-          ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiProductionLaunchpad", "ko", "AI 코믹 디렉터 · 스토리 → 편집 가능한 컷")
+          ? "AI 코믹 디렉터 · 스토리 → 편집 가능한 컷"
           : undefined
       }
       aria-describedby={descriptionId}
@@ -166,7 +162,7 @@ export function StudioAiProductionLaunchpad({
 
   return (
     <section
-      aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiProductionLaunchpad", "en", "{v0}-title"), { v0: String(rawId) })}
+      aria-labelledby={`${rawId}-title`}
       data-studio-ai-production-launchpad="true"
       className="shrink-0 rounded-xl border border-line bg-panel/45 p-2.5"
     >
@@ -175,10 +171,12 @@ export function StudioAiProductionLaunchpad({
           <Sparkles size={13} aria-hidden />
         </span>
         <div className="min-w-0">
-          <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiProductionLaunchpad", "en", "{v0}-title"), { v0: String(rawId) })} className="text-[0.68rem] font-black text-fg">
-            {translateCurrentStaticSourceText("domains.creator.ai.StudioAiProductionLaunchpad", "ko", "제작 흐름으로 시작")}</h3>
+          <h3 id={`${rawId}-title`} className="text-[0.68rem] font-black text-fg">
+            제작 흐름으로 시작
+          </h3>
           <p className="mt-0.5 text-[0.59rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.ai.StudioAiProductionLaunchpad", "ko", "모델을 고르기 전에 만들고 싶은 결과와 현재 가진 재료에서 시작합니다.")}</p>
+            모델을 고르기 전에 만들고 싶은 결과와 현재 가진 재료에서 시작합니다.
+          </p>
         </div>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
@@ -186,7 +184,7 @@ export function StudioAiProductionLaunchpad({
           <ActionCard
             key={action.id}
             action={action}
-            descriptionId={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiProductionLaunchpad", "en", "{v0}-{v1}-description"), { v0: String(rawId), v1: String(action.id) })}
+            descriptionId={`${rawId}-${action.id}-description`}
           />
         ))}
       </div>
@@ -198,7 +196,8 @@ export function StudioAiProductionLaunchpad({
           STUDIO_FOCUS_RING,
         )}
       >
-        {translateCurrentStaticSourceText("domains.creator.ai.StudioAiProductionLaunchpad", "ko", "세션·작품 바이블·작업 복원을 갖춘 전용 작업공간 열기")}<ArrowRight size={14} className="text-accent" aria-hidden />
+        세션·작품 바이블·작업 복원을 갖춘 전용 작업공간 열기
+        <ArrowRight size={14} className="text-accent" aria-hidden />
       </a>
       <a
         href="/create/promo"
@@ -210,7 +209,8 @@ export function StudioAiProductionLaunchpad({
           STUDIO_FOCUS_RING,
         )}
       >
-        {translateCurrentStaticSourceText("domains.creator.ai.StudioAiProductionLaunchpad", "ko", "컷 → 홍보영상·모션툰 만들기 (새 창)")}<ArrowRight size={14} aria-hidden />
+        컷 → 홍보영상·모션툰 만들기 (새 창)
+        <ArrowRight size={14} aria-hidden />
       </a>
     </section>
   );

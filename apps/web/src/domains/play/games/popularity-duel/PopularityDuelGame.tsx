@@ -1,7 +1,4 @@
 import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   guessNext,
   hasEnoughTitles,
   startDuel,
@@ -57,9 +54,9 @@ function DuelCard({
         <div className="mt-1 flex items-center gap-1.5 text-sm font-bold">
           <Eye className="h-4 w-4 text-fg-3" />
           {revealed ? (
-            <span className="tabular-nums text-fg">{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "조회 ")}{formatViews(title.views)}</span>
+            <span className="tabular-nums text-fg">조회 {formatViews(title.views)}</span>
           ) : (
-            <span className="tabular-nums text-fg-3">{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "조회 ???")}</span>
+            <span className="tabular-nums text-fg-3">조회 ???</span>
           )}
         </div>
       </div>
@@ -100,7 +97,7 @@ export function PopularityDuelGame({ onExit }: PlayGameProps) {
   if (loading || !state) {
     return (
       <div className="grid min-h-[18rem] place-items-center text-sm text-fg-2">
-        {loading ? translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "웹툰 인기 데이터를 불러오는 중…") : translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "대결을 준비하는 중…")}
+        {loading ? "웹툰 인기 데이터를 불러오는 중…" : "대결을 준비하는 중…"}
       </div>
     );
   }
@@ -117,22 +114,23 @@ export function PopularityDuelGame({ onExit }: PlayGameProps) {
     <div className="mx-auto flex max-w-md flex-col gap-3">
       {/* 점수 보드 */}
       <div className="flex items-center justify-between text-sm">
-        <span className="rounded-full bg-accent-soft px-3 py-1 font-bold text-accent">{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "점수 ")}{score}</span>
+        <span className="rounded-full bg-accent-soft px-3 py-1 font-bold text-accent">점수 {score}</span>
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1 text-fg-2">
             <Trophy className="h-4 w-4 text-amber-500" />
-            <span className="tabular-nums">{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "최고 ")}{best}</span>
+            <span className="tabular-nums">최고 {best}</span>
           </span>
           <GameHelp
             id="popularity-duel"
-            title={translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "웹툰 인기 대결")}
+            title="웹툰 인기 대결"
             steps={[
               {
                 emoji: "🎯",
                 title: "목표",
                 desc: (
                   <>
-                    {translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "두 웹툰 중 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "조회수가 더 많은 작품")}</b>{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "을 맞히며 연승을 쌓아요.")}</>
+                    두 웹툰 중 <b className="text-fg">조회수가 더 많은 작품</b>을 맞히며 연승을 쌓아요.
+                  </>
                 ),
               },
               {
@@ -140,8 +138,9 @@ export function PopularityDuelGame({ onExit }: PlayGameProps) {
                 title: "비교 기준",
                 desc: (
                   <>
-                    {translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "왼쪽 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "기준 작품")}</b>{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "의 조회수는 공개되고, 오른쪽")}{" "}
-                    <b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "도전 작품")}</b>{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "의 조회수는 ")}<span className="text-fg-3">???</span>{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "로 가려져요.")}</>
+                    왼쪽 <b className="text-fg">기준 작품</b>의 조회수는 공개되고, 오른쪽{" "}
+                    <b className="text-fg">도전 작품</b>의 조회수는 <span className="text-fg-3">???</span>로 가려져요.
+                  </>
                 ),
               },
               {
@@ -149,7 +148,8 @@ export function PopularityDuelGame({ onExit }: PlayGameProps) {
                 title: "선택",
                 desc: (
                   <>
-                    {translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "도전 작품의 조회수가 기준보다 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "더 높다 / 더 낮다")}</b>{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "를 골라요.")}</>
+                    도전 작품의 조회수가 기준보다 <b className="text-fg">더 높다 / 더 낮다</b>를 골라요.
+                  </>
                 ),
               },
               {
@@ -157,8 +157,9 @@ export function PopularityDuelGame({ onExit }: PlayGameProps) {
                 title: "연승",
                 desc: (
                   <>
-                    {translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "맞히면 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "점수 +1")}</b>{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", ", 직전 도전 작품이 다음 기준이 돼요. 한 번이라도 틀리면")}{" "}
-                    <b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "게임 종료")}</b>{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "—최고 점수는 계속 이어집니다.")}</>
+                    맞히면 <b className="text-fg">점수 +1</b>, 직전 도전 작품이 다음 기준이 돼요. 한 번이라도 틀리면{" "}
+                    <b className="text-fg">게임 종료</b>—최고 점수는 계속 이어집니다.
+                  </>
                 ),
               },
             ]}
@@ -168,32 +169,39 @@ export function PopularityDuelGame({ onExit }: PlayGameProps) {
 
       {/* 대결 카드 두 장 */}
       <div className="flex items-stretch gap-2.5">
-        <DuelCard title={anchor} revealed badge={translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "기준 작품")} />
-        <div className="flex shrink-0 items-center text-xs font-black text-fg-3">{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "en", "VS")}</div>
-        <DuelCard title={challenger} revealed={over} badge={translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "도전 작품")} />
+        <DuelCard title={anchor} revealed badge="기준 작품" />
+        <div className="flex shrink-0 items-center text-xs font-black text-fg-3">VS</div>
+        <DuelCard title={challenger} revealed={over} badge="도전 작품" />
       </div>
 
       {/* 추측 버튼 또는 게임오버 */}
       {!over ? (
         <div className="flex flex-col gap-2">
           <p className="text-center text-[0.72rem] text-fg-2">
-            <span className="font-semibold text-fg">{challenger.title}</span>{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "의 조회수는")}<span className="font-semibold text-fg"> {anchor.title}</span>{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "보다…")}</p>
+            <span className="font-semibold text-fg">{challenger.title}</span>의 조회수는
+            <span className="font-semibold text-fg"> {anchor.title}</span>보다…
+          </p>
           <div className="grid grid-cols-2 gap-2">
             <Button variant="solid" size="md" onClick={() => onGuess("higher")} className="h-12">
-              <ChevronUp className="mr-1 h-5 w-5" /> {translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "더 높다")}</Button>
+              <ChevronUp className="mr-1 h-5 w-5" /> 더 높다
+            </Button>
             <Button variant="outline" size="md" onClick={() => onGuess("lower")} className="h-12">
-              <ChevronDown className="mr-1 h-5 w-5" /> {translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "더 낮다")}</Button>
+              <ChevronDown className="mr-1 h-5 w-5" /> 더 낮다
+            </Button>
           </div>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-card/60 p-4">
           <p className="text-center text-sm font-bold text-fg">
-            {translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "최종 ")}{score}{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "점 · 최고 ")}{best}{translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "점")}</p>
+            최종 {score}점 · 최고 {best}점
+          </p>
           <div className="flex items-center justify-center gap-2">
             <Button variant="solid" onClick={restart}>
-              <RotateCcw className="mr-1 h-4 w-4" /> {translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "다시 도전")}</Button>
+              <RotateCcw className="mr-1 h-4 w-4" /> 다시 도전
+            </Button>
             <Button variant="outline" onClick={onExit}>
-              {translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "다른 게임")}</Button>
+              다른 게임
+            </Button>
           </div>
         </div>
       )}
@@ -205,13 +213,14 @@ export function PopularityDuelGame({ onExit }: PlayGameProps) {
       {/* 항상 보이는 안내/재시작(게임 진행 중에도 포기 가능) */}
       {!over && (
         <div className="flex items-center justify-between text-[0.7rem] text-fg-3">
-          <span aria-hidden="true">{lastCorrect === true ? translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "연속 정답 중!") : translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "높낮이를 맞혀 보세요")}</span>
+          <span aria-hidden="true">{lastCorrect === true ? "연속 정답 중!" : "높낮이를 맞혀 보세요"}</span>
           <button
             type="button"
             onClick={restart}
             className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-fg-3 transition hover:text-fg"
           >
-            <RotateCcw className="h-3.5 w-3.5" /> {translateCurrentStaticSourceText("domains.play.games.popularity.duel.PopularityDuelGame", "ko", "처음부터")}</button>
+            <RotateCcw className="h-3.5 w-3.5" /> 처음부터
+          </button>
         </div>
       )}
     </div>

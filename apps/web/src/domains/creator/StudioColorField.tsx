@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Ban } from "lucide-react";
 
 import { normalizeHexColor } from "./studio-color-utils";
@@ -87,7 +83,7 @@ export function StudioColorField({
   return (
     <div
       role="group"
-      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorField", "ko", "{v0} 설정"), { v0: String(label) })}
+      aria-label={`${label} 설정`}
       data-studio-color-field="true"
       data-studio-color-field-none={hasNone || undefined}
       data-studio-color-field-mixed={mixed || undefined}
@@ -102,7 +98,7 @@ export function StudioColorField({
               aria-label={noneLabel}
               aria-pressed={hasNone}
               disabled={disabled}
-              data-inspector-control-id={controlId ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorField", "en", "{v0}.none"), { v0: String(controlId) }) : undefined}
+              data-inspector-control-id={controlId ? `${controlId}.none` : undefined}
               onClick={() => {
                 onChange(hasNone ? effectiveColor : null);
                 onInteractionEnd?.();
@@ -142,13 +138,13 @@ export function StudioColorField({
       </div>
 
       {inlineRecent.length > 0 ? (
-        <div className="flex items-center justify-end gap-1" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorField", "ko", "{v0} 최근 색상"), { v0: String(label) })}>
-          <span className="mr-1 text-[0.58rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioColorField", "ko", "최근")}</span>
+        <div className="flex items-center justify-end gap-1" aria-label={`${label} 최근 색상`}>
+          <span className="mr-1 text-[0.58rem] font-medium text-fg-3">최근</span>
           {inlineRecent.map((color, index) => (
             <button
               key={`${color}-${index}`}
               type="button"
-              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorField", "ko", "{v0} 최근 색상 {v1} 적용"), { v0: String(label), v1: String(color) })}
+              aria-label={`${label} 최근 색상 ${color} 적용`}
               disabled={disabled}
               onClick={() => {
                 commitColor(color);

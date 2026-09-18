@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { AlertTriangle, ChevronDown, ListOrdered, Replace, Tag } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 
@@ -104,7 +101,7 @@ export function StudioInspectorBatchRenameSection({
     <section
       data-studio-inspector-batch-rename="true"
       data-inspector-section="selection.batch-rename"
-      data-inspector-section-open={open ? translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "en", "false")}
+      data-inspector-section-open={open ? "true" : "false"}
       className="mt-3 rounded-lg border border-line/70 bg-canvas/35"
     >
       <button
@@ -122,9 +119,10 @@ export function StudioInspectorBatchRenameSection({
         <span className="flex min-w-0 items-center gap-2">
           <Tag size={14} className="shrink-0 text-accent" aria-hidden />
           <span className="min-w-0">
-            <span className="block text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "일괄 이름 변경")}</span>
+            <span className="block text-xs font-bold text-fg">일괄 이름 변경</span>
             <span className="block truncate text-[0.6875rem] font-medium text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "미리보기 후 ")}{selectedIds.length}{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "개를 한 번에 적용")}</span>
+              미리보기 후 {selectedIds.length}개를 한 번에 적용
+            </span>
           </span>
         </span>
         <ChevronDown
@@ -137,7 +135,7 @@ export function StudioInspectorBatchRenameSection({
       <div id={panelId} hidden={!open}>
         {open ? (
           <div className="space-y-2 border-t border-line/60 p-2.5">
-            <div className="grid grid-cols-2 gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "이름 변경 방식")}>
+            <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="이름 변경 방식">
               <button
                 type="button"
                 aria-pressed={mode === "template"}
@@ -153,7 +151,8 @@ export function StudioInspectorBatchRenameSection({
                   className: "min-h-11 gap-1.5 pointer-coarse:min-h-11 lg:min-h-9",
                 })}
               >
-                <ListOrdered size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "형식·번호")}</button>
+                <ListOrdered size={14} aria-hidden /> 형식·번호
+              </button>
               <button
                 type="button"
                 aria-pressed={mode === "replace"}
@@ -169,13 +168,15 @@ export function StudioInspectorBatchRenameSection({
                   className: "min-h-11 gap-1.5 pointer-coarse:min-h-11 lg:min-h-9",
                 })}
               >
-                <Replace size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "찾기·바꾸기")}</button>
+                <Replace size={14} aria-hidden /> 찾기·바꾸기
+              </button>
             </div>
 
             {mode === "template" ? (
               <>
                 <label className="grid gap-1 text-[0.6875rem] font-bold text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "이름 형식")}<input
+                  이름 형식
+                  <input
                     type="text"
                     value={template}
                     maxLength={240}
@@ -190,9 +191,11 @@ export function StudioInspectorBatchRenameSection({
                   />
                 </label>
                 <p className="text-[0.6875rem] leading-relaxed text-fg-3">
-                  <code>{"{n}"}</code> {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "번호 · ")}<code>{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "en", "{type}")}</code> {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "요소 유형 · ")}<code>{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "en", "{name}")}</code> {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "현재 이름")}</p>
+                  <code>{"{n}"}</code> 번호 · <code>{"{type}"}</code> 요소 유형 · <code>{"{name}"}</code> 현재 이름
+                </p>
                 <label className="grid gap-1 text-[0.6875rem] font-bold text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "번호 순서")}<select
+                  번호 순서
+                  <select
                     value={order}
                     onChange={(event) => {
                       setOrder(event.currentTarget.value as StudioBatchRenameOrder);
@@ -202,15 +205,16 @@ export function StudioInspectorBatchRenameSection({
                     data-inspector-priority="advanced"
                     className={inputClass}
                   >
-                    <option value="layer-top">{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "레이어 위에서 아래")}</option>
-                    <option value="layer-bottom">{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "레이어 아래에서 위")}</option>
-                    <option value="canvas-top">{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "캔버스 위에서 아래")}</option>
-                    <option value="canvas-left">{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "캔버스 왼쪽에서 오른쪽")}</option>
+                    <option value="layer-top">레이어 위에서 아래</option>
+                    <option value="layer-bottom">레이어 아래에서 위</option>
+                    <option value="canvas-top">캔버스 위에서 아래</option>
+                    <option value="canvas-left">캔버스 왼쪽에서 오른쪽</option>
                   </select>
                 </label>
                 <div className="grid grid-cols-3 gap-1.5">
                   <label className="grid gap-1 text-[0.6875rem] font-bold text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "시작")}<input
+                    시작
+                    <input
                       type="number"
                       inputMode="numeric"
                       value={start}
@@ -224,7 +228,8 @@ export function StudioInspectorBatchRenameSection({
                     />
                   </label>
                   <label className="grid gap-1 text-[0.6875rem] font-bold text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "증가")}<input
+                    증가
+                    <input
                       type="number"
                       inputMode="numeric"
                       value={step}
@@ -238,7 +243,8 @@ export function StudioInspectorBatchRenameSection({
                     />
                   </label>
                   <label className="grid gap-1 text-[0.6875rem] font-bold text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "자릿수")}<input
+                    자릿수
+                    <input
                       type="number"
                       inputMode="numeric"
                       min={1}
@@ -258,7 +264,8 @@ export function StudioInspectorBatchRenameSection({
             ) : (
               <>
                 <label className="grid gap-1 text-[0.6875rem] font-bold text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "찾을 문자열")}<input
+                  찾을 문자열
+                  <input
                     type="text"
                     value={search}
                     maxLength={160}
@@ -272,7 +279,8 @@ export function StudioInspectorBatchRenameSection({
                   />
                 </label>
                 <label className="grid gap-1 text-[0.6875rem] font-bold text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "바꿀 문자열")}<input
+                  바꿀 문자열
+                  <input
                     type="text"
                     value={replacement}
                     maxLength={160}
@@ -297,15 +305,17 @@ export function StudioInspectorBatchRenameSection({
                     data-inspector-priority="advanced"
                     className="size-4 accent-accent"
                   />
-                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "대소문자 구분")}</label>
+                  대소문자 구분
+                </label>
               </>
             )}
 
-            <div className="rounded-lg border border-line/70 bg-card/70 p-2" aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "이름 변경 미리보기")}>
+            <div className="rounded-lg border border-line/70 bg-card/70 p-2" aria-label="이름 변경 미리보기">
               <div className="mb-1.5 flex items-center justify-between gap-2">
-                <p className="text-[0.6875rem] font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "미리보기")}</p>
+                <p className="text-[0.6875rem] font-bold text-fg">미리보기</p>
                 <span className="text-[0.6875rem] font-semibold tabular-nums text-fg-3">
-                  {plan.previews.length}{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "개")}</span>
+                  {plan.previews.length}개
+                </span>
               </div>
               {preview.length > 0 ? (
                 <ol className="space-y-1">
@@ -313,26 +323,27 @@ export function StudioInspectorBatchRenameSection({
                     <li key={item.id} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 text-[0.6875rem]">
                       <span className="truncate text-fg-3" title={item.currentName}>{item.currentName}</span>
                       <span aria-hidden className="text-fg-3">→</span>
-                      <span className="truncate font-semibold text-fg" title={item.nextName}>{item.nextName || translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "(빈 이름)")}</span>
+                      <span className="truncate font-semibold text-fg" title={item.nextName}>{item.nextName || "(빈 이름)"}</span>
                     </li>
                   ))}
                 </ol>
               ) : (
-                <p className="text-[0.6875rem] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "입력하면 변경될 이름을 먼저 보여 줍니다.")}</p>
+                <p className="text-[0.6875rem] leading-relaxed text-fg-3">입력하면 변경될 이름을 먼저 보여 줍니다.</p>
               )}
               {remainingPreviewCount > 0 ? (
-                <p className="mt-1 text-[0.6875rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "외 ")}{remainingPreviewCount}{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "개")}</p>
+                <p className="mt-1 text-[0.6875rem] font-medium text-fg-3">외 {remainingPreviewCount}개</p>
               ) : null}
             </div>
 
             {plan.kind === "changed" && plan.duplicateNames.length > 0 ? (
               <p className="flex items-start gap-1.5 rounded-lg bg-warn/10 px-2 py-1.5 text-[0.6875rem] leading-relaxed text-warn">
                 <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "같은 이름 ")}{plan.duplicateNames.length}{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "건이 생깁니다. 레이어 이름 중복은 허용되지만 구분이 어려울 수 있어요.")}</p>
+                같은 이름 {plan.duplicateNames.length}건이 생깁니다. 레이어 이름 중복은 허용되지만 구분이 어려울 수 있어요.
+              </p>
             ) : null}
 
             <p id={statusId} aria-live="polite" className="min-h-4 text-[0.6875rem] leading-relaxed text-fg-3">
-              {status ?? planReason ?? translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "미리보기를 확인한 뒤 한 번에 적용합니다.")}
+              {status ?? planReason ?? "미리보기를 확인한 뒤 한 번에 적용합니다."}
             </p>
 
             <button
@@ -348,7 +359,8 @@ export function StudioInspectorBatchRenameSection({
                 className: "min-h-11 w-full justify-center pointer-coarse:min-h-11",
               })}
             >
-              {selectedIds.length}{translateCurrentStaticSourceText("domains.creator.StudioInspectorBatchRenameSection", "ko", "개 이름 적용")}</button>
+              {selectedIds.length}개 이름 적용
+            </button>
           </div>
         ) : null}
       </div>

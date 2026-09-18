@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Glow Panel
  * 선택된 이미지의 글로우/블룸(Glow) 인스펙터 — 원클릭 빛 번짐 프리셋 +
@@ -51,16 +50,17 @@ export function StudioGlowPanel({
     <div className="space-y-2">
       {/* 헤더 + 항등 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioGlowPanel", "ko", "글로우/블룸 (Glow)")}</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">글로우/블룸 (Glow)</p>
         <button
           type="button"
           onClick={onReset}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.StudioGlowPanel", "ko", "글로우를 제거하고 원본으로 되돌립니다.")}
+          title="글로우를 제거하고 원본으로 되돌립니다."
         >
           <RotateCcw className="size-3.5" />
-          {translateCurrentStaticSourceText("domains.creator.StudioGlowPanel", "ko", "원본으로")}</button>
+          원본으로
+        </button>
       </div>
 
       {/* 원클릭 빛 번짐 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). */}
@@ -100,13 +100,15 @@ export function StudioGlowPanel({
 
       {/* 글로우 색 — "원색(auto)" 토글, 끄면 단색 input[type=color]로 직접 지정. (range가 아니라 공용 SliderRow 미적용) */}
       <label className={PANEL_LABEL_ROW}>
-        {translateCurrentStaticSourceText("domains.creator.StudioGlowPanel", "ko", "글로우 색")}<span className="flex items-center gap-1.5">
+        글로우 색
+        <span className="flex items-center gap-1.5">
           <StudioToggleChip
             active={isAuto}
             onClick={() => onPatch({ color: isAuto ? COLOR_FALLBACK : "auto" })}
-            title={translateCurrentStaticSourceText("domains.creator.StudioGlowPanel", "ko", "켜면 밝은 영역의 원래 색으로, 끄면 지정한 단색으로 빛을 번지게 합니다.")}
+            title="켜면 밝은 영역의 원래 색으로, 끄면 지정한 단색으로 빛을 번지게 합니다."
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioGlowPanel", "ko", "원색(auto)")}</StudioToggleChip>
+            원색(auto)
+          </StudioToggleChip>
           {!isAuto && (
             <input
               type="color"

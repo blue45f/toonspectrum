@@ -1,7 +1,4 @@
 import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   PlayCircle,
   BookOpen,
   Newspaper,
@@ -74,7 +71,7 @@ const RelatedInfoTab = memo(function RelatedInfoTab({
           : "bg-card/50 text-fg-2 hover:bg-card hover:text-fg border border-line/60"
       )}
     >
-      <Icon size={14} className={isActive ? translateCurrentStaticSourceText("shared.components.title.external", "en", "text-white") : translateCurrentStaticSourceText("shared.components.title.external", "en", "text-fg-3")} />
+      <Icon size={14} className={isActive ? "text-white" : "text-fg-3"} />
       <span>{meta.label}</span>
       <span
         className={cn(
@@ -156,10 +153,11 @@ const RelatedInfoCard = memo(function RelatedInfoCard({ item }: RelatedInfoCardP
 
         <div className="mt-4 flex items-center justify-between border-t border-line/40 pt-3 text-[0.72rem] text-fg-3">
           <span className="truncate">
-            {item.thumbnail ? item.sourceName : item.dateOrViews || translateCurrentStaticSourceText("shared.components.title.external", "ko", "상세 페이지")}
+            {item.thumbnail ? item.sourceName : item.dateOrViews || "상세 페이지"}
           </span>
           <span className="flex items-center gap-1 font-medium text-accent opacity-80 group-hover:opacity-100">
-            {translateCurrentStaticSourceText("shared.components.title.external", "ko", "이동하기")}<ArrowUpRight size={14} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            이동하기
+            <ArrowUpRight size={14} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </span>
         </div>
       </a>
@@ -193,8 +191,8 @@ export function TitleExternal({ title }: { title: Title }) {
     <Section
       className="mt-14"
       eyebrow="RELATED MEDIA & LINKS"
-      title={translateCurrentStaticSourceText("shared.components.title.external", "ko", "관련 정보 더 보기")}
-      desc={translateCurrentStaticSourceText("shared.components.title.external", "ko", "크롤링 및 큐레이션된 데이터를 바탕으로 개별 유튜브 리뷰 영상, 블로그 후기, 뉴스 기사, 나무위키 문서로 직접 연결합니다.")}
+      title="관련 정보 더 보기"
+      desc="크롤링 및 큐레이션된 데이터를 바탕으로 개별 유튜브 리뷰 영상, 블로그 후기, 뉴스 기사, 나무위키 문서로 직접 연결합니다."
     >
       <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-line pb-3">
         {CATEGORIES.map((cat) => (
@@ -210,7 +208,8 @@ export function TitleExternal({ title }: { title: Title }) {
 
       {filteredItems.length === 0 ? (
         <div className="rounded-2xl border border-line bg-card/30 p-8 text-center text-sm text-fg-3">
-          {translateCurrentStaticSourceText("shared.components.title.external", "ko", "선택한 카테고리의 관련 정보가 아직 집계되지 않았습니다.")}</div>
+          선택한 카테고리의 관련 정보가 아직 집계되지 않았습니다.
+        </div>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredItems.map((item) => (

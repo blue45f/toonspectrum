@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   BadgeCheck,
   Check,
@@ -114,7 +110,8 @@ function conflictList(
     >
       <p className="flex items-center gap-1 font-semibold">
         <AlertTriangle size={12} aria-hidden />
-        {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "용어집 충돌 ")}{conflicts.length}{translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "건")}</p>
+        용어집 충돌 {conflicts.length}건
+      </p>
       <ul className="mt-1 list-disc space-y-0.5 pl-4">
         {conflicts.map((conflict) => (
           <li
@@ -159,7 +156,8 @@ function TranslationMemoryMatchCard({
         <span className="text-[0.68rem] font-semibold text-fg">{label}</span>
         {fuzzyScore === undefined ? null : (
           <span className="rounded-full border border-line bg-panel px-1.5 py-0.5 text-[0.6rem] text-fg-3">
-            {Math.round(fuzzyScore * 100)}{translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "% 유사")}</span>
+            {Math.round(fuzzyScore * 100)}% 유사
+          </span>
         )}
         <span
           className={cx(
@@ -171,17 +169,18 @@ function TranslationMemoryMatchCard({
         </span>
         {stale ? (
           <span className="rounded-full border border-bad/35 bg-bad/10 px-1.5 py-0.5 text-[0.6rem] font-semibold text-bad">
-            {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "원문 변경 · 재검토 필요")}</span>
+            원문 변경 · 재검토 필요
+          </span>
         ) : null}
       </div>
 
       <div className="grid gap-1.5 text-[0.67rem] leading-relaxed">
         <p className="rounded-lg bg-panel/70 px-2 py-1.5 text-fg-3">
-          <span className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "원문")}</span>
+          <span className="font-semibold text-fg-2">원문</span>
           <span className="ml-1.5 whitespace-pre-wrap">{entry.sourceText}</span>
         </p>
         <p className="rounded-lg border border-line/70 bg-panel px-2 py-1.5 text-fg">
-          <span className="font-semibold text-accent">{translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "번역")}</span>
+          <span className="font-semibold text-accent">번역</span>
           <span className="ml-1.5 whitespace-pre-wrap">{entry.translation}</span>
         </p>
       </div>
@@ -195,20 +194,22 @@ function TranslationMemoryMatchCard({
           disabled={!reusable}
           title={
             reusable
-              ? translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "현재 대사 번역으로 명시적으로 재사용")
-              : translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "원문 변경 또는 용어집 충돌을 먼저 검토하세요.")
+              ? "현재 대사 번역으로 명시적으로 재사용"
+              : "원문 변경 또는 용어집 충돌을 먼저 검토하세요."
           }
           className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg bg-accent px-2.5 text-[0.68rem] font-semibold text-on-accent transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
         >
           <RotateCcw size={12} aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "번역 재사용")}</button>
+          번역 재사용
+        </button>
         <button
           type="button"
           onClick={onEdit}
           className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-2.5 text-[0.68rem] font-medium text-fg-2 transition-colors hover:bg-raised"
         >
           <PencilLine size={12} aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "편집란에 복사")}</button>
+          편집란에 복사
+        </button>
         {onReview && entry.status === "draft" ? (
           <button
             type="button"
@@ -217,7 +218,8 @@ function TranslationMemoryMatchCard({
             className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-2.5 text-[0.68rem] font-medium text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45"
           >
             <Check size={12} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "검토 완료")}</button>
+            검토 완료
+          </button>
         ) : null}
         {onApprove && entry.status !== "approved" ? (
           <button
@@ -227,7 +229,8 @@ function TranslationMemoryMatchCard({
             className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-good/35 bg-good/10 px-2.5 text-[0.68rem] font-semibold text-good transition-colors hover:bg-good/15 disabled:cursor-not-allowed disabled:opacity-45"
           >
             <BadgeCheck size={12} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "승인")}</button>
+            승인
+          </button>
         ) : null}
         {onInvalidate ? (
           <button
@@ -236,7 +239,8 @@ function TranslationMemoryMatchCard({
             disabled={entry.stale}
             className="inline-flex min-h-11 items-center justify-center rounded-lg border border-bad/30 bg-bad/5 px-2.5 text-[0.68rem] font-medium text-bad transition-colors hover:bg-bad/10 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "무효화")}</button>
+            무효화
+          </button>
         ) : null}
       </div>
     </article>
@@ -588,7 +592,7 @@ export function StudioDialogueTranslationMemoryPanel({
 
   return (
     <section
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "대사 번역 메모리")}
+      aria-label="대사 번역 메모리"
       data-studio-translation-memory="local-only"
       data-studio-translation-memory-authority={authority.kind}
       aria-busy={hydrating || persistenceBusy}
@@ -601,15 +605,17 @@ export function StudioDialogueTranslationMemoryPanel({
         <div className="min-w-0">
           <h2 className="flex items-center gap-1.5 text-sm font-bold text-fg">
             <Languages size={15} className="text-accent" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "번역 메모리")}</h2>
+            번역 메모리
+          </h2>
           <p className="mt-0.5 text-[0.63rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "작품·화자·언어쌍이 같은 번역을 안전하게 재사용합니다.")}</p>
+            작품·화자·언어쌍이 같은 번역을 안전하게 재사용합니다.
+          </p>
         </div>
         {onClose ? (
           <button
             type="button"
             onClick={onClose}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "번역 메모리 닫기")}
+            aria-label="번역 메모리 닫기"
             className="grid size-11 shrink-0 place-items-center rounded-xl border border-line text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             <X size={15} aria-hidden />
@@ -631,57 +637,58 @@ export function StudioDialogueTranslationMemoryPanel({
           <p className="flex items-center gap-1 font-semibold">
             <HardDrive size={12} aria-hidden />
             {hydrating
-              ? translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "SQLite 번역 메모리 불러오는 중")
+              ? "SQLite 번역 메모리 불러오는 중"
               : storageUnavailable
-                ? translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "현재 탭 메모리에서만 유지")
+                ? "현재 탭 메모리에서만 유지"
                 : library.status === "invalid"
-                  ? translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "SQLite 저장 데이터 손상")
+                  ? "SQLite 저장 데이터 손상"
                 : persistenceBusy
-                  ? translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "SQLite/OPFS에 저장 중")
+                  ? "SQLite/OPFS에 저장 중"
                   : authority.kind === "sqlite"
-                    ? translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "SQLite/OPFS에 로컬 저장")
-                    : translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "호스트 로컬 저장소 사용")}
+                    ? "SQLite/OPFS에 로컬 저장"
+                    : "호스트 로컬 저장소 사용"}
           </p>
           <p className="mt-0.5">
-            {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "서버·팀원·다른 기기에는 자동 동기화하지 않습니다.")}{hydrating
-              ? translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", " 기존 저장 데이터를 확인하기 전에는 쓰기를 시작하지 않습니다.")
+            서버·팀원·다른 기기에는 자동 동기화하지 않습니다.
+            {hydrating
+              ? " 기존 저장 데이터를 확인하기 전에는 쓰기를 시작하지 않습니다."
               : storageUnavailable
-              ? translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", " 새로고침하면 사라질 수 있습니다.")
-              : translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", " 필요하면 JSON으로 직접 옮기세요.")}
+              ? " 새로고침하면 사라질 수 있습니다."
+              : " 필요하면 JSON으로 직접 옮기세요."}
           </p>
           {library.error ? <p className="mt-1">{library.error}</p> : null}
         </div>
 
         <section
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "현재 대사 번역 메모리 조건")}
+          aria-label="현재 대사 번역 메모리 조건"
           className="rounded-xl border border-line bg-card/45 p-2.5"
         >
           <div className="flex flex-wrap items-center gap-1.5 text-[0.62rem] text-fg-3">
             <span
               className="max-w-full truncate rounded-full bg-panel px-2 py-1"
-              title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "작품 범위: {v0}"), { v0: String(workScope) })}
+              title={`작품 범위: ${workScope}`}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "작품 ")}{workScope || translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "미지정")}
+              작품 {workScope || "미지정"}
             </span>
             <span className="rounded-full bg-panel px-2 py-1">
               {sourceLocale} → {targetLocale}
             </span>
             <span className="rounded-full bg-panel px-2 py-1">
-              {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "화자 ")}{speaker.trim() || translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "미지정")}
+              화자 {speaker.trim() || "미지정"}
             </span>
             <span className="rounded-full bg-panel px-2 py-1">
-              {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "리비전 ")}{String(sourceRevision)}
+              리비전 {String(sourceRevision)}
             </span>
           </div>
           <p className="mt-2 max-h-20 overflow-auto whitespace-pre-wrap text-[0.69rem] leading-relaxed text-fg">
-            {sourceText || translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "원문이 없습니다.")}
+            {sourceText || "원문이 없습니다."}
           </p>
         </section>
 
         {matches.exact ? (
-          <section aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "정확히 일치하는 번역")}>
+          <section aria-label="정확히 일치하는 번역">
             <TranslationMemoryMatchCard
-              label={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "정확히 일치")}
+              label="정확히 일치"
               entry={matches.exact.entry}
               stale={matches.exact.stale}
               conflicts={matches.exact.glossaryConflicts}
@@ -703,11 +710,12 @@ export function StudioDialogueTranslationMemoryPanel({
           </section>
         ) : (
           <p className="rounded-xl border border-dashed border-line px-3 py-3 text-center text-[0.67rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "이 조건과 정확히 일치하는 로컬 번역이 없습니다.")}</p>
+            이 조건과 정확히 일치하는 로컬 번역이 없습니다.
+          </p>
         )}
 
         {matches.fuzzy.length > 0 ? (
-          <section aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "유사 번역 제안")} className="space-y-2">
+          <section aria-label="유사 번역 제안" className="space-y-2">
             <div className="flex items-start gap-2 rounded-xl border border-accent/25 bg-accent-soft px-2.5 py-2 text-[0.64rem] leading-relaxed text-fg-2">
               <ShieldCheck
                 size={13}
@@ -715,12 +723,14 @@ export function StudioDialogueTranslationMemoryPanel({
                 aria-hidden
               />
               <p>
-                {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "유사 번역은 ")}<strong>{translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "자동 적용하지 않습니다.")}</strong> {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "원문과 말투를 직접 비교한 뒤 재사용하세요.")}</p>
+                유사 번역은 <strong>자동 적용하지 않습니다.</strong> 원문과
+                말투를 직접 비교한 뒤 재사용하세요.
+              </p>
             </div>
             {matches.fuzzy.map((suggestion) => (
               <TranslationMemoryMatchCard
                 key={suggestion.entry.id}
-                label={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "유사 제안")}
+                label="유사 제안"
                 entry={suggestion.entry}
                 stale={false}
                 conflicts={suggestion.glossaryConflicts}
@@ -738,15 +748,16 @@ export function StudioDialogueTranslationMemoryPanel({
         ) : null}
 
         <section
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "번역 메모리 초안 저장")}
+          aria-label="번역 메모리 초안 저장"
           className="space-y-2 rounded-xl border border-line bg-card/45 p-2.5"
         >
           <div className="flex items-center justify-between gap-2">
             <label
-              htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "en", "{v0}-draft"), { v0: String(importInputId) })}
+              htmlFor={`${importInputId}-draft`}
               className="text-[0.68rem] font-semibold text-fg"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "번역문 초안")}</label>
+              번역문 초안
+            </label>
             <span className="text-[0.6rem] tabular-nums text-fg-4">
               {translationDraft.length.toLocaleString("ko-KR")} /{" "}
               {STUDIO_TRANSLATION_MEMORY_MAX_TRANSLATION_CHARS.toLocaleString(
@@ -755,7 +766,7 @@ export function StudioDialogueTranslationMemoryPanel({
             </span>
           </div>
           <textarea
-            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "en", "{v0}-draft"), { v0: String(importInputId) })}
+            id={`${importInputId}-draft`}
             value={translationDraft}
             onChange={(event) =>
               setTranslationDraft(
@@ -766,7 +777,7 @@ export function StudioDialogueTranslationMemoryPanel({
               )
             }
             rows={3}
-            placeholder={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "검토할 번역문을 입력하세요.")}
+            placeholder="검토할 번역문을 입력하세요."
             className="w-full resize-y rounded-xl border border-line bg-panel px-2.5 py-2 text-[0.7rem] leading-relaxed text-fg outline-none placeholder:text-fg-4 focus:border-accent"
           />
           <button
@@ -782,14 +793,14 @@ export function StudioDialogueTranslationMemoryPanel({
           >
             <Check size={13} aria-hidden />
             {matches.exact
-              ? translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "수정본을 초안으로 저장")
-              : translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "번역을 초안으로 저장")}
+              ? "수정본을 초안으로 저장"
+              : "번역을 초안으로 저장"}
           </button>
         </section>
 
         {notice ? (
           <p
-            role={notice.tone === "bad" ? translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "en", "status")}
+            role={notice.tone === "bad" ? "alert" : "status"}
             className={cx(
               "rounded-xl border px-2.5 py-2 text-[0.65rem] leading-relaxed",
               notice.tone === "good"
@@ -807,7 +818,7 @@ export function StudioDialogueTranslationMemoryPanel({
       <footer className="border-t border-line/70 bg-card/40 px-3 py-2.5">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[0.62rem] tabular-nums text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "로컬 항목 ")}{library.entries.length.toLocaleString("ko-KR")} /{" "}
+            로컬 항목 {library.entries.length.toLocaleString("ko-KR")} /{" "}
             {STUDIO_TRANSLATION_MEMORY_MAX_ENTRIES.toLocaleString("ko-KR")}
           </p>
           <div className="flex gap-1.5">
@@ -832,7 +843,7 @@ export function StudioDialogueTranslationMemoryPanel({
               )}
             >
               <FileUp size={12} aria-hidden />
-              {importBusy ? translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "가져오는 중…") : translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "JSON 가져오기")}
+              {importBusy ? "가져오는 중…" : "JSON 가져오기"}
             </label>
             <button
               type="button"
@@ -841,7 +852,8 @@ export function StudioDialogueTranslationMemoryPanel({
               className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-line bg-panel px-2.5 text-[0.67rem] font-medium text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Download size={12} aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslationMemoryPanel", "ko", "JSON 내보내기")}</button>
+              JSON 내보내기
+            </button>
           </div>
         </div>
       </footer>

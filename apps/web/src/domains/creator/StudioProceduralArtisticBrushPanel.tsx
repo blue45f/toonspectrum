@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Controlled Studio surface for the isolated p5.brush settled-raster provider.
  *
@@ -221,18 +217,21 @@ export function StudioProceduralArtisticBrushPanel({
         </span>
         <div className="min-w-0">
           <h3 id={headingId} className="text-sm font-bold tracking-tight text-fg">
-            {translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "절차적 질감 생성기")}</h3>
+            절차적 질감 생성기
+          </h3>
           <p
             id={descriptionId}
             className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "설정한 기법과 시드로 결정적 질감을 전용 GPU Worker에서 렌더링해 새 래스터 레이어로 추가합니다.")}</p>
+            설정한 기법과 시드로 결정적 질감을 전용 GPU Worker에서 렌더링해 새 래스터 레이어로 추가합니다.
+          </p>
         </div>
       </header>
 
       <fieldset disabled={controlsDisabled} className="min-w-0">
         <legend className="mb-1.5 text-[0.68rem] font-semibold text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "질감 기법")}</legend>
+          질감 기법
+        </legend>
         <div
           data-studio-procedural-artistic-brush-techniques="true"
           className="grid grid-cols-2 gap-1.5"
@@ -255,7 +254,7 @@ export function StudioProceduralArtisticBrushPanel({
               >
                 <input
                   type="radio"
-                  name={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "en", "{v0}-technique"), { v0: String(headingId) })}
+                  name={`${headingId}-technique`}
                   value={id}
                   checked={technique === id}
                   disabled={controlsDisabled}
@@ -282,12 +281,13 @@ export function StudioProceduralArtisticBrushPanel({
 
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(7.5rem,0.8fr)] gap-2 max-[340px]:grid-cols-1">
         <label className="min-w-0 text-[0.68rem] font-semibold text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "색상")}<span className="mt-1 flex min-w-0 gap-1.5">
+          색상
+          <span className="mt-1 flex min-w-0 gap-1.5">
             <span className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-card">
               <Palette size={15} aria-hidden className="pointer-events-none absolute text-fg-3" />
               <input
                 type="color"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "질감 색상")}
+                aria-label="질감 색상"
                 value={color}
                 disabled={controlsDisabled}
                 onChange={(event) => onColorChange(event.currentTarget.value)}
@@ -301,7 +301,7 @@ export function StudioProceduralArtisticBrushPanel({
             </span>
             <input
               type="text"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "질감 색상 코드")}
+              aria-label="질감 색상 코드"
               value={color}
               maxLength={32}
               autoComplete="off"
@@ -314,9 +314,10 @@ export function StudioProceduralArtisticBrushPanel({
         </label>
 
         <label className="min-w-0 text-[0.68rem] font-semibold text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "반복 시드")}<input
+          반복 시드
+          <input
             type="number"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "결정적 반복 시드")}
+            aria-label="결정적 반복 시드"
             min={0}
             max={2_147_483_647}
             step={1}
@@ -332,7 +333,7 @@ export function StudioProceduralArtisticBrushPanel({
       </div>
 
       <div
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "{v0} 세부 설정"), { v0: String(TECHNIQUES.find((entry) => entry.id === technique)?.label ?? "절차적") })}
+        aria-label={`${TECHNIQUES.find((entry) => entry.id === technique)?.label ?? "절차적"} 세부 설정`}
         className="space-y-2 rounded-lg border border-line/60 bg-card/45 p-2.5"
       >
         {technique !== "flat-wash" ? (
@@ -350,7 +351,7 @@ export function StudioProceduralArtisticBrushPanel({
 
         {technique === "hatch" || technique === "watercolor-fill" ? (
           <StudioSliderRow
-            label={technique === "hatch" ? translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "선 방향") : translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "번짐 방향")}
+            label={technique === "hatch" ? "선 방향" : "번짐 방향"}
             min={-180}
             max={180}
             step={1}
@@ -363,14 +364,14 @@ export function StudioProceduralArtisticBrushPanel({
 
         {technique === "flow-field" || technique === "hatch" ? (
           <StudioSliderRow
-            label={translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "선 굵기")}
+            label="선 굵기"
             min={0.1}
             max={32}
             step={0.1}
             value={weight}
             disabled={controlsDisabled}
             onChange={onWeightChange}
-            readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "en", "{v0}px"), { v0: String(weight.toFixed(1)) })}
+            readout={`${weight.toFixed(1)}px`}
           />
         ) : null}
 
@@ -444,7 +445,8 @@ export function StudioProceduralArtisticBrushPanel({
             )}
           >
             <Square size={13} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "생성 취소")}</button>
+            생성 취소
+          </button>
         ) : (
           <span aria-hidden className="min-h-11" />
         )}
@@ -456,7 +458,7 @@ export function StudioProceduralArtisticBrushPanel({
           title={
             generateDisabled && !busy
               ? disabledReason ?? statusText
-              : translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "현재 설정으로 결정적인 절차적 질감을 생성합니다.")
+              : "현재 설정으로 결정적인 절차적 질감을 생성합니다."
           }
           className={cn(
             "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent",
@@ -469,7 +471,7 @@ export function StudioProceduralArtisticBrushPanel({
           ) : (
             <Sparkles size={14} aria-hidden />
           )}
-          {busy ? translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "생성 중…") : translateCurrentStaticSourceText("domains.creator.StudioProceduralArtisticBrushPanel", "ko", "질감 생성")}
+          {busy ? "생성 중…" : "질감 생성"}
         </button>
       </div>
     </section>

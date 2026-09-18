@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 // 전 페이지 공용 필터 패널 — 표시할 facet을 선택해 렌더(캘린더/탐색/추천/랭킹 공용).
 import { Bookmark, Check, SlidersHorizontal, X } from "lucide-react";
 
@@ -176,7 +175,7 @@ export function TitleFilterPanel({
               aria-pressed={value.savedOnly}
               className={chip(value.savedOnly)}
             >
-              <Bookmark size={12} className={value.savedOnly ? translateCurrentStaticSourceText("shared.components.title.filter.panel", "en", "fill-accent text-accent") : ""} />
+              <Bookmark size={12} className={value.savedOnly ? "fill-accent text-accent" : ""} />
               {t("titleFilter.savedOnly")}
               {typeof savedCount === "number" ? ` (${savedCount})` : ""}
             </button>

@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   CheckCircle2,
   ChevronDown,
   CircleAlert,
@@ -66,12 +62,14 @@ export function MarketProductionFitWorkbench({ record, className }: MarketProduc
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-2xl">
-          <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "en", "Before you use it")}</p>
+          <p className="eyebrow text-accent">Before you use it</p>
           <h2 id="market-production-fit-title" className="mt-1 flex items-center gap-2 text-xl font-bold text-fg">
             <ShieldCheck className="size-5 text-accent" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "ko", "이 리소스를 지금 쓸 수 있나요?")}</h2>
+            이 리소스를 지금 쓸 수 있나요?
+          </h2>
           <p className="mt-1.5 text-xs leading-5 text-fg-3 sm:text-sm sm:leading-6">
-            {translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "ko", "Studio 버전, 지원 엔진, 기기 환경과 사용권을 한 번에 확인합니다. 어려운 기술 정보를 직접 비교하지 않아도 됩니다.")}</p>
+            Studio 버전, 지원 엔진, 기기 환경과 사용권을 한 번에 확인합니다. 어려운 기술 정보를 직접 비교하지 않아도 됩니다.
+          </p>
         </div>
         <span
           role="status"
@@ -87,25 +85,26 @@ export function MarketProductionFitWorkbench({ record, className }: MarketProduc
         <p className="mt-1 text-xs leading-5 text-fg-2 sm:text-sm sm:leading-6">{evaluation.guidance}</p>
         <div
           className="mt-3 flex flex-wrap items-center gap-1.5 text-[0.68rem] font-semibold"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "ko", "문제 없음 {v0}개, 확인 필요 {v1}개, 사용 불가 {v2}개"), { v0: String(evaluation.passCount), v1: String(evaluation.reviewCount), v2: String(evaluation.blockCount) })}
+          aria-label={`문제 없음 ${evaluation.passCount}개, 확인 필요 ${evaluation.reviewCount}개, 사용 불가 ${evaluation.blockCount}개`}
         >
-          <span className="rounded-full bg-good/10 px-2.5 py-1 text-good">{translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "ko", "문제 없음 ")}{evaluation.passCount}</span>
-          {evaluation.reviewCount > 0 ? <span className="rounded-full bg-warn/10 px-2.5 py-1 text-warn">{translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "ko", "확인 필요 ")}{evaluation.reviewCount}</span> : null}
-          {evaluation.blockCount > 0 ? <span className="rounded-full bg-danger/10 px-2.5 py-1 text-danger">{translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "ko", "사용 불가 ")}{evaluation.blockCount}</span> : null}
+          <span className="rounded-full bg-good/10 px-2.5 py-1 text-good">문제 없음 {evaluation.passCount}</span>
+          {evaluation.reviewCount > 0 ? <span className="rounded-full bg-warn/10 px-2.5 py-1 text-warn">확인 필요 {evaluation.reviewCount}</span> : null}
+          {evaluation.blockCount > 0 ? <span className="rounded-full bg-danger/10 px-2.5 py-1 text-danger">사용 불가 {evaluation.blockCount}</span> : null}
         </div>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         <Link href="/market/fit" className="inline-flex min-h-10 items-center rounded-xl border border-line bg-panel px-3 font-semibold text-fg-2 transition-colors hover:border-line-strong hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
-          {translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "ko", "내 환경에 맞는 리소스만 보기")}</Link>
+          내 환경에 맞는 리소스만 보기
+        </Link>
         {license.url ? (
           <a href={license.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1.5 rounded-xl px-2 font-semibold text-fg-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
-            {translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "ko", "사용권 원문 ")}<ExternalLink className="size-3.5" aria-hidden="true" />
+            사용권 원문 <ExternalLink className="size-3.5" aria-hidden="true" />
           </a>
         ) : null}
         {record.provenance.origin === "permissive" ? (
           <a href={record.provenance.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1.5 rounded-xl px-2 font-semibold text-fg-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
-            {translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "ko", "원 출처 확인 ")}<ExternalLink className="size-3.5" aria-hidden="true" />
+            원 출처 확인 <ExternalLink className="size-3.5" aria-hidden="true" />
           </a>
         ) : null}
       </div>
@@ -113,14 +112,16 @@ export function MarketProductionFitWorkbench({ record, className }: MarketProduc
       <details className="group mt-4 rounded-xl border border-line bg-panel/55">
         <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-3 text-xs font-bold text-fg-2 hover:text-fg [&::-webkit-details-marker]:hidden">
           <Settings2 className="size-4 text-accent" aria-hidden="true" />
-          {translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "ko", "세부 검사와 내 제작 환경 보기")}<span className="ml-auto text-[0.65rem] font-normal text-fg-3">{translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "ko", "전문 설정")}</span>
+          세부 검사와 내 제작 환경 보기
+          <span className="ml-auto text-[0.65rem] font-normal text-fg-3">전문 설정</span>
           <ChevronDown className="size-4 text-fg-3 transition-transform group-open:rotate-180" aria-hidden="true" />
         </summary>
         <div className="border-t border-line p-3 sm:p-4">
           <p className="mb-3 text-xs leading-5 text-fg-3">
-            {translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "ko", "아래 값은 서버 manifest와 브라우저에 저장한 제작 환경을 대조한 기술 상세입니다. 문제가 생길 때 원인을 확인하거나 전문 설정을 맞출 때 사용하세요.")}</p>
+            아래 값은 서버 manifest와 브라우저에 저장한 제작 환경을 대조한 기술 상세입니다. 문제가 생길 때 원인을 확인하거나 전문 설정을 맞출 때 사용하세요.
+          </p>
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.82fr)]">
-            <ul className="grid gap-2 sm:grid-cols-2" aria-label={translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "ko", "제작 적합성 세부 검사 결과")}>
+            <ul className="grid gap-2 sm:grid-cols-2" aria-label="제작 적합성 세부 검사 결과">
               {evaluation.checks.map((check) => {
                 const meta = CHECK_META[check.status];
                 const Icon = meta.icon;
@@ -137,7 +138,7 @@ export function MarketProductionFitWorkbench({ record, className }: MarketProduc
                       </span>
                     </div>
                     <details className="mt-2">
-                      <summary className="cursor-pointer text-[0.62rem] font-semibold text-fg-3 hover:text-fg">{translateCurrentStaticSourceText("domains.market.components.MarketProductionFitWorkbench", "ko", "기술 근거 보기")}</summary>
+                      <summary className="cursor-pointer text-[0.62rem] font-semibold text-fg-3 hover:text-fg">기술 근거 보기</summary>
                       <p className="mt-1 break-words rounded-md bg-raised px-2 py-1.5 font-mono text-[0.62rem] leading-relaxed text-fg-3">{check.evidence}</p>
                     </details>
                   </li>

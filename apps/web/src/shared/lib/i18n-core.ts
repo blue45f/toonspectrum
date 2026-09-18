@@ -55,37 +55,17 @@ export const DICT: DictByLocale = {
 // feature modules can register diagnostic/reference dictionaries that are not currently rendered.
 // Start with the app-shell surface, then let lazy Admin/Studio loaders explicitly opt their English
 // dictionaries in when those routes are actually loaded.
-export interface I18nRuntimeTranslationSource {
-  readonly key: string;
-  readonly locale: string;
-}
-
-const runtimeTranslationSources = new Map<string, string>(
-  Object.keys(DICT.en).map((key) => [key, "en"] as const),
-);
-
-export function registerI18nRuntimeSourceEntries(
-  locale: string,
-  entries: Readonly<Record<string, string>>,
-): void {
-  const normalized = normalizeLocaleCode(locale);
-  if (!normalized) return;
-  registerI18nLocaleEntries(normalized, entries);
-  for (const key of Object.keys(entries)) runtimeTranslationSources.set(key, normalized);
-}
+const runtimeTranslationSourceKeys = new Set<string>(Object.keys(DICT.en));
 
 export function registerI18nEnglishSourceEntries(
   entries: Readonly<Record<string, string>>,
 ): void {
-  registerI18nRuntimeSourceEntries("en", entries);
-}
-
-export function getI18nRuntimeTranslationSources(): readonly I18nRuntimeTranslationSource[] {
-  return [...runtimeTranslationSources].map(([key, locale]) => ({ key, locale }));
+  registerI18nLocaleEntries("en", entries);
+  for (const key of Object.keys(entries)) runtimeTranslationSourceKeys.add(key);
 }
 
 export function getI18nRuntimeTranslationSourceKeys(): readonly string[] {
-  return [...runtimeTranslationSources.keys()];
+  return [...runtimeTranslationSourceKeys];
 }
 
 export interface I18nState {

@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowDownToLine,
   ArrowUpToLine,
   AlignCenter,
@@ -476,7 +472,7 @@ export function StudioCanvasStatusRail({
       {followerNotice ? (
         <div
           data-studio-autosave-document-follower
-          data-studio-autosave-live-jam={followerNotice.tone === "good" ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "en", "true") : undefined}
+          data-studio-autosave-live-jam={followerNotice.tone === "good" ? "true" : undefined}
           role="status"
           aria-live="polite"
           className={cn(
@@ -521,7 +517,7 @@ export function StudioCanvasStatusRail({
           role="status"
           aria-live="polite"
           aria-atomic="true"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "{v0} 내부 편집 중. Esc로 그룹 전체 선택"), { v0: String(normalizedActiveGroupName) })}
+          aria-label={`${normalizedActiveGroupName} 내부 편집 중. Esc로 그룹 전체 선택`}
           className="mb-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-cool/35 bg-cool/10 px-2.5 py-1.5 text-xs text-cool"
         >
           <span className="flex min-w-0 max-w-full items-center gap-1.5 font-semibold">
@@ -532,13 +528,14 @@ export function StudioCanvasStatusRail({
             <span className="shrink-0 text-cool/60" aria-hidden>
               ·
             </span>
-            <span className="shrink-0">{translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "내부 편집")}</span>
+            <span className="shrink-0">내부 편집</span>
           </span>
           <span className="ml-auto shrink-0 text-[0.68rem] font-medium text-fg-3">
             <kbd className="mr-1 rounded border border-line bg-panel px-1.5 py-0.5 font-sans text-[0.62rem] font-bold text-fg-2">
               Esc
             </kbd>
-            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "로 그룹 전체 선택")}</span>
+            로 그룹 전체 선택
+          </span>
         </div>
       ) : null}
 
@@ -566,7 +563,7 @@ export function StudioCanvasStatusRail({
       {selectionCount > 0 ? (
         <div className="flex h-full min-w-0 items-center gap-2 rounded-xl border border-accent/40 bg-accent-soft/30 px-2.5 py-1.5 text-xs shadow-sm">
           <span className="flex shrink-0 items-center gap-1.5 font-semibold text-accent">
-            <span>{selectionCount}{translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "개 선택")}</span>
+            <span>{selectionCount}개 선택</span>
             {selectionGroupName ? (
               <span className="max-w-28 truncate rounded-full bg-accent/12 px-2 py-0.5 text-[0.64rem] text-accent">
                 {selectionGroupName}
@@ -575,14 +572,14 @@ export function StudioCanvasStatusRail({
           </span>
           <span className="hidden shrink-0 text-fg-3 xl:inline">
             {selectionGroupName
-              ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "드래그·방향키 이동 · Alt/⌥ 드래그 복제 · 더블클릭 내부 편집")
-              : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "드래그 이동 · Shift 비율·15° · Alt/⌥ 중심·드래그 복제")}
+              ? "드래그·방향키 이동 · Alt/⌥ 드래그 복제 · 더블클릭 내부 편집"
+              : "드래그 이동 · Shift 비율·15° · Alt/⌥ 중심·드래그 복제"}
           </span>
           <div className="ml-auto flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [scrollbar-width:thin]">
             {selectionGroupName && onUngroupSelection ? (
               <SelectionLayoutAction
                 hint={SELECTION_LAYOUT_HINTS.ungroup}
-                label={translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "선택 그룹 해제")}
+                label="선택 그룹 해제"
                 onClick={onUngroupSelection}
                 ariaKeyShortcuts="Shift+Control+G Shift+Meta+G"
                 disabled={layoutSelectionDisabledReason !== null}
@@ -590,12 +587,12 @@ export function StudioCanvasStatusRail({
                 className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
               >
                 <FolderMinus size={13} aria-hidden />
-                <span>{translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "그룹 해제")}</span>
+                <span>그룹 해제</span>
               </SelectionLayoutAction>
             ) : selectionCount >= 2 ? (
               <SelectionLayoutAction
                 hint={SELECTION_LAYOUT_HINTS.group}
-                label={translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "선택 요소 그룹화")}
+                label="선택 요소 그룹화"
                 onClick={onGroupSelection}
                 ariaKeyShortcuts="Control+G Meta+G"
                 disabled={groupSelectionDisabledReason !== null}
@@ -603,7 +600,7 @@ export function StudioCanvasStatusRail({
                 className="flex cursor-pointer items-center gap-1 rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
               >
                 <FolderPlus size={13} aria-hidden />
-                <span>{translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "그룹화")}</span>
+                <span>그룹화</span>
               </SelectionLayoutAction>
             ) : null}
             {onToggleSelectionLock ? (
@@ -615,10 +612,10 @@ export function StudioCanvasStatusRail({
                 }
                 label={
                   selectionLockState === "locked"
-                    ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "선택 잠금 해제")
+                    ? "선택 잠금 해제"
                     : selectionLockState === "mixed"
-                      ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "선택 잠금 통일")
-                      : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "선택 잠금")
+                      ? "선택 잠금 통일"
+                      : "선택 잠금"
                 }
                 onClick={onToggleSelectionLock}
                 disabled={lockSelectionDisabledReason !== null}
@@ -630,10 +627,11 @@ export function StudioCanvasStatusRail({
                 ) : (
                   <Lock size={13} aria-hidden />
                 )}
-                <span>{selectionLockState === "locked" ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "잠금 해제") : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "잠금")}</span>
+                <span>{selectionLockState === "locked" ? "잠금 해제" : "잠금"}</span>
                 {selectionLockState === "mixed" ? (
                   <span className="rounded bg-warning-soft px-1 text-[0.58rem] text-warning">
-                    {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "혼합")}</span>
+                    혼합
+                  </span>
                 ) : null}
               </SelectionLayoutAction>
             ) : null}
@@ -642,22 +640,22 @@ export function StudioCanvasStatusRail({
                 type="button"
                 onClick={onMergeBubbles}
                 disabled={bubbleMergeDisabledReason !== null}
-                aria-label={translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "선택한 말풍선 병합")}
+                aria-label="선택한 말풍선 병합"
                 title={
                   bubbleMergeDisabledReason ??
-                  translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "겹친 말풍선을 하나의 외곽선으로 병합합니다(실행취소 1회).")
+                  "겹친 말풍선을 하나의 외곽선으로 병합합니다(실행취소 1회)."
                 }
                 className="flex items-center gap-1 rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-card"
               >
                 <Combine size={13} aria-hidden />
-                <span>{translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "말풍선 병합")}</span>
+                <span>말풍선 병합</span>
               </button>
             )}
             {onReorderSelection ? (
               <div
                 className="inline-flex shrink-0 gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
                 role="group"
-                aria-label={translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "앞뒤 순서")}
+                aria-label="앞뒤 순서"
               >
                 {REORDER_SELECTION_ACTIONS.map(([mode, label, hint, Icon]) => (
                   <SelectionLayoutAction
@@ -678,12 +676,12 @@ export function StudioCanvasStatusRail({
               <div
                 className="inline-flex shrink-0 gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
                 role="group"
-                aria-label={translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "선택 보기 · 반전")}
+                aria-label="선택 보기 · 반전"
               >
                 {onZoomToSelection ? (
                   <SelectionLayoutAction
                     hint={SELECTION_LAYOUT_HINTS.zoomToSelection}
-                    label={translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "선택 영역으로 확대")}
+                    label="선택 영역으로 확대"
                     icon={ScanSearch}
                     onClick={onZoomToSelection}
                     ariaKeyShortcuts="Shift+F"
@@ -727,8 +725,8 @@ export function StudioCanvasStatusRail({
                     unavailableReason={alignmentSelectionDisabledReason ?? undefined}
                     icon={typeof content === "string" ? undefined : content}
                     className={typeof content === "string"
-                      ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "en", "cursor-pointer rounded px-1.5 py-0.5 text-[0.66rem] font-bold text-fg-3 hover:bg-raised hover:text-fg")
-                      : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "en", "cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg")}
+                      ? "cursor-pointer rounded px-1.5 py-0.5 text-[0.66rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
+                      : "cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"}
                   >
                     {typeof content === "string" ? content : null}
                   </SelectionLayoutAction>
@@ -738,24 +736,27 @@ export function StudioCanvasStatusRail({
             <div className="mx-1 h-4 w-px shrink-0 bg-line/60" />
             <SelectionLayoutAction
               hint={SELECTION_LAYOUT_HINTS.duplicate}
-              label={translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "선택 복제")}
+              label="선택 복제"
               onClick={onDuplicateSelection}
               ariaKeyShortcuts="Control+D Meta+D"
               className="shrink-0 cursor-pointer rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
             >
-              {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "복제")}</SelectionLayoutAction>
+              복제
+            </SelectionLayoutAction>
             <button
               type="button"
               onClick={onRemoveSelection}
               className="shrink-0 cursor-pointer rounded-md border border-line bg-card px-2 py-1 font-semibold text-bad transition-colors hover:bg-raised"
             >
-              {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "삭제")}</button>
+              삭제
+            </button>
             <button
               type="button"
               onClick={onClearSelection}
               className="shrink-0 cursor-pointer rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
             >
-              {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "해제")}</button>
+              해제
+            </button>
           </div>
         </div>
       ) : (
@@ -766,7 +767,8 @@ export function StudioCanvasStatusRail({
         >
           <span className="size-1.5 shrink-0 rounded-full bg-line" />
           <span className="truncate">
-            {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "요소를 선택하면 정렬·복제·삭제 명령이 여기에 표시됩니다")}</span>
+            요소를 선택하면 정렬·복제·삭제 명령이 여기에 표시됩니다
+          </span>
         </div>
       )}
       </div>
@@ -792,11 +794,11 @@ export function StudioCanvasStatusRail({
           </span>
           <span className="min-w-0 flex-1 leading-relaxed">
             <strong className="block font-bold">
-              {advancedFillBusy ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "고급 채우기 분석 중") : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "채우기 미리보기")}
+              {advancedFillBusy ? "고급 채우기 분석 중" : "채우기 미리보기"}
             </strong>
             <span className="text-fg-3">
               {advancedFillBusy
-                ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "참조 경계와 누수 가능성을 확인하고 있어요.")
+                ? "참조 경계와 누수 가능성을 확인하고 있어요."
                 : `${advancedFillPreviewMessage ?? ""}${advancedFillActive ? " · 다른 영역을 탭해 한 번의 적용으로 누적할 수 있어요." : ""}`}
             </span>
           </span>
@@ -807,13 +809,15 @@ export function StudioCanvasStatusRail({
                 onClick={onCancelAdvancedFillPreview}
                 className="min-h-11 flex-1 rounded-lg border border-line bg-card px-3 font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:flex-none"
               >
-                {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "취소")}</button>
+                취소
+              </button>
               <button
                 type="button"
                 onClick={onApplyAdvancedFillPreview}
                 className="min-h-11 flex-1 rounded-lg bg-accent px-4 font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:flex-none"
               >
-                {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "적용 · 실행취소 1회")}</button>
+                적용 · 실행취소 1회
+              </button>
             </span>
           )}
           {advancedFillBusy && (
@@ -822,7 +826,8 @@ export function StudioCanvasStatusRail({
               onClick={onCancelAdvancedFillCalculation}
               className="ml-auto min-h-11 min-w-24 rounded-lg border border-accent/35 bg-card px-3 font-bold text-accent transition-colors hover:bg-accent-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              {translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasStatusRail", "ko", "계산 취소")}</button>
+              계산 취소
+            </button>
           )}
         </div>
       )}

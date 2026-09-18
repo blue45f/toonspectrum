@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { RESOURCE_BUTTON } from "./navigation";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 import { downloadText, useCreatorWorkspace } from "./workspace";
@@ -20,11 +19,11 @@ const CHECKLIST = [
 export function PublishingPage() {
   const { workspace, update, error, ready, saving, writable } = useCreatorWorkspace();
   const completed = CHECKLIST.filter((item) => workspace.checks.includes(`publish-${item.id}`)).length;
-  return <ResourceLayout title={translateCurrentStaticSourceText("domains.creator.resources.PublishingPage", "ko", "연재·출판 준비실")} intro={translateCurrentStaticSourceText("domains.creator.resources.PublishingPage", "ko", "제출 전에 놓치기 쉬운 항목을 확인하세요. 이 체크리스트는 일반적인 준비 도구이며, 특정 플랫폼의 접수 기준이나 법률 자문이 아닙니다.")}>
+  return <ResourceLayout title="연재·출판 준비실" intro="제출 전에 놓치기 쉬운 항목을 확인하세요. 이 체크리스트는 일반적인 준비 도구이며, 특정 플랫폼의 접수 기준이나 법률 자문이 아닙니다.">
     <section className="space-y-4 rounded-2xl border border-line bg-panel p-6">
-      <h2 className="text-xl font-bold">{translateCurrentStaticSourceText("domains.creator.resources.PublishingPage", "ko", "준비 상태 · ")}{completed}/{CHECKLIST.length}</h2>
-      <progress max={CHECKLIST.length} value={completed} aria-label={translateCurrentStaticSourceText("domains.creator.resources.PublishingPage", "ko", "출판 준비 완료 항목")} className="h-3 w-full" />
-      <button className={RESOURCE_BUTTON} onClick={() => downloadText("publishing-checklist.md", "# 연재·출판 준비 체크리스트\n\n특정 제출처의 공식 기준이 아닙니다. 최신 안내를 별도로 확인하세요.\n\n" + CHECKLIST.map((item) => `- [${workspace.checks.includes(`publish-${item.id}`) ? "x" : " "}] ${item.title}\n  ${item.detail}`).join("\n"))}>{translateCurrentStaticSourceText("domains.creator.resources.PublishingPage", "ko", "체크리스트 내보내기")}</button>
+      <h2 className="text-xl font-bold">준비 상태 · {completed}/{CHECKLIST.length}</h2>
+      <progress max={CHECKLIST.length} value={completed} aria-label="출판 준비 완료 항목" className="h-3 w-full" />
+      <button className={RESOURCE_BUTTON} onClick={() => downloadText("publishing-checklist.md", "# 연재·출판 준비 체크리스트\n\n특정 제출처의 공식 기준이 아닙니다. 최신 안내를 별도로 확인하세요.\n\n" + CHECKLIST.map((item) => `- [${workspace.checks.includes(`publish-${item.id}`) ? "x" : " "}] ${item.title}\n  ${item.detail}`).join("\n"))}>체크리스트 내보내기</button>
     </section>
     <div className="grid gap-4 md:grid-cols-2">{CHECKLIST.map((item) => {
       const id = `publish-${item.id}`;

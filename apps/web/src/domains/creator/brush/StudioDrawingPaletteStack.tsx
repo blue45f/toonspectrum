@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /* eslint-disable jsx-a11y/no-noninteractive-element-interactions -- WAI-ARIA focusable separators are adjustable widgets with required pointer and keyboard input. */
 import {
   ArrowDown,
@@ -613,14 +609,14 @@ export function StudioDrawingPaletteStack({
                 aria-haspopup="dialog"
                 aria-expanded={expanded}
                 aria-controls={popupId}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "ko", "{v0} 팝업 {v1}"), { v0: String(definition.label), v1: String(expanded ? "닫기" : "열기") })}
+                aria-label={`${definition.label} 팝업 ${expanded ? "닫기" : "열기"}`}
                 title={`${definition.label} — ${definition.description}`}
                 data-studio-drawing-palette-icon-trigger={id}
                 data-position-locked={
-                  normalizedLayout.locks[id].position ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "true") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "false")
+                  normalizedLayout.locks[id].position ? "true" : "false"
                 }
                 data-height-locked={
-                  normalizedLayout.locks[id].height ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "true") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "false")
+                  normalizedLayout.locks[id].height ? "true" : "false"
                 }
                 onClick={(event) =>
                   paletteOverlay.toggle(overlay, event.currentTarget)
@@ -682,7 +678,7 @@ export function StudioDrawingPaletteStack({
         ref={rootRef}
         data-studio-drawing-palette-stack="true"
         data-studio-drawing-palette-presentation="full"
-        data-studio-drawing-palette-dragging={dragging ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "true") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "false")}
+        data-studio-drawing-palette-dragging={dragging ? "true" : "false"}
         className={cn(
           "flex min-w-0 flex-col gap-2",
           "lg:min-h-0 lg:flex-1 lg:gap-0 lg:overflow-hidden",
@@ -726,12 +722,12 @@ export function StudioDrawingPaletteStack({
             }}
             aria-labelledby={titleId}
             data-studio-drawing-palette={id}
-            data-studio-drawing-palette-collapsed={collapsed ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "true") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "false")}
+            data-studio-drawing-palette-collapsed={collapsed ? "true" : "false"}
             data-position-locked={
-              normalizedLayout.locks[id].position ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "true") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "false")
+              normalizedLayout.locks[id].position ? "true" : "false"
             }
             data-height-locked={
-              normalizedLayout.locks[id].height ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "true") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "false")
+              normalizedLayout.locks[id].height ? "true" : "false"
             }
             style={style}
             className={cn(
@@ -771,7 +767,7 @@ export function StudioDrawingPaletteStack({
               ) : null}
               <div
                 role="group"
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "ko", "{v0} 팔레트 배치"), { v0: String(definition.label) })}
+                aria-label={`${definition.label} 팔레트 배치`}
                 className={cn(
                   "flex shrink-0 items-center gap-0.5",
                   mobilePrimaryPaletteId && "hidden lg:flex",
@@ -783,8 +779,8 @@ export function StudioDrawingPaletteStack({
                   onClick={() =>
                     emit(moveStudioDrawingPalette(normalizedLayout, id, "up"))
                   }
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "ko", "{v0} 위로 이동"), { v0: String(definition.label) })}
-                  title={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "ko", "팔레트를 위로 이동")}
+                  aria-label={`${definition.label} 위로 이동`}
+                  title="팔레트를 위로 이동"
                   className={cn(
                     "grid size-11 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-35 lg:size-8",
                     STUDIO_EASE,
@@ -799,8 +795,8 @@ export function StudioDrawingPaletteStack({
                   onClick={() =>
                     emit(moveStudioDrawingPalette(normalizedLayout, id, "down"))
                   }
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "ko", "{v0} 아래로 이동"), { v0: String(definition.label) })}
-                  title={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "ko", "팔레트를 아래로 이동")}
+                  aria-label={`${definition.label} 아래로 이동`}
+                  title="팔레트를 아래로 이동"
                   className={cn(
                     "grid size-11 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-35 lg:size-8",
                     STUDIO_EASE,
@@ -823,8 +819,8 @@ export function StudioDrawingPaletteStack({
                   onClick={(event) =>
                     paletteOverlay.toggle(optionsOverlay, event.currentTarget)
                   }
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "ko", "{v0} 팔레트 옵션"), { v0: String(definition.label) })}
-                  title={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "ko", "위치·높이 잠금 및 표시 방식")}
+                  aria-label={`${definition.label} 팔레트 옵션`}
+                  title="위치·높이 잠금 및 표시 방식"
                   className={cn(
                     "grid size-11 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg lg:size-8",
                     optionsOpen && "bg-accent-soft text-accent",
@@ -903,7 +899,7 @@ export function StudioDrawingPaletteStack({
             <div
               key="palette-splitter"
               role="separator"
-              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "ko", "{v0} 크기 조절"), { v0: String(joinKoreanLabels(firstDefinition.label, secondDefinition.label)) })}
+              aria-label={`${joinKoreanLabels(firstDefinition.label, secondDefinition.label)} 크기 조절`}
               aria-orientation="horizontal"
               aria-valuemin={STUDIO_DRAWING_PALETTE_MIN_PERCENT}
               aria-valuemax={STUDIO_DRAWING_PALETTE_MAX_PERCENT}
@@ -912,13 +908,13 @@ export function StudioDrawingPaletteStack({
               aria-keyshortcuts={
                 splitHeightLocked
                   ? undefined
-                  : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "ArrowUp ArrowDown Home End Enter")
+                  : "ArrowUp ArrowDown Home End Enter"
               }
               aria-disabled={splitHeightLocked}
               tabIndex={splitHeightLocked ? -1 : 0}
               data-studio-drawing-palette-splitter="true"
-              data-dragging={dragging ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "true") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "false")}
-              data-height-locked={splitHeightLocked ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "true") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "en", "false")}
+              data-dragging={dragging ? "true" : "false"}
+              data-height-locked={splitHeightLocked ? "true" : "false"}
               onPointerDown={(event) =>
                 splitHeightLocked
                   ? undefined
@@ -934,8 +930,8 @@ export function StudioDrawingPaletteStack({
               }}
               title={
                 splitHeightLocked
-                  ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "ko", "팔레트 높이 잠금을 해제하면 크기를 조절할 수 있습니다")
-                  : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingPaletteStack", "ko", "위·아래로 드래그 · 방향키로 조절 · Enter/더블클릭/더블탭으로 기본 비율")
+                  ? "팔레트 높이 잠금을 해제하면 크기를 조절할 수 있습니다"
+                  : "위·아래로 드래그 · 방향키로 조절 · Enter/더블클릭/더블탭으로 기본 비율"
               }
               className={cn(
                 "group relative z-10 hidden h-2 shrink-0 touch-none cursor-row-resize select-none place-items-center border-0 bg-transparent p-0",

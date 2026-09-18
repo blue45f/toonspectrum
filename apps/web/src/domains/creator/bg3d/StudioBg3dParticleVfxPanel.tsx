@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Sparkles, Wind, Flame, CloudRain, Snowflake, Zap, Sun } from "lucide-react";
 import { useState } from "react";
 
@@ -50,7 +46,8 @@ export function StudioBg3dParticleVfxPanel({
     <div className="flex flex-col gap-3 p-3 text-xs text-fg">
       <div>
         <span className="mb-1.5 block text-[0.7rem] font-semibold text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dParticleVfxPanel", "ko", "웹툰 3D 파티클 & 대기 이펙트 프리셋")}</span>
+          웹툰 3D 파티클 & 대기 이펙트 프리셋
+        </span>
         <div className="grid grid-cols-2 gap-1.5">
           {presetsList.map((item) => {
             const Icon = item.icon;
@@ -61,9 +58,11 @@ export function StudioBg3dParticleVfxPanel({
                 type="button"
                 disabled={disabled}
                 onClick={() => handleSelect(item.id)}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dParticleVfxPanel", "en", "flex items-center gap-2 rounded-lg border p-2 text-left transition-all {v0}"), { v0: String(isSelected
+                className={`flex items-center gap-2 rounded-lg border p-2 text-left transition-all ${
+                  isSelected
                     ? "border-accent bg-accent/15 text-accent shadow-sm"
-                    : "border-line bg-card text-fg hover:bg-raised") })}
+                    : "border-line bg-card text-fg hover:bg-raised"
+                }`}
               >
                 <div
                   className="flex size-7 shrink-0 items-center justify-center rounded-md"
@@ -95,7 +94,7 @@ export function StudioBg3dParticleVfxPanel({
 
           <div className="mt-1 flex flex-col gap-2 border-t border-line/50 pt-2">
             <div className="flex items-center justify-between">
-              <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dParticleVfxPanel", "ko", "발생 밀도 (Density):")}</span>
+              <span className="text-[0.68rem] text-fg-2">발생 밀도 (Density):</span>
               <div className="flex items-center gap-2">
                 <input
                   type="range"
@@ -113,7 +112,7 @@ export function StudioBg3dParticleVfxPanel({
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dParticleVfxPanel", "ko", "바람 세기 (Wind):")}</span>
+              <span className="text-[0.68rem] text-fg-2">바람 세기 (Wind):</span>
               <div className="flex items-center gap-2">
                 <input
                   type="range"

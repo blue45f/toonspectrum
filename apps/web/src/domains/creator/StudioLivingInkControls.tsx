@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Droplets, Eraser, LockKeyhole, Paintbrush, Power, Waves } from "lucide-react";
 
 import { STUDIO_WASH_INK_PRODUCT_LABEL_KO } from "./brush/studio-brush-behavior-ui";
@@ -87,7 +83,7 @@ export function StudioLivingInkControls({
     <div
       data-studio-living-ink-controls="true"
       data-studio-living-ink-state={state}
-      data-studio-living-ink-physical-mode={physicalModeEnabled ? translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "en", "enabled") : translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "en", "disabled")}
+      data-studio-living-ink-physical-mode={physicalModeEnabled ? "enabled" : "disabled"}
       data-studio-brush-behavior="wash"
       className="flex shrink-0 items-center gap-1 rounded-xl border border-line/70 bg-card/70 px-1 py-0.5"
     >
@@ -109,7 +105,7 @@ export function StudioLivingInkControls({
           data-studio-living-ink-physical-toggle="true"
           disabled={busy}
           aria-pressed={physicalModeEnabled}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "ko", "{v0} 물리 모드"), { v0: String(WASH) })}
+          aria-label={`${WASH} 물리 모드`}
           onClick={() => onPhysicalModeEnabledChange(!physicalModeEnabled)}
           className={cn(
             buttonClass,
@@ -124,7 +120,7 @@ export function StudioLivingInkControls({
       </StudioToolHintTarget>
       <div
         role="group"
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "ko", "{v0} 도구"), { v0: String(WASH) })}
+        aria-label={`${WASH} 도구`}
         className="flex items-center rounded-lg bg-canvas/70 p-0.5"
       >
         {([
@@ -170,11 +166,11 @@ export function StudioLivingInkControls({
             : "현재 번짐 레이어에 픽셀 선택이 없어 전체 범위만 사용할 수 있습니다.",
         )}
       >
-        <label className="sr-only" htmlFor="studio-living-ink-scope">{WASH} {translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "ko", "처리 범위")}</label>
+        <label className="sr-only" htmlFor="studio-living-ink-scope">{WASH} 처리 범위</label>
         <select
           id="studio-living-ink-scope"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "ko", "{v0} 처리 범위"), { v0: String(WASH) })}
-          value={selectionScopeDisabled ? translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "en", "all") : scope}
+          aria-label={`${WASH} 처리 범위`}
+          value={selectionScopeDisabled ? "all" : scope}
           disabled={!ready}
           onChange={(event) => onScopeChange(event.target.value === "selection" ? "selection" : "all")}
           className={cn(
@@ -182,8 +178,8 @@ export function StudioLivingInkControls({
             STUDIO_FOCUS_RING,
           )}
         >
-          <option value="all">{translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "ko", "전체")}</option>
-          <option value="selection" disabled={selectionScopeDisabled}>{translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "ko", "선택")}</option>
+          <option value="all">전체</option>
+          <option value="selection" disabled={selectionScopeDisabled}>선택</option>
         </select>
       </StudioToolHintTarget>
 
@@ -202,7 +198,7 @@ export function StudioLivingInkControls({
           type="button"
           data-studio-living-ink-fix="true"
           disabled={!ready || !fixAvailable}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "ko", "{v0} 정착"), { v0: String(WASH) })}
+          aria-label={`${WASH} 정착`}
           onClick={onFix}
           className={cn(
             buttonClass,
@@ -228,7 +224,7 @@ export function StudioLivingInkControls({
           type="button"
           data-studio-living-ink-clear="true"
           disabled={!ready}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "ko", "{v0} 지우기"), { v0: String(WASH) })}
+          aria-label={`${WASH} 지우기`}
           onClick={onClear}
           className={cn(
             buttonClass,
@@ -241,7 +237,7 @@ export function StudioLivingInkControls({
 
       <details className="group relative">
         <summary
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "ko", "{v0} 재질 설정"), { v0: String(WASH) })}
+          aria-label={`${WASH} 재질 설정`}
           className={cn(
             "grid size-8 cursor-pointer list-none place-items-center rounded-lg border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg pointer-coarse:size-11",
             STUDIO_FOCUS_RING,
@@ -251,7 +247,7 @@ export function StudioLivingInkControls({
         </summary>
         <div className="absolute bottom-[calc(100%+0.55rem)] right-0 z-[80] w-64 rounded-xl border border-line bg-panel/98 p-3 shadow-2xl backdrop-blur-xl">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <strong className="text-xs text-fg">{translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "ko", "물·종이 재질")}</strong>
+            <strong className="text-xs text-fg">물·종이 재질</strong>
             <span role="status" className="text-[0.58rem] text-fg-3">{stateLabel(state)}</span>
           </div>
           {materialLocked ? (
@@ -261,9 +257,10 @@ export function StudioLivingInkControls({
           ) : null}
 
           <div className="mb-2.5">
-            <span className="mb-1 block text-[0.62rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "ko", "종이 질감")}</span>
+            <span className="mb-1 block text-[0.62rem] font-bold text-fg-2">종이 질감</span>
             <p className="mb-1 text-[0.52rem] leading-snug text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "ko", "문서 종이와 같은 카탈로그입니다. 수채 중목·한지·목탄지 등이 실제 결 높이와 맞춰집니다.")}</p>
+              문서 종이와 같은 카탈로그입니다. 수채 중목·한지·목탄지 등이 실제 결 높이와 맞춰집니다.
+            </p>
             <div className="grid grid-cols-4 gap-1">
               {STUDIO_PAPER_SURFACE_CATALOG.map((entry) => {
                 const isActive = matchPaperKindFromLivingInkMaterial(material) === entry.id
@@ -335,7 +332,8 @@ export function StudioLivingInkControls({
             onClick={() => onMaterialChange(DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS)}
             disabled={busy || materialLocked}
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioLivingInkControls", "ko", "재질 기본값 복원")}</button>
+            재질 기본값 복원
+          </button>
         </div>
       </details>
     </div>

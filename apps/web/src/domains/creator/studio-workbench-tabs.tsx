@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Workbench Tabs — 컴패니언 창(어시스턴트 · AI 스위트)이 공유하는 접근성 탭 스트립.
  *
@@ -160,7 +159,7 @@ export function StudioWorkbenchTabStrip({
               size={14}
               strokeWidth={1.85}
               aria-hidden
-              className={active ? translateCurrentStaticSourceText("domains.creator.studio.workbench.tabs", "en", "text-accent") : undefined}
+              className={active ? "text-accent" : undefined}
             />
             <span className="truncate">{tab.label}</span>
           </button>

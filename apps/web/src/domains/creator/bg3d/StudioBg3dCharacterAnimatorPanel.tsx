@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { User, Smile, Play, Sparkles } from "lucide-react";
 import React, { useState } from "react";
 
@@ -60,32 +56,38 @@ export function StudioBg3dCharacterAnimatorPanel({
         <button
           type="button"
           onClick={() => setActiveTab("proportions")}
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCharacterAnimatorPanel", "en", "flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all {v0}"), { v0: String(activeTab === "proportions"
+          className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all ${
+            activeTab === "proportions"
               ? "border border-line bg-raised text-fg shadow-sm"
-              : "text-fg-3 hover:text-fg") })}
+              : "text-fg-3 hover:text-fg"
+          }`}
         >
           <User className="size-3.5 text-accent" />
-          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCharacterAnimatorPanel", "ko", "등신대 비율")}</span>
+          <span>등신대 비율</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("facial")}
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCharacterAnimatorPanel", "en", "flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all {v0}"), { v0: String(activeTab === "facial"
+          className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all ${
+            activeTab === "facial"
               ? "border border-line bg-raised text-fg shadow-sm"
-              : "text-fg-3 hover:text-fg") })}
+              : "text-fg-3 hover:text-fg"
+          }`}
         >
           <Smile className="size-3.5 text-accent" />
-          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCharacterAnimatorPanel", "ko", "애니 표정 (12종)")}</span>
+          <span>애니 표정 (12종)</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("motion")}
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCharacterAnimatorPanel", "en", "flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all {v0}"), { v0: String(activeTab === "motion"
+          className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all ${
+            activeTab === "motion"
               ? "border border-line bg-raised text-fg shadow-sm"
-              : "text-fg-3 hover:text-fg") })}
+              : "text-fg-3 hover:text-fg"
+          }`}
         >
           <Play className="size-3.5 text-accent" />
-          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCharacterAnimatorPanel", "ko", "모션 클립")}</span>
+          <span>모션 클립</span>
         </button>
       </div>
 
@@ -104,9 +106,11 @@ export function StudioBg3dCharacterAnimatorPanel({
                 key={prop.id}
                 type="button"
                 onClick={() => handleProportionSelect(prop.id)}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCharacterAnimatorPanel", "en", "flex items-center justify-between rounded-lg border p-2 text-left transition-all {v0}"), { v0: String(selectedPropPreset === prop.id
+                className={`flex items-center justify-between rounded-lg border p-2 text-left transition-all ${
+                  selectedPropPreset === prop.id
                     ? "border-accent bg-accent/10 font-bold text-accent shadow-sm"
-                    : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
+                    : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+                }`}
               >
                 <span className="text-[0.72rem]">{prop.label}</span>
               </button>
@@ -115,15 +119,15 @@ export function StudioBg3dCharacterAnimatorPanel({
 
           <div className="flex flex-col gap-2 rounded-lg border border-line bg-card p-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCharacterAnimatorPanel", "ko", "머리 크기 배율 (Head):")}</span>
+              <span className="text-[0.68rem] text-fg-2">머리 크기 배율 (Head):</span>
               <span className="font-mono text-xs font-bold text-fg">{proportions.headScale}x</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCharacterAnimatorPanel", "ko", "어깨 너비 (Shoulder):")}</span>
+              <span className="text-[0.68rem] text-fg-2">어깨 너비 (Shoulder):</span>
               <span className="font-mono text-xs font-bold text-fg">{proportions.shoulderWidth}x</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCharacterAnimatorPanel", "ko", "다리 길이 (Leg):")}</span>
+              <span className="text-[0.68rem] text-fg-2">다리 길이 (Leg):</span>
               <span className="font-mono text-xs font-bold text-fg">{proportions.legLength}x</span>
             </div>
           </div>
@@ -151,9 +155,11 @@ export function StudioBg3dCharacterAnimatorPanel({
               key={exp.id}
               type="button"
               onClick={() => handleExpressionSelect(exp.id)}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCharacterAnimatorPanel", "en", "flex items-center justify-between rounded-lg border p-2 text-left transition-all {v0}"), { v0: String(selectedExpression === exp.id
+              className={`flex items-center justify-between rounded-lg border p-2 text-left transition-all ${
+                selectedExpression === exp.id
                   ? "border-accent bg-accent/10 font-bold text-accent shadow-sm"
-                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
+                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+              }`}
             >
               <span className="text-[0.72rem]">{exp.label}</span>
             </button>
@@ -169,9 +175,11 @@ export function StudioBg3dCharacterAnimatorPanel({
               key={clip.id}
               type="button"
               onClick={() => handlePlayClip(clip.id)}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCharacterAnimatorPanel", "en", "flex items-center justify-between rounded-lg border p-2 text-left transition-all {v0}"), { v0: String(selectedClip === clip.id
+              className={`flex items-center justify-between rounded-lg border p-2 text-left transition-all ${
+                selectedClip === clip.id
                   ? "border-accent bg-accent/10 font-bold text-accent shadow-sm"
-                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
+                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+              }`}
             >
               <div className="flex flex-col">
                 <span className="text-[0.72rem] font-medium text-fg">{clip.label}</span>
@@ -195,7 +203,7 @@ export function StudioBg3dCharacterAnimatorPanel({
         className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90"
       >
         <Sparkles className="size-3.5" />
-        <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dCharacterAnimatorPanel", "ko", "캐릭터 신체/표정/모션 파라미터 적용")}</span>
+        <span>캐릭터 신체/표정/모션 파라미터 적용</span>
       </button>
     </div>
   );

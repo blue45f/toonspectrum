@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Character Shaper — floating controls over the 3D viewport.
  *
@@ -91,7 +87,7 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
 
       <div
         role="group"
-        aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "뷰포트 보기 설정")}
+        aria-label="뷰포트 보기 설정"
         className={cn(
           "pointer-events-auto absolute right-2 gap-1.5",
           compact ? "top-2 grid grid-cols-2" : "top-2 flex flex-col",
@@ -104,25 +100,25 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
           disabled={paintMode || cameraLocked || !modelReady}
           title={
             paintMode
-              ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "표면 드로잉 중에는 턴테이블을 잠급니다.")
+              ? "표면 드로잉 중에는 턴테이블을 잠급니다."
               : turntable
-                ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "턴테이블 정지 (T)")
-                : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "턴테이블 회전 (T)")
+                ? "턴테이블 정지 (T)"
+                : "턴테이블 회전 (T)"
           }
-          aria-label={turntable ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "턴테이블 정지") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "턴테이블 회전")}
+          aria-label={turntable ? "턴테이블 정지" : "턴테이블 회전"}
           onClick={() => h.setTurntable((value: boolean) => !value)}
           className={cn(HUD_BUTTON, turntable && HUD_BUTTON_ACTIVE)}
         >
           <RotateCw
             size={17}
             aria-hidden
-            className={turntable ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "en", "animate-spin [animation-duration:3s] motion-reduce:animate-none") : ""}
+            className={turntable ? "animate-spin [animation-duration:3s] motion-reduce:animate-none" : ""}
           />
         </button>
         <button
           type="button"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "조명 톤 바꾸기 (현재 {v0})"), { v0: String(lightingLabel) })}
-          title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "조명 톤: {v0} → {v1}"), { v0: String(lightingLabel), v1: String(characterLightingToneLabel(nextCharacterLightingTone(lightingTone))) })}
+          aria-label={`조명 톤 바꾸기 (현재 ${lightingLabel})`}
+          title={`조명 톤: ${lightingLabel} → ${characterLightingToneLabel(nextCharacterLightingTone(lightingTone))}`}
           disabled={!modelReady}
           onClick={() => h.setLightingTone(nextCharacterLightingTone(lightingTone))}
           className={cn(HUD_BUTTON, "relative")}
@@ -135,8 +131,8 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
         <button
           type="button"
           aria-pressed={transparent}
-          aria-label={transparent ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "투명 배경 끄기") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "투명 배경 켜기")}
-          title={transparent ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "투명 배경 · 캔버스에 추가하면 캐릭터만 남습니다") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "배경색 포함 · 투명 배경으로 바꾸려면 누르세요")}
+          aria-label={transparent ? "투명 배경 끄기" : "투명 배경 켜기"}
+          title={transparent ? "투명 배경 · 캔버스에 추가하면 캐릭터만 남습니다" : "배경색 포함 · 투명 배경으로 바꾸려면 누르세요"}
           onClick={() => h.setTransparentBackground(!transparent)}
           className={cn(
             HUD_BUTTON,
@@ -149,8 +145,8 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
         <div className={cn("my-0.5 h-px w-full bg-line/70", compact && "hidden")} aria-hidden />
         <button
           type="button"
-          aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "확대")}
-          title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "확대")}
+          aria-label="확대"
+          title="확대"
           disabled={cameraLocked || !modelReady}
           onClick={() => h.zoomViewport(0.82)}
           className={HUD_BUTTON}
@@ -159,8 +155,8 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
         </button>
         <button
           type="button"
-          aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "축소")}
-          title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "축소")}
+          aria-label="축소"
+          title="축소"
           disabled={cameraLocked || !modelReady}
           onClick={() => h.zoomViewport(1.22)}
           className={HUD_BUTTON}
@@ -169,8 +165,8 @@ export function CharacterShaperViewportHud({ h, binding, compact }: CharacterSha
         </button>
         <button
           type="button"
-          aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "시점 초기화")}
-          title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperViewportHud", "ko", "시점 초기화")}
+          aria-label="시점 초기화"
+          title="시점 초기화"
           disabled={cameraLocked || !modelReady}
           onClick={() => h.handleViewReset()}
           className={HUD_BUTTON}

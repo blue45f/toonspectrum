@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   BookOpen,
   Bug,
   ChevronRight,
@@ -128,11 +124,15 @@ function HomePanel({
         <div className="relative max-w-2xl">
           <span className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
             <HelpCircle className="size-3.5" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "작업 흐름을 끊지 않는 도움말")}</span>
+            작업 흐름을 끊지 않는 도움말
+          </span>
           <h2 className="mt-4 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "지금 막힌 지점에서 바로 해결하세요")}</h2>
+            지금 막힌 지점에서 바로 해결하세요
+          </h2>
           <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-            {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "현재 도구의 30초 가이드부터 증상별 점검 순서, 시스템 진단과 복구까지 한 곳에서 연결합니다. 기능 이름을 알고 있다면 F1 명령 검색이 가장 빠릅니다.")}</p>
+            현재 도구의 30초 가이드부터 증상별 점검 순서, 시스템 진단과 복구까지 한 곳에서 연결합니다.
+            기능 이름을 알고 있다면 F1 명령 검색이 가장 빠릅니다.
+          </p>
           <div className="mt-6 flex flex-wrap gap-2">
             <button
               type="button"
@@ -140,7 +140,8 @@ function HomePanel({
               className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <Search className="size-4" aria-hidden="true" />
-              {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "기능·설정 찾기")}<kbd className="ml-1 rounded border border-primary-foreground/25 bg-primary-foreground/10 px-1.5 py-0.5 text-[10px] font-medium">F1</kbd>
+              기능·설정 찾기
+              <kbd className="ml-1 rounded border border-primary-foreground/25 bg-primary-foreground/10 px-1.5 py-0.5 text-[10px] font-medium">F1</kbd>
             </button>
             <button
               type="button"
@@ -148,7 +149,8 @@ function HomePanel({
               className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background/70 px-4 text-sm font-semibold text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <Wrench className="size-4" aria-hidden="true" />
-              {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "증상으로 해결하기")}</button>
+              증상으로 해결하기
+            </button>
           </div>
         </div>
         <div data-studio-help-hero-visual="true" className="relative mt-6 hidden min-h-56 overflow-hidden rounded-2xl border border-primary/20 bg-muted shadow-lg lg:block">
@@ -173,7 +175,7 @@ function HomePanel({
         <section aria-labelledby="current-tool-help-heading" className="rounded-2xl border border-border bg-card p-5 sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "지금 선택한 도구")}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">지금 선택한 도구</p>
               <h3 id="current-tool-help-heading" className="mt-1 truncate text-lg font-bold text-foreground">
                 {guide?.title ?? toolHelp.label}
               </h3>
@@ -186,25 +188,27 @@ function HomePanel({
               onClick={() => onViewChange("tool")}
               className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 text-sm font-semibold text-primary transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "30초 가이드")}<ChevronRight className="size-4" aria-hidden="true" />
+              30초 가이드
+              <ChevronRight className="size-4" aria-hidden="true" />
             </button>
           </div>
         </section>
       ) : (
         <section className="rounded-2xl border border-dashed border-border bg-muted/30 p-5">
-          <p className="text-sm font-semibold text-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "현재 도구 정보가 아직 연결되지 않았습니다.")}</p>
+          <p className="text-sm font-semibold text-foreground">현재 도구 정보가 아직 연결되지 않았습니다.</p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "기능·설정 찾기에서 명령 이름을 검색하거나 증상별 해결 레시피를 사용하세요.")}</p>
+            기능·설정 찾기에서 명령 이름을 검색하거나 증상별 해결 레시피를 사용하세요.
+          </p>
         </section>
       )}
 
       <section aria-labelledby="help-paths-heading">
         <div className="mb-3 flex items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "빠른 경로")}</p>
-            <h3 id="help-paths-heading" className="mt-1 text-lg font-bold text-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "목적에 맞는 도움말 열기")}</h3>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">빠른 경로</p>
+            <h3 id="help-paths-heading" className="mt-1 text-lg font-bold text-foreground">목적에 맞는 도움말 열기</h3>
           </div>
-          <p className="hidden text-xs text-muted-foreground sm:block">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "검색 · 학습 · 진단 · 복구")}</p>
+          <p className="hidden text-xs text-muted-foreground sm:block">검색 · 학습 · 진단 · 복구</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <QuickAction
@@ -212,8 +216,8 @@ function HomePanel({
             visual="/brand/theme-scenes/ink-studio.svg"
             visualPosition="center 46%"
             eyebrow="Learn"
-            title={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "현재 도구 익히기")}
-            description={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "핵심 결과, 3단계 사용법, 자주 발생하는 문제를 현재 도구 기준으로 봅니다.")}
+            title="현재 도구 익히기"
+            description="핵심 결과, 3단계 사용법, 자주 발생하는 문제를 현재 도구 기준으로 봅니다."
             onClick={() => onViewChange("tool")}
           />
           <QuickAction
@@ -221,8 +225,8 @@ function HomePanel({
             visual="/brand/theme-scenes/graphite-studio.svg"
             visualPosition="center 45%"
             eyebrow="Solve"
-            title={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "문제 해결 레시피")}
-            description={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "증상을 검색하고 재현 가능한 점검 순서대로 원인을 좁힙니다.")}
+            title="문제 해결 레시피"
+            description="증상을 검색하고 재현 가능한 점검 순서대로 원인을 좁힙니다."
             onClick={() => onViewChange("troubleshooting")}
           />
           <QuickAction
@@ -230,8 +234,8 @@ function HomePanel({
             visual="/brand/theme-scenes/contrast-studio.svg"
             visualPosition="center 47%"
             eyebrow="Find"
-            title={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "기능·설정 검색")}
-            description={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "메뉴 위치를 외우지 않고 기능 이름이나 별칭으로 명령을 찾습니다.")}
+            title="기능·설정 검색"
+            description="메뉴 위치를 외우지 않고 기능 이름이나 별칭으로 명령을 찾습니다."
             onClick={onOpenCommandSearch}
           />
           <QuickAction
@@ -239,8 +243,8 @@ function HomePanel({
             visual="/brand/theme-scenes/midnight-studio.svg"
             visualPosition="center 43%"
             eyebrow="Inspect"
-            title={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "시스템 진단")}
-            description={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "입력 이벤트, 렌더러, GPU와 브라우저 상태를 한 번에 확인합니다.")}
+            title="시스템 진단"
+            description="입력 이벤트, 렌더러, GPU와 브라우저 상태를 한 번에 확인합니다."
             onClick={() => onOpenSection("diagnostics")}
           />
           <QuickAction
@@ -248,8 +252,8 @@ function HomePanel({
             visual="/brand/theme-scenes/paper-studio.svg"
             visualPosition="center 48%"
             eyebrow="Recover"
-            title={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "작업 복구")}
-            description={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "저장·자동 복구 후보를 확인하고 안전하게 이전 상태로 돌아갑니다.")}
+            title="작업 복구"
+            description="저장·자동 복구 후보를 확인하고 안전하게 이전 상태로 돌아갑니다."
             onClick={() => onOpenSection("recovery")}
           />
           <QuickAction
@@ -257,8 +261,8 @@ function HomePanel({
             visual="/brand/theme-scenes/aurora-studio.svg"
             visualPosition="center 44%"
             eyebrow="Reference"
-            title={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "사용자 설명서")}
-            description={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "개념과 전체 작업 흐름을 길게 읽어야 할 때 별도 설명서를 엽니다.")}
+            title="사용자 설명서"
+            description="개념과 전체 작업 흐름을 길게 읽어야 할 때 별도 설명서를 엽니다."
             onClick={onOpenManual}
           />
         </div>
@@ -267,15 +271,16 @@ function HomePanel({
       <section aria-labelledby="popular-fixes-heading">
         <div className="mb-3 flex items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "자주 막히는 지점")}</p>
-            <h3 id="popular-fixes-heading" className="mt-1 text-lg font-bold text-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "먼저 확인할 문제")}</h3>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">자주 막히는 지점</p>
+            <h3 id="popular-fixes-heading" className="mt-1 text-lg font-bold text-foreground">먼저 확인할 문제</h3>
           </div>
           <button
             type="button"
             onClick={() => onViewChange("troubleshooting")}
             className="text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "전체 보기")}</button>
+            전체 보기
+          </button>
         </div>
         <div className="grid gap-3 lg:grid-cols-2">
           {STUDIO_HELP_RECIPES.slice(0, 4).map((recipe) => (
@@ -325,16 +330,18 @@ function ToolPanel({
       <div className="mx-auto flex min-h-full w-full max-w-3xl items-center px-5 py-12 sm:px-8">
         <div className="w-full rounded-3xl border border-dashed border-border bg-card/60 p-8 text-center">
           <HelpCircle className="mx-auto size-10 text-muted-foreground" aria-hidden="true" />
-          <h2 className="mt-4 text-xl font-bold text-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "현재 도구를 확인할 수 없습니다")}</h2>
+          <h2 className="mt-4 text-xl font-bold text-foreground">현재 도구를 확인할 수 없습니다</h2>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
-            {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "캔버스로 돌아가 도구를 선택한 뒤 다시 열거나, 기능·설정 검색에서 알고 있는 이름을 검색하세요.")}</p>
+            캔버스로 돌아가 도구를 선택한 뒤 다시 열거나, 기능·설정 검색에서 알고 있는 이름을 검색하세요.
+          </p>
           <button
             type="button"
             onClick={onOpenCommandSearch}
             className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Search className="size-4" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "기능·설정 찾기")}</button>
+            기능·설정 찾기
+          </button>
         </div>
       </div>
     );
@@ -344,7 +351,7 @@ function ToolPanel({
     <div className="mx-auto w-full max-w-4xl space-y-6 px-5 py-6 sm:px-8 sm:py-8">
       <header className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card p-6 sm:p-8">
         <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
-          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-primary">{guide?.eyebrow ?? translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "현재 도구")}</span>
+          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-primary">{guide?.eyebrow ?? "현재 도구"}</span>
           <span>{help.commandId}</span>
           {help.shortcut ? <kbd className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[11px] text-foreground">{help.shortcut}</kbd> : null}
         </div>
@@ -357,7 +364,7 @@ function ToolPanel({
         </p>
         {guide ? (
           <div className="mt-5 rounded-2xl border border-primary/20 bg-primary/8 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "완료하면")}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">완료하면</p>
             <p className="mt-1 text-sm font-medium leading-6 text-foreground">{guide.outcome}</p>
           </div>
         ) : null}
@@ -368,10 +375,10 @@ function ToolPanel({
           <section aria-labelledby="quick-guide-heading" className="rounded-2xl border border-border bg-card p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "30초 가이드")}</p>
-                <h3 id="quick-guide-heading" className="mt-1 text-lg font-bold text-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "가장 짧은 성공 경로")}</h3>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">30초 가이드</p>
+                <h3 id="quick-guide-heading" className="mt-1 text-lg font-bold text-foreground">가장 짧은 성공 경로</h3>
               </div>
-              <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">{guide.steps.length}{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "단계")}</span>
+              <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">{guide.steps.length}단계</span>
             </div>
             <ol className="mt-5 space-y-4">
               {guide.steps.map((step, index) => (
@@ -388,7 +395,7 @@ function ToolPanel({
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section aria-labelledby="tool-tips-heading" className="rounded-2xl border border-border bg-card p-5">
-              <h3 id="tool-tips-heading" className="text-sm font-bold text-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "품질을 높이는 팁")}</h3>
+              <h3 id="tool-tips-heading" className="text-sm font-bold text-foreground">품질을 높이는 팁</h3>
               <ul className="mt-3 space-y-3">
                 {guide.tips.map((tip) => (
                   <li key={tip} className="flex gap-2 text-sm leading-6 text-muted-foreground">
@@ -399,7 +406,7 @@ function ToolPanel({
               </ul>
             </section>
             <section aria-labelledby="tool-fixes-heading" className="rounded-2xl border border-border bg-card p-5">
-              <h3 id="tool-fixes-heading" className="text-sm font-bold text-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "이럴 때 확인")}</h3>
+              <h3 id="tool-fixes-heading" className="text-sm font-bold text-foreground">이럴 때 확인</h3>
               <div className="mt-3 space-y-3">
                 {guide.troubleshooting.map((item) => (
                   <div key={item.symptom} className="rounded-xl bg-muted/55 p-3">
@@ -413,10 +420,11 @@ function ToolPanel({
 
           <section aria-labelledby="related-help-heading" className="rounded-2xl border border-border bg-card p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3">
-              <h3 id="related-help-heading" className="text-sm font-bold text-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "관련 문제 해결")}</h3>
+              <h3 id="related-help-heading" className="text-sm font-bold text-foreground">관련 문제 해결</h3>
               {guide.tutorialId ? (
                 <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-                  {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "튜토리얼 연결됨")}</span>
+                  튜토리얼 연결됨
+                </span>
               ) : null}
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -441,9 +449,10 @@ function ToolPanel({
         </>
       ) : (
         <section className="rounded-2xl border border-dashed border-border bg-card/50 p-6">
-          <h3 className="text-base font-bold text-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "핵심 도구 가이드를 준비 중입니다")}</h3>
+          <h3 className="text-base font-bold text-foreground">핵심 도구 가이드를 준비 중입니다</h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "명령 설명과 별칭은 사용할 수 있으며, 상세 작성형 가이드가 없는 도구는 기능·설정 검색과 진단으로 이어집니다.")}</p>
+            명령 설명과 별칭은 사용할 수 있으며, 상세 작성형 가이드가 없는 도구는 기능·설정 검색과 진단으로 이어집니다.
+          </p>
           {help.aliases.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-2">
               {help.aliases.map((alias) => (
@@ -466,14 +475,16 @@ function ToolPanel({
           className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <Search className="size-3.5" aria-hidden="true" />
-          {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "관련 기능 찾기")}</button>
+          관련 기능 찾기
+        </button>
         <button
           type="button"
           onClick={onOpenDiagnostics}
           className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <Stethoscope className="size-3.5" aria-hidden="true" />
-          {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "입력·렌더링 진단")}</button>
+          입력·렌더링 진단
+        </button>
       </div>
     </div>
   );
@@ -496,7 +507,7 @@ function RecipeCard({
   readonly onRunDestination: (destination: StudioHelpRecipeDestination) => void;
 }) {
   return (
-    <article className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "en", "rounded-2xl border bg-card p-5 transition {v0}"), { v0: String(emphasized ? "border-primary/55 ring-1 ring-primary/20" : "border-border") })}>
+    <article className={`rounded-2xl border bg-card p-5 transition ${emphasized ? "border-primary/55 ring-1 ring-primary/20" : "border-border"}`}>
       <div className="flex items-start gap-3">
         <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
           <Wrench className="size-4" aria-hidden="true" />
@@ -551,35 +562,37 @@ function TroubleshootingPanel({
   return (
     <div className="mx-auto w-full max-w-4xl px-5 py-6 sm:px-8 sm:py-8">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "en", "Troubleshooting")}</p>
-        <h2 className="mt-2 text-2xl font-bold tracking-tight text-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "증상부터 찾는 문제 해결")}</h2>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Troubleshooting</p>
+        <h2 className="mt-2 text-2xl font-bold tracking-tight text-foreground">증상부터 찾는 문제 해결</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "기능 이름을 몰라도 괜찮습니다. 보이는 증상을 검색한 뒤 위에서 아래 순서로 확인하면 원인을 빠르게 좁힐 수 있습니다.")}</p>
+          기능 이름을 몰라도 괜찮습니다. 보이는 증상을 검색한 뒤 위에서 아래 순서로 확인하면 원인을 빠르게 좁힐 수 있습니다.
+        </p>
       </header>
 
       <label className="mt-6 block">
-        <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "문제 해결 검색")}</span>
+        <span className="sr-only">문제 해결 검색</span>
         <span className="relative block">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <input
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             type="search"
-            placeholder={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "예: 선이 안 보여요, 채우기가 새요, 저장 복구")}
+            placeholder="예: 선이 안 보여요, 채우기가 새요, 저장 복구"
             className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
         </span>
       </label>
 
       <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-        <span>{recipes.length}{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "개의 해결 경로")}</span>
+        <span>{recipes.length}개의 해결 경로</span>
         {query ? (
           <button
             type="button"
             onClick={() => onQueryChange("")}
             className="font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "검색 초기화")}</button>
+            검색 초기화
+          </button>
         ) : null}
       </div>
 
@@ -597,8 +610,8 @@ function TroubleshootingPanel({
       ) : (
         <div className="mt-8 rounded-2xl border border-dashed border-border bg-muted/30 p-8 text-center">
           <Search className="mx-auto size-8 text-muted-foreground" aria-hidden="true" />
-          <p className="mt-3 text-sm font-semibold text-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "일치하는 해결 레시피가 없습니다")}</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "더 짧은 증상으로 검색하거나 F1 기능·설정 검색을 사용하세요.")}</p>
+          <p className="mt-3 text-sm font-semibold text-foreground">일치하는 해결 레시피가 없습니다</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">더 짧은 증상으로 검색하거나 F1 기능·설정 검색을 사용하세요.</p>
         </div>
       )}
     </div>
@@ -757,7 +770,7 @@ export function StudioContextHelpDialog({
             <HelpCircle className="size-5" aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "en", "ToonStudio Help")}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">ToonStudio Help</p>
             <h1 id="studio-context-help-title" className="truncate text-sm font-bold text-foreground">{title}</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -767,13 +780,14 @@ export function StudioContextHelpDialog({
               className="hidden h-9 items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 text-xs font-semibold text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:inline-flex"
             >
               <Search className="size-3.5" aria-hidden="true" />
-              {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "기능 찾기")}<kbd className="rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">F1</kbd>
+              기능 찾기
+              <kbd className="rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">F1</kbd>
             </button>
             <button
               ref={closeButtonRef}
               type="button"
               onClick={onClose}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "도움말 닫기")}
+              aria-label="도움말 닫기"
               className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <X className="size-5" aria-hidden="true" />
@@ -782,15 +796,15 @@ export function StudioContextHelpDialog({
         </header>
 
         <div className="flex min-h-0 flex-1">
-          <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-muted/20 p-3 md:flex" aria-label={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "도움말 탐색")}>
+          <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-muted/20 p-3 md:flex" aria-label="도움말 탐색">
             <nav className="space-y-1">
               {internalNav.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => setView(item.id)}
-                  aria-current={view === item.id ? translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "en", "page") : undefined}
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "en", "flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary {v0}"), { v0: String(view === item.id ? "bg-primary/12 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground") })}
+                  aria-current={view === item.id ? "page" : undefined}
+                  className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${view === item.id ? "bg-primary/12 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
                 >
                   {item.icon}
                   {item.label}
@@ -798,7 +812,7 @@ export function StudioContextHelpDialog({
               ))}
             </nav>
             <div className="my-3 border-t border-border" />
-            <nav className="space-y-1" aria-label={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "지원 도구")}>
+            <nav className="space-y-1" aria-label="지원 도구">
               {sectionNav.map((item) => (
                 <button
                   key={item.id}
@@ -818,18 +832,19 @@ export function StudioContextHelpDialog({
               className="mt-auto flex items-center gap-2 rounded-xl border border-border bg-background p-3 text-left text-xs font-semibold text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <ExternalLink className="size-4 text-muted-foreground" aria-hidden="true" />
-              {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "사용자 설명서")}</button>
+              사용자 설명서
+            </button>
           </aside>
 
           <div className="min-w-0 flex-1 overflow-y-auto overscroll-contain">
-            <div className="sticky top-0 z-10 flex gap-1 overflow-x-auto border-b border-border bg-background/95 p-2 backdrop-blur md:hidden" aria-label={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "도움말 탐색")}>
+            <div className="sticky top-0 z-10 flex gap-1 overflow-x-auto border-b border-border bg-background/95 p-2 backdrop-blur md:hidden" aria-label="도움말 탐색">
               {internalNav.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => setView(item.id)}
-                  aria-current={view === item.id ? translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "en", "page") : undefined}
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "en", "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary {v0}"), { v0: String(view === item.id ? "bg-primary/12 text-primary" : "text-muted-foreground hover:bg-muted") })}
+                  aria-current={view === item.id ? "page" : undefined}
+                  className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${view === item.id ? "bg-primary/12 text-primary" : "text-muted-foreground hover:bg-muted"}`}
                 >
                   {item.icon}
                   {item.label}

@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { toPng } from "html-to-image";
 import { Download, Share2, Link2, X, Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -149,16 +146,16 @@ export function FortuneShareModal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={translateCurrentStaticSourceText("domains.fortune.FortuneShareModal", "ko", "운세 결과 공유")}
+        aria-label="운세 결과 공유"
         tabIndex={-1}
         className="relative flex max-h-[92vh] w-full max-w-[420px] flex-col gap-4 overflow-y-auto rounded-2xl border border-line bg-panel p-4 outline-none"
       >
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.fortune.FortuneShareModal", "ko", "운세 결과 공유")}</h3>
+          <h3 className="text-sm font-bold text-fg">운세 결과 공유</h3>
           <button
             type="button"
             onClick={onClose}
-            aria-label={translateCurrentStaticSourceText("domains.fortune.FortuneShareModal", "ko", "닫기")}
+            aria-label="닫기"
             className="rounded-lg border border-line p-1.5 text-fg-2 transition-colors hover:bg-card"
           >
             <X className="h-4 w-4" />
@@ -186,7 +183,8 @@ export function FortuneShareModal({
             className="flex flex-col items-center gap-1 rounded-xl border border-line bg-card py-2.5 text-[11px] font-bold text-fg-2 transition-colors hover:bg-raised disabled:opacity-50"
           >
             <Download className="h-4 w-4" />
-            {translateCurrentStaticSourceText("domains.fortune.FortuneShareModal", "ko", "이미지 저장")}</button>
+            이미지 저장
+          </button>
           <button
             type="button"
             onClick={handleShare}
@@ -194,7 +192,8 @@ export function FortuneShareModal({
             className="flex flex-col items-center gap-1 rounded-xl bg-accent py-2.5 text-[11px] font-bold text-on-accent transition-colors hover:bg-accent-2 disabled:opacity-50"
           >
             <Share2 className="h-4 w-4" />
-            {translateCurrentStaticSourceText("domains.fortune.FortuneShareModal", "ko", "공유하기")}</button>
+            공유하기
+          </button>
           <button
             type="button"
             onClick={copyLink}
@@ -206,12 +205,13 @@ export function FortuneShareModal({
             ) : (
               <Link2 className="h-4 w-4" />
             )}
-            {copied ? translateCurrentStaticSourceText("domains.fortune.FortuneShareModal", "ko", "복사됨") : translateCurrentStaticSourceText("domains.fortune.FortuneShareModal", "ko", "링크 복사")}
+            {copied ? "복사됨" : "링크 복사"}
           </button>
         </div>
         {busy && (
           <p className="text-center text-[11px] text-fg-3">
-            {translateCurrentStaticSourceText("domains.fortune.FortuneShareModal", "ko", "이미지를 만드는 중…")}</p>
+            이미지를 만드는 중…
+          </p>
         )}
       </div>
     </div>

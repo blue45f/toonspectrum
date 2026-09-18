@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioApproximateColorPanel.tsx
  *
@@ -64,9 +60,10 @@ export function StudioApproximateColorPanel({
       <div className="flex items-center justify-between gap-2 pb-2 border-b border-line/60">
         <div className="flex items-center gap-1.5 min-w-0">
           <SlidersHorizontal size={14} className="text-emerald-400 shrink-0" aria-hidden />
-          <span className="font-semibold truncate">{translateCurrentStaticSourceText("domains.creator.color.StudioApproximateColorPanel", "ko", "근사색 (Approximate Color)")}</span>
+          <span className="font-semibold truncate">근사색 (Approximate Color)</span>
           <span className="px-1 py-0.2 text-[10px] rounded font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
-            {translateCurrentStaticSourceText("domains.creator.color.StudioApproximateColorPanel", "en", "CSP")}</span>
+            CSP
+          </span>
         </div>
 
         {/* Steps Selector */}
@@ -82,8 +79,8 @@ export function StudioApproximateColorPanel({
                   ? "bg-emerald-600 text-white font-semibold"
                   : "bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700",
               )}
-              title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.color.StudioApproximateColorPanel", "ko", "{v0}x{v1} 그리드"), { v0: String(s), v1: String(s) })}
-              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.color.StudioApproximateColorPanel", "ko", "{v0}x{v1} 그리드"), { v0: String(s), v1: String(s) })}
+              title={`${s}x${s} 그리드`}
+              aria-label={`${s}x${s} 그리드`}
             >
               {s}x{s}
             </button>
@@ -149,7 +146,7 @@ export function StudioApproximateColorPanel({
                 onClick={() => onSelectColor(cellHex)}
                 onPointerEnter={() => setHoveredHex(cellHex)}
                 onPointerLeave={() => setHoveredHex(null)}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.color.StudioApproximateColorPanel", "ko", "{v0} 색상 선택"), { v0: String(cellHex) })}
+                aria-label={`${cellHex} 색상 선택`}
                 title={`${cellHex}${isCenter ? " (현재 기준색)" : ""}`}
                 className={cn(
                   "aspect-square rounded-sm transition-transform hover:scale-110 relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400",
@@ -172,7 +169,7 @@ export function StudioApproximateColorPanel({
       <div className="flex items-center justify-between mt-2 pt-1 border-t border-line/40 text-[10px] text-slate-400 font-mono">
         <div className="flex items-center gap-1">
           <Sparkles size={11} className="text-emerald-400 shrink-0" aria-hidden />
-          <span>{translateCurrentStaticSourceText("domains.creator.color.StudioApproximateColorPanel", "ko", "선택 색상: ")}{hoveredHex ?? activeColor}</span>
+          <span>선택 색상: {hoveredHex ?? activeColor}</span>
         </div>
         <span
           className="size-3 rounded border border-white/30"

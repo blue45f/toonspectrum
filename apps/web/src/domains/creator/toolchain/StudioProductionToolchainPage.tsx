@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   Box,
   CheckCircle2,
@@ -61,9 +57,10 @@ function ProfileSelector({
           <LockKeyhole size={18} aria-hidden="true" />
         </span>
         <div>
-          <h2 className="font-display text-base font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "사용 범위 프로필")}</h2>
+          <h2 className="font-display text-base font-bold text-fg">사용 범위 프로필</h2>
           <p className="mt-1 text-xs leading-5 text-fg-3 sm:text-sm">
-            {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "프로필은 기능 숨김이 아니라 라이선스 경계입니다. 비상업 전용 기능은 Research NC에서만 노출됩니다.")}</p>
+            프로필은 기능 숨김이 아니라 라이선스 경계입니다. 비상업 전용 기능은 Research NC에서만 노출됩니다.
+          </p>
         </div>
       </div>
       <div className="mt-4 grid gap-2 lg:grid-cols-3">
@@ -73,9 +70,11 @@ function ProfileSelector({
             type="button"
             aria-pressed={profile === item.id}
             onClick={() => onChange(item.id)}
-            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "en", "min-h-24 rounded-xl border p-3 text-left transition-colors {v0}"), { v0: String(profile === item.id
+            className={`min-h-24 rounded-xl border p-3 text-left transition-colors ${
+              profile === item.id
                 ? "border-accent bg-accent-soft/70"
-                : "border-line bg-card/70 hover:border-line-strong") })}
+                : "border-line bg-card/70 hover:border-line-strong"
+            }`}
           >
             <strong className="text-sm text-fg">{item.name}</strong>
             <span className="mt-1 block text-xs leading-5 text-fg-3">{item.description}</span>
@@ -90,13 +89,15 @@ function ToolStatusBadge({ state }: { readonly state: string }) {
   const ready = state === "available";
   const connector = state === "connector";
   return (
-    <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "en", "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.67rem] font-bold {v0}"), { v0: String(ready
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.67rem] font-bold ${
+      ready
         ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
         : connector
           ? "bg-blue-500/15 text-blue-700 dark:text-blue-300"
-          : "bg-raised text-fg-3") })}>
+          : "bg-raised text-fg-3"
+    }`}>
       {ready ? <CheckCircle2 size={12} aria-hidden="true" /> : <CircleSlash2 size={12} aria-hidden="true" />}
-      {ready ? translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "실행 준비") : connector ? translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "외부 연결") : state === "manual" ? translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "수동 연결") : state === "blocked" ? translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "프로필 제한") : translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "설치 안 됨")}
+      {ready ? "실행 준비" : connector ? "외부 연결" : state === "manual" ? "수동 연결" : state === "blocked" ? "프로필 제한" : "설치 안 됨"}
     </span>
   );
 }
@@ -117,23 +118,28 @@ function OverviewContent({
         <span aria-hidden="true" className="absolute -right-14 -top-20 size-64 rounded-full border border-accent/20" />
         <div className="relative max-w-4xl">
           <p className="font-display text-[0.65rem] font-bold uppercase tracking-[0.16em] text-accent">
-            {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "en", "Studio production toolchain")}</p>
+            Studio production toolchain
+          </p>
           <h1 className="mt-3 font-display text-3xl font-bold tracking-[-0.045em] text-fg sm:text-5xl">
-            {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "그리기 이후의 제작을")}<br className="hidden sm:block" /> {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "한 흐름으로 연결합니다.")}</h1>
+            그리기 이후의 제작을<br className="hidden sm:block" /> 한 흐름으로 연결합니다.
+          </h1>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base">
-            {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "필터·OCR·벡터화·애니메이션·영상·3D·출판·오디오 도구를 원본 앱과 분리된 로컬 실행기로 연결합니다. 외부 도구 객체가 작품 원본이 되지 않으며 결과와 재현 영수증만 프로젝트에 남습니다.")}</p>
+            필터·OCR·벡터화·애니메이션·영상·3D·출판·오디오 도구를 원본 앱과 분리된 로컬 실행기로 연결합니다.
+            외부 도구 객체가 작품 원본이 되지 않으며 결과와 재현 영수증만 프로젝트에 남습니다.
+          </p>
           <div className="mt-6 flex flex-wrap gap-2">
             <Link
               href={withProject("/studio/jobs", projectId)}
               className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-fg px-4 text-sm font-bold text-canvas"
             >
-              <Workflow size={17} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "제작 작업 시작 ")}<ArrowRight size={15} aria-hidden="true" />
+              <Workflow size={17} aria-hidden="true" /> 제작 작업 시작 <ArrowRight size={15} aria-hidden="true" />
             </Link>
             <Link
               href={withProject("/studio/engines", projectId)}
               className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-card px-4 text-sm font-bold text-fg-2 hover:text-fg"
             >
-              <ServerCog size={17} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "설치·라이선스 확인")}</Link>
+              <ServerCog size={17} aria-hidden="true" /> 설치·라이선스 확인
+            </Link>
           </div>
         </div>
       </section>
@@ -158,18 +164,20 @@ function OverviewContent({
       <section aria-labelledby="toolchain-areas-title">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "en", "Connected workflows")}</p>
+            <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">Connected workflows</p>
             <h2 id="toolchain-areas-title" className="mt-1 font-display text-xl font-bold text-fg sm:text-2xl">
-              {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "제작 영역별 도구")}</h2>
+              제작 영역별 도구
+            </h2>
           </div>
           <Link href={withProject("/studio/engines", projectId)} className="text-xs font-bold text-accent hover:underline">
-            {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "전체 상태 보기")}</Link>
+            전체 상태 보기
+          </Link>
         </div>
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {groups.map((group) => (
             <article key={group.id} className="rounded-2xl border border-line bg-panel/55 p-4 sm:p-5">
               <h3 className="font-display text-base font-bold text-fg">{group.name}</h3>
-              <p className="mt-1 text-xs text-fg-3">{group.tools.length}{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "개 도구 · 선택한 프로필에서 허용됨")}</p>
+              <p className="mt-1 text-xs text-fg-3">{group.tools.length}개 도구 · 선택한 프로필에서 허용됨</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {group.tools.map((tool) => (
                   <span key={tool.id} className="rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs font-semibold text-fg-2">
@@ -204,23 +212,25 @@ function EngineCenterContent({
       <section className="rounded-[1.75rem] border border-line bg-gradient-to-br from-panel to-card p-6 shadow-md sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl">
-            <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "en", "Engine & license center")}</p>
-            <h1 className="mt-2 font-display text-3xl font-bold tracking-[-0.04em] text-fg sm:text-4xl">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "설치·라이선스 상태")}</h1>
+            <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">Engine & license center</p>
+            <h1 className="mt-2 font-display text-3xl font-bold tracking-[-0.04em] text-fg sm:text-4xl">설치·라이선스 상태</h1>
             <p className="mt-3 text-sm leading-7 text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "실제 실행 파일을 탐지하고, 직접 번들·로컬 프로세스·외부 서비스·비상업 모듈을 구분합니다. 설치 확인만으로 품질 검증이나 완전 지원을 주장하지 않습니다.")}</p>
+              실제 실행 파일을 탐지하고, 직접 번들·로컬 프로세스·외부 서비스·비상업 모듈을 구분합니다.
+              설치 확인만으로 품질 검증이나 완전 지원을 주장하지 않습니다.
+            </p>
           </div>
           <Link
             href={withProject("/studio/jobs", projectId)}
             className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-fg px-4 text-sm font-bold text-canvas"
           >
-            {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "작업 큐 열기 ")}<ArrowRight size={15} aria-hidden="true" />
+            작업 큐 열기 <ArrowRight size={15} aria-hidden="true" />
           </Link>
         </div>
       </section>
 
       <StudioToonBridgeConnectionCard connection={connection} />
 
-      <section className="grid gap-3 lg:grid-cols-2" aria-label={translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "제작 도구 상태")}>
+      <section className="grid gap-3 lg:grid-cols-2" aria-label="제작 도구 상태">
         {STUDIO_PRODUCTION_TOOLS.map((tool) => {
           const admission = admitStudioProductionTool(tool, profile);
           const probe = probeByTool.get(tool.id);
@@ -244,10 +254,10 @@ function EngineCenterContent({
               </div>
 
               <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-fg-3">
-                <dt className="font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "라이선스")}</dt><dd>{tool.license}</dd>
-                <dt className="font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "실행 경계")}</dt><dd>{tool.deployment}</dd>
-                <dt className="font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "상업 이용")}</dt><dd>{tool.commercialUse}</dd>
-                <dt className="font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "상태 근거")}</dt><dd>{probe?.reason ?? admission.reason}</dd>
+                <dt className="font-bold text-fg-2">라이선스</dt><dd>{tool.license}</dd>
+                <dt className="font-bold text-fg-2">실행 경계</dt><dd>{tool.deployment}</dd>
+                <dt className="font-bold text-fg-2">상업 이용</dt><dd>{tool.commercialUse}</dd>
+                <dt className="font-bold text-fg-2">상태 근거</dt><dd>{probe?.reason ?? admission.reason}</dd>
               </dl>
 
               {probe?.version ? (
@@ -259,7 +269,7 @@ function EngineCenterContent({
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {tool.operations.map((operation) => (
                   <span key={operation.id} className="rounded-md bg-raised px-2 py-1 text-[0.68rem] font-semibold text-fg-3">
-                    {operation.name}{operation.executable ? "" : translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", " · 연결 예정")}
+                    {operation.name}{operation.executable ? "" : " · 연결 예정"}
                   </span>
                 ))}
               </div>
@@ -269,7 +279,7 @@ function EngineCenterContent({
                 rel="noreferrer"
                 className="mt-3 inline-flex min-h-9 items-center gap-1 text-xs font-bold text-accent hover:underline"
               >
-                {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "원본 프로젝트·라이선스 확인 ")}<ArrowRight size={13} aria-hidden="true" />
+                원본 프로젝트·라이선스 확인 <ArrowRight size={13} aria-hidden="true" />
               </a>
             </article>
           );
@@ -305,10 +315,11 @@ function StudioProductionToolchainRoute({ mode }: { readonly mode: ToolchainPage
       {mode === "jobs" ? (
         <>
           <section className="rounded-[1.75rem] border border-line bg-gradient-to-br from-panel to-card p-6 shadow-md sm:p-8">
-            <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "en", "Production queue")}</p>
-            <h1 className="mt-2 font-display text-3xl font-bold tracking-[-0.04em] text-fg sm:text-4xl">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "제작 작업 큐")}</h1>
+            <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">Production queue</p>
+            <h1 className="mt-2 font-display text-3xl font-bold tracking-[-0.04em] text-fg sm:text-4xl">제작 작업 큐</h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionToolchainPage", "ko", "파일을 현재 컴퓨터의 로컬 실행기로 보내고 결과·해시·라이선스 영수증을 프로젝트별로 보관합니다.")}</p>
+              파일을 현재 컴퓨터의 로컬 실행기로 보내고 결과·해시·라이선스 영수증을 프로젝트별로 보관합니다.
+            </p>
           </section>
           <StudioToonBridgeConnectionCard connection={connection} />
           <StudioProductionJobWorkspace

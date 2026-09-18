@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useState } from "react";
 
 import { studioWebtoonAssistantLoader } from "./studio-webtoon-assistant-loader";
@@ -47,13 +44,13 @@ export function StudioWebtoonAssistantModal(props: StudioWebtoonAssistantModalPr
   if (!open) return null;
   return (
     <aside className="fixed bottom-4 right-4 z-[190] max-w-[calc(100vw-2rem)] rounded-xl border border-line bg-panel p-4 text-sm text-fg shadow-xl"
-      aria-label={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantModal", "ko", "웹툰 창작 보조 센터 불러오기")}>
-      <p role={failed ? translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantModal", "en", "alert") : translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantModal", "en", "status")}>{failed
-        ? translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantModal", "ko", "보조 센터를 불러오지 못했습니다. 캔버스는 그대로 유지됩니다.")
-        : translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantModal", "ko", "웹툰 창작 보조 센터를 여는 중…")}</p>
+      aria-label="웹툰 창작 보조 센터 불러오기">
+      <p role={failed ? "alert" : "status"}>{failed
+        ? "보조 센터를 불러오지 못했습니다. 캔버스는 그대로 유지됩니다."
+        : "웹툰 창작 보조 센터를 여는 중…"}</p>
       <div className="mt-3 flex flex-wrap gap-2">
-        {failed ? <button type="button" className="min-h-11 rounded-lg border border-line px-3" onClick={() => setAttempt((value) => value + 1)}>{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantModal", "ko", "다시 시도")}</button> : null}
-        <button type="button" className="min-h-11 rounded-lg border border-line px-3" onClick={onClose}>{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantModal", "ko", "열기 취소")}</button>
+        {failed ? <button type="button" className="min-h-11 rounded-lg border border-line px-3" onClick={() => setAttempt((value) => value + 1)}>다시 시도</button> : null}
+        <button type="button" className="min-h-11 rounded-lg border border-line px-3" onClick={onClose}>열기 취소</button>
       </div>
     </aside>
   );

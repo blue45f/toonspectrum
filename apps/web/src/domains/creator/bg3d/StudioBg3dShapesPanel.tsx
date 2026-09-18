@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useState } from "react";
 
 import {
@@ -305,11 +301,12 @@ export function StudioBg3dShapesPanel({
 
   return (
 <section hidden={hidden} aria-busy={disabled || undefined}>
-                {disabled ? <p role="status" className="mb-3 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "3D 장면을 준비하고 있습니다. 엔진 선택은 보기 탭에서 할 수 있습니다.")}</p> : null}
+                {disabled ? <p role="status" className="mb-3 text-xs text-fg-3">3D 장면을 준비하고 있습니다. 엔진 선택은 보기 탭에서 할 수 있습니다.</p> : null}
                 <fieldset disabled={disabled} className="m-0 min-w-0 border-0 p-0 disabled:opacity-50">
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Boxes size={15} className="text-accent" aria-hidden />
-                  {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "도형 추가")}</h3>
+                  도형 추가
+                </h3>
                 <div className="grid grid-cols-3 gap-2">
                   {ADD_BUTTONS.map((btn) => {
                     const BtnIcon = btn.icon;
@@ -336,10 +333,11 @@ export function StudioBg3dShapesPanel({
                     className={cx(CONTROL_BUTTON, "w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
                     onClick={() => setShowProceduralBlockouts((visible) => !visible)}
                   >
-                    {showProceduralBlockouts ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "구도용 블록아웃 접기") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "구도용 블록아웃 프리셋 보기")}
+                    {showProceduralBlockouts ? "구도용 블록아웃 접기" : "구도용 블록아웃 프리셋 보기"}
                   </button>
                   <p className="mt-2 text-[0.68rem] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "기본 도형으로 공간의 비율과 배치를 먼저 잡을 때 사용합니다.")}</p>
+                    기본 도형으로 공간의 비율과 배치를 먼저 잡을 때 사용합니다.
+                  </p>
                   <div id="bg3d-procedural-blockouts" hidden={!showProceduralBlockouts} className="mt-3">
                     <StudioBg3dProceduralStarterPanel
                       disabledReason={proceduralStarterDisabledReason}
@@ -349,7 +347,7 @@ export function StudioBg3dShapesPanel({
                 </div>
 
                 <div className="mt-5 border-t border-line pt-4">
-                  <h3 className="mb-2 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "3D 텍스트 & 효과음 (SFX)")}</h3>
+                  <h3 className="mb-2 text-sm font-bold text-fg">3D 텍스트 & 효과음 (SFX)</h3>
                   <StudioBg3dTextExtruderPanel
                     onApplyText={(spec) => {
                       if (spec.characterTransforms.length > 0) {
@@ -360,9 +358,10 @@ export function StudioBg3dShapesPanel({
                 </div>
 
                 <div className="mt-5 border-t border-line pt-4">
-                  <h3 className="mb-2 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "구도용 복합 도형")}</h3>
+                  <h3 className="mb-2 text-sm font-bold text-fg">구도용 복합 도형</h3>
                   <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "기본 도형을 조합해 건물·나무·차량·소품의 비율과 배치를 잡습니다. 세부 형태와 재질은 별도로 다듬어 주세요.")}</p>
+                    기본 도형을 조합해 건물·나무·차량·소품의 비율과 배치를 잡습니다. 세부 형태와 재질은 별도로 다듬어 주세요.
+                  </p>
                   <button
                     type="button"
                     aria-expanded={showCompositeBlockouts}
@@ -370,12 +369,12 @@ export function StudioBg3dShapesPanel({
                     className={cx(CONTROL_BUTTON, "mb-2.5 w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
                     onClick={() => setShowCompositeBlockouts((visible) => !visible)}
                   >
-                    {showCompositeBlockouts ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "복합 블록아웃 접기") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "복합 블록아웃 {v0}개 보기"), { v0: String(COMPOSITE_PRESETS.length) })}
+                    {showCompositeBlockouts ? "복합 블록아웃 접기" : `복합 블록아웃 ${COMPOSITE_PRESETS.length}개 보기`}
                   </button>
                   <div
                     id="bg3d-composite-blockout-categories"
                     hidden={!showCompositeBlockouts}
-                    className={showCompositeBlockouts ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "en", "mb-2.5 flex flex-wrap gap-1.5") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "en", "hidden")}
+                    className={showCompositeBlockouts ? "mb-2.5 flex flex-wrap gap-1.5" : "hidden"}
                   >
                     <button
                       type="button"
@@ -387,7 +386,8 @@ export function StudioBg3dShapesPanel({
                       )}
                       onClick={() => setCompositeCategory(null)}
                     >
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "전체")}</button>
+                      전체
+                    </button>
                     {COMPOSITE_CATEGORIES.map((cat) => (
                       <button
                         key={cat}
@@ -407,7 +407,7 @@ export function StudioBg3dShapesPanel({
                   <div
                     id="bg3d-composite-blockout-presets"
                     hidden={!showCompositeBlockouts}
-                    className={showCompositeBlockouts ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "en", "grid grid-cols-2 gap-2") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "en", "hidden")}
+                    className={showCompositeBlockouts ? "grid grid-cols-2 gap-2" : "hidden"}
                   >
                     {COMPOSITE_PRESETS.filter((p) => compositeCategory === null || p.category === compositeCategory).map((preset) => (
                       <button
@@ -432,7 +432,7 @@ export function StudioBg3dShapesPanel({
                 <div className="mt-5 border-t border-line pt-4">
                   <div className="mb-4 rounded-xl border border-line/80 bg-card/70 p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "변형 스냅")}</p>
+                      <p className="text-xs font-bold text-fg">변형 스냅</p>
                       <button
                         type="button"
                         aria-pressed={snapSettings.enabled}
@@ -449,14 +449,16 @@ export function StudioBg3dShapesPanel({
                         }
                       >
                         <Magnet size={13} aria-hidden />
-                        {snapSettings.enabled ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "켜짐") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "꺼짐")}
+                        {snapSettings.enabled ? "켜짐" : "꺼짐"}
                       </button>
                     </div>
                     <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-                      {studioBg3dSnapSettingsSummary(snapSettings)} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "· 기즈모·수치 입력 모두 적용")}</p>
+                      {studioBg3dSnapSettingsSummary(snapSettings)} · 기즈모·수치 입력 모두 적용
+                    </p>
                     <div className="mt-2 grid grid-cols-2 gap-2">
                       <label className="text-[0.65rem] font-semibold text-fg-3">
-                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "이동 간격")}<select
+                        이동 간격
+                        <select
                           className="mt-1 min-h-9 w-full rounded-lg border border-line bg-panel px-2 text-xs font-semibold text-fg"
                           value={snapSettings.translateStep}
                           disabled={!snapSettings.enabled}
@@ -477,7 +479,8 @@ export function StudioBg3dShapesPanel({
                         </select>
                       </label>
                       <label className="text-[0.65rem] font-semibold text-fg-3">
-                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "회전 간격")}<select
+                        회전 간격
+                        <select
                           className="mt-1 min-h-9 w-full rounded-lg border border-line bg-panel px-2 text-xs font-semibold text-fg"
                           value={snapSettings.rotateStepDegrees}
                           disabled={!snapSettings.enabled}
@@ -532,12 +535,12 @@ export function StudioBg3dShapesPanel({
                   {selectedPrimitive ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "선택한 도형")}</h3>
+                        <h3 className="text-sm font-bold text-fg">선택한 도형</h3>
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
-                            aria-label={isBgObjectVisible(selectedPrimitive) ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "숨기기") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "보이기")}
-                            title={isBgObjectVisible(selectedPrimitive) ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "숨기기") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "보이기")}
+                            aria-label={isBgObjectVisible(selectedPrimitive) ? "숨기기" : "보이기"}
+                            title={isBgObjectVisible(selectedPrimitive) ? "숨기기" : "보이기"}
                             className={ICON_BUTTON}
                             onClick={() => togglePrimitiveFlag(selectedPrimitive.id, "visible")}
                           >
@@ -549,8 +552,8 @@ export function StudioBg3dShapesPanel({
                           </button>
                           <button
                             type="button"
-                            aria-label={isBgObjectLocked(selectedPrimitive) ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "잠금 해제") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "잠금")}
-                            title={isBgObjectLocked(selectedPrimitive) ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "잠금 해제") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "잠금")}
+                            aria-label={isBgObjectLocked(selectedPrimitive) ? "잠금 해제" : "잠금"}
+                            title={isBgObjectLocked(selectedPrimitive) ? "잠금 해제" : "잠금"}
                             className={cx(ICON_BUTTON, isBgObjectLocked(selectedPrimitive) && "border-accent/40 bg-accent-soft text-accent")}
                             onClick={() => togglePrimitiveFlag(selectedPrimitive.id, "locked")}
                           >
@@ -562,8 +565,8 @@ export function StudioBg3dShapesPanel({
                           </button>
                           <button
                             type="button"
-                            aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "바닥에 접지")}
-                            title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "바닥에 접지")}
+                            aria-label="바닥에 접지"
+                            title="바닥에 접지"
                             disabled={selectedIsLocked}
                             className={cx(ICON_BUTTON, "disabled:opacity-40")}
                             onClick={groundSelectedEntity}
@@ -572,8 +575,8 @@ export function StudioBg3dShapesPanel({
                           </button>
                           <button
                             type="button"
-                            aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "원점 · 바닥 정렬")}
-                            title={centerGroundSelectionDisabledReason ?? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "원점 · 바닥 정렬")}
+                            aria-label="원점 · 바닥 정렬"
+                            title={centerGroundSelectionDisabledReason ?? "원점 · 바닥 정렬"}
                             disabled={Boolean(centerGroundSelectionDisabledReason)}
                             className={cx(ICON_BUTTON, "disabled:opacity-40")}
                             onClick={centerAndGroundSelectedEntity}
@@ -582,8 +585,8 @@ export function StudioBg3dShapesPanel({
                           </button>
                           <button
                             type="button"
-                            aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "초점 맞춤")}
-                            title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "초점 맞춤")}
+                            aria-label="초점 맞춤"
+                            title="초점 맞춤"
                             className={ICON_BUTTON}
                             onClick={focusSelectedEntity}
                           >
@@ -591,8 +594,8 @@ export function StudioBg3dShapesPanel({
                           </button>
                           <button
                             type="button"
-                            aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "복제")}
-                            title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "복제")}
+                            aria-label="복제"
+                            title="복제"
                             className={ICON_BUTTON}
                             onClick={duplicateSelected}
                           >
@@ -600,8 +603,8 @@ export function StudioBg3dShapesPanel({
                           </button>
                           <button
                             type="button"
-                            aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "삭제")}
-                            title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "삭제 (Delete)")}
+                            aria-label="삭제"
+                            title="삭제 (Delete)"
                             className={cx(ICON_BUTTON, "hover:border-accent/40 hover:bg-accent-soft hover:text-accent")}
                             onClick={deleteSelected}
                           >
@@ -612,11 +615,13 @@ export function StudioBg3dShapesPanel({
 
                       {selectedIsLocked ? (
                         <p className="rounded-lg border border-line bg-raised/60 px-2.5 py-2 text-[0.68rem] leading-relaxed text-fg-3">
-                          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "잠긴 객체입니다. 위치·회전·크기를 바꾸려면 잠금을 해제하세요.")}</p>
+                          잠긴 객체입니다. 위치·회전·크기를 바꾸려면 잠금을 해제하세요.
+                        </p>
                       ) : null}
 
                                             <div className="flex flex-col gap-1.5">
-                        <label className="flex flex-col gap-1.5 text-xs font-medium text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "부모 계층 (Parent)")}<select
+                        <label className="flex flex-col gap-1.5 text-xs font-medium text-fg-2">부모 계층 (Parent)
+                        <select
                           className="h-9 w-full rounded border border-line bg-card px-2 text-xs text-fg focus:border-accent"
                           disabled={selectedIsLocked}
                           value={selectedPrimitive.parentId || ""}
@@ -625,7 +630,7 @@ export function StudioBg3dShapesPanel({
                             reparentSceneEntity(selectedPrimitive.id, newParentId);
                           }}
                         >
-                          <option value="">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "(최상위 / 없음)")}</option>
+                          <option value="">(최상위 / 없음)</option>
                           {layerListItems.filter((item) =>
                             canSetStudioBg3dParent(layerListItems, selectedPrimitive.id, item.id)
                           ).map(item => (
@@ -638,7 +643,7 @@ export function StudioBg3dShapesPanel({
                       </div>
 
                       <Vec3Field
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "위치")}
+                        label="위치"
                         values={selectedPrimitive.position}
                         step={snapSettings.enabled ? snapSettings.translateStep : 0.1}
                         precision={2}
@@ -649,7 +654,7 @@ export function StudioBg3dShapesPanel({
                         }}
                       />
                       <Vec3Field
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "회전")}
+                        label="회전"
                         values={[radToDeg(selectedPrimitive.rotation[0]), radToDeg(selectedPrimitive.rotation[1]), radToDeg(selectedPrimitive.rotation[2])]}
                         step={snapSettings.enabled ? snapSettings.rotateStepDegrees : 1}
                         precision={0}
@@ -665,7 +670,7 @@ export function StudioBg3dShapesPanel({
                         }}
                       />
                       <Vec3Field
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "크기")}
+                        label="크기"
                         values={selectedPrimitive.scale}
                         step={0.1}
                         precision={2}
@@ -677,18 +682,21 @@ export function StudioBg3dShapesPanel({
                       />
 
                       <section
-                        aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "면 밀기·당기기")}
+                        aria-label="면 밀기·당기기"
                         className="rounded-xl border border-line/80 bg-card/70 p-3"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <h4 className="text-xs font-bold text-fg">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "면 밀기·당기기")}</h4>
+                              면 밀기·당기기
+                            </h4>
                             <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "선택한 면만 수치만큼 이동하고 반대 면은 그 자리에 고정합니다.")}</p>
+                              선택한 면만 수치만큼 이동하고 반대 면은 그 자리에 고정합니다.
+                            </p>
                           </div>
                           <span className="shrink-0 rounded-full border border-accent/25 bg-accent-soft px-2 py-0.5 text-[0.6rem] font-bold text-accent">
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "en", "Push/Pull")}</span>
+                            Push/Pull
+                          </span>
                         </div>
 
                         {studioBg3dPushPullAxes(selectedPrimitive.kind).length > 0 ? (
@@ -715,7 +723,8 @@ export function StudioBg3dShapesPanel({
                                       setPushPullFeedback(null);
                                     }}
                                   >
-                                    {axis}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "축")}</button>
+                                    {axis}축
+                                  </button>
                                 );
                               })}
                             </div>
@@ -753,7 +762,8 @@ export function StudioBg3dShapesPanel({
                                 htmlFor="studio-bg3d-push-pull-distance"
                                 className="block text-[0.65rem] font-semibold text-fg-3"
                               >
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "이동 거리")}</label>
+                                이동 거리
+                              </label>
                               <div className="mt-1 flex gap-1.5">
                                 <span className="flex min-h-10 flex-1 items-center overflow-hidden rounded-lg border border-line bg-panel focus-within:border-accent">
                                   <input
@@ -768,7 +778,7 @@ export function StudioBg3dShapesPanel({
                                     }
                                     value={pushPullDistance}
                                     disabled={selectedIsLocked}
-                                    aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "Push/Pull 이동 거리")}
+                                    aria-label="Push/Pull 이동 거리"
                                     className="min-w-0 flex-1 bg-transparent px-2.5 text-xs font-semibold text-fg outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-40"
                                     onChange={(event) => {
                                       setPushPullDistance(
@@ -823,7 +833,8 @@ export function StudioBg3dShapesPanel({
                                     );
                                   }}
                                 >
-                                  {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "적용")}</button>
+                                  적용
+                                </button>
                               </div>
                             </div>
 
@@ -833,18 +844,21 @@ export function StudioBg3dShapesPanel({
                             >
                               {pushPullFeedback
                                 ?? (snapSettings.enabled
-                                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "{v0}m 스냅 적용 · 음수는 안쪽으로 당깁니다."), { v0: String(snapSettings.translateStep) })
-                                  : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "음수는 안쪽으로 당기며 최소 두께는 0.01m입니다."))}
+                                  ? `${snapSettings.translateStep}m 스냅 적용 · 음수는 안쪽으로 당깁니다.`
+                                  : "음수는 안쪽으로 당기며 최소 두께는 0.01m입니다.")}
                             </p>
                           </>
                         ) : (
                           <p className="mt-2 rounded-lg border border-line bg-panel px-2.5 py-2 text-[0.65rem] leading-relaxed text-fg-3">
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "곡면·테이퍼 도형은 형태를 속이지 않도록 비활성화했습니다. 현재 상자 전 방향과 기둥·파이프의 높이 면을 지원합니다.")}</p>
+                            곡면·테이퍼 도형은 형태를 속이지 않도록 비활성화했습니다.
+                            현재 상자 전 방향과 기둥·파이프의 높이 면을 지원합니다.
+                          </p>
                         )}
                       </section>
 
                       <label className="flex items-center gap-2 text-xs font-medium text-fg-2">
-                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "색상(셰이딩 미리보기 전용)")}<input
+                        색상(셰이딩 미리보기 전용)
+                        <input
                           type="color"
                           value={selectedPrimitive.color}
                           onChange={(e) => updateColor(selectedPrimitive.id, e.target.value)}
@@ -853,8 +867,8 @@ export function StudioBg3dShapesPanel({
                       </label>
 
                       <div>
-                        <p className="text-[0.65rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "표면 프리셋")}</p>
-                        <div className="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "표면 프리셋")}>
+                        <p className="text-[0.65rem] font-semibold text-fg-3">표면 프리셋</p>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label="표면 프리셋">
                           {surfacePresets.map((preset) => (
                             <button
                               key={preset.id}
@@ -868,23 +882,24 @@ export function StudioBg3dShapesPanel({
                           ))}
                           <button
                             type="button"
-                            aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "표면 프리셋 해제")}
+                            aria-label="표면 프리셋 해제"
                             className="min-h-8 rounded-full border border-line bg-panel px-2 py-0.5 text-[0.62rem] font-semibold text-fg-3 transition-colors hover:bg-raised hover:text-fg"
                             onClick={() => applySurfacePreset(selectedPrimitive.id, null)}
                           >
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "해제")}</button>
+                            해제
+                          </button>
                         </div>
                       </div>
                     </div>
                   ) : selectedCustomModel ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "선택한 모델")}</h3>
+                        <h3 className="text-sm font-bold text-fg">선택한 모델</h3>
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
-                            aria-label={isBgObjectVisible(selectedCustomModel) ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "숨기기") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "보이기")}
-                            title={isBgObjectVisible(selectedCustomModel) ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "숨기기") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "보이기")}
+                            aria-label={isBgObjectVisible(selectedCustomModel) ? "숨기기" : "보이기"}
+                            title={isBgObjectVisible(selectedCustomModel) ? "숨기기" : "보이기"}
                             className={ICON_BUTTON}
                             onClick={() => toggleCustomModelFlag(selectedCustomModel.id, "visible")}
                           >
@@ -896,8 +911,8 @@ export function StudioBg3dShapesPanel({
                           </button>
                           <button
                             type="button"
-                            aria-label={isBgObjectLocked(selectedCustomModel) ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "잠금 해제") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "잠금")}
-                            title={isBgObjectLocked(selectedCustomModel) ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "잠금 해제") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "잠금")}
+                            aria-label={isBgObjectLocked(selectedCustomModel) ? "잠금 해제" : "잠금"}
+                            title={isBgObjectLocked(selectedCustomModel) ? "잠금 해제" : "잠금"}
                             className={cx(ICON_BUTTON, isBgObjectLocked(selectedCustomModel) && "border-accent/40 bg-accent-soft text-accent")}
                             onClick={() => toggleCustomModelFlag(selectedCustomModel.id, "locked")}
                           >
@@ -909,8 +924,8 @@ export function StudioBg3dShapesPanel({
                           </button>
                           <button
                             type="button"
-                            aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "바닥에 접지")}
-                            title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "바닥에 접지")}
+                            aria-label="바닥에 접지"
+                            title="바닥에 접지"
                             disabled={selectedIsLocked}
                             className={cx(ICON_BUTTON, "disabled:opacity-40")}
                             onClick={groundSelectedEntity}
@@ -919,8 +934,8 @@ export function StudioBg3dShapesPanel({
                           </button>
                           <button
                             type="button"
-                            aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "배치 정리")}
-                            title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "자동 맞춤 후 바닥에 붙입니다 (다중 선택 지원)")}
+                            aria-label="배치 정리"
+                            title="자동 맞춤 후 바닥에 붙입니다 (다중 선택 지원)"
                             disabled={!canPlaceSelectedModelRecipe}
                             className={cx(
                               "inline-flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-2 text-[0.65rem] font-semibold text-fg-3 transition-colors",
@@ -929,11 +944,12 @@ export function StudioBg3dShapesPanel({
                             )}
                             onClick={placeSelectedModelRecipe}
                           >
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "배치 정리")}</button>
+                            배치 정리
+                          </button>
                           <button
                             type="button"
-                            aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "원점 · 바닥 정렬")}
-                            title={centerGroundSelectionDisabledReason ?? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "원점 · 바닥 정렬")}
+                            aria-label="원점 · 바닥 정렬"
+                            title={centerGroundSelectionDisabledReason ?? "원점 · 바닥 정렬"}
                             disabled={Boolean(centerGroundSelectionDisabledReason)}
                             className={cx(ICON_BUTTON, "disabled:opacity-40")}
                             onClick={centerAndGroundSelectedEntity}
@@ -942,8 +958,8 @@ export function StudioBg3dShapesPanel({
                           </button>
                           <button
                             type="button"
-                            aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "초점 맞춤")}
-                            title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "초점 맞춤")}
+                            aria-label="초점 맞춤"
+                            title="초점 맞춤"
                             className={ICON_BUTTON}
                             onClick={focusSelectedEntity}
                           >
@@ -951,8 +967,8 @@ export function StudioBg3dShapesPanel({
                           </button>
                           <button
                             type="button"
-                            aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "복제")}
-                            title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "복제")}
+                            aria-label="복제"
+                            title="복제"
                             className={ICON_BUTTON}
                             onClick={duplicateSelectedCustomModel}
                           >
@@ -960,8 +976,8 @@ export function StudioBg3dShapesPanel({
                           </button>
                           <button
                             type="button"
-                            aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "삭제")}
-                            title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "삭제 (Delete)")}
+                            aria-label="삭제"
+                            title="삭제 (Delete)"
                             className={cx(ICON_BUTTON, "hover:border-accent/40 hover:bg-accent-soft hover:text-accent")}
                             onClick={deleteSelectedCustomModel}
                           >
@@ -972,11 +988,13 @@ export function StudioBg3dShapesPanel({
 
                       {selectedIsLocked ? (
                         <p className="rounded-lg border border-line bg-raised/60 px-2.5 py-2 text-[0.68rem] leading-relaxed text-fg-3">
-                          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "잠긴 객체입니다. 위치·회전·크기를 바꾸려면 잠금을 해제하세요.")}</p>
+                          잠긴 객체입니다. 위치·회전·크기를 바꾸려면 잠금을 해제하세요.
+                        </p>
                       ) : null}
 
                                             <div className="flex flex-col gap-1.5">
-                        <label className="flex flex-col gap-1.5 text-xs font-medium text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "부모 계층 (Parent)")}<select
+                        <label className="flex flex-col gap-1.5 text-xs font-medium text-fg-2">부모 계층 (Parent)
+                        <select
                           className="h-9 w-full rounded border border-line bg-card px-2 text-xs text-fg focus:border-accent"
                           disabled={selectedIsLocked}
                           value={selectedCustomModel.parentId || ""}
@@ -985,7 +1003,7 @@ export function StudioBg3dShapesPanel({
                             reparentSceneEntity(selectedCustomModel.id, newParentId);
                           }}
                         >
-                          <option value="">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "(최상위 / 없음)")}</option>
+                          <option value="">(최상위 / 없음)</option>
                           {layerListItems.filter((item) =>
                             canSetStudioBg3dParent(layerListItems, selectedCustomModel.id, item.id)
                           ).map(item => (
@@ -998,7 +1016,7 @@ export function StudioBg3dShapesPanel({
                       </div>
 
                       <Vec3Field
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "위치")}
+                        label="위치"
                         values={selectedCustomModel.position}
                         step={snapSettings.enabled ? snapSettings.translateStep : 0.1}
                         precision={2}
@@ -1009,7 +1027,7 @@ export function StudioBg3dShapesPanel({
                         }}
                       />
                       <Vec3Field
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "회전")}
+                        label="회전"
                         values={[radToDeg(selectedCustomModel.rotation[0]), radToDeg(selectedCustomModel.rotation[1]), radToDeg(selectedCustomModel.rotation[2])]}
                         step={snapSettings.enabled ? snapSettings.rotateStepDegrees : 1}
                         precision={0}
@@ -1025,7 +1043,7 @@ export function StudioBg3dShapesPanel({
                         }}
                       />
                       <Vec3Field
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "크기")}
+                        label="크기"
                         values={selectedCustomModel.scale}
                         step={0.1}
                         precision={2}
@@ -1047,21 +1065,24 @@ export function StudioBg3dShapesPanel({
                                 event.target.checked ? { ...DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE } : null,
                               )}
                             />
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "인스턴스 재질 편집")}</label>
+                            인스턴스 재질 편집
+                          </label>
                           {selectedCustomModel.materialOverride ? (
                             <button
                               type="button"
                               className="text-[0.68rem] font-semibold text-accent hover:underline"
                               onClick={() => updateCustomModelMaterial(selectedCustomModel.id, null)}
                             >
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "원본 복원")}</button>
+                              원본 복원
+                            </button>
                           ) : null}
                         </div>
 
                         {selectedCustomModel.materialOverride ? (
                           <div className="space-y-2 border-t border-line/70 pt-2">
                             <label className="grid grid-cols-[4.5rem_1fr] items-center gap-2 text-[0.68rem] text-fg-3">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "색상 방식")}<select
+                              색상 방식
+                              <select
                                 className="h-8 rounded-lg border border-line bg-panel px-2 text-xs text-fg"
                                 value={selectedCustomModel.materialOverride.colorMode}
                                 onChange={(event) => updateCustomModelMaterial(
@@ -1072,13 +1093,14 @@ export function StudioBg3dShapesPanel({
                                   }),
                                 )}
                               >
-                                <option value="original">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "원본")}</option>
-                                <option value="multiply">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "곱하기")}</option>
-                                <option value="replace">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "교체")}</option>
+                                <option value="original">원본</option>
+                                <option value="multiply">곱하기</option>
+                                <option value="replace">교체</option>
                               </select>
                             </label>
                             <label className="grid grid-cols-[4.5rem_2.75rem_1fr] items-center gap-2 text-[0.68rem] text-fg-3">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "재질 색")}<input
+                              재질 색
+                              <input
                                 type="color"
                                 className="h-8 w-11 cursor-pointer rounded border border-line bg-panel"
                                 disabled={selectedCustomModel.materialOverride.colorMode === "original"}
@@ -1089,7 +1111,7 @@ export function StudioBg3dShapesPanel({
                                 )}
                               />
                               <input
-                                aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "재질 색상 혼합 강도")}
+                                aria-label="재질 색상 혼합 강도"
                                 type="range"
                                 min="0"
                                 max="1"
@@ -1103,7 +1125,8 @@ export function StudioBg3dShapesPanel({
                               />
                             </label>
                             <label className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-[0.68rem] text-fg-3">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "불투명도")}<input
+                              불투명도
+                              <input
                                 type="range"
                                 min="0"
                                 max="1"
@@ -1128,7 +1151,8 @@ export function StudioBg3dShapesPanel({
                                     (current) => ({ ...current, wireframe: event.target.checked }),
                                   )}
                                 />
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "와이어프레임")}</label>
+                                와이어프레임
+                              </label>
                               <label className="flex items-center gap-1.5">
                                 <input
                                   type="checkbox"
@@ -1138,25 +1162,29 @@ export function StudioBg3dShapesPanel({
                                     (current) => ({ ...current, doubleSided: event.target.checked }),
                                   )}
                                 />
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "양면 렌더링")}</label>
+                                양면 렌더링
+                              </label>
                             </div>
                           </div>
                         ) : (
                           <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "원본 재질과 텍스처는 보존한 채 이 배치에만 색·투명도·와이어 설정을 적용합니다.")}</p>
+                            원본 재질과 텍스처는 보존한 채 이 배치에만 색·투명도·와이어 설정을 적용합니다.
+                          </p>
                         )}
                       </div>
 
                       <div className="space-y-2 rounded-xl border border-line bg-card/55 p-2.5">
                         <div className="flex items-center justify-between gap-2">
                           <div>
-                            <h4 className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "의미 재질 분석")}</h4>
+                            <h4 className="text-xs font-semibold text-fg-2">의미 재질 분석</h4>
                             <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "재질·메시 이름을 로컬에서 분석해 캐릭터/배경 분리 패스 후보를 만듭니다.")}</p>
+                              재질·메시 이름을 로컬에서 분석해 캐릭터/배경 분리 패스 후보를 만듭니다.
+                            </p>
                           </div>
                           {selectedSemanticMaterials?.ok ? (
                             <span className="shrink-0 rounded-full border border-line bg-panel px-2 py-1 text-[0.6rem] font-semibold tabular-nums text-fg-3">
-                              {selectedSemanticMaterials.counts.total} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "재질")}</span>
+                              {selectedSemanticMaterials.counts.total} 재질
+                            </span>
                           ) : null}
                         </div>
 
@@ -1164,14 +1192,16 @@ export function StudioBg3dShapesPanel({
                           <>
                             <div className="grid grid-cols-2 gap-1.5 text-[0.65rem]">
                               <div className="rounded-lg border border-line/70 bg-panel px-2 py-1.5 text-fg-3">
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "캐릭터 후보")}<strong className="ml-1 text-fg">
+                                캐릭터 후보
+                                <strong className="ml-1 text-fg">
                                   {selectedCharacterPassPlan?.ok
                                     ? selectedCharacterPassPlan.plan.counts.included
                                     : 0}
                                 </strong>
                               </div>
                               <div className="rounded-lg border border-line/70 bg-panel px-2 py-1.5 text-fg-3">
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "배경 후보")}<strong className="ml-1 text-fg">
+                                배경 후보
+                                <strong className="ml-1 text-fg">
                                   {selectedBackgroundPassPlan?.ok
                                     ? selectedBackgroundPassPlan.plan.counts.included
                                     : 0}
@@ -1180,7 +1210,7 @@ export function StudioBg3dShapesPanel({
                             </div>
                             {selectedSemanticAssignments.length > 0 ? (
                               <ul
-                                aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "의미 재질 자동 분류")}
+                                aria-label="의미 재질 자동 분류"
                                 className="max-h-40 space-y-1 overflow-y-auto overscroll-contain pr-1"
                               >
                                 {selectedSemanticAssignments.slice(0, 24).map((assignment, index) => (
@@ -1189,7 +1219,7 @@ export function StudioBg3dShapesPanel({
                                     className="flex items-center gap-2 rounded-lg border border-line/60 bg-panel px-2 py-1.5 text-[0.65rem]"
                                   >
                                     <span className="w-12 shrink-0 truncate text-fg-3">
-                                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "재질 ")}{index + 1}
+                                      재질 {index + 1}
                                     </span>
                                     <span className="min-w-0 flex-1 truncate font-semibold text-fg-2">
                                       {SEMANTIC_MATERIAL_SLOT_LABELS[assignment.slot]}
@@ -1207,21 +1237,26 @@ export function StudioBg3dShapesPanel({
                               </ul>
                             ) : (
                               <p className="rounded-lg border border-dashed border-line px-2 py-2 text-[0.65rem] text-fg-3">
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "이 모델에는 분류할 렌더 재질이 없습니다.")}</p>
+                                이 모델에는 분류할 렌더 재질이 없습니다.
+                              </p>
                             )}
                             {selectedSemanticAssignments.length > 24 ? (
                               <p className="text-[0.62rem] text-fg-3">
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "성능을 위해 앞의 24개만 표시합니다. 전체 ")}{selectedSemanticAssignments.length}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "개는 패스 계획에 반영됩니다.")}</p>
+                                성능을 위해 앞의 24개만 표시합니다. 전체 {selectedSemanticAssignments.length}개는 패스 계획에 반영됩니다.
+                              </p>
                             ) : null}
                             <p className="text-[0.62rem] leading-relaxed text-fg-3">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "자동 제안은 원본 모델이나 장면 문서에 덮어쓰지 않습니다. 낮은 신뢰도의 재질은 분리 출력 전에 사용자 검토 대상으로 유지됩니다.")}</p>
+                              자동 제안은 원본 모델이나 장면 문서에 덮어쓰지 않습니다. 낮은 신뢰도의 재질은 분리 출력 전에 사용자 검토 대상으로 유지됩니다.
+                            </p>
                           </>
                         ) : selectedSemanticMaterials ? (
                           <p className="rounded-lg border border-dashed border-line px-2 py-2 text-[0.65rem] leading-relaxed text-fg-3">
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "안전한 이름·개수 예산 안에서 재질을 분석할 수 없어 자동 분류를 건너뛰었습니다.")}</p>
+                            안전한 이름·개수 예산 안에서 재질을 분석할 수 없어 자동 분류를 건너뛰었습니다.
+                          </p>
                         ) : (
                           <p className="rounded-lg border border-dashed border-line px-2 py-2 text-[0.65rem] leading-relaxed text-fg-3">
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "모델 렌더 준비가 끝나면 의미 재질 분석 결과가 표시됩니다.")}</p>
+                            모델 렌더 준비가 끝나면 의미 재질 분석 결과가 표시됩니다.
+                          </p>
                         )}
                       </div>
 
@@ -1237,16 +1272,18 @@ export function StudioBg3dShapesPanel({
                                 event.target.checked ? { ...DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER } : null,
                               )}
                             />
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "리그 제약")}</label>
+                            리그 제약
+                          </label>
                           <span className="text-[0.68rem] tabular-nums text-fg-3">
-                            {selectedAimConstraints.length} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "에임 · ")}{selectedTwoBoneIkConstraints.length} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "en", "IK")}</span>
+                            {selectedAimConstraints.length} 에임 · {selectedTwoBoneIkConstraints.length} IK
+                          </span>
                         </div>
 
                         {selectedCustomModel.constraints && selectedModelJoints.length > 0 ? (
                           <div className="space-y-2 border-t border-line/70 pt-2">
                             <div className="grid grid-cols-[1fr_auto] gap-2">
                               <select
-                                aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "에임 조인트")}
+                                aria-label="에임 조인트"
                                 className="h-11 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg sm:h-8 pointer-coarse:h-11"
                                 value={selectedPoseJointKey}
                                 onChange={(event) => setPoseJointSelection({
@@ -1266,10 +1303,11 @@ export function StudioBg3dShapesPanel({
                                 disabled={!selectedAimConstraint}
                                 onClick={() => commitSelectedAimConstraint(null)}
                               >
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "에임 해제")}</button>
+                                에임 해제
+                              </button>
                             </div>
                             <Vec3Field
-                              label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "모델 로컬 타깃")}
+                              label="모델 로컬 타깃"
                               values={[...(selectedAimConstraint?.target ?? [0, 1, 1])]}
                               step={0.1}
                               precision={2}
@@ -1289,7 +1327,8 @@ export function StudioBg3dShapesPanel({
                             />
                             <div className="grid grid-cols-2 gap-2">
                               <label className="space-y-1 text-[0.68rem] text-fg-3">
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "향할 로컬 축")}<select
+                                향할 로컬 축
+                                <select
                                   className="h-11 w-full rounded-lg border border-line bg-panel px-2 text-xs text-fg sm:h-8 pointer-coarse:h-11"
                                   disabled={selectedAimSuppressedByIk}
                                   value={selectedAimConstraint?.axis ?? "+z"}
@@ -1305,7 +1344,7 @@ export function StudioBg3dShapesPanel({
                                 </select>
                               </label>
                               <label className="space-y-1 text-[0.68rem] text-fg-3">
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "강도 · ")}{Math.round((selectedAimConstraint?.weight ?? 1) * 100)}%
+                                강도 · {Math.round((selectedAimConstraint?.weight ?? 1) * 100)}%
                                 <input
                                   className="block h-11 w-full sm:h-8 pointer-coarse:h-11"
                                   type="range"
@@ -1324,20 +1363,23 @@ export function StudioBg3dShapesPanel({
                             </div>
                             {selectedAimSuppressedByIk ? (
                               <p className="rounded-lg border border-warning/30 bg-warning/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-warning">
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "이 조인트의 에임은 손·발 타깃을 보존하기 위해 활성 IK 뒤에서 자동 중지됩니다. 에임을 사용하려면 겹치는 IK를 먼저 해제해 주세요.")}</p>
+                                이 조인트의 에임은 손·발 타깃을 보존하기 위해 활성 IK 뒤에서 자동 중지됩니다. 에임을 사용하려면 겹치는 IK를 먼저 해제해 주세요.
+                              </p>
                             ) : null}
                             <div className="space-y-2 border-t border-line/70 pt-2">
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-[0.68rem] font-semibold text-fg-2">
-                                  {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "2본 IK · 손/발 위치")}</span>
+                                  2본 IK · 손/발 위치
+                                </span>
                                 <span className="text-[0.64rem] text-fg-3">
-                                  {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "팔꿈치·무릎 자동 계산")}</span>
+                                  팔꿈치·무릎 자동 계산
+                                </span>
                               </div>
                               {selectedIkEndCandidates.length > 0 ? (
                                 <>
                                   <div className="grid grid-cols-[1fr_auto] gap-2">
                                     <select
-                                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "IK 끝 조인트")}
+                                      aria-label="IK 끝 조인트"
                                       className="h-11 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg sm:h-8 pointer-coarse:h-11"
                                       value={selectedIkEndJointKey}
                                       onChange={(event) => setIkEndJointSelection({
@@ -1376,26 +1418,29 @@ export function StudioBg3dShapesPanel({
                                         });
                                       }}
                                     >
-                                      {selectedTwoBoneIkConstraint ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "IK 해제") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "IK 적용")}
+                                      {selectedTwoBoneIkConstraint ? "IK 해제" : "IK 적용"}
                                     </button>
                                   </div>
                                   <p className="text-[0.64rem] leading-relaxed text-fg-3">
-                                    {selectedIkUpperJoint?.name ?? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "상위")} →{
-                                      selectedIkMiddleJoint?.name ?? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "중간")
-                                    } → {selectedIkEndJoint?.name ?? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "끝")}
+                                    {selectedIkUpperJoint?.name ?? "상위"} →{
+                                      selectedIkMiddleJoint?.name ?? "중간"
+                                    } → {selectedIkEndJoint?.name ?? "끝"}
                                   </p>
                                   {!selectedIkTransformSupported ? (
                                     <p className="rounded-lg border border-warning/30 bg-warning/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-warning">
-                                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "현재 부모·모델·관절의 월드 변환에 비균일 크기, 반전 또는 전단이 있어 IK가 일시 중지됩니다. 계층 전체를 균일 크기로 맞춰 주세요.")}</p>
+                                      현재 부모·모델·관절의 월드 변환에 비균일 크기, 반전 또는 전단이 있어 IK가 일시 중지됩니다. 계층 전체를 균일 크기로 맞춰 주세요.
+                                    </p>
                                   ) : selectedIkHasOverlap ? (
                                     <p className="rounded-lg border border-warning/30 bg-warning/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-warning">
-                                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "다른 IK와 조인트를 공유하는 체인은 동시에 적용할 수 없습니다.")}</p>
+                                      다른 IK와 조인트를 공유하는 체인은 동시에 적용할 수 없습니다.
+                                    </p>
                                   ) : selectedIkLimitReached && !selectedTwoBoneIkConstraint ? (
                                     <p className="rounded-lg border border-warning/30 bg-warning/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-warning">
-                                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "모델당 IK는 최대 ")}{STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "개까지 저장할 수 있습니다.")}</p>
+                                      모델당 IK는 최대 {STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS}개까지 저장할 수 있습니다.
+                                    </p>
                                   ) : null}
                                   <Vec3Field
-                                    label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "끝 위치 타깃")}
+                                    label="끝 위치 타깃"
                                     values={[
                                       ...(selectedTwoBoneIkConstraint?.target ?? selectedIkDefaultTarget),
                                     ]}
@@ -1419,7 +1464,7 @@ export function StudioBg3dShapesPanel({
                                     }}
                                   />
                                   <Vec3Field
-                                    label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "굽힘 폴 타깃")}
+                                    label="굽힘 폴 타깃"
                                     values={[
                                       ...(selectedTwoBoneIkConstraint?.poleTarget ?? selectedIkDefaultPole),
                                     ]}
@@ -1443,7 +1488,8 @@ export function StudioBg3dShapesPanel({
                                     }}
                                   />
                                   <label className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-[0.68rem] text-fg-3">
-                                    {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "IK 강도")}<input
+                                    IK 강도
+                                    <input
                                       className="h-11 w-full sm:h-8 pointer-coarse:h-11"
                                       type="range"
                                       min="0"
@@ -1469,7 +1515,8 @@ export function StudioBg3dShapesPanel({
                                 </>
                               ) : (
                                 <p className="text-[0.66rem] leading-relaxed text-fg-3">
-                                  {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "같은 스킨에서 부모 → 중간 → 끝으로 이어지는 3개 조인트 체인이 없습니다.")}</p>
+                                  같은 스킨에서 부모 → 중간 → 끝으로 이어지는 3개 조인트 체인이 없습니다.
+                                </p>
                               )}
                             </div>
                             <label className="flex min-h-11 items-center gap-1.5 text-[0.68rem] text-fg-2 sm:min-h-8 pointer-coarse:min-h-11">
@@ -1481,19 +1528,21 @@ export function StudioBg3dShapesPanel({
                                   (current) => ({ ...current, enabled: event.target.checked }),
                                 )}
                               />
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "애니메이션·포즈 뒤에 제약 적용")}</label>
+                              애니메이션·포즈 뒤에 제약 적용
+                            </label>
                             <button
                               type="button"
                               aria-describedby={
                                 selectedRigBakeDisabledReason
-                                  ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "en", "bg3d-rig-bake-disabled-reason")
-                                  : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "en", "bg3d-rig-bake-description")
+                                  ? "bg3d-rig-bake-disabled-reason"
+                                  : "bg3d-rig-bake-description"
                               }
                               className="min-h-11 w-full rounded-lg border border-accent/35 bg-accent-soft px-3 text-[0.7rem] font-semibold text-accent hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9 pointer-coarse:min-h-11"
                               disabled={selectedRigBakeDisabledReason !== null}
                               onClick={() => bakeCustomModelRigConstraints(selectedCustomModel.id)}
                             >
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "현재 IK·에임을 포즈로 굽기")}</button>
+                              현재 IK·에임을 포즈로 굽기
+                            </button>
                             {selectedRigBakeDisabledReason ? (
                               <p
                                 id="bg3d-rig-bake-disabled-reason"
@@ -1503,13 +1552,19 @@ export function StudioBg3dShapesPanel({
                               </p>
                             ) : null}
                             <p id="bg3d-rig-bake-description" className="text-[0.64rem] leading-relaxed text-fg-3">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "지금 보이는 한 프레임을 weight 1 포즈로 고정하고 모든 리그 제약을 제거합니다. 애니메이션은 비본 트랙을 보존한 채 현재 시각에서 일시정지되며, 3D 실행 취소로 원래 포즈와 제약을 되돌릴 수 있습니다.")}</p>
+                              지금 보이는 한 프레임을 weight 1 포즈로 고정하고 모든 리그 제약을 제거합니다.
+                              애니메이션은 비본 트랙을 보존한 채 현재 시각에서 일시정지되며, 3D 실행 취소로
+                              원래 포즈와 제약을 되돌릴 수 있습니다.
+                            </p>
                             <p className="text-[0.66rem] leading-relaxed text-fg-3">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "에임은 눈·머리·무기 방향을, 2본 IK는 손·발 위치와 굽힘 평면을 비파괴 혼합합니다. 원본 스켈레톤과 애니메이션 키는 수정하지 않습니다.")}</p>
+                              에임은 눈·머리·무기 방향을, 2본 IK는 손·발 위치와 굽힘 평면을 비파괴
+                              혼합합니다. 원본 스켈레톤과 애니메이션 키는 수정하지 않습니다.
+                            </p>
                           </div>
                         ) : (
                           <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "모델에 스킨 조인트가 있으면 시선·머리 에임과 손·발 2본 IK를 추가할 수 있습니다.")}</p>
+                            모델에 스킨 조인트가 있으면 시선·머리 에임과 손·발 2본 IK를 추가할 수 있습니다.
+                          </p>
                         )}
                       </div>
 
@@ -1525,15 +1580,18 @@ export function StudioBg3dShapesPanel({
                                 event.target.checked ? { ...DEFAULT_STUDIO_BG3D_ANIMATION_PLAYBACK } : null,
                               )}
                             />
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "모델 애니메이션")}</label>
+                            모델 애니메이션
+                          </label>
                           <span className="text-[0.68rem] tabular-nums text-fg-3">
-                            {selectedModelAnimations.length}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "개 클립")}</span>
+                            {selectedModelAnimations.length}개 클립
+                          </span>
                         </div>
 
                         {selectedCustomModel.animation && selectedAnimationClip ? (
                           <div className="space-y-2 border-t border-line/70 pt-2">
                             <label className="grid grid-cols-[4.5rem_1fr] items-center gap-2 text-[0.68rem] text-fg-3">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "클립")}<select
+                              클립
+                              <select
                                 className="h-8 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg"
                                 value={Math.min(
                                   selectedCustomModel.animation.clipIndex,
@@ -1564,7 +1622,7 @@ export function StudioBg3dShapesPanel({
                                   (current) => ({ ...current, playing: !current.playing }),
                                 )}
                               >
-                                {selectedCustomModel.animation.playing ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "일시정지") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "재생")}
+                                {selectedCustomModel.animation.playing ? "일시정지" : "재생"}
                               </button>
                               <BgAnimationPlayhead
                                 active={open && activePanelTab === "models"}
@@ -1582,7 +1640,8 @@ export function StudioBg3dShapesPanel({
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <label className="space-y-1 text-[0.68rem] text-fg-3">
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "반복")}<select
+                                반복
+                                <select
                                   className="h-8 w-full rounded-lg border border-line bg-panel px-2 text-xs text-fg"
                                   value={selectedCustomModel.animation.loop}
                                   onChange={(event) => updateCustomModelAnimation(
@@ -1593,13 +1652,13 @@ export function StudioBg3dShapesPanel({
                                     }),
                                   )}
                                 >
-                                  <option value="once">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "한 번")}</option>
-                                  <option value="repeat">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "반복")}</option>
-                                  <option value="ping-pong">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "왕복")}</option>
+                                  <option value="once">한 번</option>
+                                  <option value="repeat">반복</option>
+                                  <option value="ping-pong">왕복</option>
                                 </select>
                               </label>
                               <label className="space-y-1 text-[0.68rem] text-fg-3">
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "속도 · ")}{selectedCustomModel.animation.timeScale.toFixed(1)}×
+                                속도 · {selectedCustomModel.animation.timeScale.toFixed(1)}×
                                 <input
                                   className="block h-8 w-full"
                                   type="range"
@@ -1618,8 +1677,8 @@ export function StudioBg3dShapesPanel({
                         ) : (
                           <p className="text-[0.68rem] leading-relaxed text-fg-3">
                             {selectedModelAnimations.length > 0
-                              ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "활성화하면 클립 선택·재생·스크럽·반복·역재생 속도를 이 배치에 저장합니다.")
-                              : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "이 모델에는 재생 가능한 glTF 애니메이션 클립이 없습니다.")}
+                              ? "활성화하면 클립 선택·재생·스크럽·반복·역재생 속도를 이 배치에 저장합니다."
+                              : "이 모델에는 재생 가능한 glTF 애니메이션 클립이 없습니다."}
                           </p>
                         )}
                       </div>
@@ -1636,16 +1695,18 @@ export function StudioBg3dShapesPanel({
                                 event.target.checked ? { ...DEFAULT_STUDIO_BG3D_POSE_LAYER } : null,
                               )}
                             />
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "비파괴 포즈 레이어")}</label>
+                            비파괴 포즈 레이어
+                          </label>
                           <span className="text-[0.68rem] tabular-nums text-fg-3">
-                            {selectedModelJoints.length}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "개 조인트")}</span>
+                            {selectedModelJoints.length}개 조인트
+                          </span>
                         </div>
 
                         {selectedCustomModel.pose && selectedModelJoints.length > 0 ? (
                           <div className="space-y-2 border-t border-line/70 pt-2">
                             <div className="grid grid-cols-[1fr_auto] gap-2">
                               <select
-                                aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "포즈 조인트")}
+                                aria-label="포즈 조인트"
                                 className="h-11 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg sm:h-8 pointer-coarse:h-11"
                                 value={selectedPoseJointKey}
                                 onChange={(event) => setPoseJointSelection({
@@ -1665,10 +1726,11 @@ export function StudioBg3dShapesPanel({
                                 disabled={!selectedPoseJoint}
                                 onClick={() => commitSelectedPoseOverride(null)}
                               >
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "조인트 초기화")}</button>
+                                조인트 초기화
+                              </button>
                             </div>
                             <Vec3Field
-                              label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "회전 오프셋")}
+                              label="회전 오프셋"
                               values={selectedPoseEulerDegrees}
                               step={1}
                               precision={1}
@@ -1681,7 +1743,8 @@ export function StudioBg3dShapesPanel({
                               }}
                             />
                             <label className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-[0.68rem] text-fg-3">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "강도")}<input
+                              강도
+                              <input
                                 type="range"
                                 min="0"
                                 max="1"
@@ -1706,7 +1769,8 @@ export function StudioBg3dShapesPanel({
                                     (current) => ({ ...current, enabled: event.target.checked }),
                                   )}
                                 />
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "레이어 적용")}</label>
+                                레이어 적용
+                              </label>
                               <button
                                 type="button"
                                 className="text-[0.68rem] font-semibold text-accent hover:underline"
@@ -1715,16 +1779,19 @@ export function StudioBg3dShapesPanel({
                                   { ...DEFAULT_STUDIO_BG3D_POSE_LAYER },
                                 )}
                               >
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "전체 포즈 초기화")}</button>
+                                전체 포즈 초기화
+                              </button>
                             </div>
                             <p className="text-[0.66rem] leading-relaxed text-fg-3">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "애니메이션 또는 원본 휴지 자세를 먼저 계산한 뒤 로컬 회전 오프셋을 더합니다. 원본 리깅과 클립은 변경하지 않습니다.")}</p>
+                              애니메이션 또는 원본 휴지 자세를 먼저 계산한 뒤 로컬 회전 오프셋을 더합니다.
+                              원본 리깅과 클립은 변경하지 않습니다.
+                            </p>
                           </div>
                         ) : (
                           <p className="text-[0.68rem] leading-relaxed text-fg-3">
                             {selectedModelJoints.length > 0
-                              ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "활성화하면 본별 회전 오프셋과 혼합 강도를 이 배치에 저장합니다.")
-                              : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "이 모델에는 편집 가능한 스킨 조인트가 없습니다.")}
+                              ? "활성화하면 본별 회전 오프셋과 혼합 강도를 이 배치에 저장합니다."
+                              : "이 모델에는 편집 가능한 스킨 조인트가 없습니다."}
                           </p>
                         )}
                       </div>
@@ -1741,16 +1808,18 @@ export function StudioBg3dShapesPanel({
                                 event.target.checked ? { ...DEFAULT_STUDIO_BG3D_MORPH_LAYER } : null,
                               )}
                             />
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "표정·모프 레이어")}</label>
+                            표정·모프 레이어
+                          </label>
                           <span className="text-[0.68rem] tabular-nums text-fg-3">
-                            {selectedModelMorphTargets.length}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "개 타깃")}</span>
+                            {selectedModelMorphTargets.length}개 타깃
+                          </span>
                         </div>
 
                         {selectedCustomModel.morph && selectedModelMorphTargets.length > 0 ? (
                           <div className="space-y-2 border-t border-line/70 pt-2">
                             <div className="grid grid-cols-[1fr_auto] gap-2">
                               <select
-                                aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "모프 타깃")}
+                                aria-label="모프 타깃"
                                 className="h-8 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg"
                                 value={selectedMorphTargetKey}
                                 onChange={(event) => setMorphTargetSelection({
@@ -1776,10 +1845,12 @@ export function StudioBg3dShapesPanel({
                                   }),
                                 )}
                               >
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "타깃 초기화")}</button>
+                                타깃 초기화
+                              </button>
                             </div>
                             <label className="grid grid-cols-[4.5rem_1fr_3rem] items-center gap-2 text-[0.68rem] text-fg-3">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "오프셋")}<input
+                              오프셋
+                              <input
                                 type="range"
                                 min="-1"
                                 max="1"
@@ -1804,7 +1875,8 @@ export function StudioBg3dShapesPanel({
                               </span>
                             </label>
                             <label className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-[0.68rem] text-fg-3">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "전체 강도")}<input
+                              전체 강도
+                              <input
                                 type="range"
                                 min="0"
                                 max="1"
@@ -1829,7 +1901,8 @@ export function StudioBg3dShapesPanel({
                                     (current) => ({ ...current, enabled: event.target.checked }),
                                   )}
                                 />
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "레이어 적용")}</label>
+                                레이어 적용
+                              </label>
                               <button
                                 type="button"
                                 className="text-[0.68rem] font-semibold text-accent hover:underline"
@@ -1838,22 +1911,24 @@ export function StudioBg3dShapesPanel({
                                   { ...DEFAULT_STUDIO_BG3D_MORPH_LAYER },
                                 )}
                               >
-                                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "전체 모프 초기화")}</button>
+                                전체 모프 초기화
+                              </button>
                             </div>
                             <p className="text-[0.66rem] leading-relaxed text-fg-3">
-                              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "애니메이션이 만든 모프 값에 오프셋을 더하고 0–1 범위로 제한합니다.")}</p>
+                              애니메이션이 만든 모프 값에 오프셋을 더하고 0–1 범위로 제한합니다.
+                            </p>
                           </div>
                         ) : (
                           <p className="text-[0.68rem] leading-relaxed text-fg-3">
                             {selectedModelMorphTargets.length > 0
-                              ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "활성화하면 표정·립싱크·변형 타깃을 배치별로 조절할 수 있습니다.")
-                              : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "이 모델에는 편집 가능한 모프 타깃이 없습니다.")}
+                              ? "활성화하면 표정·립싱크·변형 타깃을 배치별로 조절할 수 있습니다."
+                              : "이 모델에는 편집 가능한 모프 타깃이 없습니다."}
                           </p>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <p className="text-xs leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShapesPanel", "ko", "도형이나 모델을 추가하거나 뷰포트·레이어 목록에서 선택하면 여기서 위치·회전·크기를 정확한 수치로 조정할 수 있습니다.")}</p>
+                    <p className="text-xs leading-relaxed text-fg-3">도형이나 모델을 추가하거나 뷰포트·레이어 목록에서 선택하면 여기서 위치·회전·크기를 정확한 수치로 조정할 수 있습니다.</p>
                   )}
                 </div>
                 </fieldset>

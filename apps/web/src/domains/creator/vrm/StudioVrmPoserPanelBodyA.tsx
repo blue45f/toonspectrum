@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { StudioVrmPaintMaterialControls } from "./StudioVrmPaintMaterialControls";
 /**
   type CustomPose,
@@ -247,18 +243,18 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
               <>
               {activePanelTab === "character" ? (
                 <div className="sticky -top-4 z-20 -mx-4 -mt-4 border-b border-line bg-panel/95 px-4 py-2 backdrop-blur sm:-mx-5 sm:px-5">
-                  <div role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "캐릭터 빌더 단계")} className="grid grid-cols-5 gap-1">
+                  <div role="tablist" aria-label="캐릭터 빌더 단계" className="grid grid-cols-5 gap-1">
                     {CHARACTER_PANEL_SECTIONS.map((section) => {
                       const SectionIcon = section.icon;
                       const selected = activeCharacterSection === section.id;
                       return (
                         <button
                           key={section.id}
-                          id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "en", "vrm-character-subtab-{v0}"), { v0: String(section.id) })}
+                          id={`vrm-character-subtab-${section.id}`}
                           type="button"
                           role="tab"
                           aria-selected={selected}
-                          aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "en", "vrm-character-section-{v0}"), { v0: String(section.id) })}
+                          aria-controls={`vrm-character-section-${section.id}`}
                           tabIndex={selected ? 0 : -1}
                           onKeyDown={handleCharacterTabKeyDown}
                           className={cx(
@@ -327,17 +323,17 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                       proportionRigReceipt?.headMeasurement?.source
                       ?? proportionHeadMeasurement?.source
                     ) === "eye-landmarks"
-                      ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "눈 랜드마크 기반 모델 추정")
-                      : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "모델 경계 기반 추정")
+                      ? "눈 랜드마크 기반 모델 추정"
+                      : "모델 경계 기반 추정"
                   }
                   proportionPresetNote={
                     proportionRigReceipt?.presetResolution?.clamped
-                      ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "{v0}두신 목표를 이 모델의 안전 범위에서 {v1}까지 적용했습니다."), { v0: String(proportionRigReceipt.presetResolution.targetHeadUnits), v1: String(formatStudioVrmHeadUnits(proportionRigReceipt.presetResolution.achievedHeadUnits)) })
+                      ? `${proportionRigReceipt.presetResolution.targetHeadUnits}두신 목표를 이 모델의 안전 범위에서 ${formatStudioVrmHeadUnits(proportionRigReceipt.presetResolution.achievedHeadUnits)}까지 적용했습니다.`
                       : null
                   }
                   proportionUnavailableReason={
                     proportionRigStatus === "unavailable" || proportionRigStatus === "reload-required"
-                      ? proportionRigMessage || translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "리그 준비 상태를 확인할 수 없습니다.")
+                      ? proportionRigMessage || "리그 준비 상태를 확인할 수 없습니다."
                       : null
                   }
                   semanticFaceMorphProfile={semanticFaceMorphProfile}
@@ -353,7 +349,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                     catalogueStatus={
                       avatarForgeReferenceSurfaceActive
                         ? avatarForgeReferenceCatalogue.status
-                        : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "en", "idle")
+                        : "idle"
                     }
                     catalogueUnavailableReason={
                       avatarForgeReferenceCatalogue.status === "unavailable"
@@ -377,7 +373,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
               {!hideOnCharacterSection("surface") ? <StudioVrmPaintMaterialControls runtime={texturePaintRuntime}
                 snapshot={texturePaintSnapshot} disabled={texturePaintDisabledReason.length > 0 || texturePaintStrokeActive} /> : null}
               <StudioVrmTexturePaintPanel
-                channel={texturePaintSnapshot?.channel ?? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "en", "baseColor")}
+                channel={texturePaintSnapshot?.channel ?? "baseColor"}
                 supportedChannels={texturePaintSnapshot?.supportedChannels ?? ["baseColor"]}
                 onChannelChange={(channel) => {
                   if (texturePaintDisabledReason.length > 0 || texturePaintStrokeActive) return;
@@ -392,7 +388,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                 status={texturePaintStatus}
                 restoreError={
                   texturePaintPersistenceStatus === "error"
-                    ? texturePaintPersistenceError || translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "저장된 표면 페인팅을 복원하지 못했습니다.")
+                    ? texturePaintPersistenceError || "저장된 표면 페인팅을 복원하지 못했습니다."
                     : null
                 }
                 strokeActive={texturePaintStrokeActive}
@@ -417,7 +413,8 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
               <section hidden={hideOnTab("face")}>
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Sparkles size={15} className="text-accent" aria-hidden />
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "표정")}</h3>
+                  표정
+                </h3>
                 {availableExpressionActions.length > 0 ? (
                   <div className="grid grid-cols-2 gap-2">
                     {availableExpressionActions.map((action: ExpressionAction) => (
@@ -440,12 +437,13 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                   </div>
                 ) : (
                   <p className="rounded-xl border border-dashed border-line bg-card/45 px-3 py-4 text-xs leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "이 VRM에는 사용할 수 있는 표정 프리셋이 없습니다.")}</p>
+                    이 VRM에는 사용할 수 있는 표정 프리셋이 없습니다.
+                  </p>
                 )}
 
                 {/* 표정 조합 프리셋(studio-pose-presets) — 여러 blendshape를 섞은 만화식 표정을 원클릭 적용 */}
                 <div className="mt-3 border-t border-line/45 pt-3">
-                  <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "원클릭 표정 조합 (")}{EXPRESSION_PRESETS.length})</p>
+                  <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">원클릭 표정 조합 ({EXPRESSION_PRESETS.length})</p>
                   <div className="grid grid-cols-3 gap-1.5">
                     {EXPRESSION_PRESETS.map((preset) => (
                       <button
@@ -472,9 +470,11 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
               <section hidden={hideOnTab("face")} className="rounded-xl border border-line bg-card/45 p-3">
                 <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-fg">
                   <Sliders size={14} className="text-accent" aria-hidden />
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "표정 세부 조절 (Blendshape Mix)")}</h3>
+                  표정 세부 조절 (Blendshape Mix)
+                </h3>
                 <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "각 표정 슬라이더를 조절하여 여러 표정을 믹스해 보세요.")}</p>
+                  각 표정 슬라이더를 조절하여 여러 표정을 믹스해 보세요.
+                </p>
 
                 <div className="mb-3 flex flex-wrap gap-1">
                   {[
@@ -528,7 +528,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                                     weight > 0 ? "border-accent bg-accent" : "border-line bg-card"
                                   )}
                                   aria-pressed={weight > 0}
-                                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "{v0} 켜기/끄기"), { v0: String(action.label) })}
+                                  aria-label={`${action.label} 켜기/끄기`}
                                 />
                               ) : (
                                 <input
@@ -538,7 +538,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                                   step="0.05"
                                   value={weight}
                                   disabled={!vrm}
-                                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "{v0} 표정 강도"), { v0: String(action.label) })}
+                                  aria-label={`${action.label} 표정 강도`}
                                   className="h-2 flex-1 accent-accent"
                                   onChange={(e) => updateExpressionWeight(name, Number(e.target.value))}
                                 />
@@ -552,7 +552,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                   }
 
                   return (
-                    <p className="text-center py-2 text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "이 카테고리에 해당하는 표정이 없습니다.")}</p>
+                    <p className="text-center py-2 text-[0.68rem] text-fg-3">이 카테고리에 해당하는 표정이 없습니다.</p>
                   );
                 })()}
 
@@ -568,55 +568,62 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                     }
                   }}
                 >
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "표정 믹스 초기화")}</button>
+                  표정 믹스 초기화
+                </button>
               </section>
 
               <section hidden={hideOnTab("pose")}>
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
                     <UserRound size={15} className="text-accent" aria-hidden />
-                    {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "포즈")}</h3>
+                    포즈
+                  </h3>
                   <div className="flex flex-wrap justify-end gap-1.5">
                     <button
                       type="button"
                       disabled={!vrm}
                       onClick={() => handleMirrorPose("all")}
                       className="inline-flex items-center gap-1 rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] font-bold text-fg-2 hover:bg-raised disabled:opacity-45"
-                      title={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "현재 포즈를 좌우로 반전")}
+                      title="현재 포즈를 좌우로 반전"
                     >
-                      <FlipHorizontal2 size={11} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "반전")}</button>
+                      <FlipHorizontal2 size={11} aria-hidden /> 반전
+                    </button>
                     <button
                       type="button"
                       disabled={!vrm}
                       onClick={handleCopyPose}
                       className="inline-flex items-center gap-1 rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] font-bold text-fg-2 hover:bg-raised disabled:opacity-45"
-                      title={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "클립보드로 포즈 데이터 복사")}
+                      title="클립보드로 포즈 데이터 복사"
                     >
-                      {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "복사")}</button>
+                      복사
+                    </button>
                     <button
                       type="button"
                       disabled={!vrm}
                       onClick={handlePastePose}
                       className="inline-flex items-center gap-1 rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] font-bold text-fg-2 hover:bg-raised disabled:opacity-45"
-                      title={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "클립보드 포즈 데이터 붙여넣기")}
+                      title="클립보드 포즈 데이터 붙여넣기"
                     >
-                      {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "붙여넣기")}</button>
+                      붙여넣기
+                    </button>
                     <button
                       type="button"
                       disabled={!vrm || vrmCreativeReadOnly}
                       onClick={handleSavePose}
                       className="inline-flex items-center gap-1 rounded-lg border border-accent/30 bg-accent-soft/40 px-2 py-1 text-[0.68rem] font-bold text-accent hover:bg-accent-soft disabled:opacity-45"
                     >
-                      <Sparkles size={11} /> {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "저장")}</button>
+                      <Sparkles size={11} /> 저장
+                    </button>
                   </div>
                 </div>
 
                 <div className="mb-3 rounded-xl border border-accent/25 bg-accent-soft/20 p-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-[0.7rem] font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "직접 관절 조작 · 손발 IK")}</p>
+                      <p className="text-[0.7rem] font-bold text-fg">직접 관절 조작 · 손발 IK</p>
                       <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
-                        {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "원형 관절은 끌어서 직접 회전하고, 손·발 마름모는 IK 위치, 주황색 P는 굽힘 방향을 조절합니다. 우클릭·길게 누르기로 잠글 수 있습니다.")}</p>
+                        원형 관절은 끌어서 직접 회전하고, 손·발 마름모는 IK 위치, 주황색 P는 굽힘 방향을 조절합니다. 우클릭·길게 누르기로 잠글 수 있습니다.
+                      </p>
                     </div>
                     <button
                       type="button"
@@ -633,16 +640,16 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                           : "border-line bg-card text-fg-2 hover:bg-raised",
                       )}
                     >
-                      {jointHandlesVisible ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "핸들 켜짐") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "핸들 꺼짐")}
+                      {jointHandlesVisible ? "핸들 켜짐" : "핸들 꺼짐"}
                     </button>
                   </div>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     <div>
-                      <p className="mb-1 text-[0.62rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "이동 방식")}</p>
+                      <p className="mb-1 text-[0.62rem] font-bold text-fg-3">이동 방식</p>
                       <div
                         className="flex max-w-full gap-1 overflow-x-auto"
                         role="group"
-                        aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "IK 핸들 이동 방식")}
+                        aria-label="IK 핸들 이동 방식"
                       >
                         {STUDIO_VRM_IK_DRAG_MODES.map((mode) => (
                           <button
@@ -673,11 +680,11 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                       </div>
                     </div>
                     <div>
-                      <p className="mb-1 text-[0.62rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "축 제한")}</p>
+                      <p className="mb-1 text-[0.62rem] font-bold text-fg-3">축 제한</p>
                       <div
                         className="flex max-w-full gap-1 overflow-x-auto"
                         role="group"
-                        aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "관절·IK 축 제한")}
+                        aria-label="관절·IK 축 제한"
                       >
                         {STUDIO_VRM_IK_AXIS_LOCKS.map((axis) => (
                           <button
@@ -706,7 +713,8 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                   </div>
                   {webcamActive || idleAnimation ? (
                     <p className="mt-1.5 text-[0.65rem] text-warn" role="status">
-                      {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "실시간 추적 또는 대기 애니메이션을 끄면 관절 핸들을 편집할 수 있습니다.")}</p>
+                      실시간 추적 또는 대기 애니메이션을 끄면 관절 핸들을 편집할 수 있습니다.
+                    </p>
                   ) : null}
                   {jointHandleStatus ? (
                     <p className="mt-1.5 text-[0.65rem] leading-relaxed text-fg-2" role="status" aria-live="polite">
@@ -795,7 +803,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                     onChange={(e) => setPreserveExpression(e.target.checked)}
                     className="size-3.5 accent-accent cursor-pointer"
                   />
-                  <span className="font-medium">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "포즈 적용 시 캐릭터 표정 유지")}</span>
+                  <span className="font-medium">포즈 적용 시 캐릭터 표정 유지</span>
                 </label>
 
                 <StudioVrmPhotoPoseScanner
@@ -850,18 +858,18 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                     type="search"
                     value={poseQuery}
                     onChange={(e) => setPoseQuery(e.target.value)}
-                    placeholder={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "포즈 검색 (이름 · 분위기)")}
-                    aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "포즈 검색")}
+                    placeholder="포즈 검색 (이름 · 분위기)"
+                    aria-label="포즈 검색"
                     className="w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-3 text-xs text-fg placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   />
                 </div>
                 {poseResultCount === 0 ? (
                   <p className="rounded-xl border border-dashed border-line/55 bg-card/20 py-4 text-center text-[0.68rem] italic text-fg-3">
                     {poseQ
-                      ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "“{v0}” 검색 결과가 없습니다."), { v0: String(poseQuery) })
+                      ? `“${poseQuery}” 검색 결과가 없습니다.`
                       : poseBucket === "recent"
-                        ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "최근에 쓴 포즈가 없습니다. 포즈를 선택하면 여기에 쌓입니다.")
-                        : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "이 분류에 맞는 포즈가 없습니다.")}
+                        ? "최근에 쓴 포즈가 없습니다. 포즈를 선택하면 여기에 쌓입니다."
+                        : "이 분류에 맞는 포즈가 없습니다."}
                   </p>
                 ) : null}
 
@@ -887,7 +895,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
 
                 {/* 자연 아이들 포즈 — 캐릭터 스폰 시 자동 적용되는 비대칭 컨트라포스토 대기 */}
                 <div className={cx("mt-3.5 border-t border-line/45 pt-3", poseQ && !NATURAL_IDLE_POSES.some(poseMatches) && "hidden")}>
-                  <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "자연 대기 · 스폰 포즈 (")}{poseQ ? NATURAL_IDLE_POSES.filter(poseMatches).length : NATURAL_IDLE_POSES.length})</p>
+                  <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">자연 대기 · 스폰 포즈 ({poseQ ? NATURAL_IDLE_POSES.filter(poseMatches).length : NATURAL_IDLE_POSES.length})</p>
                   <div className="grid grid-cols-2 gap-2">
                     {NATURAL_IDLE_POSES.filter(poseMatches).map((pose) => (
                       <button
@@ -911,7 +919,7 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
 
                 {/* 확장 포즈 프리셋(studio-pose-presets) — 코미Po!식 상황별 포즈 팩 */}
                 <div className={cx("mt-3.5 border-t border-line/45 pt-3", poseQ && !EXTRA_POSE_PRESETS.some(poseMatches) && "hidden")}>
-                  <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "확장 포즈 팩 (")}{poseQ ? EXTRA_POSE_PRESETS.filter(poseMatches).length : EXTRA_POSE_PRESETS.length})</p>
+                  <p className="mb-2 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">확장 포즈 팩 ({poseQ ? EXTRA_POSE_PRESETS.filter(poseMatches).length : EXTRA_POSE_PRESETS.length})</p>
                   <div className="grid grid-cols-2 gap-2">
                     {EXTRA_POSE_PRESETS.filter(poseMatches).map((pose) => (
                       <button
@@ -935,24 +943,26 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
 
                 <div className={cx("mt-3.5 space-y-2 border-t border-line/45 pt-3", poseQ && !savedPoses.some(poseMatches) && "hidden")}>
                   <div className="flex items-center justify-between">
-                    <p className="text-[0.65rem] font-bold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "내가 만든 포즈 (")}{savedPoses.length})</p>
+                    <p className="text-[0.65rem] font-bold text-fg-3 uppercase tracking-wider">내가 만든 포즈 ({savedPoses.length})</p>
                     <div className="flex gap-1">
                       <button
                         type="button"
                         onClick={handleExportPoses}
                         disabled={savedPoses.length === 0}
                         className="inline-flex items-center rounded border border-line bg-card px-1.5 py-0.5 text-[0.68rem] font-bold text-fg-2 hover:bg-raised hover:text-fg disabled:opacity-40"
-                        title={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "JSON 파일로 백업 내보내기")}
+                        title="JSON 파일로 백업 내보내기"
                       >
-                        {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "내보내기")}</button>
+                        내보내기
+                      </button>
                       <button
                         type="button"
                         onClick={handleImportPoses}
                         disabled={vrmCreativeReadOnly}
                         className="inline-flex items-center rounded border border-line bg-card px-1.5 py-0.5 text-[0.68rem] font-bold text-fg-2 hover:bg-raised hover:text-fg"
-                        title={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "JSON 포즈 파일 가져오기")}
+                        title="JSON 포즈 파일 가져오기"
                       >
-                        {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "가져오기")}</button>
+                        가져오기
+                      </button>
                     </div>
                   </div>
 
@@ -975,7 +985,8 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                   
                   {savedPoses.length === 0 ? (
                     <p className="text-center py-4 text-[0.68rem] text-fg-3/60 italic bg-card/20 rounded-xl border border-dashed border-line/55">
-                      {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "저장된 커스텀 포즈가 없습니다.")}</p>
+                      저장된 커스텀 포즈가 없습니다.
+                    </p>
                   ) : (
                     <div className="grid grid-cols-2 gap-2">
                       {savedPoses.filter((pose: CustomPose) => poseMatches(pose)).map((pose: CustomPose) => (
@@ -995,15 +1006,15 @@ export function StudioVrmPoserPanelBodyA({ h }: { h: StudioVrmPoserHost }) {
                             onClick={() => handleCustomPoseSelect(pose)}
                           >
                             <span className="block text-xs font-bold truncate pr-5">{pose.label}</span>
-                            <span className="mt-0.5 block text-[0.65rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "en", "Y-Offset: ")}{pose.yOffset.toFixed(2)}m</span>
+                            <span className="mt-0.5 block text-[0.65rem] text-fg-3">Y-Offset: {pose.yOffset.toFixed(2)}m</span>
                           </button>
                           <button
                             type="button"
                             onClick={(e) => handleDeletePose(pose.id, e)}
                             disabled={vrmCreativeReadOnly}
                             className="absolute right-2 top-2 grid size-5 place-items-center rounded-md text-fg-3 hover:bg-raised hover:text-bad"
-                            aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "포즈 삭제")}
-                            title={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyA", "ko", "삭제")}
+                            aria-label="포즈 삭제"
+                            title="삭제"
                           >
                             <Trash2 size={11} />
                           </button>

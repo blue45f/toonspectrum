@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Ban,
   CircleAlert,
@@ -96,10 +95,10 @@ export function StudioSurfaceState({
     <section
       role={role}
       aria-live={live}
-      aria-atomic={live ? translateCurrentStaticSourceText("domains.creator.StudioSurfaceState", "en", "true") : undefined}
+      aria-atomic={live ? "true" : undefined}
       aria-busy={state === "loading" ? true : undefined}
       data-studio-surface-state={state}
-      data-studio-empty-state={state === "empty" ? translateCurrentStaticSourceText("domains.creator.StudioSurfaceState", "en", "true") : undefined}
+      data-studio-empty-state={state === "empty" ? "true" : undefined}
       data-studio-surface-announcement={announce}
       className={cn(
         "relative isolate overflow-hidden rounded-2xl border text-center",

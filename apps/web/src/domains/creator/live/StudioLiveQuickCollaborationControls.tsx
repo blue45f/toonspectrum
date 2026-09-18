@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   LocateFixed,
   MessageCircle,
@@ -176,15 +175,17 @@ export function StudioLiveQuickCollaborationControls({
         >
           <LocateFixed className="shrink-0 text-accent" size={14} aria-hidden />
           <span className="min-w-0 flex-1 truncate text-[0.68rem] font-semibold text-fg">
-            {attention.participant.displayName} {translateCurrentStaticSourceText("domains.creator.live.StudioLiveQuickCollaborationControls", "ko", "위치 초대")}</span>
+            {attention.participant.displayName} 위치 초대
+          </span>
           <button
             className="min-h-9 shrink-0 rounded-md bg-accent px-2 text-[0.65rem] font-bold text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             type="button"
             onClick={acceptAttention}
           >
-            {translateCurrentStaticSourceText("domains.creator.live.StudioLiveQuickCollaborationControls", "ko", "따라가기")}</button>
+            따라가기
+          </button>
           <button
-            aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveQuickCollaborationControls", "ko", "작업 위치 초대 닫기")}
+            aria-label="작업 위치 초대 닫기"
             className="grid size-9 shrink-0 place-items-center rounded-md text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             type="button"
             onClick={() => setAttention(null)}
@@ -201,14 +202,15 @@ export function StudioLiveQuickCollaborationControls({
           onSubmit={submitCursorChat}
         >
           <label className="sr-only" htmlFor="studio-live-cursor-chat-input">
-            {translateCurrentStaticSourceText("domains.creator.live.StudioLiveQuickCollaborationControls", "ko", "커서 메시지")}</label>
+            커서 메시지
+          </label>
           <input
             ref={inputRef}
             autoComplete="off"
             className="min-h-9 min-w-0 flex-1 rounded-md bg-transparent px-2 text-xs text-fg placeholder:text-fg-3 focus-visible:outline-none sm:w-44"
             id="studio-live-cursor-chat-input"
             maxLength={STUDIO_LIVE_CURSOR_CHAT_MAX_LENGTH}
-            placeholder={translateCurrentStaticSourceText("domains.creator.live.StudioLiveQuickCollaborationControls", "ko", "커서 옆에 잠깐 표시")}
+            placeholder="커서 옆에 잠깐 표시"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
@@ -219,7 +221,7 @@ export function StudioLiveQuickCollaborationControls({
             }}
           />
           <button
-            aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveQuickCollaborationControls", "ko", "커서 메시지 보내기")}
+            aria-label="커서 메시지 보내기"
             className="grid size-9 shrink-0 place-items-center rounded-md bg-accent text-on-accent disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             disabled={!draft.trim()}
             type="submit"
@@ -227,7 +229,7 @@ export function StudioLiveQuickCollaborationControls({
             <SendHorizontal size={14} aria-hidden />
           </button>
           <button
-            aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveQuickCollaborationControls", "ko", "커서 메시지 취소")}
+            aria-label="커서 메시지 취소"
             className="grid size-9 shrink-0 place-items-center rounded-md text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             type="button"
             onClick={() => {
@@ -241,11 +243,11 @@ export function StudioLiveQuickCollaborationControls({
       ) : canChat ? (
         <button
           aria-keyshortcuts="/"
-          aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveQuickCollaborationControls", "ko", "커서 메시지 입력, 단축키 슬래시")}
+          aria-label="커서 메시지 입력, 단축키 슬래시"
           className="grid size-11 shrink-0 place-items-center rounded-lg border border-line/60 bg-card/80 text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
           data-studio-live-cursor-chat-action="true"
           disabled={!roomReady}
-          title={translateCurrentStaticSourceText("domains.creator.live.StudioLiveQuickCollaborationControls", "ko", "커서 메시지 · /")}
+          title="커서 메시지 · /"
           type="button"
           onClick={openComposer}
         >
@@ -255,10 +257,10 @@ export function StudioLiveQuickCollaborationControls({
 
       {canSpotlight ? (
         <button
-          aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveQuickCollaborationControls", "ko", "모든 팀원에게 현재 작업 위치 초대 보내기")}
+          aria-label="모든 팀원에게 현재 작업 위치 초대 보내기"
           className="grid size-11 shrink-0 place-items-center rounded-lg border border-accent/40 bg-accent-soft text-accent transition-colors hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           data-studio-live-attention-action="true"
-          title={translateCurrentStaticSourceText("domains.creator.live.StudioLiveQuickCollaborationControls", "ko", "모두 내 위치로 초대")}
+          title="모두 내 위치로 초대"
           type="button"
           onClick={() => {
             announce(

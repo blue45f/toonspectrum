@@ -1,7 +1,3 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Image as ImageIcon, LoaderCircle } from "lucide-react";
 import { Suspense, useEffect, useRef, useState, type ReactElement, type RefObject } from "react";
 
@@ -282,7 +278,7 @@ export function StudioProjectCardThumbnail({
     <div
       ref={rootRef}
       className="relative -mx-4 -mt-4 mb-4 aspect-[16/10] overflow-hidden border-b border-line bg-panel/70"
-      data-project-preview-state={preview ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectCardThumbnail", "en", "autosave") : storedThumbnail ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectCardThumbnail", "en", "stored") : phase}
+      data-project-preview-state={preview ? "autosave" : storedThumbnail ? "stored" : phase}
     >
       {preview ? (
         <div role="img" aria-label={previewLabel} className="h-full w-full bg-white">

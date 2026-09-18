@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Boxes, SlidersHorizontal } from "lucide-react";
 import { MarketBuiltinAssetPreview } from "./MarketBuiltinAssetPreview";
 
@@ -45,13 +41,13 @@ export function MarketAssetRecipePreview({
     <section
       aria-labelledby="market-asset-recipe-heading"
       aria-describedby="market-asset-recipe-note"
-      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketAssetRecipePreview", "en", "overflow-hidden rounded-xl border border-line bg-card {v0}"), { v0: String(className ?? "") })}
+      className={`overflow-hidden rounded-xl border border-line bg-card ${className ?? ""}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-panel/50 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
           <Boxes className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
           <h2 id="market-asset-recipe-heading" className="truncate text-xs font-semibold text-fg">
-            {translateCurrentStaticSourceText("domains.market.components.MarketAssetRecipePreview", "ko", "에셋 적용 정보 · ")}{recipe.name}
+            에셋 적용 정보 · {recipe.name}
           </h2>
         </div>
         <span className="inline-flex min-h-6 items-center rounded bg-raised px-2 text-[0.65rem] text-fg-2">
@@ -64,13 +60,14 @@ export function MarketAssetRecipePreview({
         : <MarketBuiltinAssetPreview runtimeRef={reference} />}
       <dl className="divide-y divide-line px-4">
         <div className="grid gap-1 py-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4">
-          <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.market.components.MarketAssetRecipePreview", "ko", "레시피 식별자")}</dt>
+          <dt className="text-xs text-fg-3">레시피 식별자</dt>
           <dd className="min-w-0 break-all font-mono text-xs text-fg">{recipe.recipeId}</dd>
         </div>
         <div className="grid gap-2 py-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4">
           <dt className="inline-flex items-center gap-1.5 text-xs text-fg-3">
             <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.market.components.MarketAssetRecipePreview", "ko", "적용 파라미터")}</dt>
+            적용 파라미터
+          </dt>
           <dd className="min-w-0">
             {parameters.length > 0 ? (
               <ul className="grid gap-1.5 sm:grid-cols-2">
@@ -84,7 +81,7 @@ export function MarketAssetRecipePreview({
                 ))}
               </ul>
             ) : (
-              <span className="text-xs text-fg-2">{translateCurrentStaticSourceText("domains.market.components.MarketAssetRecipePreview", "ko", "기본 설정으로 적용됩니다.")}</span>
+              <span className="text-xs text-fg-2">기본 설정으로 적용됩니다.</span>
             )}
           </dd>
         </div>
@@ -94,7 +91,8 @@ export function MarketAssetRecipePreview({
         id="market-asset-recipe-note"
         className="border-t border-line bg-panel/30 px-4 py-2 text-[0.68rem] leading-relaxed text-fg-3"
       >
-        {translateCurrentStaticSourceText("domains.market.components.MarketAssetRecipePreview", "ko", "이 정보는 설치 전에 적용 대상을 확인하기 위한 실제 manifest 값입니다. 최종 모습은 Studio 캔버스에서 확인하세요.")}</p>
+        이 정보는 설치 전에 적용 대상을 확인하기 위한 실제 manifest 값입니다. 최종 모습은 Studio 캔버스에서 확인하세요.
+      </p>
     </section>
   );
 }

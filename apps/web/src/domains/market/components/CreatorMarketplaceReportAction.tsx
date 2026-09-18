@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import * as Dialog from "@radix-ui/react-dialog";
 import { CheckCircle2, Flag, LoaderCircle, X } from "lucide-react";
 import { useId, useRef, useState } from "react";
@@ -147,7 +143,7 @@ function CreatorMarketplaceReportActionState({
         </Dialog.Trigger>
 
         <Dialog.Portal>
-          <div role="region" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "{v0} 신고 대화상자"), { v0: String(record.name) })}>
+          <div role="region" aria-label={`${record.name} 신고 대화상자`}>
             <Dialog.Overlay className="fixed inset-0 z-[180] bg-[oklch(0.12_0.012_70/0.68)] backdrop-blur-sm" />
             <Dialog.Content
               aria-modal="true"
@@ -169,15 +165,17 @@ function CreatorMarketplaceReportActionState({
               </span>
               <div className="min-w-0 flex-1">
                 <Dialog.Title className="font-display text-base font-bold text-fg">
-                  {record.name} {translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "신고")}</Dialog.Title>
+                  {record.name} 신고
+                </Dialog.Title>
                 <Dialog.Description className="mt-1 text-xs leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "현재 릴리스 v")}{record.resourceVersion}{translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "에 대한 신고입니다. 접수만으로 숨김 처리되지 않으며 관리자 검수 후 결정됩니다.")}</Dialog.Description>
+                  현재 릴리스 v{record.resourceVersion}에 대한 신고입니다. 접수만으로 숨김 처리되지 않으며 관리자 검수 후 결정됩니다.
+                </Dialog.Description>
               </div>
               <Dialog.Close asChild>
                 <button
                   type="button"
                   disabled={pending}
-                  aria-label={translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "신고 창 닫기")}
+                  aria-label="신고 창 닫기"
                   className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 disabled:cursor-wait disabled:opacity-45"
                 >
                   <X size={18} aria-hidden />
@@ -193,19 +191,20 @@ function CreatorMarketplaceReportActionState({
               >
                 <p className="flex items-center gap-2 font-semibold">
                   <CheckCircle2 size={17} aria-hidden />
-                  {submission.kind === "success" ? translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "신고가 접수되었습니다.") : translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "현재 패키지 주기에 이미 신고했습니다.")}
+                  {submission.kind === "success" ? "신고가 접수되었습니다." : "현재 패키지 주기에 이미 신고했습니다."}
                 </p>
                 <p className="mt-1 text-xs">
                   {submission.kind === "success"
-                    ? translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "관리자 검수 전에는 리소스 공개 상태가 달라지지 않습니다.")
-                    : translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "같은 관리자 상태와 절대 head 릴리스에 대한 중복 요청은 새 신고로 제출되지 않았습니다.")}
+                    ? "관리자 검수 전에는 리소스 공개 상태가 달라지지 않습니다."
+                    : "같은 관리자 상태와 절대 head 릴리스에 대한 중복 요청은 새 신고로 제출되지 않았습니다."}
                 </p>
               </div>
             ) : (
               <form className="mt-5 space-y-4" onSubmit={(event) => void submitReport(event)}>
                 <div>
                   <label htmlFor={reasonId} className="text-xs font-semibold text-fg-2">
-                    {translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "신고 사유")}</label>
+                    신고 사유
+                  </label>
                   <select
                     ref={reasonRef}
                     id={reasonId}
@@ -217,7 +216,7 @@ function CreatorMarketplaceReportActionState({
                     }}
                     className="mt-1.5 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
                   >
-                    <option value="">{translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "사유를 선택해 주세요")}</option>
+                    <option value="">사유를 선택해 주세요</option>
                     {REASON_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
@@ -227,7 +226,8 @@ function CreatorMarketplaceReportActionState({
                 <div>
                   <div className="flex items-center justify-between gap-3">
                     <label htmlFor={detailsId} className="text-xs font-semibold text-fg-2">
-                      {translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "상세 설명 (선택)")}</label>
+                      상세 설명 (선택)
+                    </label>
                     <span className="text-[0.68rem] tabular-nums text-fg-3" aria-hidden="true">
                       {details.length}/{CREATOR_MARKETPLACE_RESOURCE_REPORT_DETAILS_MAX_CHARACTERS}
                     </span>
@@ -241,18 +241,20 @@ function CreatorMarketplaceReportActionState({
                       setDetails(event.target.value);
                       if (submission.kind === "error") setSubmission({ kind: "idle" });
                     }}
-                    placeholder={translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "검수자가 확인할 위치, 권리 관계, 오해 소지가 있는 설명을 적어 주세요.")}
+                    placeholder="검수자가 확인할 위치, 권리 관계, 오해 소지가 있는 설명을 적어 주세요."
                     className="mt-1.5 w-full resize-y rounded-lg border border-line bg-card px-3 py-2.5 text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-2 focus:ring-accent/20"
                   />
                 </div>
 
                 {submission.kind === "error" ? (
                   <p role="alert" className="rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-xs leading-relaxed text-bad">
-                    {submission.message} {translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "입력한 내용은 유지되었습니다. 다시 제출할 때만 새 요청을 보냅니다.")}</p>
+                    {submission.message} 입력한 내용은 유지되었습니다. 다시 제출할 때만 새 요청을 보냅니다.
+                  </p>
                 ) : null}
 
                 <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "신고 계정과 사유는 운영 검수에만 사용됩니다. 허위 또는 반복 신고는 제한될 수 있습니다.")}</p>
+                  신고 계정과 사유는 운영 검수에만 사용됩니다. 허위 또는 반복 신고는 제한될 수 있습니다.
+                </p>
                 <div className="flex justify-end gap-2">
                   <Dialog.Close asChild>
                     <button
@@ -260,7 +262,8 @@ function CreatorMarketplaceReportActionState({
                       disabled={pending}
                       className="min-h-11 rounded-lg border border-line px-4 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 disabled:cursor-wait disabled:opacity-45"
                     >
-                      {translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "취소")}</button>
+                      취소
+                    </button>
                   </Dialog.Close>
                   <button
                     type="submit"
@@ -270,10 +273,10 @@ function CreatorMarketplaceReportActionState({
                   >
                     {pending ? <LoaderCircle size={14} className="animate-spin motion-reduce:animate-none" aria-hidden /> : null}
                     {pending
-                      ? translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "신고 제출 중…")
+                      ? "신고 제출 중…"
                       : submission.kind === "error"
-                        ? translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "다시 제출")
-                        : translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "신고 제출")}
+                        ? "다시 제출"
+                        : "신고 제출"}
                   </button>
                 </div>
               </form>
@@ -286,7 +289,8 @@ function CreatorMarketplaceReportActionState({
                     type="button"
                     className="min-h-11 rounded-lg border border-line px-4 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                   >
-                    {translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "ko", "확인")}</button>
+                    확인
+                  </button>
                 </Dialog.Close>
               </div>
             ) : null}
@@ -298,8 +302,8 @@ function CreatorMarketplaceReportActionState({
       {eligibilityMessage ? (
         <p
           id={eligibilityId}
-          role={settled ? translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "en", "status") : undefined}
-          aria-live={settled ? translateCurrentStaticSourceText("domains.market.components.CreatorMarketplaceReportAction", "en", "polite") : undefined}
+          role={settled ? "status" : undefined}
+          aria-live={settled ? "polite" : undefined}
           className={cx(
             "mt-1.5 leading-relaxed text-fg-3",
             compact ? "text-[0.52rem]" : "text-center text-[0.68rem]",

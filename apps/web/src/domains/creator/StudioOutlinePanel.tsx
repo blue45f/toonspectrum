@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Outline Panel
  * 선택된 이미지의 스티커 테두리(Outline) 인스펙터 — 원클릭 테두리 프리셋 +
@@ -41,16 +37,17 @@ export function StudioOutlinePanel({
     <div className="space-y-2">
       {/* 헤더 + 항등 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioOutlinePanel", "ko", "테두리 (Outline)")}</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">테두리 (Outline)</p>
         <button
           type="button"
           onClick={onReset}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.StudioOutlinePanel", "ko", "테두리를 제거하고 원본으로 되돌립니다.")}
+          title="테두리를 제거하고 원본으로 되돌립니다."
         >
           <RotateCcw className="size-3.5" />
-          {translateCurrentStaticSourceText("domains.creator.StudioOutlinePanel", "ko", "원본으로")}</button>
+          원본으로
+        </button>
       </div>
 
       {/* 원클릭 테두리 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). 스와치는 프리셋 색으로 칠한다. */}
@@ -69,7 +66,8 @@ export function StudioOutlinePanel({
 
       {/* 테두리 색 — input[type=color]는 빈 값 불가라 항상 #rrggbb를 들고 있다. */}
       <label className="flex items-center gap-2 text-xs text-fg-2">
-        {translateCurrentStaticSourceText("domains.creator.StudioOutlinePanel", "ko", "테두리 색")}<input
+        테두리 색
+        <input
           type="color"
           value={value.color}
           onChange={(e) => onPatch({ color: e.target.value })}
@@ -79,18 +77,18 @@ export function StudioOutlinePanel({
 
       {/* 굵기(width) 슬라이더 — 범위는 OUTLINE_WIDTH_RANGE에서. 0이면 항등. */}
       <StudioSliderRow
-        label={translateCurrentStaticSourceText("domains.creator.StudioOutlinePanel", "ko", "굵기 (Width)")}
+        label="굵기 (Width)"
         min={OUTLINE_WIDTH_RANGE.min}
         max={OUTLINE_WIDTH_RANGE.max}
         step={OUTLINE_WIDTH_RANGE.step}
         value={value.width}
         onChange={(n) => onPatch({ width: n })}
-        readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioOutlinePanel", "en", "{v0}px"), { v0: String(value.width) })}
+        readout={`${value.width}px`}
       />
 
       {/* 불투명도(opacity) 슬라이더 — 범위는 OUTLINE_OPACITY_RANGE에서. 0이면 항등. */}
       <StudioSliderRow
-        label={translateCurrentStaticSourceText("domains.creator.StudioOutlinePanel", "ko", "불투명도 (Opacity)")}
+        label="불투명도 (Opacity)"
         min={OUTLINE_OPACITY_RANGE.min}
         max={OUTLINE_OPACITY_RANGE.max}
         step={OUTLINE_OPACITY_RANGE.step}
@@ -100,7 +98,7 @@ export function StudioOutlinePanel({
       />
 
       {/* 안내 — 테두리는 실루엣 바깥으로 자라므로 투명 배경에서 효과가 또렷하다. */}
-      <p className="text-[0.6rem] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioOutlinePanel", "ko", "투명 배경 이미지(캐릭터·스티커)에서 잘 보여요.")}</p>
+      <p className="text-[0.6rem] leading-relaxed text-fg-3">투명 배경 이미지(캐릭터·스티커)에서 잘 보여요.</p>
     </div>
   );
 }

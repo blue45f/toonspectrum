@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertCircle,
   Check,
   ChevronDown,
@@ -197,12 +193,12 @@ function ActionFeedback({
   if (!actionError && !notice) return null;
   return (
     <div
-      aria-live={actionError ? translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "en", "assertive") : translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "en", "polite")}
+      aria-live={actionError ? "assertive" : "polite"}
       className={cn(
         "flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs leading-relaxed",
         actionError ? "border-bad/35 bg-bad/10 text-fg" : "border-good/35 bg-good/10 text-good"
       )}
-      role={actionError ? translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "en", "status")}
+      role={actionError ? "alert" : "status"}
     >
       {actionError ? (
         <AlertCircle className="mt-0.5 shrink-0" size={15} aria-hidden="true" />
@@ -259,23 +255,23 @@ function DraftCollaborationReadinessCard({
           <div className="flex flex-wrap items-center gap-2">
             <h3 id="studio-team-unsaved-title" className="text-sm font-bold text-fg">
               {isReady
-                ? translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "임시 협업 작업실이 준비됐어요")
+                ? "임시 협업 작업실이 준비됐어요"
                 : isProvisioning
-                  ? translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "임시 협업 작업실을 준비하고 있어요")
-                  : translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "저장 전 협업을 준비할 수 있어요")}
+                  ? "임시 협업 작업실을 준비하고 있어요"
+                  : "저장 전 협업을 준비할 수 있어요"}
             </h3>
             <span className="inline-flex min-h-6 items-center rounded-full border border-accent/30 bg-accent-soft px-2 font-mono text-[10px] font-semibold text-accent">
-              {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "초안 ")}{suffix}
+              초안 {suffix}
             </span>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-fg-2">
             {isReady
-              ? translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "초안 ID와 협업 관계를 유지한 채 링크 공유와 팀원 초대를 이어갈 수 있습니다.")
-              : translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "작업실을 여는 것만으로 서버 리소스를 만들지 않습니다. 처음 링크를 공유하거나 팀원을 초대할 때만 임시 작업실을 요청합니다.")}
+              ? "초안 ID와 협업 관계를 유지한 채 링크 공유와 팀원 초대를 이어갈 수 있습니다."
+              : "작업실을 여는 것만으로 서버 리소스를 만들지 않습니다. 처음 링크를 공유하거나 팀원을 초대할 때만 임시 작업실을 요청합니다."}
           </p>
           {readiness.status === "ready" ? (
             <p className="mt-2 text-[11px] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "임시 작업실 만료 예정 · ")}{formatTeamDate(readiness.room.expiresAt)}
+              임시 작업실 만료 예정 · {formatTeamDate(readiness.room.expiresAt)}
             </p>
           ) : readiness.status === "error" ? (
             <p className="mt-2 text-xs leading-relaxed text-bad" role="alert">
@@ -283,10 +279,13 @@ function DraftCollaborationReadinessCard({
             </p>
           ) : identity.persistence === "memory-only" ? (
             <p className="mt-2 text-[11px] leading-relaxed text-warn">
-              {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "브라우저 저장소를 사용할 수 없어 이 탭을 닫으면 초안 협업 ID가 바뀔 수 있습니다.")}</p>
+              브라우저 저장소를 사용할 수 없어 이 탭을 닫으면 초안 협업 ID가 바뀔 수 있습니다.
+            </p>
           ) : (
             <p className="mt-2 text-[11px] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "초안 ID는 이 브라우저와 현재 계정에만 저장되며, 서버 작업실과 초대는 아직 생성되지 않았습니다.")}</p>
+              초안 ID는 이 브라우저와 현재 계정에만 저장되며, 서버 작업실과 초대는 아직 생성되지
+              않았습니다.
+            </p>
           )}
           {!isReady && onShareRequest ? (
             <Button
@@ -306,7 +305,7 @@ function DraftCollaborationReadinessCard({
               ) : (
                 <Share2 size={15} aria-hidden="true" />
               )}
-              {isProvisioning ? translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "공유 링크 준비 중") : translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "공유 링크 만들기")}
+              {isProvisioning ? "공유 링크 준비 중" : "공유 링크 만들기"}
             </Button>
           ) : null}
         </div>
@@ -375,9 +374,12 @@ function UnsavedInvitationInbox({
             </span>
             <div className="min-w-0">
               <h3 id="studio-team-unsaved-title" className="text-sm font-bold text-fg">
-                {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "작품을 먼저 저장해 주세요")}</h3>
+                작품을 먼저 저장해 주세요
+              </h3>
               <p className="mt-1 text-xs leading-relaxed text-fg-2">
-                {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "현재 원고는 아직 서버에 저장되지 않았어요. 새 팀원을 초대하려면 이 작품을 한 번 저장해야 하지만, 다른 작품에서 받은 초대는 지금 확인할 수 있습니다.")}</p>
+                현재 원고는 아직 서버에 저장되지 않았어요. 새 팀원을 초대하려면 이 작품을 한 번
+                저장해야 하지만, 다른 작품에서 받은 초대는 지금 확인할 수 있습니다.
+              </p>
             </div>
           </div>
         </section>
@@ -391,16 +393,17 @@ function UnsavedInvitationInbox({
             <div className="flex items-center gap-2">
               <Inbox className="text-accent" size={17} aria-hidden="true" />
               <h3 id="studio-team-inbox-title" className="text-sm font-bold text-fg">
-                {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "내 팀 초대")}</h3>
+                내 팀 초대
+              </h3>
             </div>
-            <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "응답하지 않은 작품 초대만 표시합니다.")}</p>
+            <p className="mt-1 text-xs text-fg-3">응답하지 않은 작품 초대만 표시합니다.</p>
           </div>
           <button
             ref={refreshButtonRef}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "받은 팀 초대 새로고침")}
+            aria-label="받은 팀 초대 새로고침"
             className="grid size-11 shrink-0 place-items-center rounded-lg border border-line text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 disabled:cursor-not-allowed disabled:opacity-45"
             disabled={invitationsLoading || busyAction != null}
-            title={translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "새로고침")}
+            title="새로고침"
             type="button"
             onClick={onRetry}
           >
@@ -415,7 +418,7 @@ function UnsavedInvitationInbox({
         {invitationsLoading ? (
           <div
             aria-busy="true"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "받은 팀 초대 불러오는 중")}
+            aria-label="받은 팀 초대 불러오는 중"
             className="mt-3 space-y-3"
           >
             {[0, 1].map((index) => (
@@ -428,22 +431,24 @@ function UnsavedInvitationInbox({
         ) : invitationsError ? (
           <div className="mt-3 py-6 text-center" role="alert">
             <AlertCircle className="mx-auto text-bad" size={24} aria-hidden="true" />
-            <p className="mt-2 text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "초대 목록을 열지 못했어요")}</p>
+            <p className="mt-2 text-sm font-semibold text-fg">초대 목록을 열지 못했어요</p>
             <p className="mx-auto mt-1 max-w-xs text-xs leading-relaxed text-fg-2">
               {invitationsError}
             </p>
             <Button className="mt-4 min-h-11" size="sm" type="button" variant="outline" onClick={onRetry}>
-              <RefreshCw size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "다시 시도")}</Button>
+              <RefreshCw size={15} aria-hidden="true" /> 다시 시도
+            </Button>
           </div>
         ) : invitations.length === 0 ? (
           <div className="py-7 text-center">
             <Inbox className="mx-auto text-fg-3" size={25} aria-hidden="true" />
-            <p className="mt-2 text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "도착한 초대가 없어요")}</p>
+            <p className="mt-2 text-sm font-semibold text-fg">도착한 초대가 없어요</p>
             <p className="mt-1 text-xs leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "새 초대를 받으면 작품과 역할을 이곳에서 확인할 수 있습니다.")}</p>
+              새 초대를 받으면 작품과 역할을 이곳에서 확인할 수 있습니다.
+            </p>
           </div>
         ) : (
-          <ul aria-label={translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "받은 작품 팀 초대")} className="mt-2 divide-y divide-line">
+          <ul aria-label="받은 작품 팀 초대" className="mt-2 divide-y divide-line">
             {invitations.map((invitation) => {
               const accepting = busyAction === inboxBusyKey(invitation.workId, "accept");
               const declining = busyAction === inboxBusyKey(invitation.workId, "decline");
@@ -461,9 +466,11 @@ function UnsavedInvitationInbox({
                         </span>
                       </div>
                       <p className="mt-1 truncate text-xs text-fg-2">
-                        {invitation.owner.name} {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "· 작품 소유자")}</p>
+                        {invitation.owner.name} · 작품 소유자
+                      </p>
                       <time className="mt-1 block text-xs text-fg-3" dateTime={invitation.invitedAt}>
-                        {formatTeamDate(invitation.invitedAt)} {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "초대")}</time>
+                        {formatTeamDate(invitation.invitedAt)} 초대
+                      </time>
                     </div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 pl-[3.25rem]">
@@ -475,8 +482,8 @@ function UnsavedInvitationInbox({
                       aria-busy={accepting}
                       aria-label={
                         accepting
-                          ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "{v0} 팀 초대 수락 처리 중"), { v0: String(invitation.workTitle) })
-                          : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "{v0} 팀 초대 수락"), { v0: String(invitation.workTitle) })
+                          ? `${invitation.workTitle} 팀 초대 수락 처리 중`
+                          : `${invitation.workTitle} 팀 초대 수락`
                       }
                       className="min-h-11"
                       disabled={busyAction != null}
@@ -491,13 +498,14 @@ function UnsavedInvitationInbox({
                       ) : (
                         <Check size={15} aria-hidden="true" />
                       )}
-                      {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "수락")}</Button>
+                      수락
+                    </Button>
                     <Button
                       aria-busy={declining}
                       aria-label={
                         declining
-                          ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "{v0} 팀 초대 거절 처리 중"), { v0: String(invitation.workTitle) })
-                          : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "{v0} 팀 초대 거절"), { v0: String(invitation.workTitle) })
+                          ? `${invitation.workTitle} 팀 초대 거절 처리 중`
+                          : `${invitation.workTitle} 팀 초대 거절`
                       }
                       className="min-h-11"
                       disabled={busyAction != null}
@@ -513,7 +521,8 @@ function UnsavedInvitationInbox({
                       ) : (
                         <XCircle size={15} aria-hidden="true" />
                       )}
-                      {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "거절")}</Button>
+                      거절
+                    </Button>
                   </div>
                 </li>
               );
@@ -547,9 +556,11 @@ function TeamActivityDetails({
       <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-xs font-semibold text-fg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 [&::-webkit-details-marker]:hidden">
         <span className="flex items-center gap-2">
           <History className="text-accent" size={16} aria-hidden="true" />
-          {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "최근 팀 변경 기록")}</span>
+          최근 팀 변경 기록
+        </span>
         <span className="flex items-center gap-1.5 text-xs font-normal text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "소유자·관리자")}<ChevronDown
+          소유자·관리자
+          <ChevronDown
             className="transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none"
             size={15}
             aria-hidden="true"
@@ -559,12 +570,13 @@ function TeamActivityDetails({
       <div className="border-t border-line pt-3">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "서버에 기록된 최근 역할·초대 변경입니다.")}</p>
+            서버에 기록된 최근 역할·초대 변경입니다.
+          </p>
           <button
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "팀 변경 기록 새로고침")}
+            aria-label="팀 변경 기록 새로고침"
             className="grid size-11 shrink-0 place-items-center rounded-lg border border-line text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 disabled:cursor-not-allowed disabled:opacity-45"
             disabled={loading}
-            title={translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "변경 기록 새로고침")}
+            title="변경 기록 새로고침"
             type="button"
             onClick={onRefresh}
           >
@@ -577,7 +589,7 @@ function TeamActivityDetails({
         </div>
 
         {loading ? (
-          <div aria-busy="true" aria-label={translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "팀 변경 기록 불러오는 중")} className="mt-2 space-y-2">
+          <div aria-busy="true" aria-label="팀 변경 기록 불러오는 중" className="mt-2 space-y-2">
             {[0, 1, 2].map((index) => (
               <div className="h-14 animate-pulse rounded-lg bg-raised/70 motion-reduce:animate-none" key={index} />
             ))}
@@ -587,15 +599,16 @@ function TeamActivityDetails({
             <AlertCircle className="mx-auto text-bad" size={22} aria-hidden="true" />
             <p className="mt-2 text-xs leading-relaxed text-fg-2">{error}</p>
             <Button className="mt-3 min-h-11" size="sm" type="button" variant="outline" onClick={onRefresh}>
-              <RefreshCw size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "다시 시도")}</Button>
+              <RefreshCw size={15} aria-hidden="true" /> 다시 시도
+            </Button>
           </div>
         ) : activity.length === 0 ? (
           <div className="py-5 text-center">
             <History className="mx-auto text-fg-3" size={22} aria-hidden="true" />
-            <p className="mt-2 text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "아직 기록된 변경이 없어요")}</p>
+            <p className="mt-2 text-xs font-semibold text-fg-2">아직 기록된 변경이 없어요</p>
           </div>
         ) : (
-          <ol aria-label={translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "최근 팀 변경 기록")} className="mt-2 divide-y divide-line">
+          <ol aria-label="최근 팀 변경 기록" className="mt-2 divide-y divide-line">
             {activity.map((item) => (
               <li className="py-3" key={item.id}>
                 <div className="flex items-start justify-between gap-3">
@@ -616,7 +629,7 @@ function TeamActivityDetails({
                 <p className="mt-1.5 text-xs text-fg-3">
                   <span>{activityStateCopy(item.before)}</span>
                   <span aria-hidden="true"> → </span>
-                  <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "에서 ")}</span>
+                  <span className="sr-only">에서 </span>
                   <span className="text-fg-2">{activityStateCopy(item.after)}</span>
                 </p>
               </li>
@@ -718,9 +731,10 @@ export function StudioTeamPanelView({
       <div className="grid min-h-56 place-items-center px-5 py-8 text-center">
         <div className="max-w-xs">
           <UserRound className="mx-auto text-fg-3" size={28} aria-hidden="true" />
-          <h3 className="mt-3 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "로그인이 필요해요")}</h3>
+          <h3 className="mt-3 text-sm font-bold text-fg">로그인이 필요해요</h3>
           <p className="mt-1.5 text-xs leading-relaxed text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "팀 초대와 작품 권한은 로그인한 계정에 안전하게 연결됩니다.")}</p>
+            팀 초대와 작품 권한은 로그인한 계정에 안전하게 연결됩니다.
+          </p>
         </div>
       </div>
     );
@@ -747,7 +761,7 @@ export function StudioTeamPanelView({
 
   if (loading) {
     return (
-      <div aria-busy="true" aria-label={translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "팀 작업 공간 불러오는 중")} className="space-y-4 px-4 py-5">
+      <div aria-busy="true" aria-label="팀 작업 공간 불러오는 중" className="space-y-4 px-4 py-5">
         <div className="h-16 animate-pulse rounded-xl bg-raised/70 motion-reduce:animate-none" />
         <div className="space-y-2">
           {[0, 1, 2].map((index) => (
@@ -766,7 +780,7 @@ export function StudioTeamPanelView({
       <div className="grid min-h-56 place-items-center px-5 py-8 text-center" role="alert">
         <div className="max-w-xs">
           <AlertCircle className="mx-auto text-bad" size={28} aria-hidden="true" />
-          <h3 className="mt-3 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "팀 정보를 열지 못했어요")}</h3>
+          <h3 className="mt-3 text-sm font-bold text-fg">팀 정보를 열지 못했어요</h3>
           <p className="mt-1.5 text-xs leading-relaxed text-fg-2">{loadError}</p>
           <Button
             className="mt-4 min-h-11"
@@ -776,7 +790,8 @@ export function StudioTeamPanelView({
             variant="outline"
             onClick={onRetry}
           >
-            <RefreshCw size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "다시 시도")}</Button>
+            <RefreshCw size={15} aria-hidden="true" /> 다시 시도
+          </Button>
         </div>
       </div>
     );
@@ -799,14 +814,17 @@ export function StudioTeamPanelView({
             <UserPlus className="mt-0.5 shrink-0 text-accent" size={18} aria-hidden="true" />
             <div className="min-w-0 flex-1">
               <h3 id="studio-team-invitation-title" className="text-sm font-bold text-fg">
-                {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "팀 초대가 도착했어요")}</h3>
+                팀 초대가 도착했어요
+              </h3>
               <p className="mt-1 text-xs leading-relaxed text-fg-2">
-                {ROLE_COPY[snapshot.viewer.role].label} {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "권한으로 이 작품에 참여할 수 있습니다.")}</p>
+                {ROLE_COPY[snapshot.viewer.role].label} 권한으로 이 작품에 참여할 수 있습니다.
+              </p>
             </div>
           </div>
           {!invitationReady ? (
             <p className="mt-3 rounded-lg border border-warn/35 bg-warn/10 px-3 py-2 text-xs leading-relaxed text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "초대 조건이 갱신되었습니다. 패널을 닫았다가 다시 열어 최신 초대를 확인해 주세요.")}</p>
+              초대 조건이 갱신되었습니다. 패널을 닫았다가 다시 열어 최신 초대를 확인해 주세요.
+            </p>
           ) : null}
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Button
@@ -821,7 +839,8 @@ export function StudioTeamPanelView({
               ) : (
                 <Check size={15} aria-hidden="true" />
               )}
-              {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "초대 수락")}</Button>
+              초대 수락
+            </Button>
             <Button
               className="min-h-11"
               disabled={busyAction != null || !invitationReady}
@@ -830,14 +849,16 @@ export function StudioTeamPanelView({
               variant="outline"
               onClick={() => onInvitationRespond("decline")}
             >
-              <XCircle size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "초대 거절")}</Button>
+              <XCircle size={15} aria-hidden="true" /> 초대 거절
+            </Button>
           </div>
         </section>
       )}
 
       {snapshot.viewer.status === "declined" && (
         <p className="rounded-xl border border-line bg-card/70 px-3 py-3 text-xs leading-relaxed text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "이 작품의 팀 초대를 거절한 상태입니다. 다시 참여하려면 작품 관리자에게 새 초대를 요청하세요.")}</p>
+          이 작품의 팀 초대를 거절한 상태입니다. 다시 참여하려면 작품 관리자에게 새 초대를 요청하세요.
+        </p>
       )}
 
       <ActionFeedback actionError={actionError} notice={notice} />
@@ -847,21 +868,23 @@ export function StudioTeamPanelView({
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 id="studio-team-invite-title" className="text-sm font-bold text-fg">
-                {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "팀원 초대")}</h3>
-              <p className="mt-0.5 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "가입한 사용자의 ID로 초대합니다.")}</p>
+                팀원 초대
+              </h3>
+              <p className="mt-0.5 text-xs text-fg-3">가입한 사용자의 ID로 초대합니다.</p>
             </div>
             <ShieldCheck className="shrink-0 text-accent" size={18} aria-hidden="true" />
           </div>
           <form className="mt-3 space-y-2" onSubmit={onInvite}>
             <label className="block text-xs font-semibold text-fg-2" htmlFor="studio-team-invite-user-id">
-              {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "사용자 ID")}</label>
+              사용자 ID
+            </label>
             <input
               autoComplete="off"
               className={cn(CONTROL_CLASS, "w-full")}
               disabled={busyAction != null}
               id="studio-team-invite-user-id"
               maxLength={160}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "예: creator_1234")}
+              placeholder="예: creator_1234"
               spellCheck={false}
               type="text"
               value={inviteUserId}
@@ -869,7 +892,8 @@ export function StudioTeamPanelView({
             />
             <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
               <label className="sr-only" htmlFor="studio-team-invite-role">
-                {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "초대 역할")}</label>
+                초대 역할
+              </label>
               <select
                 className={cn(CONTROL_CLASS, "w-full")}
                 disabled={busyAction != null}
@@ -896,7 +920,8 @@ export function StudioTeamPanelView({
                 ) : (
                   <UserPlus size={15} aria-hidden="true" />
                 )}
-                {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "초대")}</Button>
+                초대
+              </Button>
             </div>
             <p className="text-xs leading-relaxed text-fg-3">
               <strong className="font-semibold text-fg-2">{ROLE_COPY[inviteRole].label}</strong>
@@ -915,26 +940,28 @@ export function StudioTeamPanelView({
             id="studio-team-members-title"
             tabIndex={-1}
           >
-            {canManageMembers ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "멤버 {v0}명"), { v0: String(snapshot.members.length) }) : translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "소유자와 내 정보")}
+            {canManageMembers ? `멤버 ${snapshot.members.length}명` : "소유자와 내 정보"}
           </h3>
           <span className="text-xs text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "내 역할 · ")}{ROLE_COPY[snapshot.viewer.role].label}
+            내 역할 · {ROLE_COPY[snapshot.viewer.role].label}
           </span>
         </div>
         {!canManageMembers ? (
           <p className="mt-2 text-xs leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "전체 팀 명단은 소유자와 관리자에게만 표시됩니다.")}</p>
+            전체 팀 명단은 소유자와 관리자에게만 표시됩니다.
+          </p>
         ) : null}
 
         {snapshot.members.length === 0 ? (
           <div className="py-8 text-center">
             <UsersRound className="mx-auto text-fg-3" size={26} aria-hidden="true" />
-            <p className="mt-2 text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "표시할 팀원이 없어요")}</p>
+            <p className="mt-2 text-sm font-semibold text-fg">표시할 팀원이 없어요</p>
             <p className="mt-1 text-xs text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "권한이 있다면 위 초대 양식에서 첫 팀원을 추가할 수 있습니다.")}</p>
+              권한이 있다면 위 초대 양식에서 첫 팀원을 추가할 수 있습니다.
+            </p>
           </div>
         ) : (
-          <ul className="divide-y divide-line" aria-label={translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "작품 팀원")}>
+          <ul className="divide-y divide-line" aria-label="작품 팀원">
             {snapshot.members.map((member) => {
               const canEditMember =
                 canManageMembers && !member.isOwner && member.userId !== snapshot.viewer.userId;
@@ -950,7 +977,7 @@ export function StudioTeamPanelView({
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <p className="min-w-0 truncate text-sm font-semibold text-fg">{member.name}</p>
                         {member.userId === snapshot.viewer.userId && (
-                          <span className="text-xs font-semibold text-accent">{translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "나")}</span>
+                          <span className="text-xs font-semibold text-accent">나</span>
                         )}
                         <StatusBadge status={member.status} />
                       </div>
@@ -966,14 +993,15 @@ export function StudioTeamPanelView({
                       className="mt-2 grid grid-cols-[minmax(0,1fr)_2.75rem] gap-2 pl-[3.25rem]"
                       data-team-manage-controls="true"
                     >
-                      <label className="sr-only" htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "en", "studio-team-role-{v0}"), { v0: String(member.userId) })}>
-                        {member.name} {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "역할")}</label>
+                      <label className="sr-only" htmlFor={`studio-team-role-${member.userId}`}>
+                        {member.name} 역할
+                      </label>
                       <select
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "{v0} 역할"), { v0: String(member.name) })}
+                        aria-label={`${member.name} 역할`}
                         className={cn(CONTROL_CLASS, "w-full")}
                         disabled={busyAction != null}
-                        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "en", "studio-team-role-{v0}"), { v0: String(member.userId) })}
-                        value={member.role === "owner" ? translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "en", "viewer") : member.role}
+                        id={`studio-team-role-${member.userId}`}
+                        value={member.role === "owner" ? "viewer" : member.role}
                         onChange={(event) => {
                           if (isAssignableRole(event.target.value)) {
                             onRoleChange(member.userId, event.target.value);
@@ -991,10 +1019,10 @@ export function StudioTeamPanelView({
                           if (node) removeButtonRefs.current.set(member.userId, node);
                           else removeButtonRefs.current.delete(member.userId);
                         }}
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "{v0} 팀에서 내보내기"), { v0: String(member.name) })}
+                        aria-label={`${member.name} 팀에서 내보내기`}
                         className="grid size-11 place-items-center rounded-lg border border-line text-fg-3 transition-colors hover:border-bad/45 hover:bg-bad/10 hover:text-bad focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 disabled:cursor-not-allowed disabled:opacity-45"
                         disabled={busyAction != null}
-                        title={translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "팀에서 내보내기")}
+                        title="팀에서 내보내기"
                         type="button"
                         onClick={() => onRemoveRequest(member.userId)}
                       >
@@ -1014,7 +1042,8 @@ export function StudioTeamPanelView({
                       aria-busy={isRemoving}
                     >
                       <p className="text-xs leading-relaxed text-fg">
-                        <strong className="font-semibold">{member.name}</strong> {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "님을 팀에서 내보낼까요?")}</p>
+                        <strong className="font-semibold">{member.name}</strong> 님을 팀에서 내보낼까요?
+                      </p>
                       <div className="mt-2 grid grid-cols-2 gap-2">
                         <Button
                           ref={(node) => {
@@ -1033,7 +1062,8 @@ export function StudioTeamPanelView({
                             );
                           }}
                         >
-                          {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "취소")}</Button>
+                          취소
+                        </Button>
                         <Button
                           className="min-h-11 border-bad/45 text-bad hover:bg-bad/10 hover:text-bad"
                           disabled={busyAction != null}
@@ -1043,9 +1073,9 @@ export function StudioTeamPanelView({
                           onClick={() => onRemoveConfirm(member.userId)}
                         >
                           {isRemoving ? (
-                            translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "연결 권한 회수 중…")
+                            "연결 권한 회수 중…"
                           ) : (
-                            translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "팀에서 내보내기")
+                            "팀에서 내보내기"
                           )}
                         </Button>
                       </div>
@@ -1070,7 +1100,7 @@ export function StudioTeamPanelView({
 
       <details className="group rounded-xl border border-line bg-card/35 px-3 py-2.5">
         <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-xs font-semibold text-fg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 [&::-webkit-details-marker]:hidden">
-          <span>{translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "역할별 서버 권한 안내")}</span>
+          <span>역할별 서버 권한 안내</span>
           <ChevronDown
             className="shrink-0 transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none"
             size={15}
@@ -1088,7 +1118,12 @@ export function StudioTeamPanelView({
       </details>
 
       <p className="border-t border-line pt-3 text-xs leading-relaxed text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "공유 원고 읽기와 소유자·관리자·편집자의 revision 공동 저장까지 서버 권한에 연결되었습니다. 위 같이 보기는 로그인 세션과 작품 권한을 확인한 팀 서버를 우선하며, 패널을 닫아도 캔버스 커서·접속 상태·페이지 따라가기는 유지됩니다. 연결 실패 때 사용자가 직접 선택한 경우에만 같은 출처 로컬 탭 모드로 전환됩니다. 서버 저장형 검토 댓글과 원격 페이지·요소 잠금의 실제 편집 강제는 다음 안전성 단계에서 연결합니다.")}</p>
+        공유 원고 읽기와 소유자·관리자·편집자의 revision 공동 저장까지 서버 권한에 연결되었습니다.
+        위 같이 보기는 로그인 세션과 작품 권한을 확인한 팀 서버를 우선하며, 패널을 닫아도 캔버스
+        커서·접속 상태·페이지 따라가기는 유지됩니다. 연결 실패 때 사용자가 직접 선택한 경우에만 같은
+        출처 로컬 탭 모드로 전환됩니다. 서버 저장형 검토 댓글과 원격 페이지·요소 잠금의 실제 편집
+        강제는 다음 안전성 단계에서 연결합니다.
+      </p>
     </div>
   );
 }
@@ -1628,18 +1663,20 @@ export function StudioTeamPanel({
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-accent">
               <UsersRound size={17} aria-hidden="true" />
-              <span className="text-xs font-semibold">{translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "서버 권한")}</span>
+              <span className="text-xs font-semibold">서버 권한</span>
             </div>
             <h2 className="mt-1 text-base font-bold tracking-tight text-fg" id={titleId}>
-              {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "팀 작업 공간")}</h2>
+              팀 작업 공간
+            </h2>
             <p className="mt-0.5 text-xs leading-relaxed text-fg-3" id={descriptionId}>
-              {translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "참여 작품을 열고, 받은 초대를 확인하며 멤버 역할을 관리합니다.")}</p>
+              참여 작품을 열고, 받은 초대를 확인하며 멤버 역할을 관리합니다.
+            </p>
           </div>
           <button
             ref={closeButtonRef}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "팀 작업 공간 닫기")}
+            aria-label="팀 작업 공간 닫기"
             className="grid size-11 shrink-0 place-items-center rounded-lg border border-line text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
-            title={translateCurrentStaticSourceText("domains.creator.StudioTeamPanel", "ko", "닫기")}
+            title="닫기"
             type="button"
             onClick={onClose}
           >

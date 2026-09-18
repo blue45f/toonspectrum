@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   Clock,
   PackageSearch,
@@ -48,9 +44,9 @@ function FocusSprint({ preset }: { preset: SessionPreset }) {
     <section className="rounded-2xl border border-line bg-panel p-5 sm:p-6" aria-labelledby="focus-sprint-title">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-bold tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "en", "FOCUS SPRINT")}</p>
+          <p className="text-xs font-bold tracking-[0.14em] text-accent">FOCUS SPRINT</p>
           <h2 id="focus-sprint-title" className="mt-2 text-xl font-bold text-fg">
-            {preset.minutes}{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "분 ")}{preset.label}
+            {preset.minutes}분 {preset.label}
           </h2>
           <p className="mt-2 text-sm leading-7 text-fg-2">{preset.start}</p>
         </div>
@@ -58,8 +54,8 @@ function FocusSprint({ preset }: { preset: SessionPreset }) {
       </div>
       <time
         className="mt-6 block font-display text-5xl font-bold tabular-nums tracking-tight text-fg"
-        dateTime={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "en", "PT{v0}S"), { v0: String(remaining) })}
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "남은 시간 {v0}"), { v0: String(formatTimer(remaining)) })}
+        dateTime={`PT${remaining}S`}
+        aria-label={`남은 시간 ${formatTimer(remaining)}`}
       >
         {formatTimer(remaining)}
       </time>
@@ -71,7 +67,8 @@ function FocusSprint({ preset }: { preset: SessionPreset }) {
       </div>
       {remaining === 0 && (
         <p className="mt-3 font-semibold text-good" role="status">
-          {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "스프린트 완료. 가장 읽히는 썸네일 하나를 선택하세요.")}</p>
+          스프린트 완료. 가장 읽히는 썸네일 하나를 선택하세요.
+        </p>
       )}
       <div className="mt-5 flex flex-wrap gap-2">
         <button
@@ -81,10 +78,11 @@ function FocusSprint({ preset }: { preset: SessionPreset }) {
           disabled={remaining === 0}
         >
           {running ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
-          {running ? translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "일시정지") : translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "집중 시작")}
+          {running ? "일시정지" : "집중 시작"}
         </button>
         <button type="button" className={ACTION_BUTTON} onClick={reset}>
-          <RotateCcw size={16} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "타이머 초기화")}</button>
+          <RotateCcw size={16} aria-hidden="true" /> 타이머 초기화
+        </button>
       </div>
     </section>
   );
@@ -95,34 +93,37 @@ function ResearchLaunchpad({ assetHref, bookHref }: { assetHref: string; bookHre
     <section className="rounded-2xl border border-line bg-panel p-5 sm:p-6" aria-labelledby="research-launchpad-title">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-bold tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "en", "RESEARCH LAUNCHPAD")}</p>
+          <p className="text-xs font-bold tracking-[0.14em] text-accent">RESEARCH LAUNCHPAD</p>
           <h2 id="research-launchpad-title" className="mt-2 text-xl font-bold text-fg">
-            {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "필요한 자료만 짧게 찾기")}</h2>
+            필요한 자료만 짧게 찾기
+          </h2>
         </div>
         <Zap size={20} className="text-accent" aria-hidden="true" />
       </div>
       <p className="mt-2 text-sm leading-7 text-fg-2">
-        {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "탐색이 제작을 대신하지 않도록 사물·공간과 작품 조사 경로를 분리했습니다. 외부 자료의 권리와 출처는 각 카드에서 확인하세요.")}</p>
+        탐색이 제작을 대신하지 않도록 사물·공간과 작품 조사 경로를 분리했습니다. 외부 자료의 권리와 출처는 각 카드에서 확인하세요.
+      </p>
       <div className="mt-5 grid gap-5 border-t border-line pt-5 sm:grid-cols-2">
         <article>
           <PackageSearch size={18} className="text-accent" aria-hidden="true" />
-          <h3 className="mt-3 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "사물·공간 레퍼런스")}</h3>
-          <p className="mt-1 text-xs leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "공개 미술 자료에서 오늘의 장면 요소를 찾습니다.")}</p>
-          <Link className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "en", "{v0} mt-4"), { v0: String(RESOURCE_BUTTON) })} to={assetHref}>
-            {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "창작 자료 검색 ")}<ArrowRight size={14} aria-hidden="true" />
+          <h3 className="mt-3 text-sm font-bold text-fg">사물·공간 레퍼런스</h3>
+          <p className="mt-1 text-xs leading-5 text-fg-3">공개 미술 자료에서 오늘의 장면 요소를 찾습니다.</p>
+          <Link className={`${RESOURCE_BUTTON} mt-4`} to={assetHref}>
+            창작 자료 검색 <ArrowRight size={14} aria-hidden="true" />
           </Link>
         </article>
         <article>
           <Sparkles size={18} className="text-accent" aria-hidden="true" />
-          <h3 className="mt-3 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "작품·판본 리서치")}</h3>
-          <p className="mt-1 text-xs leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "관련 키워드의 작품과 판본 메타데이터를 비교합니다.")}</p>
-          <Link className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "en", "{v0} mt-4"), { v0: String(RESOURCE_BUTTON) })} to={bookHref}>
-            {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "글로벌 판본 검색 ")}<ArrowRight size={14} aria-hidden="true" />
+          <h3 className="mt-3 text-sm font-bold text-fg">작품·판본 리서치</h3>
+          <p className="mt-1 text-xs leading-5 text-fg-3">관련 키워드의 작품과 판본 메타데이터를 비교합니다.</p>
+          <Link className={`${RESOURCE_BUTTON} mt-4`} to={bookHref}>
+            글로벌 판본 검색 <ArrowRight size={14} aria-hidden="true" />
           </Link>
         </article>
       </div>
-      <Link className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "en", "{v0} mt-5"), { v0: String(RESOURCE_BUTTON) })} to="/research">
-        {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowFocusResearch", "ko", "연구 보드 전체 열기")}</Link>
+      <Link className={`${RESOURCE_BUTTON} mt-5`} to="/research">
+        연구 보드 전체 열기
+      </Link>
     </section>
   );
 }

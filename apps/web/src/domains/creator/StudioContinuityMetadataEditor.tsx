@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useId, useState } from "react";
 
 import {
@@ -324,144 +321,146 @@ export function StudioContinuityMetadataEditor({
       aria-disabled={disabled || undefined}
     >
       <fieldset disabled={disabled}>
-        <legend className="px-1 text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "장면 설정")}</legend>
+        <legend className="px-1 text-xs font-bold text-fg">장면 설정</legend>
         <p className="mt-1 max-w-[70ch] text-[0.68rem] leading-relaxed text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "이 장면에서 명시된 사실만 적어 주세요. 이름과 상태는 공백을 정리하고 중복을 제거해 저장합니다.")}</p>
+          이 장면에서 명시된 사실만 적어 주세요. 이름과 상태는 공백을 정리하고 중복을 제거해 저장합니다.
+        </p>
 
         <div className={cn("mt-3 grid grid-cols-1 sm:grid-cols-2", compact ? "gap-2.5" : "gap-3")}>
           <div className="sm:col-span-2">
-            <FieldLabel htmlFor={charactersId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "등장 캐릭터")}</FieldLabel>
+            <FieldLabel htmlFor={charactersId}>등장 캐릭터</FieldLabel>
             <DraftTextarea
               id={charactersId}
               describedBy={charactersHelpId}
               value={formatCharacterNames(value.characterNames)}
               onValueChange={(next) => update({ characterNames: parseCharacterNames(next) })}
               canonicalize={canonicalizeCharacterDraft}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "민아, 도윤\n또는 한 줄에 한 명")}
+              placeholder={"민아, 도윤\n또는 한 줄에 한 명"}
               rows={rows}
               disabled={disabled}
             />
-            <FieldHelp id={charactersHelpId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "쉼표 또는 줄바꿈으로 구분합니다. 같은 이름은 한 번만 저장해요.")}</FieldHelp>
+            <FieldHelp id={charactersHelpId}>쉼표 또는 줄바꿈으로 구분합니다. 같은 이름은 한 번만 저장해요.</FieldHelp>
           </div>
 
           <div>
-            <FieldLabel htmlFor={locationId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "장소")}</FieldLabel>
+            <FieldLabel htmlFor={locationId}>장소</FieldLabel>
             <DraftInput
               id={locationId}
               describedBy={locationHelpId}
               value={normalizeScalar(value.location) ?? ""}
               onValueChange={(next) => update({ location: normalizeScalar(next) })}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "학교 옥상")}
+              placeholder="학교 옥상"
               disabled={disabled}
             />
-            <FieldHelp id={locationHelpId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "직전 장면과 정확히 비교할 장소 이름입니다.")}</FieldHelp>
+            <FieldHelp id={locationHelpId}>직전 장면과 정확히 비교할 장소 이름입니다.</FieldHelp>
           </div>
 
           <div>
-            <FieldLabel htmlFor={timeId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "시간")}</FieldLabel>
+            <FieldLabel htmlFor={timeId}>시간</FieldLabel>
             <DraftInput
               id={timeId}
               describedBy={timeHelpId}
               value={normalizeScalar(value.time) ?? ""}
               onValueChange={(next) => update({ time: normalizeScalar(next) })}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "방과 후")}
+              placeholder="방과 후"
               disabled={disabled}
             />
-            <FieldHelp id={timeHelpId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "예: 같은 날 아침, 사흘 뒤 밤.")}</FieldHelp>
+            <FieldHelp id={timeHelpId}>예: 같은 날 아침, 사흘 뒤 밤.</FieldHelp>
           </div>
 
           <div>
-            <FieldLabel htmlFor={costumesId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "캐릭터별 의상")}</FieldLabel>
+            <FieldLabel htmlFor={costumesId}>캐릭터별 의상</FieldLabel>
             <DraftTextarea
               id={costumesId}
               describedBy={costumesHelpId}
               value={formatNamedValues(value.costumes)}
               onValueChange={(next) => update({ costumes: parseNamedValues(next) })}
               canonicalize={canonicalizeNamedDraft}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "민아 = 교복\n도윤 = 체육복")}
+              placeholder={"민아 = 교복\n도윤 = 체육복"}
               rows={rows}
               disabled={disabled}
             />
-            <FieldHelp id={costumesHelpId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "한 줄에 이름 = 상태 형식으로 적습니다.")}</FieldHelp>
+            <FieldHelp id={costumesHelpId}>한 줄에 이름 = 상태 형식으로 적습니다.</FieldHelp>
           </div>
 
           <div>
-            <FieldLabel htmlFor={propsId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "소품별 상태")}</FieldLabel>
+            <FieldLabel htmlFor={propsId}>소품별 상태</FieldLabel>
             <DraftTextarea
               id={propsId}
               describedBy={propsHelpId}
               value={formatNamedValues(value.props)}
               onValueChange={(next) => update({ props: parseNamedValues(next) })}
               canonicalize={canonicalizeNamedDraft}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "우산 = 민아가 들고 있음\n편지 = 가방 안")}
+              placeholder={"우산 = 민아가 들고 있음\n편지 = 가방 안"}
               rows={rows}
               disabled={disabled}
             />
-            <FieldHelp id={propsHelpId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "소유자·위치·손상 여부처럼 이어져야 할 상태를 적습니다.")}</FieldHelp>
+            <FieldHelp id={propsHelpId}>소유자·위치·손상 여부처럼 이어져야 할 상태를 적습니다.</FieldHelp>
           </div>
         </div>
       </fieldset>
 
       <fieldset disabled={disabled} className={cn("border-t border-line", compact ? "mt-3 pt-3" : "mt-4 pt-4")}>
-        <legend className="px-1 text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "전환 설명")}</legend>
+        <legend className="px-1 text-xs font-bold text-fg">전환 설명</legend>
         <p className="mt-1 max-w-[70ch] text-[0.68rem] leading-relaxed text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "직전 장면과 값이 달라지는 것이 의도라면 이유를 남겨 주세요. 설명이 있는 변화는 연속성 경고에서 제외됩니다.")}</p>
+          직전 장면과 값이 달라지는 것이 의도라면 이유를 남겨 주세요. 설명이 있는 변화는 연속성 경고에서 제외됩니다.
+        </p>
 
         <div className={cn("mt-3 grid grid-cols-1 sm:grid-cols-2", compact ? "gap-2.5" : "gap-3")}>
           <div>
-            <FieldLabel htmlFor={locationTransitionId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "장소 전환 이유")}</FieldLabel>
+            <FieldLabel htmlFor={locationTransitionId}>장소 전환 이유</FieldLabel>
             <DraftInput
               id={locationTransitionId}
               describedBy={locationTransitionHelpId}
               value={normalizeScalar(value.transitionExplanations?.location) ?? ""}
               onValueChange={(next) => updateTransition({ location: normalizeScalar(next) })}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "계단을 올라 옥상으로 이동")}
+              placeholder="계단을 올라 옥상으로 이동"
               disabled={disabled}
             />
-            <FieldHelp id={locationTransitionHelpId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "장소가 바뀌지 않았다면 비워 둡니다.")}</FieldHelp>
+            <FieldHelp id={locationTransitionHelpId}>장소가 바뀌지 않았다면 비워 둡니다.</FieldHelp>
           </div>
 
           <div>
-            <FieldLabel htmlFor={timeTransitionId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "시간 전환 이유")}</FieldLabel>
+            <FieldLabel htmlFor={timeTransitionId}>시간 전환 이유</FieldLabel>
             <DraftInput
               id={timeTransitionId}
               describedBy={timeTransitionHelpId}
               value={normalizeScalar(value.transitionExplanations?.time) ?? ""}
               onValueChange={(next) => updateTransition({ time: normalizeScalar(next) })}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "다음 날 아침으로 전환")}
+              placeholder="다음 날 아침으로 전환"
               disabled={disabled}
             />
-            <FieldHelp id={timeTransitionHelpId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "시간이 바뀌지 않았다면 비워 둡니다.")}</FieldHelp>
+            <FieldHelp id={timeTransitionHelpId}>시간이 바뀌지 않았다면 비워 둡니다.</FieldHelp>
           </div>
 
           <div>
-            <FieldLabel htmlFor={costumeTransitionId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "의상 변경 이유")}</FieldLabel>
+            <FieldLabel htmlFor={costumeTransitionId}>의상 변경 이유</FieldLabel>
             <DraftTextarea
               id={costumeTransitionId}
               describedBy={costumeTransitionHelpId}
               value={formatNamedValues(value.transitionExplanations?.costumes)}
               onValueChange={(next) => updateTransition({ costumes: parseNamedValues(next) })}
               canonicalize={canonicalizeNamedDraft}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "민아 = 체육 수업을 위해 갈아입음\n도윤 = 비에 젖어 교체")}
+              placeholder={"민아 = 체육 수업을 위해 갈아입음\n도윤 = 비에 젖어 교체"}
               rows={rows}
               disabled={disabled}
             />
-            <FieldHelp id={costumeTransitionHelpId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "한 줄에 이름 = 변경 이유 형식으로 적습니다.")}</FieldHelp>
+            <FieldHelp id={costumeTransitionHelpId}>한 줄에 이름 = 변경 이유 형식으로 적습니다.</FieldHelp>
           </div>
 
           <div>
-            <FieldLabel htmlFor={propTransitionId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "소품 변경 이유")}</FieldLabel>
+            <FieldLabel htmlFor={propTransitionId}>소품 변경 이유</FieldLabel>
             <DraftTextarea
               id={propTransitionId}
               describedBy={propTransitionHelpId}
               value={formatNamedValues(value.transitionExplanations?.props)}
               onValueChange={(next) => updateTransition({ props: parseNamedValues(next) })}
               canonicalize={canonicalizeNamedDraft}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "우산 = 도윤에게 건넴\n편지 = 가방에서 꺼냄")}
+              placeholder={"우산 = 도윤에게 건넴\n편지 = 가방에서 꺼냄"}
               rows={rows}
               disabled={disabled}
             />
-            <FieldHelp id={propTransitionHelpId}>{translateCurrentStaticSourceText("domains.creator.StudioContinuityMetadataEditor", "ko", "한 줄에 이름 = 변경 이유 형식으로 적습니다.")}</FieldHelp>
+            <FieldHelp id={propTransitionHelpId}>한 줄에 이름 = 변경 이유 형식으로 적습니다.</FieldHelp>
           </div>
         </div>
       </fieldset>

@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
@@ -55,7 +54,7 @@ export function StudioRouter() {
       return <StudioEditorRoute resolution={resolution} />;
     case "composition":
       return (
-        <Suspense fallback={<StudioRouteLoading label={translateCurrentStaticSourceText("domains.creator.studio.router.StudioRouter", "ko", "AI 코믹 디렉터 세션을 여는 중...")} />}>
+        <Suspense fallback={<StudioRouteLoading label="AI 코믹 디렉터 세션을 여는 중..." />}>
           <StudioAiComicDirectorRoute key={resolution.lifecycleKey} resolution={resolution} />
         </Suspense>
       );
@@ -63,13 +62,13 @@ export function StudioRouter() {
       return <StudioPublishRoute resolution={resolution} />;
     case "lift3d":
       return (
-        <Suspense fallback={<StudioRouteLoading label={translateCurrentStaticSourceText("domains.creator.studio.router.StudioRouter", "ko", "2D → 3D 변환 작업대를 여는 중...")} />}>
+        <Suspense fallback={<StudioRouteLoading label="2D → 3D 변환 작업대를 여는 중..." />}>
           <StudioLift3dPage initialSubject={resolution.subject} />
         </Suspense>
       );
     case "companion":
       return (
-        <Suspense fallback={<StudioRouteLoading label={translateCurrentStaticSourceText("domains.creator.studio.router.StudioRouter", "ko", "Studio 보조 창을 여는 중...")} />}>
+        <Suspense fallback={<StudioRouteLoading label="Studio 보조 창을 여는 중..." />}>
           <StudioToolsCompanionPage />
         </Suspense>
       );

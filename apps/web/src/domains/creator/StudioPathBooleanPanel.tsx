@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Path Boolean Panel
  * 도형 결합(벡터 패스 불리언) 컨트롤 — 선택한 도형 2개를 합치기/빼기/교차/제외로
@@ -47,7 +46,8 @@ export function StudioPathBooleanPanel({
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
           <Combine size={12} aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.StudioPathBooleanPanel", "ko", "도형 결합")}</p>
+          도형 결합
+        </p>
         {busy && <Loader2 size={13} className="animate-spin text-accent" aria-hidden />}
       </div>
 

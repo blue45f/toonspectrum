@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { X } from "lucide-react";
 import { useEffect, useEffectEvent, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -118,7 +117,7 @@ export function StudioSceneSnapshotDialog({
           ref={closeButtonRef}
           type="button"
           onClick={onClose}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotDialog", "ko", "장면 스냅샷 닫기")}
+          aria-label="장면 스냅샷 닫기"
           className="absolute right-3 top-3 z-10 grid size-11 place-items-center rounded-xl border border-line bg-card text-fg-3 shadow-sm transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <X size={17} aria-hidden="true" />

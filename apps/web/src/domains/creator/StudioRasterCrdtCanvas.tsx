@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   forwardRef,
   useImperativeHandle,
@@ -197,7 +196,7 @@ export const StudioRasterCrdtCanvas = forwardRef<
         pointerEvents: "none",
         visibility: presentationAuthorized ? "visible" : "hidden",
       }}
-      data-studio-raster-frame-authorized={presentationAuthorized ? translateCurrentStaticSourceText("domains.creator.StudioRasterCrdtCanvas", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioRasterCrdtCanvas", "en", "false")}
+      data-studio-raster-frame-authorized={presentationAuthorized ? "true" : "false"}
     >
       <canvas
         ref={gpuCanvasRef}

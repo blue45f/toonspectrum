@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { ChevronDown } from "lucide-react";
 import { forwardRef, type CSSProperties } from "react";
 
@@ -107,7 +106,7 @@ export const StudioColorTrigger = forwardRef<HTMLButtonElement, StudioColorTrigg
               {displayValue}
             </span>
             <span className="block truncate text-[0.56rem] font-medium text-fg-3">
-              {mixed ? translateCurrentStaticSourceText("domains.creator.StudioColorTrigger", "ko", "여러 색") : isNone ? translateCurrentStaticSourceText("domains.creator.StudioColorTrigger", "ko", "적용 안 함") : translateCurrentStaticSourceText("domains.creator.StudioColorTrigger", "ko", "색상 편집")}
+              {mixed ? "여러 색" : isNone ? "적용 안 함" : "색상 편집"}
             </span>
           </span>
           <ChevronDown

@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 
 import { studioToolSearchTerms } from "../studio-tool-search";
@@ -96,22 +92,22 @@ export function StudioSubToolPalette({
   };
 
   return (
-    <section data-studio-subtool-palette="true" aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "빠른 브러시 선택")} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "min-w-0 rounded-xl border border-line bg-card text-fg-2 {v0}"), { v0: String(className) })}>
+    <section data-studio-subtool-palette="true" aria-label="빠른 브러시 선택" className={`min-w-0 rounded-xl border border-line bg-card text-fg-2 ${className}`}>
       <div className="space-y-2 border-b border-line p-2.5">
         <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "빠른 브러시")}</span>
-          <span className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "대표 ")}{allTools.length}{translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "개")}</span>
+          <span className="font-semibold text-fg">빠른 브러시</span>
+          <span className="text-fg-3">대표 {allTools.length}개</span>
         </div>
         <div className="relative">
           <input
             ref={searchRef}
             type="search"
-            aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "빠른 브러시 검색")}
-            aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "{v0}-scope"), { v0: String(id) })}
+            aria-label="빠른 브러시 검색"
+            aria-describedby={`${id}-scope`}
             value={query}
-            placeholder={translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "이름·용도 검색 (예: 명암, G펜)")}
+            placeholder="이름·용도 검색 (예: 명암, G펜)"
             autoComplete="off"
-            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "min-h-11 w-full min-w-0 rounded-lg border border-line bg-panel py-2 pl-3 pr-12 text-xs text-fg placeholder:text-fg-3 {v0}"), { v0: String(FOCUS) })}
+            className={`min-h-11 w-full min-w-0 rounded-lg border border-line bg-panel py-2 pl-3 pr-12 text-xs text-fg placeholder:text-fg-3 ${FOCUS}`}
             onChange={(event) => { setQuery(event.target.value); setFocusedToolId(null); }}
             onKeyDown={(event) => {
               if (event.nativeEvent.isComposing) return;
@@ -122,28 +118,28 @@ export function StudioSubToolPalette({
               }
             }}
           />
-          {query ? <button type="button" onClick={clearQuery} aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "브러시 검색 지우기")} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "absolute right-0 top-0 grid min-h-11 min-w-11 place-items-center rounded-lg text-xs text-fg-3 hover:text-fg {v0}"), { v0: String(FOCUS) })}>{translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "지움")}</button> : null}
+          {query ? <button type="button" onClick={clearQuery} aria-label="브러시 검색 지우기" className={`absolute right-0 top-0 grid min-h-11 min-w-11 place-items-center rounded-lg text-xs text-fg-3 hover:text-fg ${FOCUS}`}>지움</button> : null}
         </div>
-        <p id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "{v0}-scope"), { v0: String(id) })} className="text-[0.65rem] leading-relaxed text-fg-3">
-          {searching ? translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "전체 대표 도구에서 검색합니다.") : translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "획 특징 예시와 용도로 선택하세요.")}
+        <p id={`${id}-scope`} className="text-[0.65rem] leading-relaxed text-fg-3">
+          {searching ? "전체 대표 도구에서 검색합니다." : "획 특징 예시와 용도로 선택하세요."}
         </p>
       </div>
 
       {!searching ? (
-        <div ref={tabsRef} role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "서브 도구 분류")} className="grid grid-cols-3 gap-1 border-b border-line p-1.5">
+        <div ref={tabsRef} role="tablist" aria-label="서브 도구 분류" className="grid grid-cols-3 gap-1 border-b border-line p-1.5">
           {categories.map((group, index) => (
             <button
               key={group.id}
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "{v0}-tab-{v1}"), { v0: String(id), v1: String(group.id) })}
+              id={`${id}-tab-${group.id}`}
               type="button"
               role="tab"
               aria-selected={activeCategory === group.id}
-              aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "{v0}-panel"), { v0: String(id) })}
+              aria-controls={`${id}-panel`}
               tabIndex={group.id === tabStopId ? 0 : -1}
               onFocus={() => setFocusedTabId(group.id)}
               onKeyDown={(event) => handleTabKey(event, index)}
               onClick={() => { setFocusedToolId(null); onCategoryChange?.(group.id); }}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "min-h-11 min-w-0 rounded-lg px-1 py-2 text-xs transition-colors {v0} {v1}"), { v0: String(FOCUS), v1: String(activeCategory === group.id ? "bg-accent-soft font-semibold text-accent" : "text-fg-3 hover:bg-raised hover:text-fg") })}
+              className={`min-h-11 min-w-0 rounded-lg px-1 py-2 text-xs transition-colors ${FOCUS} ${activeCategory === group.id ? "bg-accent-soft font-semibold text-accent" : "text-fg-3 hover:bg-raised hover:text-fg"}`}
             >
               {group.label}
             </button>
@@ -151,11 +147,11 @@ export function StudioSubToolPalette({
         </div>
       ) : null}
 
-      <div id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "{v0}-panel"), { v0: String(id) })} role={searching || !category ? translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "region") : translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "tabpanel")} aria-labelledby={!searching && category ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "{v0}-tab-{v1}"), { v0: String(id), v1: String(category.id) }) : undefined} aria-label={searching || !category ? translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "빠른 브러시 검색 결과") : undefined}>
+      <div id={`${id}-panel`} role={searching || !category ? "region" : "tabpanel"} aria-labelledby={!searching && category ? `${id}-tab-${category.id}` : undefined} aria-label={searching || !category ? "빠른 브러시 검색 결과" : undefined}>
         <p role="status" aria-live="polite" aria-atomic="true" className="px-3 pt-2 text-[0.65rem] text-fg-3">
-          {searching ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "검색 결과 {v0}개"), { v0: String(currentTools.length) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "{v0} · {v1}개"), { v0: String(category?.label ?? "선택한 분류"), v1: String(currentTools.length) })}
+          {searching ? `검색 결과 ${currentTools.length}개` : `${category?.label ?? "선택한 분류"} · ${currentTools.length}개`}
         </p>
-        <div ref={containerRef} role="listbox" aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "서브 도구")} className="max-h-80 space-y-1 overflow-y-auto overscroll-contain p-2">
+        <div ref={containerRef} role="listbox" aria-label="서브 도구" className="max-h-80 space-y-1 overflow-y-auto overscroll-contain p-2">
           {currentTools.map((tool, index) => {
             const selected = activeSubToolId === tool.id;
             return (
@@ -163,29 +159,29 @@ export function StudioSubToolPalette({
                 key={tool.id}
                 role="option"
                 aria-label={tool.name}
-                aria-describedby={tool.hint ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "{v0}-hint-{v1}"), { v0: String(id), v1: String(tool.id) }) : undefined}
+                aria-describedby={tool.hint ? `${id}-hint-${tool.id}` : undefined}
                 aria-selected={selected}
                 tabIndex={tool.id === toolStopId ? 0 : -1}
                 onFocus={() => setFocusedToolId(tool.id)}
                 onClick={() => onSelectSubTool(tool.id)}
                 onKeyDown={(event) => handleToolKey(event, index)}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "flex min-h-14 cursor-pointer select-none items-center gap-2 rounded-lg border p-2 transition-colors {v0} {v1}"), { v0: String(FOCUS), v1: String(selected ? "border-accent/60 bg-accent-soft/60 text-accent" : "border-transparent hover:border-line hover:bg-raised") })}
+                className={`flex min-h-14 cursor-pointer select-none items-center gap-2 rounded-lg border p-2 transition-colors ${FOCUS} ${selected ? "border-accent/60 bg-accent-soft/60 text-accent" : "border-transparent hover:border-line hover:bg-raised"}`}
               >
                 <StudioSubToolPreview brushId={tool.id} />
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-semibold leading-snug">{tool.name}</span>
-                  {tool.hint ? <span id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "en", "{v0}-hint-{v1}"), { v0: String(id), v1: String(tool.id) })} className="mt-0.5 block text-[0.65rem] leading-relaxed text-fg-3">{tool.hint}</span> : null}
+                  {tool.hint ? <span id={`${id}-hint-${tool.id}`} className="mt-0.5 block text-[0.65rem] leading-relaxed text-fg-3">{tool.hint}</span> : null}
                 </span>
                 {selected ? <span aria-hidden className="shrink-0 text-sm">✓</span> : null}
                 {tool.shortcut ? <span className="rounded border border-line bg-raised px-1.5 py-0.5 text-[0.65rem] text-fg-3">{tool.shortcut}</span> : null}
               </div>
             );
           })}
-          {!currentTools.length ? <div className="p-4 text-center text-xs leading-relaxed text-fg-3">{searching ? translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "일치하는 대표 도구가 없습니다. 다른 표현은 전체 라이브러리에서 찾을 수 있습니다.") : translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "도구가 없습니다.")}</div> : null}
+          {!currentTools.length ? <div className="p-4 text-center text-xs leading-relaxed text-fg-3">{searching ? "일치하는 대표 도구가 없습니다. 다른 표현은 전체 라이브러리에서 찾을 수 있습니다." : "도구가 없습니다."}</div> : null}
         </div>
       </div>
       <p className="border-t border-line px-3 py-2 text-[0.65rem] leading-relaxed text-fg-3">
-        {allTools.some((tool) => tool.id === activeSubToolId) ? translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "세부 변형은 전체 라이브러리에서 선택할 수 있습니다.") : translateCurrentStaticSourceText("domains.creator.brush.StudioSubToolPalette", "ko", "현재 브러시는 전체 라이브러리의 항목입니다. 선택은 그대로 유지됩니다.")}
+        {allTools.some((tool) => tool.id === activeSubToolId) ? "세부 변형은 전체 라이브러리에서 선택할 수 있습니다." : "현재 브러시는 전체 라이브러리의 항목입니다. 선택은 그대로 유지됩니다."}
       </p>
     </section>
   );

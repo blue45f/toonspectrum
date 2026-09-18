@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 // 창작 챌린지 — 진행중 주제 카드(D-day) + 챌린지별 참여작 그리드 (툰스푼 창작 작업실 스타일).
 import { useFx } from "@toonspectrum/core/fx";
 import { ArrowLeft, CalendarClock, PenLine, Sparkles, Trophy, Users } from "lucide-react";
@@ -34,13 +31,15 @@ function DdayChip({ endsAt }: { endsAt: string | null }) {
   if (dday == null) {
     return (
       <span className="inline-flex items-center gap-1 rounded-md border border-line bg-raised px-1.5 py-0.5 text-[0.7rem] font-medium leading-none text-fg-2">
-        <CalendarClock size={11} /> {translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "상시")}</span>
+        <CalendarClock size={11} /> 상시
+      </span>
     );
   }
   if (dday < 0) {
     return (
       <span className="inline-flex items-center rounded-md border border-line bg-raised px-1.5 py-0.5 text-[0.7rem] font-medium leading-none text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "종료")}</span>
+        종료
+      </span>
     );
   }
   const urgent = dday <= 3;
@@ -54,7 +53,7 @@ function DdayChip({ endsAt }: { endsAt: string | null }) {
       )}
     >
       <CalendarClock size={11} />
-      {dday === 0 ? translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "오늘 마감") : `D-${dday}`}
+      {dday === 0 ? "오늘 마감" : `D-${dday}`}
     </span>
   );
 }
@@ -84,7 +83,7 @@ function ChallengeCard({
       <div className="flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-accent">
           <Trophy size={12} className="transition-transform duration-200 ease-out-expo group-hover:-rotate-6 group-hover:scale-110" />
-          {challenge.state === "ended" ? translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "지난 챌린지") : translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "주간 챌린지")}
+          {challenge.state === "ended" ? "지난 챌린지" : "주간 챌린지"}
         </span>
         <DdayChip endsAt={challenge.endsAt} />
       </div>
@@ -92,7 +91,7 @@ function ChallengeCard({
       <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-fg-3">{challenge.theme}</p>
       <span className="mt-3 inline-flex items-center gap-1 text-[0.72rem] text-fg-2">
         <Users size={12} />
-        {translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "참여작 ")}<span className="numeral font-semibold">{formatCount(challenge.entries)}</span>
+        참여작 <span className="numeral font-semibold">{formatCount(challenge.entries)}</span>
       </span>
     </button>
   );
@@ -179,7 +178,8 @@ export function CreateChallengesPage() {
         className="mb-5 inline-flex items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg"
       >
         <ArrowLeft size={15} />
-        {translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "창작 게시판")}</Link>
+        창작 게시판
+      </Link>
 
       <header
         className="sheen-sweep relative mb-7 overflow-hidden rounded-2xl border border-line bg-panel/45 p-5 surface-hl shadow-lg shadow-black/15 sm:p-6"
@@ -194,19 +194,23 @@ export function CreateChallengesPage() {
         <div className="relative">
           <p className="eyebrow flex items-center gap-2 text-accent">
             <span aria-hidden className="pulse-dot shrink-0" />
-            <Sparkles size={14} /> {translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "en", "CREATOR CHALLENGE")}</p>
+            <Sparkles size={14} /> CREATOR CHALLENGE
+          </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
             <ShimmerTitle as="span" particleCount={22} particleSpread={1.2}>
-              {translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "창작 챌린지")}</ShimmerTitle>
+              창작 챌린지
+            </ShimmerTitle>
           </h1>
           <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "매주 새로운 주제로 함께 그리는 창작 이벤트. ‘스튜디오에서 참여하기’를 누르면 챌린지가 자동 연결된 상태로 작품을 만들고 바로 게시할 수 있어요.")}</p>
+            매주 새로운 주제로 함께 그리는 창작 이벤트. ‘스튜디오에서 참여하기’를 누르면 챌린지가
+            자동 연결된 상태로 작품을 만들고 바로 게시할 수 있어요.
+          </p>
         </div>
       </header>
 
       {error ? (
         <ErrorState
-          title={translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "챌린지를 불러오지 못했습니다.")}
+          title="챌린지를 불러오지 못했습니다."
           message={error}
           onRetry={() => setReloadKey((value) => value + 1)}
         />
@@ -235,8 +239,8 @@ export function CreateChallengesPage() {
             <Trophy size={26} />
             <Sparkles size={12} className="pf-sparkle absolute -right-1 -top-1 text-warn" />
           </span>
-          <p className="relative text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "진행 중인 챌린지가 없습니다.")}</p>
-          <p className="relative mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "새로운 주간 챌린지가 곧 열립니다.")}</p>
+          <p className="relative text-sm font-medium text-fg">진행 중인 챌린지가 없습니다.</p>
+          <p className="relative mt-1 text-xs text-fg-3">새로운 주간 챌린지가 곧 열립니다.</p>
         </div>
       ) : (
         <>
@@ -259,7 +263,8 @@ export function CreateChallengesPage() {
               <div className="mb-4 flex flex-wrap items-center gap-3">
                 <h2 className="flex items-center gap-1.5 text-base font-bold text-fg">
                   <Trophy size={16} className="text-accent" />
-                  {selected.title} {translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "참여작")}<CountUp
+                  {selected.title} 참여작
+                  <CountUp
                     key={`${selected.id}:${selected.entries}`}
                     value={selected.entries}
                     duration={0.7}
@@ -279,7 +284,8 @@ export function CreateChallengesPage() {
                   className={buttonClass({ size: "sm", variant: "solid", className: "ml-auto gap-1.5 shadow-lg shadow-accent/25" })}
                 >
                   <PenLine size={14} />
-                  {translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "스튜디오에서 참여하기")}</Link>
+                  스튜디오에서 참여하기
+                </Link>
               </div>
               {selected.theme && (
                 <p className="mb-4 rounded-xl border border-line bg-card/50 px-3.5 py-3 text-sm leading-relaxed text-fg-2">
@@ -302,8 +308,8 @@ export function CreateChallengesPage() {
                     <PenLine size={24} />
                     <Sparkles size={12} className="pf-sparkle absolute -right-1 -top-1 text-warn" />
                   </span>
-                  <p className="relative text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "아직 참여작이 없습니다.")}</p>
-                  <p className="relative mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "첫 번째 참여자가 되어 보세요!")}</p>
+                  <p className="relative text-sm font-medium text-fg">아직 참여작이 없습니다.</p>
+                  <p className="relative mt-1 text-xs text-fg-3">첫 번째 참여자가 되어 보세요!</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -318,7 +324,7 @@ export function CreateChallengesPage() {
           {/* 종료된 챌린지 */}
           {ended.length > 0 && (
             <section className="mt-10">
-              <h2 className="mb-3 text-sm font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.CreateChallengesPage", "ko", "지난 챌린지")}</h2>
+              <h2 className="mb-3 text-sm font-bold text-fg-2">지난 챌린지</h2>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {ended.map((challenge) => (
                   <ChallengeCard

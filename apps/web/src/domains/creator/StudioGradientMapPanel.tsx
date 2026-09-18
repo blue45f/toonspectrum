@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Gradient Map Panel
  * 선택된 이미지의 그라디언트 맵(Gradient Map) 보정 인스펙터 — 색감 프리셋 + 스톱 색 편집.
@@ -52,16 +48,17 @@ export function StudioGradientMapPanel({
     <div className="space-y-2">
       {/* 헤더 + 기본(흑백) 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioGradientMapPanel", "ko", "그라디언트 맵")}</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">그라디언트 맵</p>
         <button
           type="button"
           onClick={onReset}
           disabled={isDefault}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.StudioGradientMapPanel", "ko", "그라디언트 맵을 기본 흑백 매핑으로 되돌립니다.")}
+          title="그라디언트 맵을 기본 흑백 매핑으로 되돌립니다."
         >
           <RotateCcw className="size-3.5" />
-          {translateCurrentStaticSourceText("domains.creator.StudioGradientMapPanel", "ko", "원본으로")}</button>
+          원본으로
+        </button>
       </div>
 
       {/* 현재 매핑 라이브 프리뷰 — value.stops로 그린 가로 그라디언트 바. */}
@@ -100,7 +97,7 @@ export function StudioGradientMapPanel({
               value={stop.color}
               onChange={(e) => onEditStopColor(i, e.target.value)}
               className="size-7 cursor-pointer rounded border border-line bg-card p-0"
-              title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioGradientMapPanel", "ko", "스톱 {v0} 색 ({v1}%)"), { v0: String(i + 1), v1: String(Math.round(stop.pos * 100)) })}
+              title={`스톱 ${i + 1} 색 (${Math.round(stop.pos * 100)}%)`}
             />
             <span className="text-[10px] tabular-nums text-fg-3">{Math.round(stop.pos * 100)}%</span>
           </label>

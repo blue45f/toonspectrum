@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef, useState } from "react";
 import { downloadBlob } from "../export/studio-export";
 import type { StudioVrmTexturePaintRuntime } from "./studio-vrm-texture-paint-runtime";
@@ -33,10 +30,10 @@ export function StudioVrmTextureExportButton({ runtime, disabled }: {
   return <div className="flex min-w-0 flex-wrap items-center gap-2">
     <button type="button" disabled={disabled || !runtime || busy} onClick={() => { void run(); }}
       className="min-h-11 rounded-lg border border-line bg-card px-3 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-45">
-      {busy ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmTextureExportButton", "ko", "텍스처 내보내는 중…") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmTextureExportButton", "ko", "텍스처 ZIP 내보내기")}
+      {busy ? "텍스처 내보내는 중…" : "텍스처 ZIP 내보내기"}
     </button>
-    {busy ? <button type="button" onClick={() => active.current?.abort()} aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmTextureExportButton", "ko", "텍스처 내보내기 취소")}
-      className="min-h-11 rounded-lg border border-line px-3 text-xs focus-visible:outline-2 focus-visible:outline-accent">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmTextureExportButton", "ko", "취소")}</button> : null}
+    {busy ? <button type="button" onClick={() => active.current?.abort()} aria-label="텍스처 내보내기 취소"
+      className="min-h-11 rounded-lg border border-line px-3 text-xs focus-visible:outline-2 focus-visible:outline-accent">취소</button> : null}
     {error ? <p role="alert" className="basis-full text-xs text-bad">{error}</p> : null}
   </div>;
 }

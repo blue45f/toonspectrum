@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, PencilLine } from "lucide-react";
 import { useId, type MouseEventHandler, type ReactElement } from "react";
 
@@ -32,8 +28,8 @@ export function StudioWorkspaceRecommendation({
       className="rounded-xl border border-accent/35 bg-accent-soft/25 p-3"
     >
       <div className="mb-2 flex items-center gap-1.5 text-[0.6875rem] font-bold text-accent">
-        <span className="rounded-full bg-accent px-2 py-0.5 text-on-accent">{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRecommendation", "ko", "처음이라면 추천")}</span>
-        <span>{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRecommendation", "ko", "언제든 다른 작업공간으로 바꿀 수 있어요")}</span>
+        <span className="rounded-full bg-accent px-2 py-0.5 text-on-accent">처음이라면 추천</span>
+        <span>언제든 다른 작업공간으로 바꿀 수 있어요</span>
       </div>
       <div className="flex min-w-0 items-start gap-2.5">
         <span className="grid size-9 shrink-0 place-items-center rounded-md border border-accent/25 bg-panel text-accent">
@@ -57,7 +53,7 @@ export function StudioWorkspaceRecommendation({
       <button
         type="button"
         onClick={onSelect}
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceRecommendation", "ko", "{v0} 작업공간으로 전환"), { v0: String(workspace.name) })}
+        aria-label={`${workspace.name} 작업공간으로 전환`}
         data-workspace-recommendation-action="true"
         data-workspace-id={workspace.id}
         className={cn(

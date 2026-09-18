@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Archive,
   ChevronDown,
   ExternalLink,
@@ -228,9 +224,10 @@ export function CreatorCommunityPublicationPanel({
         aria-expanded={open}        className="flex w-full items-center gap-2 px-3.5 py-3 text-left text-xs font-medium text-fg-2 transition-colors hover:text-fg"
       >
         <Archive size={14} className="text-accent" />
-        {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "작품 공개·포트폴리오 관리")}<span className="ml-auto hidden text-[0.7rem] text-fg-3 sm:inline">
+        작품 공개·포트폴리오 관리
+        <span className="ml-auto hidden text-[0.7rem] text-fg-3 sm:inline">
           {CREATOR_COMMUNITY_KIND_LABEL[metadata.kind]} · {CREATOR_COMMUNITY_PROVENANCE_LABEL[metadata.provenance]}
-          {metadata.portfolio ? translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", " · 포트폴리오") : ""}
+          {metadata.portfolio ? " · 포트폴리오" : ""}
         </span>
         <ChevronDown
           size={14}
@@ -244,14 +241,17 @@ export function CreatorCommunityPublicationPanel({
           <div className="rounded-xl border border-accent/25 bg-accent-soft/20 p-3 text-xs leading-relaxed text-fg-2">
             <p className="flex items-center gap-1.5 font-semibold text-fg">
               <ShieldCheck size={14} className="text-accent" />
-              {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "비공개 원본과 공개 릴리스는 분리됩니다")}</p>
+              비공개 원본과 공개 릴리스는 분리됩니다
+            </p>
             <p className="mt-1 text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "아래 설정을 저장해도 원본 공개 범위는 바뀌지 않습니다. 공개 발행은 스튜디오의 게시 설정에서 명시적으로 선택하고, 여기서는 현재 저장본의 불변 릴리스와 외부 연재 이력을 관리합니다.")}</p>
+              아래 설정을 저장해도 원본 공개 범위는 바뀌지 않습니다. 공개 발행은 스튜디오의 게시 설정에서 명시적으로 선택하고, 여기서는 현재 저장본의 불변 릴리스와 외부 연재 이력을 관리합니다.
+            </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-xs text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "작품 유형")}<select
+              작품 유형
+              <select
                 value={metadata.kind}
                 onChange={(event) => setMetadata((current) => ({
                   ...current,
@@ -265,7 +265,8 @@ export function CreatorCommunityPublicationPanel({
               </select>
             </label>
             <label className="flex flex-col gap-1 text-xs text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "제작 방식 공개")}<select
+              제작 방식 공개
+              <select
                 value={metadata.provenance}
                 onChange={(event) => setMetadata((current) => ({
                   ...current,
@@ -290,7 +291,8 @@ export function CreatorCommunityPublicationPanel({
                   portfolio: event.target.checked,
                 }))}
               />
-              {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "대표 포트폴리오에 포함")}</label>
+              대표 포트폴리오에 포함
+            </label>
             <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-canvas px-3 text-xs text-fg-2">
               <input
                 type="checkbox"
@@ -300,7 +302,8 @@ export function CreatorCommunityPublicationPanel({
                   downloadAllowed: event.target.checked,
                 }))}
               />
-              {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "독자 다운로드 허용")}</label>
+              독자 다운로드 허용
+            </label>
             <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-canvas px-3 text-xs text-fg-2">
               <input
                 type="checkbox"
@@ -310,11 +313,12 @@ export function CreatorCommunityPublicationPanel({
                   trainingAllowed: event.target.checked,
                 }))}
               />
-              {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "AI 학습 사용 허용")}</label>
+              AI 학습 사용 허용
+            </label>
           </div>
 
           <fieldset className="space-y-2">
-            <legend className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "콘텐츠 설명자")}</legend>
+            <legend className="text-xs font-semibold text-fg">콘텐츠 설명자</legend>
             <div className="flex flex-wrap gap-2">
               {CREATOR_COMMUNITY_CONTENT_DESCRIPTORS.map((descriptor) => {
                 const selected = metadata.contentDescriptors.includes(descriptor);
@@ -342,7 +346,7 @@ export function CreatorCommunityPublicationPanel({
           </fieldset>
 
           <fieldset className="space-y-2">
-            <legend className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "받고 싶은 창작 피드백")}</legend>
+            <legend className="text-xs font-semibold text-fg">받고 싶은 창작 피드백</legend>
             <div className="flex flex-wrap gap-2">
               {CREATOR_COMMUNITY_FEEDBACK_TOPICS.map((topic) => {
                 const selected = metadata.feedbackTopics.includes(topic);
@@ -376,26 +380,28 @@ export function CreatorCommunityPublicationPanel({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-xs text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "접근성 대체 설명")}<textarea
+              접근성 대체 설명
+              <textarea
                 value={metadata.altText}
                 onChange={(event) => setMetadata((current) => ({
                   ...current,
                   altText: event.target.value.slice(0, 1_000),
                 }))}
                 rows={3}
-                placeholder={translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "이미지를 보지 못하는 독자도 장면을 이해할 수 있도록 설명해 주세요.")}
+                placeholder="이미지를 보지 못하는 독자도 장면을 이해할 수 있도록 설명해 주세요."
                 className="rounded-lg border border-line bg-canvas px-2.5 py-2 text-sm text-fg placeholder:text-fg-3"
               />
             </label>
             <label className="flex flex-col gap-1 text-xs text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "출처·이용 조건")}<textarea
+              출처·이용 조건
+              <textarea
                 value={metadata.attributionText}
                 onChange={(event) => setMetadata((current) => ({
                   ...current,
                   attributionText: event.target.value.slice(0, 240),
                 }))}
                 rows={3}
-                placeholder={translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "예: © 작가명, 재배포 금지")}
+                placeholder="예: © 작가명, 재배포 금지"
                 className="rounded-lg border border-line bg-canvas px-2.5 py-2 text-sm text-fg placeholder:text-fg-3"
               />
             </label>
@@ -409,18 +415,20 @@ export function CreatorCommunityPublicationPanel({
               className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}
             >
               <Save size={14} />
-              {saving ? translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "저장 중…") : translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "작품 정보 저장")}
+              {saving ? "저장 중…" : "작품 정보 저장"}
             </button>
             <span className="text-[0.7rem] text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "저장은 공개가 아닙니다. 공개 범위는 기존 게시 설정에서만 변경됩니다.")}</span>
+              저장은 공개가 아닙니다. 공개 범위는 기존 게시 설정에서만 변경됩니다.
+            </span>
           </div>
 
           <div className="border-t border-line pt-4">
             <div className="flex flex-wrap items-center gap-2">
               <div>
-                <h3 className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "불변 릴리스")}</h3>
+                <h3 className="text-xs font-semibold text-fg">불변 릴리스</h3>
                 <p className="mt-0.5 text-[0.7rem] text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "현재 저장본을 외부 배포·검수용으로 고정합니다.")}</p>
+                  현재 저장본을 외부 배포·검수용으로 고정합니다.
+                </p>
               </div>
               <button
                 type="button"
@@ -429,7 +437,7 @@ export function CreatorCommunityPublicationPanel({
                 className={buttonClass({ size: "sm", variant: "outline", className: "ml-auto gap-1.5" })}
               >
                 <Plus size={14} />
-                {creatingRelease ? translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "생성 중…") : translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "현재 저장본 릴리스")}
+                {creatingRelease ? "생성 중…" : "현재 저장본 릴리스"}
               </button>
             </div>            {loading ? (
               <div className="skeleton mt-3 h-16 rounded-lg" aria-hidden />
@@ -441,7 +449,7 @@ export function CreatorCommunityPublicationPanel({
                     className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-line bg-canvas px-3 py-2 text-xs"
                   >
                     <span className="font-semibold text-fg">v{release.releaseNo}</span>
-                    <span className="text-fg-2">{translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "en", "revision ")}{release.workRevision}</span>
+                    <span className="text-fg-2">revision {release.workRevision}</span>
                     <span className="rounded-full bg-raised px-2 py-0.5 text-[0.7rem] text-fg-2">
                       {RELEASE_STATE_LABEL[release.state]}
                     </span>
@@ -456,7 +464,8 @@ export function CreatorCommunityPublicationPanel({
               </div>
             ) : (
               <p className="mt-3 rounded-lg border border-dashed border-line px-3 py-4 text-center text-xs text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "아직 릴리스가 없습니다. 저장을 마친 뒤 현재 저장본을 고정해 보세요.")}</p>
+                아직 릴리스가 없습니다. 저장을 마친 뒤 현재 저장본을 고정해 보세요.
+              </p>
             )}
           </div>
 
@@ -464,16 +473,17 @@ export function CreatorCommunityPublicationPanel({
             <div className="flex items-center gap-2">
               <Globe2 size={14} className="text-cool" />
               <div>
-                <h3 className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "외부 연재·게시 이력")}</h3>
+                <h3 className="text-xs font-semibold text-fg">외부 연재·게시 이력</h3>
                 <p className="mt-0.5 text-[0.7rem] text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "어느 플랫폼에 어떤 릴리스를 올렸는지 기록합니다.")}</p>
+                  어느 플랫폼에 어떤 릴리스를 올렸는지 기록합니다.
+                </p>
               </div>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-[12rem_1fr_auto]">
               <select
                 value={platform}
                 onChange={(event) => setPlatform(event.target.value as CreatorCommunityExternalPlatform)}
-                aria-label={translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "외부 게시 플랫폼")}
+                aria-label="외부 게시 플랫폼"
                 className="h-10 rounded-lg border border-line bg-canvas px-2.5 text-sm text-fg"
               >
                 {Object.entries(PLATFORM_LABEL).map(([value, label]) => (
@@ -485,7 +495,7 @@ export function CreatorCommunityPublicationPanel({
                 inputMode="url"
                 value={externalUrl}
                 onChange={(event) => setExternalUrl(event.target.value)}
-                placeholder={translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "https:// 공개 회차 또는 작품 주소")}
+                placeholder="https:// 공개 회차 또는 작품 주소"
                 className="h-10 rounded-lg border border-line bg-canvas px-3 text-sm text-fg placeholder:text-fg-3"
               />
               <button
@@ -495,11 +505,13 @@ export function CreatorCommunityPublicationPanel({
                 className={buttonClass({ size: "sm", variant: "outline", className: "h-10 gap-1.5" })}
               >
                 <ExternalLink size={14} />
-                {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "기록")}</button>
+                기록
+              </button>
             </div>
             {releases.length === 0 && (
               <p className="mt-2 text-[0.7rem] text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "외부 게시 주소를 기록하려면 먼저 현재 저장본의 릴리스를 생성해 주세요.")}</p>
+                외부 게시 주소를 기록하려면 먼저 현재 저장본의 릴리스를 생성해 주세요.
+              </p>
             )}
             {external.length > 0 && (
               <div className="mt-3 space-y-2">
@@ -527,7 +539,7 @@ export function CreatorCommunityPublicationPanel({
                       <button
                         type="button"
                         onClick={() => removeExternal(item.id)}
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "{v0} 게시 이력 제거"), { v0: String(PLATFORM_LABEL[item.platform]) })}
+                        aria-label={`${PLATFORM_LABEL[item.platform]} 게시 이력 제거`}
                         className="grid size-8 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-bad"
                       >
                         <Trash2 size={13} />
@@ -597,10 +609,11 @@ export function CreatorWorkReportControl({
         className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5 text-fg-3" })}
       >
         <Flag size={13} />
-        {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "신고")}</button>
+        신고
+      </button>
       {open && (
         <div className="absolute right-0 top-full z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-line bg-panel p-3 shadow-xl">
-          <p className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "작품 신고")}</p>
+          <p className="text-xs font-semibold text-fg">작품 신고</p>
           <select
             value={reason}
             onChange={(event) => setReason(event.target.value as WorkReportReason)}
@@ -615,7 +628,7 @@ export function CreatorWorkReportControl({
             value={details}
             onChange={(event) => setDetails(event.target.value.slice(0, 1_000))}
             rows={3}
-            placeholder={translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "검토에 도움이 되는 내용을 적어 주세요.")}
+            placeholder="검토에 도움이 되는 내용을 적어 주세요."
             className="mt-2 w-full rounded-lg border border-line bg-canvas px-2.5 py-2 text-sm text-fg placeholder:text-fg-3"
           />
           <div className="mt-2 flex justify-end gap-2">
@@ -624,14 +637,15 @@ export function CreatorWorkReportControl({
               onClick={() => setOpen(false)}
               className={buttonClass({ size: "sm", variant: "quiet" })}
             >
-              {translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "취소")}</button>
+              취소
+            </button>
             <button
               type="button"
               onClick={submit}
               disabled={submitting}
               className={buttonClass({ size: "sm", variant: "solid" })}
             >
-              {submitting ? translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "접수 중…") : translateCurrentStaticSourceText("domains.creator.CreatorCommunityPublicationPanel", "ko", "신고 접수")}
+              {submitting ? "접수 중…" : "신고 접수"}
             </button>
           </div>
         </div>

@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 // 작업 내역(히스토리) 패널 — 포토샵 히스토리처럼 단계 목록(최신 위, 현재 강조)을 보여주고
 // 항목 클릭으로 그 시점으로 즉시 점프한다(실행취소/다시실행 반복과 동일한 인덱스 이동).
 // 라벨·점프 계산은 studio-history-labels(순수), 인덱스 반영(setPagesHi)은 StudioPage(메인 루프)가 담당.
@@ -82,18 +79,19 @@ export function StudioHistoryPanel({
 
   return (
     <section
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", "작업 내역")}
+      aria-label="작업 내역"
       className="absolute right-3 top-3 z-40 flex max-h-[calc(100%-5rem)] w-[min(17rem,calc(100%-1.5rem))] flex-col overflow-hidden rounded-xl border border-line bg-panel/95 shadow-xl backdrop-blur"
     >
       <div className="flex items-center justify-between gap-2 border-b border-line/60 px-3 py-2">
         <p className="flex items-center gap-1.5 text-xs font-bold text-fg">
           <HistoryIcon size={13} className="shrink-0 text-fg-3" aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", "작업 내역")}<span className="font-medium text-fg-3">{history.length}{translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", "단계")}</span>
+          작업 내역
+          <span className="font-medium text-fg-3">{history.length}단계</span>
         </p>
         <button
           type="button"
           onClick={onClose}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", "작업 내역 닫기")}
+          aria-label="작업 내역 닫기"
           className="grid size-6 place-items-center rounded-lg border border-line text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           <X size={13} />
@@ -101,7 +99,7 @@ export function StudioHistoryPanel({
       </div>
 
       {/* 단계 목록 — 최신이 위. 현재 이후(다시실행 영역)는 흐리게 표시(포토샵 관례). */}
-      <ol aria-label={translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", "작업 단계 목록 (최신 순)")} className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2.5 py-2">
+      <ol aria-label="작업 단계 목록 (최신 순)" className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2.5 py-2">
         {newestFirst.map((entry) => {
           const isCurrent = entry.index === currentIndex;
           const isRedoSide = entry.index > currentIndex;
@@ -111,8 +109,8 @@ export function StudioHistoryPanel({
                 type="button"
                 ref={isCurrent ? currentItemRef : undefined}
                 onClick={() => jump(entry.index)}
-                aria-current={isCurrent ? translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "en", "step") : undefined}
-                title={isCurrent ? translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", "현재 시점") : translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", "이 시점으로 이동")}
+                aria-current={isCurrent ? "step" : undefined}
+                title={isCurrent ? "현재 시점" : "이 시점으로 이동"}
                 className={cx(
                   "flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-2 py-1.5 text-left text-[0.72rem] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
                   isCurrent
@@ -126,7 +124,8 @@ export function StudioHistoryPanel({
                 <span className="min-w-0 flex-1 truncate">{entry.label}</span>
                 {isCurrent && (
                   <span className="shrink-0 rounded-full border border-accent/40 bg-accent-soft/40 px-1.5 text-[0.72rem] font-medium text-accent">
-                    {translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", "현재")}</span>
+                    현재
+                  </span>
                 )}
               </button>
               {onDesignateBrushSource && (
@@ -140,10 +139,10 @@ export function StudioHistoryPanel({
                   aria-pressed={brushSourceIndex === entry.index}
                   title={
                     brushSourceAvailability && !brushSourceAvailability[entry.index]
-                      ? translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", "이 시점엔 같은 레이어가 없어 지정할 수 없어요.")
+                      ? "이 시점엔 같은 레이어가 없어 지정할 수 없어요."
                       : brushSourceIndex === entry.index
-                        ? translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", "히스토리 브러시 소스로 지정됨")
-                        : translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", "이 시점을 히스토리 브러시 소스로 지정")
+                        ? "히스토리 브러시 소스로 지정됨"
+                        : "이 시점을 히스토리 브러시 소스로 지정"
                   }
                   className={cx(
                     "grid size-6 shrink-0 place-items-center rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
@@ -160,12 +159,14 @@ export function StudioHistoryPanel({
         })}
         {hiddenCount > 0 && (
           <li className="px-2 py-1 text-[0.72rem] leading-snug text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", "이전 단계 ")}{hiddenCount}{translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", "개는 표시 생략 — 더 되돌리려면 목록 맨 아래로 이동한 뒤 ⌘Z 를 이어서 누르세요.")}</li>
+            이전 단계 {hiddenCount}개는 표시 생략 — 더 되돌리려면 목록 맨 아래로 이동한 뒤 ⌘Z 를 이어서 누르세요.
+          </li>
         )}
       </ol>
 
       <p className="border-t border-line/60 px-3 py-1.5 text-[0.72rem] leading-snug text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", "항목을 누르면 그 시점으로 즉시 이동해요 · ⌘Z 실행취소 · ⇧⌘Z 다시실행")}{onDesignateBrushSource && translateCurrentStaticSourceText("domains.creator.StudioHistoryPanel", "ko", " · 붓 아이콘으로 히스토리 브러시 소스 지정")}
+        항목을 누르면 그 시점으로 즉시 이동해요 · ⌘Z 실행취소 · ⇧⌘Z 다시실행
+        {onDesignateBrushSource && " · 붓 아이콘으로 히스토리 브러시 소스 지정"}
       </p>
     </section>
   );

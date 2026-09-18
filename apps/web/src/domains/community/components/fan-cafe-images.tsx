@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { isAllowedImageDataUrl } from "@/shared/lib/image-attach";
 import { cn } from "@/shared/lib/utils";
 
@@ -12,7 +11,7 @@ export function FanPostImages({ title, images }: { title: string; images?: strin
         <img
           key={`${index}-${src.slice(-24)}`}
           src={src}
-          alt={formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.fan.cafe.images", "ko", "{v0} 첨부 이미지 {v1}"), { v0: String(title), v1: String(index + 1) })}
+          alt={`${title} 첨부 이미지 ${index + 1}`}
           loading="lazy"
           decoding="async"
           className={cn(

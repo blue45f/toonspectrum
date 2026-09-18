@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowDown,
   ArrowUp,
   Check,
@@ -226,7 +222,7 @@ function StudioWorkspaceQuickAccessPreview({
         compact ? "mt-1.5" : "mt-2"
       )}
       data-quick-access-density="responsive-icon-name"
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "주요 도구 순서")}
+      aria-label="주요 도구 순서"
     >
       {QUICK_ACTION_SLOTS.map((slot, index) => {
         const action = layout.quickActions.slots[slot];
@@ -280,7 +276,7 @@ function StudioWorkspaceLayoutPreview({
             className={studioChromeIconClass({ tone: "default" })}
           />
           <span className="truncate">
-            {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "페이지 ")}{desktop.leftPanelOpen ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}px"), { v0: String(desktop.leftPanelWidth) }) : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "접힘")}
+            페이지 {desktop.leftPanelOpen ? `${desktop.leftPanelWidth}px` : "접힘"}
           </span>
         </span>
         <span className="inline-flex min-w-0 items-center gap-1">
@@ -292,7 +288,7 @@ function StudioWorkspaceLayoutPreview({
           />
           <span className="truncate">
             {INSPECTOR_PRIMARY_LABELS[layout.inspector.primary]}{" "}
-            {desktop.rightPanelOpen ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}px"), { v0: String(desktop.rightPanelWidth) }) : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "접힘")}
+            {desktop.rightPanelOpen ? `${desktop.rightPanelWidth}px` : "접힘"}
           </span>
         </span>
         <span className="col-span-2 inline-flex min-w-0 items-center gap-1">
@@ -303,11 +299,13 @@ function StudioWorkspaceLayoutPreview({
             className={studioChromeIconClass({ tone: "default" })}
           />
           <span className="truncate">
-            {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "모바일은 캔버스 우선 · 페이지/속성 시트 · ")}{mobileSide} {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "주요 도구")}</span>
+            모바일은 캔버스 우선 · 페이지/속성 시트 · {mobileSide} 주요 도구
+          </span>
         </span>
       </span>
       <span className="mt-2 block text-[0.6875rem] font-bold text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "주요 도구 순서")}</span>
+        주요 도구 순서
+      </span>
       <StudioWorkspaceQuickAccessPreview layout={layout} />
     </span>
   );
@@ -326,13 +324,15 @@ function StudioProComicPresetPreview({
     >
       <span className="flex flex-wrap items-center gap-1">
         <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.6875rem] font-bold text-accent">
-          {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "권장 시작")}</span>
+          권장 시작
+        </span>
         <span className="text-[0.6875rem] font-bold text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "팔레트 우선순위")}</span>
+          팔레트 우선순위
+        </span>
       </span>
       <span
         className="mt-1.5 flex flex-wrap gap-1"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "프로 만화 팔레트 우선순위")}
+        aria-label="프로 만화 팔레트 우선순위"
       >
         {STUDIO_PRO_COMIC_PALETTE_PRIORITY.map((priority, index) => (
           <span
@@ -344,7 +344,7 @@ function StudioProComicPresetPreview({
         ))}
       </span>
       <span className="mt-1.5 block text-[0.6875rem] leading-relaxed text-fg-3">
-        {formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "왼쪽 페이지 {v0}px · 오른쪽 {v1} {v2}px · 모바일은 캔버스 우선 시트"), { v0: String(desktop.leftPanelWidth), v1: String(INSPECTOR_PRIMARY_LABELS[layout.inspector.primary]), v2: String(desktop.rightPanelWidth) })}
+        {`왼쪽 페이지 ${desktop.leftPanelWidth}px · 오른쪽 ${INSPECTOR_PRIMARY_LABELS[layout.inspector.primary]} ${desktop.rightPanelWidth}px · 모바일은 캔버스 우선 시트`}
       </span>
       <StudioWorkspaceQuickAccessPreview layout={layout} compact />
     </span>
@@ -1139,7 +1139,7 @@ export function StudioWorkspaceMenu({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={dialogId}
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "작업공간: {v0}{v1}{v2}{v3}{v4}"), { v0: String(activeWorkspace?.name ?? "알 수 없음"), v1: String(dirty ? " 변경됨" : ""), v2: String(effectivePersistence.status === "session-only" ? " 세션" : ""), v3: String(dirty ? ", 저장되지 않은 배치 변경 있음" : ""), v4: String(effectivePersistence.status === "session-only" ? ", 변경은 이 세션에서만 유지" : ", 이 기기 저장 확인됨") })}
+        aria-label={`작업공간: ${activeWorkspace?.name ?? "알 수 없음"}${dirty ? " 변경됨" : ""}${effectivePersistence.status === "session-only" ? " 세션" : ""}${dirty ? ", 저장되지 않은 배치 변경 있음" : ""}${effectivePersistence.status === "session-only" ? ", 변경은 이 세션에서만 유지" : ", 이 기기 저장 확인됨"}`}
         className={cn(
           // StudioWorkspaceMenuGate 트리거와 같은 칩 박스 규약(이름만 shrink, 배지는 shrink-0).
           // `overflow-hidden` 을 더하지 않는 이유는 그쪽 주석 참고 — 배지를 잘리게 만든다.
@@ -1154,16 +1154,18 @@ export function StudioWorkspaceMenu({
           aria-hidden
           className={studioChromeIconClass({ tone: "default" })}
         />
-        <span className="min-w-0 truncate">{activeWorkspace?.name ?? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "작업공간")}</span>
+        <span className="min-w-0 truncate">{activeWorkspace?.name ?? "작업공간"}</span>
         {" "}
         {dirty ? (
           <span className="shrink-0 rounded-full bg-warn/15 px-1.5 py-0.5 text-[0.6875rem] font-bold text-warn">
-            {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "변경됨")}</span>
+            변경됨
+          </span>
         ) : null}
         {" "}
         {effectivePersistence.status === "session-only" ? (
           <span className="shrink-0 rounded-full bg-cool/15 px-1.5 py-0.5 text-[0.6875rem] font-bold text-cool">
-            {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "세션")}</span>
+            세션
+          </span>
         ) : null}
         <ChevronDown
           size={STUDIO_ICON_SIZE.contextMenu}
@@ -1181,7 +1183,7 @@ export function StudioWorkspaceMenu({
       <StudioWorkspaceOverlayLayer portal>
         <button
           type="button"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "작업공간 메뉴 닫기")}
+          aria-label="작업공간 메뉴 닫기"
           tabIndex={-1}
           hidden={!open}
           onClick={() => {
@@ -1223,7 +1225,7 @@ export function StudioWorkspaceMenu({
               type="button"
               hidden={view !== "manage"}
               onClick={returnToWorkspaceSwitcher}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "빠른 작업공간 전환으로 돌아가기")}
+              aria-label="빠른 작업공간 전환으로 돌아가기"
               className={cn(
                 "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg",
                 focusClass
@@ -1239,28 +1241,28 @@ export function StudioWorkspaceMenu({
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2">
                 <h2 id={titleId} className="truncate text-sm font-bold text-fg">
-                  {view === "manage" ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "작업공간 관리") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "작업공간")}
+                  {view === "manage" ? "작업공간 관리" : "작업공간"}
                 </h2>
                 <span
-                  aria-label={dirty ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "저장된 작업공간 배치와 다름") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "저장된 작업공간 배치와 일치")}
+                  aria-label={dirty ? "저장된 작업공간 배치와 다름" : "저장된 작업공간 배치와 일치"}
                   className={cn(
                     "shrink-0 rounded-full px-1.5 py-0.5 text-[0.6875rem] font-bold",
                     dirty ? "bg-warn/15 text-warn" : "bg-good/15 text-good"
                   )}
                 >
-                  {dirty ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "변경됨") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "배치 일치")}
+                  {dirty ? "변경됨" : "배치 일치"}
                 </span>
               </div>
               <p id={descriptionId} className="mt-1 truncate text-[0.6875rem] text-fg-3">
                 {view === "manage"
-                  ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "저장·복제·순서·기기 설정")
-                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "{v0} · 패널과 주요 도구 배치"), { v0: String(activeWorkspace?.name ?? "작업공간") })}
+                  ? "저장·복제·순서·기기 설정"
+                  : `${activeWorkspace?.name ?? "작업공간"} · 패널과 주요 도구 배치`}
               </p>
             </div>
             <button
               type="button"
               onClick={closeMenu}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "작업공간 메뉴 닫기")}
+              aria-label="작업공간 메뉴 닫기"
               className={cn(
                 "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg",
                 focusClass
@@ -1276,9 +1278,9 @@ export function StudioWorkspaceMenu({
           </header>
 
           <div
-            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-management-tabs"), { v0: String(dialogId) })}
+            id={`${dialogId}-management-tabs`}
             role="group"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "작업공간 관리 보기")}
+            aria-label="작업공간 관리 보기"
             hidden={view !== "manage"}
             className="grid shrink-0 grid-cols-2 gap-1.5 border-b border-line bg-card/50 px-3 py-2"
           >
@@ -1345,13 +1347,14 @@ export function StudioWorkspaceMenu({
               ) : null}
             </div>
 
-            <section hidden={view !== "switch"} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-current"), { v0: String(titleId) })}>
-              <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-current"), { v0: String(titleId) })} className="mb-1.5 text-[0.6875rem] font-bold text-fg-2">
-                {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "현재 및 최근")}</h3>
+            <section hidden={view !== "switch"} aria-labelledby={`${titleId}-current`}>
+              <h3 id={`${titleId}-current`} className="mb-1.5 text-[0.6875rem] font-bold text-fg-2">
+                현재 및 최근
+              </h3>
               <article
                 tabIndex={-1}
                 data-workspace-initial-focus="true"
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "현재 작업공간 {v0}, {v1}"), { v0: String(activeWorkspace?.name ?? "알 수 없음"), v1: String(dirty ? "변경됨" : "저장됨") })}
+                aria-label={`현재 작업공간 ${activeWorkspace?.name ?? "알 수 없음"}, ${dirty ? "변경됨" : "저장됨"}`}
                 className={cn(
                   "rounded-lg border px-3 py-2.5",
                   dirty ? "border-warn/40 bg-warn/5" : "border-line bg-card",
@@ -1369,10 +1372,10 @@ export function StudioWorkspaceMenu({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs font-bold text-fg">
-                      {activeWorkspace?.name ?? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "작업공간")}
+                      {activeWorkspace?.name ?? "작업공간"}
                     </span>
                     <span className={cn("mt-0.5 block text-fg-3", AUXILIARY_TEXT_CLASS)}>
-                      {activeIsCustom ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "내 작업공간") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "기본 작업공간")} · {dirty ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "저장 전 변경 있음") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "저장된 배치와 같음")}
+                      {activeIsCustom ? "내 작업공간" : "기본 작업공간"} · {dirty ? "저장 전 변경 있음" : "저장된 배치와 같음"}
                     </span>
                   </span>
                   <Check
@@ -1392,13 +1395,13 @@ export function StudioWorkspaceMenu({
                       type="button"
                       onClick={saveCurrentChanges}
                       disabled={!activeIsCustom && atCustomLimit}
-                      aria-label={activeIsCustom ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "현재 작업공간 변경 저장") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "현재 배치를 사본으로 저장")}
+                      aria-label={activeIsCustom ? "현재 작업공간 변경 저장" : "현재 배치를 사본으로 저장"}
                       className={cn(
                         "min-h-11 min-w-0 whitespace-normal rounded-lg bg-accent px-2 text-[0.6875rem] font-bold leading-tight text-on-accent hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-45",
                         focusClass
                       )}
                     >
-                      {activeIsCustom ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "변경 저장") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "사본으로 저장")}
+                      {activeIsCustom ? "변경 저장" : "사본으로 저장"}
                     </button>
                     <button
                       type="button"
@@ -1408,19 +1411,20 @@ export function StudioWorkspaceMenu({
                         focusClass
                       )}
                     >
-                      {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "저장된 배치 다시 불러오기")}</button>
+                      저장된 배치 다시 불러오기
+                    </button>
                   </div>
                 ) : null}
               </article>
 
               {recentWorkspaces.length > 0 ? (
-                <div className="mt-1.5 grid min-w-0 grid-cols-2 gap-1.5" aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "최근 작업공간")}>
+                <div className="mt-1.5 grid min-w-0 grid-cols-2 gap-1.5" aria-label="최근 작업공간">
                   {recentWorkspaces.map((workspace) => (
                     <button
                       key={workspace.id}
                       type="button"
                       onClick={(event) => requestWorkspaceSwitch(workspace.id, event.currentTarget)}
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "최근 작업공간 {v0}(으)로 전환"), { v0: String(workspace.name) })}
+                      aria-label={`최근 작업공간 ${workspace.name}(으)로 전환`}
                       className={cn(
                         "min-h-11 min-w-0 truncate rounded-lg border border-line bg-card px-2 text-[0.6875rem] font-bold text-fg-2 hover:border-line-strong hover:bg-raised hover:text-fg",
                         focusClass
@@ -1450,8 +1454,9 @@ export function StudioWorkspaceMenu({
                 role="search"
                 hidden={view === "manage" && manageTab !== "catalog"}
               >
-                <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-search"), { v0: String(dialogId) })} className="sr-only">
-                  {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "작업공간 검색")}</label>
+                <label htmlFor={`${dialogId}-search`} className="sr-only">
+                  작업공간 검색
+                </label>
                 <div className="relative">
                   <Search
                     size={STUDIO_ICON_SIZE.contextMenu}
@@ -1463,13 +1468,13 @@ export function StudioWorkspaceMenu({
                     )}
                   />
                   <input
-                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-search"), { v0: String(dialogId) })}
+                    id={`${dialogId}-search`}
                     type="search"
                     value={query}
                     onChange={(event) => setQuery(event.currentTarget.value)}
                     maxLength={64}
                     autoComplete="off"
-                    placeholder={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "작업공간 이름 또는 용도 검색")}
+                    placeholder="작업공간 이름 또는 용도 검색"
                     className={cn(
                       "min-h-11 w-full rounded-lg border border-line bg-card pl-9 pr-11 text-xs text-fg outline-none placeholder:text-fg-3",
                       focusClass
@@ -1479,7 +1484,7 @@ export function StudioWorkspaceMenu({
                     <button
                       type="button"
                       onClick={() => setQuery("")}
-                      aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "작업공간 검색어 지우기")}
+                      aria-label="작업공간 검색어 지우기"
                       className={cn(
                         "absolute right-0 top-0 grid size-11 place-items-center rounded-lg text-fg-3 hover:text-fg",
                         focusClass
@@ -1495,17 +1500,18 @@ export function StudioWorkspaceMenu({
                   ) : null}
                 </div>
                 <p className="sr-only" role="status" aria-live="polite">
-                  {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "검색 결과 ")}{searchResultCount}{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "개")}</p>
+                  검색 결과 {searchResultCount}개
+                </p>
               </div>
             ) : null}
 
-            <section hidden={view !== "switch"} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-defaults"), { v0: String(titleId) })}>
-              <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-defaults"), { v0: String(titleId) })}>
+            <section hidden={view !== "switch"} aria-labelledby={`${titleId}-defaults`}>
+              <h3 id={`${titleId}-defaults`}>
                 <button
                   type="button"
                   onClick={() => setBuiltinsExpanded((current) => !current)}
                   aria-expanded={builtinListExpanded}
-                  aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-builtin-list"), { v0: String(dialogId) })}
+                  aria-controls={`${dialogId}-builtin-list`}
                   className={cn(
                     "flex min-h-11 w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg",
                     focusClass
@@ -1526,24 +1532,26 @@ export function StudioWorkspaceMenu({
                       className={studioChromeIconClass({ tone: "default" })}
                     />
                   )}
-                  <span className="min-w-0 flex-1 truncate">{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "기본 작업공간")}</span>
+                  <span className="min-w-0 flex-1 truncate">기본 작업공간</span>
                   <span className={cn("inline-flex shrink-0 items-center gap-1 font-normal text-fg-3", AUXILIARY_TEXT_CLASS)}>
                     <LockKeyhole
                       size={STUDIO_ICON_SIZE.subtab}
                       strokeWidth={STUDIO_ICON_STROKE}
                       aria-hidden
                       className={studioChromeIconClass({ tone: "muted" })}
-                    /> {filteredBuiltins.length}{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "개 · 수정 불가")}</span>
+                    /> {filteredBuiltins.length}개 · 수정 불가
+                  </span>
                 </button>
               </h3>
               <div
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-builtin-list"), { v0: String(dialogId) })}
+                id={`${dialogId}-builtin-list`}
                 hidden={!builtinListExpanded}
                 className="mt-1.5 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-1"
               >
                 {filteredBuiltins.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-line px-3 py-3 text-center text-xs text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "일치하는 기본 작업공간이 없어요.")}</p>
+                    일치하는 기본 작업공간이 없어요.
+                  </p>
                 ) : null}
                 {filteredBuiltins.map((workspace) => {
                   const Icon = DEFAULT_WORKSPACE_ICONS[workspace.id];
@@ -1554,7 +1562,7 @@ export function StudioWorkspaceMenu({
                       type="button"
                       onClick={(event) => requestWorkspaceSwitch(workspace.id, event.currentTarget)}
                       disabled={active}
-                      aria-current={active ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "true") : undefined}
+                      aria-current={active ? "true" : undefined}
                       aria-label={`${workspace.name}${active ? ", 현재 작업공간" : ", 작업공간으로 전환"}`}
                       data-workspace-kind="builtin"
                       data-workspace-id={workspace.id}
@@ -1602,15 +1610,15 @@ export function StudioWorkspaceMenu({
 
             <section
               hidden={view !== "switch"}
-              aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-quick-custom"), { v0: String(titleId) })}
+              aria-labelledby={`${titleId}-quick-custom`}
               data-workspace-view="switch"
             >
-              <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-quick-custom"), { v0: String(titleId) })}>
+              <h3 id={`${titleId}-quick-custom`}>
                 <button
                   type="button"
                   onClick={() => setCustomExpanded((current) => !current)}
                   aria-expanded={customListExpanded}
-                  aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-quick-custom-list"), { v0: String(dialogId) })}
+                  aria-controls={`${dialogId}-quick-custom-list`}
                   className={cn(
                     "flex min-h-11 w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg",
                     focusClass
@@ -1631,25 +1639,27 @@ export function StudioWorkspaceMenu({
                       className={studioChromeIconClass({ tone: "default" })}
                     />
                   )}
-                  <span className="min-w-0 flex-1 truncate">{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "내 작업공간")}</span>
+                  <span className="min-w-0 flex-1 truncate">내 작업공간</span>
                   <span className={cn("shrink-0 tabular-nums font-normal text-fg-3", AUXILIARY_TEXT_CLASS)}>
                     {query
-                      ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "{v0}/{v1}개"), { v0: String(filteredCustom.length), v1: String(syncedState.customWorkspaces.length) })
-                      : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "{v0}개"), { v0: String(syncedState.customWorkspaces.length) })}
+                      ? `${filteredCustom.length}/${syncedState.customWorkspaces.length}개`
+                      : `${syncedState.customWorkspaces.length}개`}
                   </span>
                 </button>
               </h3>
               <div
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-quick-custom-list"), { v0: String(dialogId) })}
+                id={`${dialogId}-quick-custom-list`}
                 hidden={!customListExpanded}
                 className="mt-1.5 space-y-1.5"
               >
                 {syncedState.customWorkspaces.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-line px-3 py-3 text-center text-xs text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "저장한 작업공간이 없어요. 관리에서 현재 배치를 저장할 수 있어요.")}</p>
+                    저장한 작업공간이 없어요. 관리에서 현재 배치를 저장할 수 있어요.
+                  </p>
                 ) : filteredCustom.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-line px-3 py-3 text-center text-xs text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "일치하는 내 작업공간이 없어요.")}</p>
+                    일치하는 내 작업공간이 없어요.
+                  </p>
                 ) : (
                   filteredCustom.map((workspace) => {
                     const active = syncedState.activeWorkspaceId === workspace.id;
@@ -1661,7 +1671,7 @@ export function StudioWorkspaceMenu({
                           requestWorkspaceSwitch(workspace.id, event.currentTarget)
                         }
                         disabled={active}
-                        aria-current={active ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "true") : undefined}
+                        aria-current={active ? "true" : undefined}
                         aria-label={`${workspace.name}${active ? ", 현재 작업공간" : ", 작업공간으로 전환"}`}
                         data-workspace-kind="custom-switch"
                         data-workspace-id={workspace.id}
@@ -1703,15 +1713,15 @@ export function StudioWorkspaceMenu({
 
             <section
               hidden={view !== "manage" || manageTab !== "catalog"}
-              aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-custom"), { v0: String(titleId) })}
+              aria-labelledby={`${titleId}-custom`}
               data-workspace-view="manage-catalog"
             >
-              <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-custom"), { v0: String(titleId) })}>
+              <h3 id={`${titleId}-custom`}>
                 <button
                   type="button"
                   onClick={() => setCustomExpanded((current) => !current)}
                   aria-expanded={customListExpanded}
-                  aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-custom-list"), { v0: String(dialogId) })}
+                  aria-controls={`${dialogId}-custom-list`}
                   className={cn(
                     "flex min-h-11 w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg",
                     focusClass
@@ -1732,19 +1742,20 @@ export function StudioWorkspaceMenu({
                       className={studioChromeIconClass({ tone: "default" })}
                     />
                   )}
-                  <span className="min-w-0 flex-1 truncate">{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "내 작업공간")}</span>
+                  <span className="min-w-0 flex-1 truncate">내 작업공간</span>
                   <span className={cn("shrink-0 tabular-nums font-normal text-fg-3", AUXILIARY_TEXT_CLASS)}>
                     {query
-                      ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "{v0}/{v1}개"), { v0: String(filteredCustom.length), v1: String(syncedState.customWorkspaces.length) })
+                      ? `${filteredCustom.length}/${syncedState.customWorkspaces.length}개`
                       : `${syncedState.customWorkspaces.length}/${STUDIO_WORKSPACE_MAX_CUSTOM}`}
                   </span>
                 </button>
               </h3>
 
-              <div id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-custom-list"), { v0: String(dialogId) })} hidden={!customListExpanded} className="mt-1.5">
+              <div id={`${dialogId}-custom-list`} hidden={!customListExpanded} className="mt-1.5">
                 {reorderBlockedBySearch && syncedState.customWorkspaces.length > 1 ? (
                   <p role="status" className="mb-1.5 rounded-lg border border-line bg-raised px-3 py-2 text-[0.6875rem] text-fg-2">
-                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "전체 순서를 바꾸려면 검색어를 지워 주세요.")}</p>
+                    전체 순서를 바꾸려면 검색어를 지워 주세요.
+                  </p>
                 ) : null}
                 <button
                   type="button"
@@ -1755,7 +1766,7 @@ export function StudioWorkspaceMenu({
                     setError(null);
                   }}
                   aria-expanded={saveFormOpen}
-                  aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-save-form"), { v0: String(dialogId) })}
+                  aria-controls={`${dialogId}-save-form`}
                   disabled={atCustomLimit}
                   className={cn(
                     "inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-line px-3 text-xs font-bold text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-fg disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11 lg:min-h-9",
@@ -1767,24 +1778,26 @@ export function StudioWorkspaceMenu({
                     strokeWidth={STUDIO_ICON_STROKE}
                     aria-hidden
                     className={studioChromeIconClass({ tone: "default" })}
-                  /> {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "현재 배치를 새 작업공간으로 저장")}</button>
+                  /> 현재 배치를 새 작업공간으로 저장
+                </button>
 
                 <form
-                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-save-form"), { v0: String(dialogId) })}
+                  id={`${dialogId}-save-form`}
                   hidden={!saveFormOpen}
                   onSubmit={submitNewWorkspace}
                   className="mt-1.5 rounded-lg border border-accent/35 bg-accent-soft/40 p-2"
                 >
-                  <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-new-name"), { v0: String(dialogId) })} className="text-[0.6875rem] font-bold text-fg-2">
-                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "새 작업공간 이름")}</label>
+                  <label htmlFor={`${dialogId}-new-name`} className="text-[0.6875rem] font-bold text-fg-2">
+                    새 작업공간 이름
+                  </label>
                   <input
                     ref={newNameInputRef}
-                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-new-name"), { v0: String(dialogId) })}
+                    id={`${dialogId}-new-name`}
                     value={newName}
                     onChange={(event) => setNewName(event.currentTarget.value)}
                     maxLength={STUDIO_WORKSPACE_NAME_MAX_LENGTH}
                     autoComplete="off"
-                    placeholder={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "예: 야간 채색")}
+                    placeholder="예: 야간 채색"
                     className={cn(
                       "mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-sm text-fg outline-none placeholder:text-fg-3",
                       focusClass
@@ -1800,24 +1813,28 @@ export function StudioWorkspaceMenu({
                       }}
                       className={cn("min-h-11 min-w-0 rounded-lg text-xs font-bold text-fg-2 hover:bg-raised", focusClass)}
                     >
-                      {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "취소")}</button>
+                      취소
+                    </button>
                     <button
                       type="submit"
                       className={cn("min-h-11 min-w-0 rounded-lg bg-accent text-xs font-bold text-on-accent hover:bg-accent-2", focusClass)}
                     >
-                      {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "저장")}</button>
+                      저장
+                    </button>
                   </div>
                 </form>
 
                 {syncedState.customWorkspaces.length === 0 ? (
                   <div className="mt-1.5 rounded-lg border border-dashed border-line px-3 py-4 text-center">
-                    <p className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "저장한 작업공간이 없어요.")}</p>
+                    <p className="text-xs font-semibold text-fg-2">저장한 작업공간이 없어요.</p>
                     <p className="mt-1 text-[0.6875rem] leading-relaxed text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "현재 패널과 주요 도구 배치를 이름 붙여 다시 사용할 수 있어요.")}</p>
+                      현재 패널과 주요 도구 배치를 이름 붙여 다시 사용할 수 있어요.
+                    </p>
                   </div>
                 ) : filteredCustom.length === 0 ? (
                   <p className="mt-1.5 rounded-lg border border-dashed border-line px-3 py-3 text-center text-xs text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "일치하는 내 작업공간이 없어요.")}</p>
+                    일치하는 내 작업공간이 없어요.
+                  </p>
                 ) : (
                   <div className="mt-1.5 space-y-1.5">
                     {filteredCustom.map((workspace) => {
@@ -1844,7 +1861,7 @@ export function StudioWorkspaceMenu({
                               type="button"
                               onClick={(event) => requestWorkspaceSwitch(workspace.id, event.currentTarget)}
                               disabled={active}
-                              aria-current={active ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "true") : undefined}
+                              aria-current={active ? "true" : undefined}
                               aria-label={`${workspace.name}${active ? ", 현재 작업공간" : ", 작업공간으로 전환"}`}
                               className={cn(
                                 "flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-l-lg px-3 py-2 text-left transition-colors hover:bg-raised pointer-coarse:min-h-11",
@@ -1867,7 +1884,7 @@ export function StudioWorkspaceMenu({
                               </span>
                               {active ? (
                                 <span className="shrink-0 text-[0.6875rem] font-bold text-accent">
-                                  {dirty ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "현재 · 변경됨") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "현재")}
+                                  {dirty ? "현재 · 변경됨" : "현재"}
                                 </span>
                               ) : null}
                             </button>
@@ -1879,9 +1896,9 @@ export function StudioWorkspaceMenu({
                                 setConfirmDeleteId(null);
                                 setError(null);
                               }}
-                              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "{v0} 관리"), { v0: String(workspace.name) })}
+                              aria-label={`${workspace.name} 관리`}
                               aria-expanded={actionsOpen}
-                              aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-{v1}-actions"), { v0: String(dialogId), v1: String(workspace.id) })}
+                              aria-controls={`${dialogId}-${workspace.id}-actions`}
                               aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
                               data-workspace-manage-trigger={workspace.id}
                               className={cn(
@@ -1900,7 +1917,7 @@ export function StudioWorkspaceMenu({
                           </div>
 
                           <div
-                            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-{v1}-actions"), { v0: String(dialogId), v1: String(workspace.id) })}
+                            id={`${dialogId}-${workspace.id}-actions`}
                             hidden={!actionsOpen}
                             className="min-w-0 border-t border-line p-2"
                           >
@@ -1917,7 +1934,8 @@ export function StudioWorkspaceMenu({
                                       strokeWidth={STUDIO_ICON_STROKE}
                                       aria-hidden
                                       className={studioChromeIconClass({ tone: "default" })}
-                                    /> {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "변경 저장")}</button>
+                                    /> 변경 저장
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={(event) => reloadWorkspace(workspace.id, event.currentTarget)}
@@ -1928,7 +1946,8 @@ export function StudioWorkspaceMenu({
                                       strokeWidth={STUDIO_ICON_STROKE}
                                       aria-hidden
                                       className={studioChromeIconClass({ tone: "default" })}
-                                    /> {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "다시 불러오기")}</button>
+                                    /> 다시 불러오기
+                                  </button>
                                 </>
                               ) : (
                                 <button
@@ -1941,7 +1960,8 @@ export function StudioWorkspaceMenu({
                                     strokeWidth={STUDIO_ICON_STROKE}
                                     aria-hidden
                                     className={studioChromeIconClass({ tone: "default" })}
-                                  /> {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "이 배치로 전환")}</button>
+                                  /> 이 배치로 전환
+                                </button>
                               )}
                               <button
                                 type="button"
@@ -1953,12 +1973,13 @@ export function StudioWorkspaceMenu({
                                   strokeWidth={STUDIO_ICON_STROKE}
                                   aria-hidden
                                   className={studioChromeIconClass({ tone: "default" })}
-                                /> {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "이름 변경")}</button>
+                                /> 이름 변경
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => duplicateWorkspace(workspace.id)}
                                 disabled={atCustomLimit}
-                                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "{v0} 저장된 배치 복제"), { v0: String(workspace.name) })}
+                                aria-label={`${workspace.name} 저장된 배치 복제`}
                                 className={cn(
                                   "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 whitespace-normal rounded-lg bg-raised px-2 text-center text-[0.6875rem] font-bold leading-tight text-fg-2 hover:text-fg disabled:cursor-not-allowed disabled:opacity-45",
                                   focusClass
@@ -1969,12 +1990,13 @@ export function StudioWorkspaceMenu({
                                   strokeWidth={STUDIO_ICON_STROKE}
                                   aria-hidden
                                   className={studioChromeIconClass({ tone: "default" })}
-                                /> {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "저장 배치 복제")}</button>
+                                /> 저장 배치 복제
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => moveWorkspaceInCatalog(workspace.id, "up")}
                                 disabled={!canMoveUp || reorderBlockedBySearch}
-                                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "{v0} 위로 이동"), { v0: String(workspace.name) })}
+                                aria-label={`${workspace.name} 위로 이동`}
                                 aria-keyshortcuts="Alt+ArrowUp"
                                 className={cn(
                                   "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg bg-raised px-2 text-[0.6875rem] font-bold text-fg-2 hover:text-fg disabled:cursor-not-allowed disabled:opacity-35",
@@ -1986,12 +2008,13 @@ export function StudioWorkspaceMenu({
                                   strokeWidth={STUDIO_ICON_STROKE}
                                   aria-hidden
                                   className={studioChromeIconClass({ tone: "default" })}
-                                /> {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "위로")}</button>
+                                /> 위로
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => moveWorkspaceInCatalog(workspace.id, "down")}
                                 disabled={!canMoveDown || reorderBlockedBySearch}
-                                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "{v0} 아래로 이동"), { v0: String(workspace.name) })}
+                                aria-label={`${workspace.name} 아래로 이동`}
                                 aria-keyshortcuts="Alt+ArrowDown"
                                 className={cn(
                                   "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg bg-raised px-2 text-[0.6875rem] font-bold text-fg-2 hover:text-fg disabled:cursor-not-allowed disabled:opacity-35",
@@ -2003,7 +2026,8 @@ export function StudioWorkspaceMenu({
                                   strokeWidth={STUDIO_ICON_STROKE}
                                   aria-hidden
                                   className={studioChromeIconClass({ tone: "default" })}
-                                /> {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "아래로")}</button>
+                                /> 아래로
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => {
@@ -2018,7 +2042,8 @@ export function StudioWorkspaceMenu({
                                   strokeWidth={STUDIO_ICON_STROKE}
                                   aria-hidden
                                   className={studioChromeIconClass({ tone: "danger" })}
-                                /> {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "삭제")}</button>
+                                /> 삭제
+                              </button>
                             </div>
 
                             <form
@@ -2026,11 +2051,12 @@ export function StudioWorkspaceMenu({
                               onSubmit={submitRename}
                               className="mt-2 border-t border-line pt-2"
                             >
-                              <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-{v1}-rename"), { v0: String(dialogId), v1: String(workspace.id) })} className="text-[0.6875rem] font-bold text-fg-2">
-                                {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "작업공간 이름 변경")}</label>
+                              <label htmlFor={`${dialogId}-${workspace.id}-rename`} className="text-[0.6875rem] font-bold text-fg-2">
+                                작업공간 이름 변경
+                              </label>
                               <input
                                 ref={renaming ? renameInputRef : undefined}
-                                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-{v1}-rename"), { v0: String(dialogId), v1: String(workspace.id) })}
+                                id={`${dialogId}-${workspace.id}-rename`}
                                 value={renaming ? renameName : workspace.name}
                                 onChange={(event) => setRenameName(event.currentTarget.value)}
                                 maxLength={STUDIO_WORKSPACE_NAME_MAX_LENGTH}
@@ -2047,12 +2073,14 @@ export function StudioWorkspaceMenu({
                                   }}
                                   className={cn("min-h-11 min-w-0 rounded-lg text-xs font-bold text-fg-2 hover:bg-raised", focusClass)}
                                 >
-                                  {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "취소")}</button>
+                                  취소
+                                </button>
                                 <button
                                   type="submit"
                                   className={cn("min-h-11 min-w-0 rounded-lg bg-accent text-xs font-bold text-on-accent hover:bg-accent-2", focusClass)}
                                 >
-                                  {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "이름 저장")}</button>
+                                  이름 저장
+                                </button>
                               </div>
                             </form>
 
@@ -2062,7 +2090,8 @@ export function StudioWorkspaceMenu({
                               className="mt-2 border-t border-bad/25 pt-2"
                             >
                               <p className="text-[0.6875rem] leading-relaxed text-fg-2">
-                                “{workspace.name}{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "”을 삭제할까요? 원고 내용은 삭제되지 않아요.")}{active && dirty ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", " 저장하지 않은 배치 변경도 사라집니다.") : ""}
+                                “{workspace.name}”을 삭제할까요? 원고 내용은 삭제되지 않아요.
+                                {active && dirty ? " 저장하지 않은 배치 변경도 사라집니다." : ""}
                               </p>
                               <div className="mt-1.5 grid min-w-0 grid-cols-2 gap-1.5">
                                 <button
@@ -2070,13 +2099,15 @@ export function StudioWorkspaceMenu({
                                   onClick={() => setConfirmDeleteId(null)}
                                   className={cn("min-h-11 min-w-0 rounded-lg text-xs font-bold text-fg-2 hover:bg-raised", focusClass)}
                                 >
-                                  {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "유지")}</button>
+                                  유지
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => confirmDeleteWorkspace(workspace.id)}
                                   className={cn("min-h-11 min-w-0 rounded-lg bg-bad text-xs font-bold text-fg hover:brightness-110", focusClass)}
                                 >
-                                  {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "작업공간 삭제")}</button>
+                                  작업공간 삭제
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -2090,7 +2121,7 @@ export function StudioWorkspaceMenu({
 
             <section
               hidden={view !== "manage" || manageTab !== "preferences"}
-              aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-preferences"), { v0: String(titleId) })}
+              aria-labelledby={`${titleId}-preferences`}
               data-workspace-view="manage-preferences"
             >
               <div className="mb-1.5 flex items-center gap-1.5 text-fg-2">
@@ -2100,15 +2131,16 @@ export function StudioWorkspaceMenu({
                   aria-hidden
                   className={studioChromeIconClass({ tone: "default" })}
                 />
-                <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-preferences"), { v0: String(titleId) })} className="text-[0.6875rem] font-bold">
-                  {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "전환 설정")}</h3>
+                <h3 id={`${titleId}-preferences`} className="text-[0.6875rem] font-bold">
+                  전환 설정
+                </h3>
               </div>
               <div className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-card">
                 <button
                   type="button"
                   role="switch"
                   aria-checked={syncedState.applyQuickActionsOnSwitch}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "주요 도구도 함께 전환: {v0}"), { v0: String(syncedState.applyQuickActionsOnSwitch ? "켬" : "끔") })}
+                  aria-label={`주요 도구도 함께 전환: ${syncedState.applyQuickActionsOnSwitch ? "켬" : "끔"}`}
                   onClick={() =>
                     updateDevicePreferences({
                       applyQuickActionsOnSwitch:
@@ -2118,17 +2150,18 @@ export function StudioWorkspaceMenu({
                   className={cn("flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left hover:bg-raised pointer-coarse:min-h-11", focusClass)}
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block text-xs font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "주요 도구도 함께 전환")}</span>
+                    <span className="block text-xs font-bold text-fg-2">주요 도구도 함께 전환</span>
                     <span className="mt-0.5 block text-[0.6875rem] leading-relaxed text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "끄면 현재 6방향 퀵 액션 배치를 유지해요.")}</span>
+                      끄면 현재 6방향 퀵 액션 배치를 유지해요.
+                    </span>
                   </span>
                   <SwitchIndicator checked={syncedState.applyQuickActionsOnSwitch} />
                 </button>
 
                 <div className="px-3 py-2">
-                  <p className="text-xs font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "모바일 주요 도구 위치")}</p>
-                  <p className="mt-0.5 text-[0.6875rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "주로 쓰는 손에 가까운 쪽을 선택하세요.")}</p>
-                  <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "모바일 주요 도구 위치")} className="mt-2 grid min-w-0 grid-cols-2 gap-1.5">
+                  <p className="text-xs font-bold text-fg-2">모바일 주요 도구 위치</p>
+                  <p className="mt-0.5 text-[0.6875rem] text-fg-3">주로 쓰는 손에 가까운 쪽을 선택하세요.</p>
+                  <div role="group" aria-label="모바일 주요 도구 위치" className="mt-2 grid min-w-0 grid-cols-2 gap-1.5">
                     {(["left", "right"] as const).map((side) => {
                       const selected = syncedState.mobileControlSide === side;
                       const Icon = side === "left" ? PanelLeft : PanelRight;
@@ -2137,7 +2170,7 @@ export function StudioWorkspaceMenu({
                           key={side}
                           type="button"
                           aria-pressed={selected}
-                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "모바일 주요 도구 {v0} 배치"), { v0: String(side === "left" ? "왼쪽" : "오른쪽") })}
+                          aria-label={`모바일 주요 도구 ${side === "left" ? "왼쪽" : "오른쪽"} 배치`}
                           onClick={() => updateDevicePreferences({ mobileControlSide: side })}
                           className={cn(
                             "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border text-xs font-bold transition-colors pointer-coarse:min-h-11",
@@ -2152,7 +2185,7 @@ export function StudioWorkspaceMenu({
                             strokeWidth={STUDIO_ICON_STROKE}
                             aria-hidden
                             className={studioChromeIconClass({ tone: "default" })}
-                          /> {side === "left" ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "왼쪽") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "오른쪽")}
+                          /> {side === "left" ? "왼쪽" : "오른쪽"}
                         </button>
                       );
                     })}
@@ -2160,15 +2193,15 @@ export function StudioWorkspaceMenu({
                 </div>
 
                 <div className="border-t border-line px-3 py-2">
-                  <p className="text-xs font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "기기별 배치")}</p>
+                  <p className="text-xs font-bold text-fg-2">기기별 배치</p>
                   <p className="mt-0.5 text-[0.6875rem] text-fg-3">
                     {activeIsCustom
-                      ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "저장된 배치는 그대로 두고, 기기마다 도크만 다르게 세웁니다.")
-                      : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "기본 작업공간은 고칠 수 없어요. 복사본을 저장한 뒤 조정하세요.")}
+                      ? "저장된 배치는 그대로 두고, 기기마다 도크만 다르게 세웁니다."
+                      : "기본 작업공간은 고칠 수 없어요. 복사본을 저장한 뒤 조정하세요."}
                   </p>
                   <div
                     role="group"
-                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "조정할 기기")}
+                    aria-label="조정할 기기"
                     className="mt-2 grid min-w-0 grid-cols-5 gap-1"
                   >
                     {STUDIO_WORKSPACE_DEVICE_KINDS.map((device) => {
@@ -2226,7 +2259,7 @@ export function StudioWorkspaceMenu({
 
                   <div
                     role="group"
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "{v0} 주요 도구 위치"), { v0: String(DEVICE_KIND_LABELS[overrideDevice]) })}
+                    aria-label={`${DEVICE_KIND_LABELS[overrideDevice]} 주요 도구 위치`}
                     className="mt-2 grid min-w-0 grid-cols-3 gap-1.5"
                   >
                     {([null, "left", "right"] as const).map((side) => {
@@ -2241,8 +2274,8 @@ export function StudioWorkspaceMenu({
                           aria-pressed={selected}
                           aria-label={
                             side === null
-                              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "{v0}는 기본 손 위치를 따름"), { v0: String(DEVICE_KIND_LABELS[overrideDevice]) })
-                              : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "{v0} 주요 도구 {v1} 배치"), { v0: String(DEVICE_KIND_LABELS[overrideDevice]), v1: String(label) })
+                              ? `${DEVICE_KIND_LABELS[overrideDevice]}는 기본 손 위치를 따름`
+                              : `${DEVICE_KIND_LABELS[overrideDevice]} 주요 도구 ${label} 배치`
                           }
                           onClick={() =>
                             changeDeviceOverride(
@@ -2291,7 +2324,8 @@ export function StudioWorkspaceMenu({
                         strokeWidth={STUDIO_ICON_STROKE}
                         aria-hidden
                         className={studioChromeIconClass({ tone: "default" })}
-                      /> {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "지금 도크로")}</button>
+                      /> 지금 도크로
+                    </button>
                     <button
                       type="button"
                       disabled={!activeIsCustom || !activeDeviceOverride}
@@ -2312,7 +2346,8 @@ export function StudioWorkspaceMenu({
                         strokeWidth={STUDIO_ICON_STROKE}
                         aria-hidden
                         className={studioChromeIconClass({ tone: "default" })}
-                      /> {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "조정 지우기")}</button>
+                      /> 조정 지우기
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2334,7 +2369,7 @@ export function StudioWorkspaceMenu({
               type="button"
               hidden={view !== "switch"}
               onClick={openWorkspaceManager}
-              aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-management-tabs"), { v0: String(dialogId) })}
+              aria-controls={`${dialogId}-management-tabs`}
               className={cn(
                 "flex min-h-11 w-full min-w-0 items-center gap-2 rounded-lg border border-line bg-panel px-3 text-left text-xs font-bold text-fg-2 hover:border-accent/40 hover:bg-raised hover:text-fg",
                 focusClass
@@ -2346,7 +2381,7 @@ export function StudioWorkspaceMenu({
                 aria-hidden
                 className={studioChromeIconClass({ tone: "default" })}
               />
-              <span className="min-w-0 flex-1 truncate">{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "작업공간 관리")}</span>
+              <span className="min-w-0 flex-1 truncate">작업공간 관리</span>
               <ChevronRight
                 size={STUDIO_ICON_SIZE.contextMenu}
                 strokeWidth={STUDIO_ICON_STROKE}
@@ -2364,11 +2399,12 @@ export function StudioWorkspaceMenu({
               )}
             >
               {effectivePersistence.status === "persisted"
-                ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "이 기기 저장 확인됨")
+                ? "이 기기 저장 확인됨"
                 : effectivePersistence.failure
-                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "{v0} 이 세션에서만 유지"), { v0: String(persistenceFailureText(effectivePersistence.failure)) })
-                  : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "아직 이 기기에 저장되지 않음 · 변경하면 저장 여부 확인")}
-              {" · "}{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "현재 브라우저와 계정 범위 · 원고와 AI 설정은 포함하지 않아요.")}</p>
+                  ? `${persistenceFailureText(effectivePersistence.failure)} 이 세션에서만 유지`
+                  : "아직 이 기기에 저장되지 않음 · 변경하면 저장 여부 확인"}
+              {" · "}현재 브라우저와 계정 범위 · 원고와 AI 설정은 포함하지 않아요.
+            </p>
           </footer>
         </div>
 
@@ -2393,12 +2429,15 @@ export function StudioWorkspaceMenu({
               />
             </span>
             <h3 id={switchGuardTitleId} className="mt-3 text-sm font-bold text-fg">
-              {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "변경을 저장하고 전환할까요?")}</h3>
+              변경을 저장하고 전환할까요?
+            </h3>
             <p id={switchGuardDescriptionId} className="mt-1.5 text-xs leading-relaxed text-fg-2">
-              “{activeWorkspace?.name ?? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "현재 작업공간")}{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "”의 배치가 변경되었습니다. “")}{pendingWorkspace?.name ?? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "선택한 작업공간")}{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "”(으)로 전환하기 전에 저장 방법을 선택하세요.")}</p>
+              “{activeWorkspace?.name ?? "현재 작업공간"}”의 배치가 변경되었습니다. “{pendingWorkspace?.name ?? "선택한 작업공간"}”(으)로 전환하기 전에 저장 방법을 선택하세요.
+            </p>
             {!activeIsCustom ? (
               <p className="mt-2 text-[0.6875rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "기본 작업공간은 수정할 수 없어 “")}{createStudioWorkspaceCopyName(activeWorkspace?.name ?? "작업공간")}{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "”으로 저장합니다.")}</p>
+                기본 작업공간은 수정할 수 없어 “{createStudioWorkspaceCopyName(activeWorkspace?.name ?? "작업공간")}”으로 저장합니다.
+              </p>
             ) : null}
             <div className="mt-4 grid min-w-0 gap-1.5">
               <button
@@ -2407,28 +2446,31 @@ export function StudioWorkspaceMenu({
                 onClick={cancelPendingSwitch}
                 className={cn("min-h-11 min-w-0 rounded-lg border border-line text-xs font-bold text-fg-2 hover:bg-raised hover:text-fg", focusClass)}
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "취소")}</button>
+                취소
+              </button>
               <button
                 type="button"
                 onClick={discardAndSwitch}
                 className={cn("min-h-11 min-w-0 rounded-lg border border-warn/40 bg-warn/10 px-3 text-xs font-bold text-warn hover:bg-warn/15", focusClass)}
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "저장하지 않고 전환")}</button>
+                저장하지 않고 전환
+              </button>
               <button
                 type="button"
                 onClick={saveAndSwitch}
                 disabled={!activeIsCustom && atCustomLimit}
-                aria-describedby={!activeIsCustom && atCustomLimit ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-limit"), { v0: String(switchGuardDescriptionId) }) : undefined}
+                aria-describedby={!activeIsCustom && atCustomLimit ? `${switchGuardDescriptionId}-limit` : undefined}
                 className={cn("min-h-11 min-w-0 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-45", focusClass)}
               >
-                {activeIsCustom ? translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "변경 저장 후 전환") : translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "사본 저장 후 전환")}
+                {activeIsCustom ? "변경 저장 후 전환" : "사본 저장 후 전환"}
               </button>
             </div>
             {!activeIsCustom && atCustomLimit ? (
-              <p id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "en", "{v0}-limit"), { v0: String(switchGuardDescriptionId) })} className="mt-2 text-[0.6875rem] leading-relaxed text-warn">
-                {translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "내 작업공간이 24개라 사본을 만들 수 없어요. 취소한 뒤 하나를 삭제하거나 저장하지 않고 전환하세요.")}</p>
+              <p id={`${switchGuardDescriptionId}-limit`} className="mt-2 text-[0.6875rem] leading-relaxed text-warn">
+                내 작업공간이 24개라 사본을 만들 수 없어요. 취소한 뒤 하나를 삭제하거나 저장하지 않고 전환하세요.
+              </p>
             ) : null}
-            <p className="mt-3 text-[0.6875rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioWorkspaceMenu", "ko", "Esc를 누르면 전환을 취소합니다.")}</p>
+            <p className="mt-3 text-[0.6875rem] text-fg-3">Esc를 누르면 전환을 취소합니다.</p>
           </div>
         </div>
         </section>

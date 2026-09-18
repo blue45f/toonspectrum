@@ -40,7 +40,7 @@ export const DESTINATION_ART = {
   discover: "world", research: "materials", learn: "process", market: "materials",
   showcase: "world", community: "process", calendar: "world", library: "materials",
 } as const satisfies Record<string, ArtworkKind>;
-export const ART_VIEW_LABELS: Record<"ko" | "en", Record<ArtworkView, string>> = {
+export const ART_VIEW_LABELS: Record<ExperienceLocale, Record<ArtworkView, string>> = {
   ko: { art: "작품", values: "명암", composition: "구도" },
   en: { art: "Artwork", values: "Values", composition: "Composition" },
 };

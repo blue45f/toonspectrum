@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Puppet Warp Panel
  * 퍼펫 워프(핀 메쉬 변형) 인스펙터 — 모드 토글 + 핀 목록(삭제) + 초기화/적용/취소.
@@ -69,20 +65,21 @@ export function StudioPuppetWarpPanel({
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">
           <Waypoints size={12} aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "퍼펫 워프")}</p>
+          퍼펫 워프
+        </p>
         <StudioToggleChip
           active={active}
           disabled={busy}
           onClick={onToggle}
           title={
             busy
-              ? translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "현재 변형을 적용한 뒤 퍼펫 워프를 종료할 수 있습니다.")
+              ? "현재 변형을 적용한 뒤 퍼펫 워프를 종료할 수 있습니다."
               : active
-              ? translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "퍼펫 워프를 끕니다(놓은 핀은 버려집니다).")
-              : translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "퍼펫 워프를 켜고 이미지 위에 핀을 놓아 모양을 변형합니다.")
+              ? "퍼펫 워프를 끕니다(놓은 핀은 버려집니다)."
+              : "퍼펫 워프를 켜고 이미지 위에 핀을 놓아 모양을 변형합니다."
           }
         >
-          {active ? translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "조정 중") : translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "시작")}
+          {active ? "조정 중" : "시작"}
         </StudioToggleChip>
       </div>
 
@@ -98,19 +95,19 @@ export function StudioPuppetWarpPanel({
                 const moved = p.x !== p.restX || p.y !== p.restY;
                 return (
                   <li key={p.id} className="flex items-center gap-1.5">
-                    <span className="w-14 shrink-0 text-[0.68rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "핀 ")}{index + 1}</span>
+                    <span className="w-14 shrink-0 text-[0.68rem] font-semibold text-fg-3">핀 {index + 1}</span>
                     <span
                       className={cn(
                         "flex-1 truncate text-[0.68rem]",
                         moved ? "text-accent" : "text-fg-3"
                       )}
                     >
-                      {moved ? translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "이동됨") : translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "원본 위치")}
+                      {moved ? "이동됨" : "원본 위치"}
                     </span>
                     <button
                       type="button"
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "핀 {v0} 삭제"), { v0: String(index + 1) })}
-                      title={translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "이 핀 삭제")}
+                      aria-label={`핀 ${index + 1} 삭제`}
+                      title="이 핀 삭제"
                       disabled={busy}
                       onClick={() => onRemovePin(p.id)}
                       className="grid size-6 shrink-0 place-items-center rounded border border-line text-fg-3 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-45"
@@ -127,7 +124,7 @@ export function StudioPuppetWarpPanel({
             <p id={statusId} className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
               {statusText}
               {!busy && canApply
-                ? translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", " 팔다리를 굽히는 정도의 자연스러운 범위를 권장합니다.")
+                ? " 팔다리를 굽히는 정도의 자연스러운 범위를 권장합니다."
                 : null}
             </p>
           ) : null}
@@ -140,15 +137,15 @@ export function StudioPuppetWarpPanel({
               aria-describedby={statusId}
               className={cn(buttonClass({ size: "sm", variant: "solid" }), "flex-1 gap-1")}
               title={busy
-                ? translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "현재 변형을 적용하는 중입니다.")
+                ? "현재 변형을 적용하는 중입니다."
                 : !canApply
                   ? pins.length === 0
-                    ? translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "이미지에 핀을 먼저 놓으세요.")
-                    : translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "핀을 원본 위치에서 움직인 뒤 적용하세요.")
-                  : translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "지금 핀 배치대로 이미지를 원본 해상도로 왜곡해 반영합니다(⌘Z 복구 가능).")}
+                    ? "이미지에 핀을 먼저 놓으세요."
+                    : "핀을 원본 위치에서 움직인 뒤 적용하세요."
+                  : "지금 핀 배치대로 이미지를 원본 해상도로 왜곡해 반영합니다(⌘Z 복구 가능)."}
             >
               <Check className="size-3.5" aria-hidden />
-              {busy ? translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "적용 중...") : translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "적용")}
+              {busy ? "적용 중..." : "적용"}
             </button>
             <button
               type="button"
@@ -157,27 +154,31 @@ export function StudioPuppetWarpPanel({
               aria-describedby={statusId}
               className={buttonClass({ size: "sm", variant: "quiet" })}
               title={busy
-                ? translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "현재 변형을 적용하는 중입니다.")
+                ? "현재 변형을 적용하는 중입니다."
                 : pins.length === 0
-                  ? translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "되돌릴 핀이 아직 없습니다.")
-                  : translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "핀은 그대로 두고 전부 원본 위치로 되돌립니다.")}
+                  ? "되돌릴 핀이 아직 없습니다."
+                  : "핀은 그대로 두고 전부 원본 위치로 되돌립니다."}
             >
               <RotateCcw className="size-3.5" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "초기화")}</button>
+              초기화
+            </button>
             <button
               type="button"
               onClick={onCancel}
               disabled={busy}
               className={buttonClass({ size: "sm", variant: "quiet" })}
-              title={translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "핀을 전부 버리고 퍼펫 워프를 종료합니다(Esc).")}
+              title="핀을 전부 버리고 퍼펫 워프를 종료합니다(Esc)."
             >
               <X className="size-3.5" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "취소")}</button>
+              취소
+            </button>
           </div>
         </>
       ) : (
         <p className="text-[0.72rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioPuppetWarpPanel", "ko", "퍼펫 워프를 시작하면 이미지 위에 핀을 놓아 인형 관절처럼 부분부분 굽히거나 늘릴 수 있어요.")}</p>
+          퍼펫 워프를 시작하면 이미지 위에 핀을 놓아 인형 관절처럼 부분부분 굽히거나 늘릴 수
+          있어요.
+        </p>
       )}
     </div>
   );

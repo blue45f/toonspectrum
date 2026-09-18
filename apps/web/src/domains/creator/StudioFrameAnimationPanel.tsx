@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioFrameAnimationPanel — 선택한 이미지 셀을 프레임별로 그려 플립북 애니메이션으로 만드는
  * 자체완결 플로팅 패널(StudioHistoryPanel/StudioMotionExportPanel과 같은 층위). 프레임 배열
@@ -287,19 +283,20 @@ export function StudioFrameAnimationPanel({
 
   return (
     <section
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "프레임 애니메이션")}
+      aria-label="프레임 애니메이션"
       className="absolute right-3 top-3 z-40 flex max-h-[calc(100%-5rem)] w-[min(19rem,calc(100%-1.5rem))] flex-col overflow-hidden rounded-xl border border-line bg-panel/95 shadow-xl backdrop-blur"
     >
       {/* 헤더 */}
       <div className="flex items-center justify-between gap-2 border-b border-line/60 px-3 py-2">
         <p className="flex items-center gap-1.5 text-xs font-bold text-fg">
           <Film size={13} className="shrink-0 text-fg-3" aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "프레임 애니메이션")}<span className="font-medium text-fg-3">{frames.length}{translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "장")}</span>
+          프레임 애니메이션
+          <span className="font-medium text-fg-3">{frames.length}장</span>
         </p>
         <button
           type="button"
           onClick={onClose}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "프레임 애니메이션 패널 닫기")}
+          aria-label="프레임 애니메이션 패널 닫기"
           className="grid size-6 place-items-center rounded-lg border border-line text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           <X size={13} />
@@ -309,11 +306,12 @@ export function StudioFrameAnimationPanel({
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-2.5">
         {frames.length === 0 && (
           <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
-            {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "아래 버튼으로 현재 그림을 첫 프레임으로 캡처해 애니메이션을 시작하세요.")}</p>
+            아래 버튼으로 현재 그림을 첫 프레임으로 캡처해 애니메이션을 시작하세요.
+          </p>
         )}
         {frames.length > 0 && (
             /* 필름스트립 */
-            <div className="flex gap-1.5 overflow-x-auto pb-1" role="listbox" aria-label={translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "프레임 목록")}>
+            <div className="flex gap-1.5 overflow-x-auto pb-1" role="listbox" aria-label="프레임 목록">
               {frames.map((f, i) => {
                 const isHighlighted = f.id === highlightId;
                 return (
@@ -323,13 +321,13 @@ export function StudioFrameAnimationPanel({
                       role="option"
                       aria-selected={isHighlighted}
                       onClick={() => onActiveFrameChange(f.id)}
-                      title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "프레임 {v0}"), { v0: String(i + 1) })}
+                      title={`프레임 ${i + 1}`}
                       className={cn(
                         "block size-14 overflow-hidden rounded-lg border-2 bg-card/40 transition-colors",
                         isHighlighted ? "border-accent" : "border-line hover:border-line-strong"
                       )}
                     >
-                      <img src={f.src} alt={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "프레임 {v0}"), { v0: String(i + 1) })} className="size-full object-contain" draggable={false} />
+                      <img src={f.src} alt={`프레임 ${i + 1}`} className="size-full object-contain" draggable={false} />
                     </button>
                     <span className="pointer-events-none absolute left-0.5 top-0.5 rounded bg-canvas/80 px-1 text-[0.6rem] font-semibold tabular-nums text-fg-3">
                       {i + 1}
@@ -343,7 +341,7 @@ export function StudioFrameAnimationPanel({
         {activeFrame ? (
           <div
             role="toolbar"
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "선택 프레임 {v0} 작업"), { v0: String(activeIndex + 1) })}
+            aria-label={`선택 프레임 ${activeIndex + 1} 작업`}
             className="grid grid-cols-4 gap-1 rounded-xl border border-line bg-card/45 p-1"
           >
             <StudioToolHintTarget
@@ -360,13 +358,14 @@ export function StudioFrameAnimationPanel({
             >
               <button
                 type="button"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "프레임을 앞으로 이동")}
+                aria-label="프레임을 앞으로 이동"
                 onClick={() => onFramesChange(reorderFrame(frames, activeFrame.id, activeIndex - 1))}
                 disabled={Boolean(previousFrameDisabledReason)}
                 className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:opacity-35"
               >
                 <ChevronLeft size={14} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "앞으로")}</button>
+                앞으로
+              </button>
             </StudioToolHintTarget>
             <StudioToolHintTarget
               className="w-full"
@@ -382,13 +381,14 @@ export function StudioFrameAnimationPanel({
             >
               <button
                 type="button"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "프레임 복제")}
+                aria-label="프레임 복제"
                 onClick={() => onFramesChange(duplicateFrame(frames, activeFrame.id, crypto.randomUUID()))}
                 disabled={Boolean(duplicateFrameDisabledReason)}
                 className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:opacity-35"
               >
                 <Copy size={14} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "복제")}</button>
+                복제
+              </button>
             </StudioToolHintTarget>
             <StudioToolHintTarget
               className="w-full"
@@ -404,13 +404,14 @@ export function StudioFrameAnimationPanel({
             >
               <button
                 type="button"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "프레임 삭제")}
+                aria-label="프레임 삭제"
                 onClick={deleteActiveFrame}
                 disabled={Boolean(deleteFrameDisabledReason)}
                 className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-[0.65rem] font-semibold text-bad transition-colors hover:bg-bad/10 disabled:opacity-35"
               >
                 <Trash2 size={14} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "삭제")}</button>
+                삭제
+              </button>
             </StudioToolHintTarget>
             <StudioToolHintTarget
               className="w-full"
@@ -426,13 +427,14 @@ export function StudioFrameAnimationPanel({
             >
               <button
                 type="button"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "프레임을 뒤로 이동")}
+                aria-label="프레임을 뒤로 이동"
                 onClick={() => onFramesChange(reorderFrame(frames, activeFrame.id, activeIndex + 1))}
                 disabled={Boolean(nextFrameDisabledReason)}
                 className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:opacity-35"
               >
                 <ChevronRight size={14} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "뒤로")}</button>
+                뒤로
+              </button>
             </StudioToolHintTarget>
           </div>
         ) : null}
@@ -459,7 +461,8 @@ export function StudioFrameAnimationPanel({
               className={cn(buttonClass({ size: "sm", variant: "solid" }), "w-full gap-1.5")}
             >
               <Film size={13} />
-              {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "현재 그림을 새 프레임으로 캡처")}</button>
+              현재 그림을 새 프레임으로 캡처
+            </button>
           </StudioToolHintTarget>
           {captureReason && (
             <p className="text-[0.7rem] text-fg-3" role="status">
@@ -473,7 +476,8 @@ export function StudioFrameAnimationPanel({
             {/* 프레임 개별 시간 */}
             {activeFrame && (
               <label className={PANEL_LABEL_ROW}>
-                {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "이 프레임만 다르게 (ms)")}<input
+                이 프레임만 다르게 (ms)
+                <input
                   type="number"
                   min={16}
                   max={60000}
@@ -492,7 +496,7 @@ export function StudioFrameAnimationPanel({
             {/* 재생 설정 + 미리보기 */}
             <div className="space-y-1.5 border-t border-line/60 pt-2">
               <StudioSliderRow
-                label={translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "재생 속도 (fps)")}
+                label="재생 속도 (fps)"
                 min={MIN_FRAME_FPS}
                 max={MAX_FRAME_FPS}
                 step={1}
@@ -501,8 +505,9 @@ export function StudioFrameAnimationPanel({
                 readout={`${fps}`}
               />
               <div className="flex items-center justify-between gap-2">
-                <StudioToggleChip active={loop} onClick={() => onSettingsChange({ frameLoop: !loop })} title={translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "반복 재생 켜기/끄기")}>
-                  {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "반복 재생")}</StudioToggleChip>
+                <StudioToggleChip active={loop} onClick={() => onSettingsChange({ frameLoop: !loop })} title="반복 재생 켜기/끄기">
+                  반복 재생
+                </StudioToggleChip>
                 <span className="text-[0.72rem] tabular-nums text-fg-3">
                   {highlightIndex >= 0 ? highlightIndex + 1 : activeIndex + 1} / {frames.length}
                 </span>
@@ -535,7 +540,7 @@ export function StudioFrameAnimationPanel({
                   className={cn(buttonClass({ size: "sm", variant: "outline" }), "w-full gap-1.5")}
                 >
                   {playing ? <Pause size={13} /> : <Play size={13} />}
-                  {playing ? translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "정지") : translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "재생")}
+                  {playing ? "정지" : "재생"}
                 </button>
               </StudioToolHintTarget>
             </div>
@@ -544,7 +549,8 @@ export function StudioFrameAnimationPanel({
             <div className="space-y-1.5 border-t border-line/60 pt-2">
               <p className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">
                 <Ghost size={12} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "어니언스키닝")}</p>
+                어니언스키닝
+              </p>
               <StudioToolHintTarget
                 preferredSide="left"
                 hint={{
@@ -559,7 +565,8 @@ export function StudioFrameAnimationPanel({
                   active={onionSkin.enabled}
                   onClick={() => onOnionSkinChange({ ...onionSkin, enabled: !onionSkin.enabled })}
                 >
-                  {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "어니언스키닝 사용")}</StudioToggleChip>
+                  어니언스키닝 사용
+                </StudioToggleChip>
               </StudioToolHintTarget>
               {onionSkin.enabled && (
                 <>
@@ -574,7 +581,7 @@ export function StudioFrameAnimationPanel({
                     }}
                   >
                     <StudioSliderRow
-                      label={translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "이전 프레임 수")}
+                      label="이전 프레임 수"
                       min={0}
                       max={3}
                       step={1}
@@ -593,7 +600,7 @@ export function StudioFrameAnimationPanel({
                     }}
                   >
                     <StudioSliderRow
-                      label={translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "다음 프레임 수")}
+                      label="다음 프레임 수"
                       min={0}
                       max={3}
                       step={1}
@@ -612,7 +619,7 @@ export function StudioFrameAnimationPanel({
                     }}
                   >
                     <StudioSliderRow
-                      label={translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "투명도")}
+                      label="투명도"
                       min={0.1}
                       max={0.8}
                       step={0.05}
@@ -638,7 +645,8 @@ export function StudioFrameAnimationPanel({
                         onChange={(e) => onOnionSkinChange({ ...onionSkin, tint: e.target.checked })}
                         className="size-3.5 cursor-pointer accent-[var(--color-accent)]"
                       />
-                      {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "색으로 구분 (이전=빨강 · 다음=파랑)")}</label>
+                      색으로 구분 (이전=빨강 · 다음=파랑)
+                    </label>
                   </StudioToolHintTarget>
                 </>
               )}
@@ -653,15 +661,18 @@ export function StudioFrameAnimationPanel({
                 className="flex w-full items-center gap-1.5 px-2.5 py-2 text-xs font-medium text-fg-2 transition-colors hover:text-fg"
               >
                 <Download size={13} className="text-accent" />
-                {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "애니메이션 내보내기 (WebM · GIF · APNG)")}</button>
+                애니메이션 내보내기 (WebM · GIF · APNG)
+              </button>
               {exportOpen &&
                 (frames.length < 2 ? (
                   <p className="border-t border-line px-2.5 py-2 text-[0.7rem] text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "프레임이 2장 이상일 때 애니메이션을 내보낼 수 있어요.")}</p>
+                    프레임이 2장 이상일 때 애니메이션을 내보낼 수 있어요.
+                  </p>
                 ) : (
                   <div className="flex flex-col gap-2.5 border-t border-line px-2.5 py-2.5">
                     <label className="flex flex-col gap-1 text-xs text-fg-2">
-                      {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "포맷")}<select
+                      포맷
+                      <select
                         value={format}
                         onChange={(e) => setFormat(e.target.value as StudioFrameAnimExportFormat)}
                         disabled={exporting}
@@ -677,12 +688,13 @@ export function StudioFrameAnimationPanel({
 
                     <p className="text-[0.7rem] text-fg-3">
                       {format === "webm"
-                        ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "약 {v0} 분량으로 내보내요."), { v0: String(formatSeconds(plan.durationSec)) })
-                        : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "한 루프 {v0} — 무한 반복으로 저장돼요."), { v0: String(formatSeconds(plan.loopDurationMs / 1000)) })}
+                        ? `약 ${formatSeconds(plan.durationSec)} 분량으로 내보내요.`
+                        : `한 루프 ${formatSeconds(plan.loopDurationMs / 1000)} — 무한 반복으로 저장돼요.`}
                     </p>
 
                     <label className="flex flex-col gap-1 text-xs text-fg-2">
-                      {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "화질")}<select
+                      화질
+                      <select
                         value={scaleId}
                         onChange={(e) => setScaleId(e.target.value)}
                         disabled={exporting}
@@ -698,7 +710,8 @@ export function StudioFrameAnimationPanel({
 
                     {format === "webm" && (
                       <label className="flex flex-col gap-1 text-xs text-fg-2">
-                        {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "반복 횟수")}<select
+                        반복 횟수
+                        <select
                           value={loopId}
                           onChange={(e) => setLoopId(e.target.value)}
                           disabled={exporting}
@@ -715,7 +728,8 @@ export function StudioFrameAnimationPanel({
 
                     {format === "gif" && (
                       <label className="flex flex-col gap-1 text-xs text-fg-2">
-                        {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "디더링 (256색 축소 방식)")}<select
+                        디더링 (256색 축소 방식)
+                        <select
                           value={ditherId}
                           onChange={(e) => setDitherId(e.target.value as GifDitherMode)}
                           disabled={exporting}
@@ -739,12 +753,13 @@ export function StudioFrameAnimationPanel({
                           disabled={exporting}
                           className="size-3.5 cursor-pointer accent-[var(--color-accent)]"
                         />
-                        {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "투명 배경으로 내보내기")}</label>
+                        투명 배경으로 내보내기
+                      </label>
                     )}
 
                     {(format === "webm" || !transparentBg) && (
                       <label className="flex items-center justify-between gap-2 text-xs text-fg-2">
-                        {format === "webm" ? translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "배경색 (WebM은 투명 배경을 지원하지 않아요)") : translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "배경색")}
+                        {format === "webm" ? "배경색 (WebM은 투명 배경을 지원하지 않아요)" : "배경색"}
                         <input
                           type="color"
                           value={background}
@@ -763,7 +778,7 @@ export function StudioFrameAnimationPanel({
                         </div>
                         <div
                           role="progressbar"
-                          aria-label={translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "애니메이션 내보내기 진행률")}
+                          aria-label="애니메이션 내보내기 진행률"
                           aria-valuemin={0}
                           aria-valuemax={100}
                           aria-valuenow={progressPct}
@@ -779,11 +794,15 @@ export function StudioFrameAnimationPanel({
 
                     {format === "webm" && !webmSupported && (
                       <p className="text-xs text-bad">
-                        {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "이 브라우저는 영상 녹화(MediaRecorder/WebM)를 지원하지 않아요. GIF나 APNG 포맷을 선택하면 계속 내보낼 수 있어요.")}</p>
+                        이 브라우저는 영상 녹화(MediaRecorder/WebM)를 지원하지 않아요. GIF나 APNG 포맷을
+                        선택하면 계속 내보낼 수 있어요.
+                      </p>
                     )}
                     {format !== "webm" && !mediaSupported && (
                       <p className="text-xs text-bad">
-                        {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "이 브라우저는 캔버스 이미지 내보내기를 지원하지 않아요. 크롬·엣지·파이어폭스에서 시도해주세요.")}</p>
+                        이 브라우저는 캔버스 이미지 내보내기를 지원하지 않아요. 크롬·엣지·파이어폭스에서
+                        시도해주세요.
+                      </p>
                     )}
                     {error && <p className="text-xs text-bad">{error}</p>}
                     {doneMsg && !error && <p className="text-xs text-good">{doneMsg}</p>}
@@ -797,7 +816,8 @@ export function StudioFrameAnimationPanel({
                           className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
                         >
                           <Square size={13} />
-                          {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "취소")}</button>
+                          취소
+                        </button>
                       )}
                       <button
                         type="button"
@@ -806,7 +826,7 @@ export function StudioFrameAnimationPanel({
                         className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}
                       >
                         <Download size={14} />
-                        {format === "webm" ? translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "영상 내보내기") : format === "gif" ? translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "GIF 내보내기") : translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "APNG 내보내기")}
+                        {format === "webm" ? "영상 내보내기" : format === "gif" ? "GIF 내보내기" : "APNG 내보내기"}
                       </button>
                     </div>
                   </div>
@@ -829,7 +849,8 @@ export function StudioFrameAnimationPanel({
               className={cn(buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5 text-bad hover:text-bad" }), "w-full")}
             >
               <Trash2 size={13} />
-              {translateCurrentStaticSourceText("domains.creator.StudioFrameAnimationPanel", "ko", "애니메이션 해제")}</button>
+              애니메이션 해제
+            </button>
           </>
         )}
       </div>

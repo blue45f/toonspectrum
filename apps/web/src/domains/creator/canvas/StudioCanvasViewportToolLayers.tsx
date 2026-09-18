@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Layer, Rect, Circle as KCircle, Line, Shape, Image as KImage } from "react-konva/lib/ReactKonvaCore";
 
 import {
@@ -371,7 +370,7 @@ export function StudioCanvasViewportToolLayers({
                       ? strokeGuideRef
                       : undefined
                   }
-                  brushId={drawMode === "eraser" && !eraserPresetActive ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportToolLayers", "en", "eraser") : brush}
+                  brushId={drawMode === "eraser" && !eraserPresetActive ? "eraser" : brush}
                   diameter={
                     drawMode === "pen" || lowDensityEraserActive
                       ? studioBrushAliasEffectiveDiameter(brush, strokeWidth)
@@ -401,12 +400,12 @@ export function StudioCanvasViewportToolLayers({
                   visible={false}
                   stroke={
                     wetMixArmed
-                      ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportToolLayers", "en", "rgba(45, 212, 191, 0.42)")
+                      ? "rgba(45, 212, 191, 0.42)"
                       : dodgeBurnArmed
-                        ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportToolLayers", "en", "rgba(234, 179, 8, 0.42)")
+                        ? "rgba(234, 179, 8, 0.42)"
                         : liquifyArmed
-                          ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportToolLayers", "en", "rgba(251, 146, 60, 0.42)")
-                          : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportToolLayers", "en", "rgba(124, 92, 255, 0.42)")
+                          ? "rgba(251, 146, 60, 0.42)"
+                          : "rgba(124, 92, 255, 0.42)"
                   }
                   lineCap="round"
                   lineJoin="round"
@@ -416,7 +415,7 @@ export function StudioCanvasViewportToolLayers({
                   ref={smudgeCursorRef}
                   visible={false}
                   radius={Math.max(1.5, wetMixArmed ? wetMixRadius : dodgeBurnArmed ? dodgeBurnRadius : liquifyArmed ? liquifyRadius : smudgeRadius)}
-                  stroke={wetMixArmed ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportToolLayers", "en", "#2dd4bf") : dodgeBurnArmed ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportToolLayers", "en", "#eab308") : liquifyArmed ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportToolLayers", "en", "#fb923c") : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportToolLayers", "en", "#7c5cff")}
+                  stroke={wetMixArmed ? "#2dd4bf" : dodgeBurnArmed ? "#eab308" : liquifyArmed ? "#fb923c" : "#7c5cff"}
                   strokeWidth={1.25 / effScale}
                   dash={[3 / effScale, 3 / effScale]}
                   opacity={0.9}
@@ -457,7 +456,7 @@ export function StudioCanvasViewportToolLayers({
                 <KCircle
                   ref={healCloneCursorRef}
                   visible={false}
-                  stroke={healCloneTool === "heal" ? "#22c55e" : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasViewportToolLayers", "en", "#38bdf8")}
+                  stroke={healCloneTool === "heal" ? "#22c55e" : "#38bdf8"}
                   strokeWidth={1.5 / effScale}
                   dash={[3 / effScale, 2 / effScale]}
                 />

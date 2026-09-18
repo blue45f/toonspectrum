@@ -1,7 +1,3 @@
-import {
-  translateBilingualValueForLocale,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { CloudUpload, Link2, Loader2 } from "lucide-react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";

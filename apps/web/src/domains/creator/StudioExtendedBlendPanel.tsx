@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Extended Blend Panel
  * 확장 블렌드 병합 컨트롤 — Canvas globalCompositeOperation 에 없는 포토샵 전용 10모드
@@ -67,7 +64,8 @@ export function StudioExtendedBlendPanel({
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
           <Blend size={12} aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.StudioExtendedBlendPanel", "ko", "확장 블렌드 병합")}</p>
+          확장 블렌드 병합
+        </p>
         {busy && <Loader2 size={13} className="animate-spin text-accent" aria-hidden />}
       </div>
 
@@ -78,7 +76,7 @@ export function StudioExtendedBlendPanel({
             active={mode === entry.id}
             disabled={busy}
             onClick={() => onModeChange(entry.id)}
-            title={busy ? translateCurrentStaticSourceText("domains.creator.StudioExtendedBlendPanel", "ko", "병합이 끝난 뒤 모드를 바꿀 수 있습니다.") : entry.tip}
+            title={busy ? "병합이 끝난 뒤 모드를 바꿀 수 있습니다." : entry.tip}
           >
             {entry.label}
           </StudioToggleChip>
@@ -86,7 +84,7 @@ export function StudioExtendedBlendPanel({
       </div>
 
       <StudioSliderRow
-        label={translateCurrentStaticSourceText("domains.creator.StudioExtendedBlendPanel", "ko", "불투명도")}
+        label="불투명도"
         min={EXTENDED_BLEND_OPACITY_RANGE.min}
         max={EXTENDED_BLEND_OPACITY_RANGE.max}
         step={EXTENDED_BLEND_OPACITY_RANGE.step}
@@ -99,7 +97,7 @@ export function StudioExtendedBlendPanel({
       {previewDataUrl && (
         <img
           src={previewDataUrl}
-          alt={translateCurrentStaticSourceText("domains.creator.StudioExtendedBlendPanel", "ko", "확장 블렌드 미리보기")}
+          alt="확장 블렌드 미리보기"
           className="h-16 w-full rounded-lg border border-line bg-raised object-contain"
         />
       )}
@@ -110,7 +108,7 @@ export function StudioExtendedBlendPanel({
         disabled={applyDisabled}
         title={
           unavailableReason
-            ?? translateCurrentStaticSourceText("domains.creator.StudioExtendedBlendPanel", "ko", "선택한 이미지와 바로 아래 이미지를 확장 블렌드로 합쳐 하나의 이미지로 만듭니다.")
+            ?? "선택한 이미지와 바로 아래 이미지를 확장 블렌드로 합쳐 하나의 이미지로 만듭니다."
         }
         className={cn(
           PANEL_CHIP_CLASS,
@@ -121,7 +119,8 @@ export function StudioExtendedBlendPanel({
         {busy
           ? <Loader2 className="size-3 animate-spin" aria-hidden />
           : <Layers2 className="size-3" aria-hidden />}
-        {translateCurrentStaticSourceText("domains.creator.StudioExtendedBlendPanel", "ko", "아래 레이어와 병합")}</button>
+        아래 레이어와 병합
+      </button>
 
       <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
         {statusText}

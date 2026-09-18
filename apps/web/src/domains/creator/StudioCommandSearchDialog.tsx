@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * 통합 Command Search — 감사 §2.8 이 지적한 네 개의 부분 검색창을 대신하는
  * 단일 표면.
@@ -483,7 +479,8 @@ export function StudioCommandSearchDialog({
             className={studioChromeIconClass({ tone: "muted" })}
           />
           <h2 id={titleId} className="sr-only">
-            {translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "기능·설정 찾기")}</h2>
+            기능·설정 찾기
+          </h2>
           {/*
             콤보박스 계약(WAI-ARIA APG). `role="searchbox"` 였을 때는 결과 목록이
             보조기술에 아예 존재하지 않았고 ↑↓ 하이라이트도 `data-active` 라는
@@ -512,7 +509,7 @@ export function StudioCommandSearchDialog({
           <button
             type="button"
             onClick={() => onClose()}
-            title={translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "닫기 (Esc)")}
+            title="닫기 (Esc)"
             className="flex size-8 shrink-0 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <X
@@ -521,7 +518,7 @@ export function StudioCommandSearchDialog({
               aria-hidden
               className={studioChromeIconClass({ tone: "default" })}
             />
-            <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "검색 닫기")}</span>
+            <span className="sr-only">검색 닫기</span>
           </button>
         </div>
 
@@ -531,7 +528,7 @@ export function StudioCommandSearchDialog({
         */}
         <div
           role="radiogroup"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "검색 범위")}
+          aria-label="검색 범위"
           id={scopeGroupId}
           data-studio-command-search-scope={scope}
           className="flex flex-wrap items-center gap-1 border-b border-line px-3 py-1.5"
@@ -546,9 +543,11 @@ export function StudioCommandSearchDialog({
                 aria-checked={checked}
                 data-scope={candidate}
                 onClick={() => setScope(candidate)}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "en", "min-h-8 rounded-full border px-2.5 text-[0.6875rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(checked
+                className={`min-h-8 rounded-full border px-2.5 text-[0.6875rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                  checked
                     ? "border-accent bg-accent-soft text-accent"
-                    : "border-line text-fg-3 hover:bg-raised hover:text-fg") })}
+                    : "border-line text-fg-3 hover:bg-raised hover:text-fg"
+                }`}
               >
                 {SCOPE_LABELS[candidate]}
               </button>
@@ -558,8 +557,8 @@ export function StudioCommandSearchDialog({
 
         <p role="status" aria-live="polite" className="sr-only">
           {query.trim().length === 0
-            ? translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "검색어를 입력하세요.")
-            : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "{v0}개 중 {v1}개를 표시합니다."), { v0: String(outcome.totalMatched), v1: String(outcome.totalShown) })}
+            ? "검색어를 입력하세요."
+            : `${outcome.totalMatched}개 중 ${outcome.totalShown}개를 표시합니다.`}
         </p>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
@@ -573,8 +572,8 @@ export function StudioCommandSearchDialog({
             <div className="px-2 py-6 text-center text-xs text-fg-3">
               <p>
                 {scopeKinds
-                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "{v0} 범위에서 “{v1}” 와 맞는 항목이 없습니다."), { v0: String(SCOPE_LABELS[scope]), v1: String(query) })
-                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "“{v0}” 와 맞는 기능을 찾지 못했습니다."), { v0: String(query) })}
+                  ? `${SCOPE_LABELS[scope]} 범위에서 “${query}” 와 맞는 항목이 없습니다.`
+                  : `“${query}” 와 맞는 기능을 찾지 못했습니다.`}
               </p>
               {fallbackOutcome && fallbackOutcome.totalMatched > 0 ? (
                 <button
@@ -583,7 +582,8 @@ export function StudioCommandSearchDialog({
                   data-studio-command-search-widen="true"
                   className="mt-2 inline-flex min-h-9 items-center rounded-lg border border-accent/40 bg-accent-soft px-3 text-xs font-semibold text-accent transition-colors hover:border-accent/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
-                  {translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "전체에서 ")}{fallbackOutcome.totalMatched}{translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "건 보기")}</button>
+                  전체에서 {fallbackOutcome.totalMatched}건 보기
+                </button>
               ) : null}
             </div>
           ) : null}
@@ -616,7 +616,8 @@ export function StudioCommandSearchDialog({
                       </h3>
                       {section.truncated ? (
                         <span className="text-[0.62rem] tabular-nums text-fg-3">
-                          {translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "외 ")}{section.matched - section.results.length}{translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "건")}</span>
+                          외 {section.matched - section.results.length}건
+                        </span>
                       ) : null}
                     </div>
                     {/*
@@ -637,13 +638,15 @@ export function StudioCommandSearchDialog({
                               tabIndex={-1}
                               aria-selected={index === activeIndex}
                               {...(inert ? { "aria-disabled": true } : {})}
-                              data-active={index === activeIndex ? translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "en", "true") : undefined}
+                              data-active={index === activeIndex ? "true" : undefined}
                               data-action={action.kind}
                               onPointerEnter={() => setActiveIndex(index)}
                               onClick={() => activate(result)}
-                              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "en", "flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors data-[active=true]:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(inert
+                              className={`flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors data-[active=true]:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                                inert
                                   ? "cursor-not-allowed opacity-55"
-                                  : "hover:bg-raised") })}
+                                  : "hover:bg-raised"
+                              }`}
                             >
                               <span className="min-w-0">
                                 <span className="block truncate text-sm text-fg">
@@ -690,7 +693,8 @@ export function StudioCommandSearchDialog({
           <span>{footerHint}</span>
           {outcome.truncated ? (
             <span className="tabular-nums">
-              {outcome.totalMatched}{translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "건 중 ")}{outcome.totalShown}{translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "건 표시")}</span>
+              {outcome.totalMatched}건 중 {outcome.totalShown}건 표시
+            </span>
           ) : null}
         </div>
       </div>

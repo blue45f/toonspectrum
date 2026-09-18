@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Check, LocateFixed, RotateCcw, UserRound, XCircle } from "lucide-react";
 import { useState, type KeyboardEvent } from "react";
 
@@ -189,7 +185,7 @@ export function StudioBg3dSharedCharacterPlacementPanel({
 
   return (
     <section
-      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "배경과 캐릭터 함께 배치")}
+      aria-label="배경과 캐릭터 함께 배치"
       data-testid="studio-bg3d-shared-character-placement"
       className="border-b border-line pb-4"
     >
@@ -197,18 +193,20 @@ export function StudioBg3dSharedCharacterPlacementPanel({
         <div className="min-w-0">
           <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
             <UserRound size={15} className="shrink-0 text-accent" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "배경과 캐릭터 함께 배치")}</h3>
+            배경과 캐릭터 함께 배치
+          </h3>
           <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
             {previewOnly
-              ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "선택한 캐릭터는 현재 모습과 위치를 확인만 할 수 있어요. 미리보기 전용 캐릭터는 이번 배경 연결에 저장되지 않습니다.")
-              : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "이 배경에서만 위치와 방향을 맞춰요. 캐릭터 원본과 다른 배경은 바뀌지 않으며, 아래 적용을 누를 때 배경 결과와 함께 저장돼요.")}
+              ? "선택한 캐릭터는 현재 모습과 위치를 확인만 할 수 있어요. 미리보기 전용 캐릭터는 이번 배경 연결에 저장되지 않습니다."
+              : "이 배경에서만 위치와 방향을 맞춰요. 캐릭터 원본과 다른 배경은 바뀌지 않으며, 아래 적용을 누를 때 배경 결과와 함께 저장돼요."}
           </p>
         </div>
         <span className="shrink-0 rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-semibold text-fg-3">
-          {characters.length}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "명")}</span>
+          {characters.length}명
+        </span>
       </div>
 
-      <div className="flex snap-x gap-2 overflow-x-auto pb-2" role="list" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "공유 캐릭터 목록")}>
+      <div className="flex snap-x gap-2 overflow-x-auto pb-2" role="list" aria-label="공유 캐릭터 목록">
         {characters.map((character) => {
           const active = character.elementId === selected.elementId;
           const status = statuses[character.runtimeKey];
@@ -261,16 +259,16 @@ export function StudioBg3dSharedCharacterPlacementPanel({
             {runtimeStatus === "ready" ? <Check size={11} aria-hidden /> : null}
             {runtimeStatus === "unavailable" ? <XCircle size={11} aria-hidden /> : null}
             {runtimeStatus === "ready"
-              ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "렌더 준비 완료")
+              ? "렌더 준비 완료"
               : runtimeStatus === "unavailable"
-                ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "3D 표시 확인 필요")
-                : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "3D 불러오는 중")}
+                ? "3D 표시 확인 필요"
+                : "3D 불러오는 중"}
           </span>
         </div>
 
         <div
           data-testid="studio-bg3d-shared-character-grounding"
-          data-grounding-diagnosis={groundingReceipt?.diagnosis ?? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "en", "measuring")}
+          data-grounding-diagnosis={groundingReceipt?.diagnosis ?? "measuring"}
           className={cn(
             "mb-3 flex items-start gap-2 rounded-lg border px-2.5 py-2 text-[0.66rem] leading-relaxed",
             groundingReceipt?.diagnosis === "grounded"
@@ -284,16 +282,16 @@ export function StudioBg3dSharedCharacterPlacementPanel({
           <div className="min-w-0">
             <p className="font-bold">
               {groundingReceipt?.diagnosis === "grounded"
-                ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "배경에 접지됨")
+                ? "배경에 접지됨"
                 : groundingReceipt?.diagnosis === "floating"
-                  ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "바닥에서 떠 있음")
+                  ? "바닥에서 떠 있음"
                   : groundingReceipt?.diagnosis === "penetrating"
-                    ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "바닥과 겹침")
-                    : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "바닥 확인 중")}
+                    ? "바닥과 겹침"
+                    : "바닥 확인 중"}
             </p>
             <p className="mt-0.5">{groundingMessage}</p>
             {groundingReceipt?.surface.source === "stage-plane" ? (
-              <p className="mt-0.5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "맞닿을 배경 도형이 없어 기본 스테이지 바닥을 기준으로 계산했어요.")}</p>
+              <p className="mt-0.5 text-fg-3">맞닿을 배경 도형이 없어 기본 스테이지 바닥을 기준으로 계산했어요.</p>
             ) : null}
           </div>
         </div>
@@ -301,7 +299,7 @@ export function StudioBg3dSharedCharacterPlacementPanel({
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <PlacementNumberField
             key={`${selected.placementHash}:x`}
-            label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "좌우 X")}
+            label="좌우 X"
             value={transform.position[0]}
             min={-10}
             max={10}
@@ -312,7 +310,7 @@ export function StudioBg3dSharedCharacterPlacementPanel({
           />
           <PlacementNumberField
             key={`${selected.placementHash}:y`}
-            label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "높이 Y")}
+            label="높이 Y"
             value={transform.position[1]}
             min={-10}
             max={10}
@@ -323,7 +321,7 @@ export function StudioBg3dSharedCharacterPlacementPanel({
           />
           <PlacementNumberField
             key={`${selected.placementHash}:z`}
-            label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "앞뒤 Z")}
+            label="앞뒤 Z"
             value={transform.position[2]}
             min={-10}
             max={10}
@@ -333,8 +331,8 @@ export function StudioBg3dSharedCharacterPlacementPanel({
             onCommit={(value) => updatePosition(2, value)}
           />
           <PlacementNumberField
-            key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "en", "{v0}:yaw"), { v0: String(selected.placementHash) })}
-            label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "바라보는 방향")}
+            key={`${selected.placementHash}:yaw`}
+            label="바라보는 방향"
             value={transform.rotationY * 180 / Math.PI}
             min={-180}
             max={180}
@@ -366,7 +364,8 @@ export function StudioBg3dSharedCharacterPlacementPanel({
             }}
           >
             <LocateFixed size={14} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "배경 표면에 맞추기")}</button>
+            배경 표면에 맞추기
+          </button>
           <button
             type="button"
             disabled={editorDisabled}
@@ -374,21 +373,23 @@ export function StudioBg3dSharedCharacterPlacementPanel({
             onClick={() => commitTransform({ position: [0, 0, 0], rotationY: 0 })}
           >
             <RotateCcw size={14} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "배치 초기화")}</button>
+            배치 초기화
+          </button>
         </div>
       </div>
 
       {previewOnly ? (
         <p
           role="note"
-          aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "미리보기 전용 캐릭터 안내")}
+          aria-label="미리보기 전용 캐릭터 안내"
           className="mt-2 text-[0.66rem] leading-relaxed text-warning"
         >
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "이 캐릭터는 의상·소품 등 고급 상태 ")}{selected.compatibility.previewOmissions.length}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "ko", "개 때문에 미리보기 전용입니다. 캐릭터와 배치는 이번 연결에 저장되지 않아요. 배경만 적용하거나, 캐릭터 편집기에서 고급 상태를 정리한 뒤 다시 연결해 주세요.")}</p>
+          이 캐릭터는 의상·소품 등 고급 상태 {selected.compatibility.previewOmissions.length}개 때문에 미리보기 전용입니다. 캐릭터와 배치는 이번 연결에 저장되지 않아요. 배경만 적용하거나, 캐릭터 편집기에서 고급 상태를 정리한 뒤 다시 연결해 주세요.
+        </p>
       ) : null}
       {notice?.elementId === selected.elementId ? (
         <p
-          role={notice.tone === "error" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterPlacementPanel", "en", "status")}
+          role={notice.tone === "error" ? "alert" : "status"}
           className={cn(
             "mt-2 text-[0.68rem] leading-relaxed",
             notice.tone === "error" ? "text-danger" : "text-success",

@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Character Shaper — the mounted surface (`/studio/character`).
  *
@@ -80,7 +79,8 @@ export function StudioCharacterShaper(props: StudioVrmPoserProps) {
                 className={RETURN_BUTTON_CLASS}
               >
                 <ArrowLeft size={15} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.character.shaper.StudioCharacterShaper", "ko", "셰이퍼로 돌아가기")}</button>,
+                셰이퍼로 돌아가기
+              </button>,
               advancedRoot,
             )
           : null}

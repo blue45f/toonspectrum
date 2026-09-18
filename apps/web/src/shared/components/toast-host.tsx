@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { AlertTriangle, Check, Info, X } from "lucide-react";
 
 import { useToastStore, type ToastTone } from "@/shared/lib/toast-store";
@@ -32,7 +29,7 @@ export function ToastHost() {
 
   return (
     <div
-      data-studio-immersive-offset={studioImmersive ? translateCurrentStaticSourceText("shared.components.toast.host", "en", "true") : translateCurrentStaticSourceText("shared.components.toast.host", "en", "false")}
+      data-studio-immersive-offset={studioImmersive ? "true" : "false"}
       className="pointer-events-none fixed inset-x-0 bottom-4 z-[95] flex flex-col items-center gap-2 px-4 max-md:bottom-20"
       style={
         studioImmersive
@@ -54,7 +51,7 @@ export function ToastHost() {
             <button
               type="button"
               onClick={() => dismiss(t.id)}
-              aria-label={translateCurrentStaticSourceText("shared.components.toast.host", "ko", "알림 닫기")}
+              aria-label="알림 닫기"
               className="grid size-6 shrink-0 place-items-center rounded-md text-fg-3 transition-colors hover:bg-raised hover:text-fg"
             >
               <X size={14} />

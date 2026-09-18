@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { clampPanoramaRotationDegrees } from "../studio-background-3d-sky";
@@ -108,12 +107,12 @@ export function PanoramaRotationNumberField({
 
   return (
     <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-panel px-3 text-xs font-semibold text-fg-2 sm:min-h-9">
-      <span className="shrink-0">{translateCurrentStaticSourceText("domains.creator.bg3d.studio.bg3d.control.fields", "ko", "각도")}</span>
+      <span className="shrink-0">각도</span>
       <input
         type="text"
         inputMode="decimal"
         role="spinbutton"
-        aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.studio.bg3d.control.fields", "ko", "360도 환경 배경 수평 회전 각도")}
+        aria-label="360도 환경 배경 수평 회전 각도"
         aria-valuemax={180}
         aria-valuemin={-180}
         aria-valuenow={
@@ -282,7 +281,7 @@ export function BgAnimationPlayhead({
   return (
     <div className="min-w-0">
       <input
-        aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.studio.bg3d.control.fields", "ko", "애니메이션 시간")}
+        aria-label="애니메이션 시간"
         className="h-11 w-full sm:h-8 pointer-coarse:h-11"
         type="range"
         min="0"
@@ -292,7 +291,7 @@ export function BgAnimationPlayhead({
         onChange={(event) => onCommit(Number(event.target.value))}
       />
       <output
-        aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.studio.bg3d.control.fields", "ko", "현재 애니메이션 시간")}
+        aria-label="현재 애니메이션 시간"
         className="block text-right text-[0.6875rem] tabular-nums text-fg-3"
       >
         {displayTime.toFixed(2)}s / {durationSeconds.toFixed(2)}s

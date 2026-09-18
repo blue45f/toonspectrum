@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   CheckCircle2,
   Clipboard,
   Link2,
@@ -138,10 +134,11 @@ export function StudioReviewLinkManager({
           <div>
             <div className="flex items-center gap-2">
               <ShieldCheck className="size-5 text-accent" aria-hidden="true" />
-              <h3 className="text-sm font-black">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "서버 검토 링크")}</h3>
+              <h3 className="text-sm font-black">서버 검토 링크</h3>
             </div>
             <p className="mt-1 max-w-3xl text-xs leading-relaxed text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "페이지 범위와 만료·댓글·다운로드 정책을 서버에서 검증합니다. 링크 토큰 원문은 생성 직후 한 번만 표시됩니다.")}</p>
+              페이지 범위와 만료·댓글·다운로드 정책을 서버에서 검증합니다. 링크 토큰 원문은 생성 직후 한 번만 표시됩니다.
+            </p>
           </div>
           <button
             type="button"
@@ -150,7 +147,8 @@ export function StudioReviewLinkManager({
             disabled={state === "loading" || mutating}
           >
             <RefreshCw className={cn("size-4", state === "loading" && "animate-spin")} aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "새로고침")}</button>
+            새로고침
+          </button>
         </div>
 
         {error ? (
@@ -160,37 +158,40 @@ export function StudioReviewLinkManager({
         ) : null}
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           <label className="grid gap-1.5 text-xs font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "권한")}<select
+            권한
+            <select
               className="min-h-11 rounded-xl border border-line bg-card px-3 text-sm text-fg"
               value={role}
               onChange={(event) => setRole(event.currentTarget.value as "viewer" | "commenter")}
               disabled={!canManage || mutating}
             >
-              <option value="commenter">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "열람 + 댓글·승인·반려")}</option>
-              <option value="viewer">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "열람 전용")}</option>
+              <option value="commenter">열람 + 댓글·승인·반려</option>
+              <option value="viewer">열람 전용</option>
             </select>
           </label>
           <label className="grid gap-1.5 text-xs font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "만료 시간")}<select
+            만료 시간
+            <select
               className="min-h-11 rounded-xl border border-line bg-card px-3 text-sm text-fg"
               value={expiresInHours}
               onChange={(event) => setExpiresInHours(Number(event.currentTarget.value))}
               disabled={!canManage || mutating}
             >
-              <option value={24}>{translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "24시간")}</option>
-              <option value={72}>{translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "3일")}</option>
-              <option value={168}>{translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "7일")}</option>
-              <option value={720}>{translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "30일")}</option>
+              <option value={24}>24시간</option>
+              <option value={72}>3일</option>
+              <option value={168}>7일</option>
+              <option value={720}>30일</option>
             </select>
           </label>
         </div>
 
         <fieldset className="mt-4 rounded-xl border border-line p-3" disabled={!canManage || mutating}>
-          <legend className="px-1 text-xs font-bold">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "공개 페이지")}</legend>
+          <legend className="px-1 text-xs font-bold">공개 페이지</legend>
           <p className="mb-2 text-xs text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "아무 페이지도 고르지 않으면 현재 작품의 모든 렌더 페이지를 표시합니다.")}</p>
+            아무 페이지도 고르지 않으면 현재 작품의 모든 렌더 페이지를 표시합니다.
+          </p>
           {pageOptions.length === 0 ? (
-            <p className="text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "제작 계층에 연결된 페이지가 없어 전체 페이지로 발급합니다.")}</p>
+            <p className="text-xs text-fg-2">제작 계층에 연결된 페이지가 없어 전체 페이지로 발급합니다.</p>
           ) : (
             <div className="grid max-h-44 gap-2 overflow-y-auto sm:grid-cols-2">
               {pageOptions.map((page) => (
@@ -215,7 +216,8 @@ export function StudioReviewLinkManager({
               onChange={(event) => setWatermark(event.currentTarget.checked)}
               disabled={!canManage || mutating}
             />
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "워터마크 표시")}</label>
+            워터마크 표시
+          </label>
           <label className="flex min-h-11 items-center gap-2 rounded-xl border border-line px-3 text-xs">
             <input
               type="checkbox"
@@ -223,7 +225,8 @@ export function StudioReviewLinkManager({
               onChange={(event) => setAllowDownload(event.currentTarget.checked)}
               disabled={!canManage || mutating}
             />
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "원고 다운로드 허용")}</label>
+            원고 다운로드 허용
+          </label>
           <button
             type="button"
             className={buttonClass({ size: "sm" })}
@@ -231,17 +234,19 @@ export function StudioReviewLinkManager({
             disabled={!canManage || mutating}
           >
             <Link2 className="size-4" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "링크 만들기")}</button>
+            링크 만들기
+          </button>
         </div>
       </section>
       {created ? (
         <section className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4" role="status">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="size-5 text-emerald-600" aria-hidden="true" />
-            <h3 className="text-sm font-black">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "새 링크를 지금 보관하세요")}</h3>
+            <h3 className="text-sm font-black">새 링크를 지금 보관하세요</h3>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "보안을 위해 서버와 목록 화면에는 원문 토큰을 저장하지 않습니다. 이 안내를 닫거나 페이지를 벗어나면 다시 볼 수 없습니다.")}</p>
+            보안을 위해 서버와 목록 화면에는 원문 토큰을 저장하지 않습니다. 이 안내를 닫거나 페이지를 벗어나면 다시 볼 수 없습니다.
+          </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <code className="min-w-0 flex-1 break-all rounded-xl border border-line bg-card p-3 text-xs">
               {studioReviewLinkHref(created.token)}
@@ -252,26 +257,29 @@ export function StudioReviewLinkManager({
               onClick={() => void copyCreatedLink()}
             >
               <Clipboard className="size-4" aria-hidden="true" />
-              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "복사")}</button>
+              복사
+            </button>
             <button
               type="button"
               className={buttonClass({ variant: "quiet", size: "sm" })}
               onClick={() => setCreated(null)}
             >
-              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "확인")}</button>
+              확인
+            </button>
           </div>
         </section>
       ) : null}
 
       <section className="rounded-2xl border border-line bg-panel p-4">
-        <h3 className="text-sm font-black">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "발급 기록")}</h3>
-        <p className="mt-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "토큰 원문은 표시하지 않고 정책과 폐기 상태만 관리합니다.")}</p>
+        <h3 className="text-sm font-black">발급 기록</h3>
+        <p className="mt-1 text-xs text-fg-2">토큰 원문은 표시하지 않고 정책과 폐기 상태만 관리합니다.</p>
         {state === "loading" ? (
-          <p className="mt-4 text-xs text-fg-2" role="status">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "검토 링크를 불러오는 중입니다.")}</p>
+          <p className="mt-4 text-xs text-fg-2" role="status">검토 링크를 불러오는 중입니다.</p>
         ) : null}
         {state === "ready" && links.length === 0 ? (
           <p className="mt-4 rounded-xl border border-dashed border-line p-4 text-center text-xs text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "아직 발급한 검토 링크가 없습니다.")}</p>
+            아직 발급한 검토 링크가 없습니다.
+          </p>
         ) : null}
         <div className="mt-3 space-y-2">
           {links.map((link) => {
@@ -288,16 +296,16 @@ export function StudioReviewLinkManager({
                           ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                           : "border-line bg-raised text-fg-3",
                       )}>
-                        {status === "active" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "활성") : status === "expired" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "만료") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "폐기")}
+                        {status === "active" ? "활성" : status === "expired" ? "만료" : "폐기"}
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-fg-2">
-                      {link.role === "commenter" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "댓글 가능") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "열람 전용")} {translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "· 만료 ")}{new Date(link.expiresAt).toLocaleString("ko-KR")}
+                      {link.role === "commenter" ? "댓글 가능" : "열람 전용"} · 만료 {new Date(link.expiresAt).toLocaleString("ko-KR")}
                     </p>
                     <p className="mt-1 text-xs text-fg-3">
-                      {link.pageIds.length > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "{v0}개 지정 페이지"), { v0: String(link.pageIds.length) }) : translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "전체 페이지")}
-                      {link.watermark ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", " · 워터마크") : ""}
-                      {link.allowDownload ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", " · 다운로드 허용") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", " · 다운로드 차단")}
+                      {link.pageIds.length > 0 ? `${link.pageIds.length}개 지정 페이지` : "전체 페이지"}
+                      {link.watermark ? " · 워터마크" : ""}
+                      {link.allowDownload ? " · 다운로드 허용" : " · 다운로드 차단"}
                     </p>
                   </div>
                   <button
@@ -307,7 +315,8 @@ export function StudioReviewLinkManager({
                     disabled={!canManage || mutating || status !== "active"}
                   >
                     <Trash2 className="size-4" aria-hidden="true" />
-                    {translateCurrentStaticSourceText("domains.creator.studio.production.StudioReviewLinkManager", "ko", "폐기")}</button>
+                    폐기
+                  </button>
                 </div>
               </article>
             );

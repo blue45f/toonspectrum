@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio chrome UI — toolbar, dock, and menu-shell primitives shared by StudioPage.
  *
@@ -252,8 +248,8 @@ export function StudioFloatingToolPopover({
   if (desktop && desktopWindow) {
     return createPortal(
       <StudioDesktopFloatingSurface
-        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.chrome.ui", "en", "studio-tool-popover-{v0}"), { v0: String(id) })}
-        surfaceId={desktopWindow.surfaceId ?? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.chrome.ui", "en", "tool-popover:{v0}"), { v0: String(id) })}
+        id={`studio-tool-popover-${id}`}
+        surfaceId={desktopWindow.surfaceId ?? `tool-popover:${id}`}
         label={desktopWindow.label}
         defaultLayout={desktopWindow.defaultLayout}
         onClose={desktopWindow.onClose}
@@ -525,8 +521,8 @@ export function StudioEdgeRailButton({
     <button
       type="button"
       onClick={onClick}
-      title={title ?? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.chrome.ui", "ko", "{v0} 펼치기"), { v0: String(label) })}
-      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.chrome.ui", "ko", "{v0} 펼치기"), { v0: String(label) })}
+      title={title ?? `${label} 펼치기`}
+      aria-label={`${label} 펼치기`}
       data-studio-edge-rail={side}
       className={cn(
         "group hidden w-8 shrink-0 flex-col items-center gap-2.5 border-line bg-panel py-4 text-fg-3",
@@ -647,7 +643,7 @@ export const StudioDockButton = forwardRef<
       disabled={disabled}
       unavailableReason={
         disabled
-          ? hintUnavailableReason ?? (typeof title === "string" ? title : translateCurrentStaticSourceText("domains.creator.studio.chrome.ui", "ko", "현재 작업 상태에서는 이 도구를 사용할 수 없어요."))
+          ? hintUnavailableReason ?? (typeof title === "string" ? title : "현재 작업 상태에서는 이 도구를 사용할 수 없어요.")
           : undefined
       }
       preferredSide="top"
@@ -834,7 +830,7 @@ export function StudioToolIdentity({
   return (
     <div
       data-studio-tool-identity="true"
-      data-studio-tool-identity-icon-first={iconFirst ? translateCurrentStaticSourceText("domains.creator.studio.chrome.ui", "en", "true") : undefined}
+      data-studio-tool-identity-icon-first={iconFirst ? "true" : undefined}
       className={cn("inline-flex shrink-0 items-center gap-1.5", className)}
       title={detail ? `${title} — ${detail}` : title}
       aria-label={detail ? `${title}, ${detail}` : title}
@@ -988,9 +984,9 @@ export function StudioRailToolButton({
       aria-label={localizedLabel}
       aria-keyshortcuts={ariaKeyShortcuts}
       title={nativeTitle}
-      data-studio-tool-description={description ? translateCurrentStaticSourceText("domains.creator.studio.chrome.ui", "en", "true") : undefined}
-      data-studio-rail-launcher={launcher ? translateCurrentStaticSourceText("domains.creator.studio.chrome.ui", "en", "true") : undefined}
-      aria-haspopup={launcher ? translateCurrentStaticSourceText("domains.creator.studio.chrome.ui", "en", "dialog") : undefined}
+      data-studio-tool-description={description ? "true" : undefined}
+      data-studio-rail-launcher={launcher ? "true" : undefined}
+      aria-haspopup={launcher ? "dialog" : undefined}
       aria-pressed={active}
       className={cn(
         // Fresco-style: slightly larger hit, soft radius, no hard bevel.
@@ -1055,7 +1051,7 @@ export function StudioRailToolButton({
       disabled={disabled}
       unavailableReason={
         disabled
-          ? unavailableReason ?? (typeof title === "string" ? title : translateCurrentStaticSourceText("domains.creator.studio.chrome.ui", "ko", "선택 항목과 편집 권한 조건을 확인하세요."))
+          ? unavailableReason ?? (typeof title === "string" ? title : "선택 항목과 편집 권한 조건을 확인하세요.")
           : undefined
       }
       hint={hint}

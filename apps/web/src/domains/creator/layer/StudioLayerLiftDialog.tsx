@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * THESIS: A flattened webtoon cut becomes editable through one protected review flow, never a
  * surprise destructive action. The canvas remains the hero and settings recede to a compact rail.
@@ -319,7 +315,7 @@ function StudioLayerLiftCorrectionCanvas({
         ref={canvasRef}
         width={preview.width}
         height={preview.height}
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "{v0}할 영역을 칠하는 보정 캔버스"), { v0: String(mode === "include" ? "전경에 포함" : "전경에서 제외") })}
+        aria-label={`${mode === "include" ? "전경에 포함" : "전경에서 제외"}할 영역을 칠하는 보정 캔버스`}
         aria-describedby="studio-layer-lift-correction-help"
         onPointerDown={(event) => {
           if (disabled || activePointerRef.current !== null) return;
@@ -378,7 +374,8 @@ function StudioLayerLiftCorrectionCanvas({
           aria-live="polite"
         >
           <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "보정 경계를 다시 합성하는 중…")}</div>
+          보정 경계를 다시 합성하는 중…
+        </div>
       ) : null}
     </div>
   );
@@ -430,12 +427,12 @@ function StudioLayerLiftPreviewPane({
         src={previewSource(preview, view)}
         alt={
           view === "source"
-            ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "분리 전 원본")
+            ? "분리 전 원본"
             : view === "background"
-              ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "전경을 제거하고 복원한 배경")
+              ? "전경을 제거하고 복원한 배경"
               : view === "foreground"
-                ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "투명 배경의 분리 전경")
-                : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "배경과 전경을 다시 합성한 결과")
+                ? "투명 배경의 분리 전경"
+                : "배경과 전경을 다시 합성한 결과"
         }
         draggable={false}
         className="max-h-full max-w-full select-none object-contain"
@@ -528,24 +525,27 @@ export function StudioLayerLiftDialog({
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
               <h2 id={titleId} className="truncate text-sm font-bold tracking-tight text-fg">
-                {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "컷 레이어 복원")}</h2>
+                컷 레이어 복원
+              </h2>
               <span className="rounded-full border border-accent/40 bg-accent-soft px-2 py-0.5 text-[0.6rem] font-bold text-accent">
-                {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "로컬 Beta")}</span>
+                로컬 Beta
+              </span>
             </div>
             <p id={descriptionId} className="mt-0.5 truncate text-[0.7rem] leading-relaxed text-fg-3">
-              {sourceName} {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "· 원본을 보존하고 배경·전경 레이어를 만듭니다.")}</p>
+              {sourceName} · 원본을 보존하고 배경·전경 레이어를 만듭니다.
+            </p>
           </div>
           <div className="hidden shrink-0 items-center gap-1.5 text-[0.66rem] text-fg-3 sm:flex">
-            <span className={phase === "analyzing" ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "en", "font-bold text-accent") : undefined}>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "분석")}</span>
+            <span className={phase === "analyzing" ? "font-bold text-accent" : undefined}>분석</span>
             <span aria-hidden>·</span>
-            <span className={phase === "review" ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "en", "font-bold text-accent") : undefined}>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "보정")}</span>
+            <span className={phase === "review" ? "font-bold text-accent" : undefined}>보정</span>
             <span aria-hidden>·</span>
-            <span className={phase === "applying" ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "en", "font-bold text-accent") : undefined}>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "적용")}</span>
+            <span className={phase === "applying" ? "font-bold text-accent" : undefined}>적용</span>
           </div>
           <button
             type="button"
             onClick={onCancel}
-            aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "컷 레이어 복원 닫기")}
+            aria-label="컷 레이어 복원 닫기"
             className={cn(
               "grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised hover:text-fg",
               STUDIO_EASE,
@@ -560,7 +560,7 @@ export function StudioLayerLiftDialog({
           <div className="flex min-h-[44dvh] min-w-0 flex-1 flex-col border-line lg:min-h-0 lg:border-r">
             <div
               role="tablist"
-              aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "레이어 복원 미리보기")}
+              aria-label="레이어 복원 미리보기"
               className="flex min-w-0 shrink-0 gap-1 overflow-x-auto border-b border-line px-2 py-2 [scrollbar-width:thin] sm:px-3"
             >
               {REVIEW_VIEWS.map((entry) => {
@@ -605,7 +605,7 @@ export function StudioLayerLiftDialog({
                 <div className="relative grid max-h-full w-full max-w-3xl place-items-center overflow-hidden rounded-xl border border-line bg-canvas">
                   <img
                     src={sourceSrc}
-                    alt={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "레이어 분리를 기다리는 원본")}
+                    alt="레이어 분리를 기다리는 원본"
                     draggable={false}
                     className="max-h-[60dvh] max-w-full object-contain opacity-55"
                   />
@@ -624,15 +624,15 @@ export function StudioLayerLiftDialog({
                       )}
                       <p className="mt-3 text-sm font-bold text-fg">
                         {phase === "analyzing"
-                          ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "인물·캐릭터 경계를 찾고 있어요")
+                          ? "인물·캐릭터 경계를 찾고 있어요"
                           : phase === "error"
-                            ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "분석을 완료하지 못했습니다")
-                            : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "분석 준비 완료")}
+                            ? "분석을 완료하지 못했습니다"
+                            : "분석 준비 완료"}
                       </p>
                       <p className="mt-1 text-xs leading-relaxed text-fg-3">
                         {phase === "analyzing"
-                          ? progressLabel ?? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "첫 실행은 로컬 모델을 준비하느라 조금 더 걸릴 수 있습니다.")
-                          : error ?? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "오른쪽에서 분석을 시작해 주세요.")}
+                          ? progressLabel ?? "첫 실행은 로컬 모델을 준비하느라 조금 더 걸릴 수 있습니다."
+                          : error ?? "오른쪽에서 분석을 시작해 주세요."}
                       </p>
                     </div>
                   </div>
@@ -643,7 +643,7 @@ export function StudioLayerLiftDialog({
             {view === "mask" && preview ? (
               <div className="shrink-0 border-t border-line bg-panel px-3 py-2.5">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "경계 보정 방식")} className="flex items-center gap-1">
+                  <div role="group" aria-label="경계 보정 방식" className="flex items-center gap-1">
                     <button
                       type="button"
                       aria-pressed={correctionMode === "include"}
@@ -658,7 +658,8 @@ export function StudioLayerLiftDialog({
                         STUDIO_FOCUS_RING,
                       )}
                     >
-                      <Paintbrush size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "전경에 포함")}</button>
+                      <Paintbrush size={14} aria-hidden /> 전경에 포함
+                    </button>
                     <button
                       type="button"
                       aria-pressed={correctionMode === "exclude"}
@@ -673,10 +674,11 @@ export function StudioLayerLiftDialog({
                         STUDIO_FOCUS_RING,
                       )}
                     >
-                      <Eraser size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "전경에서 제외")}</button>
+                      <Eraser size={14} aria-hidden /> 전경에서 제외
+                    </button>
                   </div>
                   <label className="ml-auto flex min-h-11 min-w-[11rem] items-center gap-2 text-[0.7rem] text-fg-2">
-                    <span className="shrink-0">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "크기")}</span>
+                    <span className="shrink-0">크기</span>
                     <input
                       type="range"
                       min={2}
@@ -686,13 +688,14 @@ export function StudioLayerLiftDialog({
                       disabled={busy}
                       onChange={(event) => setCorrectionRadius(Number(event.target.value))}
                       className="h-11 min-w-0 flex-1 cursor-pointer accent-accent"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "경계 보정 브러시 크기")}
+                      aria-label="경계 보정 브러시 크기"
                     />
                     <span className="w-10 text-right tabular-nums text-fg-3">{correctionRadius}px</span>
                   </label>
                 </div>
                 <p id="studio-layer-lift-correction-help" className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "주황색은 전경으로 유지될 영역입니다. 빠르게 그어도 획 사이가 끊기지 않으며, 포인터를 놓을 때 한 번만 다시 합성합니다.")}</p>
+                  주황색은 전경으로 유지될 영역입니다. 빠르게 그어도 획 사이가 끊기지 않으며, 포인터를 놓을 때 한 번만 다시 합성합니다.
+                </p>
               </div>
             ) : null}
           </div>
@@ -708,7 +711,7 @@ export function StudioLayerLiftDialog({
                     ? "border-good/35 bg-good/10"
                     : "border-accent/35 bg-accent-soft/55",
               )}
-              role={phase === "error" ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "en", "alert") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "en", "status")}
+              role={phase === "error" ? "alert" : "status"}
               aria-live="polite"
               aria-atomic="true"
             >
@@ -729,40 +732,43 @@ export function StudioLayerLiftDialog({
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-fg">
                   {phase === "analyzing"
-                    ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "기기에서 분석 중")
+                    ? "기기에서 분석 중"
                     : phase === "applying"
-                      ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "레이어 그룹 적용 중")
+                      ? "레이어 그룹 적용 중"
                       : phase === "error"
-                        ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "다시 확인이 필요해요")
+                        ? "다시 확인이 필요해요"
                         : preview
                           ? `${CONFIDENCE_LABELS[preview.confidenceBand]} · ${percent(preview.confidenceScore)}`
-                          : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "분석 준비")}
+                          : "분석 준비"}
                 </p>
                 <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-2">
                   {phase === "error"
-                    ? error ?? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "이미지와 모델 상태를 확인한 뒤 다시 분석해 주세요.")
-                    : progressLabel ?? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "이미지 픽셀은 추론 서버에 업로드하지 않습니다.")}
+                    ? error ?? "이미지와 모델 상태를 확인한 뒤 다시 분석해 주세요."
+                    : progressLabel ?? "이미지 픽셀은 추론 서버에 업로드하지 않습니다."}
                 </p>
               </div>
             </div>
 
-            <section className="mt-4 border-t border-line pt-4" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "en", "{v0}-boundary-title"), { v0: String(id) })}>
+            <section className="mt-4 border-t border-line pt-4" aria-labelledby={`${id}-boundary-title`}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "en", "{v0}-boundary-title"), { v0: String(id) })} className="text-xs font-bold text-fg">
-                    {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "자동 경계")}</h3>
+                  <h3 id={`${id}-boundary-title`} className="text-xs font-bold text-fg">
+                    자동 경계
+                  </h3>
                   <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "값을 바꾼 뒤 미리보기를 갱신합니다.")}</p>
+                    값을 바꾼 뒤 미리보기를 갱신합니다.
+                  </p>
                 </div>
                 <Sparkles size={16} className="shrink-0 text-accent" aria-hidden />
               </div>
               <label className="mt-3 block text-[0.7rem] font-semibold text-fg-2">
                 <span className="flex items-center justify-between gap-2">
-                  {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "전경 임계값")}<span className="tabular-nums text-fg-3">{percent(options.threshold)}</span>
+                  전경 임계값
+                  <span className="tabular-nums text-fg-3">{percent(options.threshold)}</span>
                 </span>
                 <input
                   type="range"
-                  aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "전경 임계값")}
+                  aria-label="전경 임계값"
                   min={0.05}
                   max={0.95}
                   step={0.01}
@@ -777,11 +783,12 @@ export function StudioLayerLiftDialog({
               </label>
               <label className="mt-2 block text-[0.7rem] font-semibold text-fg-2">
                 <span className="flex items-center justify-between gap-2">
-                  {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "경계 부드러움")}<span className="tabular-nums text-fg-3">{percent(options.feather)}</span>
+                  경계 부드러움
+                  <span className="tabular-nums text-fg-3">{percent(options.feather)}</span>
                 </span>
                 <input
                   type="range"
-                  aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "경계 부드러움")}
+                  aria-label="경계 부드러움"
                   min={0}
                   max={0.4}
                   step={0.01}
@@ -810,15 +817,16 @@ export function StudioLayerLiftDialog({
                 ) : (
                   <RefreshCw size={14} aria-hidden />
                 )}
-                {preview ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "미리보기 다시 만들기") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "분석 시작")}
+                {preview ? "미리보기 다시 만들기" : "분석 시작"}
               </button>
             </section>
 
             {preview ? (
-              <section className="mt-4 border-t border-line pt-4" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "en", "{v0}-result-title"), { v0: String(id) })}>
-                <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "en", "{v0}-result-title"), { v0: String(id) })} className="text-xs font-bold text-fg">
-                  {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "생성될 레이어")}</h3>
-                <ol className="mt-2 space-y-1.5 text-[0.7rem]" aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "적용될 레이어 순서")}>
+              <section className="mt-4 border-t border-line pt-4" aria-labelledby={`${id}-result-title`}>
+                <h3 id={`${id}-result-title`} className="text-xs font-bold text-fg">
+                  생성될 레이어
+                </h3>
+                <ol className="mt-2 space-y-1.5 text-[0.7rem]" aria-label="적용될 레이어 순서">
                   {[
                     ["원본 백업", "숨김 · 잠금"],
                     ["분리 배경", preview.backgroundRepairQuality === "good" ? "자동 복원" : "경계 검토 필요"],
@@ -834,7 +842,7 @@ export function StudioLayerLiftDialog({
                   ))}
                 </ol>
                 {preview.diagnostics.length > 0 ? (
-                  <ul className="mt-2 space-y-1.5" aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "분리 검토 안내")}>
+                  <ul className="mt-2 space-y-1.5" aria-label="분리 검토 안내">
                     {preview.diagnostics.map((diagnostic) => (
                       <li
                         key={diagnostic.id}
@@ -861,7 +869,9 @@ export function StudioLayerLiftDialog({
             <div className="mt-4 flex items-start gap-2 border-t border-line pt-4 text-[0.66rem] leading-relaxed text-fg-3">
               <Image size={14} className="mt-0.5 shrink-0" aria-hidden />
               <p>
-                {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "현재 베타는 한 장의 정적 이미지에서 사람·캐릭터 전경을 찾습니다. 원본 레이어는 숨김·잠금 상태로 보존됩니다.")}</p>
+                현재 베타는 한 장의 정적 이미지에서 사람·캐릭터 전경을 찾습니다.
+                원본 레이어는 숨김·잠금 상태로 보존됩니다.
+              </p>
             </div>
 
             {mutationLocked ? (
@@ -871,7 +881,7 @@ export function StudioLayerLiftDialog({
                 aria-live="polite"
                 className="mt-3 rounded-xl border border-warn/40 bg-warn/10 px-3 py-2 text-[0.68rem] leading-relaxed text-warn"
               >
-                {mutationLockReason ?? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "현재 문서 상태에서는 결과를 적용할 수 없습니다.")}
+                {mutationLockReason ?? "현재 문서 상태에서는 결과를 적용할 수 없습니다."}
               </p>
             ) : null}
           </aside>
@@ -888,7 +898,7 @@ export function StudioLayerLiftDialog({
                 STUDIO_FOCUS_RING,
               )}
             >
-              {busy ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "작업 중단") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "취소")}
+              {busy ? "작업 중단" : "취소"}
             </button>
             <button
               type="button"
@@ -906,11 +916,12 @@ export function StudioLayerLiftDialog({
               ) : (
                 <Layers3 size={14} aria-hidden />
               )}
-              {phase === "applying" ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "레이어를 적용하는 중…") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "원본을 보존하고 레이어로 적용")}
+              {phase === "applying" ? "레이어를 적용하는 중…" : "원본을 보존하고 레이어로 적용"}
             </button>
           </div>
           <p className="mt-1.5 text-center text-[0.62rem] text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerLiftDialog", "ko", "적용 결과는 실행 취소 한 번으로 되돌릴 수 있습니다.")}</p>
+            적용 결과는 실행 취소 한 번으로 되돌릴 수 있습니다.
+          </p>
         </footer>
       </section>
     </div>

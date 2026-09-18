@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Thin auto-color hints product panel.
  *
@@ -434,18 +430,21 @@ export function StudioAutoColorHintsPanel({
             </span>
             <div className="min-w-0">
               <h3 id={titleId} className="text-sm font-bold text-fg">
-                {translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "자동 채색 힌트")}</h3>
+                자동 채색 힌트
+              </h3>
               <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "스크리블 시드로 영역을 지정한 뒤 계획하고, 확인 후에만 고급 채우기 배치로 적용합니다.")}</p>
+                스크리블 시드로 영역을 지정한 뒤 계획하고, 확인 후에만 고급 채우기 배치로 적용합니다.
+              </p>
             </div>
           </div>
           <span
             role="status"
             className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-full border border-accent/30 bg-accent-soft/60 px-2 text-[0.64rem] font-semibold text-accent"
-            title={translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "자동 덮어쓰기 없음 · 적용은 명시 버튼")}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "계획 전용 — 픽셀 자동 적용 없음")}
+            title="자동 덮어쓰기 없음 · 적용은 명시 버튼"
+            aria-label="계획 전용 — 픽셀 자동 적용 없음"
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "계획 전용")}</span>
+            계획 전용
+          </span>
         </div>
       </header>
 
@@ -456,7 +455,9 @@ export function StudioAutoColorHintsPanel({
         >
           <Info size={15} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
           <span className="min-w-0 break-words">
-            {translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "색을 고른 뒤 권장 영역에 스크리블 시드를 붙이고 계획을 실행하세요. 적용은 아래 「고급 채우기로 적용」에서만 일어나며, 충돌이 있으면 차단됩니다.")}</span>
+            색을 고른 뒤 권장 영역에 스크리블 시드를 붙이고 계획을 실행하세요. 적용은 아래
+            「고급 채우기로 적용」에서만 일어나며, 충돌이 있으면 차단됩니다.
+          </span>
         </p>
 
         {/* Scribble seed brush palette + optional canvas arm */}
@@ -466,7 +467,8 @@ export function StudioAutoColorHintsPanel({
         >
           <div className="flex items-center gap-2 text-[0.68rem] font-semibold text-fg-2">
             <Paintbrush size={14} className="text-accent" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "스크리블 시드 색")}</div>
+            스크리블 시드 색
+          </div>
           <button
             type="button"
             data-studio-auto-color-canvas-scribble="true"
@@ -487,17 +489,17 @@ export function StudioAutoColorHintsPanel({
           >
             <Crosshair size={15} aria-hidden="true" />
             <span className="min-w-0">
-              <span className="block">{translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "캔버스에 시드 찍기")}</span>
+              <span className="block">캔버스에 시드 찍기</span>
               <span className="mt-0.5 block font-normal leading-snug text-fg-3">
                 {canvasArmed
-                  ? translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "켜짐 · 선화 위를 드래그하면 스트로크를 따라 시드가 찍힙니다")
-                  : translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "축 정렬·반전 선화 위에 클릭·드래그해 시드를 찍습니다")}
+                  ? "켜짐 · 선화 위를 드래그하면 스트로크를 따라 시드가 찍힙니다"
+                  : "축 정렬·반전 선화 위에 클릭·드래그해 시드를 찍습니다"}
               </span>
             </span>
           </button>
           <div
             role="radiogroup"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "스크리블 시드 색")}
+            aria-label="스크리블 시드 색"
             className="flex flex-wrap gap-1.5"
           >
             {STUDIO_AUTO_COLOR_SCRIBBLE_PALETTE.map((entry) => {
@@ -524,9 +526,10 @@ export function StudioAutoColorHintsPanel({
             })}
           </div>
           <p className="text-[0.64rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "활성: ")}<span className="font-semibold text-fg-2">{activePalette.label}</span>
+            활성: <span className="font-semibold text-fg-2">{activePalette.label}</span>
             {" · "}
-            {translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "시드 ")}{effectiveSeeds.length.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "개")}{!seedsProp && scribbleSeeds.length > 0 ? (
+            시드 {effectiveSeeds.length.toLocaleString("ko-KR")}개
+            {!seedsProp && scribbleSeeds.length > 0 ? (
               <>
                 {" · "}
                 <button
@@ -534,7 +537,8 @@ export function StudioAutoColorHintsPanel({
                   className={cx("font-semibold text-accent underline-offset-2 hover:underline", controlFocusClass)}
                   onClick={() => setScribbleSeeds([])}
                 >
-                  {translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "시드 비우기")}</button>
+                  시드 비우기
+                </button>
               </>
             ) : null}
           </p>
@@ -562,12 +566,13 @@ export function StudioAutoColorHintsPanel({
           ) : (
             <Sparkles size={16} aria-hidden="true" />
           )}
-          {busy ? translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "계획 계산 중…") : translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "힌트 계획 실행")}
+          {busy ? "계획 계산 중…" : "힌트 계획 실행"}
         </button>
 
         {usingDemo && summary ? (
           <p className="text-center text-[0.64rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "데모 선화로 계산했습니다. 이미지 레이어를 선택한 뒤 다시 실행하면 선택 선화를 사용합니다.")}</p>
+            데모 선화로 계산했습니다. 이미지 레이어를 선택한 뒤 다시 실행하면 선택 선화를 사용합니다.
+          </p>
         ) : null}
 
         {error ? (
@@ -602,23 +607,23 @@ export function StudioAutoColorHintsPanel({
 
             <dl className="grid grid-cols-2 gap-2 text-[0.68rem] tabular-nums">
               <div className="rounded-md border border-line bg-panel/40 px-2 py-1.5">
-                <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "영역")}</dt>
+                <dt className="text-fg-3">영역</dt>
                 <dd className="font-semibold text-fg-1">{summary.regionCount.toLocaleString("ko-KR")}</dd>
               </div>
               <div className="rounded-md border border-line bg-panel/40 px-2 py-1.5">
-                <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "제안 연산")}</dt>
+                <dt className="text-fg-3">제안 연산</dt>
                 <dd className="font-semibold text-fg-1">
                   {summary.operationCount.toLocaleString("ko-KR")}
                 </dd>
               </div>
               <div className="rounded-md border border-line bg-panel/40 px-2 py-1.5">
-                <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "충돌")}</dt>
+                <dt className="text-fg-3">충돌</dt>
                 <dd className="font-semibold text-fg-1">
                   {summary.conflictCount.toLocaleString("ko-KR")}
                 </dd>
               </div>
               <div className="rounded-md border border-line bg-panel/40 px-2 py-1.5">
-                <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "권장 시드")}</dt>
+                <dt className="text-fg-3">권장 시드</dt>
                 <dd className="font-semibold text-fg-1">
                   {summary.recommendationCount.toLocaleString("ko-KR")}
                 </dd>
@@ -635,11 +640,11 @@ export function StudioAutoColorHintsPanel({
 
             {planRef.current && planRef.current.recommendations.length > 0 && !seedsProp ? (
               <div className="space-y-1.5 rounded-md border border-line bg-panel/30 p-2">
-                <p className="text-[0.64rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "권장 영역에 스크리블 시드")}</p>
+                <p className="text-[0.64rem] font-semibold text-fg-2">권장 영역에 스크리블 시드</p>
                 <div className="flex flex-wrap gap-1.5">
                   {planRef.current.recommendations.slice(0, 8).map((rec) => (
                     <button
-                      key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "en", "rec-{v0}"), { v0: String(rec.componentLabel) })}
+                      key={`rec-${rec.componentLabel}`}
                       type="button"
                       data-studio-auto-color-scribble-add="true"
                       onClick={() =>
@@ -650,7 +655,7 @@ export function StudioAutoColorHintsPanel({
                         controlFocusClass,
                       )}
                     >
-                      {translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "영역 #")}{rec.componentLabel} · {activePalette.label}
+                      영역 #{rec.componentLabel} · {activePalette.label}
                     </button>
                   ))}
                 </div>
@@ -669,17 +674,18 @@ export function StudioAutoColorHintsPanel({
                 )}
               >
                 <Copy size={14} aria-hidden="true" />
-                {translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "계획 복사")}</button>
+                계획 복사
+              </button>
 
               {onApplyResult || onApplyNewLayer ? (
                 <div
                   data-studio-auto-color-apply-target="true"
                   className="space-y-2 rounded-lg border border-line bg-panel/30 p-2"
                 >
-                  <p className="text-[0.64rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "적용 대상")}</p>
+                  <p className="text-[0.64rem] font-semibold text-fg-2">적용 대상</p>
                   <div
                     role="radiogroup"
-                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "자동 채색 적용 대상")}
+                    aria-label="자동 채색 적용 대상"
                     className="grid grid-cols-2 gap-1.5"
                   >
                     {STUDIO_AUTO_COLOR_APPLY_TARGET_MODES.map((mode) => {
@@ -735,10 +741,10 @@ export function StudioAutoColorHintsPanel({
                       <Paintbrush size={16} aria-hidden="true" />
                     )}
                     {applying
-                      ? translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "적용 중…")
+                      ? "적용 중…"
                       : applyTargetMode === "new-paint-layer"
-                        ? translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "새 채색 레이어에 적용")
-                        : translateCurrentStaticSourceText("domains.creator.StudioAutoColorHintsPanel", "ko", "선택 레이어에 적용")}
+                        ? "새 채색 레이어에 적용"
+                        : "선택 레이어에 적용"}
                   </button>
                 </div>
               ) : null}

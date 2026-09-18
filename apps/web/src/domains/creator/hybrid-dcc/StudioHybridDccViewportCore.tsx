@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * THESIS: 실제 편집 메시를 한눈에 읽는 정밀 검사대이며, 버튼 로그가 3D 결과를 대신하지 않는다.
  * OWN-WORLD: warm-ink 캔버스, 절제된 persimmon 선택선, 계측 그리드와 단단한 세그먼트 컨트롤.
@@ -1267,9 +1263,10 @@ class StudioHybridDccCanvasBoundary extends Component<
         <div className="absolute inset-0 grid place-items-center bg-canvas px-5 text-center" role="alert">
           <div className="max-w-sm">
             <AlertTriangle className="mx-auto mb-3 text-bad" size={24} aria-hidden="true" />
-            <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "3D 뷰포트를 시작하지 못했습니다.")}</p>
+            <p className="text-sm font-semibold text-fg">3D 뷰포트를 시작하지 못했습니다.</p>
             <p className="mt-1 text-xs leading-relaxed text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "그래픽 가속을 확인한 뒤 뷰포트를 다시 열어 주세요.")}</p>
+              그래픽 가속을 확인한 뒤 뷰포트를 다시 열어 주세요.
+            </p>
           </div>
         </div>
       );
@@ -1560,7 +1557,7 @@ export function StudioHybridDccViewport({
     <>
     <section
       ref={viewportRef}
-      aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "Hybrid DCC 3D 작업 뷰포트")}
+      aria-label="Hybrid DCC 3D 작업 뷰포트"
       aria-describedby={descriptionId}
       className={classes(
         "relative isolate h-[clamp(20rem,58dvh,42rem)] min-h-80 w-full overflow-hidden rounded-2xl border border-line bg-canvas text-fg",
@@ -1570,29 +1567,36 @@ export function StudioHybridDccViewport({
       data-studio-hybrid-dcc-viewport="true"
       data-projection={effectiveProjection}
       data-overlay={effectiveOverlay}
-      data-context-lost={contextLost ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "en", "true") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "en", "false")}
+      data-context-lost={contextLost ? "true" : "false"}
       data-transform-mode={transformMode}
       data-transform-space={effectiveTransformSpace}
       data-selection-mode={effectiveSelectionMode}
       data-selected-elements={selectedElementIds.length}
-      data-editing-disabled={editingDisabled ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "en", "true") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "en", "false")}
+      data-editing-disabled={editingDisabled ? "true" : "false"}
       data-view-preset={viewPreset}
       data-frame-target={effectiveFrameTarget}
       data-render-source={viewportRenderSource}
       data-render-signature={snapshot.signature}
       data-isolated-asset={isolatedAsset?.assetId ?? ""}
       data-visible-assets={renderedAssets.length}
-      data-snapping={preferences.snapping ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "en", "true") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "en", "false")}
-      data-dragging={dragging ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "en", "true") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "en", "false")}
+      data-snapping={preferences.snapping ? "true" : "false"}
+      data-dragging={dragging ? "true" : "false"}
       data-frame-revision={frameRevision}
     >
       <p id={descriptionId} className="sr-only">
-        {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "마우스 왼쪽 드래그로 회전하고, 오른쪽 드래그로 이동하며, 휠로 확대하거나 축소합니다. 선택 오브젝트는 G 이동, R 회전, S 크기 조절 기즈모로 편집합니다. Shift와 D는 선택 오브젝트 복제, Delete는 되돌릴 수 있는 삭제입니다. 숫자 1, 2, 3, 4는 꼭짓점, 모서리, 면, 오브젝트 선택 모드입니다. 숫자 키패드 1, 3, 7은 정면, 우측, 상단, Ctrl 조합은 반대편 보기입니다. 키패드 5는 투영 전환, /는 선택 격리, Home은 전체, F 또는 마침표는 선택 화면 맞춤입니다. 캔버스에서 Shift+Tab은 스냅 전환, Esc는 진행 중인 변형 취소입니다.")}</p>
+        마우스 왼쪽 드래그로 회전하고, 오른쪽 드래그로 이동하며, 휠로 확대하거나 축소합니다.
+        선택 오브젝트는 G 이동, R 회전, S 크기 조절 기즈모로 편집합니다.
+        Shift와 D는 선택 오브젝트 복제, Delete는 되돌릴 수 있는 삭제입니다.
+        숫자 1, 2, 3, 4는 꼭짓점, 모서리, 면, 오브젝트 선택 모드입니다.
+        숫자 키패드 1, 3, 7은 정면, 우측, 상단, Ctrl 조합은 반대편 보기입니다.
+        키패드 5는 투영 전환, /는 선택 격리, Home은 전체, F 또는 마침표는 선택 화면 맞춤입니다.
+        캔버스에서 Shift+Tab은 스냅 전환, Esc는 진행 중인 변형 취소입니다.
+      </p>
 
       {snapshot.assets.length > 0 && detectedWebgl === true ? (
         <StudioHybridDccCanvasBoundary>
           <Canvas
-            aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "편집 메시 3D 렌더")}
+            aria-label="편집 메시 3D 렌더"
             aria-describedby={descriptionId}
             tabIndex={0}
             dpr={[STUDIO_HYBRID_DCC_RENDER_PROFILE.minDpr, maxDpr]}
@@ -1712,16 +1716,17 @@ export function StudioHybridDccViewport({
         <div className="absolute inset-0 grid place-items-center px-5 text-center" role="status">
           <div className="max-w-sm">
             <CircleDashed className="mx-auto mb-3 animate-spin text-fg-3 motion-reduce:animate-none" size={26} aria-hidden="true" />
-            <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "3D 렌더러를 확인하는 중입니다.")}</p>
+            <p className="text-sm font-semibold text-fg">3D 렌더러를 확인하는 중입니다.</p>
           </div>
         </div>
       ) : snapshot.assets.length > 0 && detectedWebgl === false ? (
         <div className="absolute inset-0 grid place-items-center px-5 text-center" role="alert">
           <div className="max-w-sm">
             <AlertTriangle className="mx-auto mb-3 text-warn" size={26} aria-hidden="true" />
-            <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "WebGL 3D 렌더링을 사용할 수 없습니다.")}</p>
+            <p className="text-sm font-semibold text-fg">WebGL 3D 렌더링을 사용할 수 없습니다.</p>
             <p className="mt-1 text-xs leading-relaxed text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "브라우저의 하드웨어 가속을 켠 뒤 뷰포트를 다시 열어 주세요. 편집 메시 원본은 변경되지 않았습니다.")}</p>
+              브라우저의 하드웨어 가속을 켠 뒤 뷰포트를 다시 열어 주세요. 편집 메시 원본은 변경되지 않았습니다.
+            </p>
           </div>
         </div>
       ) : (
@@ -1733,13 +1738,13 @@ export function StudioHybridDccViewport({
               <CircleDashed className="mx-auto mb-3 text-fg-3" size={26} aria-hidden="true" />
             )}
             <p className="text-sm font-semibold text-fg">
-              {snapshot.errors.length > 0 ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "표시할 수 있는 메시가 없습니다.") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "3D 작업대가 비어 있습니다.")}
+              {snapshot.errors.length > 0 ? "표시할 수 있는 메시가 없습니다." : "3D 작업대가 비어 있습니다."}
             </p>
             <p className="mt-1 text-xs leading-relaxed text-fg-2">
               {snapshot.errors.length > 0
                 ? snapshot.errors[0]?.message
-                  ?? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "메시 진단을 실행해 잘못된 정점 또는 면을 복구해 주세요.")
-                : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "큐브를 추가하거나 모델을 가져오면 실제 편집 메시가 여기에 나타납니다.")}
+                  ?? "메시 진단을 실행해 잘못된 정점 또는 면을 복구해 주세요."
+                : "큐브를 추가하거나 모델을 가져오면 실제 편집 메시가 여기에 나타납니다."}
             </p>
           </div>
         </div>
@@ -1749,7 +1754,7 @@ export function StudioHybridDccViewport({
         <div className="pointer-events-auto rounded-xl border border-line bg-panel/95 px-3 py-2 shadow-[0_8px_22px_oklch(0.08_0.008_70/0.28)]">
           <div className="flex items-center gap-2">
             <Boxes size={15} className="text-accent" aria-hidden="true" />
-            <span className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "3D 작업 뷰")}</span>
+            <span className="text-xs font-semibold text-fg">3D 작업 뷰</span>
           </div>
           <p className="mt-0.5 font-[var(--font-display)] text-[0.66rem] tabular-nums text-fg-2" aria-live="polite">
             V {snapshot.totalVertices.toLocaleString("ko-KR")} · △ {snapshot.totalTriangles.toLocaleString("ko-KR")}
@@ -1757,16 +1762,16 @@ export function StudioHybridDccViewport({
           <p className="mt-0.5 text-[0.62rem] text-fg-3">
             {effectiveSelectionMode === "object"
               ? snapshot.assets.some(({ renderSource }) => renderSource === "modifier-cache")
-                ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "검증된 변형 결과 표시")
-                : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "편집 원본 표시")
-              : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "안정 ID 원본 케이지")}
+                ? "검증된 변형 결과 표시"
+                : "편집 원본 표시"
+              : "안정 ID 원본 케이지"}
           </p>
         </div>
 
         <div className="pointer-events-auto flex max-w-full gap-1 overflow-x-auto rounded-xl border border-line bg-panel/95 p-1 shadow-[0_8px_22px_oklch(0.08_0.008_70/0.28)]">
           {onComponentSelectionModeChange ? (
             <>
-              <div className="flex gap-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "메시 선택 모드")}>
+              <div className="flex gap-1" role="group" aria-label="메시 선택 모드">
                 {([
                   { id: "object", label: "오브젝트", accessible: "오브젝트 선택 모드 (4)" },
                   { id: "vertex", label: "점", accessible: "꼭짓점 선택 모드 (1)" },
@@ -1789,56 +1794,61 @@ export function StudioHybridDccViewport({
           ) : null}
           {onCommitAssetTransform && effectiveSelectionMode === "object" ? (
             <>
-              <div className="flex gap-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "오브젝트 변환 도구")}>
+              <div className="flex gap-1" role="group" aria-label="오브젝트 변환 도구">
                 <SegmentedButton
                   active={transformMode === "translate"}
                   disabled={editingDisabled}
-                  label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "이동 도구 (G)")}
+                  label="이동 도구 (G)"
                   onClick={() => setTransformMode("translate")}
                 >
-                  <Move3d size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "이동")}</SegmentedButton>
+                  <Move3d size={14} aria-hidden="true" /> 이동
+                </SegmentedButton>
                 <SegmentedButton
                   active={transformMode === "rotate"}
                   disabled={editingDisabled}
-                  label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "회전 도구 (R)")}
+                  label="회전 도구 (R)"
                   onClick={() => setTransformMode("rotate")}
                 >
-                  <Rotate3d size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "회전")}</SegmentedButton>
+                  <Rotate3d size={14} aria-hidden="true" /> 회전
+                </SegmentedButton>
                 <SegmentedButton
                   active={transformMode === "scale"}
                   disabled={editingDisabled}
-                  label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "크기 조절 도구 (S)")}
+                  label="크기 조절 도구 (S)"
                   onClick={() => setTransformMode("scale")}
                 >
-                  <Expand size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "크기")}</SegmentedButton>
+                  <Expand size={14} aria-hidden="true" /> 크기
+                </SegmentedButton>
                 <SegmentedButton
                   active={effectiveTransformSpace === "local"}
                   disabled={editingDisabled || transformMode === "scale"}
-                  label={effectiveTransformSpace === "local" ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "로컬 좌표계") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "월드 좌표계")}
+                  label={effectiveTransformSpace === "local" ? "로컬 좌표계" : "월드 좌표계"}
                   onClick={() => setTransformSpace((current) => current === "world" ? "local" : "world")}
                 >
-                  {effectiveTransformSpace === "local" ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "en", "Local") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "en", "World")}
+                  {effectiveTransformSpace === "local" ? "Local" : "World"}
                 </SegmentedButton>
               </div>
               <span className="my-1 w-px shrink-0 bg-line" aria-hidden="true" />
             </>
           ) : null}
-          <div className="flex gap-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "투영 방식")}>
+          <div className="flex gap-1" role="group" aria-label="투영 방식">
             <SegmentedButton
               active={effectiveProjection === "perspective"}
-              label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "원근 투영")}
+              label="원근 투영"
               onClick={() => changeProjection("perspective")}
             >
-              <Camera size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "원근")}</SegmentedButton>
+              <Camera size={14} aria-hidden="true" /> 원근
+            </SegmentedButton>
             <SegmentedButton
               active={effectiveProjection === "orthographic"}
-              label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "직교 투영")}
+              label="직교 투영"
               onClick={() => changeProjection("orthographic")}
             >
-              <Layers size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "직교")}</SegmentedButton>
+              <Layers size={14} aria-hidden="true" /> 직교
+            </SegmentedButton>
           </div>
           <span className="my-1 w-px shrink-0 bg-line" aria-hidden="true" />
-          <div className="flex gap-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "표준 보기와 화면 맞춤")}>
+          <div className="flex gap-1" role="group" aria-label="표준 보기와 화면 맞춤">
             {([
               { id: "isometric", label: "등각", accessible: "등각 보기" },
               { id: "front", label: "앞", accessible: "정면 보기 (숫자 키패드 1)" },
@@ -1859,25 +1869,27 @@ export function StudioHybridDccViewport({
             ))}
             <SegmentedButton
               active={effectiveFrameTarget === "scene"}
-              label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "전체 장면 화면 맞춤 (Home)")}
+              label="전체 장면 화면 맞춤 (Home)"
               onClick={frameScene}
             >
-              {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "전체 맞춤")}</SegmentedButton>
+              전체 맞춤
+            </SegmentedButton>
             <SegmentedButton
               active={effectiveFrameTarget === "selection"}
               disabled={!selectedAsset}
-              label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "선택 오브젝트 화면 맞춤 (마침표)")}
+              label="선택 오브젝트 화면 맞춤 (마침표)"
               onClick={frameSelection}
             >
-              {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "선택 맞춤")}</SegmentedButton>
+              선택 맞춤
+            </SegmentedButton>
           </div>
           <span className="my-1 w-px shrink-0 bg-line" aria-hidden="true" />
-          <div className="flex gap-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "표현 모드")}>
+          <div className="flex gap-1" role="group" aria-label="표현 모드">
             {OVERLAY_OPTIONS.map((option) => (
               <SegmentedButton
                 key={option.id}
                 active={effectiveOverlay === option.id}
-                label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "{v0} 표현"), { v0: String(option.label) })}
+                label={`${option.label} 표현`}
                 onClick={() => changeOverlay(option.id)}
               >
                 {option.id === "material" ? (
@@ -1896,7 +1908,7 @@ export function StudioHybridDccViewport({
 
       {snapshot.assets.length > 0 ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-2 p-2 sm:p-3">
-          <div className="pointer-events-auto flex max-w-[min(72%,34rem)] gap-1 overflow-x-auto rounded-xl border border-line bg-panel/95 p-1 shadow-[0_8px_22px_oklch(0.08_0.008_70/0.28)]" aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "뷰포트 에셋")}>
+          <div className="pointer-events-auto flex max-w-[min(72%,34rem)] gap-1 overflow-x-auto rounded-xl border border-line bg-panel/95 p-1 shadow-[0_8px_22px_oklch(0.08_0.008_70/0.28)]" aria-label="뷰포트 에셋">
             {renderedAssets.map((asset) => {
               const selected = asset.assetId === selectedAssetId;
               return (
@@ -1919,14 +1931,14 @@ export function StudioHybridDccViewport({
                 >
                   <span className="block truncate text-[0.7rem] font-semibold">{asset.assetId}</span>
                   <span className="block font-[var(--font-display)] text-[0.62rem] tabular-nums opacity-75">
-                    {asset.triangleCount.toLocaleString("ko-KR")} {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "en", "tris · ")}{
+                    {asset.triangleCount.toLocaleString("ko-KR")} tris · {
                       asset.renderSource === "modifier-cache"
-                        ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "변형 결과")
+                        ? "변형 결과"
                         : asset.renderSource === "authority-edit-cage"
-                          ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "원본 케이지")
+                          ? "원본 케이지"
                           : asset.renderSource === "authority-cache-fallback"
-                            ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "원본 대체")
-                            : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "편집 원본")
+                            ? "원본 대체"
+                            : "편집 원본"
                     }
                   </span>
                 </button>
@@ -1935,8 +1947,8 @@ export function StudioHybridDccViewport({
           </div>
           <div className="hidden rounded-lg border border-line bg-panel/95 px-2.5 py-1.5 text-[0.64rem] text-fg-2 min-[390px]:block">
             {effectiveSelectionMode === "object"
-              ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "G 이동 · R 회전 · S 크기 · Shift+D 복제 · Delete 삭제")
-              : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "{v0} {v1}개 선택 · Shift 추가 · Ctrl 전환 · Alt 빼기"), { v0: String(effectiveSelectionMode === "vertex" ? "꼭짓점" : effectiveSelectionMode === "edge" ? "모서리" : "면"), v1: String(selectedElementIds.length) })}
+              ? "G 이동 · R 회전 · S 크기 · Shift+D 복제 · Delete 삭제"
+              : `${effectiveSelectionMode === "vertex" ? "꼭짓점" : effectiveSelectionMode === "edge" ? "모서리" : "면"} ${selectedElementIds.length}개 선택 · Shift 추가 · Ctrl 전환 · Alt 빼기`}
           </div>
         </div>
       ) : null}
@@ -1944,9 +1956,9 @@ export function StudioHybridDccViewport({
       <p className="sr-only" aria-live="polite" data-studio-hybrid-dcc-selection-announcement="true">
         {effectiveSelectionMode === "object"
           ? selectedAssetId
-            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "{v0} 오브젝트 선택됨"), { v0: String(selectedAssetId) })
-            : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "선택한 오브젝트 없음")
-          : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "{v0} {v1}개 선택됨"), { v0: String(effectiveSelectionMode === "vertex" ? "꼭짓점" : effectiveSelectionMode === "edge" ? "모서리" : "면"), v1: String(selectedElementIds.length) })}
+            ? `${selectedAssetId} 오브젝트 선택됨`
+            : "선택한 오브젝트 없음"
+          : `${effectiveSelectionMode === "vertex" ? "꼭짓점" : effectiveSelectionMode === "edge" ? "모서리" : "면"} ${selectedElementIds.length}개 선택됨`}
       </p>
 
       {(snapshot.errors.length > 0 || snapshot.warnings.length > 0)
@@ -1955,10 +1967,10 @@ export function StudioHybridDccViewport({
           <span className="flex items-center gap-1.5 font-semibold">
             <AlertTriangle size={14} aria-hidden="true" />
             {snapshot.errors.length > 0
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "{v0}개 메시를 제외했습니다."), { v0: String(snapshot.errors.length) })
-              : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "{v0}개 변형 미리보기를 원본으로 대체했습니다."), { v0: String(snapshot.warnings.length) })}
+              ? `${snapshot.errors.length}개 메시를 제외했습니다.`
+              : `${snapshot.warnings.length}개 변형 미리보기를 원본으로 대체했습니다.`}
             {snapshot.errors.length > 0 && snapshot.warnings.length > 0
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", " · 원본 대체 {v0}개"), { v0: String(snapshot.warnings.length) })
+              ? ` · 원본 대체 ${snapshot.warnings.length}개`
               : null}
           </span>
           <span className="mt-0.5 block truncate text-[0.66rem] text-fg-2">
@@ -1971,9 +1983,10 @@ export function StudioHybridDccViewport({
         <div className="absolute inset-0 z-30 grid place-items-center bg-canvas/95 px-5 text-center" role="alert">
           <div className="max-w-sm">
             <AlertTriangle className="mx-auto mb-3 text-warn" size={26} aria-hidden="true" />
-            <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "그래픽 컨텍스트가 중단되었습니다.")}</p>
+            <p className="text-sm font-semibold text-fg">그래픽 컨텍스트가 중단되었습니다.</p>
             <p className="mt-1 text-xs leading-relaxed text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccViewportCore", "ko", "브라우저가 WebGL을 복구할 때까지 3D 미리보기를 잠시 멈췄습니다.")}</p>
+              브라우저가 WebGL을 복구할 때까지 3D 미리보기를 잠시 멈췄습니다.
+            </p>
           </div>
         </div>
       ) : null}

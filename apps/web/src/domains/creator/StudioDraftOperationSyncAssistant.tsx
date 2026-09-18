@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowLeftRight,
   CloudOff,
   Database,
@@ -229,8 +225,8 @@ export function StudioDraftOperationSyncAssistant({
     >
       <span
         className="sr-only"
-        role={model.tone === "danger" ? translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "en", "status")}
-        aria-live={model.tone === "danger" ? translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "en", "assertive") : translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "en", "polite")}
+        role={model.tone === "danger" ? "alert" : "status"}
+        aria-live={model.tone === "danger" ? "assertive" : "polite"}
       >
         {model.ariaLiveMessage}
       </span>
@@ -240,7 +236,7 @@ export function StudioDraftOperationSyncAssistant({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? dialogId : undefined}
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "동기화 상태: {v0}"), { v0: String(model.compactLabel) })}
+        aria-label={`동기화 상태: ${model.compactLabel}`}
         onClick={() => setOpen((current) => !current)}
         className={cn(
           "flex min-h-11 max-w-[min(19rem,calc(100vw-1.5rem))] items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold shadow-lg backdrop-blur-xl transition",
@@ -264,8 +260,8 @@ export function StudioDraftOperationSyncAssistant({
           id={dialogId}
           role="dialog"
           aria-modal="false"
-          aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "en", "{v0}-title"), { v0: String(dialogId) })}
-          aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "en", "{v0}-description"), { v0: String(dialogId) })}
+          aria-labelledby={`${dialogId}-title`}
+          aria-describedby={`${dialogId}-description`}
           className={cn(
             "absolute right-0 w-[min(34rem,calc(100vw-1rem))] max-h-[min(76dvh,48rem)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-4 text-fg shadow-2xl backdrop-blur-xl [scrollbar-gutter:stable]",
             anchorAtBottom ? "bottom-full mb-2" : "top-full mt-2",
@@ -276,9 +272,9 @@ export function StudioDraftOperationSyncAssistant({
               <StatusIcon tone={model.tone} className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "en", "{v0}-title"), { v0: String(dialogId) })} className="text-base font-black">{translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "기기·서버 동기화")}</h2>
+              <h2 id={`${dialogId}-title`} className="text-base font-black">기기·서버 동기화</h2>
               <p className="mt-0.5 text-sm font-bold leading-snug">{model.headline}</p>
-              <p id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "en", "{v0}-description"), { v0: String(dialogId) })} className="mt-1 text-xs leading-relaxed text-fg-3">
+              <p id={`${dialogId}-description`} className="mt-1 text-xs leading-relaxed text-fg-3">
                 {model.detail}
               </p>
             </div>
@@ -288,7 +284,7 @@ export function StudioDraftOperationSyncAssistant({
                 setOpen(false);
                 triggerRef.current?.focus({ preventScroll: true });
               }}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "기기·서버 동기화 닫기")}
+              aria-label="기기·서버 동기화 닫기"
               className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             >
               <X className="h-4 w-4" aria-hidden />
@@ -297,17 +293,17 @@ export function StudioDraftOperationSyncAssistant({
 
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
             <SummaryCard
-              label={translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "이 기기")}
+              label="이 기기"
               icon={<Database className="h-4 w-4" />}
               value={model.deviceSummary}
             />
             <SummaryCard
-              label={translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "변경 흐름")}
+              label="변경 흐름"
               icon={<ArrowLeftRight className="h-4 w-4" />}
               value={model.operationSummary}
             />
             <SummaryCard
-              label={translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "서버 원고")}
+              label="서버 원고"
               icon={<ShieldCheck className="h-4 w-4" />}
               value={model.serverSummary}
             />
@@ -315,19 +311,19 @@ export function StudioDraftOperationSyncAssistant({
 
           <dl className="mt-3 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
             <div className="rounded-xl border border-line bg-card/70 px-2 py-2.5">
-              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "기기 복구 지점")}</dt>
-              <dd className="mt-1 text-sm font-black">{safeCount(localCheckpointCount)}{translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "개")}</dd>
+              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">기기 복구 지점</dt>
+              <dd className="mt-1 text-sm font-black">{safeCount(localCheckpointCount)}개</dd>
             </div>
             <div className="rounded-xl border border-line bg-card/70 px-2 py-2.5">
-              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "서버 반영 대기")}</dt>
-              <dd className="mt-1 text-sm font-black">{pendingCount}{translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "개")}</dd>
+              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">서버 반영 대기</dt>
+              <dd className="mt-1 text-sm font-black">{pendingCount}개</dd>
             </div>
             <div className="rounded-xl border border-line bg-card/70 px-2 py-2.5">
-              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "마지막 서버 승인")}</dt>
+              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">마지막 서버 승인</dt>
               <dd className="mt-1 text-xs font-black">{lastAckLabel}</dd>
             </div>
             <div className="rounded-xl border border-line bg-card/70 px-2 py-2.5">
-              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "서버 원고")}</dt>
+              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">서버 원고</dt>
               <dd className="mt-1 text-sm font-black">{serverRevision === null ? "—" : `r${serverRevision}`}</dd>
             </div>
           </dl>
@@ -340,7 +336,7 @@ export function StudioDraftOperationSyncAssistant({
               className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-3 py-2.5 text-sm font-black text-accent-foreground shadow-sm hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
             >
               <ActionIcon action={model.primaryAction} busy={busyAction !== null} />
-              {busyAction === "export-recovery" ? translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "복구 파일 만드는 중") : model.primaryActionLabel}
+              {busyAction === "export-recovery" ? "복구 파일 만드는 중" : model.primaryActionLabel}
             </button>
           ) : null}
 
@@ -354,7 +350,8 @@ export function StudioDraftOperationSyncAssistant({
               className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             >
               <History className="h-4 w-4" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "버전·복구 확인")}</button>
+              버전·복구 확인
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -373,7 +370,7 @@ export function StudioDraftOperationSyncAssistant({
               className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Download className="h-4 w-4" aria-hidden />
-              {model.canExportBackup ? translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "프로젝트 백업") : translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "원고 로드 후 백업")}
+              {model.canExportBackup ? "프로젝트 백업" : "원고 로드 후 백업"}
             </button>
           </div>
 
@@ -384,7 +381,8 @@ export function StudioDraftOperationSyncAssistant({
           ) : null}
 
           <p className="mt-3 text-[0.68rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioDraftOperationSyncAssistant", "ko", "기기 복구 저장, 변경 단위 서버 승인, 서버 원고 버전은 서로 다른 보호 단계입니다. 연결이 끊겨도 로컬 변경을 먼저 보관하고, 다시 연결되면 순서대로 전송합니다. 충돌이나 권한 문제가 생기면 자동 덮어쓰기 대신 버전·복구 확인 흐름을 사용합니다.")}</p>
+            기기 복구 저장, 변경 단위 서버 승인, 서버 원고 버전은 서로 다른 보호 단계입니다. 연결이 끊겨도 로컬 변경을 먼저 보관하고, 다시 연결되면 순서대로 전송합니다. 충돌이나 권한 문제가 생기면 자동 덮어쓰기 대신 버전·복구 확인 흐름을 사용합니다.
+          </p>
         </div>
       ) : null}
     </div>

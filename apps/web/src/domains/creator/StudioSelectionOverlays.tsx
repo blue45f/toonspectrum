@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /* eslint-disable react-refresh/only-export-components -- 순수 측정 헬퍼(drawSelectionIndicatorBox)도 선택 표시 회귀 테스트의 공개 계약이다. */
 /**
  * Optional Konva overlays for pixel selection and crop editing.
@@ -122,7 +121,7 @@ export function StudioSelectionAntsOverlay({
           if (!stroke) return null;
           return passes.map((pass, passIndex) => (
             <Line
-              key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionOverlays", "en", "ants-brush-{v0}-{v1}"), { v0: String(subpathIndex), v1: String(passIndex) })}
+              key={`ants-brush-${subpathIndex}-${passIndex}`}
               points={stroke.points}
               stroke={pass.stroke}
               strokeWidth={stroke.strokeWidth}
@@ -135,7 +134,7 @@ export function StudioSelectionAntsOverlay({
         const points = subpathOutlinePoints(subpath, size);
         return passes.map((pass, passIndex) => (
           <Line
-            key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionOverlays", "en", "ants-{v0}-{v1}"), { v0: String(subpathIndex), v1: String(passIndex) })}
+            key={`ants-${subpathIndex}-${passIndex}`}
             points={points}
             closed
             stroke={pass.stroke}
@@ -149,7 +148,7 @@ export function StudioSelectionAntsOverlay({
       {selection?.invert &&
         passes.map((pass, passIndex) => (
           <Rect
-            key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionOverlays", "en", "ants-inv-{v0}"), { v0: String(passIndex) })}
+            key={`ants-inv-${passIndex}`}
             x={0}
             y={0}
             width={frame.width}
@@ -176,7 +175,7 @@ export function StudioSelectionAntsOverlay({
           <Line points={dragPoints} closed fill={dragColors.fill} />
           {passes.map((pass, passIndex) => (
             <Line
-              key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionOverlays", "en", "ants-drag-{v0}"), { v0: String(passIndex) })}
+              key={`ants-drag-${passIndex}`}
               points={dragPoints}
               closed
               stroke={pass.stroke}
@@ -200,13 +199,13 @@ export function StudioSelectionAntsOverlay({
           />
           {polyDraft.points.map((point, pointIndex) => (
             <Circle
-              key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionOverlays", "en", "poly-v-{v0}"), { v0: String(pointIndex) })}
+              key={`poly-v-${pointIndex}`}
               x={point.x * size.width}
               y={point.y * size.height}
               radius={pointIndex === 0 && polyDraft.points.length >= 3
                 ? vertexRadius * 1.35
                 : vertexRadius}
-              fill={pointIndex === 0 ? polyColors.stroke : translateCurrentStaticSourceText("domains.creator.StudioSelectionOverlays", "en", "rgba(255,255,255,0.9)")}
+              fill={pointIndex === 0 ? polyColors.stroke : "rgba(255,255,255,0.9)"}
               stroke={polyColors.stroke}
               strokeWidth={1 / scale}
             />
@@ -233,7 +232,7 @@ export function StudioCropOverlay({ rect, frame, scale }: StudioCropOverlayProps
     <Group x={frame.x} y={frame.y} rotation={frame.rotation ?? 0} listening={false}>
       {cropShadeRects(rect, size).map((shade, shadeIndex) => (
         <Rect
-          key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionOverlays", "en", "crop-shade-{v0}"), { v0: String(shadeIndex) })}
+          key={`crop-shade-${shadeIndex}`}
           x={shade.x}
           y={shade.y}
           width={shade.w}
@@ -243,7 +242,7 @@ export function StudioCropOverlay({ rect, frame, scale }: StudioCropOverlayProps
       ))}
       {cropThirdsLines(rect, size).map((points, lineIndex) => (
         <Line
-          key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionOverlays", "en", "crop-third-{v0}"), { v0: String(lineIndex) })}
+          key={`crop-third-${lineIndex}`}
           points={points}
           stroke="rgba(255, 255, 255, 0.4)"
           strokeWidth={1 / scale}
@@ -267,7 +266,7 @@ export function StudioCropOverlay({ rect, frame, scale }: StudioCropOverlayProps
       />
       {cropHandlePoints(rect, size).map((handle) => (
         <Rect
-          key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionOverlays", "en", "crop-handle-{v0}"), { v0: String(handle.id) })}
+          key={`crop-handle-${handle.id}`}
           x={handle.x - handleSide / 2}
           y={handle.y - handleSide / 2}
           width={handleSide}
@@ -352,7 +351,7 @@ export function StudioBubbleShapeOverlay({
           x={handle.x}
           y={handle.y}
           radius={5 / scale}
-          fill={activeHandleIndex === handle.pointIndex ? translateCurrentStaticSourceText("domains.creator.StudioSelectionOverlays", "en", "#7c5cfc") : translateCurrentStaticSourceText("domains.creator.StudioSelectionOverlays", "en", "#ffffff")}
+          fill={activeHandleIndex === handle.pointIndex ? "#7c5cfc" : "#ffffff"}
           stroke="#18181b"
           strokeWidth={1.25 / scale}
         />
@@ -520,7 +519,7 @@ export function StudioOnionSkinImage({ el, layer }: StudioOnionSkinImageProps) {
           y={el.y}
           width={el.width}
           height={el.height}
-          fill={layer.tint === "prev" ? translateCurrentStaticSourceText("domains.creator.StudioSelectionOverlays", "en", "#ef4444") : "#3b82f6"}
+          fill={layer.tint === "prev" ? "#ef4444" : "#3b82f6"}
           opacity={0.55}
           globalCompositeOperation="source-atop"
           listening={false}

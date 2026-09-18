@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useState } from "react";
 import { findStudioMarketplaceCc0Asset } from "@/domains/creator/studio-marketplace-cc0-catalog";
 import { studioCc0AssetUrl } from "@/domains/creator/studio-cc0-asset-delivery";
@@ -53,12 +49,12 @@ export function MarketVerifiedAssetPreview({ reference, compact = false }: {
     return () => { current = false; };
   }, [reference, compact]);
   if (!preview || preview.reference !== reference) return null;
-  if (failedReference === reference) return compact ? null : <p role="status" className="p-4 text-sm text-fg-2">{translateCurrentStaticSourceText("domains.market.components.MarketVerifiedAssetPreview", "ko", "원본 미리보기를 불러오지 못했습니다.")}</p>;
+  if (failedReference === reference) return compact ? null : <p role="status" className="p-4 text-sm text-fg-2">원본 미리보기를 불러오지 못했습니다.</p>;
   // Dark GLB turntable frames disappear on dark cards; stage them on a warm paper field.
   const stageClass = compact
     ? "absolute inset-0 h-full w-full object-contain bg-[linear-gradient(180deg,#efe8dc_0%,#d9d0c2_100%)]"
     : "max-h-[32rem] w-full object-contain bg-[linear-gradient(180deg,#efe8dc_0%,#d9d0c2_100%)]";
-  const image = <img src={preview.src} alt={compact ? "" : formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketVerifiedAssetPreview", "ko", "{v0} 실제 소재 미리보기"), { v0: String(preview.name) })}
+  const image = <img src={preview.src} alt={compact ? "" : `${preview.name} 실제 소재 미리보기`}
     loading="lazy" decoding="async" width={preview.width} height={preview.height}
     onError={() => setFailedReference(reference)}
     className={stageClass} />;
@@ -66,7 +62,7 @@ export function MarketVerifiedAssetPreview({ reference, compact = false }: {
   return <figure className="overflow-hidden rounded-xl border border-line bg-card" data-market-verified-preview={reference}>
     {image}<figcaption className="flex flex-wrap items-center justify-between gap-3 p-4 text-xs text-fg-2">
       <span>{preview.note}</span><a href={preview.download} download={preview.fileName}
-        className="inline-flex min-h-11 items-center rounded-lg border border-line px-3 font-semibold text-accent">{translateCurrentStaticSourceText("domains.market.components.MarketVerifiedAssetPreview", "ko", "검증된 소재 파일 받기")}</a>
+        className="inline-flex min-h-11 items-center rounded-lg border border-line px-3 font-semibold text-accent">검증된 소재 파일 받기</a>
     </figcaption>
   </figure>;
 }

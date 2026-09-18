@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Activity,
   AlertTriangle,
@@ -313,7 +312,7 @@ export function AdminDashboard({
             >
               <RefreshCw
                 size={14}
-                className={refreshing ? translateCurrentStaticSourceText("domains.admin.components.AdminDashboard", "en", "animate-spin") : undefined}
+                className={refreshing ? "animate-spin" : undefined}
               />
               {refreshing
                 ? copy.dashboard.refreshing
@@ -350,7 +349,7 @@ export function AdminDashboard({
             title={copy.dashboard.pendingReports}
             description={copy.dashboard.pendingReportsDesc}
             value={formatNum(snapshot.reports.length)}
-            tone={snapshot.reports.length > 0 ? translateCurrentStaticSourceText("domains.admin.components.AdminDashboard", "en", "warn") : translateCurrentStaticSourceText("domains.admin.components.AdminDashboard", "en", "good")}
+            tone={snapshot.reports.length > 0 ? "warn" : "good"}
             actionLabel={copy.dashboard.open}
             onClick={onNavigate ? () => onNavigate("reports") : undefined}
           />
@@ -361,7 +360,7 @@ export function AdminDashboard({
               data.monetization.revenuePendingCents,
             )}`}
             value={formatNum(data.monetization.pendingEvents)}
-            tone={data.monetization.pendingEvents > 0 ? translateCurrentStaticSourceText("domains.admin.components.AdminDashboard", "en", "warn") : translateCurrentStaticSourceText("domains.admin.components.AdminDashboard", "en", "good")}
+            tone={data.monetization.pendingEvents > 0 ? "warn" : "good"}
             actionLabel={copy.dashboard.open}
             onClick={onNavigate ? () => onNavigate("revenue") : undefined}
           />
@@ -370,7 +369,7 @@ export function AdminDashboard({
             title={copy.dashboard.criticalAnnouncements}
             description={copy.dashboard.criticalAnnouncementsDesc}
             value={formatNum(criticalAnnouncementCount)}
-            tone={criticalAnnouncementCount > 0 ? translateCurrentStaticSourceText("domains.admin.components.AdminDashboard", "en", "bad") : translateCurrentStaticSourceText("domains.admin.components.AdminDashboard", "en", "good")}
+            tone={criticalAnnouncementCount > 0 ? "bad" : "good"}
             actionLabel={copy.dashboard.open}
             onClick={
               onNavigate ? () => onNavigate("announcements") : undefined
@@ -393,9 +392,9 @@ export function AdminDashboard({
                   : copy.dashboard.healthy
             }
             value={
-              maintenanceEnabled ? translateCurrentStaticSourceText("domains.admin.components.AdminDashboard", "en", "MAINT") : degraded ? translateCurrentStaticSourceText("domains.admin.components.AdminDashboard", "en", "WARN") : translateCurrentStaticSourceText("domains.admin.components.AdminDashboard", "en", "OK")
+              maintenanceEnabled ? "MAINT" : degraded ? "WARN" : "OK"
             }
-            tone={maintenanceEnabled || degraded ? translateCurrentStaticSourceText("domains.admin.components.AdminDashboard", "en", "bad") : translateCurrentStaticSourceText("domains.admin.components.AdminDashboard", "en", "good")}
+            tone={maintenanceEnabled || degraded ? "bad" : "good"}
             actionLabel={copy.dashboard.open}
             onClick={onNavigate ? () => onNavigate("ops") : undefined}
           />

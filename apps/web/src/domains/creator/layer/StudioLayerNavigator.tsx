@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowDown,
   ArrowUp,
   Eye,
@@ -1207,7 +1203,7 @@ export function StudioLayerNavigator({
           "min-h-8 min-w-0 flex-1 rounded-md border border-accent bg-card px-2 text-xs font-semibold text-fg",
           focusRing
         )}
-        aria-label={target.kind === "item" ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "레이어 이름 편집") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹 이름 편집")}
+        aria-label={target.kind === "item" ? "레이어 이름 편집" : "그룹 이름 편집"}
         data-studio-escape-scope="true"
       />
     );
@@ -1261,10 +1257,10 @@ export function StudioLayerNavigator({
   return (
     <section
       className="relative flex h-full min-h-0 flex-col rounded-xl border border-line bg-panel/50 shadow-[inset_0_1px_0_oklch(0.95_0.01_85/0.03)]"
-      aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "전문 레이어 내비게이터")}
+      aria-label="전문 레이어 내비게이터"
       data-page-key={pageKey}
       data-studio-shortcut-boundary="true"
-      data-studio-layer-dragging={draggingLabel ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "en", "true") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "en", "false")}
+      data-studio-layer-dragging={draggingLabel ? "true" : "false"}
     >
       {/* The icon-only merge doors keep a stable accessible name; the caveat rides along as a
           description so a screen-reader user hears "그룹으로 묶인다" before activating them. */}
@@ -1284,14 +1280,14 @@ export function StudioLayerNavigator({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-1.5">
-              <h3 className="text-xs font-bold tracking-tight text-fg">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "레이어 ")}{stats.total}</h3>
+              <h3 className="text-xs font-bold tracking-tight text-fg">레이어 {stats.total}</h3>
               <span id={resultStatusId} role="status" aria-live="polite" className="rounded-full bg-raised px-1.5 py-0.5 text-[0.62rem] font-semibold tabular-nums text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "결과 ")}{results.length}{selectionCount > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", " · 선택 {v0}"), { v0: String(selectionCount) }) : ""}
+                결과 {results.length}{selectionCount > 0 ? ` · 선택 ${selectionCount}` : ""}
               </span>
             </div>
             <p className="truncate text-[0.68rem] text-fg-3 lg:text-[0.58rem]">
-              {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "표시 ")}{stats.visible} {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "· 숨김 ")}{stats.hidden} {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "· 잠금 ")}{stats.locked}
-              {outsideSelectionCount > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", " · 선택 {v0}개는 필터 밖"), { v0: String(outsideSelectionCount) }) : ""}
+              표시 {stats.visible} · 숨김 {stats.hidden} · 잠금 {stats.locked}
+              {outsideSelectionCount > 0 ? ` · 선택 ${outsideSelectionCount}개는 필터 밖` : ""}
             </p>
           </div>
           <button
@@ -1299,21 +1295,21 @@ export function StudioLayerNavigator({
             onClick={() => setMobileMultiSelect((current) => !current)}
             aria-pressed={mobileMultiSelect}
             className={cn(compactControl, mobileMultiSelect && "border-accent bg-accent-soft text-accent")}
-            title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "터치에서도 여러 레이어를 선택할 수 있어요")}
+            title="터치에서도 여러 레이어를 선택할 수 있어요"
           >
             <ListChecks size={13} />
-            <span className="hidden min-[350px]:inline">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "다중 선택")}</span>
+            <span className="hidden min-[350px]:inline">다중 선택</span>
           </button>
           <button
             type="button"
             onClick={() => onAction({ type: "create-group", seedIds: [...selectedIds] })}
             disabled={createGroupUnavailableReason !== undefined}
             className={compactControl}
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "새 레이어 그룹{v0}"), { v0: String(createGroupUnavailableReason ? `, 사용 불가: ${createGroupUnavailableReason}` : "") })}
-            title={createGroupUnavailableReason ?? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "선택 레이어로 새 그룹 만들기")}
+            aria-label={`새 레이어 그룹${createGroupUnavailableReason ? `, 사용 불가: ${createGroupUnavailableReason}` : ""}`}
+            title={createGroupUnavailableReason ?? "선택 레이어로 새 그룹 만들기"}
           >
             <FolderPlus size={13} />
-            <span className="hidden min-[390px]:inline">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹")}</span>
+            <span className="hidden min-[390px]:inline">그룹</span>
           </button>
         </div>
 
@@ -1321,10 +1317,10 @@ export function StudioLayerNavigator({
           <p
             role="status"
             data-studio-live-selection-ownership={
-              selectionOwnership.primaryKind ?? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "en", "free")
+              selectionOwnership.primaryKind ?? "free"
             }
             data-studio-live-selection-blocked={
-              selectionOwnership.blocksLocalEdit ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "en", "true") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "en", "false")
+              selectionOwnership.blocksLocalEdit ? "true" : "false"
             }
             className={cn(
               "mt-2 truncate rounded-md border px-2 py-1 text-[0.62rem] font-semibold",
@@ -1359,9 +1355,9 @@ export function StudioLayerNavigator({
                 }
               }}
               maxLength={512}
-              aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "레이어 이름·텍스트·그룹 검색")}
+              aria-label="레이어 이름·텍스트·그룹 검색"
               aria-describedby={resultStatusId}
-              placeholder={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "이름, 대사, 종류, 그룹 검색")}
+              placeholder="이름, 대사, 종류, 그룹 검색"
               className={cn(
                 "min-h-9 w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-8 text-xs text-fg placeholder:text-fg-3",
                 "max-lg:min-h-11 pointer-coarse:min-h-11",
@@ -1377,7 +1373,7 @@ export function StudioLayerNavigator({
                   coarseTarget,
                   focusRing
                 )}
-                aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "레이어 검색어 지우기")}
+                aria-label="레이어 검색어 지우기"
               >
                 <X size={13} />
               </button>
@@ -1399,7 +1395,8 @@ export function StudioLayerNavigator({
             )}
           >
             <SlidersHorizontal size={13} />
-            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "필터")}{activeFilterCount > 0 ? (
+            필터
+            {activeFilterCount > 0 ? (
               <span className="rounded-full bg-accent px-1.5 py-0.5 text-[0.55rem] text-on-accent">
                 {activeFilterCount}
               </span>
@@ -1416,22 +1413,22 @@ export function StudioLayerNavigator({
             {filters.kind !== "all" ? <span className="shrink-0 rounded bg-raised px-1.5 py-0.5 text-[0.58rem]">{STUDIO_LAYER_KIND_LABELS[filters.kind]}</span> : null}
             {filters.visibility !== "all" ? (
               <span className="shrink-0 rounded bg-raised px-1.5 py-0.5 text-[0.58rem]">
-                {filters.visibility === "visible" ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "표시만") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "숨김만")}
+                {filters.visibility === "visible" ? "표시만" : "숨김만"}
               </span>
             ) : null}
             {filters.lock !== "all" ? (
               <span className="shrink-0 rounded bg-raised px-1.5 py-0.5 text-[0.58rem]">
-                {filters.lock === "locked" ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "잠김만") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "잠금 해제만")}
+                {filters.lock === "locked" ? "잠김만" : "잠금 해제만"}
               </span>
             ) : null}
             {filters.role !== "all" ? (
               <span className="shrink-0 rounded bg-raised px-1.5 py-0.5 text-[0.58rem]">
-                {filters.role === "unassigned" ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "역할 없음") : STUDIO_LAYER_ROLE_LABELS[filters.role]}
+                {filters.role === "unassigned" ? "역할 없음" : STUDIO_LAYER_ROLE_LABELS[filters.role]}
               </span>
             ) : null}
             {filters.color !== "all" ? (
               <span className="shrink-0 rounded bg-raised px-1.5 py-0.5 text-[0.58rem]">
-                {filters.color === "none" ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "색 없음") : STUDIO_LAYER_COLOR_LABELS[filters.color]}
+                {filters.color === "none" ? "색 없음" : STUDIO_LAYER_COLOR_LABELS[filters.color]}
               </span>
             ) : null}
             {filters.flags.map((flag) => (
@@ -1444,7 +1441,8 @@ export function StudioLayerNavigator({
               onClick={resetFilters}
               className={cn("ml-auto shrink-0 rounded px-1.5 py-1 text-[0.68rem] font-semibold text-fg-3 hover:bg-raised hover:text-fg lg:text-[0.58rem]", coarseTarget, focusRing)}
             >
-              {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "모두 지우기")}</button>
+              모두 지우기
+            </button>
           </div>
         ) : null}
         <p
@@ -1457,10 +1455,10 @@ export function StudioLayerNavigator({
           <GripVertical size={11} aria-hidden />
           <span className="min-w-0 flex-1 truncate">
             {filterActive
-              ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "검색·필터를 지우면 끌어서 순서를 바꿀 수 있어요")
+              ? "검색·필터를 지우면 끌어서 순서를 바꿀 수 있어요"
               : draggingLabel
-                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "{v0} 이동 중 · 선은 순서, 그룹 중앙은 소속"), { v0: String(draggingLabel) })
-                : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "핸들로 순서 변경 · 그룹 중앙에 놓아 소속 이동")}
+                ? `${draggingLabel} 이동 중 · 선은 순서, 그룹 중앙은 소속`
+                : "핸들로 순서 변경 · 그룹 중앙에 놓아 소속 이동"}
           </span>
           <kbd className="shrink-0 rounded border border-line bg-card px-1 py-0.5 font-mono text-[0.52rem]">
             ⌘[ / ⌘]
@@ -1470,7 +1468,8 @@ export function StudioLayerNavigator({
           {dragAnnouncement}
         </p>
         <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "Shift+↑↓로 범위 선택 · 이름을 입력해 레이어로 이동")}</p>
+          Shift+↑↓로 범위 선택 · 이름을 입력해 레이어로 이동
+        </p>
       </div>
 
       <StudioLayerNavigatorFilterPanel
@@ -1500,13 +1499,13 @@ export function StudioLayerNavigator({
           reorderDisabled={mutationDisabled || filterActive || batchSelectedIds.length === 0}
           reorderUnavailableReason={
             readOnly
-              ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "읽기 전용 작업공간에서는 레이어 순서를 바꿀 수 없어요.")
+              ? "읽기 전용 작업공간에서는 레이어 순서를 바꿀 수 없어요."
               : filterActive
-                ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "검색·필터를 지운 뒤 전체 레이어 순서를 바꿀 수 있어요.")
+                ? "검색·필터를 지운 뒤 전체 레이어 순서를 바꿀 수 있어요."
                 : liveSelectionBlocked
                   ? selectionEditGate.reason ?? undefined
                   : batchSelectedIds.length === 0
-                    ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "먼저 레이어를 선택하세요.")
+                    ? "먼저 레이어를 선택하세요."
                     : undefined
           }
           batchMergeFallbackNote={batchMergeFallbackNote}
@@ -1578,10 +1577,10 @@ export function StudioLayerNavigator({
           aria-modal="false"
           aria-label={
             actionTarget.kind === "batch"
-              ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "선택 레이어 일괄 작업")
+              ? "선택 레이어 일괄 작업"
               : activeItem
-                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "{v0} 레이어 작업"), { v0: String(activeItem.label) })
-                : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "{v0} 그룹 작업"), { v0: String(activeGroup?.name ?? "그룹") })
+                ? `${activeItem.label} 레이어 작업`
+                : `${activeGroup?.name ?? "그룹"} 그룹 작업`
           }
           tabIndex={-1}
           className="absolute inset-x-2 bottom-2 z-40 max-h-[min(28rem,68vh)] overflow-y-auto rounded-xl border border-line bg-panel p-3 shadow-2xl"
@@ -1589,16 +1588,16 @@ export function StudioLayerNavigator({
           <div className="flex items-start justify-between gap-2 border-b border-line pb-2">
             <div className="min-w-0">
               <p className="truncate text-xs font-bold text-fg">
-                {actionTarget.kind === "batch" ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "선택 {v0}개"), { v0: String(batchSelectedIds.length) }) : activeItem?.label ?? activeGroup?.name}
+                {actionTarget.kind === "batch" ? `선택 ${batchSelectedIds.length}개` : activeItem?.label ?? activeGroup?.name}
               </p>
               <p className="text-[0.68rem] text-fg-3 lg:text-[0.6rem]">
                 {actionTarget.kind === "batch"
                   ? outsideSelectionCount > 0
-                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "현재 결과만 적용 · 필터 밖 {v0}개 제외"), { v0: String(outsideSelectionCount) })
-                    : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹 · 역할 · 색 · 삭제")
+                    ? `현재 결과만 적용 · 필터 밖 ${outsideSelectionCount}개 제외`
+                    : "그룹 · 역할 · 색 · 삭제"
                   : activeItem
-                    ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "레이어 작업")
-                    : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹 작업 · {v0}개"), { v0: String(activeGroupItemIds.length) })}
+                    ? "레이어 작업"
+                    : `그룹 작업 · ${activeGroupItemIds.length}개`}
               </p>
             </div>
             <button
@@ -1608,7 +1607,7 @@ export function StudioLayerNavigator({
                 actionTriggerRef.current?.focus();
               }}
               className={cn("grid size-8 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
-              aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "레이어 작업 닫기")}
+              aria-label="레이어 작업 닫기"
             >
               <X size={14} />
             </button>
@@ -1618,51 +1617,55 @@ export function StudioLayerNavigator({
             <div className="mt-2 grid grid-cols-2 gap-1.5">
               {outsideSelectionCount > 0 ? (
                 <p className="col-span-2 rounded-md border border-warning/35 bg-warning-soft/20 px-2 py-2 text-[0.68rem] leading-relaxed text-warning">
-                  {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "화면에 보이는 선택 ")}{batchSelectedIds.length}{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "개에만 적용합니다. 필터 밖 선택 ")}{outsideSelectionCount}{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "개는 변경하거나 삭제하지 않습니다.")}</p>
+                  화면에 보이는 선택 {batchSelectedIds.length}개에만 적용합니다. 필터 밖 선택 {outsideSelectionCount}개는 변경하거나 삭제하지 않습니다.
+                </p>
               ) : null}
               <label className="col-span-2 text-[0.68rem] font-semibold text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹")}<select
+                그룹
+                <select
                   value={commonSelectedGroup ?? ""}
                   disabled={mutationDisabled || groupingDisabled || filterActive || batchSelectedIds.length === 0}
                   onChange={(event) => setSelectedGroup(event.target.value, batchSelectedIds)}
-                  aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "선택 레이어 그룹")}
+                  aria-label="선택 레이어 그룹"
                   title={
                     groupingDisabled
-                      ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "현재 작업면은 레이어 그룹을 지원하지 않아요")
+                      ? "현재 작업면은 레이어 그룹을 지원하지 않아요"
                       : filterActive
-                        ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "검색·필터를 지운 뒤 그룹을 바꿀 수 있어요")
+                        ? "검색·필터를 지운 뒤 그룹을 바꿀 수 있어요"
                         : undefined
                   }
                   className={cn("mt-1 min-h-9 w-full rounded-md border border-line bg-card px-2 text-xs text-fg max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}
                 >
-                  {commonSelectedGroup === "__mixed__" ? <option value="__mixed__" disabled>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "여러 그룹")}</option> : null}
-                  <option value="">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹 없음")}</option>
+                  {commonSelectedGroup === "__mixed__" ? <option value="__mixed__" disabled>여러 그룹</option> : null}
+                  <option value="">그룹 없음</option>
                   {availableGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
                 </select>
               </label>
               <label className="text-[0.68rem] font-semibold text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "작업 역할")}<select
+                작업 역할
+                <select
                   value={commonSelectedRole ?? ""}
                   disabled={mutationDisabled || batchSelectedIds.length === 0}
                   onChange={(event) => setSelectedRole(event.target.value, batchSelectedIds)}
-                  aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "선택 레이어 역할")}
+                  aria-label="선택 레이어 역할"
                   className={cn("mt-1 min-h-9 w-full rounded-md border border-line bg-card px-2 text-xs text-fg max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}
                 >
-                  {commonSelectedRole === "__mixed__" ? <option value="__mixed__" disabled>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "여러 역할")}</option> : null}
-                  <option value="">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "역할 없음")}</option>
+                  {commonSelectedRole === "__mixed__" ? <option value="__mixed__" disabled>여러 역할</option> : null}
+                  <option value="">역할 없음</option>
                   {STUDIO_LAYER_ROLES.map((role) => <option key={role} value={role}>{STUDIO_LAYER_ROLE_LABELS[role]}</option>)}
                 </select>
               </label>
               <label className="text-[0.68rem] font-semibold text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "색 라벨")}<select
+                색 라벨
+                <select
                   value={commonSelectedColor ?? ""}
                   disabled={mutationDisabled || batchSelectedIds.length === 0}
                   onChange={(event) => setSelectedColor(event.target.value, batchSelectedIds)}
-                  aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "선택 레이어 색 라벨")}
+                  aria-label="선택 레이어 색 라벨"
                   className={cn("mt-1 min-h-9 w-full rounded-md border border-line bg-card px-2 text-xs text-fg max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}
                 >
-                  {commonSelectedColor === "__mixed__" ? <option value="__mixed__" disabled>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "여러 색")}</option> : null}
-                  <option value="">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "색 없음")}</option>
+                  {commonSelectedColor === "__mixed__" ? <option value="__mixed__" disabled>여러 색</option> : null}
+                  <option value="">색 없음</option>
                   {STUDIO_LAYER_COLORS.map((color) => <option key={color} value={color}>{STUDIO_LAYER_COLOR_LABELS[color]}</option>)}
                 </select>
               </label>
@@ -1674,19 +1677,22 @@ export function StudioLayerNavigator({
                 }
                 onClick={() => onAction({ type: "create-group", seedIds: batchSelectedIds })}
                 className={compactControl}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "새 그룹으로 묶기{v0}"), { v0: String(createGroupUnavailableReason
+                aria-label={`새 그룹으로 묶기${
+                  createGroupUnavailableReason
                     ? `, 사용 불가: ${createGroupUnavailableReason}`
                     : batchSelectedIds.length === 0
                       ? ", 사용 불가: 먼저 레이어를 선택하세요."
-                      : "") })}
+                      : ""
+                }`}
                 title={
                   createGroupUnavailableReason ??
                   (batchSelectedIds.length === 0
-                    ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "먼저 레이어를 선택하세요.")
-                    : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "선택 레이어를 새 그룹으로 묶기"))
+                    ? "먼저 레이어를 선택하세요."
+                    : "선택 레이어를 새 그룹으로 묶기")
                 }
               >
-                <FolderPlus size={13} /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "새 그룹으로 묶기")}</button>
+                <FolderPlus size={13} /> 새 그룹으로 묶기
+              </button>
               <button
                 type="button"
                 disabled={mutationDisabled || batchSelectedIds.length < 2}
@@ -1695,11 +1701,11 @@ export function StudioLayerNavigator({
                   setActionTarget(null);
                 }}
                 className={compactControl}
-                title={batchMergeFallbackNote ?? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "선택한 레이어를 한 장으로 굽습니다")}
-                aria-label={batchMergeFallbackNote ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "선택 묶기, 병합 보류") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "선택 레이어 병합")}
+                title={batchMergeFallbackNote ?? "선택한 레이어를 한 장으로 굽습니다"}
+                aria-label={batchMergeFallbackNote ? "선택 묶기, 병합 보류" : "선택 레이어 병합"}
                 aria-describedby={batchMergeFallbackNote ? mergeFallbackNoteId : undefined}
               >
-                <Layers3 size={13} /> {batchMergeFallbackNote ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "선택 묶기") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "선택 병합")}
+                <Layers3 size={13} /> {batchMergeFallbackNote ? "선택 묶기" : "선택 병합"}
               </button>
               <button
                 type="button"
@@ -1709,11 +1715,11 @@ export function StudioLayerNavigator({
                   setActionTarget(null);
                 }}
                 className={compactControl}
-                title={flattenVisibleFallbackNote ?? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "표시 중인 레이어를 한 장으로 굽습니다")}
-                aria-label={flattenVisibleFallbackNote ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "표시 묶기, 병합 보류") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "표시 레이어 병합")}
+                title={flattenVisibleFallbackNote ?? "표시 중인 레이어를 한 장으로 굽습니다"}
+                aria-label={flattenVisibleFallbackNote ? "표시 묶기, 병합 보류" : "표시 레이어 병합"}
                 aria-describedby={flattenVisibleFallbackNote ? flattenFallbackNoteId : undefined}
               >
-                <Grid2X2 size={13} /> {flattenVisibleFallbackNote ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "표시 묶기") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "표시 병합")}
+                <Grid2X2 size={13} /> {flattenVisibleFallbackNote ? "표시 묶기" : "표시 병합"}
               </button>
               {batchMergeFallbackNote || flattenVisibleFallbackNote ? (
                 <p className="col-span-2 rounded-md bg-warning-soft/20 px-2 py-1.5 text-[0.6rem] leading-relaxed text-warning">
@@ -1730,7 +1736,8 @@ export function StudioLayerNavigator({
                 }}
                 className={cn(compactControl, "text-bad")}
               >
-                <Trash2 size={13} /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "현재 결과 삭제")}</button>
+                <Trash2 size={13} /> 현재 결과 삭제
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -1740,12 +1747,14 @@ export function StudioLayerNavigator({
                 }}
                 className={cn(compactControl, "col-span-2")}
               >
-                {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "선택 전체 해제")}</button>
+                선택 전체 해제
+              </button>
             </div>
           ) : activeItem ? (
             <div className="mt-2 grid grid-cols-2 gap-1.5">
               <button type="button" disabled={mutationDisabled} onClick={() => beginRename("item", activeItem.id, activeItem.label)} className={compactControl}>
-                <TypeIcon size={13} /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "이름 변경")}</button>
+                <TypeIcon size={13} /> 이름 변경
+              </button>
               {activeItem.type === "frame" ? (
                 <button
                   type="button"
@@ -1762,27 +1771,28 @@ export function StudioLayerNavigator({
                     })
                   }
                   className={compactControl}
-                  title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "선택한 다른 레이어를 이 컷의 폴더로 묶고 패널 클립을 켭니다 (공유 거터 편집은 후속)")}
+                  title="선택한 다른 레이어를 이 컷의 폴더로 묶고 패널 클립을 켭니다 (공유 거터 편집은 후속)"
                 >
-                  <FolderPlus size={13} /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "컷 폴더로 묶기")}</button>
+                  <FolderPlus size={13} /> 컷 폴더로 묶기
+                </button>
               ) : null}
               <button
                 type="button"
                 disabled={mutationDisabled || activeItemHiddenByGroup}
                 onClick={() => onAction({ type: "set-items-hidden", ids: [activeItem.id], hidden: !activeItem.hidden })}
                 className={compactControl}
-                title={activeItemHiddenByGroup ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "상위 그룹이 숨겨져 있어 그룹을 먼저 표시해야 해요") : undefined}
+                title={activeItemHiddenByGroup ? "상위 그룹이 숨겨져 있어 그룹을 먼저 표시해야 해요" : undefined}
               >
                 {activeItem.hidden ? <Eye size={13} /> : <EyeOff size={13} />}
-                {activeItemHiddenByGroup ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹에서 숨김") : activeItem.hidden ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "표시") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "숨김")}
+                {activeItemHiddenByGroup ? "그룹에서 숨김" : activeItem.hidden ? "표시" : "숨김"}
               </button>
               <button
                 type="button"
                 onClick={() => onToggleLocalHidden(activeItem.id)}
                 className={compactControl}
-                title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "다른 협업자 화면에는 그대로 보이고, 내 화면에서만 숨겨요")}
+                title="다른 협업자 화면에는 그대로 보이고, 내 화면에서만 숨겨요"
               >
-                <Ghost size={13} /> {activeItemLocallyHidden ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "나만 숨기기 해제") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "나만 숨기기")}
+                <Ghost size={13} /> {activeItemLocallyHidden ? "나만 숨기기 해제" : "나만 숨기기"}
               </button>
               {onToggleLayerSolo ? (
                 <button
@@ -1792,11 +1802,11 @@ export function StudioLayerNavigator({
                     compactControl,
                     soloLayerId === activeItem.id && "border-accent/40 bg-accent-soft/50 text-accent"
                   )}
-                  title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "이 레이어만 내 화면에 남기고 나머지는 임시로 숨겨요 (협업 문서에는 반영되지 않아요)")}
+                  title="이 레이어만 내 화면에 남기고 나머지는 임시로 숨겨요 (협업 문서에는 반영되지 않아요)"
                   aria-pressed={soloLayerId === activeItem.id}
                 >
                   <Crosshair size={13} />
-                  {soloLayerId === activeItem.id ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "솔로 해제") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "솔로")}
+                  {soloLayerId === activeItem.id ? "솔로 해제" : "솔로"}
                 </button>
               ) : null}
               <button
@@ -1804,22 +1814,22 @@ export function StudioLayerNavigator({
                 disabled={mutationDisabled || activeItemLockedByGroup}
                 onClick={() => onAction({ type: "set-items-locked", ids: [activeItem.id], locked: !activeItem.locked })}
                 className={compactControl}
-                title={activeItemLockedByGroup ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "상위 그룹이 잠겨 있어 그룹 잠금을 먼저 해제해야 해요") : undefined}
+                title={activeItemLockedByGroup ? "상위 그룹이 잠겨 있어 그룹 잠금을 먼저 해제해야 해요" : undefined}
               >
                 {activeItem.locked ? <LockOpen size={13} /> : <Lock size={13} />}
-                {activeItemLockedByGroup ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹에서 잠김") : activeItem.locked ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "잠금 해제") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "잠금")}
+                {activeItemLockedByGroup ? "그룹에서 잠김" : activeItem.locked ? "잠금 해제" : "잠금"}
               </button>
               {activeItem.type === "image" ? (
                 <>
                   <button type="button" disabled={mutationDisabled || activeItemEffectivelyLocked} onClick={() => onAction({ type: "set-item-flag", id: activeItem.id, flag: "alphaLocked", value: !activeItem.alphaLocked })} className={compactControl}>
-                    <Grid2X2 size={13} /> {activeItem.alphaLocked ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "알파 락 해제") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "알파 락")}
+                    <Grid2X2 size={13} /> {activeItem.alphaLocked ? "알파 락 해제" : "알파 락"}
                   </button>
                   <button type="button" disabled={mutationDisabled} onClick={() => onAction({ type: "set-item-flag", id: activeItem.id, flag: "fillReference", value: !activeItem.fillReference })} className={compactControl}>
-                    <ScanLine size={13} /> {activeItem.fillReference ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "참조 해제") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "채우기 참조")}
+                    <ScanLine size={13} /> {activeItem.fillReference ? "참조 해제" : "채우기 참조"}
                   </button>
                   {activeItem.masked ? (
                     <button type="button" disabled={mutationDisabled || activeItemEffectivelyLocked} onClick={() => onAction({ type: "set-item-flag", id: activeItem.id, flag: "maskEnabled", value: activeItem.maskEnabled === false })} className={compactControl}>
-                      <Layers3 size={13} /> {activeItem.maskEnabled === false ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "마스크 켜기") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "마스크 끄기")}
+                      <Layers3 size={13} /> {activeItem.maskEnabled === false ? "마스크 켜기" : "마스크 끄기"}
                     </button>
                   ) : null}
                 </>
@@ -1829,62 +1839,66 @@ export function StudioLayerNavigator({
                 disabled={mutationDisabled || filterActive}
                 onClick={() => onAction({ type: "move-item", id: activeItem.id, direction: "up" })}
                 className={compactControl}
-                title={filterActive ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "검색·필터를 지우면 전체 레이어 순서를 바꿀 수 있어요") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "앞으로 이동")}
+                title={filterActive ? "검색·필터를 지우면 전체 레이어 순서를 바꿀 수 있어요" : "앞으로 이동"}
               >
-                <ArrowUp size={13} /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "앞으로")}</button>
+                <ArrowUp size={13} /> 앞으로
+              </button>
               <button
                 type="button"
                 disabled={mutationDisabled || filterActive}
                 onClick={() => onAction({ type: "move-item", id: activeItem.id, direction: "down" })}
                 className={compactControl}
-                title={filterActive ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "검색·필터를 지우면 전체 레이어 순서를 바꿀 수 있어요") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "뒤로 이동")}
+                title={filterActive ? "검색·필터를 지우면 전체 레이어 순서를 바꿀 수 있어요" : "뒤로 이동"}
               >
-                <ArrowDown size={13} /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "뒤로")}</button>
+                <ArrowDown size={13} /> 뒤로
+              </button>
 
               {filterActive ? (
                 <p className="col-span-2 rounded-md bg-warning-soft/20 px-2 py-1.5 text-[0.6rem] leading-relaxed text-warning">
-                  {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "필터된 목록에서는 보이지 않는 레이어와 순서가 섞이지 않도록 재정렬을 잠급니다.")}</p>
+                  필터된 목록에서는 보이지 않는 레이어와 순서가 섞이지 않도록 재정렬을 잠급니다.
+                </p>
               ) : null}
 
               <label className="col-span-2 text-[0.62rem] font-semibold text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹")}<select
+                그룹
+                <select
                   value={availableGroups.some((group) => group.id === activeItem.groupId) ? activeItem.groupId : ""}
                   disabled={mutationDisabled || groupingDisabled || filterActive}
                   onChange={(event) => setSelectedGroup(event.target.value, [activeItem.id])}
                   title={
                     groupingDisabled
-                      ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "현재 작업면은 레이어 그룹을 지원하지 않아요")
+                      ? "현재 작업면은 레이어 그룹을 지원하지 않아요"
                       : filterActive
-                        ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "검색·필터를 지운 뒤 그룹을 바꿀 수 있어요")
+                        ? "검색·필터를 지운 뒤 그룹을 바꿀 수 있어요"
                         : undefined
                   }
                   className={cn("mt-1 min-h-9 w-full rounded-md border border-line bg-card px-2 text-xs text-fg max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}
                 >
-                  <option value="">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹 없음")}</option>
+                  <option value="">그룹 없음</option>
                   {availableGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
                 </select>
               </label>
               <label className="text-[0.62rem] font-semibold text-fg-3">
-                <span className="inline-flex items-center gap-1"><Tags size={11} /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "작업 역할")}</span>
+                <span className="inline-flex items-center gap-1"><Tags size={11} /> 작업 역할</span>
                 <select
                   value={activeItem.role ?? ""}
                   disabled={mutationDisabled}
                   onChange={(event) => setSelectedRole(event.target.value, [activeItem.id])}
                   className={cn("mt-1 min-h-9 w-full rounded-md border border-line bg-card px-2 text-xs text-fg max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}
                 >
-                  <option value="">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "역할 없음")}</option>
+                  <option value="">역할 없음</option>
                   {STUDIO_LAYER_ROLES.map((role) => <option key={role} value={role}>{STUDIO_LAYER_ROLE_LABELS[role]}</option>)}
                 </select>
               </label>
               <label className="text-[0.62rem] font-semibold text-fg-3">
-                <span className="inline-flex items-center gap-1"><Palette size={11} /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "색 라벨")}</span>
+                <span className="inline-flex items-center gap-1"><Palette size={11} /> 색 라벨</span>
                 <select
                   value={activeItem.color ?? ""}
                   disabled={mutationDisabled}
                   onChange={(event) => setSelectedColor(event.target.value, [activeItem.id])}
                   className={cn("mt-1 min-h-9 w-full rounded-md border border-line bg-card px-2 text-xs text-fg max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}
                 >
-                  <option value="">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "색 없음")}</option>
+                  <option value="">색 없음</option>
                   {STUDIO_LAYER_COLORS.map((color) => <option key={color} value={color}>{STUDIO_LAYER_COLOR_LABELS[color]}</option>)}
                 </select>
               </label>
@@ -1898,13 +1912,13 @@ export function StudioLayerNavigator({
                 className={compactControl}
                 title={
                   activeItemMergeDownFallbackNote
-                    ?? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "아래 레이어와 한 장으로 굽습니다 (레이어 1장이 줄어요)")
+                    ?? "아래 레이어와 한 장으로 굽습니다 (레이어 1장이 줄어요)"
                 }
-                aria-label={activeItemMergeDownFallbackNote ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "아래와 묶기, 병합 보류") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "아래로 병합")}
+                aria-label={activeItemMergeDownFallbackNote ? "아래와 묶기, 병합 보류" : "아래로 병합"}
                 aria-describedby={activeItemMergeDownFallbackNote ? mergeDownFallbackNoteId : undefined}
               >
                 <Layers3 size={13} />
-                {activeItemMergeDownFallbackNote ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "아래와 묶기") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "아래로 병합")}
+                {activeItemMergeDownFallbackNote ? "아래와 묶기" : "아래로 병합"}
               </button>
               <button
                 type="button"
@@ -1916,13 +1930,13 @@ export function StudioLayerNavigator({
                 className={compactControl}
                 title={
                   flattenVisibleFallbackNote
-                    ?? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "표시 중인 레이어를 한 장으로 굽습니다")
+                    ?? "표시 중인 레이어를 한 장으로 굽습니다"
                 }
-                aria-label={flattenVisibleFallbackNote ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "표시 묶기, 병합 보류") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "표시 레이어 병합")}
+                aria-label={flattenVisibleFallbackNote ? "표시 묶기, 병합 보류" : "표시 레이어 병합"}
                 aria-describedby={flattenVisibleFallbackNote ? flattenFallbackNoteId : undefined}
               >
                 <Grid2X2 size={13} />
-                {flattenVisibleFallbackNote ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "표시 묶기") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "표시 병합")}
+                {flattenVisibleFallbackNote ? "표시 묶기" : "표시 병합"}
               </button>
               {activeItemMergeDownFallbackNote || flattenVisibleFallbackNote ? (
                 <p className="col-span-2 rounded-md bg-warning-soft/20 px-2 py-1.5 text-[0.6rem] leading-relaxed text-warning">
@@ -1935,53 +1949,58 @@ export function StudioLayerNavigator({
                 onClick={() => onAction({ type: "delete-items", ids: [activeItem.id] })}
                 className={cn(compactControl, "col-span-2 text-bad")}
               >
-                <Trash2 size={13} /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "레이어 삭제")}</button>
+                <Trash2 size={13} /> 레이어 삭제
+              </button>
             </div>
           ) : activeGroup ? (
             <div className="mt-2 grid grid-cols-2 gap-1.5">
               <button type="button" disabled={mutationDisabled} onClick={() => beginRename("group", activeGroup.id, activeGroup.name)} className={compactControl}>
-                <TypeIcon size={13} /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "이름 변경")}</button>
+                <TypeIcon size={13} /> 이름 변경
+              </button>
               <button
                 type="button"
                 onClick={() => selectGroupItems(activeGroupItemIds)}
                 aria-label={
                   activeGroupAllSelected
-                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "{v0} 그룹 선택 해제"), { v0: String(activeGroup.name) })
-                    : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "{v0} 그룹 모두 선택"), { v0: String(activeGroup.name) })
+                    ? `${activeGroup.name} 그룹 선택 해제`
+                    : `${activeGroup.name} 그룹 모두 선택`
                 }
                 aria-pressed={activeGroupAllSelected}
                 className={compactControl}
               >
                 <ListChecks size={13} />
-                {activeGroupAllSelected ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹 선택 해제") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "모두 선택")}
+                {activeGroupAllSelected ? "그룹 선택 해제" : "모두 선택"}
               </button>
               <button type="button" disabled={mutationDisabled} onClick={() => onAction({ type: "set-group-flag", groupId: activeGroup.id, flag: "hidden", value: !activeGroup.hidden })} className={compactControl}>
                 {activeGroup.hidden ? <Eye size={13} /> : <EyeOff size={13} />}
-                {activeGroup.hidden ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹 표시") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹 숨김")}
+                {activeGroup.hidden ? "그룹 표시" : "그룹 숨김"}
               </button>
               <button type="button" disabled={mutationDisabled} onClick={() => onAction({ type: "set-group-flag", groupId: activeGroup.id, flag: "locked", value: !activeGroup.locked })} className={compactControl}>
                 {activeGroup.locked ? <LockOpen size={13} /> : <Lock size={13} />}
-                {activeGroup.locked ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "잠금 해제") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹 잠금")}
+                {activeGroup.locked ? "잠금 해제" : "그룹 잠금"}
               </button>
               <button
                 type="button"
                 disabled={mutationDisabled || groupingDisabled || filterActive || activeGroupItemIds.length === 0}
                 onClick={() => onAction({ type: "move-group", groupId: activeGroup.id, direction: "up" })}
                 className={compactControl}
-                title={filterActive ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "검색·필터를 지우면 그룹 블록 순서를 바꿀 수 있어요") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹 블록을 앞으로 이동")}
+                title={filterActive ? "검색·필터를 지우면 그룹 블록 순서를 바꿀 수 있어요" : "그룹 블록을 앞으로 이동"}
               >
-                <ArrowUp size={13} /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹 앞으로")}</button>
+                <ArrowUp size={13} /> 그룹 앞으로
+              </button>
               <button
                 type="button"
                 disabled={mutationDisabled || groupingDisabled || filterActive || activeGroupItemIds.length === 0}
                 onClick={() => onAction({ type: "move-group", groupId: activeGroup.id, direction: "down" })}
                 className={compactControl}
-                title={filterActive ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "검색·필터를 지우면 그룹 블록 순서를 바꿀 수 있어요") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹 블록을 뒤로 이동")}
+                title={filterActive ? "검색·필터를 지우면 그룹 블록 순서를 바꿀 수 있어요" : "그룹 블록을 뒤로 이동"}
               >
-                <ArrowDown size={13} /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹 뒤로")}</button>
+                <ArrowDown size={13} /> 그룹 뒤로
+              </button>
               {filterActive ? (
                 <p className="col-span-2 rounded-md bg-warning-soft/20 px-2 py-1.5 text-[0.6rem] leading-relaxed text-warning">
-                  {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "필터된 목록에서는 그룹 밖 레이어와 순서가 섞이지 않도록 그룹 이동을 잠급니다.")}</p>
+                  필터된 목록에서는 그룹 밖 레이어와 순서가 섞이지 않도록 그룹 이동을 잠급니다.
+                </p>
               ) : null}
               <button
                 type="button"
@@ -1990,13 +2009,14 @@ export function StudioLayerNavigator({
                 className={cn(compactControl, "col-span-2")}
                 title={
                   groupingDisabled
-                    ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "현재 작업면은 레이어 그룹을 지원하지 않아요")
+                    ? "현재 작업면은 레이어 그룹을 지원하지 않아요"
                     : filterActive
-                      ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "검색·필터를 지운 뒤 그룹을 해제할 수 있어요")
+                      ? "검색·필터를 지운 뒤 그룹을 해제할 수 있어요"
                       : undefined
                 }
               >
-                <FolderMinus size={13} /> {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigator", "ko", "그룹 해제 · 레이어 보존")}</button>
+                <FolderMinus size={13} /> 그룹 해제 · 레이어 보존
+              </button>
             </div>
           ) : null}
         </div>

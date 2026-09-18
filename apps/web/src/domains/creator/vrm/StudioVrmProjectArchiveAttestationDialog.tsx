@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { FileArchive, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import { useId, useRef, useState, type FormEvent, type ReactElement } from "react";
 import { createPortal } from "react-dom";
@@ -224,21 +220,26 @@ export function StudioVrmProjectArchiveAttestationDialog({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.65rem] font-semibold tabular-nums text-fg-2">
-                VRM {plan.modelCount}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "개")}</span>
+                VRM {plan.modelCount}개
+              </span>
               {queuedCount > 0 ? (
                 <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.65rem] font-semibold tabular-nums text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "뒤에 ")}{queuedCount}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "건 대기")}</span>
+                  뒤에 {queuedCount}건 대기
+                </span>
               ) : null}
             </div>
             <h2 id={titleId} className="mt-1.5 text-base font-bold tracking-tight text-fg sm:text-lg">
-              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "VRM archive 이용 조건 확인")}</h2>
+              VRM archive 이용 조건 확인
+            </h2>
             <p id={descriptionId} className="mt-1 max-w-[70ch] text-xs leading-relaxed text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "원본 VRM 파일이 프로젝트 archive에 포함됩니다. 아래 항목은 추정하지 않고, 현재 프로젝트의 실제 이용 맥락을 직접 확인해야 합니다.")}</p>
+              원본 VRM 파일이 프로젝트 archive에 포함됩니다. 아래 항목은 추정하지 않고,
+              현재 프로젝트의 실제 이용 맥락을 직접 확인해야 합니다.
+            </p>
           </div>
           <button
             type="button"
             onClick={onCancel}
-            aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "VRM archive 이용 조건 확인 취소")}
+            aria-label="VRM archive 이용 조건 확인 취소"
             className={cn(
               "grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
               STUDIO_EASE,
@@ -251,9 +252,10 @@ export function StudioVrmProjectArchiveAttestationDialog({
 
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 py-5 [scrollbar-width:thin] sm:px-5">
           <fieldset>
-            <legend className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "1. 아바타 사용자 관계")}</legend>
+            <legend className="text-sm font-bold text-fg">1. 아바타 사용자 관계</legend>
             <p className="mt-1 text-xs leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "모든 포함 모델에 공통으로 허용되는 관계만 표시됩니다. 자동 선택되지 않습니다.")}</p>
+              모든 포함 모델에 공통으로 허용되는 관계만 표시됩니다. 자동 선택되지 않습니다.
+            </p>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
               {plan.permittedActorBases.map((basis) => {
                 const option = ACTOR_OPTIONS[basis];
@@ -272,7 +274,7 @@ export function StudioVrmProjectArchiveAttestationDialog({
                   >
                     <input
                       type="radio"
-                      name={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "en", "{v0}-actor-basis"), { v0: String(id) })}
+                      name={`${id}-actor-basis`}
                       value={basis}
                       required
                       checked={actorBasis === basis}
@@ -291,21 +293,23 @@ export function StudioVrmProjectArchiveAttestationDialog({
             </div>
           </fieldset>
 
-          <section aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "en", "{v0}-content-heading"), { v0: String(id) })}>
-            <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "en", "{v0}-content-heading"), { v0: String(id) })} className="text-sm font-bold text-fg">
-              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "2. 콘텐츠 분류")}</h3>
+          <section aria-labelledby={`${id}-content-heading`}>
+            <h3 id={`${id}-content-heading`} className="text-sm font-bold text-fg">
+              2. 콘텐츠 분류
+            </h3>
             <p className="mt-1 text-xs leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "네 항목을 모두 선택해야 합니다. ‘확인하지 못함’은 안전을 위해 내보내기를 차단합니다.")}</p>
+              네 항목을 모두 선택해야 합니다. ‘확인하지 못함’은 안전을 위해 내보내기를 차단합니다.
+            </p>
             <div className="mt-3 divide-y divide-line rounded-xl border border-line bg-card/35">
               {CONTENT_FIELDS.map((field) => (
                 <fieldset key={field.key} className="min-w-0 px-3 py-3 sm:px-4">
                   <legend className="px-0 text-xs font-bold text-fg">{field.label}</legend>
-                  <p id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "en", "{v0}-{v1}-hint"), { v0: String(id), v1: String(field.key) })} className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                  <p id={`${id}-${field.key}-hint`} className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
                     {field.description}
                   </p>
                   <div
                     className="mt-2 grid gap-1.5 min-[420px]:grid-cols-3"
-                    aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "en", "{v0}-{v1}-hint"), { v0: String(id), v1: String(field.key) })}
+                    aria-describedby={`${id}-${field.key}-hint`}
                   >
                     {CLASSIFICATION_OPTIONS.map((option) => (
                       <label
@@ -344,11 +348,13 @@ export function StudioVrmProjectArchiveAttestationDialog({
             </div>
           </section>
 
-          <section aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "en", "{v0}-attribution-heading"), { v0: String(id) })}>
-            <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "en", "{v0}-attribution-heading"), { v0: String(id) })} className="text-sm font-bold text-fg">
-              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "3. archive에 보존할 정확한 크레딧")}</h3>
+          <section aria-labelledby={`${id}-attribution-heading`}>
+            <h3 id={`${id}-attribution-heading`} className="text-sm font-bold text-fg">
+              3. archive에 보존할 정확한 크레딧
+            </h3>
             <p className="mt-1 text-xs leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "아래 문자열은 모델 이용 조건에서 가져온 원문입니다. 순서와 내용을 바꾸지 않고 그대로 보존합니다.")}</p>
+              아래 문자열은 모델 이용 조건에서 가져온 원문입니다. 순서와 내용을 바꾸지 않고 그대로 보존합니다.
+            </p>
             <ol
               className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-canvas/55"
               data-studio-vrm-project-archive-attributions
@@ -364,7 +370,7 @@ export function StudioVrmProjectArchiveAttestationDialog({
                   <span className="min-w-0">
                     <code
                       data-studio-vrm-project-archive-attribution={index}
-                      data-empty={text === "" ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "en", "true") : undefined}
+                      data-empty={text === "" ? "true" : undefined}
                       className="block min-w-0 whitespace-pre-wrap break-words font-sans text-xs leading-relaxed text-fg [overflow-wrap:anywhere]"
                     >
                       {text}
@@ -374,7 +380,8 @@ export function StudioVrmProjectArchiveAttestationDialog({
                         data-studio-vrm-project-archive-empty-attribution-note
                         className="inline-flex min-h-6 items-center rounded-md border border-line bg-card px-2 text-[0.68rem] font-semibold text-fg-2"
                       >
-                        {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "빈 문자열 · 추가 크레딧 문구 없음")}</span>
+                        빈 문자열 · 추가 크레딧 문구 없음
+                      </span>
                     ) : null}
                   </span>
                 </li>
@@ -397,7 +404,8 @@ export function StudioVrmProjectArchiveAttestationDialog({
                 className="mt-0.5 size-4 shrink-0 accent-accent"
               />
               <span className="text-xs font-semibold leading-relaxed text-fg">
-                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "표시된 모든 크레딧 원문을 순서와 내용 변경 없이 archive에 보존합니다.")}</span>
+                표시된 모든 크레딧 원문을 순서와 내용 변경 없이 archive에 보존합니다.
+              </span>
             </label>
           </section>
         </div>
@@ -434,7 +442,8 @@ export function StudioVrmProjectArchiveAttestationDialog({
                 STUDIO_FOCUS_RING,
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "취소")}</button>
+              취소
+            </button>
             <button
               type="submit"
               disabled={!validation.ready}
@@ -445,7 +454,8 @@ export function StudioVrmProjectArchiveAttestationDialog({
                 STUDIO_FOCUS_RING,
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmProjectArchiveAttestationDialog", "ko", "VRM 포함 archive 만들기")}</button>
+              VRM 포함 archive 만들기
+            </button>
           </div>
         </footer>
       </form>

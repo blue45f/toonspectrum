@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   BookMarked,
   Box,
@@ -167,7 +163,7 @@ function TextField({
           maxLength={maxLength}
           placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "{v0} resize-y"), { v0: String(CONTROL_CLASS) })}
+          className={`${CONTROL_CLASS} resize-y`}
         />
       ) : (
         <input
@@ -205,7 +201,7 @@ function ListField({ id, label, value, placeholder, onChange }: ListFieldProps) 
         * (STUDIO_PRODUCTION_BIBLE_MAX_LIST_ITEM_LENGTH + 1)
       }
       multiline
-      hint={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "쉼표 또는 줄바꿈으로 구분 · 최대 {v0}개"), { v0: String(STUDIO_PRODUCTION_BIBLE_MAX_LIST_ITEMS) })}
+      hint={`쉼표 또는 줄바꿈으로 구분 · 최대 ${STUDIO_PRODUCTION_BIBLE_MAX_LIST_ITEMS}개`}
       onChange={(next) => onChange(parseListInput(next))}
     />
   );
@@ -249,14 +245,15 @@ function LinkField({
           STUDIO_PRODUCTION_BIBLE_MAX_LIST_ITEMS
           * (STUDIO_PRODUCTION_BIBLE_MAX_LIST_ITEM_LENGTH + 1)
         }
-        placeholder={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "연결할 안정 ID를 한 줄에 하나씩 입력")}
+        placeholder="연결할 안정 ID를 한 줄에 하나씩 입력"
         onChange={(event) => onChange(parseListInput(event.target.value))}
-        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "{v0} resize-y font-mono text-xs"), { v0: String(CONTROL_CLASS) })}
+        className={`${CONTROL_CLASS} resize-y font-mono text-xs`}
       />
       <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "이름이 바뀌어도 연결이 유지되도록 표시 이름 대신 안정 ID를 저장합니다.")}</p>
+        이름이 바뀌어도 연결이 유지되도록 표시 이름 대신 안정 ID를 저장합니다.
+      </p>
       {options.length > 0 ? (
-        <div className="mt-2 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "{v0} 빠른 연결"), { v0: String(label) })}>
+        <div className="mt-2 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto" aria-label={`${label} 빠른 연결`}>
           {options.map((option) => {
             const selected = value.includes(option.id);
             return (
@@ -265,9 +262,11 @@ function LinkField({
                 type="button"
                 aria-pressed={selected}
                 onClick={() => toggle(option.id)}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-lg border px-2.5 text-left text-[0.68rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(selected
+                className={`inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-lg border px-2.5 text-left text-[0.68rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                  selected
                     ? "border-accent/50 bg-accent-soft text-accent"
-                    : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
+                    : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+                }`}
               >
                 {selected ? <Check size={12} aria-hidden /> : <Link2 size={12} aria-hidden />}
                 <span className="min-w-0">
@@ -483,10 +482,11 @@ export function StudioProductionBiblePanelSurface({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 id="studio-production-bible-title" className="text-base font-bold text-fg">
-              {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "프로덕션 바이블")}</h2>
+              프로덕션 바이블
+            </h2>
             <span
               data-studio-production-bible-local-only="true"
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "inline-flex min-h-7 items-center gap-1 rounded-full border px-2 text-[0.62rem] font-semibold {v0}"), { v0: String(persistenceStatus.tone) })}
+              className={`inline-flex min-h-7 items-center gap-1 rounded-full border px-2 text-[0.62rem] font-semibold ${persistenceStatus.tone}`}
             >
               <Database size={11} aria-hidden />
               {persistenceStatus.label}
@@ -494,19 +494,19 @@ export function StudioProductionBiblePanelSurface({
           </div>
           <p className="mt-0.5 max-w-[76ch] text-xs leading-relaxed text-fg-3">
             {view === "reference"
-              ? translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "장면·장소·소품의 시각 기준을 연결하고 이름이 바뀌어도 유지되는 안정 ID로 관리합니다.")
-              : translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "독자에게 건 약속의 첫 장면, 중간 단서, 회수 컷과 마감을 한 원장에서 추적합니다.")}
+              ? "장면·장소·소품의 시각 기준을 연결하고 이름이 바뀌어도 유지되는 안정 ID로 관리합니다."
+              : "독자에게 건 약속의 첫 장면, 중간 단서, 회수 컷과 마감을 한 원장에서 추적합니다."}
           </p>
         </div>
         <span className="hidden rounded-full border border-line bg-card px-2.5 py-1 text-[0.68rem] tabular-nums text-fg-3 sm:inline-flex">
           {view === "reference"
             ? `${bible.entries.length}/${STUDIO_PRODUCTION_BIBLE_MAX_ENTRIES}`
-            : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "약속 {v0}"), { v0: String(promisePayoffLedger.entries.length) })}
+            : `약속 ${promisePayoffLedger.entries.length}`}
         </span>
         <button
           type="button"
           onClick={onClose}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "프로덕션 바이블 닫기")}
+          aria-label="프로덕션 바이블 닫기"
           className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <X size={16} aria-hidden />
@@ -535,7 +535,7 @@ export function StudioProductionBiblePanelSurface({
 
       <div
         role="tablist"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "프로덕션 바이블 작업 영역")}
+        aria-label="프로덕션 바이블 작업 영역"
         className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-card/35 px-3 py-2 sm:px-5"
       >
         {([
@@ -548,13 +548,17 @@ export function StudioProductionBiblePanelSurface({
             role="tab"
             aria-selected={view === id}
             onClick={() => setView(id)}
-            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(view === id
+            className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+              view === id
                 ? "border-accent bg-accent text-on-accent"
-                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
+                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+            }`}
           >
             <Icon size={13} aria-hidden />
             {label}
-            <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "rounded px-1.5 py-0.5 text-[0.6rem] tabular-nums {v0}"), { v0: String(view === id ? "bg-black/15 text-on-accent" : "bg-raised text-fg-3") })}>
+            <span className={`rounded px-1.5 py-0.5 text-[0.6rem] tabular-nums ${
+              view === id ? "bg-black/15 text-on-accent" : "bg-raised text-fg-3"
+            }`}>
               {id === "reference"
                 ? bible.entries.length
                 : promisePayoffLedger.entries.length}
@@ -582,17 +586,17 @@ export function StudioProductionBiblePanelSurface({
                 aria-hidden
                 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
               />
-              <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "프로덕션 바이블 검색")}</span>
+              <span className="sr-only">프로덕션 바이블 검색</span>
               <input
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "이름·별칭·키워드·ID 검색")}
+                placeholder="이름·별칭·키워드·ID 검색"
                 className="min-h-11 w-full rounded-lg border border-line bg-panel py-2 pl-9 pr-3 text-xs text-fg outline-none placeholder:text-fg-3 hover:border-line-strong focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               />
             </label>
 
-            <div className="flex gap-1 overflow-x-auto pb-0.5" role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "바이블 종류 필터")}>
+            <div className="flex gap-1 overflow-x-auto pb-0.5" role="tablist" aria-label="바이블 종류 필터">
               {([
                 ["all", "전체"],
                 ["scene", "장면"],
@@ -606,16 +610,18 @@ export function StudioProductionBiblePanelSurface({
                   role="tab"
                   aria-selected={filter === id}
                   onClick={() => setFilter(id)}
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "min-h-11 shrink-0 rounded-lg border px-3 text-[0.68rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(filter === id
+                  className={`min-h-11 shrink-0 rounded-lg border px-3 text-[0.68rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                    filter === id
                       ? "border-accent bg-accent text-on-accent"
-                      : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
+                      : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+                  }`}
                 >
                   {label}
                 </button>
               ))}
             </div>
 
-            <div className="grid grid-cols-3 gap-1.5" aria-label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "바이블 항목 추가")}>
+            <div className="grid grid-cols-3 gap-1.5" aria-label="바이블 항목 추가">
               {(["scene", "location", "prop"] as const).map((kind) => {
                 const Icon = ENTRY_KIND_META[kind].icon;
                 return (
@@ -624,7 +630,7 @@ export function StudioProductionBiblePanelSurface({
                     type="button"
                     onClick={() => addEntry(kind)}
                     disabled={bible.entries.length >= STUDIO_PRODUCTION_BIBLE_MAX_ENTRIES}
-                    className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "{v0} border-line bg-card text-fg-2 hover:border-accent/45 hover:bg-accent-soft hover:text-accent"), { v0: String(TOUCH_BUTTON_CLASS) })}
+                    className={`${TOUCH_BUTTON_CLASS} border-line bg-card text-fg-2 hover:border-accent/45 hover:bg-accent-soft hover:text-accent`}
                   >
                     <Icon size={13} aria-hidden />
                     {kindLabel(kind)}
@@ -640,14 +646,15 @@ export function StudioProductionBiblePanelSurface({
                 <div>
                   <BookMarked size={21} className="mx-auto text-fg-3" aria-hidden />
                   <p className="mt-2 text-xs font-semibold text-fg-2">
-                    {bible.entries.length === 0 ? translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "첫 항목을 추가하세요") : translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "조건에 맞는 항목이 없어요")}
+                    {bible.entries.length === 0 ? "첫 항목을 추가하세요" : "조건에 맞는 항목이 없어요"}
                   </p>
                   <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "장면은 장소와 소품을 연결하는 허브가 됩니다.")}</p>
+                    장면은 장소와 소품을 연결하는 허브가 됩니다.
+                  </p>
                 </div>
               </div>
             ) : (
-              <ol className="space-y-1" aria-label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "프로덕션 바이블 항목")}>
+              <ol className="space-y-1" aria-label="프로덕션 바이블 항목">
                 {visibleEntries.map((entry) => {
                   const selected = entry.id === selectedEntry?.id;
                   const meta = ENTRY_KIND_META[entry.kind];
@@ -662,19 +669,23 @@ export function StudioProductionBiblePanelSurface({
                           setError(null);
                           setNotice(null);
                         }}
-                        aria-current={selected ? translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "true") : undefined}
-                        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "flex min-h-11 w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(selected
+                        aria-current={selected ? "true" : undefined}
+                        className={`flex min-h-11 w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                          selected
                             ? "border-accent/50 bg-accent-soft/20"
-                            : "border-transparent text-fg-2 hover:border-line hover:bg-raised") })}
+                            : "border-transparent text-fg-2 hover:border-line hover:bg-raised"
+                        }`}
                       >
                         <span
-                          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "grid size-8 shrink-0 place-items-center rounded-lg {v0}"), { v0: String(selected ? "bg-accent text-on-accent" : "bg-raised text-fg-3") })}
+                          className={`grid size-8 shrink-0 place-items-center rounded-lg ${
+                            selected ? "bg-accent text-on-accent" : "bg-raised text-fg-3"
+                          }`}
                         >
                           <Icon size={14} aria-hidden />
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-xs font-semibold text-fg">
-                            {entry.name || formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "이름 없는 {v0}"), { v0: String(meta.label) })}
+                            {entry.name || `이름 없는 ${meta.label}`}
                           </span>
                           <span className="mt-0.5 block truncate font-mono text-[0.6rem] text-fg-3">
                             {entry.id}
@@ -682,7 +693,7 @@ export function StudioProductionBiblePanelSurface({
                         </span>
                         {issueCount > 0 && (
                           <span
-                            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "끊긴 연결 {v0}개"), { v0: String(issueCount) })}
+                            aria-label={`끊긴 연결 ${issueCount}개`}
                             className="inline-flex shrink-0 items-center gap-0.5 text-[0.62rem] font-semibold text-warn"
                           >
                             <AlertTriangle size={11} aria-hidden />
@@ -701,21 +712,23 @@ export function StudioProductionBiblePanelSurface({
             <button
               type="button"
               onClick={() => void copyExport()}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "{v0} border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"), { v0: String(TOUCH_BUTTON_CLASS) })}
+              className={`${TOUCH_BUTTON_CLASS} border-line bg-card text-fg-2 hover:bg-raised hover:text-fg`}
             >
-              <Copy size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "JSON 복사")}</button>
+              <Copy size={13} aria-hidden /> JSON 복사
+            </button>
             <button
               type="button"
               onClick={() => importInputRef.current?.click()}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "{v0} border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"), { v0: String(TOUCH_BUTTON_CLASS) })}
+              className={`${TOUCH_BUTTON_CLASS} border-line bg-card text-fg-2 hover:bg-raised hover:text-fg`}
             >
-              <Upload size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "JSON 병합")}</button>
+              <Upload size={13} aria-hidden /> JSON 병합
+            </button>
             <input
               ref={importInputRef}
               type="file"
               accept="application/json,.json"
               className="sr-only"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "프로덕션 바이블 JSON 파일 선택")}
+              aria-label="프로덕션 바이블 JSON 파일 선택"
               onChange={(event) => void importFile(event.target.files?.[0])}
             />
           </div>
@@ -728,15 +741,17 @@ export function StudioProductionBiblePanelSurface({
                 <span className="mx-auto grid size-12 place-items-center rounded-lg border border-line bg-card text-fg-3">
                   <FileJson size={22} aria-hidden />
                 </span>
-                <h3 className="mt-3 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "프로덕션 기준을 작품과 함께 쌓으세요")}</h3>
+                <h3 className="mt-3 text-sm font-bold text-fg">프로덕션 기준을 작품과 함께 쌓으세요</h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "장소의 구조, 소품의 형태, 장면의 시간대를 분리해 기록하면 캐릭터 바이블과 연결해도 중복되지 않습니다.")}</p>
+                  장소의 구조, 소품의 형태, 장면의 시간대를 분리해 기록하면 캐릭터 바이블과 연결해도 중복되지 않습니다.
+                </p>
                 <button
                   type="button"
                   onClick={() => addEntry("scene")}
                   className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-4 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
-                  <Plus size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "첫 장면 만들기")}</button>
+                  <Plus size={14} aria-hidden /> 첫 장면 만들기
+                </button>
               </div>
             </div>
           ) : (
@@ -751,33 +766,35 @@ export function StudioProductionBiblePanelSurface({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="truncate text-base font-bold text-fg">
-                      {selectedEntry.name || formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "이름 없는 {v0}"), { v0: String(kindLabel(selectedEntry.kind)) })}
+                      {selectedEntry.name || `이름 없는 ${kindLabel(selectedEntry.kind)}`}
                     </h3>
                     <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.65rem] font-semibold text-fg-3">
                       {kindLabel(selectedEntry.kind)}
                     </span>
                     {selectedIssues.length > 0 && (
                       <span className="inline-flex items-center gap-1 rounded-full border border-warn/35 bg-warn/10 px-2 py-0.5 text-[0.65rem] font-semibold text-warn">
-                        <AlertTriangle size={11} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "끊긴 연결 ")}{selectedIssues.length}
+                        <AlertTriangle size={11} aria-hidden /> 끊긴 연결 {selectedIssues.length}
                       </span>
                     )}
                   </div>
                   <p className="mt-1 break-all font-mono text-[0.65rem] text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "안정 ID · ")}{selectedEntry.id}
+                    안정 ID · {selectedEntry.id}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={duplicateEntry}
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "{v0} border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"), { v0: String(TOUCH_BUTTON_CLASS) })}
+                  className={`${TOUCH_BUTTON_CLASS} border-line bg-card text-fg-2 hover:bg-raised hover:text-fg`}
                 >
-                  <Copy size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "복제")}</button>
+                  <Copy size={13} aria-hidden /> 복제
+                </button>
                 <button
                   type="button"
                   onClick={deleteEntry}
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "{v0} border-bad/30 bg-bad/10 text-bad hover:bg-bad/15"), { v0: String(TOUCH_BUTTON_CLASS) })}
+                  className={`${TOUCH_BUTTON_CLASS} border-bad/30 bg-bad/10 text-bad hover:bg-bad/15`}
                 >
-                  <Trash2 size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "삭제")}</button>
+                  <Trash2 size={13} aria-hidden /> 삭제
+                </button>
               </div>
 
               {selectedIssues.length > 0 && (
@@ -787,7 +804,8 @@ export function StudioProductionBiblePanelSurface({
                     className="flex items-center gap-1.5 text-xs font-bold text-warn"
                   >
                     <AlertTriangle size={13} aria-hidden />
-                    {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "연결 확인 필요")}</h4>
+                    연결 확인 필요
+                  </h4>
                   <ul className="mt-2 space-y-1">
                     {selectedIssues.map((issue) => (
                       <li
@@ -804,28 +822,30 @@ export function StudioProductionBiblePanelSurface({
               <section aria-labelledby="production-bible-identity">
                 <div className="py-4">
                   <h4 id="production-bible-identity" className="text-xs font-bold text-fg">
-                    {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "정체성과 검색")}</h4>
+                    정체성과 검색
+                  </h4>
                   <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "표시 이름은 바꿀 수 있지만 연결은 위 안정 ID를 사용합니다.")}</p>
+                    표시 이름은 바꿀 수 있지만 연결은 위 안정 ID를 사용합니다.
+                  </p>
                 </div>
                 <TextField
-                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "production-bible-{v0}-name"), { v0: String(selectedEntry.id) })}
-                  label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "이름")}
+                  id={`production-bible-${selectedEntry.id}-name`}
+                  label="이름"
                   value={selectedEntry.name}
-                  placeholder={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "{v0}의 표시 이름"), { v0: String(kindLabel(selectedEntry.kind)) })}
+                  placeholder={`${kindLabel(selectedEntry.kind)}의 표시 이름`}
                   maxLength={STUDIO_PRODUCTION_BIBLE_MAX_NAME_LENGTH}
                   onChange={(name) => patchEntry({ name })}
                 />
                 <ListField
-                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "production-bible-{v0}-aliases"), { v0: String(selectedEntry.id) })}
-                  label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "별칭")}
+                  id={`production-bible-${selectedEntry.id}-aliases`}
+                  label="별칭"
                   value={selectedEntry.aliases}
-                  placeholder={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "작중 호칭, 검색할 다른 이름")}
+                  placeholder="작중 호칭, 검색할 다른 이름"
                   onChange={(aliases) => patchEntry({ aliases })}
                 />
                 <TextField
-                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "production-bible-{v0}-description"), { v0: String(selectedEntry.id) })}
-                  label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "설명")}
+                  id={`production-bible-${selectedEntry.id}-description`}
+                  label="설명"
                   value={selectedEntry.description}
                   placeholder={ENTRY_KIND_META[selectedEntry.kind].description}
                   maxLength={STUDIO_PRODUCTION_BIBLE_MAX_DESCRIPTION_LENGTH}
@@ -837,29 +857,31 @@ export function StudioProductionBiblePanelSurface({
               <section aria-labelledby="production-bible-visual" className="mt-5">
                 <div className="border-t border-line py-4">
                   <h4 id="production-bible-visual" className="text-xs font-bold text-fg">
-                    {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "시각 일관성")}</h4>
+                    시각 일관성
+                  </h4>
                   <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "생성 프롬프트와 작화 체크리스트가 공유할 빛·색·형태 기준입니다.")}</p>
+                    생성 프롬프트와 작화 체크리스트가 공유할 빛·색·형태 기준입니다.
+                  </p>
                 </div>
                 <ListField
-                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "production-bible-{v0}-keywords"), { v0: String(selectedEntry.id) })}
-                  label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "시각 키워드")}
+                  id={`production-bible-${selectedEntry.id}-keywords`}
+                  label="시각 키워드"
                   value={selectedEntry.visualKeywords}
-                  placeholder={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "역광, 로우 앵글, 낡은 철망")}
+                  placeholder="역광, 로우 앵글, 낡은 철망"
                   onChange={(visualKeywords) => patchEntry({ visualKeywords })}
                 />
                 <ListField
-                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "production-bible-{v0}-colors"), { v0: String(selectedEntry.id) })}
-                  label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "대표 색")}
+                  id={`production-bible-${selectedEntry.id}-colors`}
+                  label="대표 색"
                   value={selectedEntry.colors}
-                  placeholder={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "#D86B38, 먹색, 저채도 청록")}
+                  placeholder="#D86B38, 먹색, 저채도 청록"
                   onChange={(colors) => patchEntry({ colors })}
                 />
                 <TextField
-                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "production-bible-{v0}-time"), { v0: String(selectedEntry.id) })}
-                  label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "시간대·조명")}
+                  id={`production-bible-${selectedEntry.id}-time`}
+                  label="시간대·조명"
                   value={selectedEntry.timeOfDay}
-                  placeholder={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "예: 해질녘 · 서쪽 역광")}
+                  placeholder="예: 해질녘 · 서쪽 역광"
                   maxLength={STUDIO_PRODUCTION_BIBLE_MAX_TIME_LENGTH}
                   onChange={(timeOfDay) => patchEntry({ timeOfDay })}
                 />
@@ -868,40 +890,42 @@ export function StudioProductionBiblePanelSurface({
               <section aria-labelledby="production-bible-links" className="mt-5">
                 <div className="border-t border-line py-4">
                   <h4 id="production-bible-links" className="text-xs font-bold text-fg">
-                    {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "연결과 참고 에셋")}</h4>
+                    연결과 참고 에셋
+                  </h4>
                   <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "캐릭터 바이블과 에셋 라이브러리는 외부 ID로 연결하며 원본 데이터를 복제하지 않습니다.")}</p>
+                    캐릭터 바이블과 에셋 라이브러리는 외부 ID로 연결하며 원본 데이터를 복제하지 않습니다.
+                  </p>
                 </div>
                 <LinkField
-                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "production-bible-{v0}-characters"), { v0: String(selectedEntry.id) })}
-                  label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "연결 인물")}
+                  id={`production-bible-${selectedEntry.id}-characters`}
+                  label="연결 인물"
                   value={selectedEntry.linkedCharacterIds}
                   options={characterOptions}
-                  emptyHint={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "캐릭터 바이블 통합 전에는 안정 ID를 직접 입력할 수 있습니다.")}
+                  emptyHint="캐릭터 바이블 통합 전에는 안정 ID를 직접 입력할 수 있습니다."
                   onChange={(linkedCharacterIds) => patchEntry({ linkedCharacterIds })}
                 />
                 <LinkField
-                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "production-bible-{v0}-locations"), { v0: String(selectedEntry.id) })}
-                  label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "연결 장소")}
+                  id={`production-bible-${selectedEntry.id}-locations`}
+                  label="연결 장소"
                   value={selectedEntry.linkedLocationIds}
                   options={locations}
-                  emptyHint={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "등록된 다른 장소가 없습니다.")}
+                  emptyHint="등록된 다른 장소가 없습니다."
                   onChange={(linkedLocationIds) => patchEntry({ linkedLocationIds })}
                 />
                 <LinkField
-                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "production-bible-{v0}-props"), { v0: String(selectedEntry.id) })}
-                  label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "연결 소품")}
+                  id={`production-bible-${selectedEntry.id}-props`}
+                  label="연결 소품"
                   value={selectedEntry.linkedPropIds}
                   options={props}
-                  emptyHint={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "등록된 다른 소품이 없습니다.")}
+                  emptyHint="등록된 다른 소품이 없습니다."
                   onChange={(linkedPropIds) => patchEntry({ linkedPropIds })}
                 />
                 <LinkField
-                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "en", "production-bible-{v0}-assets"), { v0: String(selectedEntry.id) })}
-                  label={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "참고 에셋")}
+                  id={`production-bible-${selectedEntry.id}-assets`}
+                  label="참고 에셋"
                   value={selectedEntry.referenceAssetIds}
                   options={assetOptions}
-                  emptyHint={translateCurrentStaticSourceText("domains.creator.StudioProductionBiblePanel", "ko", "에셋 라이브러리 통합 전에는 참고 에셋 ID를 직접 입력할 수 있습니다.")}
+                  emptyHint="에셋 라이브러리 통합 전에는 참고 에셋 ID를 직접 입력할 수 있습니다."
                   onChange={(referenceAssetIds) => patchEntry({ referenceAssetIds })}
                 />
               </section>

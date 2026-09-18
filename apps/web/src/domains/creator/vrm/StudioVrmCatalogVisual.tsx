@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useId, type ReactNode } from "react";
 
 import type { CostumePreset } from "./studio-vrm-poser-catalogs";
@@ -19,7 +15,7 @@ function VisualFrame({ label, className = "size-8", children }: VisualFrameProps
     <svg
       role="img"
       aria-label={label}
-      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmCatalogVisual", "en", "{v0} shrink-0 overflow-visible"), { v0: String(className) })}
+      className={`${className} shrink-0 overflow-visible`}
       viewBox="0 0 96 96"
       preserveAspectRatio="xMidYMid meet"
     >
@@ -29,7 +25,7 @@ function VisualFrame({ label, className = "size-8", children }: VisualFrameProps
           <stop offset="0" stopColor="var(--color-card, #fffaf5)" />
           <stop offset="1" stopColor="var(--color-panel, #eadfd5)" />
         </linearGradient>
-      </defs>      <rect x="2" y="2" width="92" height="92" rx="20" fill={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmCatalogVisual", "en", "url(#{v0})"), { v0: String(gradientId) })} />
+      </defs>      <rect x="2" y="2" width="92" height="92" rx="20" fill={`url(#${gradientId})`} />
       <ellipse cx="48" cy="82" rx="30" ry="6" fill="var(--color-line, #8b786a)" opacity="0.12" />
       {children(gradientId)}
     </svg>
@@ -106,7 +102,7 @@ export function StudioVrmWardrobeItemVisual({
   readonly className?: string;
 }) {
   return (
-    <VisualFrame label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmCatalogVisual", "ko", "{v0} 3D 의상 미리보기"), { v0: String(item.label) })} className={className}>
+    <VisualFrame label={`${item.label} 3D 의상 미리보기`} className={className}>
       {() => (
         <>
           {item.slot === "outer" ? garmentBase(item.defaultColor, outerDetail(item.id, item.defaultColor)) : null}
@@ -140,7 +136,7 @@ export function StudioVrmWardrobeSetVisual({
 }) {
   const colors = resolvedSetColors(set);
   return (
-    <VisualFrame label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmCatalogVisual", "ko", "{v0} 코디 미리보기"), { v0: String(set.label) })} className={className}>
+    <VisualFrame label={`${set.label} 코디 미리보기`} className={className}>
       {() => (
         <g stroke="var(--color-line, #705f55)" strokeWidth="1.8" strokeLinejoin="round">
           <circle cx="48" cy="21" r="10" fill="#e8bca4" />
@@ -164,10 +160,10 @@ export function StudioVrmCostumePresetVisual({
 }) {
   const colors = preset.colors;
   return (
-    <VisualFrame label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmCatalogVisual", "ko", "{v0} 색상 프리셋 미리보기"), { v0: String(preset.name) })} className={className}>
+    <VisualFrame label={`${preset.name} 색상 프리셋 미리보기`} className={className}>
       {() => (
         <g stroke="var(--color-line, #705f55)" strokeWidth="1.8" strokeLinejoin="round">
-          <circle cx="48" cy="24" r="14" fill={colors.face ?? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmCatalogVisual", "en", "#e8bca4")} />
+          <circle cx="48" cy="24" r="14" fill={colors.face ?? "#e8bca4"} />
           <path d="M35 23c1-14 25-18 29 0l-5-7-5 4-6-6-5 7-8 2Z" fill={colors.hair ?? "#342824"} />
           <path d="M31 43c4-8 30-8 34 0l4 22H27l4-22Z" fill={colors.tops ?? "#64748b"} />
           <path d="M28 64h40l-4 20H32l-4-20Z" fill={colors.bottoms ?? "#334155"} />

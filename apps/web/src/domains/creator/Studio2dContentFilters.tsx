@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useId } from "react";
 
 import type { Studio2dEnvironment, Studio2dTimeOfDay } from "./studio-2d-asset-quality";
@@ -23,29 +19,30 @@ export function Studio2dContentFilters({ environment, timeOfDay, textFreeOnly,
   const field = "min-w-0 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
   return <details className="rounded-xl border border-line bg-card p-2.5" data-studio-2d-content-filters="true">
     <summary className="cursor-pointer rounded text-xs font-medium text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
-      {translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "ko", "장소·시간·문자 필터")}{active > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "ko", " · {v0}개 적용"), { v0: String(active) }) : ""}
+      장소·시간·문자 필터{active > 0 ? ` · ${active}개 적용` : ""}
     </summary>
     <div className="mt-3 grid grid-cols-2 gap-2">
       <div className="flex min-w-0 flex-col gap-1 text-[0.66rem] text-fg-3">
-        <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "en", "{v0}-environment"), { v0: String(id) })}>{translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "ko", "장소")}</label>
-        <select id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "en", "{v0}-environment"), { v0: String(id) })} className={field} value={environment}
+        <label htmlFor={`${id}-environment`}>장소</label>
+        <select id={`${id}-environment`} className={field} value={environment}
           onChange={(event) => onEnvironmentChange(event.target.value as Studio2dEnvironment)}>
-          <option value="all">{translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "ko", "모든 장소")}</option><option value="실내">{translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "ko", "실내")}</option><option value="실외">{translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "ko", "실외")}</option>
+          <option value="all">모든 장소</option><option value="실내">실내</option><option value="실외">실외</option>
         </select>
       </div>
       <div className="flex min-w-0 flex-col gap-1 text-[0.66rem] text-fg-3">
-        <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "en", "{v0}-time"), { v0: String(id) })}>{translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "ko", "시간대")}</label>
-        <select id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "en", "{v0}-time"), { v0: String(id) })} className={field} value={timeOfDay}
+        <label htmlFor={`${id}-time`}>시간대</label>
+        <select id={`${id}-time`} className={field} value={timeOfDay}
           onChange={(event) => onTimeOfDayChange(event.target.value as Studio2dTimeOfDay)}>
-          <option value="all">{translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "ko", "모든 시간대")}</option><option value="낮">{translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "ko", "낮")}</option><option value="노을">{translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "ko", "노을")}</option><option value="밤">{translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "ko", "밤")}</option>
+          <option value="all">모든 시간대</option><option value="낮">낮</option><option value="노을">노을</option><option value="밤">밤</option>
         </select>
       </div>
-      <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "en", "{v0}-text-free"), { v0: String(id) })} className="col-span-2 flex min-h-9 items-center gap-2 text-xs text-fg-2">
-        <input id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "en", "{v0}-text-free"), { v0: String(id) })} type="checkbox" checked={textFreeOnly}
-          onChange={(event) => onTextFreeOnlyChange(event.target.checked)} />{translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "ko", "문자 형태 없는 이미지 배경만")}</label>
+      <label htmlFor={`${id}-text-free`} className="col-span-2 flex min-h-9 items-center gap-2 text-xs text-fg-2">
+        <input id={`${id}-text-free`} type="checkbox" checked={textFreeOnly}
+          onChange={(event) => onTextFreeOnlyChange(event.target.checked)} />문자 형태 없는 이미지 배경만
+      </label>
     </div>
-    <p className="mt-2 text-[0.65rem] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "ko", "원본 검수 기록이 있는 이미지에 적용합니다. 정보가 없는 소재·벡터는 조건을 확인할 수 없어 제외됩니다.")}</p>
+    <p className="mt-2 text-[0.65rem] leading-relaxed text-fg-3">원본 검수 기록이 있는 이미지에 적용합니다. 정보가 없는 소재·벡터는 조건을 확인할 수 없어 제외됩니다.</p>
     {active > 0 && <button type="button" className="mt-2 min-h-8 rounded px-2 text-xs text-fg-3 underline"
-      onClick={() => { onEnvironmentChange("all"); onTimeOfDayChange("all"); onTextFreeOnlyChange(false); }}>{translateCurrentStaticSourceText("domains.creator.Studio2dContentFilters", "ko", "장소·시간·문자 조건만 지우기")}</button>}
+      onClick={() => { onEnvironmentChange("all"); onTimeOfDayChange("all"); onTextFreeOnlyChange(false); }}>장소·시간·문자 조건만 지우기</button>}
   </details>;
 }

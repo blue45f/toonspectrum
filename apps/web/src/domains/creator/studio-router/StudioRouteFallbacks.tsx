@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioWorkspaceRouteErrorCode } from "../studio-workspace-route";
 import type { StudioPlaceholderRouteId } from "./studio-route-manifest";
 
@@ -48,7 +47,8 @@ function StudioRouteExits({
         {openLabel}
       </button>
       <Link href="/create" data-studio-route-exit="site" className={SECONDARY_EXIT_CLASS}>
-        {translateCurrentStaticSourceText("domains.creator.studio.router.StudioRouteFallbacks", "ko", "창작 게시판으로")}</Link>
+        창작 게시판으로
+      </Link>
     </div>
   );
 }
@@ -70,11 +70,12 @@ export function StudioRouteFailure({
           id="studio-route-error-title"
           className="text-balance text-2xl font-bold tracking-tight sm:text-3xl"
         >
-          {translateCurrentStaticSourceText("domains.creator.studio.router.StudioRouteFallbacks", "ko", "Studio 작업 주소를 확인해 주세요")}</h1>
+          Studio 작업 주소를 확인해 주세요
+        </h1>
         <p className="mx-auto mt-3 max-w-[62ch] text-sm leading-relaxed text-fg-2">
           {ROUTE_ERROR_DETAILS[errorCode]}
         </p>
-        <StudioRouteExits onOpenStudio={onOpenStudio} openLabel={translateCurrentStaticSourceText("domains.creator.studio.router.StudioRouteFallbacks", "ko", "새 Studio 작업 열기")} />
+        <StudioRouteExits onOpenStudio={onOpenStudio} openLabel="새 Studio 작업 열기" />
       </div>
     </section>
   );
@@ -123,7 +124,7 @@ export function StudioRoutePlaceholder({
         <p className="mx-auto mt-3 max-w-[64ch] text-sm leading-relaxed text-fg-2">
           {guide.description}
         </p>
-        <ol className="mt-6 grid gap-2 text-left sm:grid-cols-3" aria-label={translateCurrentStaticSourceText("domains.creator.studio.router.StudioRouteFallbacks", "ko", "권장 작업 순서")}>
+        <ol className="mt-6 grid gap-2 text-left sm:grid-cols-3" aria-label="권장 작업 순서">
           {guide.steps.map((step, index) => (
             <li
               key={step}
@@ -140,7 +141,9 @@ export function StudioRoutePlaceholder({
           ))}
         </ol>
         <p className="mx-auto mt-4 max-w-[64ch] text-xs leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.studio.router.StudioRouteFallbacks", "ko", "이 주소에서는 편집 문서 런타임을 중복 실행하지 않습니다. 아래 버튼으로 기본 Studio를 열면 같은 원고와 계정 권한을 유지한 채 해당 작업을 이어갈 수 있습니다.")}</p>
+          이 주소에서는 편집 문서 런타임을 중복 실행하지 않습니다. 아래 버튼으로 기본 Studio를 열면
+          같은 원고와 계정 권한을 유지한 채 해당 작업을 이어갈 수 있습니다.
+        </p>
         <StudioRouteExits onOpenStudio={onOpenStudio} openLabel={guide.openLabel} />
       </div>
     </section>

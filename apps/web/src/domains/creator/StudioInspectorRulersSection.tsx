@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense } from "react";
 
 import { CANVAS_W } from "./studio-assets";
@@ -43,7 +42,7 @@ export function StudioInspectorSymmetrySection({
   setSymmetryCenterY,
 }: StudioInspectorSymmetrySectionProps) {
   return (
-    <StudioInspectorSection sectionId="tool.symmetry" loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorRulersSection", "ko", "대칭 자를 여는 중...")}>
+    <StudioInspectorSection sectionId="tool.symmetry" loadingLabel="대칭 자를 여는 중...">
       <div className="space-y-2">
         <div className="grid grid-cols-5 gap-1">
           {([
@@ -73,7 +72,7 @@ export function StudioInspectorSymmetrySection({
           <div className="space-y-2 pl-1.5 border-l border-line/50 ml-1 py-1 animate-fade-in">
             {(symmetryType === "radial" || symmetryType === "kaleidoscope") && (
               <label className="flex items-center justify-between gap-2 text-xs text-fg-3">
-                <span>{translateCurrentStaticSourceText("domains.creator.StudioInspectorRulersSection", "ko", "갈래 수")}</span>
+                <span>갈래 수</span>
                 <select
                   value={symmetryRadialCount}
                   onChange={(e) => setSymmetryRadialCount(Number(e.target.value))}
@@ -81,7 +80,8 @@ export function StudioInspectorSymmetrySection({
                 >
                   {[4, 6, 8, 12, 16].map((num) => (
                     <option key={num} value={num}>
-                      {num}{translateCurrentStaticSourceText("domains.creator.StudioInspectorRulersSection", "ko", "방향")}</option>
+                      {num}방향
+                    </option>
                   ))}
                 </select>
               </label>
@@ -89,7 +89,7 @@ export function StudioInspectorSymmetrySection({
 
             <div className="flex gap-2">
               <label className="flex-1 flex flex-col gap-0.5 text-[0.68rem] text-fg-3">
-                <span>{translateCurrentStaticSourceText("domains.creator.StudioInspectorRulersSection", "ko", "중앙 X")}</span>
+                <span>중앙 X</span>
                 <input
                   type="number"
                   value={Math.round(symmetryCenterX)}
@@ -98,7 +98,7 @@ export function StudioInspectorSymmetrySection({
                 />
               </label>
               <label className="flex-1 flex flex-col gap-0.5 text-[0.68rem] text-fg-3">
-                <span>{translateCurrentStaticSourceText("domains.creator.StudioInspectorRulersSection", "ko", "중앙 Y")}</span>
+                <span>중앙 Y</span>
                 <input
                   type="number"
                   value={Math.round(symmetryCenterY)}
@@ -116,7 +116,8 @@ export function StudioInspectorSymmetrySection({
               }}
               className="w-full rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised transition-colors cursor-pointer"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioInspectorRulersSection", "ko", "대칭축 중앙 정렬")}</button>
+              대칭축 중앙 정렬
+            </button>
           </div>
         )}
       </div>
@@ -206,7 +207,7 @@ export function StudioInspectorRulersSection({
   setActiveAdvancedRuler,
 }: StudioInspectorRulersSectionProps) {
   return (
-    <StudioInspectorSection sectionId="tool.rulers" loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorRulersSection", "ko", "자·가이드를 여는 중...")}>
+    <StudioInspectorSection sectionId="tool.rulers" loadingLabel="자·가이드를 여는 중...">
       <Suspense fallback={null}>
         <StudioPerspectivePanel
           active={perspectiveRulerActive}

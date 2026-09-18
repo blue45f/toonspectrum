@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { User, Smile, Film, Sparkles, MessageSquare, Download, Layers } from "lucide-react";
 import { useState } from "react";
 
@@ -59,36 +55,42 @@ export function StudioBg3dShaperTooningStudioPanel({
           type="button"
           disabled={disabled}
           onClick={() => setActiveTab("shaper")}
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "en", "flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all {v0}"), { v0: String(activeTab === "shaper"
+          className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all ${
+            activeTab === "shaper"
               ? "bg-raised text-fg shadow-sm border border-line"
-              : "text-fg-3 hover:text-fg") })}
+              : "text-fg-3 hover:text-fg"
+          }`}
         >
           <User className="h-3.5 w-3.5 text-accent" />
-          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "셰이퍼 캐릭터")}</span>
+          <span>셰이퍼 캐릭터</span>
         </button>
 
         <button
           type="button"
           disabled={disabled}
           onClick={() => setActiveTab("tooning")}
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "en", "flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all {v0}"), { v0: String(activeTab === "tooning"
+          className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all ${
+            activeTab === "tooning"
               ? "bg-raised text-fg shadow-sm border border-line"
-              : "text-fg-3 hover:text-fg") })}
+              : "text-fg-3 hover:text-fg"
+          }`}
         >
           <Smile className="h-3.5 w-3.5 text-accent" />
-          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "투닝 표정 & SFX")}</span>
+          <span>투닝 표정 & SFX</span>
         </button>
 
         <button
           type="button"
           disabled={disabled}
           onClick={() => setActiveTab("storyboard")}
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "en", "flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all {v0}"), { v0: String(activeTab === "storyboard"
+          className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all ${
+            activeTab === "storyboard"
               ? "bg-raised text-fg shadow-sm border border-line"
-              : "text-fg-3 hover:text-fg") })}
+              : "text-fg-3 hover:text-fg"
+          }`}
         >
           <Film className="h-3.5 w-3.5 text-accent" />
-          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "세로 연출 & PSD")}</span>
+          <span>세로 연출 & PSD</span>
         </button>
       </div>
 
@@ -97,7 +99,8 @@ export function StudioBg3dShaperTooningStudioPanel({
         <div className="flex flex-col gap-2.5">
           <div>
             <span className="mb-1.5 block text-[0.7rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "웹툰 체형 프로포션 (아키타입)")}</span>
+              웹툰 체형 프로포션 (아키타입)
+            </span>
             <div className="grid grid-cols-2 gap-1.5">
               {[
                 { id: "shonen-hero-8head", label: "8등신 소년만화 히어로" },
@@ -111,9 +114,11 @@ export function StudioBg3dShaperTooningStudioPanel({
                   type="button"
                   disabled={disabled}
                   onClick={() => setSelectedArchetype(archetype.id as CharacterArchetype)}
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "en", "rounded-lg border p-2 text-left text-[0.68rem] font-semibold transition-all {v0}"), { v0: String(selectedArchetype === archetype.id
+                  className={`rounded-lg border p-2 text-left text-[0.68rem] font-semibold transition-all ${
+                    selectedArchetype === archetype.id
                       ? "border-accent bg-accent/15 text-accent"
-                      : "border-line bg-card text-fg hover:border-line-strong hover:bg-raised") })}
+                      : "border-line bg-card text-fg hover:border-line-strong hover:bg-raised"
+                  }`}
                 >
                   {archetype.label}
                 </button>
@@ -123,19 +128,22 @@ export function StudioBg3dShaperTooningStudioPanel({
 
           <div className="flex items-center justify-between rounded-xl border border-line bg-card/60 p-2.5 text-[0.68rem]">
             <div className="flex flex-col">
-              <span className="font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "3D 표면 직접 잉킹 (3D Inking)")}</span>
+              <span className="font-bold text-fg">3D 표면 직접 잉킹 (3D Inking)</span>
               <span className="text-[0.62rem] text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "3D 캐릭터 표면에 그린 선이 포즈 변형 시에도 자연스럽게 따라 움직임")}</span>
+                3D 캐릭터 표면에 그린 선이 포즈 변형 시에도 자연스럽게 따라 움직임
+              </span>
             </div>
             <button
               type="button"
               disabled={disabled}
               onClick={() => setIsSurfaceInking(!isSurfaceInking)}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "en", "rounded-md border px-2.5 py-1 font-bold transition-all {v0}"), { v0: String(isSurfaceInking
+              className={`rounded-md border px-2.5 py-1 font-bold transition-all ${
+                isSurfaceInking
                   ? "border-accent bg-accent text-bg"
-                  : "border-line bg-card text-fg hover:bg-raised") })}
+                  : "border-line bg-card text-fg hover:bg-raised"
+              }`}
             >
-              {isSurfaceInking ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "잉킹 활성") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "잉킹 대기")}
+              {isSurfaceInking ? "잉킹 활성" : "잉킹 대기"}
             </button>
           </div>
         </div>
@@ -146,7 +154,8 @@ export function StudioBg3dShaperTooningStudioPanel({
         <div className="flex flex-col gap-2.5">
           <div>
             <span className="mb-1.5 block text-[0.7rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "16종 표정 블렌드셰이프 프리셋")}</span>
+              16종 표정 블렌드셰이프 프리셋
+            </span>
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
               {[
                 { id: "joy-radiant", label: "환한 미소" },
@@ -163,9 +172,11 @@ export function StudioBg3dShaperTooningStudioPanel({
                   type="button"
                   disabled={disabled}
                   onClick={() => setSelectedEmotion(emotion.id as TooningEmotionPreset)}
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "en", "rounded-lg border p-1.5 text-center text-[0.68rem] font-semibold transition-all {v0}"), { v0: String(selectedEmotion === emotion.id
+                  className={`rounded-lg border p-1.5 text-center text-[0.68rem] font-semibold transition-all ${
+                    selectedEmotion === emotion.id
                       ? "border-accent bg-accent/15 text-accent"
-                      : "border-line bg-card text-fg hover:border-line-strong hover:bg-raised") })}
+                      : "border-line bg-card text-fg hover:border-line-strong hover:bg-raised"
+                  }`}
                 >
                   {emotion.label}
                 </button>
@@ -175,7 +186,8 @@ export function StudioBg3dShaperTooningStudioPanel({
 
           <div className="flex flex-col gap-1.5 rounded-xl border border-line bg-card/60 p-2.5">
             <span className="text-[0.68rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "3D 월드 공간 말풍선 & 대사 (Mouth Tracking)")}</span>
+              3D 월드 공간 말풍선 & 대사 (Mouth Tracking)
+            </span>
             <div className="flex items-center gap-1.5">
               <MessageSquare className="h-3.5 w-3.5 text-accent shrink-0" />
               <input
@@ -183,7 +195,7 @@ export function StudioBg3dShaperTooningStudioPanel({
                 value={bubbleText}
                 disabled={disabled}
                 onChange={(e) => setBubbleText(e.target.value)}
-                placeholder={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "말풍선 대사 입력...")}
+                placeholder="말풍선 대사 입력..."
                 className="w-full rounded-md border border-line bg-field px-2 py-1 text-[0.7rem] text-fg focus:border-accent focus:outline-none"
               />
             </div>
@@ -191,7 +203,8 @@ export function StudioBg3dShaperTooningStudioPanel({
 
           <div>
             <span className="mb-1.5 block text-[0.7rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "3D 감정 이모트 스티커 파티클")}</span>
+              3D 감정 이모트 스티커 파티클
+            </span>
             <div className="grid grid-cols-3 gap-1.5">
               {[
                 { id: "sweat-drop", label: "땀방울 (당황)" },
@@ -206,9 +219,11 @@ export function StudioBg3dShaperTooningStudioPanel({
                   type="button"
                   disabled={disabled}
                   onClick={() => setSelectedEmote(emote.id as EmoteSfxKind)}
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "en", "flex items-center justify-center gap-1 rounded-lg border p-1.5 text-[0.65rem] font-semibold transition-all {v0}"), { v0: String(selectedEmote === emote.id
+                  className={`flex items-center justify-center gap-1 rounded-lg border p-1.5 text-[0.65rem] font-semibold transition-all ${
+                    selectedEmote === emote.id
                       ? "border-accent bg-accent/15 text-accent"
-                      : "border-line bg-card text-fg hover:border-line-strong hover:bg-raised") })}
+                      : "border-line bg-card text-fg hover:border-line-strong hover:bg-raised"
+                  }`}
                 >
                   <Sparkles className="h-3 w-3 text-accent" />
                   <span>{emote.label}</span>
@@ -224,14 +239,16 @@ export function StudioBg3dShaperTooningStudioPanel({
         <div className="flex flex-col gap-2.5">
           <div className="flex items-center justify-between">
             <span className="text-[0.7rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "세로 스크롤 웹툰 컷 리스트 (")}{cuts.length}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "컷)")}</span>
+              세로 스크롤 웹툰 컷 리스트 ({cuts.length}컷)
+            </span>
             <button
               type="button"
               disabled={disabled}
               onClick={handleAddCut}
               className="rounded-md border border-line bg-card px-2 py-1 text-[0.65rem] font-bold text-fg hover:bg-raised"
             >
-              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "+ 컷 추가")}</button>
+              + 컷 추가
+            </button>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -256,10 +273,11 @@ export function StudioBg3dShaperTooningStudioPanel({
           <div className="mt-1 flex flex-col gap-2 rounded-xl border border-line bg-card/60 p-2.5">
             <div className="flex items-center gap-1.5 text-[0.68rem] font-bold text-fg">
               <Layers className="h-3.5 w-3.5 text-accent" />
-              <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "8종 분리 레이어 PSD 마스터 내보내기")}</span>
+              <span>8종 분리 레이어 PSD 마스터 내보내기</span>
             </div>
             <p className="text-[0.62rem] text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "선화(Line), 밑색(Flat), 1·2차 툰 음영(Shadow), 역광(Rim), 감정 SFX, 말풍선, 배경이 각각 독립 분리된 PSD로 즉시 출력됩니다.")}</p>
+              선화(Line), 밑색(Flat), 1·2차 툰 음영(Shadow), 역광(Rim), 감정 SFX, 말풍선, 배경이 각각 독립 분리된 PSD로 즉시 출력됩니다.
+            </p>
             <button
               type="button"
               disabled={disabled}
@@ -267,7 +285,7 @@ export function StudioBg3dShaperTooningStudioPanel({
               className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.7rem] font-bold text-bg shadow-sm transition-all hover:opacity-90"
             >
               <Download className="h-3.5 w-3.5" />
-              <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dShaperTooningStudioPanel", "ko", "클립스튜디오/포토샵용 PSD 내보내기")}</span>
+              <span>클립스튜디오/포토샵용 PSD 내보내기</span>
             </button>
           </div>
         </div>

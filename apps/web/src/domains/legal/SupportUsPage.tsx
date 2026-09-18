@@ -29,7 +29,7 @@ export function SupportUsPage() {
         description={t("supportUs.hero.description")}
         image="materials"
         imageAlt="ToonSpectrum creator workspace materials"
-        caption={translateCurrentStaticSourceText("domains.legal.SupportUsPage", "en", "SUPPORTER · SPONSORSHIP · CLEAR BOUNDARIES")}
+        caption="SUPPORTER · SPONSORSHIP · CLEAR BOUNDARIES"
       >
         <a
           href="#supporter-checkout"

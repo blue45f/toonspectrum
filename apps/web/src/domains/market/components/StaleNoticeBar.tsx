@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { RefreshCw } from "lucide-react";
 
 import { formatMarketDateTime } from "../models/market-kind";
@@ -22,7 +18,7 @@ export function StaleNoticeBar({ savedAt, message, onRetry, className }: StaleNo
     <div role="status" className={className ?? DEFAULT_CLASS}>
       <span>
         {message
-          ?? formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.StaleNoticeBar", "ko", "연결이 불안정해 {v0}에 저장된 사본을 보여드리고 있어요. 현재 공개 상태는 확인되지 않았어요"), { v0: String(formatMarketDateTime(savedAt ?? new Date().toISOString())) })}
+          ?? `연결이 불안정해 ${formatMarketDateTime(savedAt ?? new Date().toISOString())}에 저장된 사본을 보여드리고 있어요. 현재 공개 상태는 확인되지 않았어요`}
       </span>
       <button
         type="button"
@@ -30,7 +26,8 @@ export function StaleNoticeBar({ savedAt, message, onRetry, className }: StaleNo
         className="inline-flex min-h-6 shrink-0 items-center gap-1 rounded border border-line bg-panel px-2 py-1 font-medium text-fg-2 transition-colors duration-150 hover:border-line-strong hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 pointer-coarse:min-h-11 pointer-coarse:px-3"
       >
         <RefreshCw className="h-3 w-3" aria-hidden="true" />
-        {translateCurrentStaticSourceText("domains.market.components.StaleNoticeBar", "ko", "다시 시도")}</button>
+        다시 시도
+      </button>
     </div>
   );
 }

@@ -1,8 +1,4 @@
 import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   CheckCircle2,
   FileCheck2,
@@ -146,7 +142,8 @@ export function StudioExportPanel({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            <FileCheck2 size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioExportPanel", "en", "EXPORT PREFLIGHT")}</p>
+            <FileCheck2 size={14} aria-hidden="true" /> EXPORT PREFLIGHT
+          </p>
           <h2 id="project-export-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
             {bt("사용할 곳을 고르면 필요한 검사를 자동으로", "Choose a destination and check everything required")}
           </h2>
@@ -276,7 +273,7 @@ export function StudioExportPanel({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h3 className="flex items-center gap-2 text-sm font-black text-fg">
-              {displayedResult?.status === "pass" ? <CheckCircle2 size={17} className="text-success" aria-hidden="true" /> : <ShieldAlert size={17} className={displayedResult?.status === "blocked" ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioExportPanel", "en", "text-danger") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioExportPanel", "en", "text-warning")} aria-hidden="true" />}
+              {displayedResult?.status === "pass" ? <CheckCircle2 size={17} className="text-success" aria-hidden="true" /> : <ShieldAlert size={17} className={displayedResult?.status === "blocked" ? "text-danger" : "text-warning"} aria-hidden="true" />}
               {displayedResult
                 ? bt(displayedResult.summaryKo, displayedResult.summaryEn)
                 : (bt("현재 설정으로 검사해 보세요", "Run preflight for these settings"))}

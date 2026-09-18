@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { X } from "lucide-react";
 
 
@@ -27,7 +26,7 @@ export function StudioQuickAccessMobileSurface({
     <>
       <button
         type="button"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessMobileSurface", "ko", "빠른 액세스 닫기")}
+        aria-label="빠른 액세스 닫기"
         className="pointer-events-auto absolute inset-0 cursor-default bg-black/45 backdrop-blur-[2px]"
         onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => {
           event.preventDefault();
@@ -38,7 +37,7 @@ export function StudioQuickAccessMobileSurface({
         ref={surfaceRef}
         role="dialog"
         aria-modal="true"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessMobileSurface", "ko", "빠른 액세스 팔레트")}
+        aria-label="빠른 액세스 팔레트"
         aria-describedby={descriptionId}
         data-studio-quick-access-surface="true"
         data-studio-shortcut-boundary="true"
@@ -51,11 +50,12 @@ export function StudioQuickAccessMobileSurface({
         )}
       >
         <p id={descriptionId} className="sr-only">
-          {translateCurrentStaticSourceText("domains.creator.StudioQuickAccessMobileSurface", "ko", "자주 쓰는 명령을 실행하거나 표시 방식과 명령 순서를 편집합니다.")}</p>
+          자주 쓰는 명령을 실행하거나 표시 방식과 명령 순서를 편집합니다.
+        </p>
         <button
           type="button"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessMobileSurface", "ko", "빠른 액세스 팔레트 닫기")}
-          title={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessMobileSurface", "ko", "빠른 액세스 닫기")}
+          aria-label="빠른 액세스 팔레트 닫기"
+          title="빠른 액세스 닫기"
           className={cn(
             "absolute -top-11 right-0 z-10 inline-flex size-10 items-center justify-center rounded-lg border border-line bg-panel text-fg-2 shadow-lg hover:bg-raised hover:text-fg",
             "max-lg:size-11 pointer-coarse:size-11",

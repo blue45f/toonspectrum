@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   ArrowRight,
   BadgeCheck,
@@ -233,19 +229,19 @@ function RiskListRow({
       <div className="flex flex-wrap items-center gap-2">
         <Pill tone={severityTone(risk.severity)}>{SEVERITY_LABELS[risk.severity]}</Pill>
         <Pill tone={statusTone(risk.status)}>{STATUS_LABELS[risk.status]}</Pill>
-        <Pill>{risk.source === "automatic" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "자동 감지") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "직접 등록")}</Pill>
+        <Pill>{risk.source === "automatic" ? "자동 감지" : "직접 등록"}</Pill>
       </div>
       <p className="mt-3 text-sm font-black leading-5 text-fg">{risk.title}</p>
       <p className="mt-1 text-xs leading-5 text-fg-2">{risk.description}</p>
       <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[0.6875rem] text-fg-3">
         <span>{CATEGORY_LABELS[risk.category]}</span>
-        <span>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "우선순위 ")}{Math.round(risk.priorityScore)}</span>
+        <span>우선순위 {Math.round(risk.priorityScore)}</span>
         <span>{riskOwnerName(aggregate, risk)}</span>
         {risk.varianceHours !== null ? (
-          <span>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "예상 ")}{risk.varianceHours >= 0 ? "+" : ""}{Math.round(risk.varianceHours)}h</span>
+          <span>예상 {risk.varianceHours >= 0 ? "+" : ""}{Math.round(risk.varianceHours)}h</span>
         ) : null}
       </div>
-      {signal ? <p className="mt-2 text-[0.6875rem] leading-4 text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "마지막 평가 ")}{formatDate(signal.lastDetectedAt)}</p> : null}
+      {signal ? <p className="mt-2 text-[0.6875rem] leading-4 text-fg-3">마지막 평가 {formatDate(signal.lastDetectedAt)}</p> : null}
     </button>
   );
 }
@@ -390,7 +386,8 @@ function RiskDetail({
   return (
     <div className="rounded-2xl border border-line bg-card p-4 sm:p-5">
       <button type="button" onClick={onBack} className="mb-3 inline-flex items-center gap-1 text-xs font-bold text-fg-3 hover:text-accent xl:hidden">
-        <ChevronLeft className="size-4" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "위험 목록")}</button>
+        <ChevronLeft className="size-4" aria-hidden="true" /> 위험 목록
+      </button>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2">
@@ -403,8 +400,8 @@ function RiskDetail({
         </div>
         <div className="flex flex-col items-end gap-3">
           <div className="text-right text-xs leading-5 text-fg-3">
-            <p>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "우선순위 ")}<strong className="text-fg">{Math.round(risk.priorityScore)}</strong></p>
-            <p>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "노출도 P")}{risk.probability} × I{risk.impact} = {risk.exposureScore}</p>
+            <p>우선순위 <strong className="text-fg">{Math.round(risk.priorityScore)}</strong></p>
+            <p>노출도 P{risk.probability} × I{risk.impact} = {risk.exposureScore}</p>
             <p>{riskOwnerName(aggregate, risk)}</p>
           </div>
           <button
@@ -413,11 +410,12 @@ function RiskDetail({
             disabled={!canEdit || busy}
             onClick={onEditRisk}
           >
-            <Pencil className="size-4" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "위험 편집")}</button>
+            <Pencil className="size-4" aria-hidden="true" /> 위험 편집
+          </button>
         </div>
       </div>
 
-      <div className="mt-5 flex gap-1 overflow-x-auto rounded-xl border border-line bg-panel p-1" role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "위험 상세 보기")}>
+      <div className="mt-5 flex gap-1 overflow-x-auto rounded-xl border border-line bg-panel p-1" role="tablist" aria-label="위험 상세 보기">
         {tabs.map((item) => (
           <button
             key={item.id}
@@ -438,25 +436,25 @@ function RiskDetail({
       {tab === "overview" ? (
         <div className="mt-4 space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "기준 마감")}</p><p className="mt-1 text-xs font-semibold text-fg">{formatDate(risk.baselineDueAt)}</p></div>
-            <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "예상 완료")}</p><p className="mt-1 text-xs font-semibold text-fg">{formatDate(risk.forecastDueAt)}</p></div>
-            <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "대응 기한")}</p><p className="mt-1 text-xs font-semibold text-fg">{formatDate(risk.responseDueAt)}</p></div>
-            <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "최근 평가")}</p><p className="mt-1 text-xs font-semibold text-fg">{formatDate(risk.lastEvaluatedAt)}</p></div>
+            <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] font-bold text-fg-3">기준 마감</p><p className="mt-1 text-xs font-semibold text-fg">{formatDate(risk.baselineDueAt)}</p></div>
+            <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] font-bold text-fg-3">예상 완료</p><p className="mt-1 text-xs font-semibold text-fg">{formatDate(risk.forecastDueAt)}</p></div>
+            <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] font-bold text-fg-3">대응 기한</p><p className="mt-1 text-xs font-semibold text-fg">{formatDate(risk.responseDueAt)}</p></div>
+            <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] font-bold text-fg-3">최근 평가</p><p className="mt-1 text-xs font-semibold text-fg">{formatDate(risk.lastEvaluatedAt)}</p></div>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-xl border border-line bg-panel p-4">
-              <p className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "조기 징후")}</p>
+              <p className="text-xs font-black text-fg">조기 징후</p>
               <ul className="mt-3 space-y-2 text-xs leading-5 text-fg-2">
                 {risk.earlySignals.length > 0
                   ? risk.earlySignals.slice(0, 8).map((entry) => <li key={entry} className="flex gap-2"><CircleAlert className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden="true" /><span>{entry}</span></li>)
-                  : <li>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "기록된 조기 징후가 없습니다.")}</li>}
+                  : <li>기록된 조기 징후가 없습니다.</li>}
               </ul>
             </div>
             <div className="rounded-xl border border-line bg-panel p-4">
-              <p className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "대응 계획")}</p>
-              <p className="mt-2 text-xs leading-5 text-fg-2">{risk.mitigation || translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "대응 계획이 아직 없습니다.")}</p>
-              <p className="mt-3 text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "비상 계획")}</p>
-              <p className="mt-2 text-xs leading-5 text-fg-2">{risk.contingency || translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "비상 계획이 아직 없습니다.")}</p>
+              <p className="text-xs font-black text-fg">대응 계획</p>
+              <p className="mt-2 text-xs leading-5 text-fg-2">{risk.mitigation || "대응 계획이 아직 없습니다."}</p>
+              <p className="mt-3 text-xs font-black text-fg">비상 계획</p>
+              <p className="mt-2 text-xs leading-5 text-fg-2">{risk.contingency || "비상 계획이 아직 없습니다."}</p>
             </div>
           </div>
         </div>
@@ -468,17 +466,17 @@ function RiskDetail({
             <div key={item.key} className="grid gap-2 rounded-xl border border-line bg-panel p-3 sm:grid-cols-[minmax(10rem,1fr)_minmax(8rem,0.7fr)_minmax(8rem,0.7fr)] sm:items-center">
               <div><p className="text-xs font-bold text-fg">{item.label}</p><p className="mt-1 text-[0.6875rem] text-fg-3">{item.sourceType} · {item.sourceId}</p></div>
               <p className="text-xs font-black text-fg">{String(item.value ?? "미정")}{item.unit ? ` ${item.unit}` : ""}</p>
-              <p className="text-[0.6875rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "기준 ")}{String(item.threshold ?? "—")}</p>
+              <p className="text-[0.6875rem] text-fg-3">기준 {String(item.threshold ?? "—")}</p>
             </div>
           ))}
-          {!signal || signal.evidence.length === 0 ? <div className="rounded-xl border border-dashed border-line p-8 text-center text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "직접 등록 위험에는 자동 계산 근거가 없을 수 있습니다.")}</div> : null}
+          {!signal || signal.evidence.length === 0 ? <div className="rounded-xl border border-dashed border-line p-8 text-center text-xs text-fg-3">직접 등록 위험에는 자동 계산 근거가 없을 수 있습니다.</div> : null}
         </div>
       ) : null}
 
       {tab === "impact" ? (
         <div className="mt-4 space-y-4">
           <div className="rounded-xl border border-line bg-panel p-4">
-            <p className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "영향받는 작업")}</p>
+            <p className="text-xs font-black text-fg">영향받는 작업</p>
             <div className="mt-3 space-y-2">
               {risk.affectedTaskIds.map((taskId, index) => (
                 <div key={taskId} className="flex items-center gap-2 text-xs text-fg-2">
@@ -487,17 +485,17 @@ function RiskDetail({
                   {index < risk.affectedTaskIds.length - 1 ? <ArrowRight className="ml-auto size-3.5 text-fg-3" aria-hidden="true" /> : null}
                 </div>
               ))}
-              {risk.affectedTaskIds.length === 0 ? <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "직접 연결된 작업이 없습니다.")}</p> : null}
+              {risk.affectedTaskIds.length === 0 ? <p className="text-xs text-fg-3">직접 연결된 작업이 없습니다.</p> : null}
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-line bg-panel p-4"><p className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "영향 회차")}</p><p className="mt-2 text-xs leading-5 text-fg-2">{risk.affectedEpisodeIds.join(" · ") || translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "없음")}</p></div>
-            <div className="rounded-xl border border-line bg-panel p-4"><p className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "계약 마일스톤")}</p><p className="mt-2 text-xs leading-5 text-fg-2">{risk.affectedMilestoneIds.join(" · ") || translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "없음")}</p></div>
+            <div className="rounded-xl border border-line bg-panel p-4"><p className="text-xs font-black text-fg">영향 회차</p><p className="mt-2 text-xs leading-5 text-fg-2">{risk.affectedEpisodeIds.join(" · ") || "없음"}</p></div>
+            <div className="rounded-xl border border-line bg-panel p-4"><p className="text-xs font-black text-fg">계약 마일스톤</p><p className="mt-2 text-xs leading-5 text-fg-2">{risk.affectedMilestoneIds.join(" · ") || "없음"}</p></div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link className={buttonClass({ variant: "outline", size: "sm" })} to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "{v0}/schedule"), { v0: String(projectBase) })}><CalendarClock className="size-4" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "일정에서 보기")}</Link>
-            <Link className={buttonClass({ variant: "outline", size: "sm" })} to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "{v0}/production"), { v0: String(projectBase) })}><Workflow className="size-4" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "작업 보드에서 보기")}</Link>
-            {risk.affectedEpisodeIds[0] ? <Link className={buttonClass({ variant: "outline", size: "sm" })} to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "{v0}/episodes/{v1}"), { v0: String(projectBase), v1: String(encodeURIComponent(risk.affectedEpisodeIds[0])) })}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "회차 열기")}</Link> : null}
+            <Link className={buttonClass({ variant: "outline", size: "sm" })} to={`${projectBase}/schedule`}><CalendarClock className="size-4" aria-hidden="true" /> 일정에서 보기</Link>
+            <Link className={buttonClass({ variant: "outline", size: "sm" })} to={`${projectBase}/production`}><Workflow className="size-4" aria-hidden="true" /> 작업 보드에서 보기</Link>
+            {risk.affectedEpisodeIds[0] ? <Link className={buttonClass({ variant: "outline", size: "sm" })} to={`${projectBase}/episodes/${encodeURIComponent(risk.affectedEpisodeIds[0])}`}>회차 열기</Link> : null}
           </div>
         </div>
       ) : null}
@@ -505,31 +503,32 @@ function RiskDetail({
       {tab === "response" ? (
         <div className="mt-4 space-y-4">
           <label className="block">
-            <span className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "판단·대응 사유")}</span>
+            <span className="text-xs font-bold text-fg">판단·대응 사유</span>
             <textarea
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               rows={3}
               className="mt-2 w-full rounded-xl border border-line bg-panel px-3 py-2 text-sm text-fg outline-none focus:border-accent"
-              placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "왜 이 대응을 선택했는지 기록하세요.")}
+              placeholder="왜 이 대응을 선택했는지 기록하세요."
               disabled={!canEdit || busy}
             />
           </label>
           <p className="text-[0.6875rem] leading-4 text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "위험 수용·오탐 처리·해결 확인·신호 숨김은 판단 사유를 입력해야 실행할 수 있습니다.")}</p>
+            위험 수용·오탐 처리·해결 확인·신호 숨김은 판단 사유를 입력해야 실행할 수 있습니다.
+          </p>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void createResponse("split-task", "작업 분할")}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "작업 분할")}</button>
-            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void createResponse("reschedule", "일정 조정")}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "일정 조정")}</button>
-            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void createResponse("resolve-dependency", "차단 해소")}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "차단 해소")}</button>
-            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void createResponse("outsource", "외주 전환 검토")}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "외주 전환")}</button>
+            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void createResponse("split-task", "작업 분할")}>작업 분할</button>
+            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void createResponse("reschedule", "일정 조정")}>일정 조정</button>
+            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void createResponse("resolve-dependency", "차단 해소")}>차단 해소</button>
+            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void createResponse("outsource", "외주 전환 검토")}>외주 전환</button>
           </div>
           <div className="flex flex-wrap gap-2 border-t border-line pt-4">
-            {risk.status === "open" || risk.status === "monitoring" ? <button type="button" className={buttonClass({ size: "sm" })} disabled={!canEdit || busy} onClick={() => void transition("mitigating", "대응을 시작합니다.")}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "대응 시작")}</button> : null}
-            {risk.status === "mitigating" || risk.status === "occurred" ? <button type="button" className={buttonClass({ size: "sm" })} disabled={!canEdit || busy || !trimmedReason} onClick={() => void transition("resolved", "")}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "해결 확인")}</button> : null}
-            {risk.status === "resolved" || risk.status === "dismissed" || risk.status === "closed" ? <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void transition("open", "조건이 변경되어 위험을 다시 엽니다.")}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "다시 열기")}</button> : null}
-            {["open", "monitoring", "mitigating", "occurred"].includes(risk.status) ? <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canManage || busy || !trimmedReason} onClick={() => void transition("accepted", "")}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "위험 수용")}</button> : null}
-            {["open", "monitoring"].includes(risk.status) ? <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canManage || busy || !trimmedReason} onClick={() => void transition("dismissed", "")}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "오탐 처리")}</button> : null}
-            {signal && signal.severity !== "critical" ? <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canManage || !actorAssignmentId || busy || !trimmedReason} onClick={() => void suppressSignal()}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "신호 24시간 숨김")}</button> : null}
+            {risk.status === "open" || risk.status === "monitoring" ? <button type="button" className={buttonClass({ size: "sm" })} disabled={!canEdit || busy} onClick={() => void transition("mitigating", "대응을 시작합니다.")}>대응 시작</button> : null}
+            {risk.status === "mitigating" || risk.status === "occurred" ? <button type="button" className={buttonClass({ size: "sm" })} disabled={!canEdit || busy || !trimmedReason} onClick={() => void transition("resolved", "")}>해결 확인</button> : null}
+            {risk.status === "resolved" || risk.status === "dismissed" || risk.status === "closed" ? <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void transition("open", "조건이 변경되어 위험을 다시 엽니다.")}>다시 열기</button> : null}
+            {["open", "monitoring", "mitigating", "occurred"].includes(risk.status) ? <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canManage || busy || !trimmedReason} onClick={() => void transition("accepted", "")}>위험 수용</button> : null}
+            {["open", "monitoring"].includes(risk.status) ? <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canManage || busy || !trimmedReason} onClick={() => void transition("dismissed", "")}>오탐 처리</button> : null}
+            {signal && signal.severity !== "critical" ? <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canManage || !actorAssignmentId || busy || !trimmedReason} onClick={() => void suppressSignal()}>신호 24시간 숨김</button> : null}
           </div>
           <div className="space-y-2">
             {responses.map((response) => (
@@ -542,7 +541,7 @@ function RiskDetail({
                 canManage={canManage}
               />
             ))}
-            {responses.length === 0 ? <div className="rounded-xl border border-dashed border-line p-6 text-center text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "등록된 대응 항목이 없습니다.")}</div> : null}
+            {responses.length === 0 ? <div className="rounded-xl border border-dashed border-line p-6 text-center text-xs text-fg-3">등록된 대응 항목이 없습니다.</div> : null}
           </div>
         </div>
       ) : null}
@@ -560,7 +559,7 @@ function RiskDetail({
               </div>
             ))}
           <div className="rounded-xl border border-line bg-panel p-3">
-            <p className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "위험 최초 감지")}</p>
+            <p className="text-xs font-bold text-fg">위험 최초 감지</p>
             <p className="mt-1 text-[0.6875rem] text-fg-3">{formatDate(risk.detectedAt)}</p>
           </div>
         </div>
@@ -631,23 +630,23 @@ function RiskPolicyPanel({
 
   return (
     <Section
-      title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "자동 감지 정책")}
-      description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "자동 오픈 기준, 안정화 시간, 알림 주기와 차단·작업량·검수·연재 버퍼 임계값을 조정합니다.")}
-      action={<button type="button" className={buttonClass({ size: "sm" })} disabled={!canManage || saving || Boolean(validationError)} onClick={() => void save()}><SlidersHorizontal className="size-4" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "정책 저장")}</button>}
+      title="자동 감지 정책"
+      description="자동 오픈 기준, 안정화 시간, 알림 주기와 차단·작업량·검수·연재 버퍼 임계값을 조정합니다."
+      action={<button type="button" className={buttonClass({ size: "sm" })} disabled={!canManage || saving || Boolean(validationError)} onClick={() => void save()}><SlidersHorizontal className="size-4" aria-hidden="true" /> 정책 저장</button>}
     >
       <div className="mb-3 grid gap-3 sm:grid-cols-3">
         <label className="rounded-xl border border-line bg-panel p-3">
-          <span className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "프로젝트 시간대")}</span>
+          <span className="text-xs font-bold text-fg">프로젝트 시간대</span>
           <input
             value={draft.timezone}
             onChange={(event) => setDraft((current) => ({ ...current, timezone: event.target.value }))}
             disabled={!canManage}
             className="mt-2 w-full rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-fg outline-none focus:border-accent"
-            placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "Asia/Seoul")}
+            placeholder="Asia/Seoul"
           />
         </label>
         <label className="rounded-xl border border-line bg-panel p-3">
-          <span className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "업무 종료 시각")}</span>
+          <span className="text-xs font-bold text-fg">업무 종료 시각</span>
           <input
             type="time"
             value={draft.workdayEndLocal}
@@ -657,16 +656,16 @@ function RiskPolicyPanel({
           />
         </label>
         <label className="rounded-xl border border-line bg-panel p-3">
-          <span className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "자동 위험 생성 기준")}</span>
+          <span className="text-xs font-bold text-fg">자동 위험 생성 기준</span>
           <select
             value={draft.autoOpenSeverity}
             onChange={(event) => setDraft((current) => ({ ...current, autoOpenSeverity: event.target.value as ProductionRiskPolicy["autoOpenSeverity"] }))}
             disabled={!canManage}
             className="mt-2 w-full rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-fg"
           >
-            <option value="warning">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "주의 이상")}</option>
-            <option value="high">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "높음 이상")}</option>
-            <option value="critical">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "긴급만")}</option>
+            <option value="warning">주의 이상</option>
+            <option value="high">높음 이상</option>
+            <option value="critical">긴급만</option>
           </select>
         </label>
       </div>
@@ -794,51 +793,52 @@ export function ProductionRiskWorkspace({
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <Pill tone="accent">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "자동 위험 감지")}</Pill>
-              <Pill tone={evaluation.summary.critical > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "danger") : evaluation.summary.high > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "success")}>
-                {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "마지막 평가 ")}{formatDate(evaluation.evaluatedAt)}
+              <Pill tone="accent">자동 위험 감지</Pill>
+              <Pill tone={evaluation.summary.critical > 0 ? "danger" : evaluation.summary.high > 0 ? "warning" : "success"}>
+                마지막 평가 {formatDate(evaluation.evaluatedAt)}
               </Pill>
             </div>
-            <h1 className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "위험·병목")}</h1>
+            <h1 className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">위험·병목</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "마감 초과 전에 예상 지연과 병목을 발견하고, 근거·영향 경로·대응 결과를 한곳에서 관리합니다.")}</p>
-            {nextDeadlineRisk ? <p className="mt-2 text-xs leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "가장 먼저 확인할 항목 · ")}{nextDeadlineRisk.title}</p> : null}
+              마감 초과 전에 예상 지연과 병목을 발견하고, 근거·영향 경로·대응 결과를 한곳에서 관리합니다.
+            </p>
+            {nextDeadlineRisk ? <p className="mt-2 text-xs leading-5 text-fg-3">가장 먼저 확인할 항목 · {nextDeadlineRisk.title}</p> : null}
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit} onClick={() => void refresh()}><RefreshCw className="size-4" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "다시 평가")}</button>
-            <button type="button" className={buttonClass({ size: "sm" })} disabled={!canEdit} onClick={openCreateRisk}><Plus className="size-4" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "위험 직접 등록")}</button>
+            <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit} onClick={() => void refresh()}><RefreshCw className="size-4" aria-hidden="true" /> 다시 평가</button>
+            <button type="button" className={buttonClass({ size: "sm" })} disabled={!canEdit} onClick={openCreateRisk}><Plus className="size-4" aria-hidden="true" /> 위험 직접 등록</button>
           </div>
         </div>
       </section>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <MetricCard label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "긴급")} value={String(evaluation.summary.critical)} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "지금 조치가 필요한 위험")} icon={ShieldAlert} tone={evaluation.summary.critical > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "success")} />
-        <MetricCard label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "높은 위험")} value={String(evaluation.summary.high)} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "게시·후행 작업 영향 가능")} icon={AlertTriangle} tone={evaluation.summary.high > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "success")} />
-        <MetricCard label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "실제 초과")} value={String(evaluation.summary.actualOverdue)} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "마감을 지난 미완료 항목")} icon={Clock3} tone={evaluation.summary.actualOverdue > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "success")} />
-        <MetricCard label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "예상 초과")} value={String(evaluation.summary.forecastSlip)} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "현재 속도 기준 마감 초과")} icon={CalendarClock} tone={evaluation.summary.forecastSlip > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "success")} />
-        <MetricCard label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "차단 장기화")} value={String(evaluation.summary.blocked)} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "정책 기준을 넘긴 차단")} icon={Workflow} tone={evaluation.summary.blocked > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "success")} />
-        <MetricCard label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "영향 회차")} value={String(evaluation.summary.affectedEpisodeCount)} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "일정 신뢰도 {v0}"), { v0: String(evaluation.schedule.confidence) })} icon={ListChecks} tone={evaluation.summary.affectedEpisodeCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "accent") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "success")} />
+        <MetricCard label="긴급" value={String(evaluation.summary.critical)} detail="지금 조치가 필요한 위험" icon={ShieldAlert} tone={evaluation.summary.critical > 0 ? "danger" : "success"} />
+        <MetricCard label="높은 위험" value={String(evaluation.summary.high)} detail="게시·후행 작업 영향 가능" icon={AlertTriangle} tone={evaluation.summary.high > 0 ? "warning" : "success"} />
+        <MetricCard label="실제 초과" value={String(evaluation.summary.actualOverdue)} detail="마감을 지난 미완료 항목" icon={Clock3} tone={evaluation.summary.actualOverdue > 0 ? "danger" : "success"} />
+        <MetricCard label="예상 초과" value={String(evaluation.summary.forecastSlip)} detail="현재 속도 기준 마감 초과" icon={CalendarClock} tone={evaluation.summary.forecastSlip > 0 ? "warning" : "success"} />
+        <MetricCard label="차단 장기화" value={String(evaluation.summary.blocked)} detail="정책 기준을 넘긴 차단" icon={Workflow} tone={evaluation.summary.blocked > 0 ? "warning" : "success"} />
+        <MetricCard label="영향 회차" value={String(evaluation.summary.affectedEpisodeCount)} detail={`일정 신뢰도 ${evaluation.schedule.confidence}`} icon={ListChecks} tone={evaluation.summary.affectedEpisodeCount > 0 ? "accent" : "success"} />
       </div>
 
       <Section
-        title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "위험 필터")}
-        description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "기본값은 현재 대응이 필요한 위험만 보여 줍니다. 종료된 항목은 상태 필터에서 선택합니다.")}
+        title="위험 필터"
+        description="기본값은 현재 대응이 필요한 위험만 보여 줍니다. 종료된 항목은 상태 필터에서 선택합니다."
         action={<Filter className="size-4 text-fg-3" aria-hidden="true" />}
       >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "검색")}</span><input value={searchParams.get("q") ?? ""} onChange={(event) => updateParam("q", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg outline-none focus:border-accent" placeholder={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "제목·원인 검색")} /></label>
-          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "위험도")}</span><select value={searchParams.get("severity") ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "all")} onChange={(event) => updateParam("severity", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "전체")}</option><option value="critical">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "긴급")}</option><option value="high">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "높음")}</option><option value="warning">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "주의")}</option><option value="watch">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "관찰")}</option></select></label>
-          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "상태")}</span><select value={searchParams.get("status") ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "all")} onChange={(event) => updateParam("status", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "활성 위험")}</option>{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "유형")}</span><select value={searchParams.get("category") ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "all")} onChange={(event) => updateParam("category", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "전체")}</option>{Object.entries(CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "등록 방식")}</span><select value={searchParams.get("source") ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "en", "all")} onChange={(event) => updateParam("source", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "전체")}</option><option value="automatic">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "자동 감지")}</option><option value="manual">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "직접 등록")}</option></select></label>
+          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">검색</span><input value={searchParams.get("q") ?? ""} onChange={(event) => updateParam("q", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg outline-none focus:border-accent" placeholder="제목·원인 검색" /></label>
+          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">위험도</span><select value={searchParams.get("severity") ?? "all"} onChange={(event) => updateParam("severity", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체</option><option value="critical">긴급</option><option value="high">높음</option><option value="warning">주의</option><option value="watch">관찰</option></select></label>
+          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">상태</span><select value={searchParams.get("status") ?? "all"} onChange={(event) => updateParam("status", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">활성 위험</option>{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">유형</span><select value={searchParams.get("category") ?? "all"} onChange={(event) => updateParam("category", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체</option>{Object.entries(CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">등록 방식</span><select value={searchParams.get("source") ?? "all"} onChange={(event) => updateParam("source", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체</option><option value="automatic">자동 감지</option><option value="manual">직접 등록</option></select></label>
         </div>
       </Section>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(20rem,0.8fr)_minmax(0,1.4fr)]">
         <section className={cn("rounded-2xl border border-line bg-card p-4", mobileDetailOpen && "hidden xl:block")}>
           <div className="mb-4 flex items-center justify-between gap-3">
-            <div><h2 className="text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "위험 목록")}</h2><p className="mt-1 text-xs text-fg-3">{filteredRisks.length}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "건 · 운영 우선순위순")}</p></div>
-            <Pill>{evaluation.risks.filter((risk) => ACTIVE_STATUSES.has(risk.status)).length} {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "활성")}</Pill>
+            <div><h2 className="text-sm font-black text-fg">위험 목록</h2><p className="mt-1 text-xs text-fg-3">{filteredRisks.length}건 · 운영 우선순위순</p></div>
+            <Pill>{evaluation.risks.filter((risk) => ACTIVE_STATUSES.has(risk.status)).length} 활성</Pill>
           </div>
           <div className="space-y-2">
             {filteredRisks.map((risk) => (
@@ -854,8 +854,8 @@ export function ProductionRiskWorkspace({
             {filteredRisks.length === 0 ? (
               <div className="rounded-xl border border-dashed border-line p-8 text-center">
                 <CheckCircle2 className="mx-auto size-8 text-good" aria-hidden="true" />
-                <p className="mt-3 text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "조건에 맞는 위험이 없습니다")}</p>
-                <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "필터를 바꾸거나 제작 데이터를 다시 평가해 보세요.")}</p>
+                <p className="mt-3 text-sm font-black text-fg">조건에 맞는 위험이 없습니다</p>
+                <p className="mt-1 text-xs text-fg-3">필터를 바꾸거나 제작 데이터를 다시 평가해 보세요.</p>
               </div>
             ) : null}
           </div>
@@ -879,7 +879,7 @@ export function ProductionRiskWorkspace({
           ) : (
             <div className="rounded-2xl border border-dashed border-line bg-card p-10 text-center">
               <BadgeCheck className="mx-auto size-9 text-good" aria-hidden="true" />
-              <p className="mt-3 text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskWorkspace", "ko", "확인할 위험을 선택해 주세요")}</p>
+              <p className="mt-3 text-sm font-black text-fg">확인할 위험을 선택해 주세요</p>
             </div>
           )}
         </div>

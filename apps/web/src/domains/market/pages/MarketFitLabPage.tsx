@@ -1,7 +1,4 @@
 import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   CheckCircle2,
   CircleAlert,
   RefreshCw,
@@ -105,11 +102,14 @@ export function MarketFitLabPage() {
       <section className="border-b border-line bg-ledger">
         <Container size="wide" className="py-7 sm:py-10">
           <MarketNavHeader />
-          <p className="eyebrow mt-6 text-accent">{translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "en", "Production fit lab")}</p>
+          <p className="eyebrow mt-6 text-accent">Production fit lab</p>
           <h1 className="mt-2 text-pretty text-2xl font-bold leading-tight text-fg sm:text-3xl">
-            {translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "제작 적합성 랩")}</h1>
+            제작 적합성 랩
+          </h1>
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-fg-2">
-            {translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "리소스를 획득하기 전에 현재 제작 조건과 실제 서버 manifest를 대조하세요. 조건 일치, 확인 필요, 차단 순으로 정렬하며 근거가 없는 평점이나 호환성을 만들지 않습니다.")}</p>
+            리소스를 획득하기 전에 현재 제작 조건과 실제 서버 manifest를 대조하세요.
+            조건 일치, 확인 필요, 차단 순으로 정렬하며 근거가 없는 평점이나 호환성을 만들지 않습니다.
+          </p>
         </Container>
       </section>
 
@@ -124,20 +124,26 @@ export function MarketFitLabPage() {
         <section aria-labelledby="market-fit-results-title" className="mt-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "en", "Evidence-ranked catalog")}</p>
+              <p className="eyebrow text-accent">Evidence-ranked catalog</p>
               <h2 id="market-fit-results-title" className="mt-1 text-xl font-bold text-fg">
-                {translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "현재 불러온 서버 결과")}</h2>
+                현재 불러온 서버 결과
+              </h2>
               <p className="mt-1 text-xs leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "서버의 최신순 페이지 안에서 제작 적합성을 다시 계산합니다. 더 보기를 누르면 다음 서버 페이지도 같은 기준으로 재정렬합니다.")}</p>
+                서버의 최신순 페이지 안에서 제작 적합성을 다시 계산합니다. 더 보기를 누르면
+                다음 서버 페이지도 같은 기준으로 재정렬합니다.
+              </p>
             </div>
             <p className="text-xs text-fg-3" aria-live="polite">
-              <span className="numeral tnum font-bold text-fg">{visible.length}</span>{translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "개 표시 · 서버 결과")}<span className="numeral tnum">{counts.all}</span>{translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "개")}</p>
+              <span className="numeral tnum font-bold text-fg">{visible.length}</span>개 표시 ·
+              서버 결과 <span className="numeral tnum">{counts.all}</span>개
+            </p>
           </div>
 
           <div className="mt-4 grid gap-3 rounded-2xl border border-line bg-panel p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
             <div className="relative">
               <label htmlFor="market-fit-search" className="sr-only">
-                {translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "불러온 마켓 결과 안에서 검색")}</label>
+                불러온 마켓 결과 안에서 검색
+              </label>
               <Search
                 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-3"
                 aria-hidden="true"
@@ -148,14 +154,14 @@ export function MarketFitLabPage() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 maxLength={CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS}
-                placeholder={translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "이름·태그·배급자·렌더러·전달 방식 검색")}
+                placeholder="이름·태그·배급자·렌더러·전달 방식 검색"
                 className="h-10 w-full appearance-none rounded-xl border border-line bg-card pl-9 pr-10 text-sm text-fg outline-none transition-colors duration-150 placeholder:text-fg-3 focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/70 pointer-coarse:h-11 [&::-webkit-search-cancel-button]:hidden"
               />
               {search ? (
                 <button
                   type="button"
                   onClick={() => setSearch("")}
-                  aria-label={translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "검색어 지우기")}
+                  aria-label="검색어 지우기"
                   className="absolute right-1 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-fg-3 transition-colors duration-150 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 pointer-coarse:size-11"
                 >
                   <X className="size-3.5" aria-hidden="true" />
@@ -163,7 +169,7 @@ export function MarketFitLabPage() {
               ) : null}
             </div>
 
-            <div className="flex max-w-full gap-1.5 overflow-x-auto py-0.5" role="group" aria-label={translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "제작 적합성 상태 필터")}>
+            <div className="flex max-w-full gap-1.5 overflow-x-auto py-0.5" role="group" aria-label="제작 적합성 상태 필터">
               {FILTERS.map((filter) => {
                 const Icon = filter.icon;
                 const active = fitFilter === filter.id;
@@ -196,7 +202,7 @@ export function MarketFitLabPage() {
 
           {page.loading ? (
             <>
-              <p role="status" className="sr-only">{translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "마켓 리소스를 불러오는 중입니다.")}</p>
+              <p role="status" className="sr-only">마켓 리소스를 불러오는 중입니다.</p>
               <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-hidden="true">
                 {Array.from({ length: 8 }, (_, index) => (
                   <div key={index} className="overflow-hidden rounded-xl border border-line bg-card">
@@ -212,7 +218,7 @@ export function MarketFitLabPage() {
             </>
           ) : page.error ? (
             <div role="status" className="mt-5 rounded-2xl border border-warn/40 bg-warn/10 p-8 text-center">
-              <p className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "서버 마켓을 불러오지 못했습니다")}</p>
+              <p className="text-sm font-bold text-fg">서버 마켓을 불러오지 못했습니다</p>
               <p className="mt-1 text-sm text-fg-2">{page.error}</p>
               <button
                 type="button"
@@ -220,14 +226,16 @@ export function MarketFitLabPage() {
                 className={buttonClass({ variant: "outline", size: "sm", className: "mt-4 gap-1.5" })}
               >
                 <RefreshCw className="size-3.5" aria-hidden="true" />
-                {translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "다시 시도")}</button>
+                다시 시도
+              </button>
             </div>
           ) : visible.length === 0 ? (
             <div className="mt-5 rounded-2xl border border-dashed border-line bg-panel p-8 text-center">
               <ShieldCheck className="mx-auto size-8 text-fg-3" aria-hidden="true" />
-              <p className="mt-3 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "선택한 조건의 결과가 없습니다")}</p>
+              <p className="mt-3 text-sm font-bold text-fg">선택한 조건의 결과가 없습니다</p>
               <p className="mx-auto mt-1 max-w-md text-sm leading-relaxed text-fg-2">
-                {translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "검색어 또는 상태 필터를 바꾸거나 더 많은 서버 결과를 불러오세요.")}</p>
+                검색어 또는 상태 필터를 바꾸거나 더 많은 서버 결과를 불러오세요.
+              </p>
               <button
                 type="button"
                 onClick={() => {
@@ -236,7 +244,8 @@ export function MarketFitLabPage() {
                 }}
                 className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}
               >
-                {translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "로컬 필터 초기화")}</button>
+                로컬 필터 초기화
+              </button>
             </div>
           ) : (
             <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -254,7 +263,8 @@ export function MarketFitLabPage() {
                 onClick={page.loadMore}
                 className="min-h-9 rounded-lg border border-warn/35 bg-warn/10 px-3 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warn/50 pointer-coarse:min-h-11"
               >
-                {translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "다시 불러오기")}</button>
+                다시 불러오기
+              </button>
             </div>
           ) : null}
 
@@ -269,7 +279,7 @@ export function MarketFitLabPage() {
                 {page.loadingMore ? (
                   <RefreshCw className="size-4 animate-spin" aria-hidden="true" />
                 ) : null}
-                {page.loadingMore ? translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "불러오는 중") : translateCurrentStaticSourceText("domains.market.pages.MarketFitLabPage", "ko", "서버 결과 더 보기")}
+                {page.loadingMore ? "불러오는 중" : "서버 결과 더 보기"}
               </button>
             </div>
           ) : null}

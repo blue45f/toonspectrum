@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useState } from "react";
 import {
   Group,
@@ -36,7 +35,7 @@ export function StudioWorkAssetPlaceholderNode({
   const padding = Math.min(18, Math.max(8, placeholder.width * 0.05));
   return (
     <Group
-      key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioKonvaPrimitiveNodes", "en", "work-asset-placeholder:{v0}:{v1}"), { v0: String(placeholder.elementType), v1: String(placeholder.assetId) })}
+      key={`work-asset-placeholder:${placeholder.elementType}:${placeholder.assetId}`}
       x={placeholder.x}
       y={placeholder.y}
       rotation={placeholder.rotation}
@@ -224,9 +223,9 @@ export function StudioFramePanel({
       }}
     >
       {poly ? (
-        <Line points={poly} closed fill={el.bgColor ?? translateCurrentStaticSourceText("domains.creator.StudioKonvaPrimitiveNodes", "en", "#ffffff")} />
+        <Line points={poly} closed fill={el.bgColor ?? "#ffffff"} />
       ) : (
-        <Rect width={el.width} height={el.height} fill={el.bgColor ?? translateCurrentStaticSourceText("domains.creator.StudioKonvaPrimitiveNodes", "en", "#ffffff")} />
+        <Rect width={el.width} height={el.height} fill={el.bgColor ?? "#ffffff"} />
       )}
       {img && fit ? (
         <KImage

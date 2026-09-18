@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Activity,
   CheckCircle2,
   ChevronRight,
@@ -294,8 +290,8 @@ export function StudioBrushDynamicsPreview({
   return (
     <div className="rounded-xl border border-line bg-card/55 p-2.5 shadow-[inset_0_1px_0_oklch(0.95_0.01_85/0.04)]">
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="text-[0.7rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "실제 엔진 미리보기")}</span>
-        <StudioContextPill tone="neutral">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "필압 · 속도 · 기울기 · 회전")}</StudioContextPill>
+        <span className="text-[0.7rem] font-semibold text-fg-2">실제 엔진 미리보기</span>
+        <StudioContextPill tone="neutral">필압 · 속도 · 기울기 · 회전</StudioContextPill>
       </div>
       <svg
         viewBox="0 0 288 96"
@@ -358,7 +354,7 @@ export function StudioBrushDynamicsPreview({
                     ry={radius * composedDab.roundness}
                     fill={dabColor}
                     opacity={Math.min(1, baseOpacity * grainAt(composedDab.x, composedDab.y))}
-                    transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "en", "rotate({v0} {v1} {v2})"), { v0: String(composedDab.angle), v1: String(composedDab.x), v2: String(composedDab.y) })}
+                    transform={`rotate(${composedDab.angle} ${composedDab.x} ${composedDab.y})`}
                   />
                 )];
               }
@@ -384,7 +380,8 @@ export function StudioBrushDynamicsPreview({
         })()}
       </svg>
       <p className="mt-1.5 text-[0.62rem] leading-relaxed text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "필압·테이퍼·색상·고정 그레인·멀티 팁·듀얼 브러시가 실제 엔진 도장 경로에 반영됩니다.")}{plan.capped ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", " 미리보기 도장 수는 256개로 제한했습니다.") : ""}
+        필압·테이퍼·색상·고정 그레인·멀티 팁·듀얼 브러시가 실제 엔진 도장 경로에 반영됩니다.
+        {plan.capped ? " 미리보기 도장 수는 256개로 제한했습니다." : ""}
       </p>
     </div>
   );
@@ -403,9 +400,10 @@ function DynamicsRequiredNotice({
       role="status"
       aria-live="polite"
     >
-      <p className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "입자 브러시를 먼저 선택하세요")}</p>
+      <p className="font-semibold text-fg">입자 브러시를 먼저 선택하세요</p>
       <p className="mt-1 text-fg-3 text-pretty">
-        {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "빠른 설정에서 잉크 입자, 에어브러시, 드라이 미디어 중 하나를 고르면 이 설정이 실제 획에 적용됩니다.")}</p>
+        빠른 설정에서 잉크 입자, 에어브러시, 드라이 미디어 중 하나를 고르면 이 설정이 실제 획에 적용됩니다.
+      </p>
       <button
         type="button"
         onClick={onRequestCompatibleBrush}
@@ -413,9 +411,10 @@ function DynamicsRequiredNotice({
           "mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-accent/45 bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2",
           STUDIO_FOCUS_RING,
         )}
-        aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "호환 브러시 선택하기")}
+        aria-label="호환 브러시 선택하기"
       >
-        {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "호환 브러시 선택하기")}</button>
+        호환 브러시 선택하기
+      </button>
       {children}
     </div>
   );
@@ -583,9 +582,10 @@ export function StudioBrushTipImportControls({
           <ImagePlus size={16} aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "내 PNG 펜촉")}</p>
+          <p className="text-xs font-semibold text-fg">내 PNG 펜촉</p>
           <p id={descriptionId} className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3 text-pretty">
-            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "4MB·4,096px 이하 PNG를 최대 64×64 알파로 안전하게 축소합니다. 투명 배경과 흑백 마스크를 모두 자동 인식합니다.")}</p>
+            4MB·4,096px 이하 PNG를 최대 64×64 알파로 안전하게 축소합니다. 투명 배경과 흑백 마스크를 모두 자동 인식합니다.
+          </p>
         </div>
       </div>
 
@@ -593,7 +593,7 @@ export function StudioBrushTipImportControls({
         ref={inputRef}
         type="file"
         accept=".png,image/png"
-        aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "PNG 펜촉 파일 선택")}
+        aria-label="PNG 펜촉 파일 선택"
         aria-describedby={descriptionId}
         onChange={(event) => void handleFileChange(event)}
         className="sr-only"
@@ -604,10 +604,11 @@ export function StudioBrushTipImportControls({
           <CheckCircle2 size={16} className="shrink-0 text-good" aria-hidden />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[0.7rem] font-semibold text-fg">
-              {activeImported?.name ?? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "문서에 포함된 사용자 PNG")}
+              {activeImported?.name ?? "문서에 포함된 사용자 PNG"}
             </p>
             <p className="truncate text-[0.62rem] text-fg-3">
-              {tip.alphaMapSize}×{tip.alphaMapSize} {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "알파")}{activeImported ? ` · ${importedTipSourceLabel(activeImported.source)}` : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", " · 획과 함께 저장됨")}
+              {tip.alphaMapSize}×{tip.alphaMapSize} 알파
+              {activeImported ? ` · ${importedTipSourceLabel(activeImported.source)}` : " · 획과 함께 저장됨"}
             </p>
           </div>
           <button
@@ -624,8 +625,8 @@ export function StudioBrushTipImportControls({
               "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg",
               STUDIO_FOCUS_RING
             )}
-            aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "사용자 PNG 펜촉 제거")}
-            title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "사용자 PNG 제거")}
+            aria-label="사용자 PNG 펜촉 제거"
+            title="사용자 PNG 제거"
           >
             <Trash2 size={16} aria-hidden />
           </button>
@@ -639,7 +640,7 @@ export function StudioBrushTipImportControls({
             type="button"
             onClick={() => setError(null)}
             className={cn("grid size-11 shrink-0 place-items-center rounded-lg hover:bg-bad/10", STUDIO_FOCUS_RING)}
-            aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "펜촉 가져오기 오류 닫기")}
+            aria-label="펜촉 가져오기 오류 닫기"
           >
             <X size={15} aria-hidden />
           </button>
@@ -661,7 +662,7 @@ export function StudioBrushTipImportControls({
         ) : (
           <ImagePlus size={16} className="text-accent" aria-hidden />
         )}
-        {importing ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "펜촉 변환 중…") : customActive ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "다른 PNG로 교체") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "PNG 펜촉 가져오기")}
+        {importing ? "펜촉 변환 중…" : customActive ? "다른 PNG로 교체" : "PNG 펜촉 가져오기"}
       </button>
     </div>
   );
@@ -701,12 +702,12 @@ export function StudioBrushDualBrushControls({
   return (
     <div className="space-y-2.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "듀얼 브러시")}</span>
-        <span className="text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "간격·산포는 1차 브러시를 따릅니다")}</span>
+        <span className="text-[0.68rem] font-semibold text-fg-2">듀얼 브러시</span>
+        <span className="text-[0.62rem] text-fg-3">간격·산포는 1차 브러시를 따릅니다</span>
       </div>
       <ToggleRow
-        label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "듀얼 브러시 사용")}
-        description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "2차 팁 텍스처가 1차 팁을 도장 텍스처 합성 시점에 변조합니다")}
+        label="듀얼 브러시 사용"
+        description="2차 팁 텍스처가 1차 팁을 도장 텍스처 합성 시점에 변조합니다"
         checked={dualBrush.enabled}
         onChange={(enabled) => update({ enabled })}
       />
@@ -714,8 +715,8 @@ export function StudioBrushDualBrushControls({
         <>
           <div>
             <div className="mb-1.5 flex items-center justify-between gap-2">
-              <span className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "2차 팁")}</span>
-              <span className="text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "선택하면 2차 사용자 PNG가 해제됩니다")}</span>
+              <span className="text-[0.68rem] font-semibold text-fg-2">2차 팁</span>
+              <span className="text-[0.62rem] text-fg-3">선택하면 2차 사용자 PNG가 해제됩니다</span>
             </div>
             <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
               {STUDIO_BRUSH_TIP_SHAPE_IDS.map((shapeId) => {
@@ -725,7 +726,7 @@ export function StudioBrushDualBrushControls({
                     key={shapeId}
                     type="button"
                     aria-pressed={active}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "2차 팁 {v0}"), { v0: String(TIP_SHAPE_LABELS[shapeId]) })}
+                    aria-label={`2차 팁 ${TIP_SHAPE_LABELS[shapeId]}`}
                     onClick={() => update({
                       tip: { ...dualBrush.tip, shape: shapeId, alphaMapBase64: null },
                     })}
@@ -744,7 +745,7 @@ export function StudioBrushDualBrushControls({
               })}
             </div>
           </div>
-          <div role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "듀얼 브러시 합성 모드")} className="grid grid-cols-2 gap-1.5">
+          <div role="radiogroup" aria-label="듀얼 브러시 합성 모드" className="grid grid-cols-2 gap-1.5">
             {STUDIO_BRUSH_DUAL_BRUSH_BLEND_MODES.map((blendMode) => {
               const active = dualBrush.blendMode === blendMode;
               return (
@@ -773,13 +774,13 @@ export function StudioBrushDualBrushControls({
             })}
           </div>
           <RangeRow
-            label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "2차 팁 크기 비율")}
+            label="2차 팁 크기 비율"
             value={dualBrush.sizeRatio}
             min={STUDIO_BRUSH_DUAL_BRUSH_SIZE_RATIO_LIMITS.min}
             max={STUDIO_BRUSH_DUAL_BRUSH_SIZE_RATIO_LIMITS.max}
             step={0.05}
             display={`${Math.round(dualBrush.sizeRatio * 100)}%`}
-            hint={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "1차 팁 지름 대비 2차 팁 지름")}
+            hint="1차 팁 지름 대비 2차 팁 지름"
             onChange={(sizeRatio) => update({ sizeRatio })}
           />
           <StudioBrushTipImportControls
@@ -1019,8 +1020,8 @@ export function StudioBrushStudio({
   const content = category === "presets" ? (
     <div className="space-y-3">
       <StudioSectionHeader
-        title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "빠른 설정")}
-        description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "실제 필압·속도·기울기·회전 입력을 조합한 상용 수준 시작점입니다.")}
+        title="빠른 설정"
+        description="실제 필압·속도·기울기·회전 입력을 조합한 상용 수준 시작점입니다."
       />
       <div className="grid gap-2 md:grid-cols-3">
         {STUDIO_BRUSH_DYNAMICS_PRESETS.map((preset) => {
@@ -1043,7 +1044,8 @@ export function StudioBrushStudio({
                 {preset.name}
                 {active ? (
                   <span className="rounded-full bg-accent px-2 py-0.5 text-[0.6rem] font-semibold text-on-accent">
-                    {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "사용 중")}</span>
+                    사용 중
+                  </span>
                 ) : null}
               </span>
               <span className="mt-1.5 block text-[0.65rem] font-normal leading-relaxed text-fg-3 text-pretty">
@@ -1054,17 +1056,18 @@ export function StudioBrushStudio({
         })}
       </div>
       <div className="rounded-xl border border-line bg-card/45 px-3 py-2.5 text-[0.68rem] leading-relaxed text-fg-3 text-pretty">
-        {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "프리셋을 조정하면 자동으로 사용자 지정 상태가 됩니다. 원본 프리셋은 언제든 다시 선택할 수 있습니다.")}</div>
+        프리셋을 조정하면 자동으로 사용자 지정 상태가 됩니다. 원본 프리셋은 언제든 다시 선택할 수 있습니다.
+      </div>
     </div>
   ) : category === "response" ? (
     dynamicsActive ? (
       <div className="space-y-2.5">
         <StudioSectionHeader
-          title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "압력 반응과 도포량")}
-          description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "전체 입력 보정 뒤에 각 출력 속성의 반응 범위를 적용합니다.")}
+          title="압력 반응과 도포량"
+          description="전체 입력 보정 뒤에 각 출력 속성의 반응 범위를 적용합니다."
         />
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "가벼운 필압의 굵기")}
+          label="가벼운 필압의 굵기"
           value={pressureWidth?.from ?? 0.3}
           min={0.05}
           max={1}
@@ -1079,7 +1082,7 @@ export function StudioBrushStudio({
           ))}
         />
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "강한 필압의 굵기")}
+          label="강한 필압의 굵기"
           value={pressureWidth?.to ?? 1.7}
           min={0.5}
           max={2.4}
@@ -1094,7 +1097,7 @@ export function StudioBrushStudio({
           ))}
         />
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "가벼운 필압의 불투명도")}
+          label="가벼운 필압의 불투명도"
           value={pressureOpacity?.from ?? 0.5}
           min={0}
           max={1}
@@ -1109,13 +1112,13 @@ export function StudioBrushStudio({
           ))}
         />
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "유량")}
+          label="유량"
           value={settings.flow.base}
           min={0.04}
           max={1}
           step={0.02}
           display={`${Math.round(settings.flow.base * 100)}%`}
-          hint={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "한 도장마다 쌓이는 색의 양이며, 획 투명도와 함께 최종 농도를 결정합니다.")}
+          hint="한 도장마다 쌓이는 색의 양이며, 획 투명도와 함께 최종 농도를 결정합니다."
           onChange={(base) => onSettingsChange(updateStudioBrushDynamicsPropertyBase(settings, "flow", base))}
         />
         <StudioBrushDynamicsInputMatrix
@@ -1128,67 +1131,67 @@ export function StudioBrushStudio({
     dynamicsActive ? (
       <div className="space-y-2.5">
         <StudioSectionHeader
-          title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "도장 간격과 산포")}
-          description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "줌이 아니라 실제 촉 지름에 비례해 일관된 질감을 유지합니다.")}
+          title="도장 간격과 산포"
+          description="줌이 아니라 실제 촉 지름에 비례해 일관된 질감을 유지합니다."
         />
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "도장 간격")}
+          label="도장 간격"
           value={settings.spacingRatio ?? 0.34}
           min={0.02}
           max={1}
           step={0.01}
           display={`${Math.round((settings.spacingRatio ?? 0.34) * 100)}%`}
-          hint={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "촉 지름 대비 이동 거리")}
+          hint="촉 지름 대비 이동 거리"
           onChange={(ratio) => onSettingsChange(updateStudioBrushDynamicsRatio(settings, "spacing", ratio))}
         />
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "산포 반경")}
+          label="산포 반경"
           value={settings.scatterRatio ?? 0}
           min={0}
           max={1.2}
           step={0.01}
           display={`${Math.round((settings.scatterRatio ?? 0) * 100)}%`}
-          hint={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "진행 경로 주변으로 퍼지는 결정론적 입자 반경")}
+          hint="진행 경로 주변으로 퍼지는 결정론적 입자 반경"
           onChange={(ratio) => onSettingsChange(updateStudioBrushDynamicsRatio(settings, "scatter", ratio))}
         />
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "촉 크기 무작위")}
+          label="촉 크기 무작위"
           value={settings.width.jitter?.mode === "multiply" ? settings.width.jitter.amount : 0}
           min={0}
           max={0.75}
           step={0.01}
           display={`${Math.round((settings.width.jitter?.mode === "multiply" ? settings.width.jitter.amount : 0) * 100)}%`}
-          hint={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "같은 획은 다시 열어도 똑같이 재현됩니다.")}
+          hint="같은 획은 다시 열어도 똑같이 재현됩니다."
           onChange={(amount) => onSettingsChange(updateStudioBrushDynamicsJitter(settings, "width", amount))}
         />
         <ToggleRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "시작·끝 테이퍼")}
-          description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "획의 양 끝을 펜촉처럼 가늘게 만듭니다")}
+          label="시작·끝 테이퍼"
+          description="획의 양 끝을 펜촉처럼 가늘게 만듭니다"
           checked={settings.taper.enabled}
           onChange={(enabled) => onSettingsChange(updateStudioBrushDynamicsTaper(settings, { enabled }))}
         />
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "시작 테이퍼 길이")}
+          label="시작 테이퍼 길이"
           value={settings.taper.startLength}
           min={0}
           max={0.45}
           step={0.01}
           display={`${Math.round(settings.taper.startLength * 100)}%`}
-          hint={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "획 전체 길이 대비 시작 구간")}
+          hint="획 전체 길이 대비 시작 구간"
           onChange={(startLength) => onSettingsChange(updateStudioBrushDynamicsTaper(settings, { startLength }))}
         />
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "끝 테이퍼 길이")}
+          label="끝 테이퍼 길이"
           value={settings.taper.endLength}
           min={0}
           max={0.45}
           step={0.01}
           display={`${Math.round(settings.taper.endLength * 100)}%`}
-          hint={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "획 전체 길이 대비 끝 구간")}
+          hint="획 전체 길이 대비 끝 구간"
           onChange={(endLength) => onSettingsChange(updateStudioBrushDynamicsTaper(settings, { endLength }))}
         />
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "끝 최소 굵기")}
+          label="끝 최소 굵기"
           value={settings.taper.minSizeRatio}
           min={0.05}
           max={1}
@@ -1206,8 +1209,8 @@ export function StudioBrushStudio({
     dynamicsActive ? (
       <div className="space-y-2.5">
         <StudioSectionHeader
-          title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "펜촉 텍스처")}
-          description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "내 PNG 또는 정교한 기본 촉을 간격·산포 도장 경로에 찍습니다. 원형도가 낮을수록 각도 변화가 선명합니다.")}
+          title="펜촉 텍스처"
+          description="내 PNG 또는 정교한 기본 촉을 간격·산포 도장 경로에 찍습니다. 원형도가 낮을수록 각도 변화가 선명합니다."
         />
         <StudioBrushTipImportControls
           tip={settings.tip}
@@ -1216,8 +1219,8 @@ export function StudioBrushStudio({
         />
         <div>
           <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "기본 펜촉")}</span>
-            <span className="text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "선택하면 사용자 PNG가 해제됩니다")}</span>
+            <span className="text-[0.68rem] font-semibold text-fg-2">기본 펜촉</span>
+            <span className="text-[0.62rem] text-fg-3">선택하면 사용자 PNG가 해제됩니다</span>
           </div>
           <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
           {STUDIO_BRUSH_TIP_SHAPE_IDS.map((shapeId) => {
@@ -1249,17 +1252,17 @@ export function StudioBrushStudio({
           </div>
         </div>
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "팁 가장자리")}
+          label="팁 가장자리"
           value={settings.tip.softness}
           min={0}
           max={1}
           step={0.02}
           display={`${Math.round(settings.tip.softness * 100)}%`}
-          hint={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "PNG 알파 가장자리 부드러움")}
+          hint="PNG 알파 가장자리 부드러움"
           onChange={(softness) => onSettingsChange(updateStudioBrushDynamicsTip(settings, { softness }))}
         />
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "기본 촉 각도")}
+          label="기본 촉 각도"
           value={settings.angle.base}
           min={-180}
           max={180}
@@ -1268,7 +1271,7 @@ export function StudioBrushStudio({
           onChange={(base) => onSettingsChange(updateStudioBrushDynamicsPropertyBase(settings, "angle", base))}
         />
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "촉 원형도")}
+          label="촉 원형도"
           value={settings.roundness.base}
           min={0.08}
           max={1}
@@ -1277,8 +1280,8 @@ export function StudioBrushStudio({
           onChange={(base) => onSettingsChange(updateStudioBrushDynamicsPropertyBase(settings, "roundness", base))}
         />
         <ToggleRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "획 방향 추종")}
-          description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "이동 방향에 맞춰 타원형 촉을 회전")}
+          label="획 방향 추종"
+          description="이동 방향에 맞춰 타원형 촉을 회전"
           checked={directionAngle !== null}
           onChange={(checked) => onSettingsChange(checked
             ? updateStudioBrushDynamicsMapping(
@@ -1291,8 +1294,8 @@ export function StudioBrushStudio({
             : removeStudioBrushDynamicsMapping(settings, "angle", "direction"))}
         />
         <ToggleRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "스타일러스 회전")}
-          description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "지원 펜의 barrel roll·twist를 촉 각도에 반영")}
+          label="스타일러스 회전"
+          description="지원 펜의 barrel roll·twist를 촉 각도에 반영"
           checked={twistAngle !== null}
           onChange={(checked) => onSettingsChange(checked
             ? updateStudioBrushDynamicsMapping(
@@ -1305,8 +1308,8 @@ export function StudioBrushStudio({
             : removeStudioBrushDynamicsMapping(settings, "angle", "twist"))}
         />
         <ToggleRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "기울기 원형도")}
-          description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "펜을 눕힐수록 촉이 납작해지는 반응")}
+          label="기울기 원형도"
+          description="펜을 눕힐수록 촉이 납작해지는 반응"
           checked={tiltRoundness !== null}
           onChange={(checked) => onSettingsChange(checked
             ? updateStudioBrushDynamicsMapping(
@@ -1328,17 +1331,17 @@ export function StudioBrushStudio({
     ) : brushId === "calligraphy" ? (
       <div className="space-y-2.5">
         <div>
-          <h3 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "캘리그래피 펜촉")}</h3>
-          <p className="mt-0.5 text-xs leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "기존 캘리그래피 획의 전용 촉 설정입니다.")}</p>
+          <h3 className="text-sm font-bold text-fg">캘리그래피 펜촉</h3>
+          <p className="mt-0.5 text-xs leading-relaxed text-fg-3">기존 캘리그래피 획의 전용 촉 설정입니다.</p>
         </div>
         <ToggleRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "스타일러스 기울기")}
-          description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "Apple Pencil·Wacom의 tilt와 twist를 획에 저장")}
+          label="스타일러스 기울기"
+          description="Apple Pencil·Wacom의 tilt와 twist를 획에 저장"
           checked={tiltEnabled}
           onChange={onTiltEnabledChange}
         />
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "기본 촉 각도")}
+          label="기본 촉 각도"
           value={tipAngle}
           min={-180}
           max={180}
@@ -1347,7 +1350,7 @@ export function StudioBrushStudio({
           onChange={onTipAngleChange}
         />
         <RangeRow
-          label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "촉 원형도")}
+          label="촉 원형도"
           value={tipRoundness}
           min={0.08}
           max={1}
@@ -1385,8 +1388,8 @@ export function StudioBrushStudio({
   ) : (
     <div>
       <StudioSectionHeader
-        title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "전역 입력 보정")}
-        description={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "장치 입력을 먼저 보정한 뒤, 브러시별 크기·불투명도·도장 반응을 적용합니다.")}
+        title="전역 입력 보정"
+        description="장치 입력을 먼저 보정한 뒤, 브러시별 크기·불투명도·도장 반응을 적용합니다."
       />
       <StudioBrushInputControls
         density="touch"
@@ -1405,11 +1408,13 @@ export function StudioBrushStudio({
             key={sensor}
             className="flex min-h-11 items-center justify-center rounded-lg border border-line bg-card/45 px-2 text-center font-medium"
           >
-            {sensor} {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "입력 준비")}</span>
+            {sensor} 입력 준비
+          </span>
         ))}
       </div>
       <p className="mt-2 text-[0.62rem] leading-relaxed text-fg-3 text-pretty">
-        {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "센서 지원은 브라우저와 펜 모델에 따라 다릅니다. 지원되지 않는 입력도 다른 기기에서 쓸 브러시 설정으로 저장할 수 있습니다.")}</p>
+        센서 지원은 브라우저와 펜 모델에 따라 다릅니다. 지원되지 않는 입력도 다른 기기에서 쓸 브러시 설정으로 저장할 수 있습니다.
+      </p>
     </div>
   );
 
@@ -1422,9 +1427,11 @@ export function StudioBrushStudio({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold text-fg">
-              {restoreSession.transaction.profile.sourceName} {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "기본값으로 복원할까요?")}</p>
+              {restoreSession.transaction.profile.sourceName} 기본값으로 복원할까요?
+            </p>
             <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
-              {restoreSession.transaction.summary} {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "· 현재 색상과 브러시 선택은 유지됩니다.")}</p>
+              {restoreSession.transaction.summary} · 현재 색상과 브러시 선택은 유지됩니다.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex">
             <button
@@ -1435,7 +1442,8 @@ export function StudioBrushStudio({
                 STUDIO_FOCUS_RING,
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "취소")}</button>
+              취소
+            </button>
             <button
               type="button"
               onClick={() => confirmDefaultRestore(restoreSession.transaction)}
@@ -1444,14 +1452,16 @@ export function StudioBrushStudio({
                 STUDIO_FOCUS_RING,
               )}
             >
-              {restoreSession.transaction.changes.length}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "개 설정 복원")}</button>
+              {restoreSession.transaction.changes.length}개 설정 복원
+            </button>
           </div>
         </div>
       ) : restoreSession?.status === "applied" ? (
         <div className="flex min-h-11 items-center gap-3">
           <CheckCircle2 size={17} className="shrink-0 text-good" aria-hidden />
           <p className="min-w-0 flex-1 text-xs text-fg-2">
-            {restoreSession.transaction.changes.length}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "개 설정을 복원했습니다.")}</p>
+            {restoreSession.transaction.changes.length}개 설정을 복원했습니다.
+          </p>
           <button
             type="button"
             onClick={() => undoDefaultRestore(restoreSession.transaction)}
@@ -1461,7 +1471,8 @@ export function StudioBrushStudio({
             )}
           >
             <Undo2 size={14} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "되돌리기")}</button>
+            되돌리기
+          </button>
         </div>
       ) : restoreSession ? (
         <div
@@ -1489,15 +1500,17 @@ export function StudioBrushStudio({
                 STUDIO_FOCUS_RING,
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "다시 시도")}</button>
+              다시 시도
+            </button>
           ) : null}
         </div>
       ) : (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "선택 브러시 전체 설정")}</p>
+            <p className="text-xs font-semibold text-fg-2">선택 브러시 전체 설정</p>
             <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "굵기·불투명도·필압·보정·촉을 함께 복원하며 현재 색상은 유지합니다.")}</p>
+              굵기·불투명도·필압·보정·촉을 함께 복원하며 현재 색상은 유지합니다.
+            </p>
           </div>
           <button
             type="button"
@@ -1513,7 +1526,7 @@ export function StudioBrushStudio({
             ) : (
               <RotateCcw size={15} aria-hidden />
             )}
-            {restoreLoading ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "기본값 불러오는 중") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "이 브러시 기본값 복원")}
+            {restoreLoading ? "기본값 불러오는 중" : "이 브러시 기본값 복원"}
           </button>
         </div>
       )}
@@ -1548,13 +1561,13 @@ export function StudioBrushStudio({
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="truncate text-sm font-bold text-fg">{STUDIO_BRUSH_LABELS.editCurrent}</h2>
             <p id={descriptionId} className="truncate text-[0.65rem] text-fg-3">
-              {brushLabel} · {dynamicsActive ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "{v0}개 입력 연결"), { v0: String(mappingCount) }) : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "전역 입력과 입자 브러시 설정")}
+              {brushLabel} · {dynamicsActive ? `${mappingCount}개 입력 연결` : "전역 입력과 입자 브러시 설정"}
             </p>
           </div>
           <a
             href={fullEditorHref}
             aria-label={STUDIO_BRUSH_LABELS.create}
-            title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "브러시 스튜디오 전체 편집에서 새 브러시 만들기")}
+            title="브러시 스튜디오 전체 편집에서 새 브러시 만들기"
             className={cn(
               "grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 hover:border-accent/55 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
               STUDIO_FOCUS_RING,
@@ -1565,8 +1578,8 @@ export function StudioBrushStudio({
           <button
             type="button"
             onClick={() => setCategory("engines")}
-            aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "커스텀 브러시로 저장")}
-            title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "커스텀 브러시로 저장")}
+            aria-label="커스텀 브러시로 저장"
+            title="커스텀 브러시로 저장"
             className={cn(
               "grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
               category === "engines" && "border-accent/55 text-accent",
@@ -1578,7 +1591,7 @@ export function StudioBrushStudio({
             ref={closeRef}
             type="button"
             onClick={closeStudio}
-            aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "현재 브러시 편집 닫기")}
+            aria-label="현재 브러시 편집 닫기"
             className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             <X size={17} aria-hidden />
@@ -1606,7 +1619,7 @@ export function StudioBrushStudio({
         <div className="flex min-h-0 flex-1 flex-col sm:grid sm:grid-cols-[10rem_minmax(0,1fr)_14rem]">
           <div
             role="tablist"
-            aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "현재 브러시 편집 설정 분류")}
+            aria-label="현재 브러시 편집 설정 분류"
             className="flex shrink-0 gap-1 overflow-x-auto border-b border-line p-2 [scrollbar-width:none] sm:flex-col sm:overflow-x-visible sm:border-b-0 sm:border-r sm:p-3"
           >
             {CATEGORY_ITEMS.map(({ id, label, description, Icon }) => {
@@ -1627,7 +1640,7 @@ export function StudioBrushStudio({
                     active ? "bg-accent-soft text-fg" : "text-fg-2 hover:bg-raised"
                   )}
                 >
-                  <Icon size={15} className={active ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "en", "text-accent") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "en", "text-fg-3")} aria-hidden />
+                  <Icon size={15} className={active ? "text-accent" : "text-fg-3"} aria-hidden />
                   <span>
                     <span className="block whitespace-nowrap text-xs font-semibold">{label}</span>
                     <span className="hidden text-[0.62rem] text-fg-3 sm:block">{description}</span>
@@ -1651,9 +1664,11 @@ export function StudioBrushStudio({
               <StudioBrushDynamicsPreview settings={settings} strokeWidth={strokeWidth} color={color} />
               <div className="rounded-xl border border-line bg-card/45 p-3">
                 <div className="flex items-center gap-2 text-xs font-semibold text-fg-2">
-                  <RotateCw size={14} className="text-accent" aria-hidden /> {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "재현 가능한 획")}</div>
+                  <RotateCw size={14} className="text-accent" aria-hidden /> 재현 가능한 획
+                </div>
                 <p className="mt-1 text-[0.64rem] leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushStudio", "ko", "산포와 무작위 질감은 획 ID로 고정되어 다시 열기, SVG 내보내기, 협업 재생에서도 같은 모양을 유지합니다.")}</p>
+                  산포와 무작위 질감은 획 ID로 고정되어 다시 열기, SVG 내보내기, 협업 재생에서도 같은 모양을 유지합니다.
+                </p>
               </div>
             </div>
           </aside>

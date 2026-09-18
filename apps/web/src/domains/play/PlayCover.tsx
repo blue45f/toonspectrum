@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 // 놀이터(/play) 공용 커버.
 // 표지 썸네일(프록시·표지 정책 적용)을 우선 노출하되, 미노출/차단/실패 시
 // 자체 타이포그래픽 커버(그라디언트 + 해시 패턴 + 글로우 + 제목 타이포)로 폴백한다.
@@ -87,7 +86,7 @@ export function PlayCover({
   return (
     <div
       role="img"
-      aria-label={mystery && !revealed ? translateCurrentStaticSourceText("domains.play.PlayCover", "ko", "숨겨진 표지") : title}
+      aria-label={mystery && !revealed ? "숨겨진 표지" : title}
       className={cn("relative overflow-hidden", aspectClassName, className)}
       style={{ background: gradient }}
     >

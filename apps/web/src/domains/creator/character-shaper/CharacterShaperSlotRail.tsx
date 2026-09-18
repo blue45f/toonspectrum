@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Character Shaper — the 15-slot rail (vertical on desktop/tablet, horizontal scroll on mobile).
  *
@@ -76,8 +73,8 @@ export function CharacterShaperSlotRail({ binding, activeSlot, onSelectSlot, ori
     <div
       ref={containerRef}
       role="toolbar"
-      aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSlotRail", "ko", "캐릭터 슬롯")}
-      aria-orientation={vertical ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSlotRail", "en", "vertical") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSlotRail", "en", "horizontal")}
+      aria-label="캐릭터 슬롯"
+      aria-orientation={vertical ? "vertical" : "horizontal"}
       data-character-shaper-rail={orientation}
       onKeyDown={handleKeyDown}
       className={cn(
@@ -121,7 +118,7 @@ export function CharacterShaperSlotRail({ binding, activeSlot, onSelectSlot, ori
                 type="button"
                 data-character-slot={meta.id}
                 data-character-slot-support={support.status}
-                aria-current={active ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSlotRail", "en", "true") : undefined}
+                aria-current={active ? "true" : undefined}
                 aria-keyshortcuts={hotkey ?? undefined}
                 tabIndex={active ? 0 : -1}
                 title={`${meta.label} · ${meta.hint}${supportTitle}${hotkey ? ` (${hotkey})` : ""}`}
@@ -137,7 +134,7 @@ export function CharacterShaperSlotRail({ binding, activeSlot, onSelectSlot, ori
                 )}
               >
                 <span className="relative inline-flex">
-                  <Icon size={18} aria-hidden className={active ? "" : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSlotRail", "en", "opacity-85")} />
+                  <Icon size={18} aria-hidden className={active ? "" : "opacity-85"} />
                   {changed ? (
                     <span
                       aria-hidden
@@ -157,7 +154,7 @@ export function CharacterShaperSlotRail({ binding, activeSlot, onSelectSlot, ori
                   ) : null}
                 </span>
                 <span className="max-w-full truncate">{meta.label}</span>
-                {changed ? <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperSlotRail", "ko", "변경됨")}</span> : null}
+                {changed ? <span className="sr-only">변경됨</span> : null}
                 {support.status !== "fully-supported" ? <span className="sr-only">{support.label}</span> : null}
                 {vertical && hotkey ? (
                   <kbd

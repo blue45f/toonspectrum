@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense } from "react";
 
 import { StudioRouteLoading } from "../../StudioLazySurfaceFallback";
@@ -34,7 +33,7 @@ export function StudioPublishRoute({ resolution }: {
 
   return (
     <StudioDocumentRuntimeBoundary documentKey={publishKey}>
-      <Suspense fallback={<StudioRouteLoading label={translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioPublishRoute", "ko", "게시 명령 센터를 안전하게 여는 중...")} />}>
+      <Suspense fallback={<StudioRouteLoading label="게시 명령 센터를 안전하게 여는 중..." />}>
         <StudioPublishingCommandCenter workId={resolution.workId} />
       </Suspense>
     </StudioDocumentRuntimeBoundary>

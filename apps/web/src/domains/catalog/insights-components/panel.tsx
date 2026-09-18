@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 /**
@@ -42,7 +41,7 @@ export function Panel({
       <div className="min-w-0 flex-1">{children}</div>
       {insight != null && (
         <p className="mt-4 border-t border-line pt-3 text-[0.8rem] leading-relaxed text-fg-3">
-          <span className="eyebrow mr-1.5 text-fg-2">{translateCurrentStaticSourceText("domains.catalog.insights.components.panel", "ko", "인사이트")}</span>
+          <span className="eyebrow mr-1.5 text-fg-2">인사이트</span>
           {insight}
         </p>
       )}

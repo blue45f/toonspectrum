@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Halftone Panel
  * 선택된 이미지의 컬러 하프톤(Halftone) 인스펙터 — 원클릭 코믹 프리셋 +
@@ -57,16 +56,17 @@ export function StudioHalftonePanel({
     <div className="space-y-2">
       {/* 헤더 + 항등 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioHalftonePanel", "ko", "하프톤 (Halftone)")}</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">하프톤 (Halftone)</p>
         <button
           type="button"
           onClick={onReset}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.StudioHalftonePanel", "ko", "하프톤을 제거하고 원본으로 되돌립니다.")}
+          title="하프톤을 제거하고 원본으로 되돌립니다."
         >
           <RotateCcw className="size-3.5" />
-          {translateCurrentStaticSourceText("domains.creator.StudioHalftonePanel", "ko", "원본으로")}</button>
+          원본으로
+        </button>
       </div>
 
       {/* 원클릭 코믹 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). 항등 프리셋이 없어 항등 상태엔 활성 칩 없음. */}
@@ -80,7 +80,8 @@ export function StudioHalftonePanel({
 
       {/* 망점 모드 — CMYK 컬러 / 흑백 토글. 현재 모드 칩을 활성으로 표시. aria-pressed가 필요해 칩 버튼은 그대로 둔다. */}
       <label className={PANEL_LABEL_ROW}>
-        {translateCurrentStaticSourceText("domains.creator.StudioHalftonePanel", "ko", "모드")}<span className="flex items-center gap-1.5">
+        모드
+        <span className="flex items-center gap-1.5">
           {HALFTONE_MODE_OPTIONS.map(({ mode, label, tip }) => (
             <StudioToggleChip
               key={mode}

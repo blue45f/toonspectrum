@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   Check,
   CheckCircle2,
@@ -471,9 +467,10 @@ export function StudioCompanionAssistantDisplay({
         <div className="flex min-w-0 items-start gap-2">
           <Sparkles className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "웹툰 보조 툴킷")}</h2>
+            <h2 className="truncate text-sm font-bold">웹툰 보조 툴킷</h2>
             <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "검사 근거와 데이터 출처를 구분하고 결과에서 바로 다음 작업으로 이어집니다.")}</p>
+              검사 근거와 데이터 출처를 구분하고 결과에서 바로 다음 작업으로 이어집니다.
+            </p>
           </div>
         </div>
         <DataSourceBadge source={specSource} />
@@ -483,7 +480,7 @@ export function StudioCompanionAssistantDisplay({
         tabs={ASSISTANT_TABS}
         activeId={activeTab}
         onSelect={(id) => setActiveTab(id as AssistantDisplayTab)}
-        ariaLabel={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "웹툰 보조 툴킷 탭")}
+        ariaLabel="웹툰 보조 툴킷 탭"
         idPrefix={TAB_ID_PREFIX}
         className="rounded-xl border border-line bg-card/60 p-1"
       />
@@ -495,13 +492,13 @@ export function StudioCompanionAssistantDisplay({
         >
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-raised/45 p-2.5">
             <div>
-              <p className="font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "원고 검사 입력")}</p>
+              <p className="font-bold text-fg">원고 검사 입력</p>
               <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
                 {specSource === "example"
-                  ? translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "실제 원고가 연결되지 않아 예시값을 보여줍니다. 이 결과는 업로드 차단 판단에 쓰지 않습니다.")
+                  ? "실제 원고가 연결되지 않아 예시값을 보여줍니다. 이 결과는 업로드 차단 판단에 쓰지 않습니다."
                   : specSource === "connected"
-                    ? translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "현재 원고에서 받은 크기 정보입니다. 포맷·컷 간격이 없으면 해당 항목은 검사하지 않습니다.")
-                    : translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "직접 입력한 값입니다. 내보내기 파일과 값이 같은지 마지막으로 확인하세요.")}
+                    ? "현재 원고에서 받은 크기 정보입니다. 포맷·컷 간격이 없으면 해당 항목은 검사하지 않습니다."
+                    : "직접 입력한 값입니다. 내보내기 파일과 값이 같은지 마지막으로 확인하세요."}
               </p>
             </div>
             <DataSourceBadge source={specSource} />
@@ -509,7 +506,8 @@ export function StudioCompanionAssistantDisplay({
 
           <div className="grid grid-cols-2 gap-2">
             <label className="space-y-1 text-[0.62rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "원고 폭(px)")}<input
+              원고 폭(px)
+              <input
                 type="number"
                 min={1}
                 inputMode="numeric"
@@ -522,7 +520,8 @@ export function StudioCompanionAssistantDisplay({
               />
             </label>
             <label className="space-y-1 text-[0.62rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "원고 높이(px)")}<input
+              원고 높이(px)
+              <input
                 type="number"
                 min={1}
                 inputMode="numeric"
@@ -535,8 +534,9 @@ export function StudioCompanionAssistantDisplay({
               />
             </label>
             <label className="space-y-1 text-[0.62rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "내보내기 포맷")}<select
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "내보내기 포맷")}
+              내보내기 포맷
+              <select
+                aria-label="내보내기 포맷"
                 value={formatInput}
                 onChange={(event) => {
                   setFormatInput(event.target.value as WebtoonImageFormat | "");
@@ -544,7 +544,7 @@ export function StudioCompanionAssistantDisplay({
                 }}
                 className={FIELD_CLASS}
               >
-                <option value="">{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "미지정 · 검사 안 함")}</option>
+                <option value="">미지정 · 검사 안 함</option>
                 <option value="jpg">JPG</option>
                 <option value="png">PNG</option>
                 <option value="webp">WebP</option>
@@ -552,11 +552,12 @@ export function StudioCompanionAssistantDisplay({
               </select>
             </label>
             <label className="space-y-1 text-[0.62rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "컷 사이 여백(px, 쉼표 구분)")}<input
+              컷 사이 여백(px, 쉼표 구분)
+              <input
                 type="text"
                 inputMode="numeric"
                 value={gutterInput}
-                placeholder={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "예: 220, 640, 300")}
+                placeholder="예: 220, 640, 300"
                 onChange={(event) => {
                   setGutterInput(event.target.value);
                   markSpecManual();
@@ -568,7 +569,8 @@ export function StudioCompanionAssistantDisplay({
 
           <div className="flex flex-wrap gap-1.5 text-[0.6rem] font-semibold">
             <span className="rounded-full border border-line bg-card px-2 py-1 text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "크기 검사 중")}</span>
+              크기 검사 중
+            </span>
             <span
               className={cn(
                 "rounded-full border px-2 py-1",
@@ -577,7 +579,7 @@ export function StudioCompanionAssistantDisplay({
                   : "border-line bg-card text-fg-3",
               )}
             >
-              {formatInput ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "{v0} 검사 중"), { v0: String(formatInput.toUpperCase()) }) : translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "포맷 미검사")}
+              {formatInput ? `${formatInput.toUpperCase()} 검사 중` : "포맷 미검사"}
             </span>
             <span
               className={cn(
@@ -587,7 +589,7 @@ export function StudioCompanionAssistantDisplay({
                   : "border-line bg-card text-fg-3",
               )}
             >
-              {gutterInput.trim() ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "{v0}개 여백 검사 중"), { v0: String(parsedGutters.length) }) : translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "컷 간 여백 미검사")}
+              {gutterInput.trim() ? `${parsedGutters.length}개 여백 검사 중` : "컷 간 여백 미검사"}
             </span>
             <button
               type="button"
@@ -599,7 +601,8 @@ export function StudioCompanionAssistantDisplay({
                 STUDIO_TOUCH_TARGET,
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "입력 초기화")}</button>
+              입력 초기화
+            </button>
           </div>
 
           <div className="grid grid-cols-2 gap-1.5">
@@ -624,7 +627,8 @@ export function StudioCompanionAssistantDisplay({
                 >
                   <span className="truncate text-[0.68rem] font-bold">{platform.name}</span>
                   <span className="truncate text-[0.6rem] text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "폭 ")}{platform.recommendedWidthPx}{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "px 권장")}</span>
+                    폭 {platform.recommendedWidthPx}px 권장
+                  </span>
                 </button>
               );
             })}
@@ -649,11 +653,12 @@ export function StudioCompanionAssistantDisplay({
             )}
             <div className="min-w-0 flex-1">
               <p className="text-[0.72rem] font-bold">
-                {specSource === "example" ? translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "예시 판정 · ") : ""}
+                {specSource === "example" ? "예시 판정 · " : ""}
                 {auditResult.summary}
               </p>
               <p className="mt-0.5 text-[0.62rem] leading-relaxed opacity-90">
-                {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "권장 슬라이스 ")}{auditResult.recommendedSliceCount}{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "장 · 판정 근거는 이슈별 출처 태그를 따릅니다.")}</p>
+                권장 슬라이스 {auditResult.recommendedSliceCount}장 · 판정 근거는 이슈별 출처 태그를 따릅니다.
+              </p>
               {auditResult.issues.slice(0, 4).map((issue, index) => (
                 <p key={`${issue.field}-${index}`} className="mt-1 text-[0.62rem] leading-relaxed">
                   • {issue.message}
@@ -661,7 +666,8 @@ export function StudioCompanionAssistantDisplay({
               ))}
               {auditResult.issues.length > 4 ? (
                 <p className="mt-1 text-[0.62rem] font-semibold">
-                  {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "외 ")}{auditResult.issues.length - 4}{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "건 · 통합 보조 센터에서 전체 근거 확인")}</p>
+                  외 {auditResult.issues.length - 4}건 · 통합 보조 센터에서 전체 근거 확인
+                </p>
               ) : null}
             </div>
           </div>
@@ -675,11 +681,11 @@ export function StudioCompanionAssistantDisplay({
         >
           <div className="flex flex-wrap items-start justify-between gap-2 rounded-xl border border-line bg-raised/45 p-2.5">
             <div>
-              <p className="font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "모바일 호흡 간이 시뮬레이션")}</p>
+              <p className="font-bold text-fg">모바일 호흡 간이 시뮬레이션</p>
               <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
                 {pacingSource === "connected"
-                  ? translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "현재 원고의 패널 위치를 분석합니다.")
-                  : translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "입력한 컷 사이 여백과 컷 높이 600px 가정으로 비교합니다. 완독 시간은 추정치입니다.")}
+                  ? "현재 원고의 패널 위치를 분석합니다."
+                  : "입력한 컷 사이 여백과 컷 높이 600px 가정으로 비교합니다. 완독 시간은 추정치입니다."}
               </p>
             </div>
             <DataSourceBadge source={pacingSource} />
@@ -687,7 +693,8 @@ export function StudioCompanionAssistantDisplay({
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label className="space-y-1 text-[0.62rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "컷 사이 여백(px, 쉼표 구분)")}<input
+              컷 사이 여백(px, 쉼표 구분)
+              <input
                 type="text"
                 inputMode="numeric"
                 value={pacingGutterInput}
@@ -700,12 +707,13 @@ export function StudioCompanionAssistantDisplay({
               />
             </label>
             <label className="space-y-1 text-[0.62rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "독자 화면 높이(px)")}<input
+              독자 화면 높이(px)
+              <input
                 type="number"
                 min={1}
                 inputMode="numeric"
                 value={viewportInput}
-                placeholder={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "예: 844")}
+                placeholder="예: 844"
                 onChange={(event) => setViewportInput(event.target.value)}
                 className={FIELD_CLASS}
               />
@@ -714,11 +722,12 @@ export function StudioCompanionAssistantDisplay({
 
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.6rem] font-semibold text-fg-2">
-              {effectivePanels.length}{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "컷 분석")}</span>
+              {effectivePanels.length}컷 분석
+            </span>
             <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.6rem] font-semibold text-fg-2">
               {effectiveViewport > 0
-                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "화면당 최대 {v0}컷"), { v0: String(pacingResult.maxPanelsPerScreen ?? 0) })
-                : translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "화면당 컷수 미검사")}
+                ? `화면당 최대 ${pacingResult.maxPanelsPerScreen ?? 0}컷`
+                : "화면당 컷수 미검사"}
             </span>
             {pacingSource !== "connected" && panels && panels.length > 0 ? (
               <button
@@ -731,7 +740,8 @@ export function StudioCompanionAssistantDisplay({
                   STUDIO_TOUCH_TARGET,
                 )}
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "현재 패널로 복원")}</button>
+                현재 패널로 복원
+              </button>
             ) : null}
             {pacingSource !== "example" ? (
               <button
@@ -747,32 +757,35 @@ export function StudioCompanionAssistantDisplay({
                   STUDIO_TOUCH_TARGET,
                 )}
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "예시로 보기")}</button>
+                예시로 보기
+              </button>
             ) : null}
           </div>
 
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="min-w-0 rounded-lg border border-line bg-card/60 p-2">
-              <span className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "페이싱 점수")}</span>
+              <span className="text-[0.6rem] text-fg-3">페이싱 점수</span>
               <p className="font-mono text-lg font-black text-accent">
-                {pacingResult.pacingHealthScore}{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "점")}</p>
+                {pacingResult.pacingHealthScore}점
+              </p>
             </div>
             <div className="min-w-0 rounded-lg border border-line bg-card/60 p-2">
-              <span className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "평균 간격")}</span>
+              <span className="text-[0.6rem] text-fg-3">평균 간격</span>
               <p className="font-mono text-lg font-black text-fg">
                 {pacingResult.averageGutterPx}px
               </p>
             </div>
             <div className="min-w-0 rounded-lg border border-line bg-card/60 p-2">
-              <span className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "예상 완독")}</span>
+              <span className="text-[0.6rem] text-fg-3">예상 완독</span>
               <p className="font-mono text-lg font-black text-fg">
-                {pacingResult.estimatedReadingSeconds.casual}{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "초")}</p>
+                {pacingResult.estimatedReadingSeconds.casual}초
+              </p>
             </div>
           </div>
 
           {pacingResult.warnings.length > 0 ? (
             <div className="rounded-xl border border-warn/35 bg-warn/10 p-2.5 text-warn">
-              <p className="font-bold">{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "먼저 확인할 호흡 ")}{pacingResult.warnings.length}{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "건")}</p>
+              <p className="font-bold">먼저 확인할 호흡 {pacingResult.warnings.length}건</p>
               {pacingResult.warnings.slice(0, 3).map((warning) => (
                 <p key={warning} className="mt-1 text-[0.62rem] leading-relaxed">
                   • {warning}
@@ -781,7 +794,7 @@ export function StudioCompanionAssistantDisplay({
             </div>
           ) : (
             <div className="rounded-xl border border-good/35 bg-good/10 p-2.5 text-good">
-              <p className="font-bold">{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "현재 입력에서는 긴 공백·과밀 경고가 없습니다.")}</p>
+              <p className="font-bold">현재 입력에서는 긴 공백·과밀 경고가 없습니다.</p>
             </div>
           )}
 
@@ -796,7 +809,7 @@ export function StudioCompanionAssistantDisplay({
                   <div className="min-w-0">
                     <p className="truncate text-[0.65rem] font-bold text-fg">{beat.label}</p>
                     <p className="text-[0.6rem] text-fg-3">
-                      {beat.fromPanelIndex}→{beat.toPanelIndex}{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "컷 · ")}{beat.gutterDistancePx}px
+                      {beat.fromPanelIndex}→{beat.toPanelIndex}컷 · {beat.gutterDistancePx}px
                     </p>
                   </div>
                   <span
@@ -808,7 +821,7 @@ export function StudioCompanionAssistantDisplay({
                     )}
                     title={source.basis}
                   >
-                    {source.sourced ? translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "공식 근거") : translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "휴리스틱")}
+                    {source.sourced ? "공식 근거" : "휴리스틱"}
                   </span>
                 </div>
               );
@@ -853,8 +866,8 @@ export function StudioCompanionAssistantDisplay({
               type="search"
               value={sfxQuery}
               onChange={(event) => setSfxQuery(event.target.value)}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "의성어·의태어 검색")}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "의성어·의태어 빠른 검색…")}
+              aria-label="의성어·의태어 검색"
+              placeholder="의성어·의태어 빠른 검색…"
               className={cn(FIELD_CLASS, "pl-7")}
             />
           </div>
@@ -862,8 +875,8 @@ export function StudioCompanionAssistantDisplay({
           {filteredSfx.length === 0 ? (
             <StudioEmptyState
               icon={<Search className="size-5" aria-hidden />}
-              title={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "검색 결과가 없습니다")}
-              description={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "다른 낱말이나 태그로 찾아보세요. 예: 쿵, 심장, 번개, 문, 폭발.")}
+              title="검색 결과가 없습니다"
+              description="다른 낱말이나 태그로 찾아보세요. 예: 쿵, 심장, 번개, 문, 폭발."
               action={
                 sfxIsFiltered ? (
                   <button
@@ -879,14 +892,16 @@ export function StudioCompanionAssistantDisplay({
                       STUDIO_TOUCH_TARGET,
                     )}
                   >
-                    {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "검색 초기화")}</button>
+                    검색 초기화
+                  </button>
                 ) : undefined
               }
             />
           ) : (
             <>
               <p className="text-[0.6rem] text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "총 ")}{filteredSfx.length}{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "개 중 ")}{visibleSfx.length}{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "개 표시")}</p>
+                총 {filteredSfx.length}개 중 {visibleSfx.length}개 표시
+              </p>
               <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                 {visibleSfx.map((item) => {
                   const copyStatus = sfxCopy.statusFor(item.id);
@@ -908,8 +923,8 @@ export function StudioCompanionAssistantDisplay({
                         {onInsertSfxText ? (
                           <button
                             type="button"
-                            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "{v0} 캔버스에 삽입"), { v0: String(item.text) })}
-                            title={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "캔버스에 삽입")}
+                            aria-label={`${item.text} 캔버스에 삽입`}
+                            title="캔버스에 삽입"
                             onClick={() => insertSfx(item.text)}
                             className={cn(
                               "grid min-w-11 place-items-center rounded-md border border-accent/35 bg-accent-soft px-2 text-accent hover:bg-accent/15",
@@ -925,12 +940,12 @@ export function StudioCompanionAssistantDisplay({
                           type="button"
                           aria-label={
                             copyStatus === "copied"
-                              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "{v0} 복사됨"), { v0: String(item.text) })
+                              ? `${item.text} 복사됨`
                               : copyStatus === "failed"
-                                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "{v0} 복사 실패"), { v0: String(item.text) })
-                                : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "{v0} 복사"), { v0: String(item.text) })
+                                ? `${item.text} 복사 실패`
+                                : `${item.text} 복사`
                           }
-                          title={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "텍스트 복사")}
+                          title="텍스트 복사"
                           onClick={() => {
                             setInsertFeedback("");
                             void sfxCopy.copy(item.id, item.text);
@@ -967,7 +982,7 @@ export function StudioCompanionAssistantDisplay({
                   )}
                 >
                   <ChevronDown className="size-3" aria-hidden />
-                  {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "더 보기 (+")}{hiddenSfxCount})
+                  더 보기 (+{hiddenSfxCount})
                 </button>
               ) : null}
             </>
@@ -994,9 +1009,10 @@ export function StudioCompanionAssistantDisplay({
           className={cn("flex flex-col gap-3 outline-none", STUDIO_FOCUS_RING)}
         >
           <div>
-            <p className="font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "피부톤 프리셋")}</p>
+            <p className="font-bold text-fg">피부톤 프리셋</p>
             <p className="mt-0.5 text-[0.62rem] text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "프리셋 선택 후 밑색을 미세 조정하면 하이라이트와 2단계 음영을 다시 계산합니다.")}</p>
+              프리셋 선택 후 밑색을 미세 조정하면 하이라이트와 2단계 음영을 다시 계산합니다.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
             {SKIN_TONE_IDS.map((skinToneId) => {
@@ -1022,19 +1038,19 @@ export function StudioCompanionAssistantDisplay({
                   <span className="truncate text-[0.65rem] font-bold">{palette.name}</span>
                   <span
                     role="img"
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "{v0} 밑색·1차 음영·2차 음영"), { v0: String(palette.name) })}
+                    aria-label={`${palette.name} 밑색·1차 음영·2차 음영`}
                     className="mt-1 flex h-3 w-full overflow-hidden rounded border border-line"
                   >
-                    <span className="flex-1" style={{ backgroundColor: palette.base }} title={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "밑색")} />
+                    <span className="flex-1" style={{ backgroundColor: palette.base }} title="밑색" />
                     <span
                       className="flex-1"
                       style={{ backgroundColor: palette.shadow1 }}
-                      title={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "1차 음영")}
+                      title="1차 음영"
                     />
                     <span
                       className="flex-1"
                       style={{ backgroundColor: palette.shadow2 }}
-                      title={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "2차 음영")}
+                      title="2차 음영"
                     />
                   </span>
                 </button>
@@ -1044,12 +1060,13 @@ export function StudioCompanionAssistantDisplay({
 
           <div className="rounded-xl border border-line bg-raised/45 p-2.5">
             <label className="text-[0.62rem] font-semibold text-fg-2" htmlFor="companion-custom-base">
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "밑색 HEX")}</label>
+              밑색 HEX
+            </label>
             <div className="mt-1 grid grid-cols-[44px_1fr] gap-2">
               <input
                 id="companion-custom-base-picker"
                 type="color"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "밑색 선택")}
+                aria-label="밑색 선택"
                 value={customColorValid ? customBase : selectedPalette.base}
                 onChange={(event) => setCustomBase(event.target.value)}
                 className={cn(
@@ -1068,12 +1085,13 @@ export function StudioCompanionAssistantDisplay({
             </div>
             {!customColorValid ? (
               <p role="alert" className="mt-1 text-[0.6rem] font-semibold text-bad">
-                {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "#RRGGBB 형식의 6자리 HEX를 입력하세요.")}</p>
+                #RRGGBB 형식의 6자리 HEX를 입력하세요.
+              </p>
             ) : null}
 
             <div
               role="img"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "계산된 하이라이트·밑색·1차 음영·2차 음영")}
+              aria-label="계산된 하이라이트·밑색·1차 음영·2차 음영"
               className="mt-2 grid grid-cols-4 overflow-hidden rounded-lg border border-line"
             >
               {[
@@ -1085,8 +1103,8 @@ export function StudioCompanionAssistantDisplay({
                 <button
                   key={label}
                   type="button"
-                  title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "{v0} {v1} 복사"), { v0: String(label), v1: String(color) })}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "{v0} {v1} 복사"), { v0: String(label), v1: String(color) })}
+                  title={`${label} ${color} 복사`}
+                  aria-label={`${label} ${color} 복사`}
                   onClick={() => void colorCopy.copy(`color-${label}`, color)}
                   className={cn(
                     "flex min-w-0 flex-col justify-end border-r border-line/70 p-1 text-left last:border-r-0",
@@ -1105,14 +1123,14 @@ export function StudioCompanionAssistantDisplay({
             <p role="status" aria-live="polite" className="mt-1 min-h-3 text-[0.6rem] font-semibold text-good">
               {colorCopy.current
                 ? colorCopy.current.status === "copied"
-                  ? translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "색상 코드를 복사했습니다")
-                  : translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "색상 코드 복사에 실패했습니다")
+                  ? "색상 코드를 복사했습니다"
+                  : "색상 코드 복사에 실패했습니다"
                 : ""}
             </p>
           </div>
 
           <div>
-            <p className="font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "장면 조명 무드")}</p>
+            <p className="font-bold text-fg">장면 조명 무드</p>
             <div className="mt-1.5 grid grid-cols-2 gap-1.5">
               {SCENE_MOOD_PALETTES.map((mood) => (
                 <button
@@ -1156,8 +1174,9 @@ export function StudioCompanionAssistantDisplay({
         >
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label className="space-y-1 text-[0.62rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "제작 공정")}<select
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "제작 공정")}
+              제작 공정
+              <select
+                aria-label="제작 공정"
                 value={timerState.activeStage}
                 onChange={(event) => {
                   timerEngine.setStage(event.target.value as WebtoonProductionStage);
@@ -1173,8 +1192,9 @@ export function StudioCompanionAssistantDisplay({
               </select>
             </label>
             <label className="space-y-1 text-[0.62rem] font-semibold text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "집중 모드")}<select
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "집중 모드")}
+              집중 모드
+              <select
+                aria-label="집중 모드"
                 value={timerState.pomodoroMode}
                 onChange={(event) => {
                   timerEngine.setPomodoroMode(event.target.value as PomodoroMode);
@@ -1193,14 +1213,14 @@ export function StudioCompanionAssistantDisplay({
 
           <div className="flex flex-col items-center justify-center rounded-xl border border-line bg-card/60 p-4 text-center">
             <span className="rounded-full border border-accent/30 bg-accent-soft px-2 py-1 text-[0.62rem] font-bold text-accent">
-              {timerState.isResting ? translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "휴식") : translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "집중")} · {POMODORO_LABELS[timerState.pomodoroMode]}
+              {timerState.isResting ? "휴식" : "집중"} · {POMODORO_LABELS[timerState.pomodoroMode]}
             </span>
             <div className="my-2 font-mono text-4xl font-black tabular-nums text-fg">
               {formatClock(timerState.currentSecondsRemaining)}
             </div>
             <div
               role="progressbar"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "현재 세션 진행률")}
+              aria-label="현재 세션 진행률"
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={Math.round(timerProgress)}
@@ -1212,9 +1232,9 @@ export function StudioCompanionAssistantDisplay({
               />
             </div>
             <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-[0.6rem] text-fg-3">
-              <span>{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "완료 ")}{timerState.completedPomodoros}{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "회")}</span>
+              <span>완료 {timerState.completedPomodoros}회</span>
               <span aria-hidden>·</span>
-              <span>{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "누적 ")}{timerEngine.getTotalWorkHours()}{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "시간")}</span>
+              <span>누적 {timerEngine.getTotalWorkHours()}시간</span>
             </div>
             <div className="mt-3 flex w-full gap-2">
               <button
@@ -1236,7 +1256,7 @@ export function StudioCompanionAssistantDisplay({
                 ) : (
                   <Play className="size-3.5" aria-hidden />
                 )}
-                {timerState.isRunning ? translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "일시정지") : translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "시작")}
+                {timerState.isRunning ? "일시정지" : "시작"}
               </button>
               <button
                 type="button"
@@ -1248,7 +1268,8 @@ export function StudioCompanionAssistantDisplay({
                   STUDIO_TOUCH_TARGET,
                 )}
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "세션 초기화")}</button>
+                세션 초기화
+              </button>
             </div>
           </div>
         </div>
@@ -1263,7 +1284,7 @@ export function StudioCompanionAssistantDisplay({
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-[0.72rem] font-bold text-accent">
-                  {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "추천 포즈 · ")}{currentPosePrompt.title}
+                  추천 포즈 · {currentPosePrompt.title}
                 </p>
                 <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-2">
                   {currentPosePrompt.description}
@@ -1274,7 +1295,7 @@ export function StudioCompanionAssistantDisplay({
               </span>
             </div>
             <p className="mt-2 rounded-lg border border-line/70 bg-card/70 p-2 text-[0.6rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "해부 포인트 · ")}{currentPosePrompt.keyAnatomyFocus}
+              해부 포인트 · {currentPosePrompt.keyAnatomyFocus}
             </p>
           </div>
 
@@ -1295,7 +1316,8 @@ export function StudioCompanionAssistantDisplay({
                     : "border-line bg-card text-fg-2 hover:bg-raised",
                 )}
               >
-                {interval}{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "초")}</button>
+                {interval}초
+              </button>
             ))}
           </div>
 
@@ -1321,7 +1343,7 @@ export function StudioCompanionAssistantDisplay({
               ) : (
                 <Play className="size-3.5" aria-hidden />
               )}
-              {croquisRunning ? translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "일시정지") : translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "시작")}
+              {croquisRunning ? "일시정지" : "시작"}
             </button>
             <button
               type="button"
@@ -1336,12 +1358,14 @@ export function StudioCompanionAssistantDisplay({
                 STUDIO_TOUCH_TARGET,
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "리셋")}</button>
+              리셋
+            </button>
           </div>
 
           <label className="space-y-1 text-[0.62rem] font-semibold text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "투시 프리셋")}<select
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "투시 프리셋")}
+            투시 프리셋
+            <select
+              aria-label="투시 프리셋"
               value={perspectivePreset}
               onChange={(event) =>
                 setPerspectivePreset(event.target.value as PerspectiveGuidePreset)
@@ -1366,7 +1390,8 @@ export function StudioCompanionAssistantDisplay({
                 }}
               />
               <div className="absolute inset-0 grid place-items-center text-[0.55rem] font-bold text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "소실점 ")}{perspective.vanishingPointCount}{translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "개")}</div>
+                소실점 {perspective.vanishingPointCount}개
+              </div>
             </div>
             <div className="min-w-0">
               <p className="text-[0.65rem] font-bold text-fg">{perspective.label}</p>
@@ -1384,7 +1409,8 @@ export function StudioCompanionAssistantDisplay({
               STUDIO_TOUCH_TARGET,
             )}
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioCompanionAssistantDisplay", "ko", "다음 포즈 · 추천 시간 적용")}</button>
+            다음 포즈 · 추천 시간 적용
+          </button>
         </div>
       ) : null}
     </section>

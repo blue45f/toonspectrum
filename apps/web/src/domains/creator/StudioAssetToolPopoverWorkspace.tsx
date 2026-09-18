@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense } from "react";
 
 import { StudioAssetToolPopoverBody } from "./StudioAssetToolPopoverBody";
@@ -19,7 +18,7 @@ export function StudioAssetToolPopoverWorkspace({
   }
 
   return (
-    <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioAssetToolPopoverWorkspace", "ko", "통합 에셋을 여는 중...")} />}>
+    <Suspense fallback={<StudioPanelLoading label="통합 에셋을 여는 중..." />}>
       <LazyStudioUnifiedAssetToolPopoverContent toolBelt={toolBelt} />
     </Suspense>
   );

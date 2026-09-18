@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Selection context strip. The same bottom lane is shared with drawing controls so selection
  * replaces the current tool context instead of creating another persistent row.
@@ -143,7 +139,7 @@ export function StudioSelectOptionsBar({
   return (
     <div
       role="toolbar"
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "선택 옵션")}
+      aria-label="선택 옵션"
       data-studio-select-options="true"
       data-studio-context-kind="selection"
       data-studio-context-bar="true"
@@ -159,7 +155,7 @@ export function StudioSelectOptionsBar({
     >
       <span
         data-studio-selection-badge="true"
-        title={selectionCount > 1 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "{v0}개 선택"), { v0: String(selectionCount) }) : badgeText}
+        title={selectionCount > 1 ? `${selectionCount}개 선택` : badgeText}
         className={cn(
           "mr-0.5 inline-flex max-w-[11rem] items-center gap-1.5 truncate rounded-lg border border-accent/30",
           "bg-accent-soft/50 px-2 py-1 text-[0.68rem] font-bold tracking-tight text-fg"
@@ -175,7 +171,7 @@ export function StudioSelectOptionsBar({
         {selectionCount === 1 ? (
           <span className="min-w-0 truncate">{badgeText}</span>
         ) : (
-          <span className="sr-only">{selectionCount}{translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "개 선택")}</span>
+          <span className="sr-only">{selectionCount}개 선택</span>
         )}
       </span>
 
@@ -184,9 +180,9 @@ export function StudioSelectOptionsBar({
           id="edit-text"
           icon={MessageSquareText}
           label={textEditLabel}
-          description={translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "선택한 레터링을 캔버스 위에서 바로 수정합니다.")}
+          description="선택한 레터링을 캔버스 위에서 바로 수정합니다."
           preview="text"
-          tip={translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "T를 눌러도 선택한 말풍선이나 글자를 즉시 편집할 수 있어요.")}
+          tip="T를 눌러도 선택한 말풍선이나 글자를 즉시 편집할 수 있어요."
           showLabel
           onClick={onEditText}
         />
@@ -195,18 +191,18 @@ export function StudioSelectOptionsBar({
       <Action
         id="duplicate"
         icon={Copy}
-        label={translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "복제")}
-        description={translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "선택한 요소를 같은 위치에 복제합니다.")}
+        label="복제"
+        description="선택한 요소를 같은 위치에 복제합니다."
         preview="layer-duplicate"
         onClick={onDuplicate}
       />
 
       {onToggleLock ? (
         <Action
-          id={locked ? translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "en", "unlock") : translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "en", "lock")}
+          id={locked ? "unlock" : "lock"}
           icon={locked ? LockOpen : Lock}
-          label={locked ? translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "잠금 해제") : translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "잠금")}
-          description={locked ? translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "선택 요소의 잠금을 풉니다.") : translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "선택 요소를 고정해 실수 편집을 막습니다.")}
+          label={locked ? "잠금 해제" : "잠금"}
+          description={locked ? "선택 요소의 잠금을 풉니다." : "선택 요소를 고정해 실수 편집을 막습니다."}
           preview="layer-lock"
           onClick={onToggleLock}
         />
@@ -215,8 +211,8 @@ export function StudioSelectOptionsBar({
       <Action
         id="delete"
         icon={Trash2}
-        label={translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "삭제")}
-        description={translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "현재 선택한 요소를 제거합니다. 실행취소로 되돌릴 수 있어요.")}
+        label="삭제"
+        description="현재 선택한 요소를 제거합니다. 실행취소로 되돌릴 수 있어요."
         preview="layer-delete"
         danger
         onClick={onDelete}
@@ -224,7 +220,7 @@ export function StudioSelectOptionsBar({
 
       <details className="group relative shrink-0" data-studio-selection-overflow="true">
         <summary
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "선택 더보기")}
+          aria-label="선택 더보기"
           className={cn(
             "grid size-9 cursor-pointer list-none place-items-center rounded-lg border border-line bg-card text-fg-3 marker:hidden hover:bg-raised hover:text-fg",
             STUDIO_EASE,
@@ -243,8 +239,8 @@ export function StudioSelectOptionsBar({
           <Action
             id="bring-front"
             icon={ArrowUpToLine}
-            label={translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "맨 앞")}
-            description={translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "선택한 요소를 현재 페이지의 가장 앞쪽으로 올립니다.")}
+            label="맨 앞"
+            description="선택한 요소를 현재 페이지의 가장 앞쪽으로 올립니다."
             preview="layer-reorder-front"
             showLabel
             onClick={onBringFront}
@@ -252,8 +248,8 @@ export function StudioSelectOptionsBar({
           <Action
             id="send-back"
             icon={ArrowDownToLine}
-            label={translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "맨 뒤")}
-            description={translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "선택한 요소를 현재 페이지의 가장 뒤쪽으로 보냅니다.")}
+            label="맨 뒤"
+            description="선택한 요소를 현재 페이지의 가장 뒤쪽으로 보냅니다."
             preview="layer-reorder-back"
             showLabel
             onClick={onSendBack}
@@ -262,8 +258,8 @@ export function StudioSelectOptionsBar({
             <Action
               id="fit-bubble"
               icon={ScanText}
-              label={translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "텍스트 맞춤")}
-              description={translateCurrentStaticSourceText("domains.creator.StudioSelectOptionsBar", "ko", "대사 길이에 맞춰 말풍선 높이를 자동으로 조절합니다.")}
+              label="텍스트 맞춤"
+              description="대사 길이에 맞춰 말풍선 높이를 자동으로 조절합니다."
               preview="bubble"
               previewVariant="fit-text"
               showLabel

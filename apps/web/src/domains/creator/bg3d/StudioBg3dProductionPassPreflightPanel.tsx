@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { CheckCircle2, TriangleAlert, WandSparkles } from "lucide-react";
 import { useId, useMemo } from "react";
 
@@ -49,13 +45,16 @@ export function StudioBg3dProductionPassPreflightPanel() {
             id={titleId}
             className="text-[0.66rem] font-bold text-warn"
           >
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionPassPreflightPanel", "ko", "출력 전 LT 패스 확인")}</h3>
+            출력 전 LT 패스 확인
+          </h3>
           <p className="mt-1 text-[0.56rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionPassPreflightPanel", "ko", "선택한 패스 중 현재 SceneDocument의 선·톤 설정으로 생성되지 않는 항목이 있습니다. 누락된 파일을 정상 출력으로 오인하지 않도록 배치를 잠갔습니다.")}</p>
+            선택한 패스 중 현재 SceneDocument의 선·톤 설정으로 생성되지 않는 항목이 있습니다.
+            누락된 파일을 정상 출력으로 오인하지 않도록 배치를 잠갔습니다.
+          </p>
         </div>
       </div>
 
-      <ul className="mt-2 grid gap-1.5" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionPassPreflightPanel", "ko", "생성되지 않는 선택 패스")}>
+      <ul className="mt-2 grid gap-1.5" aria-label="생성되지 않는 선택 패스">
         {readiness.issues.map((issue) => (
           <li
             key={issue.pass}
@@ -69,7 +68,8 @@ export function StudioBg3dProductionPassPreflightPanel() {
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <p className="min-w-0 flex-1 text-[0.52rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionPassPreflightPanel", "ko", "선·톤을 유지하려면 LT 설정을 조정하고, 현재 룩 그대로 출력하려면 유효 패스만 유지하세요.")}</p>
+          선·톤을 유지하려면 LT 설정을 조정하고, 현재 룩 그대로 출력하려면 유효 패스만 유지하세요.
+        </p>
         <button
           type="button"
           disabled={
@@ -86,8 +86,8 @@ export function StudioBg3dProductionPassPreflightPanel() {
             <WandSparkles className="size-3.5" aria-hidden />
           )}
           {readiness.readyPasses.length > 0
-            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionPassPreflightPanel", "ko", "유효 {v0}개 패스만 유지"), { v0: String(readiness.readyPasses.length) })
-            : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionPassPreflightPanel", "ko", "안전 패스로 전환")}
+            ? `유효 ${readiness.readyPasses.length}개 패스만 유지`
+            : "안전 패스로 전환"}
         </button>
       </div>
     </section>

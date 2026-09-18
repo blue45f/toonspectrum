@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useId, useState } from "react";
 import {
   decodeStudioBrowserWorkspace, encodeStudioBrowserWorkspace,
@@ -39,37 +35,46 @@ export function StudioBrowserWorkspaceTransfer({ profile, onImport, editorHref, 
   return (
     <details className="rounded-xl border border-line bg-card/60 p-3">
       <summary className="min-h-11 cursor-pointer content-center text-xs font-semibold text-fg-2 outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
-        {translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "ko", "다른 브라우저로 작업공간 옮기기")}</summary>
+        다른 브라우저로 작업공간 옮기기
+      </summary>
       <div className="space-y-3 pt-2">
         <p className="text-xs leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "ko", "같은 브라우저·프로필의 동일 사이트 탭과 창만 실시간 연결됩니다. Chrome ↔ Safari, 다른 프로필·시크릿 창은 연결되지 않습니다. 배치 설정에는 고정 화면과 열기 방식만 포함되며 원고·로그인·세션 정보는 포함되지 않습니다.")}</p>
+          같은 브라우저·프로필의 동일 사이트 탭과 창만 실시간 연결됩니다.
+          Chrome ↔ Safari, 다른 프로필·시크릿 창은 연결되지 않습니다.
+          배치 설정에는 고정 화면과 열기 방식만 포함되며 원고·로그인·세션 정보는 포함되지 않습니다.
+        </p>
         <div className="flex flex-wrap gap-2">
           <button type="button" className={CONTROL} disabled={disabled} onClick={() => {
             const encoded = encodeStudioBrowserWorkspace(profile);
             setText(encoded);
             void copy(encoded);
-          }}>{translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "ko", "배치 설정 복사")}</button>
-          <button type="button" className={CONTROL} disabled={disabled || !text.trim()} onClick={importProfile}>{translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "ko", "배치 설정 가져오기")}</button>
+          }}>배치 설정 복사</button>
+          <button type="button" className={CONTROL} disabled={disabled || !text.trim()} onClick={importProfile}>배치 설정 가져오기</button>
         </div>
-        <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "en", "{v0}-profile"), { v0: String(id) })} className="block text-xs font-medium text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "ko", "배치 설정 JSON")}</label>
-        <textarea id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "en", "{v0}-profile"), { v0: String(id) })} value={text} onChange={(event) => setText(event.target.value)}
+        <label htmlFor={`${id}-profile`} className="block text-xs font-medium text-fg-2">배치 설정 JSON</label>
+        <textarea id={`${id}-profile`} value={text} onChange={(event) => setText(event.target.value)}
           maxLength={STUDIO_BROWSER_WORKSPACE_MAX_BYTES} rows={5} spellCheck={false}
           className="w-full resize-y rounded-lg border border-line bg-canvas p-2 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-          placeholder={translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "ko", "다른 브라우저에서 복사한 배치 설정을 붙여넣으세요.")} />
+          placeholder="다른 브라우저에서 복사한 배치 설정을 붙여넣으세요." />
         {editorHref ? (
           <div className="space-y-2 border-t border-line pt-3">
             <p className="text-xs leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "ko", "서버 저장을 완료한 뒤 다른 브라우저에서 같은 계정으로 로그인하세요. 이 주소는 작품을 다시 여는 링크이며 저장 전 변경사항과 로컬 원고는 전송하지 않습니다. 두 브라우저에서 동시에 편집하지 말고 저장 후 작업을 넘겨 주세요.")}</p>
-            <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "en", "{v0}-editor"), { v0: String(id) })} className="block text-xs font-medium text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "ko", "저장된 작품 주소")}</label>
-            <input id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "en", "{v0}-editor"), { v0: String(id) })} readOnly value={editorHref} onFocus={(event) => event.currentTarget.select()}
+              서버 저장을 완료한 뒤 다른 브라우저에서 같은 계정으로 로그인하세요.
+              이 주소는 작품을 다시 여는 링크이며 저장 전 변경사항과 로컬 원고는 전송하지 않습니다.
+              두 브라우저에서 동시에 편집하지 말고 저장 후 작업을 넘겨 주세요.
+            </p>
+            <label htmlFor={`${id}-editor`} className="block text-xs font-medium text-fg-2">저장된 작품 주소</label>
+            <input id={`${id}-editor`} readOnly value={editorHref} onFocus={(event) => event.currentTarget.select()}
               className="min-h-11 w-full rounded-lg border border-line bg-canvas px-2 text-xs" />
-            <button type="button" className={CONTROL} disabled={disabled} onClick={() => void copy(editorHref)}>{translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "ko", "작품 주소 복사")}</button>
+            <button type="button" className={CONTROL} disabled={disabled} onClick={() => void copy(editorHref)}>작품 주소 복사</button>
           </div>
         ) : (
           <p className="text-xs leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "ko", "로컬·새 원고는 주소만으로 다른 브라우저에 옮길 수 없습니다. 기본 편집기에서 프로젝트 파일로 내보낸 뒤 다른 브라우저에서 가져와 주세요.")}</p>
+            로컬·새 원고는 주소만으로 다른 브라우저에 옮길 수 없습니다.
+            기본 편집기에서 프로젝트 파일로 내보낸 뒤 다른 브라우저에서 가져와 주세요.
+          </p>
         )}
-        {notice ? <p role={notice.error ? translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioBrowserWorkspaceTransfer", "en", "status")} className="text-xs leading-relaxed text-fg-2">{notice.text}</p> : null}
+        {notice ? <p role={notice.error ? "alert" : "status"} className="text-xs leading-relaxed text-fg-2">{notice.text}</p> : null}
       </div>
     </details>
   );

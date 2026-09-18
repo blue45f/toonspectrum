@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useId, useState } from "react";
 
 const SpatialStoryboardPanel = lazy(() => import("./StudioBg3dSpatialStoryboardPanel"));
@@ -18,11 +15,11 @@ export function StudioBg3dSpatialStoryboardLauncher({ hidden = false }: { readon
         className="min-h-11 w-full rounded-lg border border-line bg-card px-3 text-left text-xs font-bold text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         onClick={() => setExpanded((value) => !value)}
       >
-        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardLauncher", "ko", "공간 콘티 · XR 배치 계획 ")}{expanded ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardLauncher", "ko", "접기") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardLauncher", "ko", "열기")}
+        공간 콘티 · XR 배치 계획 {expanded ? "접기" : "열기"}
       </button>
       <div id={contentId} hidden={!expanded}>
         {expanded && !hidden ? (
-          <Suspense fallback={<p role="status" className="py-3 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialStoryboardLauncher", "ko", "공간 콘티 도구를 불러오는 중입니다.")}</p>}>
+          <Suspense fallback={<p role="status" className="py-3 text-xs text-fg-3">공간 콘티 도구를 불러오는 중입니다.</p>}>
             <SpatialStoryboardPanel />
           </Suspense>
         ) : null}

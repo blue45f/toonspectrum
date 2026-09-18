@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Activity,
   DollarSign,
@@ -78,15 +77,18 @@ export function AdminHeaderStats({ userId }: AdminHeaderStatsProps) {
           </p>
           <p className="flex items-center gap-1.5 pt-0.5 text-xs font-bold text-white">
             <span
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.AdminHeaderStats", "en", "size-2 rounded-full {v0}"), { v0: String(health.status === "healthy"
+              className={`size-2 rounded-full ${
+                health.status === "healthy"
                   ? "animate-pulse bg-emerald-400"
-                  : "bg-rose-400") })}
+                  : "bg-rose-400"
+              }`}
             />
             {health.status === "healthy"
               ? t("admin.stats.healthy")
               : t("admin.stats.degraded")}
             <span className="font-mono text-[10px] text-slate-500">
-              ({health.database.latencyMs}{translateCurrentStaticSourceText("domains.admin.components.AdminHeaderStats", "en", "ms)")}</span>
+              ({health.database.latencyMs}ms)
+            </span>
           </p>
         </div>
       </div>

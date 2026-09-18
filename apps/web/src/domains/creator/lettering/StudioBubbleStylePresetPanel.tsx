@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { normalizeStrokeStyle, type StrokeStyle } from "../brush/studio-stroke-shapes";
 
 import { BUBBLE_STYLE_PRESETS, type BubbleStylePreset } from "./studio-bubble-style-presets";
@@ -108,7 +107,8 @@ function BubbleStyleSwatch({ preset }: { preset: BubbleStylePreset }) {
         fill={preset.textFill}
         fontFamily="system-ui, sans-serif"
       >
-        {translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleStylePresetPanel", "ko", "가")}</text>
+        가
+      </text>
     </svg>
   );
 }
@@ -125,9 +125,10 @@ export function StudioBubbleStylePresetPanel({
       className="mt-2.5 rounded-2xl border border-line/45 bg-gradient-to-b from-card/50 to-transparent p-2.5"
       data-studio-bubble-style-presets="true"
     >
-      <p className="mb-0.5 text-[0.72rem] font-semibold tracking-tight text-fg-2">{translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleStylePresetPanel", "ko", "분위기 스와치")}</p>
+      <p className="mb-0.5 text-[0.72rem] font-semibold tracking-tight text-fg-2">분위기 스와치</p>
       <p className="mb-2 text-[0.6rem] leading-snug text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleStylePresetPanel", "ko", "색·선·모양을 한 번에. 장면에 맞는 말투를 골라 보세요.")}</p>
+        색·선·모양을 한 번에. 장면에 맞는 말투를 골라 보세요.
+      </p>
       <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
         {BUBBLE_STYLE_PRESETS.map((preset) => {
           const isMatch =
