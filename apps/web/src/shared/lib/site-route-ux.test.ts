@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { resolveTranslation } from "./i18n-core";
 import {
   BANNED_USER_FACING_ROUTE_TERMS,
   SITE_ROUTE_UX_OVERRIDES,
@@ -24,8 +25,8 @@ describe("site route UX contracts", () => {
     ]) {
       const contract = resolveSiteRouteUxContract(path);
       expect(contract.canonicalPath).toMatch(/^\//u);
-      expect(contract.pagePurpose.ko.length).toBeGreaterThan(12);
-      expect(contract.pagePurpose.en.length).toBeGreaterThan(12);
+      expect(resolveTranslation("ko", contract.pagePurpose).length).toBeGreaterThan(12);
+      expect(resolveTranslation("en", contract.pagePurpose).length).toBeGreaterThan(12);
       expect(contract.helpPath).toMatch(/^\/help/u);
       expect(contract.audiences.length).toBeGreaterThan(0);
     }

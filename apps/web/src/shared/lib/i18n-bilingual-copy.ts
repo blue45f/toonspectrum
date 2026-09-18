@@ -12,6 +12,14 @@ export type TranslationResolver = (key: string) => string;
 
 type StringTree = string | readonly StringTree[] | { readonly [key: string]: StringTree };
 
+type LocalizedStringTree<T> = T extends string
+  ? string
+  : T extends readonly (infer U)[]
+    ? readonly LocalizedStringTree<U>[]
+    : T extends object
+      ? { readonly [K in keyof T]: LocalizedStringTree<T[K]> }
+      : never;
+
 function normalizeKeyPart(value: string): string {
   return value
     .trim()
@@ -129,9 +137,15 @@ function translateParallelNode(
 export function translateParallelBilingualCopy<const T extends StringTree>(
   t: TranslationResolver,
   scope: string,
-  branches: Readonly<{ readonly ko: T; readonly en: T }>,
-): T {
-  return translateParallelNode(t, scope, branches.ko, branches.en, []) as T;
+  branches: Readonly<{ readonly ko: T; readonly en: LocalizedStringTree<T> }>,
+): LocalizedStringTree<T> {
+  return translateParallelNode(
+    t,
+    scope,
+    branches.ko,
+    branches.en as unknown as StringTree,
+    [],
+  ) as unknown as LocalizedStringTree<T>;
 }
 
 export function formatI18nTemplate(
