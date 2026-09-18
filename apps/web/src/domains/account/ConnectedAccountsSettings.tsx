@@ -5,10 +5,10 @@ import { CheckCircle2, Link2, Loader2, Unlink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
+  GoogleIdentityButton,
   parseAuthProviderDiscovery,
   type AuthProviderDiscovery,
-} from "@/domains/auth/components/auth-provider-discovery";
-import { GoogleIdentityButton } from "@/domains/auth/components/google-identity-button";
+} from "@/domains/auth/public/connected-accounts";
 import { persistSession } from "@/compat/auth-session-store";
 import { api, apiPath } from "@/infrastructure/api";
 
