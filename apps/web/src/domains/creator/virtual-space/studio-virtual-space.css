@@ -119,3 +119,80 @@
 .studio-vspace-zone:hover .studio-vspace-master-zone-glass,.studio-vspace-zone:focus-within .studio-vspace-master-zone-glass{background:linear-gradient(180deg,rgb(255 255 255/.035),rgb(119 84 255/.055));box-shadow:inset 0 0 0 1px rgb(216 202 255/.18)}
 .studio-vspace-plaza-mascot-new{filter:drop-shadow(0 10px 14px rgb(46 24 68/.38))}
 @media(max-width:1023px){.studio-vspace-master-backdrop .vs-master-world-svg{width:100%;height:100%}}
+
+/* Approved-art player cutout used for the live RPG layer. */
+.studio-vspace-reference-player{
+  position:relative;
+  display:block;
+  width:6.2rem;
+  height:8.2rem;
+  transform-origin:50% 92%;
+  filter:drop-shadow(0 10px 8px rgb(0 0 0/.38));
+  will-change:transform;
+}
+.studio-vspace-reference-player img{
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:contain;
+  object-position:bottom center;
+  transform-origin:50% 85%;
+  filter:hue-rotate(var(--studio-reference-hue,0deg)) saturate(1.02);
+  user-select:none;
+  pointer-events:none;
+}
+.studio-vspace-reference-player[data-direction=left] img{transform:scaleX(-1)}
+.studio-vspace-reference-player[data-direction=right] img{transform:scaleX(1)}
+.studio-vspace-reference-player[data-direction=up] img{filter:hue-rotate(var(--studio-reference-hue,0deg)) saturate(.96) brightness(.92)}
+.studio-vspace-reference-player[data-motion=walk]{animation:studio-reference-player-walk .34s ease-in-out infinite}
+.studio-vspace-reference-player[data-motion=talk]{animation:studio-reference-player-talk .7s ease-in-out infinite}
+.studio-vspace-reference-player[data-motion=draw]{animation:studio-reference-player-draw .46s ease-in-out infinite}
+.studio-vspace-reference-player[data-motion=review]{animation:studio-reference-player-review 1.15s ease-in-out infinite}
+.studio-vspace-reference-player::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  bottom:.12rem;
+  width:64%;
+  height:.7rem;
+  translate:-50% 45%;
+  border-radius:50%;
+  background:rgb(24 15 13/.28);
+  filter:blur(3px);
+  z-index:-1;
+}
+.studio-vspace-reference-online{
+  position:absolute;
+  right:.35rem;
+  bottom:.6rem;
+  width:.72rem;
+  height:.72rem;
+  border-radius:50%;
+  border:2px solid #17202b;
+  background:#58e091;
+  box-shadow:0 0 12px rgb(88 224 145/.55);
+}
+.studio-vspace-reference-online.is-away{background:#8a96a5;box-shadow:none}
+@keyframes studio-reference-player-walk{
+  0%,100%{transform:translateY(0) rotate(-.7deg)}
+  50%{transform:translateY(-5px) rotate(.7deg)}
+}
+@keyframes studio-reference-player-talk{
+  0%,100%{transform:translateY(0)}
+  35%{transform:translateY(-3px) rotate(-1deg)}
+  70%{transform:translateY(-1px) rotate(1deg)}
+}
+@keyframes studio-reference-player-draw{
+  0%,100%{transform:translateY(0) rotate(-1deg)}
+  50%{transform:translateY(-2px) rotate(1.5deg)}
+}
+@keyframes studio-reference-player-review{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-1px) rotate(1deg)}
+}
+@media(max-width:560px){
+  .studio-vspace-reference-player{width:5.2rem;height:6.9rem}
+}
+@media(prefers-reduced-motion:reduce){
+  .studio-vspace-reference-player{animation:none!important}
+}
