@@ -8,7 +8,7 @@ import {
   translateBilingualValueForActiveLocale,
 } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("studio-vrm-display-name", ko, en);
 
 type DisplayLocale = "en" | "ko" | "ja" | "zhHans" | "zhHant";
