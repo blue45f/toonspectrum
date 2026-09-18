@@ -8,10 +8,12 @@ import {
   CloudOff,
   Coffee,
   ExternalLink,
+  Footprints,
   Gamepad2,
   Headphones,
   Heart,
   LayoutGrid,
+  Map,
   MessageCircle,
   Mic2,
   MousePointer2,
@@ -265,6 +267,76 @@ function stagePosition(point: StudioVirtualSpacePoint): CSSProperties {
     left: `${(point.x / STUDIO_VIRTUAL_SPACE_WIDTH) * 100}%`,
     top: `${(point.y / STUDIO_VIRTUAL_SPACE_HEIGHT) * 100}%`,
   };
+}
+
+function VirtualSpaceMiniMap({
+  snapshot,
+  currentZone,
+  onMoveTo,
+}: {
+  readonly snapshot: StudioVirtualSpaceSnapshot;
+  readonly currentZone: StudioVirtualSpaceZone;
+  readonly onMoveTo: (point: StudioVirtualSpacePoint) => void;
+}) {
+  const bt = useBilingual("StudioVirtualSpaceMiniMap");
+
+  return (
+    <div
+      className="studio-vspace-minimap absolute right-3 top-3 z-50 hidden w-44 overflow-hidden rounded-2xl border border-white/15 bg-panel/90 p-2 shadow-2xl backdrop-blur-xl sm:block"
+      data-space-interactive="true"
+    >
+      <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
+        <span className="inline-flex items-center gap-1.5 text-[0.58rem] font-black uppercase tracking-[0.12em] text-fg-2">
+          <Map size={11} aria-hidden />
+          {bt("스튜디오 맵", "Studio map")}
+        </span>
+        <span className="max-w-20 truncate text-[0.52rem] font-bold text-accent">
+          {bt(currentZone.labelKo, currentZone.labelEn)}
+        </span>
+      </div>
+      <button
+        type="button"
+        className="studio-vspace-minimap-stage relative block aspect-[59/36] w-full overflow-hidden rounded-xl border border-line/70 bg-canvas/80 text-left"
+        aria-label={bt("미니맵에서 이동할 위치 선택", "Choose a destination on the minimap")}
+        onClick={(event) => {
+          const rect = event.currentTarget.getBoundingClientRect();
+          if (!rect.width || !rect.height) return;
+          onMoveTo(clampStudioVirtualSpacePoint({
+            x: ((event.clientX - rect.left) / rect.width) * STUDIO_VIRTUAL_SPACE_WIDTH,
+            y: ((event.clientY - rect.top) / rect.height) * STUDIO_VIRTUAL_SPACE_HEIGHT,
+          }));
+        }}
+      >
+        {STUDIO_VIRTUAL_SPACE_ZONES.map((zone) => (
+          <span
+            key={zone.id}
+            className="studio-vspace-minimap-zone absolute rounded-[3px] border"
+            data-active={zone.id === currentZone.id || undefined}
+            style={{
+              left: `${(zone.x / STUDIO_VIRTUAL_SPACE_WIDTH) * 100}%`,
+              top: `${(zone.y / STUDIO_VIRTUAL_SPACE_HEIGHT) * 100}%`,
+              width: `${(zone.width / STUDIO_VIRTUAL_SPACE_WIDTH) * 100}%`,
+              height: `${(zone.height / STUDIO_VIRTUAL_SPACE_HEIGHT) * 100}%`,
+            }}
+            aria-hidden
+          />
+        ))}
+        {snapshot.peers.map((peer) => (
+          <span
+            key={peer.participant.sessionId}
+            className="studio-vspace-minimap-peer absolute size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-good shadow-[0_0_6px_rgba(110,231,160,.8)]"
+            style={stagePosition(peer.state)}
+            aria-hidden
+          />
+        ))}
+        <span
+          className="studio-vspace-minimap-self absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-accent shadow-[0_0_10px_var(--color-accent)]"
+          style={stagePosition(snapshot.self)}
+          aria-hidden
+        />
+      </button>
+    </div>
+  );
 }
 
 function ChibiAvatar({
@@ -573,7 +645,11 @@ function VirtualSpaceExperience({
   }));
   const [activity, setActivity] = useState<StudioVirtualSpaceActivity>("available");
   const [moving, setMoving] = useState(false);
+  const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
   const selfRef = useRef(snapshot.self);
+  const peersRef = useRef(snapshot.peers);
+  const followingPeerIdRef = useRef<string | null>(null);
+  const lastFollowPathAtRef = useRef(0);
   const pressedKeysRef = useRef(new Set<string>());
   const joystickRef = useRef<StudioVirtualSpacePoint>({ x: 0, y: 0 });
   const clickPathRef = useRef<readonly StudioVirtualSpacePoint[]>([]);
@@ -582,7 +658,15 @@ function VirtualSpaceExperience({
 
   useEffect(() => {
     selfRef.current = snapshot.self;
-  }, [snapshot.self]);
+    peersRef.current = snapshot.peers;
+  }, [snapshot.peers, snapshot.self]);
+
+  const setFollowingPeer = useCallback((sessionId: string | null) => {
+    followingPeerIdRef.current = sessionId;
+    lastFollowPathAtRef.current = 0;
+    if (!sessionId) clickPathRef.current = [];
+    setFollowingPeerId(sessionId);
+  }, []);
 
   useEffect(() => {
     const timeout = globalThis.setTimeout(() => {
@@ -700,6 +784,7 @@ function VirtualSpaceExperience({
       const hasDirectInput = Math.abs(horizontal) > 0.02 || Math.abs(vertical) > 0.02;
 
       if (hasDirectInput) {
+        if (followingPeerIdRef.current) setFollowingPeer(null);
         clickPathRef.current = [];
         const direction = normalizeStudioVirtualSpaceVector(horizontal, vertical);
         const sprint = keys.has("shift") ? 1.35 : 1;
@@ -708,21 +793,44 @@ function VirtualSpaceExperience({
           y: direction.y * STUDIO_VIRTUAL_SPACE_WALK_SPEED * sprint * elapsedSeconds,
         });
         facing = facingFromDelta(direction.x, direction.y);
-      } else if (clickPathRef.current.length > 0) {
-        const target = clickPathRef.current[0]!;
-        const dx = target.x - current.x;
-        const dy = target.y - current.y;
-        if (Math.hypot(dx, dy) <= STUDIO_VIRTUAL_SPACE_CLICK_STOP_DISTANCE) {
-          clickPathRef.current = clickPathRef.current.slice(1);
-        } else {
-          next = studioVirtualSpaceStepToward(
-            current,
-            target,
-            STUDIO_VIRTUAL_SPACE_WALK_SPEED * elapsedSeconds,
-          );
-          facing = facingFromDelta(dx, dy);
-          if (next.x === current.x && next.y === current.y) {
+      } else {
+        const followId = followingPeerIdRef.current;
+        if (followId) {
+          const peer = peersRef.current.find((candidate) => candidate.participant.sessionId === followId);
+          if (!peer) {
+            setFollowingPeer(null);
+          } else {
+            const distance = Math.hypot(peer.state.x - current.x, peer.state.y - current.y);
+            if (distance <= 88) {
+              clickPathRef.current = [];
+            } else if (now - lastFollowPathAtRef.current >= 360 || clickPathRef.current.length === 0) {
+              const offsetX = peer.state.x >= current.x ? -56 : 56;
+              const approach = clampStudioVirtualSpacePoint({
+                x: peer.state.x + offsetX,
+                y: peer.state.y,
+              });
+              clickPathRef.current = findStudioVirtualSpacePath(current, approach);
+              lastFollowPathAtRef.current = now;
+            }
+          }
+        }
+
+        if (clickPathRef.current.length > 0) {
+          const target = clickPathRef.current[0]!;
+          const dx = target.x - current.x;
+          const dy = target.y - current.y;
+          if (Math.hypot(dx, dy) <= STUDIO_VIRTUAL_SPACE_CLICK_STOP_DISTANCE) {
             clickPathRef.current = clickPathRef.current.slice(1);
+          } else {
+            next = studioVirtualSpaceStepToward(
+              current,
+              target,
+              STUDIO_VIRTUAL_SPACE_WALK_SPEED * elapsedSeconds,
+            );
+            facing = facingFromDelta(dx, dy);
+            if (next.x === current.x && next.y === current.y) {
+              clickPathRef.current = clickPathRef.current.slice(1);
+            }
           }
         }
       }
@@ -740,7 +848,7 @@ function VirtualSpaceExperience({
       globalThis.cancelAnimationFrame(frame);
       setMovingState(false);
     };
-  }, [activity, projectId, updatePosition]);
+  }, [activity, projectId, setFollowingPeer, updatePosition]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -779,6 +887,22 @@ function VirtualSpaceExperience({
     };
   }, [activateCurrentZone]);
 
+  const queuePathTo = useCallback((point: StudioVirtualSpacePoint) => {
+    setFollowingPeer(null);
+    clickPathRef.current = findStudioVirtualSpacePath(selfRef.current, point);
+  }, [setFollowingPeer]);
+
+  const startFollowingPeer = useCallback((sessionId: string) => {
+    const peer = peersRef.current.find((candidate) => candidate.participant.sessionId === sessionId);
+    if (!peer) return;
+    setFollowingPeer(sessionId);
+    const offsetX = peer.state.x >= selfRef.current.x ? -56 : 56;
+    clickPathRef.current = findStudioVirtualSpacePath(selfRef.current, {
+      x: peer.state.x + offsetX,
+      y: peer.state.y,
+    });
+  }, [setFollowingPeer]);
+
   const handleStagePointer = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || (event.target as HTMLElement).closest("[data-space-interactive=true]")) return;
     const rect = stageRef.current?.getBoundingClientRect();
@@ -803,11 +927,14 @@ function VirtualSpaceExperience({
           x: ((event.clientX - rect.left) / rect.width) * STUDIO_VIRTUAL_SPACE_WIDTH,
           y: ((event.clientY - rect.top) / rect.height) * STUDIO_VIRTUAL_SPACE_HEIGHT,
         });
-    clickPathRef.current = findStudioVirtualSpacePath(selfRef.current, point);
-  }, []);
+    queuePathTo(point);
+  }, [queuePathTo]);
 
   const currentZone = STUDIO_VIRTUAL_SPACE_ZONES.find((zone) => zone.id === snapshot.self.zoneId)
     ?? STUDIO_VIRTUAL_SPACE_ZONES[0]!;
+  const followingPeer = followingPeerId
+    ? snapshot.peers.find((peer) => peer.participant.sessionId === followingPeerId) ?? null
+    : null;
   const localName = live.room?.participant.displayName.replace(/\s*·\s*이 탭$/u, "") || bt("나", "Me");
 
   const startNearbyHuddle = useCallback(() => {
@@ -970,11 +1097,7 @@ function VirtualSpaceExperience({
                           });
                           return;
                         }
-                        const dx = peer.state.x >= selfRef.current.x ? -46 : 46;
-                        clickPathRef.current = findStudioVirtualSpacePath(selfRef.current, {
-                          x: peer.state.x + dx,
-                          y: peer.state.y,
-                        });
+                        startFollowingPeer(peer.participant.sessionId);
                       }}
                     >
                       <ChibiAvatar
@@ -1003,6 +1126,12 @@ function VirtualSpaceExperience({
                 </div>
                 </div>
 
+                <VirtualSpaceMiniMap
+                  snapshot={snapshot}
+                  currentZone={currentZone}
+                  onMoveTo={queuePathTo}
+                />
+
                 <div className="absolute bottom-3 left-3 z-40 hidden max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-2xl border border-line bg-panel/90 p-2 shadow-lg backdrop-blur lg:flex">
                   <span className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-card px-3 text-[0.7rem] font-bold text-fg-2">
                     <Gamepad2 size={14} aria-hidden />
@@ -1023,6 +1152,18 @@ function VirtualSpaceExperience({
                     <span className={cn("size-2 rounded-full", moving ? "bg-good animate-pulse" : "bg-fg-3/60")} />
                     {moving ? bt("이동 중", "Walking") : bt("대기", "Idle")}
                   </span>
+                  {followingPeer ? (
+                    <button
+                      type="button"
+                      className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-good/30 bg-good/10 px-3 text-[0.7rem] font-black text-good"
+                      data-space-interactive="true"
+                      onClick={() => setFollowingPeer(null)}
+                    >
+                      <Footprints size={13} aria-hidden />
+                      {bt(`${followingPeer.participant.displayName} 따라가는 중`, `Following ${followingPeer.participant.displayName}`)}
+                      <span aria-hidden>×</span>
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-accent/30 bg-accent-soft px-3 text-[0.7rem] font-black text-accent"
@@ -1136,17 +1277,36 @@ function VirtualSpaceExperience({
                     <p className="truncate text-[0.68rem] text-accent">{bt(currentZone.labelKo, currentZone.labelEn)}</p>
                   </div>
                 </div>
-                {snapshot.peers.slice(0, 7).map((peer) => (
-                  <div key={peer.participant.sessionId} className="flex items-center gap-2">
-                    <ChibiAvatar identity={peer.participant.sessionId} name={peer.participant.displayName} compact activity={peer.state.activity} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-bold">{peer.participant.displayName}</p>
-                      <p className="truncate text-[0.68rem] text-fg-3">
-                        {STUDIO_VIRTUAL_SPACE_ZONES.find((zone) => zone.id === peer.state.zoneId)?.labelKo ?? peer.state.zoneId}
-                      </p>
+                {snapshot.peers.slice(0, 7).map((peer) => {
+                  const following = followingPeerId === peer.participant.sessionId;
+                  return (
+                    <div key={peer.participant.sessionId} className="flex items-center gap-2 rounded-xl px-1 py-1">
+                      <ChibiAvatar identity={peer.participant.sessionId} name={peer.participant.displayName} compact activity={peer.state.activity} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-bold">{peer.participant.displayName}</p>
+                        <p className="truncate text-[0.68rem] text-fg-3">
+                          {STUDIO_VIRTUAL_SPACE_ZONES.find((zone) => zone.id === peer.state.zoneId)?.labelKo ?? peer.state.zoneId}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        aria-pressed={following}
+                        className={cn(
+                          "grid size-8 shrink-0 place-items-center rounded-lg border transition",
+                          following
+                            ? "border-good/40 bg-good/10 text-good"
+                            : "border-line bg-card text-fg-3 hover:border-accent/40 hover:text-accent",
+                        )}
+                        title={following ? bt("따라가기 중지", "Stop following") : bt("이 팀원 따라가기", "Follow this teammate")}
+                        onClick={() => following
+                          ? setFollowingPeer(null)
+                          : startFollowingPeer(peer.participant.sessionId)}
+                      >
+                        <Footprints size={13} aria-hidden />
+                      </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <label className="mt-4 block text-[0.68rem] font-bold text-fg-3">
                 {bt("내 상태", "My status")}
