@@ -1,7 +1,6 @@
 import {
-  translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Check,
@@ -37,7 +36,6 @@ import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
 
-type Locale = string;
 
 const CURRENT_REVIEWER_ID = "project-owner";
 
@@ -90,7 +88,7 @@ function ReviewThreadCard({
   readonly canResolve: boolean;
   readonly onResolve: () => void;
 }) {
-  const l = useBilingualLocalizer("studioReview.thread");
+  const bt = useBilingualLocalizer("studioReview.thread");
   return (
     <article
       className={cn(
