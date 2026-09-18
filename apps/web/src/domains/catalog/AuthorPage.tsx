@@ -1,7 +1,4 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { lazy, Suspense } from "react";
 import { PenLine } from "lucide-react";
 import { useParams } from "react-router-dom";
 
@@ -10,7 +7,6 @@ import type { Title } from "@/shared/lib/types";
 
 import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
 import { Container } from "@/shared/components/section";
-import { SharePageButton } from "@/shared/components/share-page-button";
 import { TitleCard } from "@/shared/components/title-card";
 import { GenreChip } from "@/shared/components/ui/chip";
 import { Stars } from "@/shared/components/ui/stars";
@@ -21,6 +17,11 @@ import { ErrorState } from "@/components/error-state";
 import { NotFoundPage } from "@/components/NotFoundPage";
 import { useDocumentTitle, useMetaDescription, usePageSocialMeta } from "@/hooks/use-document-title";
 import { useApiResource } from "@/infrastructure/use-api-resource";
+
+const SharePageButton = lazy(async () => {
+  const module = await import("@/shared/components/share-page-button");
+  return { default: module.SharePageButton };
+});
 
 interface AuthorResponse {
   author: string;
@@ -85,14 +86,16 @@ export function AuthorPage() {
             ))}
           </div>
           {!loading && !error && data && (
-            <SharePageButton
-              path={sharePath}
-              text={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "{v0} 작가"), { v0: String(author) })}
-              description={shareDescription}
-              label={translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "작가 페이지 공유")}
-              actionLabel={translateCurrentStaticSourceText("domains.catalog.AuthorPage", "ko", "작가 작품 보기")}
-              className="mt-4"
-            />
+            <Suspense fallback={null}>
+              <SharePageButton
+                path={sharePath}
+                text={`${author} 작가`}
+                description={shareDescription}
+                label="작가 페이지 공유"
+                actionLabel="작가 작품 보기"
+                className="mt-4"
+              />
+            </Suspense>
           )}
         </div>
         <dl className="flex flex-wrap items-center gap-6">
