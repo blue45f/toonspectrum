@@ -26,9 +26,11 @@ import type {
 import { getStudioProjectGraphDeviceId } from "./studio-project-graph-device";
 import { useStudioProjectGraph } from "./useStudioProjectGraph";
 
-type Locale = "ko" | "en";
+function toBilingualLocale(locale: string): "ko" | "en" {
+  return locale.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+}
 
-const KIND_LABELS: Readonly<Record<StudioRevisionRecord["kind"], Readonly<Record<Locale, string>>>> = {
+const KIND_LABELS: Readonly<Record<StudioRevisionRecord["kind"], Readonly<Record<"ko" | "en", string>>>> = {
   autosave: { ko: "자동 저장", en: "Autosave" },
   checkpoint: { ko: "체크포인트", en: "Checkpoint" },
   submission: { ko: "검수 제출본", en: "Submission" },
@@ -37,8 +39,8 @@ const KIND_LABELS: Readonly<Record<StudioRevisionRecord["kind"], Readonly<Record
   release: { ko: "게시본", en: "Release" },
 };
 
-function formatDate(value: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(locale === "ko" ? "ko-KR" : "en-US", {
+function formatDate(value: string, copyLocale: "ko" | "en"): string {
+  return new Intl.DateTimeFormat(copyLocale === "ko" ? "ko-KR" : "en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -66,10 +68,11 @@ export function StudioProjectVersionStackPanel({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
+  const copyLocale = toBilingualLocale(locale);
   const location = useLocation();
-  const graph = useStudioProjectGraph(projectId, locale);
+  const graph = useStudioProjectGraph(projectId, copyLocale);
   const requestedArtifactId = useMemo(
     () => new URLSearchParams(location.search).get("artifact"),
     [location.search],
@@ -99,14 +102,14 @@ export function StudioProjectVersionStackPanel({
     } catch (nextError) {
       setError(await getApiErrorMessage(
         nextError,
-        locale === "ko"
+        copyLocale === "ko"
           ? "버전 이력을 불러오지 못했습니다."
           : "Version history could not be loaded.",
       ));
     } finally {
       setLoading(false);
     }
-  }, [artifact, locale]);
+  }, [artifact, copyLocale]);
 
   useEffect(() => {
     setHeadOverride(null);
@@ -119,7 +122,7 @@ export function StudioProjectVersionStackPanel({
     if (!artifact || !currentHeadRevisionId || !graph.project?.access.edit) return;
     if (confirmRevisionId !== revision.id) {
       setConfirmRevisionId(revision.id);
-      setNotice(locale === "ko"
+      setNotice(copyLocale === "ko"
         ? "한 번 더 누르면 이 상태를 새 체크포인트로 복원합니다. 현재 이력은 삭제되지 않습니다."
         : "Press once more to restore this state as a new checkpoint. Current history is preserved.");
       return;
@@ -140,21 +143,21 @@ export function StudioProjectVersionStackPanel({
             typeof window === "undefined" ? null : window.localStorage,
           ),
           createdAt: now,
-          message: locale === "ko"
-            ? `${formatDate(revision.createdAt, locale)} 버전에서 복원`
-            : `Restored from ${formatDate(revision.createdAt, locale)}`,
+          message: copyLocale === "ko"
+            ? `${formatDate(revision.createdAt, copyLocale)} 버전에서 복원`
+            : `Restored from ${formatDate(revision.createdAt, copyLocale)}`,
         },
       );
       setHeadOverride(result.headRevisionId);
       setConfirmRevisionId(null);
-      setNotice(locale === "ko"
+      setNotice(copyLocale === "ko"
         ? "새 복원 체크포인트를 만들었습니다. 과거와 현재 버전은 모두 보존됩니다."
         : "Created a restored checkpoint. Both previous and current versions are preserved.");
       await Promise.all([load(), graph.refresh()]);
     } catch (nextError) {
       setError(await getApiErrorMessage(
         nextError,
-        locale === "ko" ? "버전을 복원하지 못했습니다." : "The revision could not be restored.",
+        copyLocale === "ko" ? "버전을 복원하지 못했습니다." : "The revision could not be restored.",
       ));
     } finally {
       setRestoringRevisionId(null);
@@ -165,10 +168,10 @@ export function StudioProjectVersionStackPanel({
     return (
       <section className="rounded-3xl border border-line bg-card p-5 shadow-sm">
         <h2 className="text-xl font-black text-fg">
-          {locale === "ko" ? "버전 이력" : "Version history"}
+          {copyLocale === "ko" ? "버전 이력" : "Version history"}
         </h2>
         <p className="mt-2 text-sm text-fg-2">
-          {locale === "ko"
+          {copyLocale === "ko"
             ? "ProjectGraph로 전환된 제작 문서가 아직 없습니다. 기존 로컬 원고는 계속 자동 저장됩니다."
             : "No production document has moved to ProjectGraph yet. Existing local documents continue to autosave."}
         </p>
@@ -187,10 +190,10 @@ export function StudioProjectVersionStackPanel({
             VERSION STACK
           </p>
           <h2 id="studio-version-stack-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
-            {locale === "ko" ? "작업본·검수본·승인본·게시본" : "Working, review, approved and release versions"}
+            {copyLocale === "ko" ? "작업본·검수본·승인본·게시본" : "Working, review, approved and release versions"}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">
-            {locale === "ko"
+            {copyLocale === "ko"
               ? `“${artifact.title}”의 고정된 버전 이력입니다. 복원은 기존 기록을 덮어쓰지 않고 새 체크포인트를 만듭니다.`
               : `Immutable history for “${artifact.title}”. Restore creates a new checkpoint without overwriting existing records.`}
           </p>
@@ -204,7 +207,7 @@ export function StudioProjectVersionStackPanel({
           {loading
             ? <LoaderCircle size={15} className="animate-spin" aria-hidden="true" />
             : <History size={15} aria-hidden="true" />}
-          {locale === "ko" ? "이력 새로고침" : "Refresh history"}
+          {copyLocale === "ko" ? "이력 새로고침" : "Refresh history"}
         </button>
       </div>
 
@@ -238,18 +241,18 @@ export function StudioProjectVersionStackPanel({
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.64rem] font-bold text-fg-2">
-                      {KIND_LABELS[revision.kind][locale]}
+                      {KIND_LABELS[revision.kind][copyLocale]}
                     </span>
                     {isHead ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-1 text-[0.64rem] font-bold text-on-accent">
                         <CheckCircle2 size={12} aria-hidden="true" />
-                        {locale === "ko" ? "현재 작업본" : "Current head"}
+                        {copyLocale === "ko" ? "현재 작업본" : "Current head"}
                       </span>
                     ) : null}
                     {isApproved ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-1 text-[0.64rem] font-bold text-success">
                         <ShieldCheck size={12} aria-hidden="true" />
-                        {locale === "ko" ? "승인 이력" : "Approval history"}
+                        {copyLocale === "ko" ? "승인 이력" : "Approval history"}
                       </span>
                     ) : null}
                   </div>
@@ -257,9 +260,9 @@ export function StudioProjectVersionStackPanel({
                     {revision.message || revision.id}
                   </p>
                   <p className="mt-1 text-xs text-fg-3">
-                    {formatDate(revision.createdAt, locale)} · {revision.id}
+                    {formatDate(revision.createdAt, copyLocale)} · {revision.id}
                     {revision.parentIds.length > 0
-                      ? ` · ${locale === "ko" ? "부모" : "parent"} ${revision.parentIds.join(", ")}`
+                      ? ` · ${copyLocale === "ko" ? "부모" : "parent"} ${revision.parentIds.join(", ")}`
                       : ""}
                   </p>
                 </div>
@@ -270,7 +273,7 @@ export function StudioProjectVersionStackPanel({
                     className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
                   >
                     <GitCompareArrows size={14} aria-hidden="true" />
-                    {locale === "ko" ? "비교" : "Compare"}
+                    {copyLocale === "ko" ? "비교" : "Compare"}
                   </Link>
                   {canRestore ? (
                     <button
@@ -287,8 +290,8 @@ export function StudioProjectVersionStackPanel({
                         ? <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
                         : <RotateCcw size={14} aria-hidden="true" />}
                       {confirmRevisionId === revision.id
-                        ? locale === "ko" ? "복원 확정" : "Confirm restore"
-                        : locale === "ko" ? "새 체크포인트로 복원" : "Restore as checkpoint"}
+                        ? copyLocale === "ko" ? "복원 확정" : "Confirm restore"
+                        : copyLocale === "ko" ? "새 체크포인트로 복원" : "Restore as checkpoint"}
                     </button>
                   ) : null}
                 </div>
@@ -298,7 +301,7 @@ export function StudioProjectVersionStackPanel({
         })}
         {!loading && revisions.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line p-6 text-center text-sm text-fg-3">
-            {locale === "ko" ? "표시할 클라우드 버전이 없습니다." : "No cloud revisions to display."}
+            {copyLocale === "ko" ? "표시할 클라우드 버전이 없습니다." : "No cloud revisions to display."}
           </p>
         ) : null}
       </div>

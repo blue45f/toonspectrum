@@ -3,7 +3,9 @@ import { motion, useReducedMotion } from "motion/react";
 
 import "./studio-import-visual-guide.css";
 
-type Locale = "ko" | "en";
+function toBilingualLocale(locale: string): "ko" | "en" {
+  return locale.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+}
 
 const COPY = {
   ko: {
@@ -45,8 +47,9 @@ const COPY = {
 const SOURCE_ICONS = [FileImage, Cloud, FolderOpen] as const;
 const STEP_ICONS = [FolderOpen, Layers3, ShieldCheck] as const;
 
-export function StudioImportVisualGuide({ locale }: { readonly locale: Locale }) {
-  const copy = COPY[locale];
+export function StudioImportVisualGuide({ locale }: { readonly locale: string }) {
+  const copyLocale = toBilingualLocale(locale);
+  const copy = COPY[copyLocale];
   const reducedMotion = useReducedMotion();
 
   return (

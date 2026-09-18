@@ -19,7 +19,9 @@ import {
 import type { CompatibilityReport } from "./studio-project-graph-contract";
 import { useStudioProjectGraph } from "./useStudioProjectGraph";
 
-type Locale = "ko" | "en";
+function toBilingualLocale(locale: string): "ko" | "en" {
+  return locale.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+}
 
 const GRADE_STYLES = Object.freeze({
   A: "border-success/30 bg-success-soft/30 text-success",
@@ -28,9 +30,9 @@ const GRADE_STYLES = Object.freeze({
   D: "border-danger/30 bg-danger-soft/30 text-danger",
 });
 
-function reportSummary(report: CompatibilityReport, locale: Locale): string {
+function reportSummary(report: CompatibilityReport, copyLocale: "ko" | "en"): string {
   const summary = report.summary;
-  if (locale === "ko") {
+  if (copyLocale === "ko") {
     return `보존 ${summary.preserved} · 변환 ${summary.converted} · 래스터화 ${summary.rasterized} · 제외/미지원 ${summary.excluded + summary.unsupported}`;
   }
   return `Preserved ${summary.preserved} · converted ${summary.converted} · rasterized ${summary.rasterized} · excluded/unsupported ${summary.excluded + summary.unsupported}`;
@@ -41,9 +43,10 @@ export function StudioCompatibilityReportsPanel({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
-  const graph = useStudioProjectGraph(projectId, locale);
+  const copyLocale = toBilingualLocale(locale);
+  const graph = useStudioProjectGraph(projectId, copyLocale);
   const cloudProjectId = graph.project?.id ?? null;
   const [reports, setReports] = useState<readonly CompatibilityReport[]>([]);
   const [loading, setLoading] = useState(false);
@@ -62,14 +65,14 @@ export function StudioCompatibilityReportsPanel({
     } catch (nextError) {
       setError(await getApiErrorMessage(
         nextError,
-        locale === "ko"
+        copyLocale === "ko"
           ? "파일 호환성 이력을 불러오지 못했습니다."
           : "File compatibility history could not be loaded.",
       ));
     } finally {
       setLoading(false);
     }
-  }, [cloudProjectId, locale]);
+  }, [cloudProjectId, copyLocale]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -89,7 +92,7 @@ export function StudioCompatibilityReportsPanel({
     } catch (nextError) {
       setError(await getApiErrorMessage(
         nextError,
-        locale === "ko"
+        copyLocale === "ko"
           ? "호환성 손실 승인을 저장하지 못했습니다."
           : "Compatibility loss approval could not be saved.",
       ));
@@ -109,10 +112,10 @@ export function StudioCompatibilityReportsPanel({
             IMPORT COMPATIBILITY
           </p>
           <h2 id="studio-compatibility-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
-            {locale === "ko" ? "PSD·PNG·CLIP 원본과 변환 손실" : "PSD, PNG and CLIP source fidelity"}
+            {copyLocale === "ko" ? "PSD·PNG·CLIP 원본과 변환 손실" : "PSD, PNG and CLIP source fidelity"}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">
-            {locale === "ko"
+            {copyLocale === "ko"
               ? "원본은 변경하지 않고 보관하며, 변환·래스터화·제외 항목은 저장 전에 명시적으로 보여줍니다. A 이외 등급은 사용자 승인 없이는 편집 Revision에 연결되지 않습니다."
               : "Originals remain immutable. Conversion, rasterization and exclusion are disclosed before save. Grades below A require explicit approval before entering an editable revision."}
           </p>
@@ -126,7 +129,7 @@ export function StudioCompatibilityReportsPanel({
           {loading
             ? <LoaderCircle size={15} className="animate-spin" aria-hidden="true" />
             : <RefreshCcw size={15} aria-hidden="true" />}
-          {locale === "ko" ? "검사 이력 새로고침" : "Refresh reports"}
+          {copyLocale === "ko" ? "검사 이력 새로고침" : "Refresh reports"}
         </button>
       </div>
 
@@ -160,28 +163,28 @@ export function StudioCompatibilityReportsPanel({
                     {approved ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-1 text-[0.62rem] font-bold text-success">
                         <ShieldCheck size={12} aria-hidden="true" />
-                        {locale === "ko" ? "손실 승인됨" : "Losses approved"}
+                        {copyLocale === "ko" ? "손실 승인됨" : "Losses approved"}
                       </span>
                     ) : blocked ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-1 text-[0.62rem] font-bold text-warning-strong">
                         <AlertTriangle size={12} aria-hidden="true" />
-                        {locale === "ko" ? "승인 전 변환 금지" : "Blocked until approval"}
+                        {copyLocale === "ko" ? "승인 전 변환 금지" : "Blocked until approval"}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-1 text-[0.62rem] font-bold text-success">
                         <CheckCircle2 size={12} aria-hidden="true" />
-                        {locale === "ko" ? "편집 보존" : "Edit-preserving"}
+                        {copyLocale === "ko" ? "편집 보존" : "Edit-preserving"}
                       </span>
                     )}
                   </div>
-                  <p className="mt-2 text-xs text-fg-2">{reportSummary(report, locale)}</p>
+                  <p className="mt-2 text-xs text-fg-2">{reportSummary(report, copyLocale)}</p>
                   <p className="mt-1 break-all text-[0.68rem] text-fg-3">
                     SHA-256 {report.source.sourceHash}
                   </p>
                   {report.items.length > 0 ? (
                     <details className="mt-3 rounded-xl border border-line bg-card px-3 py-2">
                       <summary className="cursor-pointer text-xs font-bold text-fg-2">
-                        {locale === "ko"
+                        {copyLocale === "ko"
                           ? `항목별 결과 ${report.items.length}개`
                           : `${report.items.length} item-level results`}
                       </summary>
@@ -208,7 +211,7 @@ export function StudioCompatibilityReportsPanel({
                     {approvingId === report.id
                       ? <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
                       : <FileWarning size={14} aria-hidden="true" />}
-                    {locale === "ko" ? "손실 확인 후 승인" : "Review and approve losses"}
+                    {copyLocale === "ko" ? "손실 확인 후 승인" : "Review and approve losses"}
                   </button>
                 ) : null}
               </div>
@@ -219,8 +222,8 @@ export function StudioCompatibilityReportsPanel({
         {!loading && reports.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line p-6 text-center text-sm text-fg-3">
             {cloudProjectId
-              ? locale === "ko" ? "아직 저장된 호환성 보고서가 없습니다." : "No compatibility reports have been stored yet."
-              : locale === "ko" ? "클라우드 ProjectGraph 전환 후 파일 검사 이력이 여기에 표시됩니다." : "File inspection history appears after ProjectGraph migration."}
+              ? copyLocale === "ko" ? "아직 저장된 호환성 보고서가 없습니다." : "No compatibility reports have been stored yet."
+              : copyLocale === "ko" ? "클라우드 ProjectGraph 전환 후 파일 검사 이력이 여기에 표시됩니다." : "File inspection history appears after ProjectGraph migration."}
           </p>
         ) : null}
       </div>
