@@ -169,6 +169,64 @@ export function MembershipPolicyPage() {
           </section>
         )}
 
+        {overview && (
+          <section className="mt-10 rounded-3xl border border-line bg-panel p-6 sm:p-8" aria-labelledby="creator-level-title">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black tracking-[0.14em] text-accent">CREATOR LEVEL</p>
+                <h2 id="creator-level-title" className="mt-2 text-2xl font-black text-fg">
+                  활동과 검증을 분리한 창작자 등급
+                </h2>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-fg-2">
+                  결제 멤버십과 창작자 등급은 별개입니다. Creator 인증, 공개 작품 수,
+                  서버가 확인한 정상 활동 포인트로 자동 등급을 계산하고 Partner는 운영 검토로만 부여합니다.
+                </p>
+              </div>
+              <span className="rounded-full border border-accent/30 bg-accent-soft px-4 py-2 text-sm font-black text-accent">
+                {creatorLevelLabels[overview.creatorProgress.effectiveLevel] ?? overview.creatorProgress.effectiveLevel}
+              </span>
+            </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-card/55 p-4">
+                <p className="text-xs font-bold text-fg-3">Creator 인증</p>
+                <p className="mt-1 font-black text-fg">
+                  {overview.creatorProgress.metrics.verifiedCreator ? "완료" : "필요"}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-card/55 p-4">
+                <p className="text-xs font-bold text-fg-3">공개 작품</p>
+                <p className="mt-1 font-black text-fg">
+                  {number.format(overview.creatorProgress.metrics.publishedWorks)}개
+                </p>
+              </div>
+              <div className="rounded-2xl bg-card/55 p-4">
+                <p className="text-xs font-bold text-fg-3">등급 산정 활동 포인트</p>
+                <p className="mt-1 font-black text-fg">
+                  {number.format(overview.creatorProgress.metrics.activityPoints)} P
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              {Object.entries(CREATOR_LEVEL_AUTO_POLICIES)
+                .filter(([level]) => level !== "new")
+                .map(([level, policy]) => (
+                  <div key={level} className="rounded-2xl border border-line bg-card/35 p-4 text-sm">
+                    <p className="font-black text-fg">{creatorLevelLabels[level] ?? level}</p>
+                    <p className="mt-2 text-xs leading-5 text-fg-3">
+                      Creator 인증 {policy.verifiedCreator ? "필수" : "선택"}
+                      {policy.publishedWorks > 0 ? ` · 공개 작품 ${number.format(policy.publishedWorks)}+` : ""}
+                      {policy.activityPoints > 0 ? ` · 활동 ${number.format(policy.activityPoints)}P+` : ""}
+                    </p>
+                  </div>
+                ))}
+            </div>
+            <p className="mt-4 text-xs leading-5 text-fg-3">
+              Trust Level과 Seller Level은 신고·저작권·판매자 검증 등 별도 운영 신호로 관리하며,
+              Creator Level과 합산하지 않습니다. 관리자 수동 등급이 있으면 자동 계산이 덮어쓰지 않습니다.
+            </p>
+          </section>
+        )}
+
         <section className="mt-10" aria-labelledby="membership-plan-title">
           <div className="flex items-end justify-between gap-4">
             <div>
