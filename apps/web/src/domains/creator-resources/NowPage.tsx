@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -183,8 +184,8 @@ export function NowPage() {
 
   return (
     <ResourceLayout
-      title="오늘의 영감"
-      intro="매일 한 장면을 발견하고, 연출 모드·제작 시간·명시적 변주 규칙을 고른 뒤 5컷으로 실행하는 데일리 창작 데스크입니다. 저장·완주·개인 메모는 이 브라우저에만 남습니다."
+      title={translateCurrentStaticSourceText("domains.creator.resources.NowPage", "ko", "오늘의 영감")}
+      intro={translateCurrentStaticSourceText("domains.creator.resources.NowPage", "ko", "매일 한 장면을 발견하고, 연출 모드·제작 시간·명시적 변주 규칙을 고른 뒤 5컷으로 실행하는 데일리 창작 데스크입니다. 저장·완주·개인 메모는 이 브라우저에만 남습니다.")}
       width="wide"
     >
       <NowSceneHero
@@ -246,8 +247,7 @@ export function NowPage() {
       <aside className="flex items-start gap-3 rounded-2xl border border-line bg-card/40 p-5 text-sm leading-7 text-fg-2">
         <ShieldCheck size={20} className="mt-0.5 shrink-0 text-good" aria-hidden="true" />
         <p>
-          오늘의 주제·미션·연출 가이드는 ToonStudio의 오리지널 에디토리얼 콘텐츠입니다. 외부 자료는 Studio에 자동 삽입하지 않으며,
-          원문·출처·현재 이용조건을 확인한 뒤 사용해야 합니다. 기준일: {selected.day.iso}
+          {translateCurrentStaticSourceText("domains.creator.resources.NowPage", "ko", "오늘의 주제·미션·연출 가이드는 ToonStudio의 오리지널 에디토리얼 콘텐츠입니다. 외부 자료는 Studio에 자동 삽입하지 않으며, 원문·출처·현재 이용조건을 확인한 뒤 사용해야 합니다. 기준일:")}{selected.day.iso}
         </p>
       </aside>
     </ResourceLayout>

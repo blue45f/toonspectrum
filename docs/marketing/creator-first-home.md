@@ -32,7 +32,7 @@ The marketing route is lazy-loaded. No Remotion player, renderer, studio engine 
 
 ## Video and operations
 
-`media/brand-film` is an isolated npm project pinned to Remotion 4.0.514. Four compositions use deterministic frame animation: landscape, portrait, square, and a sharing-image composition. Three 24-second H.264 MP4s, a poster, an OG image and a hash manifest are produced by `render.mjs`. No voice/music is asserted: this is a silent typographic/illustrative brand film with caption alternatives.
+`media/brand-film` is an isolated npm project pinned to Remotion 4.0.514. Five compositions use deterministic frame animation: landscape, portrait, square, a dedicated wide route-header rendition, and a sharing-image composition. Three downloadable 24-second H.264 MP4s plus a 1920×768 route-header MP4, a poster, an OG image and a hash manifest are produced by `render.mjs`. No voice/music is asserted: this is a silent typographic/illustrative brand film with caption alternatives.
 
 `creator-brand-film.yml` produces reviewable Actions artifacts, never automatically publishes or mutates main. The n8n export is inactive and contains no secrets. It requests the fixed renderer workflow on main through a configured GitHub credential and reports accepted, not completed. See the automation README for deployment prerequisites and permission boundaries.
 

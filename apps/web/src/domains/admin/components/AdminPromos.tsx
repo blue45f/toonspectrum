@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Ticket, Plus, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 
@@ -161,17 +162,15 @@ export function AdminPromos({ userId }: AdminPromosProps) {
                   </td>
                   <td className="p-4">
                     <span
-                      className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                        item.isActive
+                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.AdminPromos", "en", "px-2.5 py-0.5 rounded-full text-xs font-semibold {v0}"), { v0: String(item.isActive
                           ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                          : "bg-slate-800 text-slate-400 border border-slate-700"
-                      }`}
+                          : "bg-slate-800 text-slate-400 border border-slate-700") })}
                     >
                       {item.isActive ? t("admin.plans.statusActive") : t("admin.plans.statusInactive")}
                     </span>
                   </td>
                   <td className="p-4 text-slate-400 text-xs font-mono">
-                    {item.expiresAt ? formatDate(item.expiresAt) : "Unlimited"}
+                    {item.expiresAt ? formatDate(item.expiresAt) : translateCurrentStaticSourceText("domains.admin.components.AdminPromos", "en", "Unlimited")}
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -216,7 +215,7 @@ export function AdminPromos({ userId }: AdminPromosProps) {
                 required
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="WELCOME2026"
+                placeholder={translateCurrentStaticSourceText("domains.admin.components.AdminPromos", "en", "WELCOME2026")}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
               />
             </div>

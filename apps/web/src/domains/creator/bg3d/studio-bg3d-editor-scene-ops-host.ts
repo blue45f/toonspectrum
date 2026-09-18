@@ -186,7 +186,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     shotBatchRecoveryRef, shotBatchRecoveryScopeRef, shotBatchRecoveryStoreRef, shotBatchAuthorizationEpochRef,
     physicsPhaseRef, physicsAbortRef, physicsAnimationFrameRef, physicsGenerationRef,
     physicsPlaybackStartedAtRef, physicsPlaybackOffsetRef, physicsLastUiUpdateRef, physicsLastFrameTimestampRef,
-    latestPhysicsSamplesRef, physicsSessionRef, physicsWorkerSessionRef, physicsRuntimeSourceRef,
+    latestPhysicsSamplesRef, physicsSessionRef, physicsWorkerSessionRef, physicsRuntimeSourceRef, replaceCanonicalDocumentState,
     physicsStartButtonRef, physicsTransportActionRef, shouldTransferPhysicsFocusRef, isModalAssetSessionCurrent,
     getModelThumbnailCaptureController, acquireModelThumbnailGpuLease, startModelThumbnailCaptureBatch, invalidateModalAssetSession,
     cancelSurfaceSnap, handleViewportReady, resetWebXrPresentationUi, finishWebXrControllerCleanup,
@@ -400,14 +400,11 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     const snap = receipt.state;
     const nextPrimitives = clonePrimitives(snap.primitives);
     const nextCustomModels = cloneBgCustomModelInstances(snap.customModels);
-    physicsRuntimeSourceRef.current = {
+    replaceCanonicalDocumentState({
       primitives: nextPrimitives,
       customModels: nextCustomModels,
       document: snap.document,
-    };
-    setPrimitives(nextPrimitives);
-    setCustomModels(nextCustomModels);
-    setSceneBaseDocument(snap.document);
+    });
     applyOrDeferStudioBg3dHistoryCamera(
       viewportApiRef.current,
       pendingInitialCameraRef,
@@ -444,8 +441,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     const live = physicsRuntimeSourceRef.current;
     const next = createPrimitive(kind, live.primitives.length);
     const nextPrimitives = [...live.primitives, next];
-    physicsRuntimeSourceRef.current = { ...live, primitives: nextPrimitives };
-    setPrimitives(nextPrimitives);
+    replaceCanonicalDocumentState({ primitives: nextPrimitives });
     setSelectedIds(new Set([next.id]));
   };
   h.addPrimitive = addPrimitive;
@@ -456,8 +452,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     const parts = instantiateCompositePreset(preset, live.primitives.length);
     if (parts.length === 0 || !canAdmitSceneNodes(parts.length)) return;
     const nextPrimitives = [...live.primitives, ...parts];
-    physicsRuntimeSourceRef.current = { ...live, primitives: nextPrimitives };
-    setPrimitives(nextPrimitives);
+    replaceCanonicalDocumentState({ primitives: nextPrimitives });
     setSelectedIds(new Set([parts[0].id]));
   };
   h.addComposite = addComposite;
@@ -500,8 +495,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     if (!plan.ok) return plan;
 
     const nextPrimitives = [...live.primitives, ...plan.primitives];
-    physicsRuntimeSourceRef.current = { ...live, primitives: nextPrimitives };
-    setPrimitives(nextPrimitives);
+    replaceCanonicalDocumentState({ primitives: nextPrimitives });
     setSelectedIds(new Set([plan.primitives[0].id]));
     return plan;
   };
@@ -532,8 +526,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
       id: allocation.nodeIds[index],
     }));
     const nextPrimitives = [...live.primitives, ...parts];
-    physicsRuntimeSourceRef.current = { ...live, primitives: nextPrimitives };
-    setPrimitives(nextPrimitives);
+    replaceCanonicalDocumentState({ primitives: nextPrimitives });
     setSelectedIds(new Set(allocation.nodeIds));
     setError(null);
   };
@@ -543,8 +536,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     const parts = instantiateStudioBg3dRoomBuild(roomBuilderSpec, live.primitives.length);
     if (parts.length === 0 || !canAdmitSceneNodes(parts.length)) return;
     const nextPrimitives = [...live.primitives, ...parts];
-    physicsRuntimeSourceRef.current = { ...live, primitives: nextPrimitives };
-    setPrimitives(nextPrimitives);
+    replaceCanonicalDocumentState({ primitives: nextPrimitives });
     setSelectedIds(new Set([parts[0].id]));
   };
   h.addRoomBuild = addRoomBuild;
@@ -564,14 +556,11 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     const next = plan.snapshot;
     // This ref is the scene-mutation authority between an event and React's next render. Advance it
     // first so a queued add/template can never observe and resurrect the just-removed instances.
-    physicsRuntimeSourceRef.current = {
+    replaceCanonicalDocumentState({
       primitives: next.primitives,
       customModels: next.customModels,
       document: next.document,
-    };
-    setPrimitives(next.primitives);
-    setCustomModels(next.customModels);
-    setSceneBaseDocument(next.document);
+    });
     if (options.resetHistory) {
       // Deleting the backing IndexedDB bytes is intentionally irreversible. Retaining older
       // snapshots would let Undo resurrect an instance whose attachment and cache no longer exist.
@@ -706,13 +695,10 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     const newModels: BgCustomModelInstance[] = modelPairs.map(preserveSelectedHierarchy);
     const nextPrimitives = [...live.primitives, ...newPrimitives];
     const nextCustomModels = [...live.customModels, ...newModels];
-    physicsRuntimeSourceRef.current = {
-      ...live,
-      primitives: nextPrimitives,
-      customModels: nextCustomModels,
-    };
-    if (newPrimitives.length > 0) setPrimitives(nextPrimitives);
-    if (newModels.length > 0) setCustomModels(nextCustomModels);
+    replaceCanonicalDocumentState({
+      ...(newPrimitives.length > 0 ? { primitives: nextPrimitives } : {}),
+      ...(newModels.length > 0 ? { customModels: nextCustomModels } : {}),
+    });
     const clonedEntities = [...newPrimitives, ...newModels];
     setSelectedIds(new Set(orderStudioBg3dHierarchySelectionRootsFirst(clonedEntities)));
     setError(null);

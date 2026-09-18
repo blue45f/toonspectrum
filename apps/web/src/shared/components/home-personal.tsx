@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useState } from "react";
 
 import { Section, Rail } from "./section";
@@ -98,8 +99,8 @@ export function HomePersonal() {
       {reading.length > 0 && (
         <Section
           eyebrow="WELCOME BACK"
-          title="내 서재에서 이어보기"
-          desc="관심·정주행 중인 작품"
+          title={translateCurrentStaticSourceText("shared.components.home.personal", "ko", "내 서재에서 이어보기")}
+          desc={translateCurrentStaticSourceText("shared.components.home.personal", "ko", "관심·정주행 중인 작품")}
           action={{ label: "내 서재", href: "/library" }}
         >
           <Rail>
@@ -112,8 +113,8 @@ export function HomePersonal() {
       {recent.length > 0 && (
         <Section
           eyebrow="JUMP BACK IN"
-          title="최근 본 작품"
-          desc="둘러봤던 작품으로 빠르게 돌아가기"
+          title={translateCurrentStaticSourceText("shared.components.home.personal", "ko", "최근 본 작품")}
+          desc={translateCurrentStaticSourceText("shared.components.home.personal", "ko", "둘러봤던 작품으로 빠르게 돌아가기")}
           action={{ label: "내 서재", href: "/library" }}
         >
           <Rail>
@@ -126,8 +127,8 @@ export function HomePersonal() {
       {recs.length > 0 && (
         <Section
           eyebrow="FOR YOU"
-          title="당신을 위한 추천"
-          desc="평가·관심 이력으로 고른 작품"
+          title={translateCurrentStaticSourceText("shared.components.home.personal", "ko", "당신을 위한 추천")}
+          desc={translateCurrentStaticSourceText("shared.components.home.personal", "ko", "평가·관심 이력으로 고른 작품")}
           action={{ label: "추천 더 보기", href: "/recommend" }}
         >
           <Rail>

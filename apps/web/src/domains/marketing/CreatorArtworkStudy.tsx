@@ -1,7 +1,19 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowLeftRight, Brush, Grid2X2, Move3D, Pause, Play } from "lucide-react";
 import { useId, useState, type CSSProperties } from "react";
 
 import { CREATOR_ART_ASSETS, type CreatorArtAsset } from "./creator-theme-art";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("CreatorArtworkStudy", ko, en);
 
 const COPY = {
   ko: {
@@ -20,15 +32,16 @@ const COPY = {
 const GUIDE_ICONS = [Brush, Grid2X2, Move3D] as const;
 
 /** A real tonal comparison of the same artwork, with illustrative composition guides. */
-export function CreatorArtworkStudy({ locale, stage, image = CREATOR_ART_ASSETS.world }: { locale: "ko" | "en"; stage: number; image?: CreatorArtAsset }) {
-  const text = COPY[locale];
+export function CreatorArtworkStudy({ locale: _locale, stage, image = CREATOR_ART_ASSETS.world }: { locale: "ko" | "en"; stage: number; image?: CreatorArtAsset }) {
+  useBilingualI18nRevision();
+  const text = bi((COPY).ko, (COPY).en);
   const id = useId();
   const [colorAmount, setColorAmount] = useState(68);
   const [moving, setMoving] = useState(true);
   const Icon = GUIDE_ICONS[stage];
   return (
-    <figure className="cf-art-study" data-study-stage={stage} data-motion={moving ? "running" : "paused"} data-art-asset={image.id} style={{ "--cf-reveal": `${colorAmount}%` } as CSSProperties}>
-      <div className="cf-study-heading"><span>ATELIER STUDY / NO. 001</span><button type="button" className="cf-motion-control" onClick={() => setMoving(!moving)} aria-label={moving ? text.pause : text.play} aria-pressed={moving}>{moving ? <Pause size={13} aria-hidden="true" /> : <Play size={13} aria-hidden="true" />}<span>{moving ? "PAUSE" : "PLAY"}</span></button></div>
+    <figure className="cf-art-study" data-study-stage={stage} data-motion={moving ? translateCurrentStaticSourceText("domains.marketing.CreatorArtworkStudy", "en", "running") : translateCurrentStaticSourceText("domains.marketing.CreatorArtworkStudy", "en", "paused")} data-art-asset={image.id} style={{ "--cf-reveal": `${colorAmount}%` } as CSSProperties}>
+      <div className="cf-study-heading"><span>{translateCurrentStaticSourceText("domains.marketing.CreatorArtworkStudy", "en", "ATELIER STUDY / NO. 001")}</span><button type="button" className="cf-motion-control" onClick={() => setMoving(!moving)} aria-label={moving ? text.pause : text.play} aria-pressed={moving}>{moving ? <Pause size={13} aria-hidden="true" /> : <Play size={13} aria-hidden="true" />}<span>{moving ? translateCurrentStaticSourceText("domains.marketing.CreatorArtworkStudy", "en", "PAUSE") : translateCurrentStaticSourceText("domains.marketing.CreatorArtworkStudy", "en", "PLAY")}</span></button></div>
       <div className="cf-study-scene">
         <div className="cf-study-art cf-study-values"><img src={image.src} srcSet={image.srcSet} sizes="(max-width: 820px) 92vw, 52vw" width={1536} height={1024} alt={text.alt} fetchPriority="high" /></div>
         <div className="cf-study-art cf-study-color" aria-hidden="true"><img src={image.src} srcSet={image.srcSet} sizes="(max-width: 820px) 92vw, 52vw" width={1536} height={1024} alt="" /></div>
@@ -41,7 +54,7 @@ export function CreatorArtworkStudy({ locale, stage, image = CREATOR_ART_ASSETS.
         <div className="cf-study-labels" aria-hidden="true"><span>{text.color}</span><span>{text.tone}</span></div>
         <div className="cf-study-caption"><Icon size={17} aria-hidden="true" /><span>{text.guides[stage]}</span><span aria-hidden="true">0{stage + 1}</span></div>
       </div>
-      <div className="cf-study-controls"><label htmlFor={id}>{text.label}</label><input id={id} type="range" min={0} max={100} value={colorAmount} onChange={(event) => setColorAmount(Number(event.target.value))} aria-valuetext={`${text.color} ${colorAmount}%`} aria-describedby={`${id}-hint`} /><p id={`${id}-hint`}>{text.hint}</p></div>
+      <div className="cf-study-controls"><label htmlFor={id}>{text.label}</label><input id={id} type="range" min={0} max={100} value={colorAmount} onChange={(event) => setColorAmount(Number(event.target.value))} aria-valuetext={`${text.color} ${colorAmount}%`} aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.CreatorArtworkStudy", "en", "{v0}-hint"), { v0: String(id) })} /><p id={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.CreatorArtworkStudy", "en", "{v0}-hint"), { v0: String(id) })}>{text.hint}</p></div>
       <figcaption>{text.caption}</figcaption>
     </figure>
   );

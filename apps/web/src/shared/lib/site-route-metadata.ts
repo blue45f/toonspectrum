@@ -35,6 +35,7 @@ const pathMatchesAny = (pathname: string, routes: readonly string[]) => routes.s
 const DOC_ROUTES = [
   "/about",
   "/accessibility",
+  "/business",
   "/contact",
   "/copyright",
   "/design",
@@ -44,10 +45,15 @@ const DOC_ROUTES = [
   "/privacy",
   "/sitemap",
   "/support",
+  "/support-us",
+  "/support-creators",
   "/terms",
 ] as const;
 
 const STUDIO_PUBLIC_ROUTES = [
+  "/",
+  "/brand-film",
+  "/product-tour",
   "/collaborate",
   "/learn",
   "/market",
@@ -61,7 +67,7 @@ const STUDIO_PUBLIC_ROUTES = [
 ] as const;
 
 const LEARNING_ROUTES = ["/about/workflow", "/learn", "/references", "/research"] as const;
-const CONNECT_ROUTES = ["/collaborate", "/community", "/contact", "/feedback", "/messages", "/showcase", "/support"] as const;
+const CONNECT_ROUTES = ["/business", "/collaborate", "/community", "/contact", "/feedback", "/messages", "/showcase", "/support", "/support-us", "/support-creators"] as const;
 const MANAGE_ROUTES = ["/library", "/me", "/my", "/settings"] as const;
 const TRUST_ROUTES = ["/about", "/about/principles", "/accessibility", "/copyright", "/design", "/guide", "/help", "/privacy", "/sitemap", "/terms"] as const;
 const CREATE_ROUTES = ["/market", "/now", "/opportunities", "/story-lab", "/studio"] as const;
@@ -135,6 +141,8 @@ const DESKTOP_FIRST_ROUTES = [
   "/studio/poser",
 ] as const;
 
+const STUDIO_NAVIGATION_DOC_ROUTES = ["/about/technology", "/help"] as const;
+
 export function resolveSiteRouteMetadata(input: string): SiteRouteMetadata {
   const canonicalPath = canonicalSitePath(input);
   const authority = resolveSiteRouteAuthority(canonicalPath);
@@ -189,6 +197,16 @@ export function resolveSiteRouteMetadata(input: string): SiteRouteMetadata {
     device: pathMatchesAny(canonicalPath, DESKTOP_FIRST_ROUTES) ? "desktop-first" : "responsive",
     projectContext,
   };
+}
+
+
+/** Resolve the product navigation shell from canonical route metadata instead of duplicating route prefixes. */
+export function resolveSiteRouteNavigationContext(input: string): "studio" | "spectrum" {
+  const canonicalPath = canonicalSitePath(input);
+  const metadata = resolveSiteRouteMetadata(canonicalPath);
+  return metadata.product === "studio" || pathMatchesAny(canonicalPath, STUDIO_NAVIGATION_DOC_ROUTES)
+    ? "studio"
+    : "spectrum";
 }
 
 export function siteRouteMetadataSearchText(metadata: SiteRouteMetadata): string {

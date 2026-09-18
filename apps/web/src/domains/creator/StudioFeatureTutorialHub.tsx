@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * 기능별 튜토리얼 허브 — 목록 + 단계 카드 + 따라 해보기.
  * StudioShortcutsHelp 와 같은 모달 계약(포커스·Esc·포털).
@@ -444,8 +447,8 @@ export function StudioFeatureTutorialHub({
             className="shrink-0 border-b border-warning/35 bg-warning/10 px-4 py-1.5 text-[0.65rem] text-fg-2"
           >
             {preferSourceCopy
-              ? "튜토리얼 진행도는 저장소를 다시 연결하기 전까지 이번 탭에서만 유지됩니다."
-              : "Tutorial progress stays in this tab until local storage is available again."}
+              ? translateCurrentStaticSourceText("domains.creator.StudioFeatureTutorialHub", "ko", "튜토리얼 진행도는 저장소를 다시 연결하기 전까지 이번 탭에서만 유지됩니다.")
+              : translateCurrentStaticSourceText("domains.creator.StudioFeatureTutorialHub", "en", "Tutorial progress stays in this tab until local storage is available again.")}
           </p>
         ) : null}
 
@@ -520,7 +523,7 @@ export function StudioFeatureTutorialHub({
                             type="button"
                             onClick={() => selectTutorial(item)}
                             aria-label={localizedTitle}
-                            aria-current={isActive ? "true" : undefined}
+                            aria-current={isActive ? translateCurrentStaticSourceText("domains.creator.StudioFeatureTutorialHub", "en", "true") : undefined}
                             className={cn(
                               "flex min-h-11 w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left transition-colors duration-150 md:min-h-9 pointer-coarse:min-h-11",
                               isActive
@@ -612,7 +615,7 @@ export function StudioFeatureTutorialHub({
                     type="button"
                     onClick={() => setStepIndex(i)}
                     aria-label={`${t("studio.hub.stepAriaPrefix")} ${i + 1}`}
-                    aria-current={i === stepIndex ? "step" : undefined}
+                    aria-current={i === stepIndex ? translateCurrentStaticSourceText("domains.creator.StudioFeatureTutorialHub", "en", "step") : undefined}
                     className="grid size-11 shrink-0 place-items-center rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:size-9 pointer-coarse:size-11"
                   >
                     <span

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 // "3D 배경" 도구의 씬 템플릿 피커 — StudioBackground3D.tsx "도형" 탭의 복합 오브젝트 프리셋 그리드와
 // 같은 패턴(카테고리 칩 + 카드 그리드)을 쓰되, 한 항목이 건물 한 채가 아니라 "교실"·"거리"처럼 이미
 // 여러 프리셋이 배치된 완성된 공간이라는 차이가 있다. 프레젠테이션 전용(무상태) — 카테고리 선택 상태와
@@ -153,8 +157,7 @@ export function StudioBg3dSceneTemplatePanel({
   return (
     <div>
       <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
-        건물·나무·소품 여러 개가 이미 자연스럽게 배치된 완성형 공간을 한 번에 추가합니다. 추가한 뒤에도 각 부품을 따로 선택해 다듬을 수 있어요.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "건물·나무·소품 여러 개가 이미 자연스럽게 배치된 완성형 공간을 한 번에 추가합니다. 추가한 뒤에도 각 부품을 따로 선택해 다듬을 수 있어요.")}</p>
 
       <div className="mb-2.5 flex flex-wrap gap-1.5">
         <button
@@ -165,8 +168,7 @@ export function StudioBg3dSceneTemplatePanel({
           )}
           onClick={() => onCategoryChange(null)}
         >
-          전체
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "전체")}</button>
         {templateCategories.map((cat) => (
           <button
             key={cat}
@@ -202,29 +204,26 @@ export function StudioBg3dSceneTemplatePanel({
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1.5 text-xs font-semibold text-fg">
                   {template.label}
-                  <span className="rounded-full bg-panel px-1.5 py-0.5 text-[0.6rem] font-medium text-fg-3">오브젝트 {estimatedObjectCount(template, compositePresets)}개</span>
+                  <span className="rounded-full bg-panel px-1.5 py-0.5 text-[0.6rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "오브젝트 ")}{estimatedObjectCount(template, compositePresets)}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "개")}</span>
                 </span>
                 <span className="mt-0.5 block text-[0.66rem] leading-snug text-fg-3">{template.description}</span>
               </span>
             </button>
           );
         })}
-        {visibleTemplates.length === 0 ? <p className="py-4 text-center text-[0.68rem] text-fg-3">이 카테고리에는 아직 템플릿이 없어요.</p> : null}
+        {visibleTemplates.length === 0 ? <p className="py-4 text-center text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "이 카테고리에는 아직 템플릿이 없어요.")}</p> : null}
       </div>
 
       <section className="mt-5 border-t border-line pt-4" aria-labelledby="bg3d-template-organizer-title">
         <div className="mb-2 flex items-center justify-between gap-3">
           <h4 id="bg3d-template-organizer-title" className="flex items-center gap-1.5 text-xs font-bold text-fg">
             <Layers size={14} className="text-accent" aria-hidden />
-            추가된 템플릿 정리
-          </h4>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "추가된 템플릿 정리")}</h4>
           <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-semibold text-fg-3">
-            {templateInstances.length}개 묶음
-          </span>
+            {templateInstances.length}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "개 묶음")}</span>
         </div>
         <p className="mb-3 text-[0.66rem] leading-relaxed text-fg-3">
-          템플릿 부품을 한 묶음으로 선택하거나, 바닥에 붙이고 묶음 사이를 1m 간격으로 정돈할 수 있어요.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "템플릿 부품을 한 묶음으로 선택하거나, 바닥에 붙이고 묶음 사이를 1m 간격으로 정돈할 수 있어요.")}</p>
 
         {organizationDisabledReason ? (
           <p role="status" className="mb-3 rounded-lg border border-line bg-card/70 px-2.5 py-2 text-[0.65rem] leading-relaxed text-fg-3">
@@ -234,7 +233,7 @@ export function StudioBg3dSceneTemplatePanel({
 
         {templateInstances.length > 0 ? (
           <>
-            <div className="mb-3 grid grid-cols-2 gap-1.5" role="group" aria-label="모든 템플릿 정리">
+            <div className="mb-3 grid grid-cols-2 gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "모든 템플릿 정리")}>
               <button
                 type="button"
                 className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9"
@@ -242,28 +241,25 @@ export function StudioBg3dSceneTemplatePanel({
                 onClick={() => { setPendingDelete(null); onSelectAllTemplateInstances(); }}
               >
                 <Layers size={13} aria-hidden />
-                전체 선택
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "전체 선택")}</button>
               <button
                 type="button"
                 className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9"
                 disabled={organizationDisabled || !allArrangeAvailable}
-                title={!allArrangeAvailable ? "잠긴 템플릿 객체의 잠금을 먼저 해제해 주세요." : undefined}
+                title={!allArrangeAvailable ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "잠긴 템플릿 객체의 잠금을 먼저 해제해 주세요.") : undefined}
                 onClick={() => { setPendingDelete(null); onArrangeAllTemplateInstances(); }}
               >
                 <Move size={13} aria-hidden />
-                바닥 · 간격 정돈
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "바닥 · 간격 정돈")}</button>
               <button
                 type="button"
                 className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9"
                 disabled={organizationDisabled || !allResetAvailable}
-                title={!allResetAvailable ? "원본을 찾을 수 없거나 잠긴 템플릿이 있습니다." : undefined}
+                title={!allResetAvailable ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "원본을 찾을 수 없거나 잠긴 템플릿이 있습니다.") : undefined}
                 onClick={() => { setPendingDelete(null); onResetAllTemplateInstances(); }}
               >
                 <RotateCcw size={13} aria-hidden />
-                전체 원래 배치
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "전체 원래 배치")}</button>
               <button
                 type="button"
                 className={cx(
@@ -292,12 +288,12 @@ export function StudioBg3dSceneTemplatePanel({
                 <Trash2 size={13} aria-hidden />
                 {pendingDelete?.kind === "all"
                   && pendingDelete.membershipSignature === templateMembershipSignature
-                  ? "전체 삭제 확인"
-                  : "전체 삭제"}
+                  ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "전체 삭제 확인")
+                  : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "전체 삭제")}
               </button>
             </div>
 
-            <div className="space-y-2" aria-label="추가된 템플릿 묶음">
+            <div className="space-y-2" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "추가된 템플릿 묶음")}>
               {templateInstances.map((instance) => {
                 const confirmingDelete = pendingDelete?.kind === "instance"
                   && pendingDelete.id === instance.id;
@@ -318,14 +314,12 @@ export function StudioBg3dSceneTemplatePanel({
                       <div className="min-w-0">
                         <p className="truncate text-xs font-bold text-fg">{instance.label}</p>
                         <p className="mt-0.5 text-[0.62rem] text-fg-3">
-                          {instance.sourceKind === "catalog" ? "기본 씬" : "내 템플릿"} · 오브젝트 {instance.nodeCount}개
-                          {instance.lockedNodeCount > 0 ? ` · 잠김 ${instance.lockedNodeCount}개` : ""}
+                          {instance.sourceKind === "catalog" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "기본 씬") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "내 템플릿")} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "· 오브젝트 ")}{instance.nodeCount}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "개")}{instance.lockedNodeCount > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", " · 잠김 {v0}개"), { v0: String(instance.lockedNodeCount) }) : ""}
                         </p>
                       </div>
                       {instance.selected ? (
                         <span className="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.6rem] font-bold text-accent">
-                          묶음 선택됨
-                        </span>
+                          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "묶음 선택됨")}</span>
                       ) : null}
                     </div>
                     <div className="grid grid-cols-2 gap-1.5">
@@ -335,17 +329,15 @@ export function StudioBg3dSceneTemplatePanel({
                         disabled={organizationDisabled}
                         onClick={() => runInstanceAction(onSelectTemplateInstance, instance.id)}
                       >
-                        <Layers size={12} aria-hidden /> 묶음 선택
-                      </button>
+                        <Layers size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "묶음 선택")}</button>
                       <button
                         type="button"
                         className="inline-flex min-h-11 items-center justify-center gap-1 rounded-md border border-line bg-panel px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50 sm:min-h-9"
                         disabled={organizationDisabled || instance.lockedNodeCount > 0}
-                        title={instance.lockedNodeCount > 0 ? "잠긴 최상위 객체를 먼저 해제해 주세요." : undefined}
+                        title={instance.lockedNodeCount > 0 ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "잠긴 최상위 객체를 먼저 해제해 주세요.") : undefined}
                         onClick={() => runInstanceAction(onGroundTemplateInstance, instance.id)}
                       >
-                        <LocateFixed size={12} aria-hidden /> 바닥 접지
-                      </button>
+                        <LocateFixed size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "바닥 접지")}</button>
                       <button
                         type="button"
                         className="inline-flex min-h-11 items-center justify-center gap-1 rounded-md border border-line bg-panel px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50 sm:min-h-9"
@@ -353,8 +345,7 @@ export function StudioBg3dSceneTemplatePanel({
                         title={!instance.resetAvailable ? resetUnavailableReason : undefined}
                         onClick={() => runInstanceAction(onResetTemplateInstance, instance.id)}
                       >
-                        <RotateCcw size={12} aria-hidden /> 원래 배치
-                      </button>
+                        <RotateCcw size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "원래 배치")}</button>
                       <button
                         type="button"
                         className={cx(
@@ -374,7 +365,7 @@ export function StudioBg3dSceneTemplatePanel({
                         }}
                       >
                         <Trash2 size={12} aria-hidden />
-                        {confirmingDelete ? "묶음 삭제 확인" : "묶음 삭제"}
+                        {confirmingDelete ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "묶음 삭제 확인") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "묶음 삭제")}
                       </button>
                     </div>
                   </article>
@@ -384,8 +375,7 @@ export function StudioBg3dSceneTemplatePanel({
           </>
         ) : (
           <p className="rounded-lg border border-dashed border-line bg-card/40 px-3 py-3 text-center text-[0.66rem] leading-relaxed text-fg-3">
-            추적 가능한 템플릿 배치가 없습니다. 새 씬 템플릿이나 내 템플릿을 추가하면 이곳에서 한 묶음으로 정리할 수 있어요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneTemplatePanel", "ko", "추적 가능한 템플릿 배치가 없습니다. 새 씬 템플릿이나 내 템플릿을 추가하면 이곳에서 한 묶음으로 정리할 수 있어요.")}</p>
         )}
       </section>
     </div>

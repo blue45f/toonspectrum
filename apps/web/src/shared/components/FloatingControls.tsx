@@ -178,13 +178,13 @@ export function FloatingControls({
       {/* 언어 선택 — 전 세계 언어 카탈로그와 안전한 영어 폴백을 제공합니다. */}
       {showLang && (
         <div
-          className="inline-flex h-11 items-center gap-1 rounded-full border border-line bg-panel/95 p-0.5 shadow-lg shadow-[oklch(0.1_0.02_70/0.35)] backdrop-blur"
+          className="inline-flex h-[44px] items-center gap-1 rounded-full border border-line bg-panel/95 p-0.5 shadow-lg shadow-[oklch(0.1_0.02_70/0.35)] backdrop-blur"
         >
           <select
             aria-label={t("control.language.label")}
             value={lang}
             onChange={(event) => setLang(event.target.value)}
-            className="max-w-[14rem] rounded-full bg-transparent px-2 py-2 text-xs font-semibold text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/35"
+            className="h-[44px] min-h-[44px] max-w-[14rem] rounded-full bg-transparent px-2 py-2 text-xs font-semibold text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/35"
           >
             <optgroup label={t("control.language.group.translated")}>
               {languageGroups.translated.map((option) => (

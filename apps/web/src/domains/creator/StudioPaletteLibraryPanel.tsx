@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 // Palette library manager. The compact panel is mounted inside Studio's lazy style popover;
 // binary/text interchange codecs remain in a second intent-loaded chunk.
 import {
@@ -683,27 +687,26 @@ export function StudioPaletteLibraryPanel({
 
   return (
     <section
-      aria-label="내 팔레트 라이브러리"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "내 팔레트 라이브러리")}
       aria-busy={busy}
       data-studio-palette-authority={storageState}
     >
       <div className="mb-2">
-        <p className="text-xs font-semibold text-fg">내 팔레트</p>
+        <p className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "내 팔레트")}</p>
         <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">
-          GPL·Adobe·JASC·CSS·JSON을 한 곳에서 교환합니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "GPL·Adobe·JASC·CSS·JSON을 한 곳에서 교환합니다.")}</p>
       </div>
 
       <p className="mb-2 text-[0.6rem] font-semibold text-fg-3" aria-live="polite">
         {storageState === "loading"
-          ? "SQLite/OPFS 팔레트 확인 중"
+          ? translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "SQLite/OPFS 팔레트 확인 중")
           : storageState === "sqlite"
-            ? "이 기기 SQLite/OPFS 저장"
+            ? translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "이 기기 SQLite/OPFS 저장")
             : storageState === "memory"
-              ? "현재 탭 메모리 임시 · 새로고침 시 사라짐"
+              ? translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "현재 탭 메모리 임시 · 새로고침 시 사라짐")
               : storageState === "unavailable"
-                ? "SQLite/OPFS 사용 불가 · 저장되지 않음"
-                : "주입 저장소"}
+                ? translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "SQLite/OPFS 사용 불가 · 저장되지 않음")
+                : translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "주입 저장소")}
       </p>
 
       {message && (
@@ -714,8 +717,8 @@ export function StudioPaletteLibraryPanel({
             message.tone === "warning" && "border-warn/40 bg-warn/10 text-fg",
             message.tone === "success" && "border-good/35 bg-good/10 text-fg"
           )}
-          role={message.tone === "error" ? "alert" : "status"}
-          aria-live={message.tone === "error" ? "assertive" : "polite"}
+          role={message.tone === "error" ? translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "en", "status")}
+          aria-live={message.tone === "error" ? translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "en", "assertive") : translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "en", "polite")}
         >
           <div className="flex items-start gap-1.5 font-semibold">
             {message.tone === "success" ? (
@@ -735,7 +738,7 @@ export function StudioPaletteLibraryPanel({
 
       {busyOperation && (
         <p className="sr-only" role="status" aria-live="polite">
-          {busyOperation.kind === "import" ? "팔레트 파일을 확인하고 있어요." : "팔레트 파일을 만들고 있어요."}
+          {busyOperation.kind === "import" ? translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "팔레트 파일을 확인하고 있어요.") : translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "팔레트 파일을 만들고 있어요.")}
         </p>
       )}
 
@@ -747,11 +750,11 @@ export function StudioPaletteLibraryPanel({
           )}
           onPointerEnter={preloadStudioPaletteInterchangeModule}
         >
-          <Upload size={14} aria-hidden /> {busyOperation?.kind === "import" ? "확인 중…" : "파일 가져오기"}
+          <Upload size={14} aria-hidden /> {busyOperation?.kind === "import" ? translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "확인 중…") : translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "파일 가져오기")}
           <input
             type="file"
             accept={PALETTE_IMPORT_ACCEPT}
-            aria-label="팔레트 파일 가져오기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "팔레트 파일 가져오기")}
             className="sr-only"
             disabled={busy}
             onFocus={preloadStudioPaletteInterchangeModule}
@@ -762,19 +765,18 @@ export function StudioPaletteLibraryPanel({
           type="button"
           onClick={handleCreateFromRecent}
           disabled={busy || !seedColors || seedColors.length === 0}
-          title={seedColors && seedColors.length > 0 ? "최근 사용한 색으로 새 팔레트 만들기" : "최근 사용한 색이 없어요"}
+          title={seedColors && seedColors.length > 0 ? translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "최근 사용한 색으로 새 팔레트 만들기") : translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "최근 사용한 색이 없어요")}
           className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors duration-150 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Plus size={14} aria-hidden /> 최근 색으로 만들기
-        </button>
+          <Plus size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "최근 색으로 만들기")}</button>
       </div>
 
       <label className="mb-2 block" onPointerEnter={preloadStudioPaletteInterchangeModule}>
-        <span className="mb-1 block text-[0.66rem] font-semibold text-fg-2">내보내기 형식</span>
+        <span className="mb-1 block text-[0.66rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "내보내기 형식")}</span>
         <select
           value={exportFormat}
           disabled={busy}
-          aria-label="내보내기 형식"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "내보내기 형식")}
           aria-describedby="palette-export-format-description"
           onFocus={preloadStudioPaletteInterchangeModule}
           onChange={(event) => setExportFormat(event.target.value as StudioPaletteInterchangeFormat)}
@@ -797,8 +799,7 @@ export function StudioPaletteLibraryPanel({
           creatorOpen ? "bg-raised text-fg-2" : "text-fg-3 hover:text-fg-2"
         )}
       >
-        직접 입력
-      </button>
+        {translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "직접 입력")}</button>
 
       {creatorOpen && (
         <div className="mb-2 flex flex-col gap-1.5 border-y border-line bg-card/50 py-2">
@@ -807,16 +808,16 @@ export function StudioPaletteLibraryPanel({
             value={newName}
             disabled={busy}
             onChange={(event) => setNewName(event.target.value)}
-            placeholder="팔레트 이름"
-            aria-label="새 팔레트 이름"
+            placeholder={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "팔레트 이름")}
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "새 팔레트 이름")}
             className="min-h-11 rounded-lg border border-line bg-panel px-2.5 text-xs text-fg outline-none placeholder:text-fg-2 focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           />
           <textarea
             value={newColorsText}
             disabled={busy}
             onChange={(event) => setNewColorsText(event.target.value)}
-            placeholder="#ff0000 #00ff00 #0000ff — 공백이나 쉼표로 구분"
-            aria-label="새 팔레트 색상 코드"
+            placeholder={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "#ff0000 #00ff00 #0000ff — 공백이나 쉼표로 구분")}
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "새 팔레트 색상 코드")}
             rows={3}
             className="min-h-[4.5rem] resize-none rounded-lg border border-line bg-panel px-2.5 py-2 text-xs leading-relaxed text-fg outline-none placeholder:text-fg-2 focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           />
@@ -826,36 +827,31 @@ export function StudioPaletteLibraryPanel({
             disabled={busy || !newColorsText.trim()}
             className="min-h-11 rounded-lg bg-accent px-3 text-[0.68rem] font-semibold text-on-accent transition-colors duration-150 hover:bg-accent-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
           >
-            팔레트 만들기
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "팔레트 만들기")}</button>
         </div>
       )}
 
       {/* Tabs: 내 팔레트 vs 웹툰 추천 프리셋 */}
-      <div className="mb-2 flex rounded-lg border border-line bg-raised/50 p-0.5" role="tablist" aria-label="팔레트 보기 방식">
+      <div className="mb-2 flex rounded-lg border border-line bg-raised/50 p-0.5" role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "팔레트 보기 방식")}>
         <button
           type="button"
           role="tab"
           aria-selected={activeTab === "all"}
-          aria-label="내 팔레트 목록"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "내 팔레트 목록")}
           onClick={() => setActiveTab("all")}
-          className={`flex-1 rounded py-1 text-[0.65rem] font-medium transition-colors ${
-            activeTab === "all" ? "bg-card text-accent shadow-sm" : "text-fg-3 hover:text-fg-2"
-          }`}
+          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "en", "flex-1 rounded py-1 text-[0.65rem] font-medium transition-colors {v0}"), { v0: String(activeTab === "all" ? "bg-card text-accent shadow-sm" : "text-fg-3 hover:text-fg-2") })}
         >
-          내 팔레트 ({palettes.length})
+          {translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "내 팔레트 (")}{palettes.length})
         </button>
         <button
           type="button"
           role="tab"
           aria-selected={activeTab === "presets"}
-          aria-label="웹툰 추천 프리셋 보기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "웹툰 추천 프리셋 보기")}
           onClick={() => setActiveTab("presets")}
-          className={`flex-1 rounded py-1 text-[0.65rem] font-medium transition-colors ${
-            activeTab === "presets" ? "bg-card text-accent shadow-sm" : "text-fg-3 hover:text-fg-2"
-          }`}
+          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "en", "flex-1 rounded py-1 text-[0.65rem] font-medium transition-colors {v0}"), { v0: String(activeTab === "presets" ? "bg-card text-accent shadow-sm" : "text-fg-3 hover:text-fg-2") })}
         >
-          웹툰 추천 ({WEBTOON_PRESETS.length})
+          {translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "웹툰 추천 (")}{WEBTOON_PRESETS.length})
         </button>
       </div>
 
@@ -867,12 +863,11 @@ export function StudioPaletteLibraryPanel({
                 <span className="text-xs font-semibold text-fg-1">{preset.name}</span>
                 <button
                   type="button"
-                  aria-label={`${preset.name} 내 팔레트로 저장`}
+                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "{v0} 내 팔레트로 저장"), { v0: String(preset.name) })}
                   onClick={() => handleSavePreset(preset.name, preset.colors)}
                   className="flex items-center gap-1 rounded border border-line bg-raised px-1.5 py-0.5 text-[0.58rem] font-medium text-fg-2 hover:border-accent hover:text-accent"
                 >
-                  <Sparkles className="size-2.5" aria-hidden /> 내 저장소에 복사
-                </button>
+                  <Sparkles className="size-2.5" aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "내 저장소에 복사")}</button>
               </div>
               <div
                 className="my-1.5 h-1.5 w-full rounded-full shadow-inner opacity-90"
@@ -883,7 +878,7 @@ export function StudioPaletteLibraryPanel({
                   <button
                     key={hex}
                     type="button"
-                    aria-label={`${preset.name} 색상 ${hex} 선택`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "{v0} 색상 {v1} 선택"), { v0: String(preset.name), v1: String(hex) })}
                     onClick={() => onPickColor(hex)}
                     className="size-7 rounded border border-line transition-transform hover:scale-105 active:scale-95"
                     style={{ backgroundColor: hex }}
@@ -902,8 +897,8 @@ export function StudioPaletteLibraryPanel({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="팔레트 검색..."
-                aria-label="팔레트 검색"
+                placeholder={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "팔레트 검색...")}
+                aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "팔레트 검색")}
                 className="h-8 w-full rounded-lg border border-line bg-panel pl-8 pr-2.5 text-xs text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none"
               />
             </div>
@@ -911,10 +906,9 @@ export function StudioPaletteLibraryPanel({
 
           {palettes.length === 0 ? (
             <p className="rounded-lg border border-dashed border-line px-3 py-5 text-center text-[0.68rem] leading-relaxed text-fg-3">
-              아직 저장된 팔레트가 없어요.<br />GPL·Adobe·JASC·CSS·JSON 파일을 가져오거나 최근 색으로 시작하세요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "아직 저장된 팔레트가 없어요.")}<br />{translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "GPL·Adobe·JASC·CSS·JSON 파일을 가져오거나 최근 색으로 시작하세요.")}</p>
           ) : (
-            <div className="max-h-80 space-y-1.5 overflow-y-auto pr-1" aria-label={`저장된 팔레트 ${palettes.length}개`}>
+            <div className="max-h-80 space-y-1.5 overflow-y-auto pr-1" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "저장된 팔레트 {v0}개"), { v0: String(palettes.length) })}>
               {filteredPalettes.map((palette) => {
                 const isExpanded = expandedPaletteIds.has(palette.id);
                 const colorsToShow = isExpanded ? palette.colors : palette.colors.slice(0, SWATCH_PREVIEW_COUNT);
@@ -934,7 +928,7 @@ export function StudioPaletteLibraryPanel({
                           type="text"
                           value={renamingName}
                           disabled={busy}
-                          aria-label={`${palette.name} 새 이름`}
+                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "{v0} 새 이름"), { v0: String(palette.name) })}
                           onChange={(event) => setRenamingName(event.target.value)}
                           onBlur={commitRename}
                           onKeyDown={handleRenameKeyDown}
@@ -945,7 +939,7 @@ export function StudioPaletteLibraryPanel({
                       ) : (
                         <span className="min-w-0 flex-1 truncate text-xs font-medium text-fg" title={palette.name}>
                           {palette.name}
-                          <span className="ml-1 text-[0.62rem] text-fg-3">{palette.colors.length}색</span>
+                          <span className="ml-1 text-[0.62rem] text-fg-3">{palette.colors.length}{translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "색")}</span>
                         </span>
                       )}
 
@@ -954,8 +948,8 @@ export function StudioPaletteLibraryPanel({
                         type="button"
                         onClick={() => handleDuplicate(palette)}
                         disabled={busy}
-                        aria-label={`${palette.name} 팔레트 복제`}
-                        title="복제"
+                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "{v0} 팔레트 복제"), { v0: String(palette.name) })}
+                        title={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "복제")}
                         className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
                       >
                         <Copy size={14} aria-hidden />
@@ -967,8 +961,8 @@ export function StudioPaletteLibraryPanel({
                           type="button"
                           onClick={() => handleAddColor(palette, seedColors[0]!)}
                           disabled={busy || palette.colors.includes(seedColors[0]!.toLowerCase())}
-                          aria-label={`${palette.name}에 현재 색 ${seedColors[0]} 추가`}
-                          title="현재 색 추가"
+                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "{v0}에 현재 색 {v1} 추가"), { v0: String(palette.name), v1: String(seedColors[0]) })}
+                          title={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "현재 색 추가")}
                           className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-good focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
                         >
                           <Plus size={14} aria-hidden />
@@ -979,8 +973,8 @@ export function StudioPaletteLibraryPanel({
                         type="button"
                         onClick={() => startRename(palette)}
                         disabled={busy}
-                        aria-label={`${palette.name} 이름 변경`}
-                        title="이름 변경"
+                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "{v0} 이름 변경"), { v0: String(palette.name) })}
+                        title={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "이름 변경")}
                         className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
                       >
                         <Pencil size={14} aria-hidden />
@@ -989,8 +983,8 @@ export function StudioPaletteLibraryPanel({
                         type="button"
                         onClick={() => void handleExport(palette)}
                         disabled={busy}
-                        aria-label={`${palette.name} ${selectedFormat.shortLabel}로 내보내기`}
-                        title={`${selectedFormat.label}로 내보내기`}
+                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "{v0} {v1}로 내보내기"), { v0: String(palette.name), v1: String(selectedFormat.shortLabel) })}
+                        title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "{v0}로 내보내기"), { v0: String(selectedFormat.label) })}
                         className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
                       >
                         <Download size={14} aria-hidden />
@@ -999,8 +993,8 @@ export function StudioPaletteLibraryPanel({
                         type="button"
                         onClick={() => handleDelete(palette.id)}
                         disabled={busy}
-                        aria-label={`${palette.name} 팔레트 삭제`}
-                        title="삭제"
+                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "{v0} 팔레트 삭제"), { v0: String(palette.name) })}
+                        title={translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "삭제")}
                         className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-bad disabled:cursor-wait disabled:opacity-45"
                       >
                         <X size={14} aria-hidden />
@@ -1014,7 +1008,7 @@ export function StudioPaletteLibraryPanel({
                           type="button"
                           onClick={() => onPickColor(hex)}
                           disabled={busy}
-                          aria-label={`${palette.name} 색상 ${hex} 선택`}
+                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "{v0} 색상 {v1} 선택"), { v0: String(palette.name), v1: String(hex) })}
                           title={hex}
                           className="size-11 rounded-lg border border-line-strong shadow-[0_0_0_1px_oklch(0.15_0.008_70/0.35)_inset] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-55"
                           style={{ background: hex }}
@@ -1024,7 +1018,7 @@ export function StudioPaletteLibraryPanel({
                         <button
                           type="button"
                           onClick={() => setExpandedPaletteIds((prev) => new Set([...prev, palette.id]))}
-                          aria-label={`${palette.name} 모든 ${palette.colors.length}색 펼치기`}
+                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteLibraryPanel", "ko", "{v0} 모든 {v1}색 펼치기"), { v0: String(palette.name), v1: String(palette.colors.length) })}
                           className="flex size-11 items-center justify-center rounded-lg border border-line px-1 text-[0.62rem] font-semibold text-fg-3 hover:bg-raised hover:text-fg-1"
                         >
                           +{palette.colors.length - SWATCH_PREVIEW_COUNT}

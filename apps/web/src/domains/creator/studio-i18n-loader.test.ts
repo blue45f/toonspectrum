@@ -220,14 +220,18 @@ describe("Studio lazy i18n assets", () => {
       path.resolve(process.cwd(), "apps/web/src/domains/creator/StudioToolsCompanionPage.tsx"),
       "utf8",
     );
-    const creatorRoutesSource = readFileSync(
-      path.resolve(process.cwd(), "apps/web/src/app/routes/groups/creator.routes.tsx"),
+    const creatorRoutePagesSource = readFileSync(
+      path.resolve(
+        process.cwd(),
+        "apps/web/src/app/routes/groups/creator-route-pages.ts",
+      ),
       "utf8",
     );
 
     expect(i18nSource).not.toMatch(/^\s+"studio\.[^"]+":/mu);
     expect(studioPageSource).not.toContain("studio-i18n");
     expect(companionSource).not.toContain("studio-i18n");
-    expect(creatorRoutesSource).toContain("loadStudioI18nDictionaries()");
+    expect(creatorRoutePagesSource).toContain("preloadStudioI18nCore()");
+    expect(creatorRoutePagesSource).toContain("startStudioI18nCorePreload()");
   });
 });

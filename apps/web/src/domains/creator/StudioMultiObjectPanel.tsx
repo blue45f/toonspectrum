@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio 3D 다중 오브젝트 배치 패널(Multi-Object Placement Panel).
  *
@@ -49,17 +53,16 @@ export function StudioMultiObjectPanel({
   return (
     <div className="space-y-3">
       <StudioSectionHeader
-        title="3D 소품 배치"
-        description="룸 프리셋으로 일괄 배치하거나 개별 오브젝트를 관리하세요."
+        title={translateCurrentStaticSourceText("domains.creator.StudioMultiObjectPanel", "ko", "3D 소품 배치")}
+        description={translateCurrentStaticSourceText("domains.creator.StudioMultiObjectPanel", "ko", "룸 프리셋으로 일괄 배치하거나 개별 오브젝트를 관리하세요.")}
       />
 
       {/* 룸 레이아웃 프리셋 */}
       <div className="space-y-1">
         <span className="text-xs font-semibold text-fg-2">
           <Layers size={12} className="mr-1 inline-block align-[-2px]" aria-hidden />
-          룸 레이아웃 프리셋
-        </span>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="룸 레이아웃 프리셋">
+          {translateCurrentStaticSourceText("domains.creator.StudioMultiObjectPanel", "ko", "룸 레이아웃 프리셋")}</span>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioMultiObjectPanel", "ko", "룸 레이아웃 프리셋")}>
           {STUDIO_ROOM_LAYOUT_PRESETS.map((preset) => (
             <StudioPanelChip
               key={preset.id}
@@ -75,12 +78,11 @@ export function StudioMultiObjectPanel({
       {/* 배치된 오브젝트 리스트 */}
       <div className="space-y-1">
         <span className="text-xs font-semibold text-fg-2">
-          배치된 오브젝트 ({objects.length})
+          {translateCurrentStaticSourceText("domains.creator.StudioMultiObjectPanel", "ko", "배치된 오브젝트 (")}{objects.length})
         </span>
         {objects.length === 0 ? (
           <p className="rounded-lg border border-dashed border-line/70 bg-card/60 p-3 text-[0.7rem] leading-relaxed text-fg-3">
-            배치된 3D 소품이 없습니다. 룸 프리셋을 적용하거나 모델을 추가하세요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioMultiObjectPanel", "ko", "배치된 3D 소품이 없습니다. 룸 프리셋을 적용하거나 모델을 추가하세요.")}</p>
         ) : (
           <div className="max-h-48 space-y-0.5 overflow-y-auto rounded-md border border-line/50 bg-card/40 p-1">
             {objects.map((obj) => (
@@ -95,11 +97,9 @@ export function StudioMultiObjectPanel({
                     setSelectedId((prev) => (prev === obj.id ? null : obj.id));
                   }
                 }}
-                className={`flex items-center gap-1.5 rounded px-2 py-1.5 text-[0.72rem] transition-colors ${
-                  selectedId === obj.id
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioMultiObjectPanel", "en", "flex items-center gap-1.5 rounded px-2 py-1.5 text-[0.72rem] transition-colors {v0}"), { v0: String(selectedId === obj.id
                     ? "bg-accent/15 text-accent"
-                    : "text-fg-2 hover:bg-card/80"
-                }`}
+                    : "text-fg-2 hover:bg-card/80") })}
               >
                 <GripVertical size={11} className="shrink-0 text-fg-3" aria-hidden />
                 <span className="min-w-0 flex-1 truncate">{obj.name}</span>
@@ -111,7 +111,7 @@ export function StudioMultiObjectPanel({
                       onSnapToFloor(obj.id);
                     }}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "!px-1" })}
-                    title="바닥 스냅"
+                    title={translateCurrentStaticSourceText("domains.creator.StudioMultiObjectPanel", "ko", "바닥 스냅")}
                   >
                     <RotateCcw size={11} aria-hidden />
                   </button>
@@ -122,7 +122,7 @@ export function StudioMultiObjectPanel({
                       onDuplicate(obj.id);
                     }}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "!px-1" })}
-                    title="복제"
+                    title={translateCurrentStaticSourceText("domains.creator.StudioMultiObjectPanel", "ko", "복제")}
                   >
                     <Copy size={11} aria-hidden />
                   </button>
@@ -133,7 +133,7 @@ export function StudioMultiObjectPanel({
                       onRemove(obj.id);
                     }}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "!px-1 text-rose-400" })}
-                    title="삭제"
+                    title={translateCurrentStaticSourceText("domains.creator.StudioMultiObjectPanel", "ko", "삭제")}
                   >
                     <Trash2 size={11} aria-hidden />
                   </button>
@@ -151,8 +151,7 @@ export function StudioMultiObjectPanel({
         return (
           <div className="space-y-2 rounded-lg border border-line/50 bg-card/40 p-2">
             <span className="text-xs font-semibold text-fg-2">
-              「{obj.name}」 Transform
-            </span>
+              「{obj.name}{translateCurrentStaticSourceText("domains.creator.StudioMultiObjectPanel", "en", "」 Transform")}</span>
             <StudioSliderRow
               label="X"
               min={-10}

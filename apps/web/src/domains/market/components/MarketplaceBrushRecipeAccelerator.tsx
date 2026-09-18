@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useMemo, useState, type ReactElement } from "react";
 
 import {
@@ -240,18 +243,16 @@ export function MarketplaceBrushRecipeAccelerator({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h4 id="market-brush-recipe-lab-title" className="text-base font-bold text-fg">
-            브러시 레시피 랩
-          </h4>
+            {translateCurrentStaticSourceText("domains.market.components.MarketplaceBrushRecipeAccelerator", "ko", "브러시 레시피 랩")}</h4>
           <p className="mt-1 text-xs leading-5 text-fg-2">
-            제작 목적에 맞는 다중 엔진 기준점을 선택한 뒤 모든 패스와 입력 매핑을 수정하세요.
-          </p>
+            {translateCurrentStaticSourceText("domains.market.components.MarketplaceBrushRecipeAccelerator", "ko", "제작 목적에 맞는 다중 엔진 기준점을 선택한 뒤 모든 패스와 입력 매핑을 수정하세요.")}</p>
         </div>
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
           className="min-h-10 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg"
         >
-          {expanded ? "고급 편집 닫기" : "고급 편집 열기"}
+          {expanded ? translateCurrentStaticSourceText("domains.market.components.MarketplaceBrushRecipeAccelerator", "ko", "고급 편집 닫기") : translateCurrentStaticSourceText("domains.market.components.MarketplaceBrushRecipeAccelerator", "ko", "고급 편집 열기")}
         </button>
       </div>
 
@@ -266,8 +267,7 @@ export function MarketplaceBrushRecipeAccelerator({
             <strong className="block text-sm text-fg">{recipe.name}</strong>
             <span className="mt-1 block text-[11px] leading-4 text-fg-2">{recipe.description}</span>
             <span className="mt-2 block text-[10px] font-semibold text-accent">
-              {recipe.engines.length}개 엔진 패스
-            </span>
+              {recipe.engines.length}{translateCurrentStaticSourceText("domains.market.components.MarketplaceBrushRecipeAccelerator", "ko", "개 엔진 패스")}</span>
           </button>
         ))}
       </div>
@@ -276,8 +276,7 @@ export function MarketplaceBrushRecipeAccelerator({
         <div className="mt-5 space-y-3 border-t border-line pt-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <label className="text-xs font-semibold text-fg">
-              새 매핑
-              <select
+              {translateCurrentStaticSourceText("domains.market.components.MarketplaceBrushRecipeAccelerator", "ko", "새 매핑")}<select
                 value={selectedMapping}
                 onChange={(event) => setSelectedMapping(Number(event.target.value))}
                 className="ml-2 min-h-10 rounded-lg border border-line bg-card px-2 text-xs text-fg"
@@ -288,8 +287,7 @@ export function MarketplaceBrushRecipeAccelerator({
               </select>
             </label>
             <span className="text-xs text-fg-2">
-              현재 탐색 조합 {creatorMarketplaceBrushCombinationCount(draft).toLocaleString()}개
-            </span>
+              {translateCurrentStaticSourceText("domains.market.components.MarketplaceBrushRecipeAccelerator", "ko", "현재 탐색 조합 ")}{creatorMarketplaceBrushCombinationCount(draft).toLocaleString()}{translateCurrentStaticSourceText("domains.market.components.MarketplaceBrushRecipeAccelerator", "ko", "개")}</span>
           </div>
 
           {draft.brush.engineNodes.map((node, index) => (
@@ -304,12 +302,12 @@ export function MarketplaceBrushRecipeAccelerator({
                     type="button"
                     onClick={() => duplicateNode(node)}
                     className="min-h-10 rounded-lg border border-line px-3 text-[11px] font-semibold text-fg"
-                  >복제</button>
+                  >{translateCurrentStaticSourceText("domains.market.components.MarketplaceBrushRecipeAccelerator", "ko", "복제")}</button>
                   <button
                     type="button"
                     onClick={() => addMapping(node.id)}
                     className="min-h-10 rounded-lg border border-line px-3 text-[11px] font-semibold text-fg"
-                  >매핑 추가</button>
+                  >{translateCurrentStaticSourceText("domains.market.components.MarketplaceBrushRecipeAccelerator", "ko", "매핑 추가")}</button>
                   {(["shape", "image", "procedural", "studio-snapshot"] as const).map((source) => (
                     <button
                       key={source}
@@ -347,7 +345,7 @@ export function MarketplaceBrushRecipeAccelerator({
                   <button
                     key={mapping.id}
                     type="button"
-                    title="매핑 삭제"
+                    title={translateCurrentStaticSourceText("domains.market.components.MarketplaceBrushRecipeAccelerator", "ko", "매핑 삭제")}
                     onClick={() => updateNode(node.id, (current) => ({
                       ...current,
                       mappings: current.mappings.filter((item) => item.id !== mapping.id),
@@ -361,14 +359,14 @@ export function MarketplaceBrushRecipeAccelerator({
                   <button
                     key={tip.id}
                     type="button"
-                    title="팁 레이어 삭제"
+                    title={translateCurrentStaticSourceText("domains.market.components.MarketplaceBrushRecipeAccelerator", "ko", "팁 레이어 삭제")}
                     onClick={() => updateNode(node.id, (current) => ({
                       ...current,
                       tipLayers: current.tipLayers.filter((item) => item.id !== tip.id),
                     }))}
                     className="min-h-9 rounded-full border border-accent/25 bg-accent/5 px-2 text-[10px] text-fg-2"
                   >
-                    tip:{tip.source} ×
+                    {translateCurrentStaticSourceText("domains.market.components.MarketplaceBrushRecipeAccelerator", "en", "tip:")}{tip.source} ×
                   </button>
                 ))}
               </div>

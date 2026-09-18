@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Layer Style Panel
  * 선택된 이미지의 레이어 스타일 인스펙터 — 원클릭 그림자/모서리 프리셋 +
@@ -78,7 +81,7 @@ export function StudioLayerStylePanel({
       {/* 헤더 + 원본 복귀 — outline 채널이 있으면 테두리까지 함께 지운다. */}
       <div className="flex items-center justify-between gap-2">
         <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
-          {hasOutlineChannel ? "레이어 스타일 (그림자·모서리·테두리)" : "레이어 스타일 (그림자·모서리)"}
+          {hasOutlineChannel ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "레이어 스타일 (그림자·모서리·테두리)") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "레이어 스타일 (그림자·모서리)")}
         </p>
         <button
           type="button"
@@ -87,11 +90,10 @@ export function StudioLayerStylePanel({
             if (hasOutlineChannel) onOutlineChange(undefined);
           }}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title="모든 레이어 스타일을 제거하고 원본으로 되돌립니다."
+          title={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "모든 레이어 스타일을 제거하고 원본으로 되돌립니다.")}
         >
           <RotateCcw className="size-3.5" />
-          원본으로
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "원본으로")}</button>
       </div>
 
       {/* 원클릭 프리셋 칩 — reset 후 적용해 절대값으로 덮어쓴다(누적 아님). */}
@@ -138,8 +140,7 @@ export function StudioLayerStylePanel({
 
       {/* 그림자 색 — input[type=color]는 빈 값 불가라 미지정 시 검정 폴백. */}
       <label className="flex items-center gap-2 text-xs text-fg-2">
-        그림자 색
-        <input
+        {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "그림자 색")}<input
           type="color"
           value={values.shadowColor ?? SHADOW_FALLBACK_COLOR}
           onChange={(e) => onPatch({ shadowColor: e.target.value })}
@@ -149,8 +150,7 @@ export function StudioLayerStylePanel({
 
       {/* 그림자/모서리 슬라이더 — 범위는 LAYER_STYLE_RANGES에서 가져온다. */}
       <label className={LABEL_ROW}>
-        그림자 번짐
-        <span className="flex items-center gap-1.5">
+        {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "그림자 번짐")}<span className="flex items-center gap-1.5">
           <input
             type="range"
             min={LAYER_STYLE_RANGES.shadowBlur.min}
@@ -165,8 +165,7 @@ export function StudioLayerStylePanel({
       </label>
 
       <label className={LABEL_ROW}>
-        가로 오프셋
-        <span className="flex items-center gap-1.5">
+        {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "가로 오프셋")}<span className="flex items-center gap-1.5">
           <input
             type="range"
             min={LAYER_STYLE_RANGES.shadowOffsetX.min}
@@ -181,8 +180,7 @@ export function StudioLayerStylePanel({
       </label>
 
       <label className={LABEL_ROW}>
-        세로 오프셋
-        <span className="flex items-center gap-1.5">
+        {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "세로 오프셋")}<span className="flex items-center gap-1.5">
           <input
             type="range"
             min={LAYER_STYLE_RANGES.shadowOffsetY.min}
@@ -197,8 +195,7 @@ export function StudioLayerStylePanel({
       </label>
 
       <label className={LABEL_ROW}>
-        그림자 농도
-        <span className="flex items-center gap-1.5">
+        {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "그림자 농도")}<span className="flex items-center gap-1.5">
           <input
             type="range"
             min={LAYER_STYLE_RANGES.shadowOpacity.min}
@@ -213,8 +210,7 @@ export function StudioLayerStylePanel({
       </label>
 
       <label className={LABEL_ROW}>
-        모서리 둥글기
-        <span className="flex items-center gap-1.5">
+        {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "모서리 둥글기")}<span className="flex items-center gap-1.5">
           <input
             type="range"
             min={LAYER_STYLE_RANGES.cornerRadius.min}
@@ -231,11 +227,10 @@ export function StudioLayerStylePanel({
       {/* 이중 외곽선 — 안쪽 링(color/width) + 바깥 링(secondColor/secondWidth). outline 채널 필요. */}
       {hasOutlineChannel && (
         <div className="space-y-2 border-t border-line/60 pt-2">
-          <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">이중 외곽선 (스티커 테두리)</p>
+          <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "이중 외곽선 (스티커 테두리)")}</p>
 
           <label className="flex items-center gap-2 text-xs text-fg-2">
-            안쪽 테두리 색
-            <input
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "안쪽 테두리 색")}<input
               type="color"
               value={currentOutline.color}
               onChange={(e) => patchOutline({ color: e.target.value })}
@@ -244,8 +239,7 @@ export function StudioLayerStylePanel({
           </label>
 
           <label className={LABEL_ROW}>
-            안쪽 굵기
-            <span className="flex items-center gap-1.5">
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "안쪽 굵기")}<span className="flex items-center gap-1.5">
               <input
                 type="range"
                 min={OUTLINE_WIDTH_RANGE.min}
@@ -260,8 +254,7 @@ export function StudioLayerStylePanel({
           </label>
 
           <label className="flex items-center gap-2 text-xs text-fg-2">
-            바깥 테두리 색
-            <input
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "바깥 테두리 색")}<input
               type="color"
               value={currentOutline.secondColor ?? DEFAULT_OUTLINE_SECOND_COLOR}
               onChange={(e) => patchOutline({ secondColor: e.target.value })}
@@ -270,8 +263,7 @@ export function StudioLayerStylePanel({
           </label>
 
           <label className={LABEL_ROW}>
-            바깥 굵기
-            <span className="flex items-center gap-1.5">
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "바깥 굵기")}<span className="flex items-center gap-1.5">
               <input
                 type="range"
                 min={OUTLINE_WIDTH_RANGE.min}
@@ -287,8 +279,7 @@ export function StudioLayerStylePanel({
 
           {/* 안내 — 테두리는 실루엣 바깥으로 자라므로 투명 배경에서 효과가 또렷하다. */}
           <p className="text-[0.6rem] leading-relaxed text-fg-3">
-            투명 배경 이미지(캐릭터·스티커)에서 잘 보여요. 안쪽 흰색+바깥 검정이 웹툰 스티커 조합이에요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerStylePanel", "ko", "투명 배경 이미지(캐릭터·스티커)에서 잘 보여요. 안쪽 흰색+바깥 검정이 웹툰 스티커 조합이에요.")}</p>
         </div>
       )}
     </div>

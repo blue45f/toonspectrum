@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Precision, view-only canvas controls. The parent owns every state transition so this HUD never
  * mutates document data or enters Studio history.
@@ -147,7 +151,7 @@ function ZoomPresetButton({
     <button
       type="button"
       tabIndex={-1}
-      aria-label={`캔버스 확대율 ${percent}퍼센트`}
+      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "캔버스 확대율 {v0}퍼센트"), { v0: String(percent) })}
       aria-pressed={active}
       aria-disabled={!available ? true : undefined}
       data-studio-view-zoom-preset={percent}
@@ -326,12 +330,12 @@ export function StudioViewToolsHud({
   return (
     <div
       role="toolbar"
-      id={`studio-view-tools-hud-${mode}`}
+      id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "en", "studio-view-tools-hud-{v0}"), { v0: String(mode) })}
       ref={toolbarRef}
       aria-label={toolbarLabel}
       aria-orientation="horizontal"
       data-studio-view-tools-hud={mode}
-      data-studio-view-precision={precisionZoomAvailable ? "true" : undefined}
+      data-studio-view-precision={precisionZoomAvailable ? translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "en", "true") : undefined}
       onKeyDown={handleKeyDown}
       onMouseDown={(event) => event.stopPropagation()}
       className={cn(
@@ -358,13 +362,13 @@ export function StudioViewToolsHud({
         {isZoom && precisionZoomAvailable ? (
           <label
             className="relative flex shrink-0 items-center"
-            aria-label={`현재 확대율 ${zoomPercent}퍼센트`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "현재 확대율 {v0}퍼센트"), { v0: String(zoomPercent) })}
           >
             <input
               type="text"
               inputMode="decimal"
               value={zoomDraft}
-              aria-label="캔버스 확대율 입력"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "캔버스 확대율 입력")}
               aria-describedby="studio-view-zoom-range"
               onFocus={(event) => event.currentTarget.select()}
               onChange={(event) => setZoomDraft(event.currentTarget.value)}
@@ -398,8 +402,8 @@ export function StudioViewToolsHud({
             aria-atomic="true"
             aria-label={
               isZoom
-                ? `현재 확대율 ${zoomPercent}퍼센트`
-                : `현재 회전 각도 ${rotation}도`
+                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "현재 확대율 {v0}퍼센트"), { v0: String(zoomPercent) })
+                : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "현재 회전 각도 {v0}도"), { v0: String(rotation) })
             }
             className="min-w-11 rounded-lg border border-line/70 bg-card px-2 py-1 text-center text-[0.72rem] font-bold tabular-nums text-fg-2"
           >
@@ -415,15 +419,15 @@ export function StudioViewToolsHud({
           <div
             className="flex shrink-0 items-center gap-0.5"
             role="group"
-            aria-label="확대 및 축소"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "확대 및 축소")}
           >
             <HudAction
-              label="캔버스 축소"
+              label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "캔버스 축소")}
               hint={STUDIO_VIEW_ACTION_HINTS.zoomOut}
               icon={Minus}
               onClick={onZoomOut}
               disabled={!canZoomOut}
-              unavailableReason="최소 축소 배율에 도달했습니다."
+              unavailableReason={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "최소 축소 배율에 도달했습니다.")}
             />
             {precisionZoomAvailable ? (
               <div className="flex h-11 shrink-0 items-center px-1.5">
@@ -433,7 +437,7 @@ export function StudioViewToolsHud({
                   max={STUDIO_VIEW_MAGNIFICATION_SLIDER_MAX}
                   step={1}
                   value={sliderValue}
-                  aria-label="캔버스 확대율 정밀 조절"
+                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "캔버스 확대율 정밀 조절")}
                   aria-valuetext={`${zoomPercent}%`}
                   onChange={(event) => {
                     setMagnification(
@@ -455,37 +459,37 @@ export function StudioViewToolsHud({
                   className="h-11 w-28 cursor-ew-resize accent-[var(--accent)] sm:w-36"
                 />
                 <span id="studio-view-zoom-range" className="sr-only">
-                  허용 범위 {Math.round(bounds.min * 100)}%에서{" "}
+                  {translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "허용 범위 ")}{Math.round(bounds.min * 100)}{translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "%에서")}{" "}
                   {Math.round(bounds.max * 100)}%
                 </span>
               </div>
             ) : null}
             <HudAction
-              label="캔버스 확대"
+              label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "캔버스 확대")}
               hint={STUDIO_VIEW_ACTION_HINTS.zoomIn}
               icon={Plus}
               onClick={onZoomIn}
               disabled={!canZoomIn}
-              unavailableReason="최대 확대 배율에 도달했습니다."
+              unavailableReason={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "최대 확대 배율에 도달했습니다.")}
             />
             <HudAction
-              label="캔버스 너비에 맞춤"
+              label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "캔버스 너비에 맞춤")}
               hint={STUDIO_VIEW_ACTION_HINTS.fitWidth}
               icon={ScanLine}
               onClick={onFit}
             />
             {onFitSelection ? (
               <HudAction
-                label="선택 영역에 맞춤"
+                label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "선택 영역에 맞춤")}
                 hint={STUDIO_VIEW_ACTION_HINTS.fitSelection}
                 icon={Focus}
                 onClick={onFitSelection}
                 disabled={selectionCount <= 0}
-                unavailableReason="먼저 캔버스 요소를 하나 이상 선택하세요."
+                unavailableReason={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "먼저 캔버스 요소를 하나 이상 선택하세요.")}
               />
             ) : null}
             <HudAction
-              label="캔버스 실제 픽셀 100%"
+              label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "캔버스 실제 픽셀 100%")}
               hint={STUDIO_VIEW_ACTION_HINTS.actualSize}
               onClick={onActual}
             >
@@ -503,7 +507,7 @@ export function StudioViewToolsHud({
               <div
                 className="flex shrink-0 items-center gap-1 px-1"
                 role="group"
-                aria-label="확대율 프리셋"
+                aria-label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "확대율 프리셋")}
               >
                 {STUDIO_VIEW_MAGNIFICATION_PRESETS.map((preset) => (
                   <ZoomPresetButton
@@ -522,10 +526,10 @@ export function StudioViewToolsHud({
         <div
           className="flex shrink-0 items-center gap-0.5"
           role="group"
-          aria-label="캔버스 회전"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "캔버스 회전")}
         >
           <HudAction
-            label="캔버스 왼쪽으로 90도 회전"
+            label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "캔버스 왼쪽으로 90도 회전")}
             hint={STUDIO_VIEW_ACTION_HINTS.rotateLeft}
             icon={RotateCcw}
             onClick={onRotateLeft}
@@ -534,13 +538,13 @@ export function StudioViewToolsHud({
             role="status"
             aria-live="polite"
             aria-atomic="true"
-            aria-label={`현재 회전 각도 ${rotation}도`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "현재 회전 각도 {v0}도"), { v0: String(rotation) })}
             className="mx-1 min-w-12 rounded-lg border border-line/70 bg-card px-2 py-1.5 text-center text-[0.72rem] font-black tabular-nums text-fg-2"
           >
             {rotation}°
           </span>
           <HudAction
-            label="캔버스 오른쪽으로 90도 회전"
+            label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "캔버스 오른쪽으로 90도 회전")}
             hint={STUDIO_VIEW_ACTION_HINTS.rotateRight}
             icon={RotateCw}
             onClick={onRotateRight}
@@ -553,11 +557,11 @@ export function StudioViewToolsHud({
       <div
         className="flex shrink-0 items-center gap-0.5"
         role="group"
-        aria-label="공통 보기 작업"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "공통 보기 작업")}
       >
         <HudAction
           label={
-            flipped ? "캔버스 좌우 반전 해제" : "캔버스 좌우 반전"
+            flipped ? translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "캔버스 좌우 반전 해제") : translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "캔버스 좌우 반전")
           }
           hint={studioViewFlipHint(flipped)}
           icon={FlipHorizontal2}
@@ -565,13 +569,13 @@ export function StudioViewToolsHud({
           onClick={onToggleFlip}
         />
         <HudAction
-          label="캔버스 보기 초기화"
+          label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "캔버스 보기 초기화")}
           hint={STUDIO_VIEW_ACTION_HINTS.reset}
           icon={RotateCcw}
           onClick={onReset}
         />
         <HudAction
-          label="보기 도구 닫기"
+          label={translateCurrentStaticSourceText("domains.creator.StudioViewToolsHud", "ko", "보기 도구 닫기")}
           hint={STUDIO_VIEW_ACTION_HINTS.close}
           icon={X}
           onClick={restoreFocusAndClose}

@@ -29,7 +29,7 @@ vi.mock("@/shared/components/share-page-button", () => ({
 
 afterEach(cleanup);
 describe("PencafePage", () => {
-  it("shares the public fan cafe with an encoded canonical route", () => {
+  it("shares the public fan cafe with an encoded canonical route", async () => {
     render(
       <MemoryRouter initialEntries={["/pencafe/%EC%9B%B9%ED%88%B0%20%EC%97%B0%EA%B5%AC%ED%9A%8C"]}>
         <Routes>
@@ -39,7 +39,7 @@ describe("PencafePage", () => {
     );
 
     expect(screen.getByRole("heading", { name: "웹툰 연구회 펜카페" })).toBeTruthy();
-    const share = screen.getByTestId("share-probe");
+    const share = await screen.findByTestId("share-probe");
     expect(share.getAttribute("data-path"))
       .toBe("/pencafe/%EC%9B%B9%ED%88%B0%20%EC%97%B0%EA%B5%AC%ED%9A%8C");
     expect(share.getAttribute("data-title")).toBe("웹툰 연구회 펜카페");

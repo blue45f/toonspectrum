@@ -25,12 +25,9 @@ describe("ToonStudio final product IA", () => {
   });
 
   it("keeps the rendered Studio header aligned with the IA contract", () => {
-    expect(TOONSTUDIO_PRIMARY_NAVIGATION.map(({ id, href }) => ({ id, href }))).toEqual([
-      { id: "studio", href: "/studio" },
-      { id: "make", href: "/studio/new" },
-      { id: "studio-assets", href: "/studio/assets" },
-      { id: "learn", href: "/learn" },
-    ]);
+    expect(TOONSTUDIO_PRIMARY_NAVIGATION.map(({ id, href }) => ({ id, href }))).toEqual(
+      STUDIO_GLOBAL_NAVIGATION.map(({ id, href }) => ({ id, href })),
+    );
   });
 
   it("assigns exactly one primary surface to every capability", () => {

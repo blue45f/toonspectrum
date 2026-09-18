@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * 파괴적 명령 승인 창 — Wave E 의 preview 텍스트를 온캔버스 다이얼로그로 띄운다.
  *
@@ -151,8 +152,7 @@ export function StudioDestructiveConfirmDialog({
               </span>
               {queuedCount > 0 ? (
                 <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.62rem] font-semibold text-fg-3">
-                  뒤에 {queuedCount}건 대기
-                </span>
+                  {translateCurrentStaticSourceText("domains.creator.StudioDestructiveConfirmDialog", "ko", "뒤에 ")}{queuedCount}{translateCurrentStaticSourceText("domains.creator.StudioDestructiveConfirmDialog", "ko", "건 대기")}</span>
               ) : null}
             </p>
             <h2
@@ -177,11 +177,10 @@ export function StudioDestructiveConfirmDialog({
           {showLosses ? (
             <section className="rounded-xl border border-line bg-card/45 p-3">
               <h3 className="text-[0.68rem] font-bold uppercase tracking-wider text-fg-3">
-                사라지는 것
-              </h3>
+                {translateCurrentStaticSourceText("domains.creator.StudioDestructiveConfirmDialog", "ko", "사라지는 것")}</h3>
               <ul className="mt-1.5 space-y-1.5" data-studio-destructive-losses>
                 {request.losses.length === 0 ? (
-                  <li className="text-xs leading-relaxed text-fg-2">확인된 손실 없음</li>
+                  <li className="text-xs leading-relaxed text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioDestructiveConfirmDialog", "ko", "확인된 손실 없음")}</li>
                 ) : (
                   request.losses.map((loss) => (
                     <li
@@ -206,8 +205,7 @@ export function StudioDestructiveConfirmDialog({
           {request.gains && request.gains.length > 0 ? (
             <section className="rounded-xl border border-line bg-card/45 p-3">
               <h3 className="text-[0.68rem] font-bold uppercase tracking-wider text-fg-3">
-                대신 들어오는 것
-              </h3>
+                {translateCurrentStaticSourceText("domains.creator.StudioDestructiveConfirmDialog", "ko", "대신 들어오는 것")}</h3>
               <ul className="mt-1.5 space-y-1" data-studio-destructive-gains>
                 {request.gains.map((gain) => (
                   <li

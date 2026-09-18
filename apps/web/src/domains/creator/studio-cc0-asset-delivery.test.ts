@@ -86,6 +86,7 @@ describe("CC0 delivery catalog boundary", () => {
     const asset = fixture();
     expect(() => parseStudioCc0Catalog(manifest([{...asset, license: {...asset.license, redistributionAllowed: false}}]))).toThrow();
   });
+  // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
   it.each(["https://kenney.nl.evil.example/assets/x", "http://kenney.nl/assets/x", "https://user:pass@kenney.nl/assets/x"])("rejects a forged supplier %s", sourceUrl => {
     const asset = fixture();
     expect(() => parseStudioCc0Catalog(manifest([{...asset, license: {...asset.license, sourceUrl}}]))).toThrow();

@@ -75,11 +75,19 @@ describe("PWA manifest", () => {
     }
   });
 
-  it("exposes creator shortcuts that resolve to declared in-scope app routes", () => {
+  it("exposes unique creator shortcuts for the current production journey", () => {
     const shortcuts = manifest.shortcuts ?? [];
-    expect(shortcuts.map((shortcut) => shortcut.url)).toEqual([
-      "/studio", "/studio/comic", "/shaper", "/research",
-    ]);
+    const shortcutUrls = shortcuts.map((shortcut) => shortcut.url);
+    const requiredCreatorEntries = [
+      "/studio/new",
+      "/studio",
+      "/studio/bg3d",
+      "/studio/publish",
+    ];
+
+    expect(shortcutUrls).toHaveLength(requiredCreatorEntries.length);
+    expect(new Set(shortcutUrls).size).toBe(shortcutUrls.length);
+    expect(shortcutUrls).toEqual(expect.arrayContaining(requiredCreatorEntries));
 
     // Use the real router, not the legacy navigation-only metadata. Do not
     // allow a missing destination to pass through the global 404 wildcard.

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { EyeOff, GripHorizontal, Pin, RotateCcw, Scaling } from "lucide-react";
 import {
   useEffect,
@@ -18,8 +22,10 @@ import {
   resizeStudioFloatingSurfaceRectFromEdge,
   resolveStudioFloatingSurfaceDock,
   resolveStudioFloatingSurfaceRect,
+  setStudioFloatingSurfaceDock,
   setStudioFloatingSurfaceLock,
   type StudioFloatingSurfaceConstraints,
+  type StudioFloatingSurfaceDock,
   type StudioFloatingSurfaceRect,
   type StudioFloatingSurfaceViewport,
 } from "../studio-floating-surface";
@@ -52,6 +58,20 @@ import { cn } from "@/shared/lib/utils";
 
 const MOVE_STEP = 10;
 const LARGE_MOVE_STEP = 40;
+const DOCK_OPTIONS: readonly { readonly value: StudioFloatingSurfaceDock; readonly label: string }[] = [
+  { value: "free", label: "자유" },
+  { value: "left", label: "왼쪽" },
+  { value: "right", label: "오른쪽" },
+  { value: "top", label: "위쪽" },
+  { value: "bottom", label: "아래쪽" },
+];
+const DOCK_LABELS: Readonly<Record<StudioFloatingSurfaceDock, string>> = {
+  free: "자유 배치",
+  left: "왼쪽",
+  right: "오른쪽",
+  top: "위쪽",
+  bottom: "아래쪽",
+};
 const MANAGED_STYLE_PROPERTIES = [
   "position",
   "left",
@@ -161,10 +181,15 @@ function setManagedAttributes(
   node: HTMLElement,
   surfaceId: StudioShellFloatingSurfaceId,
   visible: boolean,
+  drawingAutoHidden: boolean,
 ): void {
   node.setAttribute("data-studio-shell-layout-hidden", visible ? "false" : "true");
   node.setAttribute("data-studio-shell-layout-managed", "true");
   node.setAttribute("data-studio-shell-layout-surface", surfaceId);
+  node.setAttribute(
+    "data-studio-shell-drawing-auto-hidden",
+    drawingAutoHidden ? "true" : "false",
+  );
 }
 
 function styleRect(node: HTMLElement, rect: StudioFloatingSurfaceRect, applySize: boolean): void {
@@ -204,6 +229,7 @@ export function StudioShellFloatingTarget({
     [surfaceId],
   );
   const shell = useStudioShellFloatingLayout();
+  const { setSurfaceMounted } = shell;
   const preferredVisible = shell.isVisible(definition.visibilityId);
   const [node, setNode] = useState<HTMLElement | null>(null);
   const [forceVisible, setForceVisible] = useState(false);
@@ -216,6 +242,7 @@ export function StudioShellFloatingTarget({
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState(false);
   const pointerSession = useRef<StudioFloatingSurfacePointerSession | null>(null);
+  const dockGuide = useRef<HTMLDivElement | null>(null);
   const originalStyle = useRef<StyleSnapshot | null>(null);
   const originalHiddenMarker = useRef<string | null>(null);
   const stackSurfaceId = `shell:${surfaceId}`;
@@ -233,7 +260,13 @@ export function StudioShellFloatingTarget({
     surfaceId: stackSurfaceId,
     defaultLayout: definition.defaultLayout,
   });
-  const actualVisible = preferredVisible || forceVisible;
+  const managedVisible = preferredVisible || forceVisible;
+  const drawingAutoHidden = preferredVisible
+    && !forceVisible
+    && shell.autoHideWhileDrawing
+    && shell.drawingAutoHideActive
+    && definition.hideWhileDrawing !== false;
+  const actualVisible = managedVisible && !drawingAutoHidden;
   const positionEnabled = viewport.width >= definition.positionMinWidth;
   const constraints = useMemo(
     () => actualConstraints(definition, size),
@@ -271,6 +304,12 @@ export function StudioShellFloatingTarget({
     };
   }, [definition.selector]);
 
+  useEffect(() => {
+    setSurfaceMounted(surfaceId, node !== null);
+    if (!node) return undefined;
+    return () => setSurfaceMounted(surfaceId, false);
+  }, [node, setSurfaceMounted, surfaceId]);
+
   useLayoutEffect(() => {
     if (!node) return undefined;
     originalStyle.current = captureStyle(node);
@@ -289,14 +328,15 @@ export function StudioShellFloatingTarget({
       }
       node.removeAttribute("data-studio-shell-layout-managed");
       node.removeAttribute("data-studio-shell-layout-surface");
+      node.removeAttribute("data-studio-shell-drawing-auto-hidden");
       originalStyle.current = null;
     };
   }, [node]);
 
   useLayoutEffect(() => {
     if (!node) return;
-    setManagedAttributes(node, surfaceId, actualVisible);
-  }, [actualVisible, node, surfaceId]);
+    setManagedAttributes(node, surfaceId, managedVisible, drawingAutoHidden);
+  }, [drawingAutoHidden, managedVisible, node, surfaceId]);
 
   useLayoutEffect(() => {
     if (!node) return undefined;
@@ -332,7 +372,7 @@ export function StudioShellFloatingTarget({
   }, [definition, node]);
 
   useLayoutEffect(() => {
-    if (!node || !actualVisible || !positionEnabled) {
+    if (!node || !managedVisible || !positionEnabled) {
       if (node && originalStyle.current) restoreStyle(node, originalStyle.current);
       return;
     }
@@ -347,9 +387,9 @@ export function StudioShellFloatingTarget({
     const rect = node.getBoundingClientRect();
     setScreenRect(rect.width > 0 && rect.height > 0 ? rect : null);
   }, [
-    actualVisible,
     definition.applySize,
     definition.zIndexFloor,
+    managedVisible,
     node,
     positionEnabled,
     resolvedRect,
@@ -357,9 +397,9 @@ export function StudioShellFloatingTarget({
   ]);
 
   useLayoutEffect(() => {
-    if (!node || !actualVisible || !positionEnabled) return undefined;
+    if (!node || !managedVisible || !positionEnabled) return undefined;
     return registerStudioFloatingSurface(stackSurfaceId);
-  }, [actualVisible, node, positionEnabled, stackSurfaceId]);
+  }, [managedVisible, node, positionEnabled, stackSurfaceId]);
 
   useEffect(
     () => subscribeStudioFloatingSurfaceLayoutReset(resetLayout),
@@ -400,6 +440,46 @@ export function StudioShellFloatingTarget({
     setLayout(setStudioFloatingSurfaceLock(layout, kind, !locked));
   };
 
+  const hideDockGuide = (): void => {
+    const guide = dockGuide.current;
+    if (!guide) return;
+    guide.style.display = "none";
+    guide.textContent = "";
+  };
+
+  const previewDockGuide = (nextRect: StudioFloatingSurfaceRect): void => {
+    const guide = dockGuide.current;
+    if (!guide) return;
+    const dock = resolveStudioFloatingSurfaceDock(nextRect, viewport, 14);
+    if (dock === "free") {
+      hideDockGuide();
+      return;
+    }
+    const guideRect = resolveStudioFloatingSurfaceRect(
+      createStudioFloatingSurfaceLayout(nextRect, viewport, constraints, {
+        dock,
+        positionLocked: layout.positionLocked,
+        sizeLocked: layout.sizeLocked,
+      }),
+      viewport,
+      constraints,
+      definition.defaultLayout,
+    );
+    Object.assign(guide.style, {
+      display: "grid",
+      left: `${Math.round(guideRect.x)}px`,
+      top: `${Math.round(guideRect.y)}px`,
+      width: `${Math.round(guideRect.width)}px`,
+      height: `${Math.round(guideRect.height)}px`,
+    });
+    guide.textContent = `${DOCK_LABELS[dock]}에 도킹`;
+  };
+
+  const setDock = (dock: StudioFloatingSurfaceDock): void => {
+    hideDockGuide();
+    setLayout(setStudioFloatingSurfaceDock(layout, dock));
+  };
+
   const begin = (
     event: ReactPointerEvent<HTMLButtonElement>,
     kind: "move" | "resize",
@@ -418,6 +498,7 @@ export function StudioShellFloatingTarget({
     event.stopPropagation();
     event.currentTarget.focus({ preventScroll: true });
     bringStudioFloatingSurfaceToFront(stackSurfaceId);
+    hideDockGuide();
     const start = node.getBoundingClientRect();
     const startRect: StudioFloatingSurfaceRect = {
       x: start.x,
@@ -436,7 +517,7 @@ export function StudioShellFloatingTarget({
       startRect,
       cursor: kind === "move" ? "grabbing" : "se-resize",
       resolveRect(deltaX, deltaY, commit) {
-        return kind === "move"
+        const next = kind === "move"
           ? moveStudioFloatingSurfaceRect(
               startRect,
               deltaX,
@@ -453,6 +534,8 @@ export function StudioShellFloatingTarget({
               viewport,
               constraints,
             );
+        if (kind === "move") previewDockGuide(next);
+        return next;
       },
       onActiveChange(active) {
         if (kind === "move") setDragging(active);
@@ -460,6 +543,7 @@ export function StudioShellFloatingTarget({
       },
       onComplete() {
         pointerSession.current = null;
+        hideDockGuide();
       },
       onCommit(nextRect) {
         commitRect(
@@ -552,12 +636,12 @@ export function StudioShellFloatingTarget({
   });
 
   useLayoutEffect(() => {
-    if (!node || !actualVisible || !positionEnabled) return undefined;
+    if (!node || !managedVisible || !positionEnabled) return undefined;
     return registerStudioFloatingSurfaceArrangementController(stackSurfaceId, {
       arrange: (...args) => arrangementController.current.arrange(...args),
       setMinimized: (value) => arrangementController.current.setMinimized(value),
     });
-  }, [actualVisible, node, positionEnabled, stackSurfaceId]);
+  }, [managedVisible, node, positionEnabled, stackSurfaceId]);
 
   if (
     typeof document === "undefined"
@@ -594,18 +678,25 @@ export function StudioShellFloatingTarget({
   return createPortal(
     <>
       <div
+        ref={dockGuide}
+        aria-hidden="true"
+        data-studio-shell-floating-dock-guide={surfaceId}
+        className="pointer-events-none fixed place-items-center rounded-xl border-2 border-dashed border-accent bg-accent-soft/20 px-3 text-xs font-black text-accent shadow-xl backdrop-blur-sm"
+        style={{ display: "none", zIndex: 119 }}
+      />
+      <div
         role="toolbar"
-        aria-label={`${definition.label} 배치 편집`}
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 배치 편집"), { v0: String(definition.label) })}
         data-studio-shell-floating-handle={surfaceId}
         className="pointer-events-auto fixed flex max-w-[min(22rem,calc(100vw-1rem))] items-center gap-1 rounded-lg border border-accent/50 bg-panel/95 p-1 text-fg shadow-2xl backdrop-blur"
         style={toolbarStyle}
       >
         <button
           type="button"
-          aria-label={`${definition.label} 이동`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 이동"), { v0: String(definition.label) })}
           aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight Home"
           disabled={layout.positionLocked}
-          title={layout.positionLocked ? "위치 잠금을 해제한 뒤 이동할 수 있어요." : "끌어서 이동 · 방향키로 미세 조정"}
+          title={layout.positionLocked ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "위치 잠금을 해제한 뒤 이동할 수 있어요.") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "끌어서 이동 · 방향키로 미세 조정")}
           className={cn(
             actionClass,
             "min-w-0 flex-1 cursor-grab touch-none justify-start active:cursor-grabbing",
@@ -618,11 +709,26 @@ export function StudioShellFloatingTarget({
           <GripHorizontal size={14} aria-hidden className="shrink-0" />
           <span className="truncate">{definition.label}</span>
         </button>
+        <select
+          value={layout.dock}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 도킹 위치"), { v0: String(definition.label) })}
+          title={translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "화면 가장자리에 도킹")}
+          disabled={layout.positionLocked}
+          className={cn(
+            "h-8 max-w-20 rounded-md border border-line bg-card px-1 text-[0.65rem] font-bold text-fg-2",
+            STUDIO_FOCUS_RING,
+          )}
+          onChange={(event) => setDock(event.target.value as StudioFloatingSurfaceDock)}
+        >
+          {DOCK_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
         <button
           type="button"
           aria-pressed={layout.positionLocked}
-          aria-label={`${definition.label} 위치 ${layout.positionLocked ? "잠금 해제" : "잠금"}`}
-          title={layout.positionLocked ? "위치 잠금 해제" : "위치 잠금"}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 위치 {v1}"), { v0: String(definition.label), v1: String(layout.positionLocked ? "잠금 해제" : "잠금") })}
+          title={layout.positionLocked ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "위치 잠금 해제") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "위치 잠금")}
           className={cn(
             actionClass,
             "size-8 px-0",
@@ -636,8 +742,8 @@ export function StudioShellFloatingTarget({
           <button
             type="button"
             aria-pressed={layout.sizeLocked}
-            aria-label={`${definition.label} 크기 ${layout.sizeLocked ? "잠금 해제" : "잠금"}`}
-            title={layout.sizeLocked ? "크기 잠금 해제" : "크기 잠금"}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 크기 {v1}"), { v0: String(definition.label), v1: String(layout.sizeLocked ? "잠금 해제" : "잠금") })}
+            title={layout.sizeLocked ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "크기 잠금 해제") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "크기 잠금")}
             className={cn(
               actionClass,
               "size-8 px-0",
@@ -650,8 +756,8 @@ export function StudioShellFloatingTarget({
         ) : null}
         <button
           type="button"
-          aria-label={`${definition.label} 기본 위치로 복원`}
-          title="기본 위치"
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 기본 위치로 복원"), { v0: String(definition.label) })}
+          title={translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "기본 위치")}
           className={cn(actionClass, "size-8 px-0")}
           onClick={resetLayout}
         >
@@ -659,8 +765,8 @@ export function StudioShellFloatingTarget({
         </button>
         <button
           type="button"
-          aria-label={`${definition.label} 숨기기`}
-          title={forceVisible ? "현재 안전 상태 때문에 숨김 후에도 자동 표시됩니다." : "숨기기"}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 숨기기"), { v0: String(definition.label) })}
+          title={forceVisible ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "현재 안전 상태 때문에 숨김 후에도 자동 표시됩니다.") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "숨기기")}
           className={cn(actionClass, "size-8 px-0")}
           onClick={() => shell.setVisible(definition.visibilityId, false)}
         >
@@ -670,10 +776,10 @@ export function StudioShellFloatingTarget({
       {definition.resizable ? (
         <button
           type="button"
-          aria-label={`${definition.label} 크기 조절`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "{v0} 크기 조절"), { v0: String(definition.label) })}
           aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Shift+ArrowUp Shift+ArrowDown Shift+ArrowLeft Shift+ArrowRight"
           disabled={layout.sizeLocked}
-          title={layout.sizeLocked ? "크기 잠금을 해제한 뒤 조절할 수 있어요." : "끌어서 크기 조절 · 방향키로 미세 조정"}
+          title={layout.sizeLocked ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "크기 잠금을 해제한 뒤 조절할 수 있어요.") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioShellFloatingTarget", "ko", "끌어서 크기 조절 · 방향키로 미세 조정")}
           data-studio-shell-floating-resize={surfaceId}
           className={cn(
             "pointer-events-auto fixed grid size-11 touch-none cursor-se-resize place-items-center rounded-lg border border-accent/50 bg-panel/95 text-accent shadow-xl",

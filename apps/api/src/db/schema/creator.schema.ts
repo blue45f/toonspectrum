@@ -1266,12 +1266,18 @@ export const creatorSeries = pgTable(
     description: text("description").notNull().default(""),
     cover: text("cover").notNull().default(""), // 대표 커버(데이터 URL 또는 외부 URL)
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
-    status: text("status").notNull().default("ongoing"), // ongoing(연재중) | completed(완결)
+    status: text("status").notNull().default("ongoing"), // ongoing(연재중) | hiatus(휴재) | completed(완결)
     hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
     createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
     updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
   },
-  (t) => [index("creator_series_user_idx").on(t.userId)]
+  (t) => [
+    index("creator_series_user_idx").on(t.userId),
+    check(
+      "creator_series_status_check",
+      sql`${t.status} in ('ongoing', 'hiatus', 'completed')`,
+    ),
+  ]
 );
 
 

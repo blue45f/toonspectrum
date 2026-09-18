@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /** Searchable, reorderable, non-destructive smart-filter stack for image elements. */
 import {
   ArrowDown,
@@ -457,13 +461,13 @@ function ConvolutionKernelEditor({
         ))}
       </div>
       <fieldset>
-        <legend className="mb-1 text-[0.6rem] font-semibold text-fg-3">3 × 3 커널</legend>
+        <legend className="mb-1 text-[0.6rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "3 × 3 커널")}</legend>
         <div className="grid grid-cols-3 gap-1">
           {Array.from({ length: 9 }, (_, index) => {
             const key = `k${index}`;
             return (
               <label key={key} className="min-w-0">
-                <span className="sr-only">커널 {index + 1}</span>
+                <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "커널 ")}{index + 1}</span>
                 <input
                   type="number"
                   min={-16}
@@ -495,7 +499,7 @@ function StudioSmartFilterControls({
     <div className="ml-7 space-y-2 rounded-lg border border-line/60 bg-panel/35 p-2">
       {presetOptions ? (
         <SelectParameterControl
-          label="프리셋"
+          label={translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "프리셋")}
           paramKey="preset"
           value={typeof entry.params.preset === "string" ? entry.params.preset : presetOptions[0]!.value}
           options={presetOptions}
@@ -505,9 +509,9 @@ function StudioSmartFilterControls({
       ) : null}
       {entry.engine === "morphology" ? (
         <SelectParameterControl
-          label="연산"
+          label={translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "연산")}
           paramKey="mode"
-          value={entry.params.mode === "dilate" ? "dilate" : "erode"}
+          value={entry.params.mode === "dilate" ? translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "en", "dilate") : translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "en", "erode")}
           options={[
             { value: "erode", label: "침식 · 어두운 선 확장" },
             { value: "dilate", label: "팽창 · 밝은 영역 확장" },
@@ -518,9 +522,9 @@ function StudioSmartFilterControls({
       ) : null}
       {entry.engine === "offset" ? (
         <SelectParameterControl
-          label="가장자리"
+          label={translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "가장자리")}
           paramKey="edge"
-          value={typeof entry.params.edge === "string" ? entry.params.edge : "transparent"}
+          value={typeof entry.params.edge === "string" ? entry.params.edge : translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "en", "transparent")}
           options={[
             { value: "transparent", label: "투명" },
             { value: "wrap", label: "반복" },
@@ -532,9 +536,9 @@ function StudioSmartFilterControls({
       ) : null}
       {entry.engine === "color-halftone" ? (
         <SelectParameterControl
-          label="색상 모드"
+          label={translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "색상 모드")}
           paramKey="mode"
-          value={entry.params.mode === "mono" ? "mono" : "cmyk"}
+          value={entry.params.mode === "mono" ? translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "en", "mono") : "cmyk"}
           options={[
             { value: "cmyk", label: "CMYK 컬러 망점" },
             { value: "mono", label: "단색 흑백 망점" },
@@ -545,7 +549,7 @@ function StudioSmartFilterControls({
       ) : null}
       {SEEDED_EFFECT_ENGINES.has(entry.engine) ? (
         <label className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2 text-[0.62rem] font-semibold text-fg-2">
-          <span>시드</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "시드")}</span>
           <input
             type="number"
             min={0}
@@ -560,9 +564,9 @@ function StudioSmartFilterControls({
       {entry.engine === "clouds" ? (
         <>
           <SelectParameterControl
-            label="합성"
+            label={translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "합성")}
             paramKey="mode"
-            value={typeof entry.params.mode === "string" ? entry.params.mode : "overlay"}
+            value={typeof entry.params.mode === "string" ? entry.params.mode : translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "en", "overlay")}
             options={[
               { value: "overlay", label: "오버레이" },
               { value: "multiply", label: "곱하기" },
@@ -572,7 +576,7 @@ function StudioSmartFilterControls({
             onChange={onChange}
           />
           <label className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2 text-[0.62rem] font-semibold text-fg-2">
-            <span>시드</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "시드")}</span>
             <input
               type="number"
               min={0}
@@ -590,18 +594,18 @@ function StudioSmartFilterControls({
       ) : null}
       {entry.engine === "color-to-alpha" ? (
         <label className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2 text-[0.62rem] font-semibold text-fg-2">
-          <span>배경색</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "배경색")}</span>
           <input
             type="color"
             value={
               typeof entry.params.keyColor === "string"
               && /^#[0-9a-f]{6}$/i.test(entry.params.keyColor)
                 ? entry.params.keyColor
-                : "#ffffff"
+                : translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "en", "#ffffff")
             }
             onChange={(event) => onChange({ ...entry.params, keyColor: event.target.value })}
             className="h-10 w-full cursor-pointer rounded-lg border border-line bg-canvas p-1 pointer-coarse:min-h-11"
-            aria-label="투명화할 배경색"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "투명화할 배경색")}
           />
         </label>
       ) : null}
@@ -673,21 +677,19 @@ export function StudioSmartFiltersPanel({
       {mutationError ? <p role="alert" className="text-sm text-fg-2">{mutationError}</p> : null}
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">필터 관리</p>
+          <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "필터 관리")}</p>
           <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
-            원본은 유지됩니다. 필터를 검색해 추가하고 각 항목의 값을 언제든 다시 조절하세요.
-            적용 순서와 불투명도도 원본을 바꾸지 않고 조절할 수 있습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "원본은 유지됩니다. 필터를 검색해 추가하고 각 항목의 값을 언제든 다시 조절하세요. 적용 순서와 불투명도도 원본을 바꾸지 않고 조절할 수 있습니다.")}</p>
         </div>
         <span className="shrink-0 rounded-lg border border-line bg-card px-2 py-1 text-[0.6rem] tabular-nums text-fg-3">
-          {current.entries.length}{maxEntries === undefined ? "개" : ` / ${maxEntries}개`}
+          {current.entries.length}{maxEntries === undefined ? translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "개") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", " / {v0}개"), { v0: String(maxEntries) })}
         </span>
       </div>
 
       <StudioEffectsWorkspacePanel stack={current} onChange={patch} />
 
       <div className="rounded-xl border border-line/70 bg-card/40 p-2.5">
-        <label htmlFor={searchId} className="sr-only">필터 검색</label>
+        <label htmlFor={searchId} className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "필터 검색")}</label>
         <div className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-canvas px-2.5 focus-within:border-accent">
           <Search className="size-3.5 shrink-0 text-fg-3" aria-hidden />
           <input
@@ -695,14 +697,14 @@ export function StudioSmartFiltersPanel({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="필터 이름·효과 검색"
+            placeholder={translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "필터 이름·효과 검색")}
             className="min-w-0 flex-1 bg-transparent text-xs text-fg outline-none placeholder:text-fg-3"
           />
           {query ? (
             <button
               type="button"
               onClick={() => setQuery("")}
-              aria-label="필터 검색어 지우기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "필터 검색어 지우기")}
               className="grid size-9 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg pointer-coarse:size-11"
             >
               <X className="size-3.5" aria-hidden />
@@ -711,7 +713,7 @@ export function StudioSmartFiltersPanel({
         </div>
 
         <p className="mt-2 text-[0.58rem] text-fg-3" role="status" aria-live="polite">
-          {query ? `검색 결과 ${visibleCatalog.length}개` : `사용 가능한 필터 ${visibleCatalog.length}개`}
+          {query ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "검색 결과 {v0}개"), { v0: String(visibleCatalog.length) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "사용 가능한 필터 {v0}개"), { v0: String(visibleCatalog.length) })}
         </p>
 
         <div className="mt-2 max-h-72 space-y-2.5 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin]">
@@ -756,8 +758,8 @@ export function StudioSmartFiltersPanel({
           })}
           {visibleCatalog.length === 0 ? (
             <div className="rounded-lg border border-dashed border-line px-3 py-4 text-center">
-              <p className="text-xs font-semibold text-fg-2">일치하는 필터가 없습니다</p>
-              <p className="mt-1 text-[0.62rem] text-fg-3">‘선명’, ‘구름’, ‘감마’처럼 효과 이름으로 찾아보세요.</p>
+              <p className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "일치하는 필터가 없습니다")}</p>
+              <p className="mt-1 text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "‘선명’, ‘구름’, ‘감마’처럼 효과 이름으로 찾아보세요.")}</p>
             </div>
           ) : null}
         </div>
@@ -765,10 +767,9 @@ export function StudioSmartFiltersPanel({
 
       {current.entries.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line bg-card/40 px-3 py-4 text-center text-[0.68rem] text-fg-3">
-          스택이 비어 있어요. 위 카탈로그에서 필터를 추가하면 여기에 조절값이 나타납니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "스택이 비어 있어요. 위 카탈로그에서 필터를 추가하면 여기에 조절값이 나타납니다.")}</p>
       ) : (
-        <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line" aria-label="스마트 필터 목록">
+        <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line" aria-label={translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "스마트 필터 목록")}>
           {current.entries.map((entry, index) => {
             const catalog = studioFilterCatalogEntry(entry.engine);
             return (
@@ -787,9 +788,9 @@ export function StudioSmartFiltersPanel({
                   </div>
                   <button
                     type="button"
-                    aria-label={entry.enabled ? `${studioAdjustmentEngineLabel(entry.engine)} 끄기` : `${studioAdjustmentEngineLabel(entry.engine)} 켜기`}
+                    aria-label={entry.enabled ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "{v0} 끄기"), { v0: String(studioAdjustmentEngineLabel(entry.engine)) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "{v0} 켜기"), { v0: String(studioAdjustmentEngineLabel(entry.engine)) })}
                     aria-pressed={entry.enabled}
-                    title={entry.enabled ? "미리보기 끄기" : "미리보기 켜기"}
+                    title={entry.enabled ? translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "미리보기 끄기") : translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "미리보기 켜기")}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-10 min-w-10 pointer-coarse:min-h-11 pointer-coarse:min-w-11" })}
                     onClick={() => patch(setStudioAdjustmentEntryEnabled(current, entry.id, !entry.enabled))}
                   >
@@ -797,7 +798,7 @@ export function StudioSmartFiltersPanel({
                   </button>
                   <button
                     type="button"
-                    aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 위로 이동`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "{v0} 위로 이동"), { v0: String(studioAdjustmentEngineLabel(entry.engine)) })}
                     disabled={index === 0}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-10 min-w-10 pointer-coarse:min-h-11 pointer-coarse:min-w-11" })}
                     onClick={() => patch(reorderStudioAdjustmentEntry(current, index, index - 1))}
@@ -806,7 +807,7 @@ export function StudioSmartFiltersPanel({
                   </button>
                   <button
                     type="button"
-                    aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 아래로 이동`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "{v0} 아래로 이동"), { v0: String(studioAdjustmentEngineLabel(entry.engine)) })}
                     disabled={index >= current.entries.length - 1}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-10 min-w-10 pointer-coarse:min-h-11 pointer-coarse:min-w-11" })}
                     onClick={() => patch(reorderStudioAdjustmentEntry(current, index, index + 1))}
@@ -815,7 +816,7 @@ export function StudioSmartFiltersPanel({
                   </button>
                   <button
                     type="button"
-                    aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 복제`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "{v0} 복제"), { v0: String(studioAdjustmentEngineLabel(entry.engine)) })}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-10 min-w-10 pointer-coarse:min-h-11 pointer-coarse:min-w-11" })}
                     disabled={maxEntries !== undefined && current.entries.length >= maxEntries}
                     onClick={() => patch(duplicateStudioEffectEntry(current, entry.id))}
@@ -824,7 +825,7 @@ export function StudioSmartFiltersPanel({
                   </button>
                   <button
                     type="button"
-                    aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 삭제`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "{v0} 삭제"), { v0: String(studioAdjustmentEngineLabel(entry.engine)) })}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-10 min-w-10 text-bad pointer-coarse:min-h-11 pointer-coarse:min-w-11" })}
                     onClick={() => patch(removeStudioAdjustmentEntry(current, entry.id))}
                   >
@@ -832,15 +833,14 @@ export function StudioSmartFiltersPanel({
                   </button>
                 </div>
                 <label className="flex min-h-11 items-center justify-between gap-2 text-xs text-fg-2">
-                  불투명도
-                  <span className="flex items-center gap-1">
+                  {translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "불투명도")}<span className="flex items-center gap-1">
                     <input
                       type="number"
                       min={0}
                       max={100}
                       step={1}
                       value={Number(((entry.opacity ?? 1) * 100).toFixed(2))}
-                      aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 필터 ${index + 1} 불투명도`}
+                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "{v0} 필터 {v1} 불투명도"), { v0: String(studioAdjustmentEngineLabel(entry.engine)), v1: String(index + 1) })}
                       className="min-h-11 w-20 rounded border border-line bg-card px-2 text-right tabular-nums text-fg"
                       onChange={(event) => patch({
                         ...current,
@@ -855,8 +855,8 @@ export function StudioSmartFiltersPanel({
                 <div className="flex justify-end">
                   <button
                     type="button"
-                    aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 초기값으로 재설정`}
-                    title="파라미터와 불투명도를 기본값으로 재설정"
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "{v0} 초기값으로 재설정"), { v0: String(studioAdjustmentEngineLabel(entry.engine)) })}
+                    title={translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "파라미터와 불투명도를 기본값으로 재설정")}
                     className={buttonClass({
                       size: "sm",
                       variant: "quiet",
@@ -865,8 +865,7 @@ export function StudioSmartFiltersPanel({
                     onClick={() => patch(resetStudioEffectEntry(current, entry.id))}
                   >
                     <RotateCcw className="size-3.5" aria-hidden />
-                    초기값
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.StudioSmartFiltersPanel", "ko", "초기값")}</button>
                 </div>
                 {entry.enabled ? (
                   <StudioSmartFilterControls

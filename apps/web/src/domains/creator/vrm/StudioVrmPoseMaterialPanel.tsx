@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Download, Loader2, Sparkles, Trash2, Upload } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 
@@ -496,18 +500,16 @@ export function StudioVrmPoseMaterialPanel({
     <details className="group mt-3.5 rounded-xl border border-accent/25 bg-accent-soft/15 p-3">
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-xs font-bold text-fg [&::-webkit-details-marker]:hidden">
         <Sparkles size={15} className="text-accent" aria-hidden />
-        캐릭터 공용 포즈 소재
-        <span className="ml-auto rounded-full bg-card px-2 py-0.5 text-[0.65rem] text-fg-3">
+        {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "캐릭터 공용 포즈 소재")}<span className="ml-auto rounded-full bg-card px-2 py-0.5 text-[0.65rem] text-fg-3">
           {panelState.payload.materials.length}/64
         </span>
       </summary>
 
       <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-        VRM normalized 55본 회전만 저장해 체형이 다른 캐릭터에도 이식합니다. 높이·표정·캐릭터 회전은 v1 소재에 포함하지 않습니다.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "VRM normalized 55본 회전만 저장해 체형이 다른 캐릭터에도 이식합니다. 높이·표정·캐릭터 회전은 v1 소재에 포함하지 않습니다.")}</p>
 
       <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem]">
-        <label htmlFor={nameInputId} className="sr-only">포즈 소재 이름</label>
+        <label htmlFor={nameInputId} className="sr-only">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "포즈 소재 이름")}</label>
         <input
           id={nameInputId}
           type="text"
@@ -515,10 +517,10 @@ export function StudioVrmPoseMaterialPanel({
           maxLength={STUDIO_POSE_MATERIAL_MAX_NAME_LENGTH}
           disabled={mutationDisabled}
           onChange={(event) => setMaterialName(event.target.value)}
-          placeholder="소재 이름 (예: 검을 든 상체)"
+          placeholder={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "소재 이름 (예: 검을 든 상체)")}
           className="min-h-11 min-w-0 rounded-lg border border-line bg-card px-3 text-xs text-fg placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45"
         />
-        <label htmlFor={captureScopeId} className="sr-only">저장할 포즈 범위</label>
+        <label htmlFor={captureScopeId} className="sr-only">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "저장할 포즈 범위")}</label>
         <select
           id={captureScopeId}
           value={captureScope}
@@ -527,7 +529,7 @@ export function StudioVrmPoseMaterialPanel({
           className="min-h-11 rounded-lg border border-line bg-card px-2 text-xs text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45"
         >
           {STUDIO_POSE_SCOPES.map((scope) => (
-            <option key={scope} value={scope}>{SCOPE_LABELS[scope]} 저장</option>
+            <option key={scope} value={scope}>{SCOPE_LABELS[scope]} {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "저장")}</option>
           ))}
         </select>
       </div>
@@ -538,16 +540,14 @@ export function StudioVrmPoseMaterialPanel({
         onClick={handleSave}
         className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3 text-xs font-bold text-accent transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-45"
       >
-        <Sparkles size={14} aria-hidden /> 현재 자세를 범용 소재로 저장
-      </button>
+        <Sparkles size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "현재 자세를 범용 소재로 저장")}</button>
 
       {disabled ? (
         <p className="mt-2 text-[0.65rem] leading-relaxed text-warn" role="status">
-          실시간 추적·애니메이션·캡처·관절 드래그가 끝나면 저장하고 적용할 수 있습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "실시간 추적·애니메이션·캡처·관절 드래그가 끝나면 저장하고 적용할 수 있습니다.")}</p>
       ) : null}
       {lockedBoneCount > 0 ? (
-        <p className="mt-1 text-[0.65rem] text-fg-3">현재 잠금 본 {lockedBoneCount}개는 소재 적용 시 그대로 유지됩니다.</p>
+        <p className="mt-1 text-[0.65rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "현재 잠금 본 ")}{lockedBoneCount}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "개는 소재 적용 시 그대로 유지됩니다.")}</p>
       ) : null}
 
       <div className="mt-3 rounded-lg border border-line/50 bg-card/40 px-2.5 py-2">
@@ -555,12 +555,12 @@ export function StudioVrmPoseMaterialPanel({
           htmlFor={strengthSliderId}
           className="flex items-center justify-between gap-2 text-[0.68rem] font-semibold text-fg-2"
         >
-          <span>적용 강도</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "적용 강도")}</span>
           <span className="tabular-nums text-fg-3">{Math.round(applyStrength * 100)}%</span>
         </label>
         <input
           id={strengthSliderId}
-          aria-label="적용 강도"
+          aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "적용 강도")}
           type="range"
           min={0}
           max={1}
@@ -575,13 +575,12 @@ export function StudioVrmPoseMaterialPanel({
           aria-valuetext={`${Math.round(applyStrength * 100)}%`}
         />
         <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
-          100%는 소재 자세 전체, 0%는 rest에 가깝게 섞입니다. 모든 적용 버튼에 공통으로 쓰입니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "100%는 소재 자세 전체, 0%는 rest에 가깝게 섞입니다. 모든 적용 버튼에 공통으로 쓰입니다.")}</p>
       </div>
 
       {panelState.message ? (
         <p
-          className={`mt-2 text-[0.65rem] leading-relaxed ${messageClass(panelState.messageTone)}`}
+          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "en", "mt-2 text-[0.65rem] leading-relaxed {v0}"), { v0: String(messageClass(panelState.messageTone)) })}
           role="status"
           aria-live="polite"
           data-studio-vrm-pose-material-authority={panelState.authority}
@@ -597,8 +596,7 @@ export function StudioVrmPoseMaterialPanel({
           onClick={handleExport}
           className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-3 text-[0.68rem] font-bold text-fg-2 hover:bg-raised disabled:opacity-45"
         >
-          <Download size={13} aria-hidden /> JSON 내보내기
-        </button>
+          <Download size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "JSON 내보내기")}</button>
         <button
           type="button"
           disabled={mutationDisabled}
@@ -606,8 +604,7 @@ export function StudioVrmPoseMaterialPanel({
           className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-3 text-[0.68rem] font-bold text-fg-2 hover:bg-raised disabled:opacity-45"
         >
           {importing ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Upload size={13} aria-hidden />}
-          JSON 병합
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "JSON 병합")}</button>
         <input
           ref={fileInputRef}
           type="file"
@@ -620,8 +617,7 @@ export function StudioVrmPoseMaterialPanel({
 
       {panelState.payload.materials.length === 0 ? (
         <p className="mt-3 rounded-lg border border-dashed border-line/60 bg-card/25 px-3 py-4 text-center text-[0.68rem] text-fg-3">
-          저장된 범용 포즈 소재가 없습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "저장된 범용 포즈 소재가 없습니다.")}</p>
       ) : (
         <div className="mt-3 space-y-2">
           {panelState.payload.materials.map((material) => {
@@ -634,31 +630,28 @@ export function StudioVrmPoseMaterialPanel({
             return (
               <article
                 key={material.id}
-                className={`rounded-xl border p-2.5 ${
-                  isActive ? "border-accent/60 bg-accent-soft/35" : "border-line bg-card/65"
-                }`}
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "en", "rounded-xl border p-2.5 {v0}"), { v0: String(isActive ? "border-accent/60 bg-accent-soft/35" : "border-line bg-card/65") })}
               >
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-bold text-fg" title={material.name}>{material.name}</p>
                     <p className="mt-0.5 text-[0.65rem] text-fg-3">
-                      {SCOPE_LABELS[material.scope]} 소재 · {material.bones.length}본
-                    </p>
+                      {SCOPE_LABELS[material.scope]} {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "소재 · ")}{material.bones.length}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "본")}</p>
                   </div>
                   <button
                     type="button"
                     disabled={mutationDisabled}
                     onClick={() => void handleDelete(material)}
                     className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 hover:border-bad/40 hover:text-bad disabled:opacity-45"
-                    aria-label={`${material.name} 포즈 소재 삭제`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "{v0} 포즈 소재 삭제"), { v0: String(material.name) })}
                   >
                     <Trash2 size={14} aria-hidden />
                   </button>
                 </div>
                 <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_6.5rem]">
-                  <label className="sr-only" htmlFor={`pose-material-scope-${material.id}`}>적용 범위</label>
+                  <label className="sr-only" htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "en", "pose-material-scope-{v0}"), { v0: String(material.id) })}>{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "적용 범위")}</label>
                   <select
-                    id={`pose-material-scope-${material.id}`}
+                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "en", "pose-material-scope-{v0}"), { v0: String(material.id) })}
                     value={selectedScope}
                     disabled={disabled}
                     onChange={(event) =>
@@ -670,7 +663,7 @@ export function StudioVrmPoseMaterialPanel({
                     className="min-h-11 min-w-0 rounded-lg border border-line bg-card px-2 text-[0.68rem] text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45"
                   >
                     {applicableScopes.map((scope) => (
-                      <option key={scope} value={scope}>{SCOPE_LABELS[scope]}에 적용</option>
+                      <option key={scope} value={scope}>{SCOPE_LABELS[scope]}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "에 적용")}</option>
                     ))}
                   </select>
                   <button
@@ -679,8 +672,7 @@ export function StudioVrmPoseMaterialPanel({
                     onClick={() => handleApply(material)}
                     className="min-h-11 rounded-lg border border-accent/40 bg-accent-soft px-3 text-[0.68rem] font-bold text-accent hover:bg-accent/15 disabled:opacity-45"
                   >
-                    적용
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseMaterialPanel", "ko", "적용")}</button>
                 </div>
               </article>
             );

@@ -146,6 +146,7 @@ test('cache read and write failures do not mask successful online responses', as
 test('only bounded, same-origin static build URLs are admitted', () => {
   assert.equal(protocol.normalizeStudioOfflineAssetUrl(`${origin}/assets/brush-a.js`, origin), '/assets/brush-a.js');
   for (const input of ['https://other.test/assets/a.js', '/api/works', '/assets/a.js?token=x',
+    // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
     '/assets/a.js#x', 'https://user:secret@www.toonstudio.cloud/assets/a.js', '/assets/../api/a.js', '/assets/private.json', 'x'.repeat(2049)]) {
     assert.equal(protocol.normalizeStudioOfflineAssetUrl(input, origin), null);
   }

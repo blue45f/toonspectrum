@@ -48,8 +48,13 @@ describe("StudioAiCompositionPanel server operation identity", () => {
       />
     );
 
-    expect(screen.getByText(/로그인하면 자동 무료 AI를 먼저 사용합니다/u)).toBeTruthy();
-    expect(screen.getByText(/개인 클라우드 API 키와 모델을 연결하세요/u)).toBeTruthy();
+    expect(screen.getByText(/장면 초안은 먼저 작성할 수 있어요/u)).toBeTruthy();
+    expect(screen.getByRole("textbox").hasAttribute("disabled")).toBe(false);
+    expect(screen.getByRole("button", { name: "구도 제안 받기" }).hasAttribute("disabled"))
+      .toBe(true);
+    const settingsLink = screen.getByRole("link", { name: "AI 설정 열기" });
+    expect(settingsLink.getAttribute("href")).toBe("/settings/ai");
+    expect(settingsLink.getAttribute("target")).toBe("_blank");
   });
 
   it("binds the tracked operation ID to the server request and settlement", async () => {

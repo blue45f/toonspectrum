@@ -46,7 +46,7 @@ env:
   BLENDER_VERSION: 5.2.1
   VRM_ADDON_VERSION: 4.5.0
   VRM_ADDON_SHA256: e5e0f923a0bb11eb1320870b2db8091948dd5b63014510d839016a112e40a35a
-  NODE_OPTIONS: --max-old-space-size=8192
+  NODE_OPTIONS: --max-old-space-size=12288
 
 jobs:
   contracts:

@@ -17,6 +17,66 @@ const project = projectScope(PROJECT_ID);
 const episode12 = episodeScope(PROJECT_ID, "episode-12");
 const episode13 = episodeScope(PROJECT_ID, "episode-13");
 
+type DemoRiskInput = Pick<
+  ProductionRisk,
+  | "id"
+  | "projectId"
+  | "scope"
+  | "category"
+  | "title"
+  | "description"
+  | "probability"
+  | "impact"
+  | "ownerAssignmentId"
+  | "mitigation"
+  | "trigger"
+  | "status"
+  | "dueAt"
+>;
+
+function createDemoRisk(input: DemoRiskInput): ProductionRisk {
+  const exposureScore = input.probability * input.impact;
+  const priorityScore = Math.min(100, exposureScore * 4);
+  const severity: ProductionRisk["severity"] = priorityScore >= 85
+    ? "critical"
+    : priorityScore >= 70
+      ? "high"
+      : priorityScore >= 30 ? "warning" : "watch";
+  const episodeId = input.scope.kind === "episode"
+    ? input.scope.id
+    : input.scope.ancestors.find((entry) => entry.kind === "episode")?.id ?? null;
+  return Object.freeze({
+    ...input,
+    revision: 1,
+    source: "manual",
+    signalIds: Object.freeze([]),
+    exposureScore,
+    severity,
+    priorityScore,
+    causeCodes: Object.freeze(["manual"]),
+    earlySignals: Object.freeze([]),
+    contingency: "필요하면 일정·범위·인력 조정을 검토합니다.",
+    affectedTaskIds: Object.freeze([]),
+    affectedEpisodeIds: Object.freeze(episodeId ? [episodeId] : []),
+    affectedMilestoneIds: Object.freeze([]),
+    baselineDueAt: null,
+    forecastDueAt: null,
+    varianceHours: null,
+    responseDueAt: input.dueAt,
+    nextReviewAt: input.dueAt,
+    acceptedReason: null,
+    dismissedReason: null,
+    resolutionSummary: null,
+    detectedAt: AT,
+    lastEvaluatedAt: AT,
+    occurredAt: input.status === "occurred" ? AT : null,
+    resolvedAt: input.status === "resolved" ? AT : null,
+    closedAt: input.status === "closed" ? AT : null,
+    createdAt: AT,
+    updatedAt: AT,
+  });
+}
+
 const scene1201: ScopeRef = {
   kind: "scene",
   id: "scene-12-01",
@@ -1282,8 +1342,8 @@ export function createProductionDemoProject(): ProductionProjectAggregate {
       { id: "asset-rooftop", projectId: PROJECT_ID, scope: scene1202, category: "3d", title: "옥상 3D 블로킹", specification: "난간·출입문·물탱크 카메라 프리셋", sourcePlanRefs: [scenePlans[1]!.id], sourcing: "existing", rightsRequirements: ["프로젝트 라이선스 확인"], requiredByAt: "2026-09-18T00:00:00.000Z", status: "ready" },
     ],
     risks: [
-      { id: "risk-background-capacity", projectId: PROJECT_ID, scope: episode12, category: "capacity", title: "내부 배경 capacity 부족", description: "12화 배경 18컷 중 12컷을 내부 일정으로 처리할 수 없습니다.", probability: 4, impact: 4, ownerAssignmentId: producerAssignmentId, mitigation: "승인 협력사에 12컷을 ScopePackage로 발주", trigger: "내부 가용 시간이 20시간 미만", status: "mitigating", dueAt: "2026-09-16T00:00:00.000Z" },
-      { id: "risk-envelope-reveal", projectId: PROJECT_ID, scope: episode12, category: "story", title: "발신인 정보 조기 노출", description: "봉투 문양과 글자가 너무 일찍 식별될 위험", probability: 3, impact: 5, ownerAssignmentId: "assignment-story", mitigation: "MUST_PRESERVE 지시와 Narrative lane 검수", trigger: "마지막 4컷 이전에 식별 가능", status: "open", dueAt: "2026-09-18T00:00:00.000Z" },
+      createDemoRisk({ id: "risk-background-capacity", projectId: PROJECT_ID, scope: episode12, category: "capacity", title: "내부 배경 capacity 부족", description: "12화 배경 18컷 중 12컷을 내부 일정으로 처리할 수 없습니다.", probability: 4, impact: 4, ownerAssignmentId: producerAssignmentId, mitigation: "승인 협력사에 12컷을 ScopePackage로 발주", trigger: "내부 가용 시간이 20시간 미만", status: "mitigating", dueAt: "2026-09-16T00:00:00.000Z" }),
+      createDemoRisk({ id: "risk-envelope-reveal", projectId: PROJECT_ID, scope: episode12, category: "story", title: "발신인 정보 조기 노출", description: "봉투 문양과 글자가 너무 일찍 식별될 위험", probability: 3, impact: 5, ownerAssignmentId: "assignment-story", mitigation: "MUST_PRESERVE 지시와 Narrative lane 검수", trigger: "마지막 4컷 이전에 식별 가능", status: "open", dueAt: "2026-09-18T00:00:00.000Z" }),
     ],
     decisions: [
       { id: "decision-envelope-reveal", projectId: PROJECT_ID, scope: episode12, domain: "canon", question: "봉투 문양을 마지막 컷 전에 보여도 되는가?", decision: "문양은 허용하되 글자와 발신인 식별 요소는 가린다.", rationale: "클리프행어의 정보 공개 순서를 보존한다.", alternatives: ["봉투 전체를 숨김", "발신인을 그림자 처리"], evidenceRefs: [storySnapshot.id], decidedByAssignmentId: "assignment-story", consultedAssignmentIds: ["assignment-art"], supersedesDecisionId: null, createdAt: "2026-09-15T10:00:00.000Z" },

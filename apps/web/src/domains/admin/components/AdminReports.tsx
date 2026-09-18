@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   CheckCircle,
   ExternalLink,
   Flag,
@@ -342,7 +346,7 @@ export function AdminReports({ userId }: AdminReportsProps) {
           >
             <RefreshCw
               size={14}
-              className={refreshing ? "animate-spin" : undefined}
+              className={refreshing ? translateCurrentStaticSourceText("domains.admin.components.AdminReports", "en", "animate-spin") : undefined}
             />
             {copy.reports.refresh}
           </button>
@@ -512,7 +516,7 @@ export function AdminReports({ userId }: AdminReportsProps) {
                           {item.targetType}
                         </span>
                         <span className="max-w-sm truncate text-xs text-slate-500">
-                          ID: {item.targetId}
+                          {translateCurrentStaticSourceText("domains.admin.components.AdminReports", "en", "ID: ")}{item.targetId}
                         </span>
                       </div>
 
@@ -538,11 +542,10 @@ export function AdminReports({ userId }: AdminReportsProps) {
                       {messageEvidence ? (
                         <details className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
                           <summary className="cursor-pointer text-xs font-semibold text-slate-300">
-                            보존된 대화 증거 {messageEvidence.messages.length.toLocaleString()}건
-                          </summary>
+                            {translateCurrentStaticSourceText("domains.admin.components.AdminReports", "ko", "보존된 대화 증거 ")}{messageEvidence.messages.length.toLocaleString()}{translateCurrentStaticSourceText("domains.admin.components.AdminReports", "ko", "건")}</summary>
                           {messageEvidence.capturedAt ? (
                             <p className="mt-2 text-[0.68rem] text-slate-500">
-                              캡처 시각: {formatDate(messageEvidence.capturedAt)}
+                              {translateCurrentStaticSourceText("domains.admin.components.AdminReports", "ko", "캡처 시각: ")}{formatDate(messageEvidence.capturedAt)}
                             </p>
                           ) : null}
                           <div className="mt-3 max-h-96 space-y-2 overflow-y-auto pr-1">
@@ -556,11 +559,11 @@ export function AdminReports({ userId }: AdminReportsProps) {
                                 )}
                               >
                                 <div className="flex flex-wrap items-center gap-2 text-[0.68rem] text-slate-500">
-                                  <span>{message.senderId ?? "탈퇴한 회원"}</span>
+                                  <span>{message.senderId ?? translateCurrentStaticSourceText("domains.admin.components.AdminReports", "ko", "탈퇴한 회원")}</span>
                                   <span>{message.type}</span>
                                   <span>{formatDate(message.createdAt)}</span>
                                   {message.id === messageEvidence.targetMessageId ? (
-                                    <span className="font-semibold text-amber-400">신고 대상</span>
+                                    <span className="font-semibold text-amber-400">{translateCurrentStaticSourceText("domains.admin.components.AdminReports", "ko", "신고 대상")}</span>
                                   ) : null}
                                 </div>
                                 <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-300">
@@ -586,13 +589,12 @@ export function AdminReports({ userId }: AdminReportsProps) {
                   <div className="flex flex-wrap gap-2 lg:justify-end">
                     {item.targetType === "member_message" ? (
                       <span className="inline-flex min-h-10 items-center rounded-xl border border-line bg-panel px-3 text-xs text-fg-3">
-                        관리자 전용 증거
-                      </span>
+                        {translateCurrentStaticSourceText("domains.admin.components.AdminReports", "ko", "관리자 전용 증거")}</span>
                     ) : (
                       <Link
-                        href={`/admin/community?q=${encodeURIComponent(
+                        href={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.AdminReports", "en", "/admin/community?q={v0}"), { v0: String(encodeURIComponent(
                           item.targetId,
-                        )}`}
+                        )) })}
                         className={adminButtonClass("ghost")}
                       >
                         <ExternalLink size={13} />

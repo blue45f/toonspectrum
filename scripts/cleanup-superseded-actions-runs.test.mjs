@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { selectSupersededActionsRuns } from "./cleanup-superseded-actions-runs.mjs";
+import {
+  cleanupSupersededActionsRuns,
+  selectSupersededActionsRuns,
+} from "./cleanup-superseded-actions-runs.mjs";
 
 function run({
   id,
@@ -10,6 +13,7 @@ function run({
   createdAt,
   pr = 10,
   attempt = 1,
+  status = "queued",
 }) {
   return {
     id,
@@ -19,8 +23,51 @@ function run({
     head_sha: `sha-${id}`,
     created_at: createdAt,
     run_attempt: attempt,
+    status,
     pull_requests: event === "pull_request" && pr !== null ? [{ number: pr }] : [],
     name: `workflow-${workflow}`,
+  };
+}
+
+function jsonResponse(body, status = 200) {
+  return new Response(body === null ? null : JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function createCleanupFetch(forceCancelStatus) {
+  const calls = [];
+  const staleRun = run({
+    id: 50,
+    branch: "feature/closed",
+    createdAt: "2026-09-17T00:00:00Z",
+    pr: null,
+  });
+
+  return {
+    calls,
+    async fetchImpl(url, init = {}) {
+      const request = new URL(url);
+      calls.push(`${init.method ?? "GET"} ${request.pathname}${request.search}`);
+      if (request.searchParams.get("status") === "queued") {
+        return jsonResponse({ workflow_runs: [staleRun] });
+      }
+      if (["pending", "in_progress"].includes(request.searchParams.get("status"))) {
+        return jsonResponse({ workflow_runs: [] });
+      }
+      if (request.pathname.endsWith("/pulls")) return jsonResponse([]);
+      if (request.pathname.endsWith("/50/cancel")) {
+        return jsonResponse({ message: "not queued yet" }, 409);
+      }
+      if (request.pathname.endsWith("/50/force-cancel")) {
+        return jsonResponse(
+          forceCancelStatus === 204 ? null : { message: "not queued yet" },
+          forceCancelStatus,
+        );
+      }
+      throw new Error(`Unexpected request: ${request}`);
+    },
   };
 }
 
@@ -100,6 +147,61 @@ describe("selectSupersededActionsRuns", () => {
     expect(selected).toEqual([]);
   });
 
+  it("cancels superseded dynamic code-scanning runs for the same PR head", () => {
+    const selected = selectSupersededActionsRuns([
+      run({
+        id: 20,
+        event: "dynamic",
+        branch: "refs/pull/1578/head",
+        pr: null,
+        createdAt: "2026-09-17T00:00:00Z",
+      }),
+      run({
+        id: 21,
+        event: "dynamic",
+        branch: "refs/pull/1578/head",
+        pr: null,
+        createdAt: "2026-09-17T00:01:00Z",
+      }),
+    ]);
+    expect(selected).toHaveLength(1);
+    expect(selected[0]).toMatchObject({ reason: "superseded", run: { id: 20 } });
+  });
+
+  it.each(["pending", "queued"])(
+    "cancels a %s run that has remained unscheduled for six hours",
+    (status) => {
+      const selected = selectSupersededActionsRuns(
+        [run({ id: 30, createdAt: "2026-09-17T00:00:00Z", status })],
+        {
+          now: Date.parse("2026-09-17T06:00:00Z"),
+          pullRequestStates: new Map([[10, "open"]]),
+        },
+      );
+      expect(selected).toHaveLength(1);
+      expect(selected[0]).toMatchObject({ reason: "stale-queued", run: { id: 30 } });
+    },
+  );
+
+  it("keeps recent queued runs and never age-cancels in-progress work", () => {
+    const selected = selectSupersededActionsRuns(
+      [
+        run({ id: 31, createdAt: "2026-09-17T05:30:00Z", status: "queued" }),
+        run({
+          id: 32,
+          workflow: 2,
+          createdAt: "2026-09-16T00:00:00Z",
+          status: "in_progress",
+        }),
+      ],
+      {
+        now: Date.parse("2026-09-17T06:00:00Z"),
+        pullRequestStates: new Map([[10, "open"]]),
+      },
+    );
+    expect(selected).toEqual([]);
+  });
+
   it("protects the cleanup workflow's current run", () => {
     const selected = selectSupersededActionsRuns(
       [
@@ -118,5 +220,47 @@ describe("selectSupersededActionsRuns", () => {
       run({ id: 3, event: "workflow_dispatch", pr: null, createdAt: "2026-09-10T00:02:00Z" }),
     ]);
     expect(selected).toEqual([]);
+  });
+});
+
+describe("cleanupSupersededActionsRuns", () => {
+  it.each([
+    {
+      name: "falls back to force-cancel after GitHub rejects ordinary cancel",
+      forceCancelStatus: 204,
+      cancelled: 1,
+      skipped: 0,
+      operation: "force-cancel",
+    },
+    {
+      name: "reports an uncancellable ghost when both cancellation APIs reject it",
+      forceCancelStatus: 409,
+      cancelled: 0,
+      skipped: 1,
+      operation: undefined,
+    },
+  ])("$name", async ({ forceCancelStatus, cancelled, skipped, operation }) => {
+    const { calls, fetchImpl } = createCleanupFetch(forceCancelStatus);
+    const report = await cleanupSupersededActionsRuns({
+      token: "test-token",
+      repository: "owner/repository",
+      currentRunId: 999,
+      apply: true,
+      fetchImpl,
+      now: Date.parse("2026-09-17T01:00:00Z"),
+    });
+
+    expect(report.planned).toHaveLength(1);
+    expect(report.planned[0]).toMatchObject({ id: 50, reason: "pull-request-no-longer-open" });
+    expect(report.cancelled).toHaveLength(cancelled);
+    expect(report.skipped).toHaveLength(skipped);
+    if (operation) expect(report.cancelled[0]).toMatchObject({ operation });
+    if (skipped > 0) {
+      expect(report.skipped[0]).toMatchObject({
+        failure: "cancel-and-force-cancel-rejected",
+      });
+    }
+    expect(calls).toContain("POST /repos/owner/repository/actions/runs/50/cancel");
+    expect(calls).toContain("POST /repos/owner/repository/actions/runs/50/force-cancel");
   });
 });

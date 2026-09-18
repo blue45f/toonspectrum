@@ -1,26 +1,50 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useFx } from "@toonspectrum/core/fx";
-import { Compass, RefreshCw, RotateCcw, Shuffle, SlidersHorizontal, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  Compass,
+  RefreshCw,
+  RotateCcw,
+  Shuffle,
+  SlidersHorizontal,
+  Sparkles,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-
 import type { SortKey } from "@/shared/lib/search";
-import type { AgeRating, PlatformId, Pricing, SerialStatus, Title, WorkType } from "@/shared/lib/types";
+import type {
+  PlatformId,
+  Title,
+  WorkType,
+} from "@/shared/lib/types";
 
 import { AdSlot } from "@/shared/components/ad-slot";
+import { DiscoveryWorkspaceNav } from "@/shared/components/discovery-workspace-nav";
 import { CountUp } from "@/shared/components/count-up";
 import { RevealOnScroll } from "@/shared/components/reveal-on-scroll";
 import { Container } from "@/shared/components/section";
 import { ShimmerTitle } from "@/shared/components/shimmer-title";
 import { TitleCard } from "@/shared/components/title-card";
 import { TitleFilterPanel } from "@/shared/components/title-filter-panel";
-import { genreBorder, genreColor, genreTextColor, genreTint, spectrumGradient } from "@/shared/lib/genre-color";
+import {
+  genreBorder,
+  genreColor,
+  genreTextColor,
+  genreTint,
+  spectrumGradient,
+} from "@/shared/lib/genre-color";
+import {
+  parseCatalogDiscoveryState,
+  writeCatalogDiscoveryState,
+} from "@/shared/lib/catalog-discovery-state";
 import { useSavedTitleIds } from "@/shared/lib/store";
 import { GENRES, TYPE_LABEL } from "@/shared/lib/taxonomy";
 import {
   applyClientOnlyFilters,
   countActiveTitleFilters,
-  titleFiltersToParams,
   type TitleFilterState,
 } from "@/shared/lib/title-filters";
 import { cn } from "@/shared/lib/utils";
@@ -57,61 +81,6 @@ const FACETS = [
   "adapted",
 ] as const;
 
-function splitParam(value: string | null): string[] {
-  return (value ?? "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-}
-
-// URL 검색파라미터 → 패널 상태. 단일 genre/tag(스펙트럼·태그 칩)와 복수 genres/tags를 병합한다.
-// 서버 explore는 freeOnly만 받으므로(가격 정밀값은 클라 전용) URL에서 pricing 정밀 선택을 복원한다.
-function filtersFromSearchParams(sp: URLSearchParams): TitleFilterState {
-  const genres = new Set(splitParam(sp.get("genres")));
-  const singleGenre = sp.get("genre");
-  if (singleGenre && GENRES.includes(singleGenre as (typeof GENRES)[number])) genres.add(singleGenre);
-
-  const tags = new Set(splitParam(sp.get("tags")));
-  const singleTag = sp.get("tag");
-  if (singleTag) tags.add(singleTag);
-
-  const types = new Set<WorkType>(splitParam(sp.get("types")) as WorkType[]);
-  const singleType = sp.get("type") as WorkType | null;
-  if (singleType === "webtoon" || singleType === "webnovel") types.add(singleType);
-
-  const yearMin = Number(sp.get("yearMin"));
-  const yearMax = Number(sp.get("yearMax"));
-  const yearRange: [number, number] | null =
-    Number.isFinite(yearMin) && Number.isFinite(yearMax) && sp.get("yearMin") && sp.get("yearMax")
-      ? [yearMin, yearMax]
-      : null;
-
-  const minRating = Number(sp.get("minRating"));
-
-  return {
-    types: [...types],
-    genres: [...genres],
-    status: splitParam(sp.get("status")) as SerialStatus[],
-    platforms: splitParam(sp.get("platforms")) as PlatformId[],
-    ages: splitParam(sp.get("ages")) as AgeRating[],
-    pricing: splitParam(sp.get("pricing")) as Pricing[],
-    minRating: Number.isFinite(minRating) ? minRating : 0,
-    yearRange,
-    tags: [...tags],
-    savedOnly: sp.get("savedOnly") === "true",
-    adaptedOnly: sp.get("adaptedOnly") === "true",
-  };
-}
-
-// 패널 상태 → URL. 서버 파라미터(titleFiltersToParams)에 더해 클라 전용(pricing 정밀·savedOnly)도
-// URL에 보존해 새로고침/공유 시 복원되게 한다. sort/show는 호출부에서 합친다.
-function clientOnlyParams(filters: TitleFilterState): Record<string, string> {
-  const extra: Record<string, string> = {};
-  if (filters.pricing.length) extra.pricing = filters.pricing.join(",");
-  if (filters.savedOnly) extra.savedOnly = "true";
-  return extra;
-}
-
 interface PlatformCoverage {
   id: PlatformId;
   label: string;
@@ -147,37 +116,60 @@ export function ExplorePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const savedIds = useSavedTitleIds();
   const [panelOpen, setPanelOpen] = useState(false);
+  const [showAllGenres, setShowAllGenres] = useState(false);
+  const [showAllTags, setShowAllTags] = useState(false);
   const fx = useFx();
 
-  const sort = (SORTS.find((entry) => entry.key === searchParams.get("sort"))?.key ?? "popular") as SortKey;
-  const sortExplicit = Boolean(searchParams.get("sort"));
+  const discoveryState = useMemo(
+    () => parseCatalogDiscoveryState(searchParams, { defaultSort: "popular" }),
+    [searchParams],
+  );
+  const { filters, sort } = discoveryState;
+  const sortExplicit = searchParams.has("sort");
   const showParam = searchParams.get("show") ?? undefined;
-
-  const filters = filtersFromSearchParams(searchParams);
   const activeFilters = countActiveTitleFilters(filters);
-  // 헤더 스펙트럼/그라데이션이 강조할 장르 — 선택한 첫 장르(없으면 미강조).
   const heroGenre = filters.genres[0];
+  const visibleGenres = showAllGenres
+    ? [...GENRES]
+    : [...new Set([...filters.genres, ...GENRES.slice(0, 8)])];
 
-  // 패널/칩이 바꾼 상태를 서버 파라미터 + 클라 전용 파라미터로 직렬화해 URL에 반영.
-  // sort/show는 명시 override가 없으면 기존 값을 보존한다(show는 필터 변경 시 초기화).
-  const writeState = (next: TitleFilterState, override?: { sort?: SortKey | null; show?: string | null }) => {
-    const extra: Record<string, string> = { ...clientOnlyParams(next) };
-    const nextSort = override && "sort" in override ? override.sort : sortExplicit ? sort : null;
-    if (nextSort) extra.sort = nextSort;
+  const writeState = (
+    nextFilters: TitleFilterState,
+    override?: { sort?: SortKey | null; show?: string | null },
+  ) => {
+    const nextState = {
+      ...discoveryState,
+      filters: nextFilters,
+      sort:
+        override && "sort" in override
+          ? (override.sort ?? "popular")
+          : discoveryState.sort,
+    };
+    const nextParams = writeCatalogDiscoveryState(searchParams, nextState, {
+      includeQuery: false,
+      includeView: false,
+      includeRecommendation: false,
+    });
     const nextShow = override && "show" in override ? override.show : null;
-    if (nextShow) extra.show = nextShow;
-    setSearchParams(new URLSearchParams(titleFiltersToParams(next, extra)));
+    if (nextShow) nextParams.set("show", nextShow);
+    else nextParams.delete("show");
+    setSearchParams(nextParams, { replace: true, preventScrollReset: true });
   };
 
   const applyFilters = (next: TitleFilterState) => writeState(next);
-  const changeSort = (key: SortKey) => writeState(filters, { sort: key, show: showParam ?? null });
-  const showMore = () => writeState(filters, { sort: sortExplicit ? sort : null, show: String(showCount + pageSize) });
+  const changeSort = (key: SortKey) =>
+    writeState(filters, { sort: key, show: showParam ?? null });
+  const showMore = () =>
+    writeState(filters, {
+      sort: sortExplicit ? sort : null,
+      show: String(showCount + pageSize),
+    });
 
   // 빌드된 서버 쿼리(현재 URL 그대로 사용). useApiResource가 키스트로크당 네트워크를 보장.
   const query = searchParams.toString();
   const { data, loading, error, reload } = useApiResource<ExploreResponse>(
     query ? `/api/explore?${query}` : "/api/explore",
-    "탐색 데이터를 불러오지 못했습니다."
+    "탐색 데이터를 불러오지 못했습니다.",
   );
   const rawResults = data?.results ?? [];
   // 서버가 적용하지 못한 클라 전용 facet(가격 정밀·내 찜만)을 결과에 추가 적용.
@@ -186,8 +178,22 @@ export function ExplorePage() {
   const pageSize = data?.pageSize ?? 40;
   const shown = results.slice(0, showCount);
   const tags = data?.tags ?? [];
+  const tagCount = new Map(tags.map((entry) => [entry.tag, entry.count]));
+  const visibleTags = showAllTags
+    ? tags
+    : [
+        ...new Map([
+          ...filters.tags.map(
+            (tag) => [tag, { tag, count: tagCount.get(tag) ?? 0 }] as const,
+          ),
+          ...tags.slice(0, 12).map((entry) => [entry.tag, entry] as const),
+        ]).values(),
+      ];
+  const hiddenTagCount = Math.max(0, tags.length - visibleTags.length);
   // 데이터에 존재하는 플랫폼만 패널에 노출(빈 플랫폼 숨김).
-  const platformOptions = data?.catalog?.platformCoverage?.map((entry) => entry.id);
+  const platformOptions = data?.catalog?.platformCoverage?.map(
+    (entry) => entry.id,
+  );
   const hasFilter = sortExplicit || activeFilters > 0;
   const accent = heroGenre ? genreColor(heroGenre, 0.84) : undefined;
 
@@ -199,12 +205,13 @@ export function ExplorePage() {
   showMoreRef.current = showMore;
   useEffect(() => {
     const node = loaderRef.current;
-    if (!node || !hasMore || typeof IntersectionObserver === "undefined") return;
+    if (!node || !hasMore || typeof IntersectionObserver === "undefined")
+      return;
     const io = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting && !loading) showMoreRef.current();
       },
-      { rootMargin: "800px 0px" }
+      { rootMargin: "800px 0px" },
     );
     io.observe(node);
     return () => io.disconnect();
@@ -214,7 +221,10 @@ export function ExplorePage() {
     <div>
       <section className="relative overflow-hidden border-b border-line bg-ledger">
         {/* 상단 장르-스펙트럼 스트립 — 데이터 시그니처(홈과 톤 정합). 좌→우 fill-in. */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1 overflow-hidden" aria-hidden>
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1 overflow-hidden"
+          aria-hidden
+        >
           <div
             className="size-full origin-left motion-safe:[animation:spectrum-grow_0.9s_var(--ease-out-expo)_0.1s_both]"
             style={{ background: spectrumGradient([...GENRES], 90) }}
@@ -244,7 +254,7 @@ export function ExplorePage() {
             style={{
               background: `radial-gradient(120% 90% at 18% -10%, ${genreTint(
                 heroGenre,
-                0.2
+                0.2,
               )}, transparent 60%)`,
             }}
             aria-hidden
@@ -253,7 +263,9 @@ export function ExplorePage() {
         <Container size="wide" className="relative py-7 sm:py-12 lg:py-16">
           <p
             className="eyebrow inline-flex items-center gap-2 text-accent"
-            style={{ animation: "fade-up 0.5s var(--ease-out-expo) 0.05s both" }}
+            style={{
+              animation: "fade-up 0.5s var(--ease-out-expo) 0.05s both",
+            }}
           >
             {/* 시그니처 스펙트럼 틱 — 살아있는 브랜드 맥동(데이터 맥락, 홈 히어로와 동일 언어). */}
             <span
@@ -262,23 +274,29 @@ export function ExplorePage() {
               style={{ backgroundImage: spectrumGradient([...GENRES], 90) }}
             />
             <Compass size={14} strokeWidth={2} />
-            GENRE SPECTRUM / 탐색
-          </p>
+            {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "GENRE SPECTRUM / 탐색")}</p>
 
           <div className="mt-3 max-w-2xl sm:mt-4">
             <h1
               className="text-pretty text-[clamp(1.7rem,7vw,2.25rem)] font-bold leading-[1.1] sm:text-4xl"
-              style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.14s both" }}
+              style={{
+                animation: "fade-up 0.6s var(--ease-out-expo) 0.14s both",
+              }}
             >
-              색을 따라 떠나는{" "}
+              {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "색을 따라 떠나는")}{" "}
               {heroGenre ? (
-                <span className="relative font-serif font-normal italic" style={{ color: accent }}>
+                <span
+                  className="relative font-serif font-normal italic"
+                  style={{ color: accent }}
+                >
                   {heroGenre}
                   {/* 선택 장르 강조 밑줄 — 그 장르색으로 fill-in. */}
                   <span
                     aria-hidden
                     className="absolute -bottom-0.5 left-0 h-[0.12em] w-full origin-left rounded-full motion-safe:[animation:spectrum-grow_0.6s_var(--ease-out-expo)_0.5s_both]"
-                    style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }}
+                    style={{
+                      background: `linear-gradient(90deg, ${accent}, transparent)`,
+                    }}
                   />
                 </span>
               ) : (
@@ -288,31 +306,43 @@ export function ExplorePage() {
                   particleCount={22}
                   particleSpread={1.2}
                 >
-                  스펙트럼 탐색
-                </ShimmerTitle>
+                  {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "스펙트럼 탐색")}</ShimmerTitle>
               )}
             </h1>
             <p
               className="lede mt-2.5 text-pretty text-sm leading-relaxed text-fg-2 sm:mt-3.5 sm:text-base"
-              style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.24s both" }}
+              style={{
+                animation: "fade-up 0.6s var(--ease-out-expo) 0.24s both",
+              }}
             >
-              장르·태그·유형별로 웹툰과 웹소설을 좁혀봅니다. 작품 카드에는 줄거리와 연재 상태가 함께
-              표시되어 무슨 작품인지 바로 판단할 수 있습니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "장르·태그·유형별로 웹툰과 웹소설을 좁혀봅니다. 작품 카드에는 줄거리와 연재 상태가 함께 표시되어 무슨 작품인지 바로 판단할 수 있습니다.")}</p>
             <Link
-              href={heroGenre ? `/random?genre=${encodeURIComponent(heroGenre)}` : "/random"}
+              href={
+                heroGenre
+                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.ExplorePage", "en", "/random?genre={v0}"), { v0: String(encodeURIComponent(heroGenre)) })
+                  : "/random"
+              }
               className="sheen-sweep group mt-4 inline-flex items-center gap-2 overflow-hidden rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-fg-2 transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-accent/50 hover:bg-accent-soft hover:text-accent hover:shadow-[0_8px_24px_-12px_oklch(0.72_0.185_42/0.5)] sm:mt-5"
-              style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.32s both" }}
+              style={{
+                animation: "fade-up 0.6s var(--ease-out-expo) 0.32s both",
+              }}
             >
-              <Shuffle size={16} className="transition-transform duration-300 ease-out-expo group-hover:rotate-180" />
-              {heroGenre ? `${heroGenre}에서 랜덤 발견` : "랜덤으로 한 편 발견"}
+              <Shuffle
+                size={16}
+                className="transition-transform duration-300 ease-out-expo group-hover:rotate-180"
+              />
+              {heroGenre ? formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "{v0}에서 랜덤 발견"), { v0: String(heroGenre) }) : translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "랜덤으로 한 편 발견")}
             </Link>
           </div>
 
           <RevealOnScroll className="mt-8" delayMs={60}>
-            <div className="h-2 w-full rounded-full" style={{ background: spectrumGradient([...GENRES]) }} aria-hidden />
+            <div
+              className="h-2 w-full rounded-full"
+              style={{ background: spectrumGradient([...GENRES]) }}
+              aria-hidden
+            />
             <div className="mt-4 flex flex-wrap gap-2">
-              {GENRES.map((entry) => {
+              {visibleGenres.map((entry) => {
                 const active = filters.genres.includes(entry);
                 return (
                   <button
@@ -326,40 +356,66 @@ export function ExplorePage() {
                         fx.burstAt(event.currentTarget, {
                           count: 12,
                           spread: 0.8,
-                          colors: [genreColor(entry, 0.82), genreColor(entry, 0.66), "oklch(0.95 0.02 85)"],
+                          colors: [
+                            genreColor(entry, 0.82),
+                            genreColor(entry, 0.66),
+                            "oklch(0.95 0.02 85)",
+                          ],
                         });
                       }
-                      applyFilters({ ...filters, genres: toggleValue(filters.genres, entry) });
+                      applyFilters({
+                        ...filters,
+                        genres: toggleValue(filters.genres, entry),
+                      });
                     }}
                     aria-pressed={active}
                     className={cn(
-                      "inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium",
+                      "inline-flex min-h-11 items-center rounded-full border px-3 py-1.5 text-sm font-medium",
                       "transition-[transform,background-color,border-color,box-shadow] duration-200 ease-out-expo",
                       "hover:-translate-y-px active:scale-[0.96]",
-                      active && "ring-1"
+                      active && "ring-1",
                     )}
                     style={{
                       color: genreTextColor(entry, active ? 0.92 : 0.82),
                       backgroundColor: genreTint(entry, active ? 0.3 : 0.12),
                       borderColor: genreBorder(entry, active ? 0.7 : 0.26),
                       // 선택된 칩엔 그 장르색 글로우로 "켜진" 느낌을 강화.
-                      boxShadow: active ? `0 6px 20px -10px ${genreColor(entry, 0.62)}` : undefined,
+                      boxShadow: active
+                        ? `0 6px 20px -10px ${genreColor(entry, 0.62)}`
+                        : undefined,
                     }}
                   >
                     {entry}
                   </button>
                 );
               })}
+              {GENRES.length > visibleGenres.length ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAllGenres(true)}
+                  className="inline-flex min-h-9 items-center rounded-full border border-line bg-card px-3 text-sm font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:text-accent"
+                >
+                  {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "모든 장르 보기 · ")}{GENRES.length - visibleGenres.length}{translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "개")}</button>
+              ) : showAllGenres ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAllGenres(false)}
+                  className="inline-flex min-h-9 items-center rounded-full px-3 text-sm font-semibold text-fg-3 hover:text-fg"
+                >
+                  {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "자주 쓰는 장르만 보기")}</button>
+              ) : null}
             </div>
           </RevealOnScroll>
         </Container>
       </section>
 
       <Container size="wide" className="flex flex-col gap-8 py-10">
+        <DiscoveryWorkspaceNav current="explore" />
+
         <RevealOnScroll variant="fade">
-          <p className="eyebrow mb-3 text-fg-3">BY CODE / 코드로 좁히기</p>
+          <p className="eyebrow mb-3 text-fg-3">{translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "BY CODE / 코드로 좁히기")}</p>
           <div className="flex flex-wrap gap-2">
-            {tags.map(({ tag: entry, count }) => {
+            {visibleTags.map(({ tag: entry, count }) => {
               const active = filters.tags.includes(entry);
               return (
                 <button
@@ -369,35 +425,69 @@ export function ExplorePage() {
                   onClick={(event) => {
                     if (!active) {
                       fx.sfx("pop");
-                      fx.burstAt(event.currentTarget, { count: 10, spread: 0.7 });
+                      fx.burstAt(event.currentTarget, {
+                        count: 10,
+                        spread: 0.7,
+                      });
                     }
-                    applyFilters({ ...filters, tags: toggleValue(filters.tags, entry) });
+                    applyFilters({
+                      ...filters,
+                      tags: toggleValue(filters.tags, entry),
+                    });
                   }}
                   aria-pressed={active}
                   className={cn(
                     "group inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.96]",
                     active
                       ? "border-accent/60 bg-accent-soft text-accent shadow-[0_4px_16px_-8px_oklch(0.72_0.185_42/0.5)]"
-                      : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg"
+                      : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg",
                   )}
                 >
-                  <span className={cn(active ? "text-accent" : "text-fg-3 group-hover:text-accent")}>#</span>
+                  <span
+                    className={cn(
+                      active
+                        ? "text-accent"
+                        : "text-fg-3 group-hover:text-accent",
+                    )}
+                  >
+                    #
+                  </span>
                   {entry}
                   <span className="tnum text-xs text-fg-3">{count}</span>
                 </button>
               );
             })}
+            {hiddenTagCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => setShowAllTags(true)}
+                className="inline-flex min-h-9 items-center rounded-full border border-line bg-card px-3 text-sm font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:text-accent"
+              >
+                {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "태그 더 보기 · ")}{hiddenTagCount}{translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "개")}</button>
+            ) : showAllTags && tags.length > 12 ? (
+              <button
+                type="button"
+                onClick={() => setShowAllTags(false)}
+                className="inline-flex min-h-9 items-center rounded-full px-3 text-sm font-semibold text-fg-3 hover:text-fg"
+              >
+                {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "주요 태그만 보기")}</button>
+            ) : null}
           </div>
         </RevealOnScroll>
 
         <div className="flex flex-col gap-4 border-y border-line py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-            <div className="inline-flex items-center rounded-lg border border-line bg-card p-0.5" role="group" aria-label="작품 유형">
+            <div
+              className="inline-flex items-center rounded-lg border border-line bg-card p-0.5"
+              role="group"
+              aria-label={translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "작품 유형")}
+            >
               {TYPES.map((entry) => {
                 const active =
                   entry.value === "all"
                     ? filters.types.length === 0
-                    : filters.types.length === 1 && filters.types[0] === entry.value;
+                    : filters.types.length === 1 &&
+                      filters.types[0] === entry.value;
                 return (
                   <button
                     key={entry.value}
@@ -411,7 +501,9 @@ export function ExplorePage() {
                     aria-pressed={active}
                     className={cn(
                       "rounded-md px-3 py-1 text-sm font-medium transition-colors duration-150",
-                      active ? "bg-accent text-on-accent" : "text-fg-2 hover:text-fg"
+                      active
+                        ? "bg-accent text-on-accent"
+                        : "text-fg-2 hover:text-fg",
                     )}
                   >
                     {entry.label}
@@ -431,7 +523,9 @@ export function ExplorePage() {
                     aria-pressed={active}
                     className={cn(
                       "rounded-md px-2.5 py-1 text-sm transition-colors duration-150",
-                      active ? "font-semibold text-fg" : "font-medium text-fg-3 hover:text-fg-2"
+                      active
+                        ? "font-semibold text-fg"
+                        : "font-medium text-fg-3 hover:text-fg-2",
                     )}
                   >
                     {entry.label}
@@ -448,20 +542,21 @@ export function ExplorePage() {
                 "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors duration-150",
                 panelOpen || activeFilters > 0
                   ? "border-accent/60 bg-accent-soft/60 text-fg"
-                  : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg"
+                  : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg",
               )}
             >
               <SlidersHorizontal size={14} className="text-accent" />
-              상세 필터
-              {activeFilters > 0 && (
-                <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">{activeFilters}</span>
+              {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "상세 필터")}{activeFilters > 0 && (
+                <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">
+                  {activeFilters}
+                </span>
               )}
             </button>
           </div>
 
           <div className="flex items-center gap-4">
             <p className="text-sm text-fg-2">
-              작품{" "}
+              {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "작품")}{" "}
               <CountUp
                 key={results.length}
                 value={results.length}
@@ -469,24 +564,21 @@ export function ExplorePage() {
                 separator={results.length >= 1000}
                 className="numeral text-base text-fg"
               />
-              편
-            </p>
+              {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "편")}</p>
             <button
               type="button"
               onClick={reload}
               className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-fg-3 transition-colors duration-150 hover:text-accent"
             >
               <RefreshCw size={13} className={cn(loading && "animate-spin")} />
-              갱신
-            </button>
+              {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "갱신")}</button>
             {hasFilter && (
               <Link
                 href="/explore"
                 className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-fg-3 transition-colors duration-150 hover:text-accent"
               >
                 <RotateCcw size={13} />
-                필터 초기화
-              </Link>
+                {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "필터 초기화")}</Link>
             )}
           </div>
         </div>
@@ -502,7 +594,13 @@ export function ExplorePage() {
         )}
 
         {/* 수익화 OFF면 렌더되지 않음(기본 invisible). 결과 그리드 위 광고 지면(탐색 전용 슬롯). */}
-        <AdSlot slots={["discover-spotlight-1", "discover-spotlight-2", "discover-spotlight-3"]} />
+        <AdSlot
+          slots={[
+            "discover-spotlight-1",
+            "discover-spotlight-2",
+            "discover-spotlight-3",
+          ]}
+        />
 
         {loading ? (
           <div className="grid grid-cols-2 gap-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -515,7 +613,11 @@ export function ExplorePage() {
             ))}
           </div>
         ) : error ? (
-          <ErrorState title="탐색 데이터를 불러오지 못했습니다." message={error} onRetry={reload} />
+          <ErrorState
+            title={translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "탐색 데이터를 불러오지 못했습니다.")}
+            message={error}
+            onRetry={reload}
+          />
         ) : results.length > 0 ? (
           <>
             <div className="grid grid-cols-2 gap-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -530,7 +632,7 @@ export function ExplorePage() {
                   onClick={showMore}
                   className="inline-flex items-center gap-2 rounded-xl border border-line bg-card px-5 py-2.5 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
                 >
-                  {loading ? "불러오는 중…" : "더 보기"}
+                  {loading ? translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "불러오는 중…") : translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "더 보기")}
                   <span className="numeral text-fg-3">
                     {shown.length} / {results.length}
                   </span>
@@ -544,18 +646,27 @@ export function ExplorePage() {
             <div
               aria-hidden
               className="pointer-events-none absolute left-1/2 top-2 h-32 w-32 -translate-x-1/2 rounded-full opacity-50 blur-3xl"
-              style={{ background: "radial-gradient(circle, oklch(0.72 0.185 42 / 0.32), transparent 70%)" }}
+              style={{
+                background:
+                  "radial-gradient(circle, oklch(0.72 0.185 42 / 0.32), transparent 70%)",
+              }}
             />
             <span
               aria-hidden
               className="pf-glow relative mb-4 grid size-14 place-items-center rounded-2xl border border-accent/30 bg-accent-soft/60 text-accent"
             >
               <Compass size={26} />
-              <Sparkles size={12} className="pf-sparkle absolute -right-1 -top-1 text-warn" />
+              <Sparkles
+                size={12}
+                className="pf-sparkle absolute -right-1 -top-1 text-warn"
+              />
             </span>
-            <p className="relative text-sm font-medium text-fg">조건에 맞는 작품이 없어요.</p>
+            <p className="relative text-sm font-medium text-fg">
+              {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "조건에 맞는 작품이 없어요.")}</p>
             <p className="relative mt-1 text-xs text-fg-3">
-              {hasFilter ? "필터를 조금 넓히거나 초기화해 보세요." : "다른 장르나 태그로 탐색해 보세요."}
+              {hasFilter
+                ? translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "필터를 조금 넓히거나 초기화해 보세요.")
+                : translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "다른 장르나 태그로 탐색해 보세요.")}
             </p>
             {hasFilter && (
               <Link
@@ -563,8 +674,7 @@ export function ExplorePage() {
                 className="relative mt-4 inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-4 py-2 text-sm font-medium text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-accent"
               >
                 <RotateCcw size={14} />
-                필터 초기화
-              </Link>
+                {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "필터 초기화")}</Link>
             )}
           </div>
         )}
@@ -574,5 +684,7 @@ export function ExplorePage() {
 }
 
 function toggleValue<T>(arr: T[], value: T): T[] {
-  return arr.includes(value) ? arr.filter((entry) => entry !== value) : [...arr, value];
+  return arr.includes(value)
+    ? arr.filter((entry) => entry !== value)
+    : [...arr, value];
 }

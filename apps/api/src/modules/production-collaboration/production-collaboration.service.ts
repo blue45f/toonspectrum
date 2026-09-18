@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 
 import {
   BadRequestException,
@@ -18,6 +18,10 @@ import {
   createPlanningSnapshot,
   createProductionProjectAggregate,
   detectTaskDependencyCycles,
+  deriveCriticalPathSchedule,
+  derivePersonalProductionInbox,
+  evaluateAutomationRule,
+  evaluateProductionRisks,
   evaluateHandoffReadiness,
   evaluateProductionStudioRevisionCoverage,
   evaluateReviewApproval,
@@ -26,6 +30,8 @@ import {
   stableProductionFingerprint,
   transitionEpisodeCollaboration,
   transitionHandoff,
+  transitionProductionRisk,
+  transitionProductionRiskResponse,
   validateCollaborationGraph,
   validateAssetRequirement,
   validateContractChangeOrder,
@@ -37,6 +43,7 @@ import {
   validateInvoice,
   validatePaymentRecord,
   validatePlanningRevision,
+  validateProductionOperationsRecord,
   validateProcurementProposal,
   validateProductionAgreement,
   validateProductionDispute,
@@ -57,19 +64,27 @@ import {
   type ContributionRecord,
   type CreditManifest,
   type EpisodeCollaboration,
+  type ExternalReviewAccess,
+  type ExternalReviewResponse,
+  type ProductionOperationsRecord,
   type ProductionProjectAggregate,
+  type ProductionRisk,
+  type ProductionRiskSignal,
   type RightsInterest,
   type ScopePackage,
   type StoryToArtHandoffPackage,
 } from "../../../../../packages/core/src/production";
 
 import {
+  CreateProductionProjectDto,
   CreateProductionProjectSchema,
   ExecuteProductionCommandSchema,
   ProductionProjectByWorkParamsSchema,
   ProductionProjectParamsSchema,
+  SubmitProductionExternalReviewDto,
   type ExecuteProductionCommand,
-  type ProductionCommand, CreateProductionProjectDto
+  type ProductionCommand,
+  type ProductionRiskQuery,
 } from "./production-collaboration.dto";
 import {
   ProductionCollaborationRepository,
@@ -152,8 +167,14 @@ function eventTarget(command: ProductionCommand): { type: string; id: string } {
       return { type: "review-decision", id: command.decision.id };
     case "upsert-task":
       return { type: "task", id: command.task.id };
+    case "upsert-task-batch":
+      return { type: "task-batch", id: command.tasks[0]?.id ?? "task-batch" };
     case "upsert-episode-operations":
       return { type: "episode-operations", id: command.episodeId };
+    case "upsert-operations-record":
+      return { type: `operations-${command.record.kind}`, id: command.record.value.id };
+    case "apply-schedule-scenario":
+      return { type: "schedule-scenario", id: command.baseline.id };
     case "upsert-change-request":
       return { type: "change-request", id: command.request.id };
     case "publish-scope-package":
@@ -168,6 +189,22 @@ function eventTarget(command: ProductionCommand): { type: string; id: string } {
       return { type: "rights-interest", id: command.interest.id };
     case "upsert-compensation-plan":
       return { type: "compensation-plan", id: command.plan.id };
+    case "upsert-risk":
+      return { type: "risk", id: command.risk.id };
+    case "transition-risk":
+      return { type: "risk", id: command.riskId };
+    case "upsert-risk-response":
+      return { type: "risk-response", id: command.response.id };
+    case "transition-risk-response":
+      return { type: "risk-response", id: command.responseId };
+    case "suppress-risk-signal":
+      return { type: "risk-signal", id: command.signalId };
+    case "update-risk-policy":
+      return { type: "risk-policy", id: command.policy.id };
+    case "evaluate-risks":
+      return { type: "risk-evaluation", id: "project-risks" };
+    case "rebaseline-task":
+      return { type: "task-baseline", id: command.taskId };
   }
 }
 
@@ -654,10 +691,66 @@ function applyPlanningSnapshot(
   };
 }
 
+function normalizeTaskTiming(
+  aggregate: ProductionProjectAggregate,
+  task: ProductionProjectAggregate["tasks"][number],
+  at: string,
+): ProductionProjectAggregate["tasks"][number] {
+  const current = aggregate.tasks.find((entry) => entry.id === task.id) ?? null;
+  const statusChanged = current?.status !== task.status;
+  const completed = task.status === "approved" || task.status === "done";
+  return Object.freeze({
+    ...task,
+    plannedStartAt: task.plannedStartAt ?? current?.plannedStartAt ?? null,
+    baselineDueAt: task.baselineDueAt ?? current?.baselineDueAt ?? task.dueAt,
+    statusChangedAt: statusChanged ? at : task.statusChangedAt ?? current?.statusChangedAt ?? at,
+    startedAt: task.startedAt ?? current?.startedAt ?? (task.status === "in-progress" ? at : null),
+    completedAt: task.completedAt ?? current?.completedAt ?? (completed ? at : null),
+    progressPercent: task.progressPercent ?? current?.progressPercent ?? null,
+    remainingEstimateHours: task.remainingEstimateHours ?? current?.remainingEstimateHours ?? null,
+    linkedRiskIds: Object.freeze([...(task.linkedRiskIds ?? current?.linkedRiskIds ?? [])]),
+  });
+}
+
+function evaluateRiskAggregate(
+  aggregate: ProductionProjectAggregate,
+  at: string,
+): { readonly aggregate: ProductionProjectAggregate; readonly derived: unknown } {
+  const evaluation = evaluateProductionRisks(aggregate, new Date(at));
+  const riskIdsByTask = new Map<string, string[]>();
+  for (const risk of evaluation.risks) {
+    if (["resolved", "dismissed", "closed"].includes(risk.status)) continue;
+    for (const taskId of risk.affectedTaskIds) {
+      const values = riskIdsByTask.get(taskId) ?? [];
+      values.push(risk.id);
+      riskIdsByTask.set(taskId, values);
+    }
+  }
+  const tasks = aggregate.tasks.map((task) => Object.freeze({
+    ...task,
+    linkedRiskIds: Object.freeze([...(riskIdsByTask.get(task.id) ?? [])]),
+  }));
+  return {
+    aggregate: {
+      ...aggregate,
+      tasks: Object.freeze(tasks),
+      riskSignals: evaluation.signals,
+      risks: evaluation.risks,
+      riskAssessments: evaluation.assessments,
+    },
+    derived: {
+      riskSummary: evaluation.summary,
+      evaluatedAt: evaluation.evaluatedAt,
+      scheduleConfidence: evaluation.schedule.confidence,
+    },
+  };
+}
+
 function applyCommand(
   aggregate: ProductionProjectAggregate,
   command: ProductionCommand,
   actorUserId: string,
+  at: string,
 ): { aggregate: ProductionProjectAggregate; derived?: unknown } {
   switch (command.type) {
     case "upsert-planning-record":
@@ -902,12 +995,28 @@ function applyCommand(
     }
     case "upsert-task": {
       assertProjectIdentity(aggregate, command.task);
-      const tasks = upsertById(aggregate.tasks, command.task);
+      const task = normalizeTaskTiming(aggregate, command.task, at);
+      const tasks = upsertById(aggregate.tasks, task);
       const cycles = detectTaskDependencyCycles(tasks);
       if (cycles.length > 0) {
         throw new BadRequestException({ message: "작업 의존성에 순환이 있습니다.", cycles });
       }
       return { aggregate: { ...aggregate, tasks } };
+    }
+    case "upsert-task-batch": {
+      let tasks = aggregate.tasks;
+      for (const task of command.tasks) {
+        assertProjectIdentity(aggregate, task);
+        tasks = upsertById(tasks, task);
+      }
+      const cycles = detectTaskDependencyCycles(tasks);
+      if (cycles.length > 0) {
+        throw new BadRequestException({ message: "작업 묶음의 의존성에 순환이 있습니다.", cycles });
+      }
+      return {
+        aggregate: { ...aggregate, tasks },
+        derived: { taskCount: command.tasks.length },
+      };
     }
     case "upsert-episode-operations": {
       if (!command.episode && !command.episodePlan && command.tasks.length === 0) {
@@ -936,7 +1045,7 @@ function applyCommand(
         if (task.scope.kind !== "episode" || task.scope.id !== command.episodeId) {
           throw new BadRequestException("회차 운영 작업의 범위가 대상 회차와 일치하지 않습니다.");
         }
-        tasks = upsertById(tasks, task);
+        tasks = upsertById(tasks, normalizeTaskTiming({ ...next, tasks }, task, at));
       }
       const cycles = detectTaskDependencyCycles(tasks);
       if (cycles.length > 0) {
@@ -949,6 +1058,133 @@ function applyCommand(
           taskCount: command.tasks.length,
           releaseAt: command.tasks.find((task) => task.processKey === "publication")?.dueAt ?? null,
         },
+      };
+    }
+    case "upsert-operations-record": {
+      const record = command.record as ProductionOperationsRecord;
+      const issues = validateProductionOperationsRecord(aggregate, record);
+      if (issues.length > 0) {
+        throw new BadRequestException({
+          message: "제작 운영 기록을 저장할 수 없습니다.",
+          issues,
+        });
+      }
+      switch (record.kind) {
+        case "resource-calendar": {
+          const resourceCalendars = upsertById(
+            aggregate.resourceCalendars ?? [],
+            record.value,
+          );
+          const next = { ...aggregate, resourceCalendars };
+          return {
+            aggregate: next,
+            derived: { schedule: deriveCriticalPathSchedule(next) },
+          };
+        }
+        case "schedule-baseline": {
+          const current = aggregate.scheduleBaselines ?? [];
+          const deactivated = record.value.active
+            ? current.map((baseline) => ({ ...baseline, active: false }))
+            : current;
+          return {
+            aggregate: {
+              ...aggregate,
+              scheduleBaselines: upsertById(deactivated, record.value),
+            },
+          };
+        }
+        case "release-plan": {
+          const releasePlans = upsertById(aggregate.releasePlans ?? [], record.value);
+          const next = { ...aggregate, releasePlans };
+          return {
+            aggregate: next,
+            derived: { readiness: evaluateReleaseReadiness(next, record.value) },
+          };
+        }
+        case "external-review-access":
+          return {
+            aggregate: {
+              ...aggregate,
+              externalReviewAccesses: upsertById(
+                aggregate.externalReviewAccesses ?? [],
+                record.value,
+              ),
+            },
+          };
+        case "automation-rule": {
+          const automationRules = upsertById(aggregate.automationRules ?? [], record.value);
+          const next = { ...aggregate, automationRules };
+          return {
+            aggregate: next,
+            derived: { matches: evaluateAutomationRule(next, record.value) },
+          };
+        }
+        case "notification-policy":
+          return {
+            aggregate: {
+              ...aggregate,
+              notificationPolicies: upsertById(
+                aggregate.notificationPolicies ?? [],
+                record.value,
+              ),
+            },
+          };
+        case "notification":
+          return {
+            aggregate: {
+              ...aggregate,
+              notifications: upsertById(
+                aggregate.notifications ?? [],
+                record.value,
+              ),
+            },
+          };
+        case "saved-view":
+          return {
+            aggregate: {
+              ...aggregate,
+              savedViews: upsertById(aggregate.savedViews ?? [], record.value),
+            },
+          };
+      }
+      return { aggregate };
+    }
+    case "apply-schedule-scenario": {
+      const baselineRecord: ProductionOperationsRecord = {
+        kind: "schedule-baseline",
+        value: command.baseline,
+      };
+      const issues = [...validateProductionOperationsRecord(aggregate, baselineRecord)];
+      let tasks = aggregate.tasks;
+      for (const task of command.tasks) {
+        assertProjectIdentity(aggregate, task);
+        if (!aggregate.tasks.some((entry) => entry.id === task.id)) {
+          issues.push(`schedule-task-missing:${task.id}`);
+          continue;
+        }
+        tasks = upsertById(tasks, task);
+      }
+      const cycles = detectTaskDependencyCycles(tasks);
+      if (cycles.length > 0) issues.push("schedule-task-cycle");
+      if (issues.length > 0) {
+        throw new BadRequestException({
+          message: "일정 회복안을 적용할 수 없습니다.",
+          issues,
+          cycles,
+        });
+      }
+      const current = aggregate.scheduleBaselines ?? [];
+      const deactivated = command.baseline.active
+        ? current.map((baseline) => ({ ...baseline, active: false }))
+        : current;
+      const next = {
+        ...aggregate,
+        tasks,
+        scheduleBaselines: upsertById(deactivated, command.baseline),
+      };
+      return {
+        aggregate: next,
+        derived: { schedule: deriveCriticalPathSchedule(next) },
       };
     }
     case "upsert-change-request": {
@@ -1057,7 +1293,220 @@ function applyCommand(
         },
       };
     }
+    case "upsert-risk": {
+      const risk = command.risk as ProductionRisk;
+      assertProjectIdentity(aggregate, risk);
+      const current = aggregate.risks.find((entry) => entry.id === risk.id) ?? null;
+      if ((!current && risk.revision !== 1) || (current && risk.revision !== current.revision + 1)) {
+        throw new ConflictException("위험 항목 revision이 현재 값과 일치하지 않습니다.");
+      }
+      if (risk.ownerAssignmentId) {
+        const owner = aggregate.assignments.find((entry) => entry.id === risk.ownerAssignmentId);
+        if (!owner || owner.status !== "active") {
+          throw new BadRequestException("위험 담당자는 활성 역할 배정이어야 합니다.");
+        }
+      }
+      const issues = validateProductionRisk(risk);
+      if (issues.length > 0) {
+        throw new BadRequestException({ message: "위험 항목을 저장할 수 없습니다.", issues });
+      }
+      return { aggregate: { ...aggregate, risks: upsertById(aggregate.risks, risk) } };
+    }
+    case "transition-risk": {
+      const risk = aggregate.risks.find((entry) => entry.id === command.riskId);
+      if (!risk) throw new BadRequestException("변경할 위험 항목을 찾을 수 없습니다.");
+      if (risk.revision !== command.expectedRiskRevision) {
+        throw new ConflictException("위험 항목이 다른 사용자에 의해 변경되었습니다.");
+      }
+      const next = transitionProductionRisk(risk, command.toStatus, {
+        reason: command.reason,
+        at,
+      });
+      return { aggregate: { ...aggregate, risks: upsertById(aggregate.risks, next) } };
+    }
+    case "upsert-risk-response": {
+      const response = command.response;
+      assertProjectIdentity(aggregate, response);
+      const current = aggregate.riskResponses.find((entry) => entry.id === response.id) ?? null;
+      if (!aggregate.risks.some((risk) => risk.id === response.riskId)) {
+        throw new BadRequestException("대응을 연결할 위험 항목을 찾을 수 없습니다.");
+      }
+      if (current && current.riskId !== response.riskId) {
+        throw new BadRequestException("위험 대응의 연결 대상은 변경할 수 없습니다.");
+      }
+      if ((!current && response.status !== "proposed") || (current && response.status !== current.status)) {
+        throw new BadRequestException("위험 대응 상태 변경은 전용 상태 전이 명령을 사용해야 합니다.");
+      }
+      if (response.ownerAssignmentId) {
+        const owner = aggregate.assignments.find((entry) => entry.id === response.ownerAssignmentId);
+        if (!owner || owner.status !== "active") {
+          throw new BadRequestException("위험 대응 담당자는 활성 역할 배정이어야 합니다.");
+        }
+      }
+      if (response.linkedTaskId && !aggregate.tasks.some((task) => task.id === response.linkedTaskId)) {
+        throw new BadRequestException("위험 대응에 연결할 작업을 찾을 수 없습니다.");
+      }
+      return {
+        aggregate: {
+          ...aggregate,
+          riskResponses: upsertById(aggregate.riskResponses, response),
+        },
+      };
+    }
+    case "transition-risk-response": {
+      const response = aggregate.riskResponses.find((entry) => entry.id === command.responseId);
+      if (!response) throw new BadRequestException("상태를 변경할 위험 대응을 찾을 수 없습니다.");
+      try {
+        const next = transitionProductionRiskResponse(response, command.toStatus, {
+          at,
+          actualEffect: command.actualEffect,
+        });
+        return {
+          aggregate: {
+            ...aggregate,
+            riskResponses: upsertById(aggregate.riskResponses, next),
+          },
+        };
+      } catch (error) {
+        throw new BadRequestException(error instanceof Error ? error.message : "위험 대응 상태를 변경할 수 없습니다.");
+      }
+    }
+
+    case "suppress-risk-signal": {
+      const signal = aggregate.riskSignals.find((entry) => entry.id === command.signalId);
+      if (!signal) throw new BadRequestException("숨길 위험 신호를 찾을 수 없습니다.");
+      if (signal.severity === "critical") {
+        throw new BadRequestException("긴급 위험 신호는 숨길 수 없습니다.");
+      }
+      assertAssignmentCanAct(aggregate, actorUserId, command.suppressedByAssignmentId);
+      const nextSignal: ProductionRiskSignal = Object.freeze({
+        ...signal,
+        state: "suppressed",
+        suppression: {
+          reason: command.reason,
+          suppressedByAssignmentId: command.suppressedByAssignmentId,
+          suppressedAt: at,
+          expiresAt: command.expiresAt,
+        },
+      });
+      return {
+        aggregate: {
+          ...aggregate,
+          riskSignals: upsertById(aggregate.riskSignals, nextSignal),
+        },
+      };
+    }
+    case "update-risk-policy": {
+      const policy = command.policy;
+      assertProjectIdentity(aggregate, policy);
+      if (policy.revision !== aggregate.riskPolicy.revision + 1) {
+        throw new ConflictException("위험 정책 revision이 현재 값과 일치하지 않습니다.");
+      }
+      if (policy.blockedWarningHours > policy.blockedCriticalHours) {
+        throw new BadRequestException("차단 경고 기준은 긴급 기준보다 클 수 없습니다.");
+      }
+      if (policy.capacityWarningPercent > policy.capacityCriticalPercent) {
+        throw new BadRequestException("작업량 주의 기준은 긴급 기준보다 클 수 없습니다.");
+      }
+      return { aggregate: { ...aggregate, riskPolicy: Object.freeze(policy) } };
+    }
+    case "evaluate-risks":
+      return { aggregate };
+    case "rebaseline-task": {
+      const task = aggregate.tasks.find((entry) => entry.id === command.taskId);
+      if (!task) throw new BadRequestException("재기준화할 작업을 찾을 수 없습니다.");
+      if (task.sourceAgreementMilestoneId && !command.sourceChangeRequestId) {
+        throw new BadRequestException("계약 마일스톤 작업의 재기준화에는 승인된 변경 요청이 필요합니다.");
+      }
+      if (command.sourceChangeRequestId) {
+        const request = aggregate.changeRequests.find((entry) => entry.id === command.sourceChangeRequestId);
+        if (!request || !["approved", "implementing", "verification", "completed"].includes(request.status)) {
+          throw new BadRequestException("승인된 변경 요청을 찾을 수 없습니다.");
+        }
+      }
+      const nextTask = Object.freeze({
+        ...task,
+        baselineDueAt: command.newDueAt,
+        dueAt: command.newDueAt,
+        statusChangedAt: at,
+      });
+      return {
+        aggregate: {
+          ...aggregate,
+          tasks: upsertById(aggregate.tasks, nextTask),
+        },
+        derived: {
+          previousBaselineDueAt: task.baselineDueAt ?? task.dueAt,
+          nextBaselineDueAt: command.newDueAt,
+          reason: command.reason,
+        },
+      };
+    }
   }
+}
+
+function externalReviewTokenDigest(token: string): string {
+  return `sha256:${createHash("sha256").update(token, "utf8").digest("hex")}`;
+}
+
+function externalReviewTokenMatches(expectedDigest: string, token: string): boolean {
+  const actual = Buffer.from(externalReviewTokenDigest(token), "utf8");
+  const expected = Buffer.from(expectedDigest, "utf8");
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+function requireExternalReviewAccess(
+  aggregate: ProductionProjectAggregate,
+  reviewId: string,
+  token: string,
+): ExternalReviewAccess {
+  const access = (aggregate.externalReviewAccesses ?? []).find((entry) => entry.id === reviewId);
+  if (
+    !access
+    || access.status !== "active"
+    || Date.parse(access.expiresAt) <= Date.now()
+    || !externalReviewTokenMatches(access.tokenDigest, token)
+  ) {
+    throw new NotFoundException("유효한 외부 검수 링크를 찾을 수 없습니다.");
+  }
+  return access;
+}
+
+function externalReviewProjection(
+  aggregate: ProductionProjectAggregate,
+  access: ExternalReviewAccess,
+) {
+  const submissions = access.submissionIds.flatMap((submissionId) => {
+    const submission = aggregate.submissions.find((entry) => entry.id === submissionId);
+    if (!submission) return [];
+    const deliverable = aggregate.deliverables.find((entry) => entry.id === submission.deliverableId) ?? null;
+    return [{
+      id: submission.id,
+      status: submission.status,
+      submittedAt: submission.submittedAt,
+      revisionRef: submission.revisionRef,
+      evidenceRefs: submission.evidenceRefs,
+      deliverable: deliverable ? {
+        id: deliverable.id,
+        type: deliverable.type,
+        expectedFormat: deliverable.expectedFormat,
+        completionCriteria: deliverable.completionCriteria,
+      } : null,
+    }];
+  });
+  return Object.freeze({
+    projectId: aggregate.projectId,
+    projectTitle: aggregate.title,
+    review: {
+      id: access.id,
+      label: access.label,
+      watermark: access.watermark,
+      permissions: access.permissions,
+      expiresAt: access.expiresAt,
+      responses: access.responses,
+    },
+    submissions: Object.freeze(submissions),
+  });
 }
 
 @Injectable()
@@ -1069,9 +1518,268 @@ export class ProductionCollaborationService {
     return this.run(() => this.repository.getProject(actorUserId, projectId));
   }
 
+  async listProjects(actorUserId: string) {
+    const records = await this.run(() => this.repository.listProjects(actorUserId));
+    const now = Date.now();
+    const closedStatuses = new Set(["approved", "done", "cancelled", "out-of-scope"]);
+    const reviewStatuses = new Set(["internal-review", "external-review", "changes-requested", "conditionally-approved"]);
+    const projects = records.map(({ aggregate, access }) => {
+      const openTasks = aggregate.tasks.filter((task) => !closedStatuses.has(task.status));
+      const publicationDueDates = openTasks
+        .filter((task) => ["publication", "publish", "release"].some((key) => task.processKey.toLocaleLowerCase("en-US").includes(key)))
+        .flatMap((task) => task.dueAt ? [Date.parse(task.dueAt)] : [])
+        .filter(Number.isFinite)
+        .sort((left, right) => left - right);
+      const criticalRiskCount = aggregate.risks.filter((risk) =>
+        ["open", "mitigating"].includes(risk.status) && risk.probability * risk.impact >= 12).length;
+      const overdueTaskCount = openTasks.filter((task) => Boolean(task.dueAt && Date.parse(task.dueAt) < now)).length;
+      const blockedTaskCount = openTasks.filter((task) => task.status === "blocked" || task.status === "needs-input").length;
+      const unassignedTaskCount = openTasks.filter((task) => task.assignmentIds.length === 0).length;
+      const reviewTaskCount = openTasks.filter((task) => reviewStatuses.has(task.status)).length;
+      const activeEpisodeCount = aggregate.episodes.filter((episode) => !["published", "cancelled"].includes(episode.state)).length;
+      const readyBufferCount = aggregate.episodes.filter((episode) => episode.state === "publish-ready").length;
+      const schedule = deriveCriticalPathSchedule(aggregate);
+      const healthScore = Math.max(0, 100
+        - Math.min(36, criticalRiskCount * 12)
+        - Math.min(30, overdueTaskCount * 6)
+        - Math.min(24, blockedTaskCount * 6)
+        - Math.min(12, unassignedTaskCount * 3)
+        - Math.min(10, reviewTaskCount * 2));
+      return Object.freeze({
+        projectId: aggregate.projectId,
+        workId: aggregate.workId,
+        title: aggregate.title,
+        collaborationModel: aggregate.collaborationModel,
+        revision: aggregate.revision,
+        updatedAt: aggregate.updatedAt,
+        access,
+        healthScore,
+        activeEpisodeCount,
+        readyBufferCount,
+        criticalRiskCount,
+        overdueTaskCount,
+        blockedTaskCount,
+        unassignedTaskCount,
+        reviewTaskCount,
+        nextReleaseAt: publicationDueDates[0] ? new Date(publicationDueDates[0]).toISOString() : null,
+        forecastFinishAt: schedule.projectFinishAt,
+        scheduleConfidencePercent: schedule.confidencePercent,
+      });
+    }).sort((left, right) => {
+      if (left.healthScore !== right.healthScore) return left.healthScore - right.healthScore;
+      const leftRelease = left.nextReleaseAt ? Date.parse(left.nextReleaseAt) : Number.MAX_SAFE_INTEGER;
+      const rightRelease = right.nextReleaseAt ? Date.parse(right.nextReleaseAt) : Number.MAX_SAFE_INTEGER;
+      if (leftRelease !== rightRelease) return leftRelease - rightRelease;
+      return left.title.localeCompare(right.title, "ko-KR");
+    });
+    return Object.freeze({ projects: Object.freeze(projects) });
+  }
+
+  async getPersonalInbox(actorUserId: string) {
+    const records = await this.run(() => this.repository.listProjects(actorUserId));
+    const now = new Date();
+    const buckets = [
+      "dueToday",
+      "inProgress",
+      "review",
+      "ready",
+      "waitingInput",
+      "blockingOthers",
+    ] as const;
+    const items = new Map<string, {
+      readonly bucket: typeof buckets[number];
+      readonly projectId: string;
+      readonly projectTitle: string;
+      readonly taskId: string;
+      readonly taskTitle: string;
+      readonly processKey: string;
+      readonly status: string;
+      readonly dueAt: string | null;
+      readonly estimateHours: number;
+      readonly episodeId: string | null;
+    }>();
+    for (const { aggregate } of records) {
+      const partyIds = new Set(aggregate.parties
+        .filter((party) => party.accountUserId === actorUserId)
+        .map((party) => party.id));
+      const assignments = aggregate.assignments.filter((assignment) =>
+        partyIds.has(assignment.partyId) && assignment.status === "active");
+      for (const assignment of assignments) {
+        const inbox = derivePersonalProductionInbox(aggregate, assignment.id, now);
+        for (const bucket of buckets) {
+          for (const task of inbox[bucket]) {
+            const episodeId = task.scope.kind === "episode"
+              ? task.scope.id
+              : task.scope.ancestors.find((ancestor) => ancestor.kind === "episode")?.id ?? null;
+            items.set(`${bucket}:${aggregate.projectId}:${task.id}`, {
+              bucket,
+              projectId: aggregate.projectId,
+              projectTitle: aggregate.title,
+              taskId: task.id,
+              taskTitle: task.title,
+              processKey: task.processKey,
+              status: task.status,
+              dueAt: task.dueAt,
+              estimateHours: task.estimateHours?.likely ?? 0,
+              episodeId,
+            });
+          }
+        }
+      }
+    }
+    const sorted = [...items.values()].sort((left, right) => {
+      const bucketOrder = buckets.indexOf(left.bucket) - buckets.indexOf(right.bucket);
+      if (bucketOrder !== 0) return bucketOrder;
+      const leftDue = left.dueAt ? Date.parse(left.dueAt) : Number.MAX_SAFE_INTEGER;
+      const rightDue = right.dueAt ? Date.parse(right.dueAt) : Number.MAX_SAFE_INTEGER;
+      if (leftDue !== rightDue) return leftDue - rightDue;
+      return left.taskTitle.localeCompare(right.taskTitle, "ko-KR");
+    });
+    const counts = Object.fromEntries(buckets.map((bucket) => [
+      bucket,
+      sorted.filter((item) => item.bucket === bucket).length,
+    ]));
+    return Object.freeze({ items: Object.freeze(sorted), counts: Object.freeze(counts) });
+  }
+
   async getProjectByWork(actorUserId: string, workIdValue: string): Promise<ProductionProjectRecord> {
     const { workId } = ProductionProjectByWorkParamsSchema.parse({ workId: workIdValue });
     return this.run(() => this.repository.getProjectByWork(actorUserId, workId));
+  }
+
+  async getExternalReview(projectId: string, reviewId: string, token: string) {
+    return this.run(async () => {
+      const aggregate = await this.repository.getPublicProject(projectId);
+      const access = requireExternalReviewAccess(aggregate, reviewId, token);
+      return externalReviewProjection(aggregate, access);
+    });
+  }
+
+  async submitExternalReview(
+    projectId: string,
+    reviewId: string,
+    token: string,
+    body: SubmitProductionExternalReviewDto,
+  ) {
+    if (body.decision !== "approve" && !body.note.trim()) {
+      throw new BadRequestException("댓글 또는 수정 요청에는 내용을 입력해야 합니다.");
+    }
+    const result = await this.run(() => this.repository.mutatePublicReview({
+      projectId,
+      mutate: (current) => {
+        const access = requireExternalReviewAccess(current, reviewId, token);
+        if (!access.permissions.includes("comment") && body.decision === "comment") {
+          throw new ForbiddenException("이 링크에는 댓글 권한이 없습니다.");
+        }
+        if (!access.permissions.includes("approve") && body.decision !== "comment") {
+          throw new ForbiddenException("이 링크에는 승인 결정 권한이 없습니다.");
+        }
+        const response: ExternalReviewResponse = {
+          id: body.responseId,
+          reviewerName: body.reviewerName,
+          decision: body.decision,
+          note: body.note,
+          createdAt: new Date().toISOString(),
+        };
+        const existingResponse = access.responses.find((entry) => entry.id === response.id);
+        if (existingResponse) {
+          if (
+            existingResponse.reviewerName !== response.reviewerName
+            || existingResponse.decision !== response.decision
+            || existingResponse.note !== response.note
+          ) {
+            throw new ConflictException("같은 외부 검수 응답 식별자가 다른 내용에 이미 사용되었습니다.");
+          }
+          return { aggregate: current, derived: externalReviewProjection(current, access) };
+        }
+        const updatedAccess: ExternalReviewAccess = {
+          ...access,
+          lastAccessedAt: response.createdAt,
+          responses: Object.freeze([...access.responses, response]),
+        };
+        const mutated: ProductionProjectAggregate = {
+          ...current,
+          externalReviewAccesses: upsertById(current.externalReviewAccesses ?? [], updatedAccess),
+        };
+        const aggregate = commitProductionAggregate(current, {
+          expectedRevision: current.revision,
+          actorPartyId: null,
+          action: "external-review-response",
+          targetType: "external-review-access",
+          targetId: access.id,
+          beforeDigest: stableProductionFingerprint(current),
+          afterDigest: stableProductionFingerprint(mutated),
+          at: response.createdAt,
+          eventId: randomUUID(),
+          mutate: () => mutated,
+        });
+        return {
+          aggregate,
+          derived: externalReviewProjection(aggregate, updatedAccess),
+        };
+      },
+    }));
+    return result.derived;
+  }
+
+  async getRisks(
+    actorUserId: string,
+    projectIdValue: string,
+    query: ProductionRiskQuery,
+  ) {
+    const { projectId } = ProductionProjectParamsSchema.parse({ projectId: projectIdValue });
+    return this.run(async () => {
+      const record = await this.repository.getProject(actorUserId, projectId);
+      const evaluation = evaluateProductionRisks(record.aggregate);
+      const statuses = query.status?.split(",").filter(Boolean) ?? [];
+      const severities = query.severity?.split(",").filter(Boolean) ?? [];
+      const categories = query.category?.split(",").filter(Boolean) ?? [];
+      const search = query.q?.toLocaleLowerCase("ko-KR") ?? "";
+      const signalsByRiskId = new Map(
+        evaluation.signals
+          .filter((signal) => signal.linkedRiskId)
+          .map((signal) => [signal.linkedRiskId!, signal]),
+      );
+      const items = evaluation.risks.filter((risk) => {
+        const signal = signalsByRiskId.get(risk.id);
+        return (statuses.length === 0 || statuses.includes(risk.status))
+          && (severities.length === 0 || severities.includes(risk.severity))
+          && (categories.length === 0 || categories.includes(risk.category))
+          && (!query.source || risk.source === query.source)
+          && (!query.episodeId || risk.affectedEpisodeIds.includes(query.episodeId))
+          && (!query.ownerAssignmentId || risk.ownerAssignmentId === query.ownerAssignmentId)
+          && (!query.ruleKey || signal?.ruleKey === query.ruleKey)
+          && (!search || `${risk.title} ${risk.description} ${risk.causeCodes.join(" ")}`.toLocaleLowerCase("ko-KR").includes(search));
+      }).slice(0, query.limit).map((risk) => ({
+        risk,
+        signal: signalsByRiskId.get(risk.id) ?? null,
+        responseCount: record.aggregate.riskResponses.filter((response) => response.riskId === risk.id).length,
+      }));
+      return {
+        summary: evaluation.summary,
+        items,
+        nextCursor: null,
+        evaluatedAt: evaluation.evaluatedAt,
+      };
+    });
+  }
+
+  async getRisk(actorUserId: string, projectIdValue: string, riskId: string) {
+    const { projectId } = ProductionProjectParamsSchema.parse({ projectId: projectIdValue });
+    return this.run(async () => {
+      const record = await this.repository.getProject(actorUserId, projectId);
+      const evaluation = evaluateProductionRisks(record.aggregate);
+      const risk = evaluation.risks.find((entry) => entry.id === riskId);
+      if (!risk) throw new NotFoundException("위험 항목을 찾을 수 없습니다.");
+      return {
+        risk,
+        signal: evaluation.signals.find((entry) => risk.signalIds.includes(entry.id)) ?? null,
+        responses: record.aggregate.riskResponses.filter((response) => response.riskId === risk.id),
+        assessment: evaluation.assessments.find((entry) => entry.riskId === risk.id) ?? null,
+        taskForecasts: risk.affectedTaskIds.map((taskId) => evaluation.schedule.byTaskId[taskId]).filter(Boolean),
+        evaluatedAt: evaluation.evaluatedAt,
+      };
+    });
   }
 
   async createProject(
@@ -1129,8 +1837,9 @@ export class ProductionCollaborationService {
       requiredCapability: commandCapability(input.command),
       mutate: (current) => {
         const beforeDigest = stableProductionFingerprint(current);
-        const mutation = applyCommand(current, input.command, actorUserId);
         const at = new Date().toISOString();
+        const mutation = applyCommand(current, input.command, actorUserId, at);
+        const riskEvaluation = evaluateRiskAggregate(mutation.aggregate, at);
         const aggregate = commitProductionAggregate(current, {
           expectedRevision: input.expectedRevision,
           actorPartyId: actorPartyId(current, actorUserId),
@@ -1138,14 +1847,15 @@ export class ProductionCollaborationService {
           targetType: target.type,
           targetId: target.id,
           beforeDigest,
-          afterDigest: stableProductionFingerprint(mutation.aggregate),
+          afterDigest: stableProductionFingerprint(riskEvaluation.aggregate),
           at,
           eventId: randomUUID(),
-          mutate: () => mutation.aggregate,
+          mutate: () => riskEvaluation.aggregate,
         });
-        return mutation.derived === undefined
-          ? { aggregate }
-          : { aggregate, derived: mutation.derived };
+        const derived = input.command.type === "evaluate-risks"
+          ? riskEvaluation.derived
+          : mutation.derived;
+        return derived === undefined ? { aggregate } : { aggregate, derived };
       },
     }));
   }
