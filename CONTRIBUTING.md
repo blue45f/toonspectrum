@@ -43,9 +43,9 @@ For a breaking change, use `!` in the header or a `BREAKING CHANGE:` footer.
 
 ## Local Git quality gates
 
-- `pre-commit`: runs `lint-staged` on staged TypeScript files.
+- `pre-commit`: runs staged ESLint plus Secretlint credential checks.
 - `commit-msg`: runs `commitlint`.
-- `pre-push`: validates architecture, typechecks, and lints changed files.
+- `pre-push`: validates architecture, typechecks, and lints changed files, including Secretlint.
 
 Do not replace these tracked hooks with editor-only checks. The repository configures
 `core.hooksPath=.husky` so fresh worktrees use the same gates.
@@ -57,6 +57,8 @@ Do not replace these tracked hooks with editor-only checks. The repository confi
 | `pnpm lint:strict` | ESLint, including import hygiene and JSX accessibility rules |
 | `pnpm typecheck` | TypeScript module, symbol, and type resolution |
 | `pnpm quality:imports` | Knip unresolved imports and undeclared dependencies |
+| `pnpm quality:secrets` | Secretlint credential scan over tracked/unignored text files |
+| `pnpm quality:secrets:changed` | Secretlint scan over current changed text files |
 | `pnpm quality:deadcode` | Full Knip dead-code/dependency inventory |
 | `pnpm quality:cycles` | Knip circular dependency inventory |
 | `pnpm test:a11y` | axe-core browser smoke checks for critical public routes |
@@ -68,6 +70,11 @@ without being declared.
 
 `quality:imports` is intended for CI. The broader dead-code and cycle inventories stay
 explicit so existing architectural debt can be reduced deliberately.
+
+Secretlint uses `@secretlint/secretlint-rule-preset-recommend`. It complements GitHub
+secret scanning by failing local staged changes, pre-push branch changes, and CI when a
+recognized credential is committed. Keep exceptions narrow and rule-specific rather than
+ignoring broad source directories.
 
 ## Accessibility
 
