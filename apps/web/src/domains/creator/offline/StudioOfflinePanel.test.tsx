@@ -203,9 +203,11 @@ describe("automatic Studio offline mode", () => {
     expect(await screen.findByText(/로컬 자동 저장은 계속되지만/u)).toBeTruthy();
   });
 
-  it("warns when local storage is nearly full", async () => {
+  it("warns when local storage is nearly full without showing offline readiness copy", async () => {
     runtime.inspect.mockResolvedValue({ ...device, usage: 95 });
     openPanel();
+    expect(await screen.findByText("저장 공간 부족 · 백업 권장")).toBeTruthy();
     expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.queryByText(/오프라인 자동 준비/u)).toBeNull();
   });
 });
