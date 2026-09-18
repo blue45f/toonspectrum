@@ -380,7 +380,6 @@ export class MembershipWalletService {
     feature: CreditFeatureKey;
     units?: number;
     idempotencyKey: string;
-    dailyLimit?: number;
     metadata?: Record<string, unknown>;
   }) {
     await this.ensureBetaFounderPromotion(input.userId);
