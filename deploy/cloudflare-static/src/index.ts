@@ -10,6 +10,7 @@ import {
   cloudflareLargeAssetKey,
   cloudflareLargeAssetSidecarPath,
   isCloudflareOversizedAssetPath,
+  supportsCloudflareStaticSidecar,
   type CloudflareLargeAssetEncoding,
 } from "./large-static-assets";
 
@@ -584,7 +585,11 @@ async function serveCompressedLargeAsset(
   const incoming = new URL(request.url);
   const descriptor = cloudflareLargeAssetDescriptor(incoming.pathname);
   const encoding = preferredLargeAssetEncoding(request);
-  if (!descriptor || !encoding) return null;
+  if (
+    !descriptor
+    || !encoding
+    || !supportsCloudflareStaticSidecar(incoming.pathname)
+  ) return null;
 
   const sidecarUrl = new URL(incoming);
   sidecarUrl.pathname = cloudflareLargeAssetSidecarPath(

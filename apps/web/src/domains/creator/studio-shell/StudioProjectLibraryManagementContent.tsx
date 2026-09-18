@@ -1,13 +1,11 @@
-import { FolderOpen, HardDrive, Plus } from "lucide-react";
-
-import Link from "@/compat/router-link";
-import { buttonClass } from "@/shared/components/ui/button-utils";
+import { FolderOpen, HardDrive } from "lucide-react";
 
 import type { StudioProjectLibraryEntry } from "../studio-project-library-store";
 import {
   StudioProjectLibraryCard,
   StudioProjectLibraryRecoveryRow,
 } from "./StudioProjectLibraryManagementUi";
+import { StudioProjectLibraryEmptyVisual } from "./StudioProjectLibraryEmptyVisual";
 import type { StudioProjectLibraryManagementController } from "./useStudioProjectLibraryManagementController";
 
 export function StudioProjectLibraryManagementContent({
@@ -74,27 +72,25 @@ export function StudioProjectLibraryManagementContent({
   return (
     <>
       {visibleProjects.length === 0 ? (
-        <section className="mt-5 rounded-3xl border border-dashed border-line bg-card/60 px-5 py-14 text-center">
-          <FolderOpen size={24} className="mx-auto text-fg-3" aria-hidden="true" />
-          <h2 className="mt-3 text-xl font-black text-fg">
-            {query
-              ? locale === "ko" ? "검색 결과가 없습니다" : "No matching projects"
-              : locale === "ko" ? "표시할 작업이 없습니다" : "No work to show"}
-          </h2>
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-fg-3">
-            {view === "active"
-              ? locale === "ko" ? "새 작업은 그리는 즉시 임시 자동저장되며 이 화면에 나타납니다." : "New work is temporarily autosaved as soon as you draw and appears here."
-              : view === "archived"
+        view === "active" && !query ? (
+          <StudioProjectLibraryEmptyVisual locale={locale} />
+        ) : (
+          <section className="mt-5 rounded-3xl border border-dashed border-line bg-card/60 px-5 py-14 text-center">
+            <FolderOpen size={24} className="mx-auto text-fg-3" aria-hidden="true" />
+            <h2 className="mt-3 text-xl font-black text-fg">
+              {query
+                ? locale === "ko" ? "검색 결과가 없습니다" : "No matching projects"
+                : locale === "ko" ? "표시할 작업이 없습니다" : "No work to show"}
+            </h2>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-fg-3">
+              {view === "archived"
                 ? locale === "ko" ? "보관한 프로젝트가 없습니다." : "There are no archived projects."
-                : locale === "ko" ? "휴지통이 비어 있습니다." : "Trash is empty."}
-          </p>
-          {view === "active" && !query ? (
-            <Link href="/studio/new" className={buttonClass({ className: "mt-5 gap-2" })}>
-              <Plus size={16} aria-hidden="true" />
-              {locale === "ko" ? "새 작업 시작" : "Start new work"}
-            </Link>
-          ) : null}
-        </section>
+                : view === "trash"
+                  ? locale === "ko" ? "휴지통이 비어 있습니다." : "Trash is empty."
+                  : locale === "ko" ? "검색어를 바꾸거나 필터를 초기화해 보세요." : "Try another search or clear the filters."}
+            </p>
+          </section>
+        )
       ) : view === "active" ? (
         <div className="mt-6 space-y-8">
           {temporaryProjects.length > 0 ? (

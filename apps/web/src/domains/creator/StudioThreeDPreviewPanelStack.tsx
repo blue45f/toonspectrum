@@ -263,7 +263,6 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   composeWorkAssetPreviewPage,
   currentPageId,
   elementById,
-  isMobile,
   masterEditMode,
   pageDnd,
   pageReviewOpen,

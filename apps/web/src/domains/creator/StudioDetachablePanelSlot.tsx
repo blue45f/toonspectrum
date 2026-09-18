@@ -79,7 +79,7 @@ export function StudioDetachablePanelSlot({
         "data-studio-floating-layout-failure": failure ?? undefined,
       }}
       className="border-line-strong"
-      contentClassName="flex min-h-0 flex-1"
+      contentClassName="flex min-h-0 min-w-0 flex-1 overflow-auto"
     >
       {children}
     </StudioFloatingSurface>,

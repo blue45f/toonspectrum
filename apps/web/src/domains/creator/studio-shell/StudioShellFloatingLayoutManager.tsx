@@ -41,6 +41,7 @@ import {
   type StudioShellFloatingVisibilityId,
 } from "./studio-shell-floating-layout";
 
+import { Switch } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
 const STUDIO_SHELL_FLOATING_LAYOUT_OPEN_EVENT =
@@ -150,6 +151,7 @@ export function StudioShellFloatingLayoutManager() {
 
   const actionClass = cn(
     "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-line px-3",
+    "pointer-coarse:min-h-11",
     "text-xs font-bold text-fg-2 hover:border-line-strong hover:bg-raised hover:text-fg",
     STUDIO_FOCUS_RING,
   );
@@ -179,7 +181,7 @@ export function StudioShellFloatingLayoutManager() {
         aria-hidden={drawingAutoHideRunning ? true : undefined}
         inert={drawingAutoHideRunning ? true : undefined}
         className={cn(
-          "pointer-events-auto fixed bottom-[calc(var(--studio-canvas-bottom-inset,0px)+env(safe-area-inset-bottom)+0.75rem)] left-3 z-[70] max-w-[calc(100vw-1.5rem)] text-fg print:hidden lg:bottom-3",
+          "pointer-events-auto fixed bottom-[calc(var(--studio-canvas-bottom-inset,0px)+0.75rem)] left-3 z-[70] max-w-[calc(100vw-1.5rem)] text-fg print:hidden lg:bottom-3",
           "transition-[opacity,transform] duration-150 motion-reduce:transition-none",
           drawingAutoHideRunning && "pointer-events-none translate-y-2 opacity-0",
         )}
@@ -205,7 +207,7 @@ export function StudioShellFloatingLayoutManager() {
               <button
                 type="button"
                 aria-label="보기 설정 닫기"
-                className={cn(actionClass, "size-10 shrink-0 px-0")}
+                className={cn(actionClass, "size-10 shrink-0 px-0 pointer-coarse:size-11")}
                 onClick={() => {
                   setOpen(false);
                   launcherRef.current?.focus({ preventScroll: true });
@@ -247,7 +249,7 @@ export function StudioShellFloatingLayoutManager() {
               ) : null}
 
               <section aria-labelledby="studio-shell-floating-visibility-heading">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 id="studio-shell-floating-visibility-heading" className="text-xs font-black">
                       화면에 보이는 요소
@@ -256,7 +258,7 @@ export function StudioShellFloatingLayoutManager() {
                       설정 {configuredVisibleCount}/{STUDIO_SHELL_FLOATING_VISIBILITY_IDS.length} · 현재 보기 {visibleCount} · 이 화면에서 사용 가능 {mountedVisibilityCount}
                     </p>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1 sm:justify-end">
                     <button
                       type="button"
                       className={cn(actionClass, "min-h-8 px-2")}
@@ -293,62 +295,48 @@ export function StudioShellFloatingLayoutManager() {
                     return (
                       <div
                         key={definition.id}
-                        className="rounded-xl border border-line bg-card p-3"
+                        className="rounded-xl border border-line bg-card p-3 transition-colors hover:border-line-strong"
                       >
-                        <div className="flex items-start gap-3">
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={checked}
-                            className={cn(
-                              "relative mt-0.5 h-7 w-12 shrink-0 rounded-full border transition-colors",
-                              checked
-                                ? "border-accent bg-accent"
-                                : "border-line-strong bg-raised",
-                              STUDIO_FOCUS_RING,
-                            )}
-                            onClick={() => {
-                              shell.toggleVisible(definition.visibilityId);
-                              setNotice(checked
-                                ? `${definition.label}을 숨겼어요.`
-                                : `${definition.label}을 표시하도록 설정했어요.`);
-                            }}
-                          >
-                            <span
-                              aria-hidden="true"
-                              className={cn(
-                                "absolute top-1 size-5 rounded-full bg-white shadow transition-transform",
-                                checked ? "translate-x-6" : "translate-x-1",
-                              )}
-                            />
-                            <span className="sr-only">
-                              {checked ? `${definition.label} 숨기기` : `${definition.label} 표시하기`}
-                            </span>
-                          </button>
+                        <div className="flex min-w-0 items-start gap-3">
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-black text-fg">{definition.label}</p>
                             <p className="mt-1 text-[0.68rem] leading-5 text-fg-3">
                               {definition.description}
                             </p>
-                            <span
-                              data-studio-shell-mounted-state={mountedCount > 0 ? "available" : "unavailable"}
-                              className={cn(
-                                "mt-1 inline-flex min-h-6 items-center rounded-full border px-2 text-[0.62rem] font-bold",
-                                mountedCount > 0
-                                  ? "border-success/30 bg-success-soft/20 text-success"
-                                  : "border-line bg-raised text-fg-3",
-                              )}
-                            >
-                              {availabilityLabel}
-                            </span>
                             {definition.safetyBehavior ? (
                               <p className="mt-1 text-[0.65rem] leading-5 text-accent">
                                 {definition.safetyBehavior}
                               </p>
                             ) : null}
                           </div>
+                          <Switch
+                            checked={checked}
+                            aria-label={checked
+                              ? `${definition.label} 숨기기`
+                              : `${definition.label} 표시하기`}
+                            onCheckedChange={() => {
+                              shell.toggleVisible(definition.visibilityId);
+                              setNotice(checked
+                                ? `${definition.label}을 숨겼어요.`
+                                : `${definition.label}을 표시하도록 설정했어요.`);
+                            }}
+                          />
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-2">
+                          <span
+                            data-studio-shell-mounted-state={mountedCount > 0 ? "available" : "unavailable"}
+                            className={cn(
+                              "inline-flex min-h-6 items-center rounded-full border px-2 text-[0.62rem] font-bold",
+                              mountedCount > 0
+                                ? "border-success/30 bg-success-soft/20 text-success"
+                                : "border-line bg-raised text-fg-3",
+                            )}
+                          >
+                            {availabilityLabel}
+                          </span>
                           <button
                             type="button"
+                            aria-label={`${definition.label} 위치를 기본값으로 복원`}
                             className={cn(actionClass, "min-h-8 shrink-0 px-2")}
                             onClick={() => {
                               for (const id of surfaceIds) {
@@ -357,7 +345,7 @@ export function StudioShellFloatingLayoutManager() {
                               setNotice(`${definition.label} 위치를 기본값으로 복원했어요.`);
                             }}
                           >
-                            <RotateCcw size={13} aria-hidden />위치
+                            <RotateCcw size={13} aria-hidden />위치 초기화
                           </button>
                         </div>
                       </div>
@@ -567,9 +555,12 @@ export function StudioShellFloatingLayoutManager() {
             : shell.focusModeActive
               ? <Focus size={16} aria-hidden />
               : <SlidersHorizontal size={16} aria-hidden />}
-          {arranging ? "배치 편집 중" : shell.focusModeActive ? "집중 보기" : "보기"}
-          <span className="rounded-full bg-raised px-1.5 py-0.5 text-[0.62rem] text-fg-3">
-            {visibleCount}
+          {arranging ? "배치 편집 중" : shell.focusModeActive ? "집중 보기" : "보기 설정"}
+          <span
+            className="rounded-full bg-raised px-1.5 py-0.5 text-[0.62rem] text-fg-3"
+            aria-label={`현재 플로팅 UI ${visibleCount}개 표시`}
+          >
+            {visibleCount}개
           </span>
           {shell.failure ? (
             <MessageCircle size={13} aria-label="설정 저장 제한" />

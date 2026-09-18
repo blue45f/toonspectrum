@@ -22,6 +22,7 @@ export function attachStudioBg3dEditorTemplateSwitchHost(h) {
     orderStudioBg3dHierarchySelectionRootsFirst,
     physicsPhaseRef,
     physicsRuntimeSourceRef,
+    replaceCanonicalDocumentState,
     setCustomModels,
     setError,
     setPrimitives,
@@ -90,13 +91,10 @@ export function attachStudioBg3dEditorTemplateSwitchHost(h) {
       live.document,
       before,
     );
-    physicsRuntimeSourceRef.current = {
-      ...live,
+    replaceCanonicalDocumentState({
       primitives: nextPrimitives,
       customModels: nextCustomModels,
-    };
-    setPrimitives(nextPrimitives);
-    setCustomModels(nextCustomModels);
+    });
     setSelectedIds(new Set(orderStudioBg3dHierarchySelectionRootsFirst(parts)));
     setError(null);
   };

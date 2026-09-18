@@ -1,6 +1,6 @@
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, PanelLeftClose, Pin, RotateCcw } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Maximize2, Minimize2, PanelLeftClose, Pin, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
-import type { StudioFloatingSurfaceDock, StudioFloatingSurfaceLayout, StudioFloatingSurfaceRect } from "./studio-floating-surface";
+import type { StudioFloatingSurfaceDock, StudioFloatingSurfaceLayout, StudioFloatingSurfaceRect, StudioFloatingSurfaceSizePreset } from "./studio-floating-surface";
 import { STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { cn } from "@/shared/lib/utils";
 
@@ -22,11 +22,12 @@ export interface StudioWorkspaceRegionMenuProps {
   readonly menuButtonRef: RefObject<HTMLButtonElement | null>;
   readonly onClose: () => void;
   readonly onResize: (width: number, height: number) => void;
+  readonly onResizePreset: (preset: StudioFloatingSurfaceSizePreset) => void;
   readonly attach: () => void; readonly reset: () => void;
   readonly authority: string;
 }
 
-export function StudioWorkspaceRegionMenu({ label, buttonClass, choices, layout, setLayout, changeDetached, move, minWidth, maxWidth, minHeight, maxHeight, viewport, insetTop, rect, floating, compact, menuButtonRef, onClose, onResize, attach, reset, authority }: StudioWorkspaceRegionMenuProps) {
+export function StudioWorkspaceRegionMenu({ label, buttonClass, choices, layout, setLayout, changeDetached, move, minWidth, maxWidth, minHeight, maxHeight, viewport, insetTop, rect, floating, compact, menuButtonRef, onClose, onResize, onResizePreset, attach, reset, authority }: StudioWorkspaceRegionMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [widthInput, setWidthInput] = useState(() => String(Math.round(rect.width)));
   const [heightInput, setHeightInput] = useState(() => String(Math.round(rect.height)));
@@ -53,6 +54,11 @@ export function StudioWorkspaceRegionMenu({ label, buttonClass, choices, layout,
           [-10, 0, "왼쪽으로 이동", ArrowLeft], [0, -10, "위로 이동", ArrowUp],
           [0, 10, "아래로 이동", ArrowDown], [10, 0, "오른쪽으로 이동", ArrowRight],
         ] as const).map(([dx, dy, name, Icon]) => <button key={name} type="button" className={buttonClass} aria-label={`${label} ${name}`} disabled={layout.positionLocked} onClick={() => move(dx, dy)}><Icon size={15} aria-hidden /></button>)}</div>
+        <div role="group" aria-label={`${label} 빠른 크기`} className="my-2 grid grid-cols-3 gap-1 rounded-md border border-line p-1">
+          <button type="button" disabled={layout.sizeLocked} className={cn(buttonClass, "min-w-0 flex-col gap-0.5 px-1 py-1 text-[0.65rem]")} aria-label={`${label} 최소 크기`} onClick={() => onResizePreset("minimum")}><Minimize2 size={14} aria-hidden />최소</button>
+          <button type="button" disabled={layout.sizeLocked} className={cn(buttonClass, "min-w-0 flex-col gap-0.5 px-1 py-1 text-[0.65rem]")} aria-label={`${label} 권장 크기`} onClick={() => onResizePreset("default")}><RotateCcw size={14} aria-hidden />권장</button>
+          <button type="button" disabled={layout.sizeLocked} className={cn(buttonClass, "min-w-0 flex-col gap-0.5 px-1 py-1 text-[0.65rem]")} aria-label={`${label} 최대 크기`} onClick={() => onResizePreset("maximum")}><Maximize2 size={14} aria-hidden />최대</button>
+        </div>
         <fieldset disabled={layout.sizeLocked} className="my-2 grid grid-cols-2 gap-2 rounded-md border border-line p-2">
           <legend className="px-1 text-xs font-semibold">크기 직접 입력 · px</legend>
           <label className="text-xs">너비<input aria-label={`${label} 너비`} type="number" min={minWidth} max={Math.min(maxWidth, viewport.width - 24)} value={widthInput} onChange={event => setWidthInput(event.target.value)} className={cn("mt-1 w-full rounded border border-line bg-panel p-1", STUDIO_FOCUS_RING)} /></label>

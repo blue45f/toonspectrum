@@ -6,10 +6,23 @@
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 import { StudioMarketplaceModelImport } from "./StudioMarketplaceModelImport";
+import { StudioBg3dSceneDirectorPanel } from "./StudioBg3dSceneDirectorPanel";
+
+import type { StudioBg3dSceneGoal } from "./StudioBg3dSceneDirectorPanel";
 import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import { StudioBg3dEditorSidebarExtras } from "./StudioBg3dEditorSidebarExtras";
 
-export function StudioBg3dEditorSidebar({ h }) {
+interface StudioBg3dEditorSidebarProps {
+  readonly h: any;
+  readonly experienceMode?: "simple" | "pro";
+  readonly onOpenPro?: () => void;
+}
+
+export function StudioBg3dEditorSidebar({
+  h,
+  experienceMode = "pro",
+  onOpenPro = (): void => undefined,
+}: StudioBg3dEditorSidebarProps) {
   const {
     THREE, OrbitControls, OrthographicCamera, PerspectiveCamera, TransformControls, View,
     Canvas, useThree, Aperture, Boxes, Camera, ChevronDown, CircleDashed, Copy, Crosshair, Eye,
@@ -326,21 +339,64 @@ export function StudioBg3dEditorSidebar({ h }) {
     canPlaceSelectedModelRecipe, centerGroundSelectionDisabledReason, layerListItems, selectedAimConstraints, selectedIkDefaultPole, selectedIkDefaultTarget, selectedTwoBoneIkConstraints, setPoseJointSelection,
     sceneRecoveryError, sharedStageUpdateBlockedReason,
   } = { ...R, ...h };
+  const simpleMode = experienceMode === "simple";
+  const simplePanelCopy = {
+    shapes: { label: "소품", hint: "가구·물건·기본 도형을 장면에 배치" },
+    templates: { label: "배경", hint: "교실·거리·카페 같은 장소를 빠르게 구성" },
+    layers: { label: "장면", hint: "현재 장면의 인물·배경·소품을 관리" },
+    view: { label: "구도", hint: "카메라 각도·원근·조명으로 장면 연출" },
+    lt: { label: "웹툰", hint: "선화·톤·컬러 가이드로 작화 준비" },
+    models: { label: "인물", hint: "캐릭터·포즈·3D 에셋을 장면에 배치" },
+  };
+  const panelTabs = simpleMode
+    ? BG_PANEL_TABS.map((tab) => ({ ...tab, ...simplePanelCopy[tab.id] }))
+    : BG_PANEL_TABS;
+  const activeSceneGoal: StudioBg3dSceneGoal | null = activePanelTab === "templates"
+    ? "background"
+    : activePanelTab === "view"
+      ? "camera"
+      : activePanelTab === "models"
+        ? "character"
+        : activePanelTab === "shapes"
+          ? "props"
+          : activePanelTab === "lt"
+            ? "webtoon"
+            : null;
+  const selectSceneGoal = (goal: StudioBg3dSceneGoal) => {
+    if (goal === "background") handlePanelTabChange("templates");
+    else if (goal === "camera") { handlePanelTabChange("view"); setViewEditorSection("camera"); }
+    else if (goal === "character") { handlePanelTabChange("models"); setModelsPanelActivated(true); }
+    else if (goal === "props") handlePanelTabChange("shapes");
+    else { handlePanelTabChange("lt"); setLtEditorSection("line"); setLineArtPreview(true); }
+  };
   return (
           <aside className="flex min-h-0 flex-col border-t border-line bg-panel lg:border-l lg:border-t-0">
-            <StudioMarketplaceModelImport
-              modelId={h.marketplaceModelId ?? null}
-              scopeKey={h.sharedStageSessionScopeKey}
-              disabled={Boolean(h.isRestoringScene || h.isUploadingModel || h.physicsInteractionLocked || h.immersiveSceneActive || h.sceneRecoveryError)}
-              onImport={h.importMarketplaceModelFiles}
-            />
+            {simpleMode ? (
+              <StudioBg3dSceneDirectorPanel
+                activeGoal={activeSceneGoal}
+                disabled={isCapturing || isRestoringScene || physicsInteractionLocked || immersiveSceneActive}
+                lineArtPreview={lineArtPreview}
+                savedShotCount={savedShots?.length ?? 0}
+                sceneHasContent={primitives.length > 0 || customModels.length > 0 || sharedCharacterCaptureElementIds.length > 0}
+                onSelectGoal={selectSceneGoal}
+                onOpenPro={onOpenPro}
+              />
+            ) : null}
+            {!simpleMode || h.marketplaceModelId ? (
+              <StudioMarketplaceModelImport
+                modelId={h.marketplaceModelId ?? null}
+                scopeKey={h.sharedStageSessionScopeKey}
+                disabled={Boolean(h.isRestoringScene || h.isUploadingModel || h.physicsInteractionLocked || h.immersiveSceneActive || h.sceneRecoveryError)}
+                onImport={h.importMarketplaceModelFiles}
+              />
+            ) : null}
             <div
               role="tablist"
               aria-label="컨트롤 카테고리"
               inert={physicsInteractionLocked || immersiveSceneActive}
               className="grid shrink-0 grid-cols-6 gap-1 border-b border-line bg-panel/95 px-2 py-2 backdrop-blur sm:px-3"
             >
-              {BG_PANEL_TABS.map((tab) => {
+              {panelTabs.map((tab) => {
                 const TabIcon = tab.icon;
                 const isActive = activePanelTab === tab.id;
                 return (
@@ -622,6 +678,7 @@ export function StudioBg3dEditorSidebar({ h }) {
               materializationKind={sharedStageMaterializationKind}
               captureElementCount={sharedCharacterCaptureElementIds.length}
               toneOutputType={ltToneSettings.type}
+              simpleMode={simpleMode}
             />
           </aside>
   );

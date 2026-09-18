@@ -3,10 +3,15 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 
 import Link from "@/compat/router-link";
+import {
+  translateBilingualText,
+  translateParallelBilingualCopy,
+  type BilingualText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import { useT } from "@/shared/lib/i18n";
 
 import "./brand-film-storyboard.css";
 
-type Locale = "ko" | "en";
 type ChapterId = "imagine" | "draw" | "create" | "finish";
 
 interface Chapter {
@@ -16,9 +21,9 @@ interface Chapter {
   readonly image: string;
   readonly image640?: string;
   readonly image960?: string;
-  readonly title: Readonly<Record<Locale, string>>;
-  readonly body: Readonly<Record<Locale, string>>;
-  readonly action: Readonly<Record<Locale, string>>;
+  readonly title: BilingualText;
+  readonly body: BilingualText;
+  readonly action: BilingualText;
   readonly href: string;
 }
 
@@ -111,11 +116,15 @@ function ChapterPicture({ chapter, alt }: { chapter: Chapter; alt: string }) {
   return <img src={chapter.image} alt={alt} loading="lazy" decoding="async" />;
 }
 
-export function BrandFilmStoryboard({ locale }: { readonly locale: Locale }) {
-  const copy = COPY[locale];
+export function BrandFilmStoryboard() {
+  const t = useT();
+  const copy = translateParallelBilingualCopy(t, "brandFilmStoryboard", COPY);
   const reducedMotion = useReducedMotion();
   const [activeId, setActiveId] = useState<ChapterId>("imagine");
   const active = CHAPTERS.find((chapter) => chapter.id === activeId) ?? CHAPTERS[0];
+  const activeTitle = translateBilingualText(t, `brandFilmStoryboard.chapter.${active.id}.title`, active.title);
+  const activeBody = translateBilingualText(t, `brandFilmStoryboard.chapter.${active.id}.body`, active.body);
+  const activeAction = translateBilingualText(t, `brandFilmStoryboard.chapter.${active.id}.action`, active.action);
   const ActiveIcon = active.icon;
 
   return (
@@ -133,11 +142,16 @@ export function BrandFilmStoryboard({ locale }: { readonly locale: Locale }) {
           {CHAPTERS.map((chapter, index) => {
             const Icon = chapter.icon;
             const selected = chapter.id === active.id;
+            const title = translateBilingualText(
+              t,
+              `brandFilmStoryboard.chapter.${chapter.id}.title`,
+              chapter.title,
+            );
             return (
               <button key={chapter.id} type="button" aria-pressed={selected} onClick={() => setActiveId(chapter.id)}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <Icon size={18} aria-hidden="true" />
-                <strong>{chapter.title[locale]}</strong>
+                <strong>{title}</strong>
                 <small>{chapter.time}s</small>
               </button>
             );
@@ -153,8 +167,8 @@ export function BrandFilmStoryboard({ locale }: { readonly locale: Locale }) {
               exit={reducedMotion ? undefined : { opacity: 0, scale: 1.012 }}
               transition={{ duration: .34, ease: [0.16, 1, 0.3, 1] }}
             >
-              <ChapterPicture chapter={active} alt={`${copy.visualAlt}: ${active.title[locale]}`} />
-              <figcaption><ActiveIcon size={15} aria-hidden="true" />{active.time}s · {active.title[locale]}</figcaption>
+              <ChapterPicture chapter={active} alt={`${copy.visualAlt}: ${activeTitle}`} />
+              <figcaption><ActiveIcon size={15} aria-hidden="true" />{active.time}s · {activeTitle}</figcaption>
             </motion.figure>
           </AnimatePresence>
           <AnimatePresence mode="wait" initial={false}>
@@ -167,9 +181,9 @@ export function BrandFilmStoryboard({ locale }: { readonly locale: Locale }) {
               transition={{ duration: .28, ease: [0.16, 1, 0.3, 1] }}
             >
               <span>{active.time}s</span>
-              <h3>{active.title[locale]}</h3>
-              <p>{active.body[locale]}</p>
-              <Link href={active.href}>{active.action[locale]}<ArrowRight size={15} aria-hidden="true" /></Link>
+              <h3>{activeTitle}</h3>
+              <p>{activeBody}</p>
+              <Link href={active.href}>{activeAction}<ArrowRight size={15} aria-hidden="true" /></Link>
             </motion.div>
           </AnimatePresence>
         </div>

@@ -112,15 +112,35 @@ async function writeJson(filePath, value) {
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+export function resolveReleaseCommand(
+  command,
+  args,
+  platform = process.platform,
+  environment = process.env,
+) {
+  if (platform !== "win32" || !command.toLowerCase().endsWith(".cmd")) {
+    return { command, args };
+  }
+  const commandProcessor = environment.ComSpec?.trim()
+    || environment.COMSPEC?.trim()
+    || "cmd.exe";
+  return {
+    command: commandProcessor,
+    args: ["/d", "/s", "/c", command, ...args],
+  };
+}
+
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const resolved = resolveReleaseCommand(command, args);
+  const result = spawnSync(resolved.command, resolved.args, {
     cwd: options.cwd ?? ROOT,
     encoding: "utf8",
     env: { ...process.env, ...options.env },
     stdio: options.capture ? "pipe" : "inherit",
   });
   if (result.status !== 0) {
-    throw new Error(`${command} failed with exit code ${result.status ?? "unknown"}`);
+    const reason = result.error?.message ?? `exit code ${result.status ?? "unknown"}`;
+    throw new Error(`${command} failed with ${reason}`);
   }
   return result.stdout?.trim() ?? "";
 }
@@ -142,8 +162,11 @@ async function copyJavaScriptTree(source, destination) {
 }
 
 async function findNodeLicense() {
-  const runtimeRoot = resolve(dirname(process.execPath), "..");
+  const runtimeDirectory = dirname(process.execPath);
+  const runtimeRoot = resolve(runtimeDirectory, "..");
   const candidates = [
+    join(runtimeDirectory, "LICENSE"),
+    join(runtimeDirectory, "LICENSE.md"),
     join(runtimeRoot, "LICENSE"),
     join(runtimeRoot, "LICENSE.md"),
     join(runtimeRoot, "share", "doc", "node", "copyright"),

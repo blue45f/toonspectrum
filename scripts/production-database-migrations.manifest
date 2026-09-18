@@ -65,3 +65,8 @@ apps/api/src/db/migrations/0064_studio_project_graph_v3.sql
 apps/api/src/db/migrations/0065_creator_series_lifecycle.sql
 apps/api/src/db/migrations/0066_share_analytics_events.sql
 apps/api/src/db/migrations/0067_creator_role_workspace_personalization.sql
+apps/api/src/db/migrations/0068_business_inquiries.sql
+apps/api/src/db/migrations/0069_account_consolidation.sql
+apps/api/src/db/migrations/0070_user_region_settings.sql
+apps/api/src/db/migrations/0071_supporter_payments.sql
+apps/api/src/db/migrations/0072_creator_support_program.sql

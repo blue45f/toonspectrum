@@ -36,6 +36,20 @@ describe("studio shell floating integration", () => {
       .toContain('data-studio-shell-force-visible={arranging ? "true" : undefined}');
   });
 
+  it("keeps phone floating status controls in separate lanes above the editing dock", () => {
+    const saveCenter = source("StudioDraftSaveCenterImpl.tsx");
+    const offline = source("offline/StudioOfflinePanel.tsx");
+    const huddle = source("live/huddle/StudioP2pHuddleLauncher.tsx");
+    const manager = source("studio-shell/StudioShellFloatingLayoutManager.tsx");
+    expect(saveCenter).toContain("var(--studio-canvas-bottom-inset,7rem)+4.25rem");
+    expect(offline).toContain("var(--studio-canvas-bottom-inset,7rem)+7.5rem");
+    expect(offline).toContain('!attentionRequired && "max-lg:hidden"');
+    expect(huddle).toContain("var(--studio-canvas-bottom-inset,5rem)+0.75rem");
+    expect(manager).toContain("var(--studio-canvas-bottom-inset,0px)+0.75rem");
+    expect(manager).toContain("보기 설정");
+    expect(manager).toContain("{visibleCount}개");
+  });
+
   it("lazy-loads the durable manager inside the document lifetime boundary", () => {
     const layout = source("studio-router/StudioDocumentLayout.tsx");
     const host = source("studio-shell/StudioShellFloatingLayoutHost.tsx");

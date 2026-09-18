@@ -32,6 +32,11 @@ describe("role personalization center contract", () => {
     expect(source).toContain("roleWorkspace");
   });
 
+  it("does not start protected role-workspace sync for signed-out Studio visitors", () => {
+    expect(source).toContain('const workspaceSyncEnabled = status === "authenticated";');
+    expect(source.match(/workspaceSyncEnabled,/gu)).toHaveLength(2);
+  });
+
   it("keeps recommendations advisory and permissions separate", () => {
     expect(source).toContain("recommendCreatorTeamRoles");
     expect(source).toContain("자동 배정하거나 접근 권한을 바꾸지 않습니다");

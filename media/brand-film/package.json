@@ -6,6 +6,7 @@
   "scripts": {
     "studio": "remotion studio src/index.tsx --public-dir=../../apps/web/public",
     "render": "node render.mjs",
+    "render:product-tour": "node render-product-tour.mjs",
     "render:technology": "node render-technology.mjs",
     "typecheck": "tsc --noEmit"
   },

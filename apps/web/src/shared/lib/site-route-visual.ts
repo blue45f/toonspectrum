@@ -1,3 +1,4 @@
+import { defineBilingualAutoText } from "./i18n-bilingual-copy";
 import {
   canonicalSitePath,
   resolveSiteRouteMetadata,
@@ -35,14 +36,12 @@ export type SiteRouteVisualMotion =
   | "focus";
 export type SiteRouteVisualDensity = "compact" | "prominent";
 
-export interface SiteRouteVisualText {
-  readonly ko: string;
-  readonly en: string;
-}
+/** Global i18n key for route visual copy. */
+export type SiteRouteVisualText = string;
 
 export interface SiteRouteVisualVideo {
   readonly src: string;
-  readonly portraitSrc: string;
+  readonly poster: string;
   readonly startSeconds: number;
   readonly endSeconds: number;
 }
@@ -58,10 +57,11 @@ export interface SiteRouteVisualProfile {
   readonly layers: readonly [SiteRouteVisualText, SiteRouteVisualText, SiteRouteVisualText];
 }
 
-const t = (ko: string, en: string): SiteRouteVisualText => ({ ko, en });
+const t = (ko: string, en: string): SiteRouteVisualText =>
+  defineBilingualAutoText("siteRouteVisual", ko, en);
 const FILM = (startSeconds: number, endSeconds = Math.min(24, startSeconds + 6)): SiteRouteVisualVideo => ({
-  src: "/brand/toonstudio-intro.mp4",
-  portraitSrc: "/brand/toonstudio-intro-portrait.mp4",
+  src: "/brand/toonstudio-route-header.mp4",
+  poster: `/brand/toonstudio-route-header-${startSeconds}.jpg`,
   startSeconds,
   endSeconds,
 });

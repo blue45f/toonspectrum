@@ -79,7 +79,7 @@ describe("lightweight page payload admission", () => {
     { props: { hideMaster: "bad", paperGrainVisible: "bad" }, message: "페이지 마스터 표시 값이 올바르지 않습니다." },
     { props: { paperGrainVisible: "bad", paperSurface: null }, message: "페이지 종이 결 표시 값이 올바르지 않습니다." },
     { props: { paperSurface: null, layerComps: null }, message: "페이지 종이 표면 설정이 올바르지 않습니다." },
-    { props: { layerComps: null, drawingAssist: null }, message: "페이지 레이어 콤프가 올바르지 않습니다." },
+    { props: { layerComps: null, drawingAssist: null }, message: "페이지 레이어 보기 정보가 올바르지 않습니다." },
     { props: { drawingAssist: null, note: "한".repeat(3000) }, message: "페이지 드로잉 보조 설정이 손상되었거나 지원하지 않는 버전입니다." },
     { props: { note: "한".repeat(3000) }, message: "페이지 정보가 실시간 동기화 8KiB 한도를 초과했습니다." },
   ];

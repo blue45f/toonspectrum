@@ -6,6 +6,7 @@ import {
   createCharacterShaperHistory,
   pushCharacterShaperHistory,
   redoCharacterShaperHistory,
+  trimCharacterShaperHistoryEntries,
   undoCharacterShaperHistory,
 } from "./useCharacterShaperHistory";
 
@@ -74,6 +75,24 @@ describe("character shaper history", () => {
     expect(stack.past).toHaveLength(CHARACTER_SHAPER_HISTORY_LIMIT);
     expect(stack.past[0]?.label).toBe("단계 5");
     expect(stack.past[stack.past.length - 1]?.label).toBe(`단계 ${CHARACTER_SHAPER_HISTORY_LIMIT + 4}`);
+  });
+
+  it("byte budget가 넘으면 가장 오래된 snapshot부터 제거한다", () => {
+    const entries = [
+      { label: "a", snapshot: { value: "a".repeat(40) } },
+      { label: "b", snapshot: { value: "b".repeat(40) } },
+      { label: "c", snapshot: { value: "c".repeat(40) } },
+    ];
+    const trimmed = trimCharacterShaperHistoryEntries(entries, 60, 320);
+    expect(trimmed.length).toBeLessThan(entries.length);
+    expect(trimmed.at(-1)?.label).toBe("c");
+  });
+
+  it("oversized snapshot 하나도 byte budget 밖에서는 retained 하지 않는다", () => {
+    const trimmed = trimCharacterShaperHistoryEntries([
+      { label: "huge", snapshot: { value: "x".repeat(500) } },
+    ], 60, 128);
+    expect(trimmed).toEqual([]);
   });
 
   it("never mutates the stack it is given", () => {

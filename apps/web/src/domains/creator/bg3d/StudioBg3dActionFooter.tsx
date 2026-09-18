@@ -33,6 +33,7 @@ interface StudioBg3dActionFooterProps {
   readonly materializationKind: StudioBg3dSharedStageMaterializationKind;
   readonly captureElementCount: number;
   readonly toneOutputType: string;
+  readonly simpleMode?: boolean;
 }
 
 export function StudioBg3dActionFooter({
@@ -58,6 +59,7 @@ export function StudioBg3dActionFooter({
   materializationKind,
   captureElementCount,
   toneOutputType,
+  simpleMode = false,
 }: StudioBg3dActionFooterProps) {
   const isPreparing = isCapturing || isRestoringScene || hasPendingClone || hasPendingSharedCharacter;
 
@@ -128,7 +130,7 @@ export function StudioBg3dActionFooter({
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
-            aria-label="3D 배경 편집기 닫기"
+            aria-label={simpleMode ? "3D 장면 연출 닫기" : "3D 배경 편집기 닫기"}
             className={cx(
               CONTROL_BUTTON,
               "shrink-0 whitespace-nowrap border-line bg-card text-fg-2 hover:bg-raised hover:text-fg max-[359px]:size-11 max-[359px]:px-0",
@@ -142,7 +144,7 @@ export function StudioBg3dActionFooter({
           </button>
           <button
             type="button"
-            aria-label="3D 소재 저장"
+            aria-label={simpleMode ? "3D 장면 저장" : "3D 소재 저장"}
             className={cx(
               CONTROL_BUTTON,
               "shrink-0 whitespace-nowrap border-line bg-card text-fg-2 hover:bg-raised hover:text-fg max-[359px]:size-11 max-[359px]:px-0",
@@ -151,7 +153,7 @@ export function StudioBg3dActionFooter({
             onClick={onSave}
           >
             <Save size={14} className="min-[360px]:mr-1.5" aria-hidden />
-            <span className="max-[359px]:sr-only">소재 저장</span>
+            <span className="max-[359px]:sr-only">{simpleMode ? "장면 저장" : "소재 저장"}</span>
           </button>
         </div>
         <button
@@ -173,13 +175,15 @@ export function StudioBg3dActionFooter({
                 ? "원본 다시 연결하고 업데이트"
                 : mutationKind === "connect"
                   ? `${captureElementCount}명과 연결해 ${operation === "update" ? "업데이트" : "추가"}`
-                  : operation === "update"
-                    ? "3D 배경 업데이트"
-                    : !hasFilledOutput
-                      ? "선화만 추가"
-                      : toneOutputType === "color"
-                        ? "컬러 배경 추가"
-                        : "톤 배경 추가"}
+                  : simpleMode
+                    ? operation === "update" ? "작화에 다시 적용" : "작화에 적용"
+                    : operation === "update"
+                      ? "3D 배경 업데이트"
+                      : !hasFilledOutput
+                        ? "선화만 추가"
+                        : toneOutputType === "color"
+                          ? "컬러 배경 추가"
+                          : "톤 배경 추가"}
           </span>
           <span className="hidden max-[359px]:inline">
             {mutationKind === "unlink"
@@ -190,7 +194,9 @@ export function StudioBg3dActionFooter({
                 ? "다시 연결"
                 : mutationKind === "connect"
                   ? "연결해 적용"
-                  : operation === "update" ? "업데이트" : "배경 추가"}
+                  : simpleMode
+                    ? operation === "update" ? "다시 적용" : "적용"
+                    : operation === "update" ? "업데이트" : "배경 추가"}
           </span>
         </button>
       </footer>
