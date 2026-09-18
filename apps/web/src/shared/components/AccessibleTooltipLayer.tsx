@@ -578,10 +578,16 @@ export function AccessibleTooltipLayer(): ReactElement | null {
 
     function onClick(event: MouseEvent): void {
       const intent = touchIntent;
-      if (!intent?.opened || !isInsideTarget(intent.source.target, event.target)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      touchIntent = null;
+      if (intent?.opened && isInsideTarget(intent.source.target, event.target)) {
+        event.preventDefault();
+        event.stopPropagation();
+        touchIntent = null;
+        return;
+      }
+      // Pointer/focus tooltips are descriptive, not interactive popovers. Once a normal control
+      // click commits an action, close immediately so the old help bubble cannot cover the modal
+      // or sheet that the action just opened.
+      close(true);
     }
 
     function onContextMenu(event: MouseEvent): void {
