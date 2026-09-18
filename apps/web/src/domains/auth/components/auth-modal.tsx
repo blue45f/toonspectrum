@@ -297,7 +297,7 @@ export function AuthModal({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={mode === "login" ? translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "로그인") : translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "회원가입")}
+        aria-label={mode === "login" ? "로그인" : "회원가입"}
         data-auth-modal="true"
         className="relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-line-strong bg-panel shadow-2xl shadow-[oklch(0.1_0.02_70/0.5)] sm:max-h-[calc(100dvh-7rem)]"
         style={{ animation: "fade-up 0.22s var(--ease-out-expo)" }}

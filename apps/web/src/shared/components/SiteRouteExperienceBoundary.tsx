@@ -2,6 +2,7 @@ import { MonitorUp, WifiOff } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
+import { RoutePurposeScene } from "./RoutePurposeScene";
 import { WorkflowTrustBadge } from "./WorkflowTrustBadge";
 import { supportsRoutePurposeScene } from "./site-experience/site-experience-policy";
 
@@ -11,38 +12,7 @@ import {
 import { useT } from "@/shared/lib/i18n";
 import { resolveSiteRouteExperience } from "@/shared/lib/site-route-experience";
 import { resolveSiteRouteVisual } from "@/shared/lib/site-route-visual";
-
-const COPY = {
-  desktopTitle: defineBilingualText(
-    "siteRouteBoundary",
-    "desktopTitle",
-    "정밀 편집은 큰 화면에서 지원됩니다.",
-    "Precision editing requires a larger screen.",
-  ),
-  desktopBody: defineBilingualText(
-    "siteRouteBoundary",
-    "desktopBody",
-    "모바일에서는 보기와 검토를 중심으로 사용할 수 있습니다. 키보드·펜을 사용할 수 있는 환경에서 편집을 이어가세요.",
-    "Use mobile for viewing and review, then continue editing with a keyboard or pen on a larger screen.",
-  ),
-  viewSupport: defineBilingualText(
-    "siteRouteBoundary",
-    "viewSupport",
-    "지원 범위 보기",
-    "View support",
-  ),
-  offlineBody: defineBilingualText(
-    "siteRouteBoundary",
-    "offlineBody",
-    "저장 상태 표시에서 현재 변경 내용이 이 기기에 보관됐는지 확인하세요. 연결이 돌아오면 지원되는 작업은 다시 동기화됩니다.",
-    "Check the workspace save status to confirm whether current changes are stored on this device. Supported work can sync after reconnection.",
-  ),
-} as const;
-
-const RoutePurposeScene = lazy(async () => {
-  const module = await import("./RoutePurposeScene");
-  return { default: module.RoutePurposeScene };
-});
+import { useI18n } from "@/shared/lib/i18n";
 
 function useNarrowViewport() {
   const [narrow, setNarrow] = useState(false);
@@ -83,7 +53,6 @@ export function SiteRouteExperienceBoundary({
   readonly children: ReactNode;
   readonly routeTitle: string;
 }) {
-  const t = useT();
   const { pathname, search } = useLocation();
   const experience = useMemo(
     () => resolveSiteRouteExperience(`${pathname}${search}`),
@@ -129,13 +98,12 @@ export function SiteRouteExperienceBoundary({
       </p>
 
       {routePurposeSceneSupported ? (
-        <Suspense fallback={null}>
-          <RoutePurposeScene
-            title={routeTitle}
-            experience={experience}
-            profile={visual}
-          />
-        </Suspense>
+        <RoutePurposeScene
+          title={routeTitle}
+          locale={locale}
+          experience={experience}
+          profile={visual}
+        />
       ) : null}
 
       {desktopRequired ? (

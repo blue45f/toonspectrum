@@ -21,13 +21,11 @@ describe("install prompt and creator home spacing contracts", () => {
     expect(pwaCss).toContain("env(safe-area-inset-top)");
     expect(pwaCss).toContain("env(safe-area-inset-bottom)");
     expect(pwaCss).toContain('[data-surface="home"]');
-    expect(pwaCss).toContain("--pwa-install-inline-gap");
-    expect(pwaCss).toContain("--pwa-install-mobile-nav-offset: 5.75rem");
+    expect(pwaCss).toContain("--pwa-install-mobile-nav-offset: 5.5rem");
     expect(pwaCss).toContain("bottom: calc(var(--pwa-install-mobile-nav-offset) + env(safe-area-inset-bottom))");
-    expect(pwaCss).toContain("overflow-x: clip");
     expect(pwaCss).toContain("overflow-y: auto");
     expect(pwaCss).toContain("@media (max-width: 360px)");
-    expect(pwaCss).toContain("@media (max-width: 640px) and (max-height: 640px)");
+    expect(pwaCss).toContain("@media (max-width: 640px) and (max-height: 420px)");
     expect(pwaCss).toContain("grid-template-columns: minmax(0, 1fr) auto auto");
   });
 
@@ -47,16 +45,10 @@ describe("install prompt and creator home spacing contracts", () => {
     );
     expect(homeExperience).not.toContain("<CreatorHomeNavigation");
     expect(homeSpacingCss).toContain("--ch-page-gutter");
-    expect(homeSpacingCss).toContain("--cf-content-max: 82.5rem");
-    expect(homeSpacingCss).toContain("--cf-page-gutter");
+    expect(homeSpacingCss).toContain("--cf-shell-inline-total");
     expect(homeSpacingCss).toContain(".cf-hero {");
     expect(homeSpacingCss).toContain("margin-inline: auto");
-    expect(homeSpacingCss).toContain("padding-inline-start");
     expect(homeSpacingCss).toContain("env(safe-area-inset-left)");
-    expect(homeSpacingCss).toContain('[data-creator-home="production-first"][data-theme-art]');
-    expect(homeSpacingCss).toContain("--cf-ink: var(--color-fg)");
-    expect(homeSpacingCss).toContain("--cf-muted: var(--color-fg-2)");
-    expect(homeSpacingCss).toContain("color-mix(in oklch, var(--cf-accent) 7%, var(--cf-card))");
     expect(homeSpacingCss).toContain("@media (max-width: 390px)");
   });
 

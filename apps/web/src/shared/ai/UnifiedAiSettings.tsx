@@ -447,8 +447,8 @@ function AiSettingsEditor({
                     {status && !status.configured ? translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "ko", " · 비활성") : ""}
                   </span>
                   <span className="flex shrink-0 gap-1">
-                    <button type="button" className={ORDER_BUTTON} style={ORDER_BUTTON_STYLE} disabled={index === 0} onClick={() => moveServerProvider(id, -1)} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "ko", "{v0} 위로"), { v0: String(id) })}>↑</button>
-                    <button type="button" className={ORDER_BUTTON} style={ORDER_BUTTON_STYLE} disabled={index === routing.serverProviderOrder.length - 1} onClick={() => moveServerProvider(id, 1)} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "ko", "{v0} 아래로"), { v0: String(id) })}>↓</button>
+                    <button type="button" className={ORDER_BUTTON} style={ORDER_BUTTON_STYLE} disabled={index === 0} onClick={() => moveServerProvider(id, -1)} aria-label={`${id} 위로`}>↑</button>
+                    <button type="button" className={ORDER_BUTTON} style={ORDER_BUTTON_STYLE} disabled={index === routing.serverProviderOrder.length - 1} onClick={() => moveServerProvider(id, 1)} aria-label={`${id} 아래로`}>↓</button>
                   </span>
                 </div>
               );

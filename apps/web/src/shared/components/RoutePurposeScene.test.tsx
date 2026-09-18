@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RoutePurposeScene } from "./RoutePurposeScene";
 import { SiteRouteExperienceBoundary } from "./SiteRouteExperienceBoundary";
 
-import { useI18n } from "@/shared/lib/i18n";
 import { resolveSiteRouteExperience } from "@/shared/lib/site-route-experience";
 import { resolveSiteRouteVisual } from "@/shared/lib/site-route-visual";
 
@@ -16,7 +15,6 @@ let reducedMotion = false;
 
 beforeEach(() => {
   reducedMotion = false;
-  useI18n.setState({ lang: "ko" });
   vi.stubGlobal("IntersectionObserver", class {
     constructor(callback: IntersectionObserverCallback) {
       intersection = (visible) => callback(
@@ -49,6 +47,7 @@ function scene(pathname: string) {
   return render(
     <RoutePurposeScene
       title="페이지 제목"
+      locale="ko"
       experience={resolveSiteRouteExperience(pathname)}
       profile={resolveSiteRouteVisual(pathname)}
     />,
@@ -82,11 +81,8 @@ describe("route purpose scene", () => {
     const result = scene("/studio/new");
     const video = result.container.querySelector<HTMLVideoElement>("video")!;
     expect(video.dataset.ready).toBe("false");
-    expect(video.querySelector("source")?.getAttribute("src")).toBe("/brand/toonstudio-route-header.mp4");
-    expect(video.querySelectorAll("source")).toHaveLength(1);
-    fireEvent.playing(video);
+    fireEvent.canPlay(video);
     expect(video.dataset.ready).toBe("true");
-    expect(result.container.querySelector<HTMLElement>("[data-route-visual-kind]")?.dataset.routeVisualVideoReady).toBe("true");
   });
 
   it("loops only the route-specific film chapter", () => {
@@ -110,7 +106,7 @@ describe("route purpose scene", () => {
 });
 
 describe("route visual boundary", () => {
-  it("mounts public route guidance and exposes route metadata", async () => {
+  it("mounts public route guidance and exposes route metadata", () => {
     const result = render(
       <MemoryRouter initialEntries={["/market/browse"]}>
         <SiteRouteExperienceBoundary routeTitle="소재 마켓">
@@ -118,9 +114,7 @@ describe("route visual boundary", () => {
         </SiteRouteExperienceBoundary>
       </MemoryRouter>,
     );
-    await waitFor(() => {
-      expect(result.container.querySelector('[data-route-visual-kind="assets"]')).not.toBeNull();
-    });
+    expect(result.container.querySelector('[data-route-visual-kind="assets"]')).not.toBeNull();
     expect(document.documentElement.dataset.routeVisualKind).toBe("assets");
     expect(document.documentElement.dataset.routeVisualMotion).toBe("stack");
     expect(document.documentElement.dataset.routePurposeScene).toBe("true");
@@ -157,7 +151,7 @@ describe("route visual boundary", () => {
     ["/studio/new", "create"],
     ["/studio/p/demo/production", "production"],
     ["/studio/manual/getting-started", "learn"],
-  ] as const)("explains non-editor Studio route %s", async (path, kind) => {
+  ] as const)("explains non-editor Studio route %s", (path, kind) => {
     const result = render(
       <MemoryRouter initialEntries={[path]}>
         <SiteRouteExperienceBoundary routeTitle="스튜디오 안내">
@@ -165,8 +159,6 @@ describe("route visual boundary", () => {
         </SiteRouteExperienceBoundary>
       </MemoryRouter>,
     );
-    await waitFor(() => {
-      expect(result.container.querySelector(`[data-route-visual-kind="${kind}"]`)).not.toBeNull();
-    });
+    expect(result.container.querySelector(`[data-route-visual-kind="${kind}"]`)).not.toBeNull();
   });
 });

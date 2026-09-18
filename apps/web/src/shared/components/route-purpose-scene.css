@@ -161,8 +161,9 @@
   border-radius: 1.1rem;
   background: var(--color-raised);
   box-shadow: 0 1.3rem 2.8rem -2rem color-mix(in oklch, var(--route-scene-accent) 62%, transparent);
-  transform: none;
-  will-change: auto;
+  transform: rotateY(-8deg) rotateX(2deg) translateZ(0);
+  transform-origin: 45% 50%;
+  will-change: transform;
 }
 
 .route-purpose-scene__media::after {
@@ -182,24 +183,16 @@
   height: 100%;
   max-width: none;
   object-fit: cover;
+  filter: saturate(0.88) contrast(1.04);
 }
 
-.route-purpose-scene__media img { filter: saturate(0.9) contrast(1.025); }
-
 .route-purpose-scene__media video {
-  filter: none;
   z-index: 1;
   opacity: 0;
   transition: opacity 240ms ease;
 }
 .route-purpose-scene__media video[data-ready="true"] { opacity: 1; }
 .route-purpose-scene__media::after, .route-purpose-scene__scan { z-index: 2; }
-
-.route-purpose-scene[data-route-visual-video-ready="true"] .route-purpose-scene__media::after {
-  background:
-    linear-gradient(90deg, color-mix(in oklch, var(--color-panel) 28%, transparent), transparent 20%),
-    linear-gradient(0deg, color-mix(in oklch, var(--color-canvas) 30%, transparent), transparent 46%);
-}
 
 .route-purpose-scene__scan {
   position: absolute;
@@ -313,6 +306,9 @@
 .route-purpose-scene__motion-toggle:hover { border-color: var(--route-scene-accent); color: var(--route-scene-accent); }
 .route-purpose-scene__motion-toggle:focus-visible { outline: 3px solid var(--route-scene-accent); outline-offset: 3px; }
 
+.route-purpose-scene[data-route-visual-running="true"] .route-purpose-scene__media {
+  animation: route-purpose-media-float 8s ease-in-out infinite alternate;
+}
 .route-purpose-scene[data-route-visual-running="true"] .route-purpose-scene__focus-ring {
   animation: route-purpose-focus-pulse 3.8s ease-in-out infinite alternate;
 }
@@ -327,6 +323,7 @@
 }
 
 .route-purpose-scene[data-route-visual-motion="storyboard"] .route-purpose-scene__cards { animation-duration: 5.4s; }
+.route-purpose-scene[data-route-visual-motion="camera"] .route-purpose-scene__media { animation-name: route-purpose-camera; animation-duration: 9s; }
 .route-purpose-scene[data-route-visual-motion="stack"] .route-purpose-scene__cards { animation-name: route-purpose-stack; animation-duration: 7.5s; }
 .route-purpose-scene[data-route-visual-motion="timeline"] .route-purpose-scene__scan { width: 9%; animation-duration: 3.8s; }
 .route-purpose-scene[data-route-visual-motion="signal"] .route-purpose-scene__focus-ring { animation-duration: 2.4s; }
@@ -336,6 +333,14 @@
 @keyframes route-purpose-scene-enter {
   from { opacity: 0; translate: 0 0.65rem; }
   to { opacity: 1; translate: 0 0; }
+}
+@keyframes route-purpose-media-float {
+  from { transform: rotateY(-8deg) rotateX(2deg) translate3d(0, 0, 0); }
+  to { transform: rotateY(-4deg) rotateX(-1deg) translate3d(-0.6rem, -0.25rem, 1rem); }
+}
+@keyframes route-purpose-camera {
+  from { transform: rotateY(-10deg) rotateX(3deg) translate3d(0, 0, 0) scale(1.01); }
+  to { transform: rotateY(-2deg) rotateX(-2deg) translate3d(-0.8rem, -0.2rem, 1.2rem) scale(1.035); }
 }
 @keyframes route-purpose-focus-pulse {
   to { scale: 1.07; box-shadow: 0 0 0 0.85rem color-mix(in oklch, var(--route-scene-accent) 7%, transparent); }
@@ -350,6 +355,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .route-purpose-scene:hover .route-purpose-scene__media { transform: rotateY(-3deg) rotateX(0) translateZ(1.3rem); }
   .route-purpose-scene:hover .route-purpose-scene__cards { transform: translateZ(calc(var(--route-scene-depth) * 1.45)); }
 }
 
@@ -361,7 +367,7 @@
   }
   .route-purpose-scene__copy { padding: 1.15rem 4.35rem 0.9rem 1.1rem; }
   .route-purpose-scene__visual,
-  .route-purpose-scene-shell[data-density="compact"] .route-purpose-scene__visual { min-height: clamp(10.5rem, 49vw, 12rem); }
+  .route-purpose-scene-shell[data-density="compact"] .route-purpose-scene__visual { min-height: 8.6rem; }
   .route-purpose-scene__media { inset: 0.2rem 0.7rem 0.75rem; transform: none; }
   .route-purpose-scene__media::after { background: linear-gradient(0deg, color-mix(in oklch, var(--color-canvas) 62%, transparent), transparent 70%); }
   .route-purpose-scene__focus-ring { right: auto; left: 1.35rem; width: 3.1rem; }

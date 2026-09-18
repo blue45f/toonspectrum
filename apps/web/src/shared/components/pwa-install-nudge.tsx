@@ -26,6 +26,8 @@ const bi = <T,>(ko: T, en: T): T =>
 
 import "./pwa-install-nudge.css";
 
+import "./pwa-install-nudge.css";
+
 const INSTALL_NUDGE_SESSION_KEY = "toonstudio:pwa-install-nudge-dismissed";
 
 function readInstallNudgeDismissal(): boolean {
