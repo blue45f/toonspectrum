@@ -18,6 +18,7 @@ import {
   Server,
   Share2,
   ShieldCheck,
+  UserRound,
   Users,
   WifiOff,
 } from "lucide-react";
@@ -70,6 +71,12 @@ import { getStudioTeam, type StudioTeamSnapshot } from "../studio-team-client";
 
 import { getMyProfile, type MeProfile } from "@/infrastructure/me-client";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import {
+  GLOBAL_CREATOR_ROLE_WORKSPACE_KEY,
+  creatorCollaborationUiEnabled,
+  resolveCreatorCollaborationLevel,
+} from "@/shared/lib/creator-role-workspace-contract";
+import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
 import { cn } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 
@@ -321,6 +328,11 @@ function StudioProductionHubWorkspace({
   >(null);
   const [teamSnapshot, setTeamSnapshot] = useState<StudioTeamSnapshot | null>(null);
   const [myProfile, setMyProfile] = useState<MeProfile | null>(null);
+  const roleWorkspace = useCreatorRoleWorkspace(
+    GLOBAL_CREATOR_ROLE_WORKSPACE_KEY,
+    myProfile?.creatorRoleProfile,
+    myProfile !== null,
+  );
   const capabilities = useMemo(() => {
     const base = studioProductionWorkspaceCapabilities(mode);
     if (mode !== "server-work" || !serverCapabilities) return base;
@@ -340,6 +352,29 @@ function StudioProductionHubWorkspace({
     [mode, scope.key],
   );
   const [workspace, setWorkspace] = useState<ProductionWorkspace>(initial);
+  const collaborationLevel = useMemo(() => resolveCreatorCollaborationLevel({
+    collaborationMode: roleWorkspace.snapshot.document.collaborationMode,
+    workspaceMode: roleWorkspace.snapshot.document.workspaceMode,
+    serverBacked: mode === "server-work",
+    memberCount: Math.max(
+      workspace.members.length,
+      teamSnapshot?.members.filter((member) => member.status === "active").length ?? 0,
+    ),
+  }), [
+    mode,
+    roleWorkspace.snapshot.document.collaborationMode,
+    roleWorkspace.snapshot.document.workspaceMode,
+    teamSnapshot,
+    workspace.members.length,
+  ]);
+  const showCollaborationUi =
+    mode === "demo" || creatorCollaborationUiEnabled(collaborationLevel);
+  const navigationSurfaces = useMemo(
+    () => showCollaborationUi
+      ? STUDIO_PRODUCTION_SURFACES
+      : STUDIO_PRODUCTION_SURFACES.filter((item) => item !== "join"),
+    [showCollaborationUi],
+  );
   const [persistence, setPersistence] = useState<PersistenceState>(
     mode === "demo" ? "demo" : "loading",
   );
@@ -578,14 +613,14 @@ function StudioProductionHubWorkspace({
         return;
       }
       if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-      const next = STUDIO_PRODUCTION_SURFACES[Number(event.key) - 1];
+      const next = navigationSurfaces[Number(event.key) - 1];
       if (!next) return;
       event.preventDefault();
       void navigate(surfaceHref(next, scope));
     };
     globalThis.addEventListener("keydown", handler);
     return () => globalThis.removeEventListener("keydown", handler);
-  }, [navigate, scope]);
+  }, [navigate, navigationSurfaces, scope]);
 
   useEffect(() => {
     const previous = document.title;
@@ -697,6 +732,7 @@ function StudioProductionHubWorkspace({
       data-studio-production-command-center
       data-scope-key={scope.key}
       data-workspace-mode={mode}
+      data-collaboration-level={collaborationLevel}
     >
       <header className="sticky top-0 z-40 border-b border-line bg-bg/92 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1920px] flex-wrap items-center gap-3 px-3 py-2 sm:px-5">
@@ -747,7 +783,7 @@ function StudioProductionHubWorkspace({
           aria-label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "프로젝트 메뉴")}
         >
           <div className="flex min-w-max gap-1">
-            {STUDIO_PRODUCTION_SURFACES.map((item, index) => {
+            {navigationSurfaces.map((item, index) => {
               const meta = SURFACE_META[item];
               const Icon = meta.icon;
               const active = item === surface;
@@ -776,6 +812,17 @@ function StudioProductionHubWorkspace({
       <div className="mx-auto max-w-[1920px] space-y-4 px-3 py-4 sm:px-5 sm:py-5">
         <ModeNotice mode={mode} />
 
+        {!showCollaborationUi && mode !== "demo" ? (
+          <div
+            className="rounded-xl border border-line bg-panel px-3 py-2.5 text-xs leading-relaxed text-fg-2"
+            data-solo-workspace-notice
+            role="status"
+          >
+            <UserRound className="mr-2 inline size-4 text-accent" aria-hidden="true" />
+            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "개인 작업 중심으로 협업 UI를 간소화했습니다. 공유는 계속 사용할 수 있고, 실제 팀 프로젝트에 참여하면 참여자·역할·협업 동선이 자동으로 다시 표시됩니다.")}
+          </div>
+        ) : null}
+
         {loadError ? (
           <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm" role="alert">
             <p className="font-bold">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "저장된 제작 운영 데이터를 안전하게 열지 못했습니다.")}</p>
@@ -801,7 +848,10 @@ function StudioProductionHubWorkspace({
           </div>
         ) : null}
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className={cn(
+          "grid gap-3 sm:grid-cols-2",
+          showCollaborationUi ? "xl:grid-cols-4" : "xl:grid-cols-3",
+        )}>
           <Metric
             label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "진행률")}
             value={`${progress}%`}
@@ -822,11 +872,13 @@ function StudioProductionHubWorkspace({
             detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "중요 {v0} · 일반 {v1}"), { v0: String(openBlockers), v1: String(openMajor) })}
             tone={openBlockers > 0 ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "danger") : openMajor > 0 ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "warning") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "en", "success")}
           />
-          <Metric
-            label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "참여자")}
-            value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}명"), { v0: String(workspace.members.length) })}
-            detail={capabilities.serverAuthoritative ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "팀 권한에 따라 표시") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "이 기기의 프로젝트 정보")}
-          />
+          {showCollaborationUi ? (
+            <Metric
+              label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "참여자")}
+              value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}명"), { v0: String(workspace.members.length) })}
+              detail={capabilities.serverAuthoritative ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "팀 권한에 따라 표시") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "이 기기의 프로젝트 정보")}
+            />
+          ) : null}
         </div>
 
         {surface === "projects" ? (
