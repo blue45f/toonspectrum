@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * ChangelogDesk 네이티브 통합 — 인앱 "What's new" 체인지로그.
  * ──────────────────────────────────────────────────────────────────────────
@@ -177,13 +181,12 @@ export function NativeChangelog() {
           ref={launcherRef}
           type="button"
           aria-haspopup="dialog"
-          aria-label={unread > 0 ? `새 소식 ${unread}건` : "새 소식"}
+          aria-label={unread > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("components.deskcloud.native.NativeChangelog", "ko", "새 소식 {v0}건"), { v0: String(unread) }) : translateCurrentStaticSourceText("components.deskcloud.native.NativeChangelog", "ko", "새 소식")}
           onClick={openDialog}
           className="fixed bottom-6 right-4 z-[88] inline-flex items-center gap-2 rounded-full border border-line bg-card/95 px-3.5 py-2 text-sm font-medium text-fg-2 shadow-lg backdrop-blur transition-[color,border-color,transform] duration-150 ease-out-expo hover:-translate-y-0.5 hover:border-accent/60 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas motion-reduce:transition-none motion-reduce:hover:translate-y-0"
         >
           <Sparkles size={15} aria-hidden="true" />
-          새 소식
-          {unread > 0 && (
+          {translateCurrentStaticSourceText("components.deskcloud.native.NativeChangelog", "ko", "새 소식")}{unread > 0 && (
             <span className="ml-0.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-accent px-1.5 py-0.5 text-[0.6875rem] font-bold leading-none text-on-accent tabular-nums">
               {unread > 99 ? "99+" : unread}
             </span>
@@ -209,11 +212,10 @@ export function NativeChangelog() {
             <header className="flex items-center gap-2.5 border-b border-line px-5 py-4">
               <Sparkles size={18} className="text-accent" aria-hidden="true" />
               <h2 id={titleId} className="flex-1 text-base font-bold tracking-tight text-fg">
-                새 소식
-              </h2>
+                {translateCurrentStaticSourceText("components.deskcloud.native.NativeChangelog", "ko", "새 소식")}</h2>
               <button
                 type="button"
-                aria-label="닫기"
+                aria-label={translateCurrentStaticSourceText("components.deskcloud.native.NativeChangelog", "ko", "닫기")}
                 onClick={closeDialog}
                 className="-mr-1.5 flex size-8 shrink-0 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80"
               >
@@ -239,11 +241,10 @@ export function NativeChangelog() {
                   <span className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-bad/15 text-bad">
                     <Megaphone size={24} aria-hidden="true" />
                   </span>
-                  <p className="text-sm text-fg-2">소식을 불러오지 못했어요.</p>
+                  <p className="text-sm text-fg-2">{translateCurrentStaticSourceText("components.deskcloud.native.NativeChangelog", "ko", "소식을 불러오지 못했어요.")}</p>
                   <div className="mt-4">
                     <Button size="sm" onClick={load}>
-                      다시 시도
-                    </Button>
+                      {translateCurrentStaticSourceText("components.deskcloud.native.NativeChangelog", "ko", "다시 시도")}</Button>
                   </div>
                 </div>
               )}
@@ -253,7 +254,7 @@ export function NativeChangelog() {
                   <span className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-raised text-fg-3">
                     <Sparkles size={24} aria-hidden="true" />
                   </span>
-                  <p className="text-sm text-fg-2">아직 게시된 소식이 없어요.</p>
+                  <p className="text-sm text-fg-2">{translateCurrentStaticSourceText("components.deskcloud.native.NativeChangelog", "ko", "아직 게시된 소식이 없어요.")}</p>
                 </div>
               )}
 

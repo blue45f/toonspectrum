@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   Check,
@@ -90,6 +91,7 @@ const CHANNEL_CLASS =
 export interface ShareDialogProps {
   readonly payload: SharePayload;
   readonly trigger: ReactElement;
+  readonly defaultOpen?: boolean;
 }
 
 function shareHost(url: string): string {
@@ -100,9 +102,9 @@ function shareHost(url: string): string {
   }
 }
 
-export function ShareDialog({ payload, trigger }: ShareDialogProps) {
+export function ShareDialog({ payload, trigger, defaultOpen = false }: ShareDialogProps) {
   const t = useT();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState<"native" | "kakao" | "qr" | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -125,7 +127,7 @@ export function ShareDialog({ payload, trigger }: ShareDialogProps) {
     setNotice(null);
     try {
       await nativeShare(payload);
-      emitShareEvent("native", "success", payload);
+      emitShareEvent("native", "completed", payload);
       setNotice({ kind: "success", message: t("share.status.shared") });
     } catch (error) {
       if (isShareCancellation(error)) {
@@ -145,7 +147,7 @@ export function ShareDialog({ payload, trigger }: ShareDialogProps) {
     setNotice(null);
     try {
       await shareWithKakao(payload);
-      emitShareEvent("kakao", "success", payload);
+      emitShareEvent("kakao", "opened", payload);
       setNotice({ kind: "success", message: t("share.status.kakaoOpened") });
     } catch {
       emitShareEvent("kakao", "failed", payload);
@@ -158,7 +160,7 @@ export function ShareDialog({ payload, trigger }: ShareDialogProps) {
   async function copyLink() {
     setNotice(null);
     const copied = await copyShareLink(payload);
-    emitShareEvent("copy", copied ? "success" : "failed", payload);
+    emitShareEvent("copy", copied ? "completed" : "failed", payload);
     setNotice({
       kind: copied ? "success" : "error",
       message: t(copied ? "share.status.copied" : "share.status.copyFailed"),
@@ -166,7 +168,7 @@ export function ShareDialog({ payload, trigger }: ShareDialogProps) {
   }
 
   function recordLinkShare(channel: LinkShareChannel) {
-    emitShareEvent(channel, "success", payload);
+    emitShareEvent(channel, "opened", payload);
     setNotice({
       kind: "success",
       message: t(
@@ -194,7 +196,7 @@ export function ShareDialog({ payload, trigger }: ShareDialogProps) {
       });
       setQrDataUrl(dataUrl);
       setQrVisible(true);
-      emitShareEvent("qr", "success", payload);
+      emitShareEvent("qr", "opened", payload);
     } catch {
       emitShareEvent("qr", "failed", payload);
       setNotice({ kind: "error", message: t("share.status.qrFailed") });
@@ -303,8 +305,8 @@ export function ShareDialog({ payload, trigger }: ShareDialogProps) {
                 <a
                   key={option.channel}
                   href={shareTargetUrl(option.channel, payload)}
-                  target={email ? undefined : "_blank"}
-                  rel={email ? undefined : "noopener noreferrer"}
+                  target={email ? undefined : translateCurrentStaticSourceText("shared.components.share.dialog", "en", "_blank")}
+                  rel={email ? undefined : translateCurrentStaticSourceText("shared.components.share.dialog", "en", "noopener noreferrer")}
                   onClick={() => recordLinkShare(option.channel)}
                   className={CHANNEL_CLASS}
                 >
@@ -375,7 +377,7 @@ export function ShareDialog({ payload, trigger }: ShareDialogProps) {
 
           {notice && (
             <p
-              role={notice.kind === "error" ? "alert" : "status"}
+              role={notice.kind === "error" ? translateCurrentStaticSourceText("shared.components.share.dialog", "en", "alert") : translateCurrentStaticSourceText("shared.components.share.dialog", "en", "status")}
               aria-live="polite"
               className={cn(
                 "mt-4 rounded-xl border px-3 py-2 text-xs font-medium",

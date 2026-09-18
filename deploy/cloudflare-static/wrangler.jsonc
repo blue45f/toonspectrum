@@ -18,8 +18,21 @@
       "/market",
       "/market/browse",
       "/market/resource/*",
+      "/create/*",
+      "/showcase/work/*",
+      "/showcase/series/*",
+      "/u/*",
+      "/author/*",
+      "/community/post/*",
+      "/community/cafes/*",
+      "/pencafe/*",
+      "/collaborate/*",
+      "/community/promote/*",
+      "/ranking",
+      "/play",
       "/assets/opencascade.wasm-*.wasm",
-      "/assets/studio/cc0-20260906/assets/polyhaven-modular-street-seating/modular_street_seating.glb"
+      "/assets/studio/cc0-20260906/assets/polyhaven-modular-street-seating/modular_street_seating.glb",
+      "/brand/toonstudio-product-tour.mp4"
     ]
   },
   "r2_buckets": [

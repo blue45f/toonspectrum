@@ -1,3 +1,6 @@
+import {
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -16,9 +19,10 @@ import { readStudioSubmissions } from "../save-first/studio-submission-store";
 import {
   ensureInitialStudioProjectDocument,
   readStudioProjectDocuments,
-  studioProjectDocumentHref,
   studioProjectDocumentStorageKey,
 } from "../studio-project-document-store";
+import { removeStudioExactResumeContext } from "../studio-exact-resume-context";
+import { resolveStudioProjectResumeTarget } from "../studio-project-resume-target";
 import {
   activateStudioProjectsBulk,
   archiveStudioProjectsBulk,
@@ -38,6 +42,14 @@ import {
 } from "./studio-project-library-management-model";
 import { useStudioProjectLibrary } from "./useStudioProjectLibrary";
 import { useStudioSaveProfiles } from "./useStudioSaveProfiles";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("useStudioProjectLibraryManagementController", ko, en);
 
 export interface StudioProjectLibraryNoticeState {
   readonly message: string;
@@ -51,6 +63,7 @@ export interface StudioProjectLibraryDeleteRequest {
 }
 
 export function useStudioProjectLibraryManagementController() {
+  useBilingualI18nRevision();
   const [searchParams] = useSearchParams();
   const { data: session } = useSession();
   const language = useI18n((state) => state.lang);
@@ -139,13 +152,13 @@ export function useStudioProjectLibraryManagementController() {
     setSelectedIds(new Set());
     if (result.affectedIds.length === 0) {
       setNotice({
-        message: locale === "ko" ? "변경할 수 있는 프로젝트가 없습니다." : "There are no eligible projects to change.",
+        message: bi("변경할 수 있는 프로젝트가 없습니다.", "There are no eligible projects to change."),
       });
       return;
     }
     setNotice({
       message: successMessage,
-      actionLabel: undo ? (locale === "ko" ? "실행 취소" : "Undo") : undefined,
+      actionLabel: undo ? (bi("실행 취소", "Undo")) : undefined,
       action: undo,
     });
   };
@@ -155,15 +168,11 @@ export function useStudioProjectLibraryManagementController() {
     const result = archiveStudioProjectsBulk(window.localStorage, ids, { target: window });
     showBulkResult(
       result,
-      locale === "ko"
-        ? `${result.affectedIds.length}개 프로젝트를 보관함으로 옮겼습니다.`
-        : `Archived ${result.affectedIds.length} project(s).`,
+      formatI18nTemplate(String(bi("{value0}개 프로젝트를 보관함으로 옮겼습니다.", "Archived {value0} project(s).")), { value0: result.affectedIds.length }),
       () => {
         const undone = activateStudioProjectsBulk(window.localStorage, result.affectedIds, { target: window });
         setNotice({
-          message: locale === "ko"
-            ? `${undone.affectedIds.length}개 프로젝트를 내 작업으로 되돌렸습니다.`
-            : `Returned ${undone.affectedIds.length} project(s) to My work.`,
+          message: formatI18nTemplate(String(bi("{value0}개 프로젝트를 내 작업으로 되돌렸습니다.", "Returned {value0} project(s) to My work.")), { value0: undone.affectedIds.length }),
         });
       },
     );
@@ -174,15 +183,11 @@ export function useStudioProjectLibraryManagementController() {
     const result = trashStudioProjectsBulk(window.localStorage, ids, { target: window });
     showBulkResult(
       result,
-      locale === "ko"
-        ? `${result.affectedIds.length}개 프로젝트를 휴지통으로 옮겼습니다.`
-        : `Moved ${result.affectedIds.length} project(s) to Trash.`,
+      formatI18nTemplate(String(bi("{value0}개 프로젝트를 휴지통으로 옮겼습니다.", "Moved {value0} project(s) to Trash.")), { value0: result.affectedIds.length }),
       () => {
         const undone = restoreStudioProjectsBulk(window.localStorage, result.affectedIds, { target: window });
         setNotice({
-          message: locale === "ko"
-            ? `${undone.affectedIds.length}개 프로젝트를 원래 위치로 복구했습니다.`
-            : `Restored ${undone.affectedIds.length} project(s) to their previous location.`,
+          message: formatI18nTemplate(String(bi("{value0}개 프로젝트를 원래 위치로 복구했습니다.", "Restored {value0} project(s) to their previous location.")), { value0: undone.affectedIds.length }),
         });
       },
     );
@@ -195,17 +200,13 @@ export function useStudioProjectLibraryManagementController() {
       : restoreStudioProjectsBulk(window.localStorage, ids, { target: window });
     showBulkResult(
       result,
-      locale === "ko"
-        ? `${result.affectedIds.length}개 프로젝트를 복구했습니다.`
-        : `Restored ${result.affectedIds.length} project(s).`,
+      formatI18nTemplate(String(bi("{value0}개 프로젝트를 복구했습니다.", "Restored {value0} project(s).")), { value0: result.affectedIds.length }),
       () => {
         const undone = view === "archived"
           ? archiveStudioProjectsBulk(window.localStorage, result.affectedIds, { target: window })
           : trashStudioProjectsBulk(window.localStorage, result.affectedIds, { target: window });
         setNotice({
-          message: locale === "ko"
-            ? `${undone.affectedIds.length}개 프로젝트를 이전 위치로 되돌렸습니다.`
-            : `Moved ${undone.affectedIds.length} project(s) back.`,
+          message: formatI18nTemplate(String(bi("{value0}개 프로젝트를 이전 위치로 되돌렸습니다.", "Moved {value0} project(s) back.")), { value0: undone.affectedIds.length }),
         });
       },
     );
@@ -217,15 +218,17 @@ export function useStudioProjectLibraryManagementController() {
     if (result.affectedIds.length > 0) {
       removeStudioSaveProfilesBulk(window.localStorage, result.affectedIds, { target: window });
       for (const projectId of result.affectedIds) {
+        const documents = readStudioProjectDocuments(window.localStorage, projectId).documents;
+        for (const document of documents) {
+          removeStudioExactResumeContext(window.localStorage, projectId, document.id);
+        }
         window.localStorage.removeItem(studioProjectDocumentStorageKey(projectId));
       }
     }
     setDeleteRequest(null);
     setSelectedIds(new Set());
     setNotice({
-      message: locale === "ko"
-        ? `${result.affectedIds.length}개 프로젝트를 완전히 삭제했습니다.`
-        : `Permanently deleted ${result.affectedIds.length} project(s).`,
+      message: formatI18nTemplate(String(bi("{value0}개 프로젝트를 완전히 삭제했습니다.", "Permanently deleted {value0} project(s).")), { value0: result.affectedIds.length }),
     });
   };
 
@@ -246,9 +249,7 @@ export function useStudioProjectLibraryManagementController() {
       createVersions: true,
     });
     setNotice({
-      message: locale === "ko"
-        ? `“${project.title}”의 임시 복사본을 만들었습니다.`
-        : `Created a temporary copy of “${project.title}”.`,
+      message: formatI18nTemplate(String(bi("“{value0}”의 임시 복사본을 만들었습니다.", "Created a temporary copy of “{value0}”.")), { value0: project.title }),
     });
   };
 
@@ -288,19 +289,13 @@ export function useStudioProjectLibraryManagementController() {
       setSaveTarget(null);
       setNotice({
         message: method === "file-picker"
-          ? locale === "ko"
-            ? `“${project.title}”을 선택한 파일·동기화 폴더에 저장했습니다.`
-            : `Saved “${project.title}” to the selected file or synced folder.`
-          : locale === "ko"
-            ? `“${project.title}” 프로젝트 파일을 다운로드했습니다.`
-            : `Downloaded the “${project.title}” project file.`,
+          ? formatI18nTemplate(String(bi("“{value0}”을 선택한 파일·동기화 폴더에 저장했습니다.", "Saved “{value0}” to the selected file or synced folder.")), { value0: project.title })
+          : formatI18nTemplate(String(bi("“{value0}” 프로젝트 파일을 다운로드했습니다.", "Downloaded the “{value0}” project file.")), { value0: project.title }),
       });
     } catch (cause) {
       if (!(cause instanceof DOMException && cause.name === "AbortError")) {
         setNotice({
-          message: locale === "ko"
-            ? "프로젝트 파일을 저장하지 못했습니다. 임시 자동저장본은 그대로 유지됩니다."
-            : "The project file could not be saved. The temporary autosave remains intact.",
+          message: bi("프로젝트 파일을 저장하지 못했습니다. 임시 자동저장본은 그대로 유지됩니다.", "The project file could not be saved. The temporary autosave remains intact."),
         });
       }
     } finally {
@@ -312,19 +307,20 @@ export function useStudioProjectLibraryManagementController() {
     `/studio/p/${encodeURIComponent(project.id)}/overview`
   );
 
-  const continueProjectHref = (project: StudioProjectLibraryEntry): string => {
-    const fallback = projectOverviewHref(project);
-    if (typeof window === "undefined") return fallback;
-    const documents = readStudioProjectDocuments(window.localStorage, project.id).documents;
-    const document = documents.find((candidate) => candidate.id === project.lastOpenedDocumentId)
-      ?? documents.find((candidate) => candidate.status === "active");
-    if (!document) return fallback;
-    try {
-      return studioProjectDocumentHref(document);
-    } catch {
-      return fallback;
+  const projectResumeTarget = (project: StudioProjectLibraryEntry) => {
+    if (typeof window === "undefined") {
+      return {
+        href: projectOverviewHref(project),
+        documentId: project.lastOpenedDocumentId,
+        summary: null,
+        exact: false,
+      };
     }
+    return resolveStudioProjectResumeTarget(window.localStorage, project, locale);
   };
+  const continueProjectHref = (project: StudioProjectLibraryEntry): string => (
+    projectResumeTarget(project).href
+  );
   return {
     locale,
     authUserId,
@@ -360,6 +356,7 @@ export function useStudioProjectLibraryManagementController() {
     duplicateProject,
     savePackage,
     projectOverviewHref,
+    projectResumeTarget,
     continueProjectHref,
   };
 }

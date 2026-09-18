@@ -72,6 +72,7 @@ describe("Upstash QStash durable queue configuration", () => {
       resolveUpstashQStashConfig({
         ...enabledEnvironment,
         BACKEND_UPSTASH_QSTASH_API_BASE_URL:
+          // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic userinfo rejection fixture
           "https://user:secret@qstash.upstash.io",
       })
     ).toThrow(UpstashQStashConfigurationError);

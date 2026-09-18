@@ -168,6 +168,46 @@ ToonSpectrum은 비공개 이메일 조회에 필요한 `user:email`만 요청�
 `/user/emails`에서 `verified=true`인 주소만 사용하고, 그중 `primary=true`를 우선한다.
 검증 이메일이 없으면 GitHub 사용자 ID 기반 별도 계정을 만든다. 로그인 완료 후 access/refresh token은 저장하지 않는다.
 
+## Apple 로그인
+
+### Services ID / 웹 Return URL 설정
+
+1. Apple Developer의 기본 App ID에서 **Sign in with Apple**을 활성화한다.
+2. 웹 로그인용 **Services ID**를 만들고 기본 App ID와 연결한다.
+3. Services ID의 웹 설정에 도메인 `www.toonstudio.cloud`를 등록한다.
+4. Return URL은 다음 값을 정확히 등록한다.
+
+```text
+https://www.toonstudio.cloud/api/auth/oauth/apple/callback
+```
+
+5. Sign in with Apple 권한이 연결된 private key를 만들고 `.p8` 파일을 안전하게 보관한다.
+6. Services ID, Team ID, Key ID와 private key를 Core API secret store에 저장한다.
+
+```dotenv
+APPLE_SERVICE_ID=<Services ID>
+APPLE_TEAM_ID=<10-character Team ID>
+APPLE_KEY_ID=<10-character Key ID>
+APPLE_PRIVATE_KEY=<PKCS8 .p8 PEM; vault에서는 줄바꿈을 \n으로 이스케이프 가능>
+```
+
+ToonSpectrum은 Apple 웹 authorize 요청에 `scope=name email`, `response_mode=form_post`, 브라우저 세션에서
+파생한 SHA-256 nonce를 사용한다. Apple의 cross-site POST가 상태 쿠키를 전달할 수 있도록 **Apple provider의
+OAuth state 쿠키에만** `SameSite=None; Secure; HttpOnly`를 적용하고 일반 인증 세션은 기존
+`SameSite=Lax`를 유지한다. 기존 계정에 Apple 로그인을 추가 연결할 때만 같은 provider 경로의
+10분짜리 HttpOnly 재인증 증명 쿠키를 사용한다.
+
+서버는 Team ID/Key ID/Services ID와 `.p8` 키로 짧은 수명의 ES256 client-secret을 생성해
+authorization code를 Apple token endpoint에서 교환한다. 반환된 ID token은 Apple RSA JWKS로
+서명을 검증하고 `iss`, `aud`, `iat`, `exp`, `nonce`를 모두 확인한다. 사용자 정본은
+변경 가능한 이메일이 아니라 **Apple `sub`** 이며, `privaterelay.appleid.com` 주소도 연락 속성으로만
+취급한다. 이름은 최초 승인 시 form payload에만 올 수 있으므로 제어문자를 제거하고 길이를 제한한 뒤
+프로필 초기값에만 사용한다. 동일 이메일이라는 이유로 기존 ToonSpectrum 계정과 자동 병합하지 않는다.
+
+현재 로그인과 ToonSpectrum 내부 provider 연결/해제에서는 Apple access/refresh token을 DB에 평문으로
+저장하지 않는다. Apple 서버 측 authorization revocation까지 지원하려면 별도의 암호화 refresh-token 저장소와
+revoke 운영 경계를 추가해야 한다.
+
 ## Google 기존 연동
 
 Google은 현재 GIS ID 토큰 흐름을 사용한다. 운영 웹 클라이언트의 승인된 JavaScript origin은
@@ -183,7 +223,7 @@ https://www.toonstudio.cloud/api/auth/oauth/google/callback
 - 기존 값은 보존하고 누락된 변수만 추가한다.
 - Client Secret, `AUTH_STATE_SECRET`, `AUTH_SESSION_SECRET`은 Core API의 encrypted secret store에만 둔다.
 - Client ID도 서버 설정으로 관리하며, Google GIS에 필요한 Client ID만 `/api/auth/providers` 응답에 공개한다.
-- 카카오·네이버·GitHub의 access token과 refresh token은 로그인 후 DB에 저장하지 않는다.
+- 카카오·네이버·GitHub의 access/refresh token과 Apple token-exchange 결과는 로그인 후 DB에 저장하지 않는다.
 - 공급자 토큰으로 신원을 확인한 뒤 ToonSpectrum이 자체 HttpOnly, Secure, SameSite=Lax 세션을 발급한다.
 - 설정 변경은 운영 배포가 아니다. 검토된 SHA의 별도 수동 배포와 canary 승인이 필요하다.
 
@@ -202,7 +242,8 @@ chmod 700 ~/.config/toonstudio ~/.config/toonstudio/secrets
 chmod 600 ~/.config/toonstudio/secrets/oauth-production.env
 ```
 
-파일에는 아래 여섯 항목만 두며 실제 값은 문서, 이슈, PR, 셸 기록에 붙여넣지 않는다.
+파일에는 아래 열 항목만 두며 실제 값은 문서, 이슈, PR, 셸 기록에 붙여넣지 않는다.
+`APPLE_PRIVATE_KEY`는 한 줄 vault 파일을 위해 PEM 줄바꿈을 `\n`으로 이스케이프할 수 있다.
 
 ```dotenv
 KAKAO_REST_API_KEY=<existing value>
@@ -211,6 +252,10 @@ NAVER_OAUTH_CLIENT_ID=<existing value>
 NAVER_OAUTH_CLIENT_SECRET=<existing value>
 GITHUB_OAUTH_CLIENT_ID=<existing value>
 GITHUB_OAUTH_CLIENT_SECRET=<existing value>
+APPLE_SERVICE_ID=<existing value>
+APPLE_TEAM_ID=<existing value>
+APPLE_KEY_ID=<existing value>
+APPLE_PRIVATE_KEY=<existing .p8 value with escaped \n>
 ```
 
 macOS에서는 저장 후 Keychain으로 동기화한다. 스크립트는 값 자체를 출력하지 않고
@@ -236,14 +281,14 @@ pnpm run verify:social-login-production
 pnpm run verify:social-login-production -- --origin=https://www.toonstudio.cloud
 ```
 
-검증기는 `/api/auth/providers`뿐 아니라 카카오·네이버·GitHub 로그인 시작 경로도 직접 확인한다.
-공식 공급자 HTTPS 호스트, 정본 callback, browser-bound state 쿠키, GitHub S256 PKCE,
-카카오 최소 프로필 scope와 이메일 scope 비활성화까지 모두 통과해야 성공한다.
+검증기는 `/api/auth/providers`뿐 아니라 Apple·카카오·네이버·GitHub 로그인 시작 경로도 직접 확인한다.
+공식 공급자 HTTPS 호스트, 정본 callback, browser-bound state 쿠키, Apple `form_post`/nonce/`SameSite=None`,
+GitHub S256 PKCE, 카카오 최소 프로필 scope와 이메일 scope 비활성화까지 모두 통과해야 성공한다.
 
 기대 상태:
 
-- `google.mode`, `kakao.mode`, `naver.mode`, `github.mode`: 모두 `oauth`
-- `kakao.redirectAvailable`, `naver.redirectAvailable`, `github.redirectAvailable`: 모두 `true`
+- `google.mode`, `apple.mode`, `kakao.mode`, `naver.mode`, `github.mode`: 모두 `oauth`
+- `apple.redirectAvailable`, `kakao.redirectAvailable`, `naver.redirectAvailable`, `github.redirectAvailable`: 모두 `true`
 - `google.clientId`: 올바른 GIS Web Client ID이며 Secret 필드는 공개 응답에 없음
 - 네이버 검수 승인 전에는 등록된 개발 계정만 실제 로그인을 완료할 수 있음
 

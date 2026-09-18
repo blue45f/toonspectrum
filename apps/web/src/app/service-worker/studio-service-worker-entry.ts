@@ -20,6 +20,7 @@ import {
   planStudioServiceWorkerCacheTrim,
   staleStudioServiceWorkerCacheNames,
   studioServiceWorkerCacheBucket,
+  studioServiceWorkerPressureAdjustedLimit,
   studioServiceWorkerCacheNames,
   studioServiceWorkerOfflineShellUrl,
   studioServiceWorkerStrategy,
@@ -62,11 +63,18 @@ const putsSinceTrim = new Map<StudioServiceWorkerCacheBucket, number>();
 const TRIM_INTERVAL = 25;
 
 async function trimBucket(cache: Cache, bucket: StudioServiceWorkerCacheBucket): Promise<void> {
-  const limit = RUNTIME_LIMIT_BY_BUCKET[bucket];
-  if (!Number.isFinite(limit)) return;
+  const baseLimit = RUNTIME_LIMIT_BY_BUCKET[bucket];
+  if (!Number.isFinite(baseLimit)) return;
   const pending = (putsSinceTrim.get(bucket) ?? 0) + 1;
   if (pending < TRIM_INTERVAL) { putsSinceTrim.set(bucket, pending); return; }
   putsSinceTrim.set(bucket, 0);
+  let limit = baseLimit;
+  try {
+    const estimate = await scope.navigator.storage?.estimate();
+    limit = studioServiceWorkerPressureAdjustedLimit(baseLimit, estimate?.usage, estimate?.quota);
+  } catch {
+    // StorageManager is advisory; fixed entry limits remain the fallback.
+  }
   const keys = await cache.keys();
   await Promise.all(planStudioServiceWorkerCacheTrim(keys, limit).map((key) => cache.delete(key)));
 }

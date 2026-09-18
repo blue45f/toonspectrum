@@ -13,8 +13,7 @@ import type { Artifact } from "./artifact";
 import type { ProjectId, RevisionId } from "./ids";
 import type { RevisionManifest } from "./revision";
 
-export const projectAuthorityVersionSchema = z.enum(["legacy-v2", "project-graph-v3"]);
-export type ProjectAuthorityVersion = z.infer<typeof projectAuthorityVersionSchema>;
+export type ProjectAuthorityVersion = "legacy-v2" | "project-graph-v3";
 
 export interface LegacyProjectionMetadata {
   readonly snapshotVersion: 2;
@@ -35,7 +34,7 @@ export const projectGraphV3Schema = z
   .object({
     schemaVersion: z.literal(3),
     projectId: studioEntityIdSchema,
-    authorityVersion: projectAuthorityVersionSchema,
+    authorityVersion: z.enum(["legacy-v2", "project-graph-v3"]),
     artifacts: z.record(studioEntityIdSchema, artifactSchema),
     revisions: z.record(studioEntityIdSchema, revisionManifestSchema),
     legacyProjection: z

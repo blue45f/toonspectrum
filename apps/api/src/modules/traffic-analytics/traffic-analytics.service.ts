@@ -18,22 +18,27 @@ import {
   normalizeTrafficReferrerHost,
   normalizeTrafficScreenClass,
   requireTrafficIdentifier,
+  requireTrafficShareChannel,
+  requireTrafficShareOutcome,
   TRAFFIC_DEFAULT_RETENTION_DAYS,
   TRAFFIC_MAX_ENGAGED_SECONDS,
   type TrafficHeartbeatPayload,
   type TrafficPageViewPayload,
   type TrafficRequestContext,
+  type TrafficShareEventPayload,
 } from "./traffic-analytics-model";
 import {
   cleanupExpiredTrafficData,
   persistTrafficHeartbeat,
   persistTrafficPageView,
+  persistTrafficShareEvent,
 } from "./traffic-analytics-store";
 
 const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1_000;
 const RATE_WINDOW_MS = 60_000;
 const MAX_PAGE_VIEWS_PER_SESSION_WINDOW = 120;
 const MAX_HEARTBEATS_PER_SESSION_WINDOW = 4;
+const MAX_SHARES_PER_SESSION_WINDOW = 60;
 const MAX_RATE_LIMIT_ENTRIES = 10_000;
 const MAX_GLOBAL_EVENTS_PER_WINDOW = 5_000;
 
@@ -41,6 +46,7 @@ type RateLimitState = {
   windowStartedAt: number;
   pageViews: number;
   heartbeats: number;
+  shares: number;
 };
 
 function retentionDays(): number {
@@ -90,7 +96,7 @@ export class TrafficAnalyticsService {
 
   private enforceRateLimit(
     sessionHash: string,
-    kind: "page-view" | "heartbeat",
+    kind: "page-view" | "heartbeat" | "share",
   ): void {
     const now = Date.now();
     if (now - this.globalWindowStartedAt >= RATE_WINDOW_MS) {
@@ -116,17 +122,22 @@ export class TrafficAnalyticsService {
 
     const state =
       !current || now - current.windowStartedAt >= RATE_WINDOW_MS
-        ? { windowStartedAt: now, pageViews: 0, heartbeats: 0 }
+        ? { windowStartedAt: now, pageViews: 0, heartbeats: 0, shares: 0 }
         : current;
     if (kind === "page-view") {
       state.pageViews += 1;
       if (state.pageViews > MAX_PAGE_VIEWS_PER_SESSION_WINDOW) {
         throw tooManyRequests("트래픽 수집 요청이 너무 많습니다.");
       }
-    } else {
+    } else if (kind === "heartbeat") {
       state.heartbeats += 1;
       if (state.heartbeats > MAX_HEARTBEATS_PER_SESSION_WINDOW) {
         throw tooManyRequests("트래픽 수집 요청이 너무 많습니다.");
+      }
+    } else {
+      state.shares += 1;
+      if (state.shares > MAX_SHARES_PER_SESSION_WINDOW) {
+        throw tooManyRequests("공유 분석 요청이 너무 많습니다.");
       }
     }
     this.rateLimits.set(sessionHash, state);
@@ -271,6 +282,42 @@ export class TrafficAnalyticsService {
         engagedSeconds,
         isBot: false,
       },
+    });
+
+    this.scheduleCleanup();
+    return { accepted: true };
+  }
+
+  async recordShareEvent(
+    payload: TrafficShareEventPayload,
+    context: TrafficRequestContext,
+  ): Promise<{ accepted: boolean; excluded?: boolean }> {
+    if (context.privacyOptOut) return { accepted: false, excluded: true };
+
+    const path = normalizeTrafficPath(payload.path);
+    if (isExcludedTrafficPath(path)) return { accepted: false, excluded: true };
+
+    const device = classifyTrafficDevice(context.userAgent);
+    if (device.isBot) return { accepted: false, excluded: true };
+
+    const visitorId = requireTrafficIdentifier(payload.visitorId, "방문자 식별자");
+    const sessionId = requireTrafficIdentifier(payload.sessionId, "세션 식별자");
+    const visitorHash = hashIdentifier("visitor", visitorId);
+    const sessionHash = hashIdentifier("session", sessionId);
+    this.enforceRateLimit(sessionHash, "share");
+
+    await persistTrafficShareEvent({
+      id: randomUUID(),
+      occurredAt: new Date(),
+      visitorHash,
+      sessionHash,
+      path,
+      channel: requireTrafficShareChannel(payload.channel),
+      outcome: requireTrafficShareOutcome(payload.outcome),
+      countryCode: normalizeTrafficCountryCode(context.countryCode),
+      deviceType: device.deviceType,
+      browser: device.browser,
+      os: device.os,
     });
 
     this.scheduleCleanup();

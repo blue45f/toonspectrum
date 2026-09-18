@@ -18,9 +18,16 @@ export interface SharePayload {
   readonly buttonLabel?: string;
 }
 
+export type ShareOutcome = "opened" | "completed" | "cancelled" | "failed";
+
 export interface ShareEventDetail {
   readonly channel: ShareChannel;
-  readonly outcome: "success" | "cancelled" | "failed";
+  /**
+   * `opened` means an external picker/target or QR was presented. It is not proof that a
+   * recipient received a message. `completed` is reserved for operations the browser can
+   * positively confirm, such as copying a link or a resolved Web Share request.
+   */
+  readonly outcome: ShareOutcome;
   readonly path: string;
 }
 

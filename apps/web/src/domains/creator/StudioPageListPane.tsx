@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { LayoutGrid } from "lucide-react";
 import {
   memo,
@@ -76,14 +77,12 @@ export const StudioPageListPane = memo(function StudioPageListPane(
           aria-haspopup="dialog"
           aria-expanded={organizerOpen}
           className="inline-flex min-h-11 min-w-11 shrink-0 items-center gap-1 rounded-lg border border-line bg-card px-2.5 text-[0.7rem] font-semibold text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:text-[10px]"
-          title="전체 페이지를 검색하고 범위 선택·일괄 정리"
+          title={translateCurrentStaticSourceText("domains.creator.StudioPageListPane", "ko", "전체 페이지를 검색하고 범위 선택·일괄 정리")}
         >
           <LayoutGrid size={13} aria-hidden />
-          찾기·정리
-          {liveSelectedPageIds.length > 0 ? (
+          {translateCurrentStaticSourceText("domains.creator.StudioPageListPane", "ko", "찾기·정리")}{liveSelectedPageIds.length > 0 ? (
             <span className="rounded-full bg-accent px-1.5 py-0.5 text-[0.6rem] tabular-nums text-on-accent">
-              {liveSelectedPageIds.length}개 선택
-            </span>
+              {liveSelectedPageIds.length}{translateCurrentStaticSourceText("domains.creator.StudioPageListPane", "ko", "개 선택")}</span>
           ) : null}
         </button>,
         toolbarHost,

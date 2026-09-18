@@ -7,6 +7,7 @@ import { creatorRoutes } from "./creator.routes";
 import { experienceRoutes } from "./experience.routes";
 import { legalRoutes } from "./legal.routes";
 import { marketRoutes } from "./market.routes";
+import { marketingRoutes } from "./marketing.routes";
 import { notFoundRoutes } from "./not-found.route";
 import { productionRoutes } from "./production.routes";
 import { referenceRoutes } from "./reference.routes";
@@ -17,6 +18,7 @@ import { referenceRoutes } from "./reference.routes";
  */
 export const appRoutes = [
   ...catalogRoutes,
+  ...marketingRoutes,
   ...referenceRoutes,
   ...communityRoutes,
   ...creatorRoutes,

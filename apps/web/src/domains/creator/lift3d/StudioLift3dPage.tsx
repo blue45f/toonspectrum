@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -466,37 +470,32 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
       <div className="mx-auto max-w-6xl">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-fg-3">Studio</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-fg-3">{translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "en", "Studio")}</p>
             <h1 id="studio-lift3d-title" className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-              2D → 3D 변환
-            </h1>
+              {translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "2D → 3D 변환")}</h1>
             <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-fg-2">
-              캐릭터·소품·배경 원화를 실루엣과 명암으로 읽어 3D 모델로 세웁니다. 변환은 이 기기
-              안에서만 이뤄지고, 결과 GLB 는 배경 3D 씬에 그대로 가져다 쓸 수 있습니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "캐릭터·소품·배경 원화를 실루엣과 명암으로 읽어 3D 모델로 세웁니다. 변환은 이 기기 안에서만 이뤄지고, 결과 GLB 는 배경 3D 씬에 그대로 가져다 쓸 수 있습니다.")}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href="/studio/character-convert" className={SECONDARY_BUTTON_CLASS}>캐릭터 AI 2D ↔ 3D</Link>
+            <Link href="/studio/character-convert" className={SECONDARY_BUTTON_CLASS}>{translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "캐릭터 AI 2D ↔ 3D")}</Link>
             <button
               type="button"
               data-studio-route-exit="editor"
               onClick={() => navigate("/studio")}
               className={SECONDARY_BUTTON_CLASS}
             >
-              Studio 편집기 열기
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "Studio 편집기 열기")}</button>
             <Link href="/create" data-studio-route-exit="site" className={SECONDARY_BUTTON_CLASS}>
-              창작 게시판으로
-            </Link>
+              {translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "창작 게시판으로")}</Link>
           </div>
         </header>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[22rem_1fr]">
           <div className="space-y-4">
             <div className={CARD_CLASS}>
-              <h2 className="text-sm font-semibold">1. 원화 선택</h2>
+              <h2 className="text-sm font-semibold">{translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "1. 원화 선택")}</h2>
               <label className="mt-3 block">
-                <span className="sr-only">변환할 이미지 파일</span>
+                <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "변환할 이미지 파일")}</span>
                 <input
                   type="file"
                   accept={STUDIO_LIFT3D_ACCEPTED_MIME_TYPES.join(",")}
@@ -508,9 +507,8 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                 />
               </label>
               <p className="mt-2 text-xs leading-relaxed text-fg-3">
-                PNG · JPEG · WebP. 캐릭터·소품은 <strong className="font-semibold text-fg-2">배경을 지운 PNG</strong>
-                일 때 실루엣이 가장 정확합니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "PNG · JPEG · WebP. 캐릭터·소품은 ")}<strong className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "배경을 지운 PNG")}</strong>
+                {translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "일 때 실루엣이 가장 정확합니다.")}</p>
               {decoded !== null ? (
                 <p className="mt-2 font-mono text-xs text-fg-3">
                   {decoded.fileName} · {decoded.naturalWidth}×{decoded.naturalHeight}px
@@ -522,10 +520,10 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
             </div>
 
             <div className={CARD_CLASS}>
-              <h2 className="text-sm font-semibold">2. 무엇을 만들까요</h2>
+              <h2 className="text-sm font-semibold">{translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "2. 무엇을 만들까요")}</h2>
               {/* 네이티브 라디오라 방향키 이동·폼 시맨틱을 브라우저가 그대로 처리한다. */}
               <fieldset className="mt-3 grid gap-2">
-                <legend className="sr-only">피사체 종류</legend>
+                <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "피사체 종류")}</legend>
                 {STUDIO_LIFT3D_SUBJECTS.map((candidate) => {
                   const option = STUDIO_LIFT3D_PRESETS[candidate];
                   return (
@@ -535,7 +533,7 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                     >
                       <input
                         type="radio"
-                        name={`${subjectGroupName}-subject`}
+                        name={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "en", "{v0}-subject"), { v0: String(subjectGroupName) })}
                         value={candidate}
                         checked={candidate === subject}
                         onChange={() => selectSubject(candidate)}
@@ -552,19 +550,19 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
             </div>
 
             <div className={CARD_CLASS}>
-              <h2 className="text-sm font-semibold">3. 다듬기</h2>
+              <h2 className="text-sm font-semibold">{translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "3. 다듬기")}</h2>
               <div className="mt-3 space-y-4">
                 <SliderField
-                  label="해상도"
+                  label={translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "해상도")}
                   value={resolution}
                   min={STUDIO_LIFT3D_LIMITS.minResolution}
                   max={STUDIO_LIFT3D_LIMITS.maxResolution}
                   step={8}
-                  display={`${resolution}px`}
+                  display={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "en", "{v0}px"), { v0: String(resolution) })}
                   onChange={setResolution}
                 />
                 <SliderField
-                  label={preset.geometryMode === "relief" ? "돌출 깊이" : "두께"}
+                  label={preset.geometryMode === "relief" ? translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "돌출 깊이") : translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "두께")}
                   value={depthScale}
                   min={0.02}
                   max={1}
@@ -573,32 +571,32 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                   onChange={setDepthScale}
                 />
                 <SliderField
-                  label="매끄럽게"
+                  label={translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "매끄럽게")}
                   value={smoothing}
                   min={0}
                   max={12}
                   step={1}
-                  display={`${smoothing}회`}
+                  display={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "{v0}회"), { v0: String(smoothing) })}
                   onChange={setSmoothing}
                 />
                 {preset.geometryMode === "inflate" ? (
                   <SliderField
-                    label="앞쪽 두께 비율"
+                    label={translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "앞쪽 두께 비율")}
                     value={frontRatio}
                     min={0.2}
                     max={0.8}
                     step={0.02}
-                    display={`앞 ${Math.round(frontRatio * 100)}%`}
+                    display={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "앞 {v0}%"), { v0: String(Math.round(frontRatio * 100)) })}
                     onChange={setFrontRatio}
                   />
                 ) : (
                   <SliderField
-                    label="시차 레이어"
+                    label={translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "시차 레이어")}
                     value={layerBands}
                     min={1}
                     max={12}
                     step={1}
-                    display={layerBands < 2 ? "연속 부조" : `${layerBands}층`}
+                    display={layerBands < 2 ? translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "연속 부조") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "{v0}층"), { v0: String(layerBands) })}
                     onChange={setLayerBands}
                   />
                 )}
@@ -610,8 +608,7 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                       onChange={(event) => setInvertRelief(event.target.checked)}
                       className="size-4 accent-accent"
                     />
-                    어두운 면을 앞으로 (역광 배경)
-                  </label>
+                    {translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "어두운 면을 앞으로 (역광 배경)")}</label>
                 ) : null}
                 <label className="flex items-center gap-2 text-xs font-semibold text-fg-2">
                   <input
@@ -620,20 +617,19 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                     onChange={(event) => setUnlit(event.target.checked)}
                     className="size-4 accent-accent"
                   />
-                  조명 없이 원화 그대로 (unlit)
-                </label>
+                  {translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "조명 없이 원화 그대로 (unlit)")}</label>
               </div>
             </div>
 
             <div className={CARD_CLASS}>
-              <h2 className="text-sm font-semibold">4. 내보내기</h2>
+              <h2 className="text-sm font-semibold">{translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "4. 내보내기")}</h2>
               {/*
                 이용 권리는 원화의 권리를 따르는데 그건 이 코드가 알 수 없다. 편집기 업로드
                 패널이 사용자에게 묻는 것과 같은 네 가지를, 같은 문구로 묻는다.
               */}
               <label className="mt-3 block space-y-1.5">
                 <span className={FIELD_LABEL_CLASS}>
-                  <span>이용 권리</span>
+                  <span>{translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "이용 권리")}</span>
                 </span>
                 {/*
                   등록 중에는 잠근다. 같은 GLB 가 이미 저장된 뒤라 표기만 바꿔 다시 등록하면
@@ -670,23 +666,20 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                   }}
                   className="size-4 accent-accent disabled:opacity-40"
                 />
-                상업적 이용 가능
-                {libraryRights === "unknown" ? (
-                  <span className="font-normal text-fg-3">(확인 전에는 선언할 수 없습니다)</span>
+                {translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "상업적 이용 가능")}{libraryRights === "unknown" ? (
+                  <span className="font-normal text-fg-3">{translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "(확인 전에는 선언할 수 없습니다)")}</span>
                 ) : null}
               </label>
               <button
                 type="button"
                 onClick={() => void onSaveToLibrary()}
                 disabled={result === null || busy || librarySaving}
-                className={`${PRIMARY_BUTTON_CLASS} mt-3 w-full`}
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "en", "{v0} mt-3 w-full"), { v0: String(PRIMARY_BUTTON_CLASS) })}
               >
-                {librarySaving ? "등록하는 중..." : "배경 3D 모델로 등록"}
+                {librarySaving ? translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "등록하는 중...") : translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "배경 3D 모델로 등록")}
               </button>
               <p className="mt-2 text-xs leading-relaxed text-fg-3">
-                배경 3D 편집기의 모델 목록에 바로 올라갑니다. 파일을 내려받았다가 다시 올릴
-                필요가 없습니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "배경 3D 편집기의 모델 목록에 바로 올라갑니다. 파일을 내려받았다가 다시 올릴 필요가 없습니다.")}</p>
               {libraryNotice !== null ? (
                 <p role="status" className="mt-2 text-xs leading-relaxed text-fg-2">{libraryNotice}</p>
               ) : null}
@@ -694,10 +687,9 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                 type="button"
                 onClick={onDownload}
                 disabled={result === null || busy}
-                className={`${SECONDARY_BUTTON_CLASS} mt-3 w-full`}
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "en", "{v0} mt-3 w-full"), { v0: String(SECONDARY_BUTTON_CLASS) })}
               >
-                GLB 파일로 저장
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "GLB 파일로 저장")}</button>
               {liftError !== null ? (
                 <p role="alert" className="mt-3 text-xs leading-relaxed text-danger">{liftError}</p>
               ) : null}
@@ -710,7 +702,7 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
           <div className="space-y-3">
             <div
               role="tablist"
-              aria-label="미리보기 화면"
+              aria-label={translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "미리보기 화면")}
               className="flex flex-wrap gap-1 rounded-lg border border-line bg-card/60 p-1"
             >
               {PREVIEW_TABS.map((candidate) => (
@@ -720,9 +712,7 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
                   role="tab"
                   aria-selected={tab === candidate}
                   onClick={() => setTab(candidate)}
-                  className={`min-h-11 min-w-11 flex-1 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                    tab === candidate ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised"
-                  }`}
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "en", "min-h-11 min-w-11 flex-1 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(tab === candidate ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised") })}
                 >
                   {PREVIEW_TAB_LABELS[candidate]}
                 </button>
@@ -732,39 +722,38 @@ export function StudioLift3dPage({ initialSubject = null }: StudioLift3dPageProp
             <div className="grid min-h-[24rem] place-items-center overflow-hidden rounded-xl border border-line bg-panel p-3 lg:min-h-[32rem]">
               {decoded === null ? (
                 <p className="max-w-[36ch] text-center text-sm leading-relaxed text-fg-3">
-                  변환할 원화를 선택하면 실루엣·깊이·3D 결과를 여기에서 확인할 수 있습니다.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "변환할 원화를 선택하면 실루엣·깊이·3D 결과를 여기에서 확인할 수 있습니다.")}</p>
               ) : tab === "source" ? (
                 sourceUrl === null ? (
-                  <p className="text-sm text-fg-3">원화 미리보기를 사용할 수 없습니다.</p>
+                  <p className="text-sm text-fg-3">{translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "원화 미리보기를 사용할 수 없습니다.")}</p>
                 ) : (
                   <img
                     src={sourceUrl}
-                    alt="선택한 원화"
+                    alt={translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "선택한 원화")}
                     className="max-h-full max-w-full object-contain"
                   />
                 )
               ) : result === null ? (
                 <p className="max-w-[36ch] text-center text-sm leading-relaxed text-fg-3">
-                  {busy ? "변환하는 중입니다..." : liftError ?? "아직 변환 결과가 없습니다."}
+                  {busy ? translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "변환하는 중입니다...") : liftError ?? translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "아직 변환 결과가 없습니다.")}
                 </p>
               ) : tab === "mask" && maskPixels !== null ? (
                 <RasterPreview
                   width={result.lift.mask.width}
                   height={result.lift.mask.height}
                   pixels={maskPixels}
-                  label="추출한 실루엣 마스크"
+                  label={translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "추출한 실루엣 마스크")}
                 />
               ) : tab === "depth" && depthPixels !== null ? (
                 <RasterPreview
                   width={result.lift.mask.width}
                   height={result.lift.mask.height}
                   pixels={depthPixels}
-                  label="추정한 깊이장"
+                  label={translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "추정한 깊이장")}
                 />
               ) : buffers !== null ? (
                 <div className="h-[24rem] w-full lg:h-[32rem]">
-                  <Suspense fallback={<StudioPanelLoading label="3D 미리보기를 여는 중..." />}>
+                  <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPage", "ko", "3D 미리보기를 여는 중...")} />}>
                     <StudioLift3dPreview
                       buffers={buffers}
                       textureUrl={previewTextureUrl}

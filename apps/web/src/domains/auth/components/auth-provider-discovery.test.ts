@@ -74,6 +74,29 @@ describe("auth provider discovery", () => {
     });
   });
 
+  it("accepts Apple only when the server confirms the complete redirect flow", () => {
+    expect(
+      parseAuthProviderDiscovery({
+        apple: {
+          label: "Apple",
+          mode: "oauth",
+          redirectAvailable: true,
+        },
+      }),
+    ).toEqual({
+      apple: {
+        label: "Apple",
+        mode: "oauth",
+        redirectAvailable: true,
+      },
+    });
+    expect(
+      parseAuthProviderDiscovery({
+        apple: { mode: "disabled", redirectAvailable: false },
+      }),
+    ).toEqual({});
+  });
+
   it("accepts GitHub only when the server confirms the redirect flow", () => {
     expect(
       parseAuthProviderDiscovery({

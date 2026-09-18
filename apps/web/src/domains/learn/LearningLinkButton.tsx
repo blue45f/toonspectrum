@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useId, useState } from "react";
 
 export function LearningLinkButton({ makePath }: { makePath: () => string }) {
@@ -18,9 +22,9 @@ export function LearningLinkButton({ makePath }: { makePath: () => string }) {
   }
   return (
     <div className="learn-share">
-      <button type="button" onClick={() => { void copy(); }}>이 예제 설정 공유</button>
+      <button type="button" onClick={() => { void copy(); }}>{translateCurrentStaticSourceText("domains.learn.LearningLinkButton", "ko", "이 예제 설정 공유")}</button>
       {message && <p className="learn-small" role="status">{message}</p>}
-      {manualUrl && <><label htmlFor={`${id}-url`}>직접 복사할 예제 링크</label><input id={`${id}-url`} type="text" value={manualUrl} readOnly onFocus={(event) => event.currentTarget.select()} /></>}
+      {manualUrl && <><label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.learn.LearningLinkButton", "en", "{v0}-url"), { v0: String(id) })}>{translateCurrentStaticSourceText("domains.learn.LearningLinkButton", "ko", "직접 복사할 예제 링크")}</label><input id={formatI18nTemplate(translateCurrentStaticSourceText("domains.learn.LearningLinkButton", "en", "{v0}-url"), { v0: String(id) })} type="text" value={manualUrl} readOnly onFocus={(event) => event.currentTarget.select()} /></>}
     </div>
   );
 }

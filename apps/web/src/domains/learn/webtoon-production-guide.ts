@@ -42,7 +42,7 @@ export const WEBTOON_PRODUCTION_MODELS: readonly WebtoonProductionModel[] = [
     reviewStyle: "창작 검수와 플랫폼 정책·현지화·론칭 검수를 분리",
     planningFocus: ["계약·권리", "론칭 패키지", "휴재·복귀", "데이터 회고", "언어별 납품"],
   },
-] as const;
+];
 
 export type WebtoonLifecyclePhaseId =
   | "rights"
@@ -242,7 +242,7 @@ export const WEBTOON_LIFECYCLE_PHASES: readonly WebtoonLifecyclePhase[] = [
     studioLabel: "프로젝트 보관 구조 보기",
     studioHref: "/learn/process#lifecycle",
   },
-] as const;
+];
 
 export interface WebtoonEpisodePipelineStage {
   readonly id: string;
@@ -271,7 +271,7 @@ export const WEBTOON_EPISODE_PIPELINE: readonly WebtoonEpisodePipelineStage[] = 
   { id: "qa", order: 12, title: "통합 QA·수정", owner: "작가·PD·QA", purpose: "스토리·비주얼·스크롤·기술·권리 기준으로 출판 가능 여부를 확인합니다.", checks: ["설정·오탈자", "작화 연속성", "모바일 스크롤", "규격·정책·권리"], output: "QA 리포트·승인본", lock: "G9 · Final approval", mayRunWith: ["다음 회차 후반 작업"] },
   { id: "delivery", order: 13, title: "납품·예약·공개", owner: "PD·운영", purpose: "플랫폼 파일·썸네일·메타데이터·크레딧을 묶어 납품하고 공개를 확인합니다.", checks: ["파일 패키지", "회차 제목·소개", "등급·경고", "공개 직후 오류"], output: "납품 패키지·공개 기록", lock: "G10 · Delivery accepted", mayRunWith: ["다음 회차 QA", "공개 후 분석"] },
   { id: "feedback", order: 14, title: "반응 분석·다음 회차 반영", owner: "작가·편집·운영", purpose: "오류 수정과 장기 개선을 구분해 다음 제작 주기에 반영합니다.", checks: ["즉시 수정", "향후 개선", "편집 검토", "참고 의견"], output: "회차 회고·개선 백로그", lock: null, mayRunWith: ["다음 회차 제작 전 공정"] },
-] as const;
+];
 
 export const WEBTOON_ROLLING_PIPELINE = [
   { episode: "27화", stage: "플롯", owner: "스토리", risk: "normal" },
@@ -283,7 +283,7 @@ export const WEBTOON_ROLLING_PIPELINE = [
   { episode: "21화", stage: "최종 QA", owner: "PD·QA", risk: "normal" },
   { episode: "20화", stage: "업로드 예약", owner: "운영", risk: "normal" },
   { episode: "19화", stage: "연재 중", owner: "운영", risk: "published" },
-] as const;
+];
 
 export const WEBTOON_APPROVAL_GATES = [
   { id: "G0", title: "권리 확인", evidence: "원작·공동 저작·유통·2차 사업 범위" },
@@ -298,7 +298,7 @@ export const WEBTOON_APPROVAL_GATES = [
   { id: "G9", title: "최종 출판 승인", evidence: "스토리·비주얼·스크롤·기술·권리 QA" },
   { id: "G10", title: "납품 수락", evidence: "플랫폼 패키지·편성·공개 확인" },
   { id: "G11", title: "시즌 종료", evidence: "정산·크레딧·아카이브·회고" },
-] as const;
+];
 
 export const WEBTOON_PROCESS_REFERENCES = [
   {
@@ -321,4 +321,4 @@ export const WEBTOON_PROCESS_REFERENCES = [
     description: "글·그림 콘티, 선화, 배경, 채색, 후보정, 현지화 분업 사례",
     href: "https://recruit.studiolico.com/lico/recruitMain",
   },
-] as const;
+];

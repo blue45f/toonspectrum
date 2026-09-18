@@ -260,6 +260,25 @@ export const AVATAR_FORGE_HAIR_STYLE_OPTIONS: ReadonlyArray<{
   { id: "pixie", label: "픽시", emoji: "▵", hint: "짧게 친 경쾌한 커트" },
 ] as const;
 
+export const AVATAR_FORGE_HAIR_STYLE_RECIPES: Readonly<
+  Record<AvatarForgeHairStyle, Readonly<Partial<AvatarForgeHairParams>>>
+> = Object.freeze({
+  none: Object.freeze({}),
+  short: Object.freeze({ volume: 0.94, length: 0.72, strandWidth: 0.9, fringe: 0.58, curl: 0.08, wave: 0, ahoge: 0, bangStyle: "side-swept" }),
+  bob: Object.freeze({ volume: 1, length: 0.9, strandWidth: 0.96, fringe: 0.72, curl: 0.14, wave: 0, ahoge: 0, bangStyle: "curtain" }),
+  long: Object.freeze({ volume: 1.02, length: 1.18, strandWidth: 0.94, fringe: 0.76, curl: 0.12, wave: 0.06, ahoge: 0, bangStyle: "curtain" }),
+  ponytail: Object.freeze({ volume: 1.02, length: 1.08, strandWidth: 0.92, fringe: 0.62, curl: 0.16, wave: 0.06, ahoge: 0, tailHeight: 0.72, bangStyle: "side-swept" }),
+  twintail: Object.freeze({ volume: 1.06, length: 1.05, strandWidth: 0.9, fringe: 0.68, curl: 0.22, wave: 0.12, ahoge: 0, tailHeight: 0.7, bangStyle: "split" }),
+  bun: Object.freeze({ volume: 0.96, length: 0.72, strandWidth: 0.9, fringe: 0.6, curl: 0.12, wave: 0, ahoge: 0, tailHeight: 0.7, bangStyle: "side-swept" }),
+  wavy: Object.freeze({ volume: 1.08, length: 1.18, strandWidth: 0.95, fringe: 0.74, curl: 0.28, wave: 0.58, ahoge: 0, bangStyle: "curtain" }),
+  braid: Object.freeze({ volume: 0.98, length: 1.12, strandWidth: 0.9, fringe: 0.64, curl: 0.08, wave: 0.05, ahoge: 0, tailHeight: 0.58, bangStyle: "split" }),
+  "twin-braid": Object.freeze({ volume: 0.98, length: 1.04, strandWidth: 0.86, fringe: 0.64, curl: 0.08, wave: 0.05, ahoge: 0, tailHeight: 0.58, bangStyle: "split" }),
+  hime: Object.freeze({ volume: 1, length: 1.2, strandWidth: 0.94, fringe: 0.82, curl: 0.04, wave: 0, ahoge: 0, bangStyle: "blunt" }),
+  wolf: Object.freeze({ volume: 1.03, length: 0.86, strandWidth: 0.82, fringe: 0.62, curl: 0.12, wave: 0.05, ahoge: 0, bangStyle: "side-swept" }),
+  "half-up": Object.freeze({ volume: 1.02, length: 1.08, strandWidth: 0.92, fringe: 0.68, curl: 0.16, wave: 0.12, ahoge: 0, tailHeight: 0.68, bangStyle: "curtain" }),
+  pixie: Object.freeze({ volume: 0.9, length: 0.58, strandWidth: 0.72, fringe: 0.42, curl: 0.05, wave: 0, ahoge: 0, bangStyle: "side-swept" }),
+});
+
 export const AVATAR_FORGE_BANG_STYLE_OPTIONS: ReadonlyArray<{
   id: AvatarForgeBangStyle;
   label: string;
@@ -691,6 +710,34 @@ export function createAvatarForgeState(presetId?: string): AvatarForgeState {
   if (!presetId) return sanitizeAvatarForgeState(DEFAULT_AVATAR_FORGE_STATE);
   const selected = AVATAR_FORGE_PRESETS.find((item) => item.id === presetId);
   return sanitizeAvatarForgeState(selected?.state ?? DEFAULT_AVATAR_FORGE_STATE);
+}
+
+/**
+ * Hair silhouette cards are curated recipes, not raw enum toggles. Carrying a long/wavy recipe's
+ * extreme length, width and curl into pixie/bun was a major source of "broken" looking results.
+ * Colors, shine and original-hair replacement intent stay user-owned; shape parameters switch to a
+ * style-safe baseline and remain fully editable afterwards.
+ */
+export function applyAvatarForgeHairStyleRecipe(
+  state: AvatarForgeState,
+  style: AvatarForgeHairStyle,
+): AvatarForgeState {
+  const current = sanitizeAvatarForgeState(state);
+  const recipe = AVATAR_FORGE_HAIR_STYLE_RECIPES[style] ?? AVATAR_FORGE_HAIR_STYLE_RECIPES.none;
+  return sanitizeAvatarForgeState({
+    ...current,
+    presetId: undefined,
+    hair: {
+      ...current.hair,
+      ...recipe,
+      style,
+      replaceOriginal: current.hair.replaceOriginal,
+      baseColor: current.hair.baseColor,
+      shadowColor: current.hair.shadowColor,
+      tipColor: current.hair.tipColor,
+      shine: current.hair.shine,
+    },
+  });
 }
 
 /**

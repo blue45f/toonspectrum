@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useState, type ReactElement, type ReactNode } from "react";
 
 import { resolveStudioBrushBehaviorPresentation } from "./brush/studio-brush-behavior-ui";
@@ -162,7 +165,7 @@ export function StudioActiveBrushSummary({
       data-studio-active-brush-summary="true"
       data-studio-brush-behavior={behavior.kind}
       data-studio-brush-metadata-state={
-        needsProMetadata ? (metadataFailed ? "error" : catalogItem ? "loaded" : "loading") : "ready"
+        needsProMetadata ? (metadataFailed ? translateCurrentStaticSourceText("domains.creator.StudioActiveBrushSummary", "en", "error") : catalogItem ? translateCurrentStaticSourceText("domains.creator.StudioActiveBrushSummary", "en", "loaded") : translateCurrentStaticSourceText("domains.creator.StudioActiveBrushSummary", "en", "loading")) : translateCurrentStaticSourceText("domains.creator.StudioActiveBrushSummary", "en", "ready")
       }
       data-studio-brush-runtime-id={runtimeSemantics?.runtimeBrushId}
       data-studio-brush-runtime-engine={runtimeSemantics?.engine}
@@ -170,7 +173,7 @@ export function StudioActiveBrushSummary({
       data-studio-brush-runtime-texture={runtimeSemantics?.texture}
       data-studio-brush-runtime-dynamics={runtimeSemantics?.dynamics}
       data-studio-brush-semantic-source={
-        runtimeSemantics ? "runtime-contract" : "preview-fallback"
+        runtimeSemantics ? translateCurrentStaticSourceText("domains.creator.StudioActiveBrushSummary", "en", "runtime-contract") : translateCurrentStaticSourceText("domains.creator.StudioActiveBrushSummary", "en", "preview-fallback")
       }
       aria-busy={needsProMetadata && !metadataFailed && !catalogItem ? true : undefined}
       title={summaryTitle}
@@ -226,14 +229,14 @@ export function StudioActiveBrushSummary({
             {Math.round(strokeWidth * 10) / 10}px
           </span>
           <span className="rounded-md bg-raised px-1.5 py-1 tabular-nums">
-            농도 {Math.round(opacity * 100)}%
+            {translateCurrentStaticSourceText("domains.creator.StudioActiveBrushSummary", "ko", "농도 ")}{Math.round(opacity * 100)}%
           </span>
           <span className="rounded-md bg-raised px-1.5 py-1">
             {studioStabilizerSummary(stabilizerMode, stabilizer)}
           </span>
           {calligraphy ? (
             <span className="rounded-md bg-raised px-1.5 py-1 tabular-nums">
-              촉 {Math.round(tipAngle)}° · 원형도 {Math.round(tipRoundness * 100)}%
+              {translateCurrentStaticSourceText("domains.creator.StudioActiveBrushSummary", "ko", "촉 ")}{Math.round(tipAngle)}{translateCurrentStaticSourceText("domains.creator.StudioActiveBrushSummary", "ko", "° · 원형도 ")}{Math.round(tipRoundness * 100)}%
             </span>
           ) : null}
         </span>

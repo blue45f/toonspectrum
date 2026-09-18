@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowLeft } from "lucide-react";
 import { useEffectEvent, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -72,21 +73,19 @@ export function StudioHybridDccRouteGate({
             type="button"
             onClick={onClose}
             className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            aria-label="캔버스로 돌아가기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccRouteGate", "ko", "캔버스로 돌아가기")}
           >
             <ArrowLeft size={17} aria-hidden="true" />
-            <span className="hidden sm:inline">캔버스</span>
+            <span className="hidden sm:inline">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccRouteGate", "ko", "캔버스")}</span>
           </button>
           <div className="min-w-0 flex-1">
             <h2
               id="studio-hybrid-dcc-route-gate-title"
               className="truncate text-sm font-semibold tracking-tight"
             >
-              ToonSpectrum 전문 3D 제작
-            </h2>
+              {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccRouteGate", "ko", "ToonSpectrum 전문 3D 제작")}</h2>
             <p className="truncate text-[11px] text-fg-3">
-              편집 가능한 원본 메시 · 정밀 CAD·솔리드 · 웹툰 컷·선화 전달
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccRouteGate", "ko", "편집 가능한 원본 메시 · 정밀 CAD·솔리드 · 웹툰 컷·선화 전달")}</p>
           </div>
         </header>
         <div

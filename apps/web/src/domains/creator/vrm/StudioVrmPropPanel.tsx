@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ChevronDown,
   Plus,
   RotateCcw,
@@ -359,7 +363,7 @@ function AxisField({
         precision={precision}
         value={value}
         disabled={disabled}
-        label={`${accessibleLabel} 직접 입력`}
+        label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "{v0} 직접 입력"), { v0: String(accessibleLabel) })}
         onCommit={onChange}
       />
     </div>
@@ -417,7 +421,7 @@ function ScalarField({
         precision={precision}
         value={value}
         disabled={disabled}
-        label={`${label} 직접 입력`}
+        label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "{v0} 직접 입력"), { v0: String(label) })}
         onCommit={onChange}
       />
     </div>
@@ -464,7 +468,7 @@ function CatalogButton({ definition, disabled, onAdd }: CatalogButtonProps) {
     <button
       type="button"
       disabled={disabled}
-      aria-label={`${definition.label} 추가. ${definition.hint}`}
+      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "{v0} 추가. {v1}"), { v0: String(definition.label), v1: String(definition.hint) })}
       className={cn(
         "flex min-h-12 min-w-0 items-center justify-between gap-1.5 rounded-lg border border-line bg-card px-2 py-1.5 text-left text-fg-2 transition-colors hover:border-accent/40 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-40",
         FOCUS_RING
@@ -626,14 +630,13 @@ function SelectedEditor({
       aria-labelledby={editorTitleId}
     >
       {qualityNotice ? (
-        <p role="note" aria-label="소품 품질 안내" className="mb-3 rounded-lg border border-line bg-panel p-3 text-xs leading-relaxed text-fg-2">
-          품질 개선 대기 소품입니다. 기존 장면의 부착과 편집은 유지되지만 새로 추가할 수 없습니다. {qualityNotice}
+        <p role="note" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "소품 품질 안내")} className="mb-3 rounded-lg border border-line bg-panel p-3 text-xs leading-relaxed text-fg-2">
+          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "품질 개선 대기 소품입니다. 기존 장면의 부착과 편집은 유지되지만 새로 추가할 수 없습니다. ")}{qualityNotice}
         </p>
       ) : null}
       {item.bone === "head" && rigMetrics.faceSocket.hairClearanceRequired ? (
-        <p role="note" aria-label="헤어 간섭 안내" className="mb-3 rounded-lg border border-line bg-panel p-3 text-xs leading-relaxed text-fg-2">
-          볼륨 헤어나 기본 머리장식이 소품과 겹칠 수 있습니다. 측면에서 확인하고 소품 위치와 크기를 조정해 주세요.
-        </p>
+        <p role="note" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "헤어 간섭 안내")} className="mb-3 rounded-lg border border-line bg-panel p-3 text-xs leading-relaxed text-fg-2">
+          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "볼륨 헤어나 기본 머리장식이 소품과 겹칠 수 있습니다. 측면에서 확인하고 소품 위치와 크기를 조정해 주세요.")}</p>
       ) : null}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -643,10 +646,9 @@ function SelectedEditor({
             tabIndex={-1}
             className="text-xs font-bold text-fg outline-none"
           >
-            {definition?.label ?? item.propId} 편집
-          </h4>
+            {definition?.label ?? item.propId} {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "편집")}</h4>
           <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3">
-            {definition?.hint ?? "기존 소품의 부착 위치와 모양을 조정합니다."}
+            {definition?.hint ?? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "기존 소품의 부착 위치와 모양을 조정합니다.")}
           </p>
         </div>
         <span
@@ -657,7 +659,7 @@ function SelectedEditor({
               : "border-line bg-card text-fg-3"
           )}
         >
-          {rig ? "스마트 소켓" : "기존 부착"}
+          {rig ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "스마트 소켓") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "기존 부착")}
         </span>
       </div>
 
@@ -665,7 +667,7 @@ function SelectedEditor({
         <button
           type="button"
           disabled={disabled}
-          aria-label={`${definition?.label ?? item.propId} 부착부 확대 확인`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "{v0} 부착부 확대 확인"), { v0: String(definition?.label ?? item.propId) })}
           className={cn(
             "mt-3 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft/45 px-3 text-xs font-bold text-accent transition-colors hover:border-accent/60 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-45",
             FOCUS_RING
@@ -673,18 +675,17 @@ function SelectedEditor({
           onClick={onInspect}
         >
           <ScanSearch size={15} aria-hidden />
-          부착부 확대 확인
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "부착부 확대 확인")}</button>
       ) : null}
 
       <div
         role="note"
-        aria-label="소품 부착 안내"
+        aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "소품 부착 안내")}
         className="mt-3 rounded-lg border border-line/70 bg-card/55 p-2.5"
       >
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-bold text-fg-2">
-            {rig ? "스마트 소켓으로 부착됨" : "기존 관절 기준으로 부착됨"}
+            {rig ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "스마트 소켓으로 부착됨") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "기존 관절 기준으로 부착됨")}
           </p>
           <span
             className={cn(
@@ -692,13 +693,13 @@ function SelectedEditor({
               rig ? "bg-accent-soft text-accent" : "bg-raised text-fg-3"
             )}
           >
-            {rig ? "정밀 조정 가능" : "변환 가능"}
+            {rig ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "정밀 조정 가능") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "변환 가능")}
           </span>
         </div>
         <p className="mt-1 text-[0.64rem] leading-relaxed text-fg-3">
           {rig
-            ? "캐릭터의 접촉점을 따라 자동 배치하며, 아래 위치·회전·모양 값은 그 결과에 더하는 정밀 보정입니다."
-            : "현재 값은 그대로 유지됩니다. 스마트 소켓을 사용하면 캐릭터 크기와 접촉점을 기준으로 배치한 뒤 정밀하게 보정할 수 있습니다."}
+            ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "캐릭터의 접촉점을 따라 자동 배치하며, 아래 위치·회전·모양 값은 그 결과에 더하는 정밀 보정입니다.")
+            : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "현재 값은 그대로 유지됩니다. 스마트 소켓을 사용하면 캐릭터 크기와 접촉점을 기준으로 배치한 뒤 정밀하게 보정할 수 있습니다.")}
         </p>
         {!rig ? (
           <button
@@ -711,8 +712,7 @@ function SelectedEditor({
             onClick={enableSmartSocket}
           >
             <Sparkles size={14} aria-hidden />
-            스마트 소켓 사용
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "스마트 소켓 사용")}</button>
         ) : null}
       </div>
 
@@ -720,8 +720,7 @@ function SelectedEditor({
         htmlFor={boneSelectId}
         className="mt-3 block text-xs font-semibold text-fg-2"
       >
-        부착 부위
-        <select
+        {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "부착 부위")}<select
           id={boneSelectId}
           value={item.bone}
           disabled={disabled}
@@ -744,14 +743,14 @@ function SelectedEditor({
           <ToggleRow
             checked={rig.autoScale}
             disabled={disabled}
-            label="모델 크기 자동 맞춤"
-            description={`${fitReferenceLabel(definition)} 실측값을 기준으로 안전 범위 안에서 배율을 맞춥니다.`}
+            label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "모델 크기 자동 맞춤")}
+            description={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "{v0} 실측값을 기준으로 안전 범위 안에서 배율을 맞춥니다."), { v0: String(fitReferenceLabel(definition)) })}
             onChange={(autoScale) => updateRig({ autoScale })}
           />
           <ToggleRow
             checked={rig.autoFingerPose}
             disabled={disabled || (!rig.autoFingerPose && !gripAvailable)}
-            label="손가락 자동 그립"
+            label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "손가락 자동 그립")}
             description={autoGripDescription(definition, item, gripReadiness)}
             onChange={(autoFingerPose) => updateRig({ autoFingerPose })}
           />
@@ -759,7 +758,7 @@ function SelectedEditor({
             <div className="border-t border-line/60 py-2">
               <ScalarField
                 disabled={disabled || !gripAvailable}
-                label="손가락 맞춤 강도"
+                label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "손가락 맞춤 강도")}
                 min={VRM_PROP_GRIP_FIT_MIN * 100}
                 max={VRM_PROP_GRIP_FIT_MAX * 100}
                 step={5}
@@ -772,13 +771,12 @@ function SelectedEditor({
                 aria-hidden
                 className="mt-0.5 flex items-center justify-between text-[0.6rem] font-semibold text-fg-3"
               >
-                <span>느슨하게</span>
-                <span>기본 100%</span>
-                <span>단단하게</span>
+                <span>{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "느슨하게")}</span>
+                <span>{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "기본 100%")}</span>
+                <span>{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "단단하게")}</span>
               </div>
               <p className="mt-1 text-[0.64rem] leading-relaxed text-fg-3">
-                손가락이 소품을 뚫으면 낮추고, 소품에서 떠 보이면 높이세요. 직접 손가락을 편집하려면 자동 그립을 끄면 됩니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "손가락이 소품을 뚫으면 낮추고, 소품에서 떠 보이면 높이세요. 직접 손가락을 편집하려면 자동 그립을 끄면 됩니다.")}</p>
             </div>
           ) : null}
         </div>
@@ -789,11 +787,11 @@ function SelectedEditor({
           <ToggleRow
             checked={secondary.enabled}
             disabled={disabled || !isHandBone(item.bone)}
-            label="보조 손 연결"
+            label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "보조 손 연결")}
             description={
               isHandBone(item.bone)
-                ? "긴 소품의 두 번째 접촉점을 반대 손에 연결해 양손 포즈를 안정시킵니다."
-                : "주 부착 부위를 왼손 또는 오른손으로 선택하면 사용할 수 있습니다."
+                ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "긴 소품의 두 번째 접촉점을 반대 손에 연결해 양손 포즈를 안정시킵니다.")
+                : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "주 부착 부위를 왼손 또는 오른손으로 선택하면 사용할 수 있습니다.")
             }
             onChange={(enabled) =>
               updateRig({
@@ -815,8 +813,7 @@ function SelectedEditor({
                 htmlFor={secondaryBoneSelectId}
                 className="block text-[0.68rem] font-semibold text-fg-2"
               >
-                보조 손
-                <select
+                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "보조 손")}<select
                   id={secondaryBoneSelectId}
                   value={secondary.bone}
                   disabled={disabled}
@@ -834,16 +831,14 @@ function SelectedEditor({
                   }
                 >
                   <option value="leftHand" disabled={item.bone === "leftHand"}>
-                    왼손
-                  </option>
+                    {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "왼손")}</option>
                   <option value="rightHand" disabled={item.bone === "rightHand"}>
-                    오른손
-                  </option>
+                    {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "오른손")}</option>
                 </select>
               </label>
               <ScalarField
                 disabled={disabled}
-                label="보조 손 영향도"
+                label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "보조 손 영향도")}
                 min={0}
                 max={1}
                 step={0.05}
@@ -860,7 +855,7 @@ function SelectedEditor({
                 }
               />
               <p className="text-right text-[0.62rem] tabular-nums text-fg-3">
-                실제 영향 {Math.round(secondary.influence * 100)}%
+                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "실제 영향 ")}{Math.round(secondary.influence * 100)}%
               </p>
             </div>
           ) : null}
@@ -869,7 +864,7 @@ function SelectedEditor({
 
       <div
         role="tablist"
-        aria-label="소품 미세 조정"
+        aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "소품 미세 조정")}
         className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-card p-1"
       >
         {TRANSFORM_SECTIONS.map((section) => {
@@ -877,11 +872,11 @@ function SelectedEditor({
           return (
             <button
               key={section.id}
-              id={`${sectionBaseId}-${section.id}-tab`}
+              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "en", "{v0}-{v1}-tab"), { v0: String(sectionBaseId), v1: String(section.id) })}
               type="button"
               role="tab"
               aria-selected={active}
-              aria-controls={`${sectionBaseId}-${section.id}-panel`}
+              aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "en", "{v0}-{v1}-panel"), { v0: String(sectionBaseId), v1: String(section.id) })}
               tabIndex={active ? 0 : -1}
               className={cn(
                 "min-h-11 rounded-lg border px-2 text-xs font-bold",
@@ -900,21 +895,21 @@ function SelectedEditor({
       </div>
 
       <div
-        id={`${sectionBaseId}-position-panel`}
+        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "en", "{v0}-position-panel"), { v0: String(sectionBaseId) })}
         role="tabpanel"
-        aria-labelledby={`${sectionBaseId}-position-tab`}
+        aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "en", "{v0}-position-tab"), { v0: String(sectionBaseId) })}
         hidden={transformSection !== "position"}
         className="mt-2"
       >
         <p className="mb-1 text-[0.64rem] leading-relaxed text-fg-3">
-          {rig ? "자동 소켓 위치 위에 더할 미세 이동입니다." : "관절 기준 기존 절대 위치입니다."}
+          {rig ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "자동 소켓 위치 위에 더할 미세 이동입니다.") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "관절 기준 기존 절대 위치입니다.")}
         </p>
         {([0, 1, 2] as const).map((axis) => (
           <AxisField
             key={axis}
             axis={axis}
             disabled={disabled}
-            label={rig ? "미세 위치" : "위치"}
+            label={rig ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "미세 위치") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "위치")}
             min={-1}
             max={1}
             step={0.01}
@@ -927,21 +922,21 @@ function SelectedEditor({
       </div>
 
       <div
-        id={`${sectionBaseId}-rotation-panel`}
+        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "en", "{v0}-rotation-panel"), { v0: String(sectionBaseId) })}
         role="tabpanel"
-        aria-labelledby={`${sectionBaseId}-rotation-tab`}
+        aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "en", "{v0}-rotation-tab"), { v0: String(sectionBaseId) })}
         hidden={transformSection !== "rotation"}
         className="mt-2"
       >
         <p className="mb-1 text-[0.64rem] leading-relaxed text-fg-3">
-          {rig ? "자동 소켓 정렬 뒤에 더할 회전 보정입니다." : "기존 관절 기준 절대 회전입니다."}
+          {rig ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "자동 소켓 정렬 뒤에 더할 회전 보정입니다.") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "기존 관절 기준 절대 회전입니다.")}
         </p>
         {([0, 1, 2] as const).map((axis) => (
           <AxisField
             key={axis}
             axis={axis}
             disabled={disabled}
-            label={rig ? "미세 회전" : "회전"}
+            label={rig ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "미세 회전") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "회전")}
             min={-180}
             max={180}
             step={1}
@@ -954,33 +949,32 @@ function SelectedEditor({
       </div>
 
       <div
-        id={`${sectionBaseId}-appearance-panel`}
+        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "en", "{v0}-appearance-panel"), { v0: String(sectionBaseId) })}
         role="tabpanel"
-        aria-labelledby={`${sectionBaseId}-appearance-tab`}
+        aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "en", "{v0}-appearance-tab"), { v0: String(sectionBaseId) })}
         hidden={transformSection !== "appearance"}
         className="mt-2 space-y-2"
       >
         <ScalarField
           disabled={disabled}
-          label={rig ? "자동 맞춤 추가 배율" : "크기 배율"}
+          label={rig ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "자동 맞춤 추가 배율") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "크기 배율")}
           min={0.2}
           max={4}
           step={0.05}
           precision={2}
-          suffix="배"
+          suffix={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "배")}
           value={scale}
           onChange={updateScale}
         />
         {item.color !== null ? (
           <label className="flex min-h-11 items-center justify-between gap-3 border-t border-line/60 pt-2 text-xs font-semibold text-fg-2">
-            소품 색상
-            <span className="flex items-center gap-2">
+            {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "소품 색상")}<span className="flex items-center gap-2">
               <span className="font-mono text-[0.68rem] uppercase text-fg-3">{item.color}</span>
               <input
                 type="color"
                 value={item.color}
                 disabled={disabled}
-                aria-label={`${definition?.label ?? item.propId} 색상`}
+                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "{v0} 색상"), { v0: String(definition?.label ?? item.propId) })}
                 className="size-11 cursor-pointer rounded-lg border border-line bg-card p-1 disabled:cursor-not-allowed disabled:opacity-45"
                 onChange={(event) => onUpdate(item.uid, { color: event.target.value })}
               />
@@ -988,8 +982,7 @@ function SelectedEditor({
           </label>
         ) : (
           <p className="rounded-lg border border-dashed border-line px-2.5 py-3 text-center text-[0.64rem] text-fg-3">
-            이 소품은 고정 재질을 사용합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "이 소품은 고정 재질을 사용합니다.")}</p>
         )}
       </div>
 
@@ -1004,8 +997,7 @@ function SelectedEditor({
           onClick={resetSmartFit}
         >
           <RotateCcw size={14} aria-hidden />
-          스마트 소켓 맞춤 초기화
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "스마트 소켓 맞춤 초기화")}</button>
       ) : null}
     </div>
   );
@@ -1180,15 +1172,12 @@ export function StudioVrmPropPanel({
             className="flex items-center gap-1.5 text-sm font-bold text-fg outline-none"
           >
             <Sparkles size={15} className="shrink-0 text-accent" aria-hidden />
-            소품 부착
-          </h3>
+            {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "소품 부착")}</h3>
           <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3">
-            장착 목록과 맞춤 편집을 먼저 확인하고, 필요한 소품만 카탈로그에서 추가하세요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "장착 목록과 맞춤 편집을 먼저 확인하고, 필요한 소품만 카탈로그에서 추가하세요.")}</p>
         </div>
         <span className="shrink-0 rounded-full border border-line bg-panel px-2 py-1 text-[0.64rem] font-bold tabular-nums text-fg-3">
-          {items.length}개
-        </span>
+          {items.length}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "개")}</span>
       </div>
 
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -1197,8 +1186,7 @@ export function StudioVrmPropPanel({
 
       {!vrmReady ? (
         <p className="mt-2 rounded-lg border border-warn/35 bg-warn/10 px-2.5 py-2 text-[0.68rem] leading-relaxed text-warn">
-          캐릭터 모델 준비가 끝나면 소품을 추가하고 맞춤 값을 조정할 수 있습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "캐릭터 모델 준비가 끝나면 소품을 추가하고 맞춤 값을 조정할 수 있습니다.")}</p>
       ) : null}
 
       <div className="mt-3">
@@ -1208,15 +1196,14 @@ export function StudioVrmPropPanel({
             tabIndex={-1}
             className="text-xs font-bold text-fg-2 outline-none"
           >
-            현재 장착
-          </h4>
+            {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "현재 장착")}</h4>
           {items.length > 0 ? (
             <div className="flex shrink-0 items-center gap-1">
               <button
                 ref={clearButtonRef}
                 type="button"
                 aria-label={
-                  clearConfirmation ? "장착된 모든 소품 제거 확인" : "장착된 모든 소품 제거"
+                  clearConfirmation ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "장착된 모든 소품 제거 확인") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "장착된 모든 소품 제거")
                 }
                 className={cn(
                   "min-h-11 rounded-lg border px-2.5 text-[0.68rem] font-semibold transition-colors",
@@ -1227,20 +1214,19 @@ export function StudioVrmPropPanel({
                 )}
                 onClick={handleClear}
               >
-                {clearConfirmation ? "5초 내 제거" : "전체 제거"}
+                {clearConfirmation ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "5초 내 제거") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "전체 제거")}
               </button>
               {clearConfirmation ? (
                 <button
                   type="button"
-                  aria-label="장착된 모든 소품 제거 취소"
+                  aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "장착된 모든 소품 제거 취소")}
                   className={cn(
                     "min-h-11 rounded-lg border border-line bg-card px-2.5 text-[0.68rem] font-semibold text-fg-3 transition-colors hover:bg-raised hover:text-fg",
                     FOCUS_RING
                   )}
                   onClick={handleCancelClear}
                 >
-                  취소
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "취소")}</button>
               ) : null}
             </div>
           ) : null}
@@ -1248,13 +1234,12 @@ export function StudioVrmPropPanel({
 
         {items.length === 0 ? (
           <div className="rounded-lg border border-dashed border-line bg-panel/35 px-3 py-4 text-center">
-            <p className="text-xs font-semibold text-fg-2">아직 장착된 소품이 없습니다.</p>
+            <p className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "아직 장착된 소품이 없습니다.")}</p>
             <p className="mt-1 text-[0.64rem] leading-relaxed text-fg-3">
-              아래 추천에서 빠르게 추가하거나 전체 카탈로그를 검색하세요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "아래 추천에서 빠르게 추가하거나 전체 카탈로그를 검색하세요.")}</p>
           </div>
         ) : (
-          <ul className="space-y-2" aria-label={`현재 장착된 소품 ${items.length}개`}>
+          <ul className="space-y-2" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "현재 장착된 소품 {v0}개"), { v0: String(items.length) })}>
             {items.map((item) => {
               const definition = propDefById(item.propId) ?? null;
               const selected = selectedUid === item.uid;
@@ -1289,13 +1274,13 @@ export function StudioVrmPropPanel({
                           {definition?.label ?? item.propId}
                         </span>
                         <span className="shrink-0 text-[0.62rem] font-normal text-fg-3">
-                          {PROP_BONE_LABELS[item.bone]} · {item.rig ? "스마트 소켓" : "기존 부착"}
+                          {PROP_BONE_LABELS[item.bone]} · {item.rig ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "스마트 소켓") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "기존 부착")}
                         </span>
                       </span>
                     </button>
                     <button
                       type="button"
-                      aria-label={`${definition?.label ?? item.propId} 제거`}
+                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "{v0} 제거"), { v0: String(definition?.label ?? item.propId) })}
                       className={cn(
                         "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-bad",
                         FOCUS_RING
@@ -1329,15 +1314,15 @@ export function StudioVrmPropPanel({
       <div className="mt-4">
         <div className="mb-1.5 flex min-h-11 items-center justify-between gap-2">
           <div>
-            <p className="text-xs font-bold text-fg-2">최근 · 추천</p>
-            <p className="text-[0.62rem] text-fg-3">자주 쓰는 8종을 바로 추가합니다.</p>
+            <p className="text-xs font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "최근 · 추천")}</p>
+            <p className="text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "자주 쓰는 8종을 바로 추가합니다.")}</p>
           </div>
           <span className="text-[0.62rem] tabular-nums text-fg-3">{quickDefinitions.length}/8</span>
         </div>
         <div className="grid grid-cols-2 gap-1.5 min-[360px]:grid-cols-4">
           {quickDefinitions.map((definition) => (
             <CatalogButton
-              key={`quick-${definition.id}`}
+              key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "en", "quick-{v0}"), { v0: String(definition.id) })}
               definition={definition}
               disabled={!vrmReady}
               onAdd={handleAdd}
@@ -1356,11 +1341,9 @@ export function StudioVrmPropPanel({
         >
           <span className="flex min-w-0 items-center gap-1.5">
             <Search size={14} className="shrink-0 text-accent" aria-hidden />
-            전체 소품 찾기
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "전체 소품 찾기")}</span>
           <span className="flex shrink-0 items-center gap-1 text-[0.64rem] font-normal tabular-nums text-fg-3">
-            {SELECTABLE_PROP_COUNT}종
-            <ChevronDown
+            {SELECTABLE_PROP_COUNT}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "종")}<ChevronDown
               size={14}
               className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
               aria-hidden
@@ -1369,9 +1352,8 @@ export function StudioVrmPropPanel({
         </summary>
 
         <div id={catalogContentId} className="border-t border-line/70 px-3 py-3">
-          <label htmlFor={`${catalogContentId}-search`} className="sr-only">
-            소품 검색
-          </label>
+          <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "en", "{v0}-search"), { v0: String(catalogContentId) })} className="sr-only">
+            {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "소품 검색")}</label>
           <div className="relative">
             <Search
               size={14}
@@ -1379,10 +1361,10 @@ export function StudioVrmPropPanel({
               aria-hidden
             />
             <input
-              id={`${catalogContentId}-search`}
+              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "en", "{v0}-search"), { v0: String(catalogContentId) })}
               type="search"
               value={query}
-              placeholder="이름·용도 검색"
+              placeholder={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "이름·용도 검색")}
               className={cn(
                 "min-h-11 w-full rounded-lg border border-line bg-card py-2 pl-9 pr-3 text-xs text-fg placeholder:text-fg-3",
                 FOCUS_RING
@@ -1393,7 +1375,7 @@ export function StudioVrmPropPanel({
 
           <div
             role="group"
-            aria-label="소품 카테고리"
+            aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "소품 카테고리")}
             className="mt-2 grid grid-cols-4 gap-1"
           >
             {CATALOG_CATEGORIES.map((option) => {
@@ -1423,12 +1405,11 @@ export function StudioVrmPropPanel({
             role="status"
             aria-live="polite"
           >
-            검색 결과 {filteredDefinitions.length}종
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "검색 결과 ")}{filteredDefinitions.length}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "종")}</p>
 
           {filteredDefinitions.length === 0 ? (
             <div className="rounded-lg border border-dashed border-line px-3 py-5 text-center">
-              <p className="text-xs font-semibold text-fg-2">검색 결과가 없습니다.</p>
+              <p className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "검색 결과가 없습니다.")}</p>
               <button
                 type="button"
                 className={cn(
@@ -1440,14 +1421,13 @@ export function StudioVrmPropPanel({
                   setCategory("all");
                 }}
               >
-                검색 초기화
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "ko", "검색 초기화")}</button>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-1.5 min-[360px]:grid-cols-3">
               {filteredDefinitions.map((definition) => (
                 <CatalogButton
-                  key={`catalog-${definition.id}`}
+                  key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPropPanel", "en", "catalog-{v0}"), { v0: String(definition.id) })}
                   definition={definition}
                   disabled={!vrmReady}
                   onAdd={handleAdd}

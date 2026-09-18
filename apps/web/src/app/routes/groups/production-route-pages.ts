@@ -1,7 +1,7 @@
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 export const ProductionLandingPage = lazyRetry(
-  () => import("@/domains/creator/production-hub/ProductionHubPage").then((module) => ({
+  () => import("@/domains/creator/production-hub/ProductionLandingPage").then((module) => ({
     default: module.ProductionLandingPage,
   })),
   "ProductionLandingPage",
@@ -19,4 +19,11 @@ export const ProductionEpisodeRoomPage = lazyRetry(
     default: module.ProductionEpisodeRoomPage,
   })),
   "ProductionEpisodeRoomPage",
+);
+
+export const ProductionExternalReviewPage = lazyRetry(
+  () => import("@/domains/creator/production-hub/ProductionExternalReviewPage").then((module) => ({
+    default: module.ProductionExternalReviewPage,
+  })),
+  "ProductionExternalReviewPage",
 );

@@ -50,6 +50,14 @@ describe("natural normalized-VRM hand poses", () => {
     expect(proximal).toEqual([...proximal].sort((a, b) => a - b));
   });
 
+  it("authors thumb opposition through the CMC instead of hinging only MCP/IP", () => {
+    for (const pose of ["fist", "holding", "penGrip", "relaxed"] as const) {
+      const hand = createStudioVrmHandPose("right", pose);
+      expect(Math.abs(hand.rightThumbMetacarpal[0])).toBeGreaterThan(0);
+      expect(Math.abs(hand.rightThumbMetacarpal[1])).toBeGreaterThan(0);
+    }
+  });
+
   it("does not emit body, wrist or opposite-hand edits", () => {
     for (const name of Object.keys(createStudioVrmHandPose("left", "fist"))) {
       expect(name).toMatch(/^left(Thumb|Index|Middle|Ring|Little)/);

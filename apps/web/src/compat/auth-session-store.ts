@@ -283,11 +283,12 @@ export async function signInWithGoogleIdToken(
 }
 
 export async function signIn(provider?: string, options?: Record<string, unknown>) {
-  // 소셜 로그인(Google·Kakao·Naver·GitHub): OAuth 시작 엔드포인트로 전체 페이지 리다이렉트.
+  // 소셜 로그인(Google·Apple·Kakao·Naver·GitHub): OAuth 시작 엔드포인트로 전체 페이지 리다이렉트.
   // 백엔드가 실제 제공자 또는 개발 환경에서 명시적으로 허용한 데모 흐름으로 분기한다.
   // (Google 실연동은 GIS 버튼 → signInWithGoogleIdToken 경로를 사용; 이 리다이렉트는 데모/code-flow 폴백.)
   if (
     provider === "google"
+    || provider === "apple"
     || provider === "kakao"
     || provider === "naver"
     || provider === "github"

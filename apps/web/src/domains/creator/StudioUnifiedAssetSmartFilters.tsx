@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { RotateCcw, SlidersHorizontal } from "lucide-react";
 import type { ChangeEvent } from "react";
 
@@ -59,8 +63,7 @@ export function StudioUnifiedAssetSmartFilters({
       <div className="flex items-center justify-between gap-2">
         <p className="inline-flex items-center gap-1 text-[0.58rem] font-bold text-fg-2">
           <SlidersHorizontal size={12} aria-hidden />
-          제작 조건
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartFilters", "ko", "제작 조건")}</p>
         {activeCount > 0 ? (
           <button
             type="button"
@@ -71,19 +74,19 @@ export function StudioUnifiedAssetSmartFilters({
             )}
           >
             <RotateCcw size={11} aria-hidden />
-            초기화 {activeCount}
+            {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartFilters", "ko", "초기화 ")}{activeCount}
           </button>
         ) : null}
       </div>
 
-      <div className="flex gap-1 overflow-x-auto pb-1" aria-label="에셋 기술 형식">
+      <div className="flex gap-1 overflow-x-auto pb-1" aria-label={translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartFilters", "ko", "에셋 기술 형식")}>
         {FORMATS.map((option) => (
           <button
             key={option}
             type="button"
             onClick={() => onFormatChange(option)}
             aria-pressed={format === option}
-            aria-label={`에셋 형식 ${STUDIO_UNIFIED_ASSET_FORMAT_LABELS[option]}`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartFilters", "ko", "에셋 형식 {v0}"), { v0: String(STUDIO_UNIFIED_ASSET_FORMAT_LABELS[option]) })}
             className={cn(
               "min-h-10 shrink-0 rounded-lg border px-2 text-[0.56rem] font-semibold pointer-coarse:min-h-11",
               SMART_LIBRARY_FOCUS,
@@ -127,23 +130,21 @@ export function StudioUnifiedAssetSmartFilters({
             }
             className="size-4 accent-[var(--accent)]"
           />
-          계속 편집 가능한 에셋만
-        </label>
+          {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartFilters", "ko", "계속 편집 가능한 에셋만")}</label>
         <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-card px-2 text-[0.58rem] font-semibold text-fg-2">
-          정렬
-          <select
+          {translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartFilters", "ko", "정렬")}<select
             value={sort}
             onChange={(event: ChangeEvent<HTMLSelectElement>) =>
               onSortChange(event.target.value as StudioUnifiedAssetSort)
             }
-            aria-label="스마트 에셋 정렬"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartFilters", "ko", "스마트 에셋 정렬")}
             className={cn(
               "min-h-9 min-w-0 flex-1 rounded-md border border-line bg-panel px-2 text-[0.58rem] text-fg",
               SMART_LIBRARY_FOCUS,
             )}
           >
-            <option value="recommended">추천순</option>
-            <option value="name">이름순</option>
+            <option value="recommended">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartFilters", "ko", "추천순")}</option>
+            <option value="name">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartFilters", "ko", "이름순")}</option>
           </select>
         </label>
       </div>

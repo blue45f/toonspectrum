@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * THESIS: 측정값과 추론 상태를 한 시선 안에 두고, SketchUp식 줄자를 웹툰 배경 작업에 연결한다.
  * OWN-WORLD: 기존 warm-ink 패널, 얇은 경계, persimmon 활성 신호, tabular 측정 숫자를 계승한다.
@@ -162,11 +166,9 @@ export function StudioBg3dMeasurementPanel({
             className="flex items-center gap-1.5 text-sm font-bold text-fg"
           >
             <Ruler size={15} className="shrink-0 text-accent" aria-hidden />
-            줄자 · 추론 가이드
-          </h3>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "줄자 · 추론 가이드")}</h3>
           <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-            뷰포트의 두 점을 재고 축·평행·수직 방향을 확인한 뒤 영구 가이드로 남깁니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "뷰포트의 두 점을 재고 축·평행·수직 방향을 확인한 뒤 영구 가이드로 남깁니다.")}</p>
         </div>
         <span className="shrink-0 rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-bold tabular-nums text-fg-3">
           {document.guides.length}/{STUDIO_BG3D_MEASUREMENT_MAX_GUIDES}
@@ -176,7 +178,7 @@ export function StudioBg3dMeasurementPanel({
       <div
         className="mt-3 grid grid-cols-3 gap-1 rounded-lg border border-line bg-card p-1"
         role="radiogroup"
-        aria-label="측정 표시 단위"
+        aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "측정 표시 단위")}
       >
         {UNIT_OPTIONS.map((option) => (
           <button
@@ -202,9 +204,9 @@ export function StudioBg3dMeasurementPanel({
         <div className="mt-3 overflow-hidden rounded-xl border border-line bg-card/70">
           <div className="flex items-end justify-between gap-3 border-b border-line/70 px-3 py-2.5">
             <div>
-              <p className="text-[0.64rem] font-semibold text-fg-3">현재 두 점 거리</p>
+              <p className="text-[0.64rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "현재 두 점 거리")}</p>
               <output
-                aria-label="현재 측정 거리"
+                aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "현재 측정 거리")}
                 className="mt-0.5 block text-lg font-bold tabular-nums tracking-[-0.02em] text-fg"
               >
                 {distanceLabel ?? "—"}
@@ -219,7 +221,7 @@ export function StudioBg3dMeasurementPanel({
               )}
             >
               <Magnet size={11} aria-hidden />
-              {inference ? inferenceLabel(inference.primary) : "추론 대기"}
+              {inference ? inferenceLabel(inference.primary) : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "추론 대기")}
             </span>
           </div>
 
@@ -235,8 +237,7 @@ export function StudioBg3dMeasurementPanel({
           </dl>
 
           <p className="px-3 py-2 text-[0.64rem] tabular-nums text-fg-3">
-            중점&nbsp;
-            {draftMeasurement.midpointWorld.map((value) =>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "중점&nbsp;")}{draftMeasurement.midpointWorld.map((value) =>
               formatSignedCoordinate(value, document.unit)
             ).join(" · ")}
           </p>
@@ -244,10 +245,9 @@ export function StudioBg3dMeasurementPanel({
       ) : (
         <div className="mt-3 rounded-xl border border-dashed border-line bg-card/45 px-3 py-4 text-center">
           <Ruler size={20} className="mx-auto text-fg-3" aria-hidden />
-          <p className="mt-2 text-xs font-semibold text-fg-2">뷰포트에서 시작점과 끝점을 찍어 주세요.</p>
+          <p className="mt-2 text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "뷰포트에서 시작점과 끝점을 찍어 주세요.")}</p>
           <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-            두 번째 점을 움직이는 동안 거리와 XYZ 변화량, 방향 추론이 실시간으로 표시됩니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "두 번째 점을 움직이는 동안 거리와 XYZ 변화량, 방향 추론이 실시간으로 표시됩니다.")}</p>
         </div>
       )}
 
@@ -269,16 +269,15 @@ export function StudioBg3dMeasurementPanel({
             )}
           >
             {lockedLengthMeters === null ? <Unlock size={13} aria-hidden /> : <Lock size={13} aria-hidden />}
-            길이 잠금
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "길이 잠금")}</button>
           <label className="flex min-h-11 min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-line bg-panel px-2.5 text-xs sm:min-h-9">
-            <span className="shrink-0 text-fg-3">값</span>
+            <span className="shrink-0 text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "값")}</span>
             <input
               type="number"
               inputMode="decimal"
               min={0.000001}
               step="any"
-              aria-label="잠금 길이"
+              aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "잠금 길이")}
               disabled={disabled || lockedLengthMeters === null}
               value={lockedLengthInputValue(lockedLengthMeters, document.unit)}
               className="min-w-0 flex-1 bg-transparent text-right font-semibold tabular-nums text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
@@ -310,15 +309,14 @@ export function StudioBg3dMeasurementPanel({
           onClick={addCurrentGuide}
         >
           <Plus size={14} aria-hidden />
-          현재 측정을 영구 가이드로 고정
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "현재 측정을 영구 가이드로 고정")}</button>
       </div>
 
       {notice ? (
         <p
-          role={notice.tone === "error" ? "alert" : "status"}
-          aria-label="측정 가이드 알림"
-          aria-live={notice.tone === "error" ? "assertive" : "polite"}
+          role={notice.tone === "error" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "en", "status")}
+          aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "측정 가이드 알림")}
+          aria-live={notice.tone === "error" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "en", "assertive") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "en", "polite")}
           className={cx(
             "mt-2 rounded-lg border px-2.5 py-2 text-[0.68rem] leading-relaxed",
             notice.tone === "error"
@@ -331,16 +329,15 @@ export function StudioBg3dMeasurementPanel({
       ) : null}
 
       <div className="mt-4 flex items-center justify-between gap-2">
-        <h4 className="text-xs font-bold text-fg">영구 가이드</h4>
-        <span className="text-[0.62rem] text-fg-3">캡처 제외 · 장면에 저장</span>
+        <h4 className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "영구 가이드")}</h4>
+        <span className="text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "캡처 제외 · 장면에 저장")}</span>
       </div>
 
       {resolvedGuides.length === 0 ? (
         <p className="mt-2 rounded-lg border border-dashed border-line px-3 py-3 text-center text-[0.68rem] leading-relaxed text-fg-3">
-          저장된 가이드가 없습니다. 자주 쓰는 벽 높이·문 폭·가구 간격을 남겨 보세요.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "저장된 가이드가 없습니다. 자주 쓰는 벽 높이·문 폭·가구 간격을 남겨 보세요.")}</p>
       ) : (
-        <ul className="mt-2 space-y-1.5" aria-label="영구 측정 가이드 목록">
+        <ul className="mt-2 space-y-1.5" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "영구 측정 가이드 목록")}>
           {resolvedGuides.map(({ guide, resolved }, index) => {
             const label = resolved.ok ? resolved.resolved.label : "손상된 가이드";
             return (
@@ -360,13 +357,13 @@ export function StudioBg3dMeasurementPanel({
                     {label}
                   </span>
                   <span className="block truncate text-[0.6rem] text-fg-3">
-                    가이드 {String(index + 1).padStart(2, "0")}
-                    {guide.lockedLengthMeters !== null ? " · 길이 잠금" : ""}
+                    {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "가이드 ")}{String(index + 1).padStart(2, "0")}
+                    {guide.lockedLengthMeters !== null ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", " · 길이 잠금") : ""}
                   </span>
                 </span>
                 <button
                   type="button"
-                  aria-label={`${label} 가이드 ${guide.visible ? "숨기기" : "보이기"}`}
+                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "{v0} 가이드 {v1}"), { v0: String(label), v1: String(guide.visible ? "숨기기" : "보이기") })}
                   disabled={disabled}
                   className={STUDIO_BG3D_ICON_BUTTON}
                   onClick={() => updateDocument(
@@ -381,7 +378,7 @@ export function StudioBg3dMeasurementPanel({
                 </button>
                 <button
                   type="button"
-                  aria-label={`${label} 가이드 삭제`}
+                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMeasurementPanel", "ko", "{v0} 가이드 삭제"), { v0: String(label) })}
                   disabled={disabled}
                   className={cx(
                     STUDIO_BG3D_ICON_BUTTON,
