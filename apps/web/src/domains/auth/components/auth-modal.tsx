@@ -72,11 +72,13 @@ type AuthFormValues = z.infer<typeof authSchema>;
 export function AuthModal({
   onClose,
   returnFocusRef,
+  initialMode = "login",
 }: {
   onClose: () => void;
   returnFocusRef?: RefObject<HTMLElement | null>;
+  initialMode?: "login" | "signup";
 }) {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const [providers, setProviders] = useState<AuthProviderDiscovery>({});
   const [providerStatus, setProviderStatus] = useState<"loading" | "ready" | "error">("loading");
   const [providerAttempt, setProviderAttempt] = useState(0);
@@ -109,6 +111,10 @@ export function AuthModal({
 
   // RHF의 register ref 와 포커스용 emailRef 를 함께 연결
   const emailField = register("email");
+
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
 
   useEffect(() => {
     const controller = new AbortController();

@@ -96,6 +96,7 @@ const INDEXABLE_EXACT_ROUTES = new Set([
 
 const INDEXABLE_PREFIXES = [
   "/about/technology",
+  "/events",
   "/learn",
   "/research",
 ] as const;
