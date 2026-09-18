@@ -1,9 +1,9 @@
 import {
   formatI18nTemplate,
-  getCurrentUiLocale,
-  translateBilingualValueForLocale,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   AlertTriangle,
@@ -54,7 +54,6 @@ import { useEngineeringLocale } from "./use-engineering-locale";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
 import { cx } from "@/shared/lib/cx";
-import { getActiveI18nLocale, translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringFieldNotesPage", ko, en);
@@ -166,7 +165,7 @@ export function EngineeringFieldNotesPage() {
       bi((ENGINEERING_FIELD_CATEGORY_META[note.category].label).ko, (ENGINEERING_FIELD_CATEGORY_META[note.category].label).en),
       ...note.technologies,
     ].join(" ").toLocaleLowerCase(getActiveI18nLocale()).includes(normalizedQuery));
-  }, [filter, locale, normalizedQuery]);
+  }, [filter, normalizedQuery]);
   const inventoryCards = [
     { icon: Workflow, value: ENGINEERING_IMPLEMENTATION_INVENTORY.workerEntries, label: bi("전용 Worker 엔트리", "Dedicated worker entries") },
     { icon: Code2, value: ENGINEERING_IMPLEMENTATION_INVENTORY.workerClients, label: bi("Worker 클라이언트", "Worker clients") },

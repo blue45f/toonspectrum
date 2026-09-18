@@ -1,14 +1,8 @@
-import {
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Box, Brush, Image, Library, ShieldCheck, Store, Type, UserRound } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
 import Link from "@/compat/router-link";
 import { useT } from "@/shared/lib/i18n";
-import { translateParallelBilingualCopy } from "@/shared/lib/i18n-bilingual-copy";
-
-import { useI18n, useT } from "@/shared/lib/i18n";
 import { translateParallelBilingualCopy } from "@/shared/lib/i18n-bilingual-copy";
 
 const COPY = {
@@ -52,7 +46,7 @@ export function StudioAssetVisualIntro({ locale }: { readonly locale: string }) 
   const reducedMotion = useReducedMotion();
 
   return (
-    <section className="studio-asset-visual-intro" aria-labelledby="studio-asset-visual-title" lang={language}>
+    <section className="studio-asset-visual-intro" aria-labelledby="studio-asset-visual-title" lang={locale}>
       <div className="studio-asset-visual-intro__hero">
         <motion.figure
           initial={reducedMotion ? false : { opacity: 0, y: 14 }}

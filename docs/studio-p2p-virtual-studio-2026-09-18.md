@@ -9,9 +9,11 @@
 - Project Lobby
 - Writers Room
 - Storyboard Wall
+- Creator Lounge
+- Asset Library
 - Drawing Studio
 - Review Room
-- Creator Lounge
+- Assistant Desk
 
 사용자는 공간을 클릭·드래그·방향키·모바일 탭으로 이동한다. 같은 프로젝트의 P2P 참여자 위치와 작업 상태를 보고, 같은 존에서 가까운 사용자를 근접 대화 대상으로 삼을 수 있다.
 
@@ -64,7 +66,16 @@ STUN-only이므로 일부 회사망, 대칭 NAT, 방화벽, 인앱 브라우저�
 
 미디어 Huddle은 기존 정책대로 소규모 팀을 대상으로 한다. 공간 presence는 기존 P2P overlay 상한 안에서 동작하지만 대규모 회의나 웨비나를 목표로 하지 않는다.
 
-## UI 원칙
+## 경험 모드와 UI 원칙
+
+공개 홈은 데이터와 라우트를 복제하지 않고 표현 레이어만 바꾸는 두 가지 경험 모드를 제공한다.
+
+- Classic: 기존 제작 중심 홈을 그대로 유지
+- Virtual Studio: 좌측 내비게이션, 중앙 제작 룸, 우측 Huddle/채팅/AI 패널, 하단 기능 스트립으로 같은 기능을 공간형 UI로 표현
+- 선택은 브라우저에 저장하며 색상 테마와 독립적으로 유지
+- 모바일에서는 공간 이동을 방 카드/바로가기 중심으로 단순화
+
+실제 P2P 공간에서는 다음 원칙을 유지한다.
 
 - PC: 지도 클릭·드래그·방향키 이동
 - 모바일: 지도 탭과 존 바로가기 버튼

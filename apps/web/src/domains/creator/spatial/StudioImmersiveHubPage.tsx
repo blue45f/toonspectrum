@@ -1,8 +1,9 @@
 import {
   formatI18nTemplate,
-  resolveUiLocale,
-  translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
+  useBilingual,
+  useBilingualI18nRevision,
+  useBilingualLocalizer,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
@@ -26,11 +27,9 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 import {
   inspectStudioImmersiveCapabilities,
@@ -46,11 +45,6 @@ import {
   type StudioImmersiveStage,
 } from "./studio-immersive-workflows";
 import { SpatialWebtoonReaderLauncher } from "./SpatialWebtoonReaderLauncher";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 type Locale = string;
 type Icon = ComponentType<{ size?: number; className?: string; "aria-hidden"?: boolean }>;
@@ -129,7 +123,7 @@ function CapabilityCard({
     </article>
   );
 }
-function ImmersiveHeroVisual({ locale }: { readonly locale: Locale }) {
+function ImmersiveHeroVisual() {
   const bt = useBilingual("StudioImmersiveHubPage.hero");
   return (
     <div className="relative min-h-72 overflow-hidden rounded-[2rem] border border-line bg-[radial-gradient(circle_at_top_left,oklch(0.72_0.18_285/0.26),transparent_42%),radial-gradient(circle_at_bottom_right,oklch(0.76_0.14_190/0.2),transparent_44%),var(--color-panel)] p-5 shadow-xl">
@@ -379,7 +373,7 @@ export function StudioImmersiveHubPage() {
                   return (
                     <li key={deliverable} className="flex items-start gap-2">
                       <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
-                      <span>{l(deliverable, kit.deliverablesEn[deliverableIndex] ?? deliverable)}</span>
+                      <span>{deliverable}</span>
                     </li>
                   );
                 })}

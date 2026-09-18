@@ -24,8 +24,9 @@ export function CreatorHomePage() {
   return (
     <>
       <BetaOpenEventBanner />
-      <div className="fixed right-4 top-20 z-[80] hidden sm:block">
-        <CreatorExperienceModeSwitch />
+      <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] right-3 z-[80] sm:bottom-auto sm:right-4 sm:top-20">
+        <span className="sm:hidden"><CreatorExperienceModeSwitch compact /></span>
+        <span className="hidden sm:inline"><CreatorExperienceModeSwitch /></span>
       </div>
       <CreatorHomeExperience />
       <CreatorFeatureReels />

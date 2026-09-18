@@ -39,8 +39,8 @@ const CHARACTERS = [
 
 const NAV = [
   { href: "/", ko: "홈", en: "Home", icon: Home },
-  { href: "/studio", ko: "프로젝트", en: "Projects", icon: FolderKanban },
-  { href: "/studio/immersive", ko: "스튜디오", en: "Studio", icon: Sparkles, active: true },
+  { href: "/studio/projects", ko: "프로젝트", en: "Projects", icon: FolderKanban },
+  { href: "/studio", ko: "스튜디오", en: "Studio", icon: Sparkles, active: true },
   { href: "/showcase", ko: "작품 관리", en: "Works", icon: GalleryHorizontalEnd },
   { href: "/collaborate", ko: "멤버", en: "Members", icon: Users },
   { href: "/production", ko: "작업 보드", en: "Production", icon: ClipboardCheck },
@@ -253,14 +253,23 @@ export function CreatorVirtualStudioExperience() {
           <Link href="/studio" className="vs-chat-input">{t("Studio에서 P2P 채팅 시작", "Start P2P chat in Studio")}<ChevronRight size={14} /></Link>
         </section>
 
-        <section className="vs-panel vs-ai-preview">
-          <header><div><strong>{t("AI 프로듀서", "AI Producer")}</strong><small>{t("창작자를 보조하는 작업 코디네이터", "A creator-controlled production assistant")}</small></div><Bot size={17} /></header>
-          <ul>
-            <li><span>✓</span>{t("회의 요약과 결정사항 정리", "Summarise meetings and decisions")}</li>
-            <li><span>✓</span>{t("작업·담당자·마감 연결", "Connect tasks, owners and deadlines")}</li>
-            <li><span>✓</span>{t("리뷰 대기와 병목 표시", "Surface review queues and bottlenecks")}</li>
-          </ul>
-          <Link href="/studio/ai-settings" className="vs-panel-action">{t("AI 설정 열기", "Open AI settings")}<ChevronRight size={14} /></Link>
+        <section className="vs-panel vs-members-preview">
+          <header><div><strong>{t("접속 중인 멤버", "Members online")}</strong><small>{t("현재 공간의 작업 상태", "Live studio presence")}</small></div><Users size={17} /></header>
+          <div className="vs-member-list">
+            {[
+              { index: 0, ko: "하늘", en: "Haneul", statusKo: "작업 중", statusEn: "Creating" },
+              { index: 1, ko: "지훈 PD", en: "Jihun · PD", statusKo: "리뷰 중", statusEn: "Reviewing" },
+              { index: 2, ko: "민준", en: "Minjun", statusKo: "집중 중", statusEn: "Focused" },
+              { index: 3, ko: "시나", en: "Sina", statusKo: "온라인", statusEn: "Online" },
+            ].map((member) => (
+              <div key={member.en}>
+                <CharacterAvatar index={member.index} small />
+                <span><strong>{t(member.ko, member.en)}</strong><small>{t(member.statusKo, member.statusEn)}</small></span>
+                <i aria-hidden="true" />
+              </div>
+            ))}
+          </div>
+          <Link href="/collaborate" className="vs-panel-action">{t("멤버와 협업 관리", "Manage collaboration")}<ChevronRight size={14} /></Link>
         </section>
       </aside>
 

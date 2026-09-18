@@ -138,7 +138,15 @@ export function StudioP2pVirtualStudio({
         <span className="p2p-vs-count"><Users size={12} />{snapshot.peers.length + 1}</span>
       </header>
 
-      <div className="p2p-vs-map">
+      <div
+        className="p2p-vs-map"
+        role="application"
+        aria-label={translateCurrentStaticSourceText(
+          "domains.creator.live.huddle.StudioP2pVirtualStudio",
+          "ko",
+          "가상 스튜디오 지도",
+        )}
+      >
         <button
           type="button"
           className="p2p-vs-map-surface"
