@@ -1,4 +1,14 @@
-import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  createPrivateKey,
+  createPublicKey,
+  randomBytes,
+  randomUUID,
+  sign as signPayload,
+  timingSafeEqual,
+  verify as verifyPayload,
+} from "node:crypto";
 
 import { and, eq } from "drizzle-orm";
 import { OAuth2Client } from "google-auth-library";
@@ -8,16 +18,17 @@ import { accounts, db, dbClient, users } from "../db";
 import { normalizePersistedAuthRole } from "./admin-roles";
 import { ensureUserLifecycleSchema, getUserAuthBlock, normalizeSessionVersion } from "./user-lifecycle";
 
-// ── 소셜 로그인(Google·Kakao·Naver·GitHub) ──
+// ── 소셜 로그인(Google·Apple·Kakao·Naver·GitHub) ──
 // Google: GIS(Google Identity Services) ID 토큰 흐름. 프론트가 받은 ID 토큰을 google-auth-library
 //   verifyIdToken 으로 서버 검증(서명·aud·iss·exp)해 신원을 확정한다(인가-코드 교환 불필요).
 //   하위 호환: 기존 인가-코드 콜백 경로(handleOAuthCallback)도 키 설정 시 그대로 동작한다.
+// Apple: Services ID authorization-code/form_post 흐름. 서버가 ES256 client-secret을 생성하고 Apple ID token을 JWKS로 검증한다.
 // Kakao·Naver·GitHub: 서버가 인가 코드를 교환하고 제공자 프로필을 검증하는 OAuth 2.0 흐름.
-//   Kakao·Naver는 관리자 데모 토글을 유지하고, GitHub는 설정 누락 시 비활성 진단만 노출한다.
+//   Kakao·Naver는 관리자 데모 토글을 유지하고, GitHub는 S256 PKCE를 사용한다.
 // 세션은 서명 JWT(./session.ts)로 발급되어 HttpOnly 쿠키에 저장된다.
 // 마이그레이션 중인 탭 전용 클라이언트는 같은 JWT를 x-user-id 헤더로도 보낼 수 있다.
 
-export type OAuthProviderId = "google" | "kakao" | "naver" | "github";
+export type OAuthProviderId = "google" | "apple" | "kakao" | "naver" | "github";
 export type OAuthProviderMode = "oauth" | "demo" | "disabled";
 
 // OAuth 제공자 프로필 JSON: 키 형태를 고정할 수 없어 unknown 값 레코드로 표현.
@@ -33,7 +44,7 @@ function str(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
-// 소셜 로그인(Google·Kakao·Naver·GitHub) 실연동 활성화
+// 소셜 로그인(Google·Apple·Kakao·Naver·GitHub) 실연동 활성화
 const DEMO_ONLY_PROVIDERS = new Set<OAuthProviderId>();
 
 export interface OAuthUser {
@@ -131,6 +142,19 @@ function providerConfig(id: OAuthProviderId): ProviderConfig {
       demoEmail: "demo.google@webdex.local",
     };
   }
+  if (id === "apple") {
+    return {
+      id,
+      label: "Apple",
+      clientId: env("APPLE_SERVICE_ID") ?? env("APPLE_CLIENT_ID"),
+      authorizeUrl: "https://appleid.apple.com/auth/authorize",
+      tokenUrl: "https://appleid.apple.com/auth/token",
+      userInfoUrl: "https://appleid.apple.com/auth/keys",
+      scope: "name email",
+      demoName: "Apple 사용자",
+      demoEmail: "demo.apple@webdex.local",
+    };
+  }
   if (id === "github") {
     return {
       id,
@@ -179,6 +203,7 @@ function providerConfig(id: OAuthProviderId): ProviderConfig {
 export function isOAuthProvider(value: string): value is OAuthProviderId {
   return (
     value === "google"
+    || value === "apple"
     || value === "kakao"
     || value === "naver"
     || value === "github"
@@ -190,12 +215,85 @@ function socialLoginDemoEnabled(): boolean {
     && env("AUTH_SOCIAL_DEMO_ENABLED") === "true";
 }
 
+function applePrivateKey(): string | undefined {
+  const raw = env("APPLE_PRIVATE_KEY");
+  return raw?.replaceAll("\\n", "\n");
+}
+
+function appleAuthorizationConfigured(): boolean {
+  const clientId = env("APPLE_SERVICE_ID") ?? env("APPLE_CLIENT_ID");
+  const teamId = env("APPLE_TEAM_ID");
+  const keyId = env("APPLE_KEY_ID");
+  const privateKey = applePrivateKey();
+  if (
+    !clientId
+    || !/^[A-Za-z0-9.-]{3,255}$/u.test(clientId)
+    || !teamId
+    || !/^[A-Z0-9]{10}$/u.test(teamId)
+    || !keyId
+    || !/^[A-Z0-9]{10}$/u.test(keyId)
+    || !privateKey
+  ) return false;
+  try {
+    const key = createPrivateKey(privateKey);
+    return key.asymmetricKeyType === "ec"
+      && key.asymmetricKeyDetails?.namedCurve === "prime256v1";
+  } catch {
+    return false;
+  }
+}
+
+export function appleNonceForState(state: string): string {
+  return createHash("sha256").update(state, "utf8").digest("base64url");
+}
+
+function encodeJwtPart(value: JsonRecord): string {
+  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+}
+
+export function createAppleClientSecret(now = Date.now()): string {
+  const clientId = env("APPLE_SERVICE_ID") ?? env("APPLE_CLIENT_ID");
+  const teamId = env("APPLE_TEAM_ID");
+  const keyId = env("APPLE_KEY_ID");
+  const privateKey = applePrivateKey();
+  if (!clientId || !teamId || !keyId || !privateKey) {
+    throw new Error("Apple Sign in is not fully configured");
+  }
+  const issuedAt = Math.floor(now / 1000);
+  const header = encodeJwtPart({ alg: "ES256", kid: keyId, typ: "JWT" });
+  const payload = encodeJwtPart({
+    iss: teamId,
+    iat: issuedAt,
+    exp: issuedAt + 5 * 60,
+    aud: "https://appleid.apple.com",
+    sub: clientId,
+  });
+  const signingInput = `${header}.${payload}`;
+  const signingKey = createPrivateKey(privateKey);
+  if (
+    signingKey.asymmetricKeyType !== "ec"
+    || signingKey.asymmetricKeyDetails?.namedCurve !== "prime256v1"
+  ) {
+    throw new Error("Apple private key must be a P-256 EC key");
+  }
+  const signature = signPayload(
+    "sha256",
+    Buffer.from(signingInput, "ascii"),
+    {
+      key: signingKey,
+      dsaEncoding: "ieee-p1363",
+    },
+  );
+  return `${signingInput}.${signature.toString("base64url")}`;
+}
+
 export function providerMode(id: OAuthProviderId): OAuthProviderMode {
   if (DEMO_ONLY_PROVIDERS.has(id)) return "demo";
   const c = providerConfig(id);
   // Google은 GIS(ID 토큰) 흐름이라 client id만 있으면 실연동(클라이언트 시크릿 불필요).
   // 실 공급자 자격 증명이 없을 때 운영에서 데모 사용자로 가장하지 않고 안전하게 숨긴다.
   if (id === "google") return c.clientId ? "oauth" : "disabled";
+  if (id === "apple") return appleAuthorizationConfigured() ? "oauth" : "disabled";
   if (c.clientId && c.clientSecret) return "oauth";
   if ((id === "kakao" || id === "naver") && socialLoginDemoEnabled()) {
     return "demo";
@@ -215,6 +313,7 @@ export function isAuthorizationCodeFlowConfigured(
   id: OAuthProviderId,
 ): boolean {
   if (DEMO_ONLY_PROVIDERS.has(id)) return false;
+  if (id === "apple") return appleAuthorizationConfigured();
   const c = providerConfig(id);
   return Boolean(c.clientId && c.clientSecret);
 }
@@ -232,6 +331,7 @@ export interface AuthProviderInfo {
 // providers 엔드포인트 응답 — 설정 여부에 따라 oauth/demo 모드를 함께 노출.
 export function listAuthProviders(opts?: { kakao?: boolean; naver?: boolean }) {
   const googleMode = providerMode("google");
+  const appleMode = providerMode("apple");
   const githubMode = providerMode("github");
   const kakaoMode = providerMode("kakao");
   const naverMode = providerMode("naver");
@@ -243,6 +343,14 @@ export function listAuthProviders(opts?: { kakao?: boolean; naver?: boolean }) {
       // GIS 흐름: 실연동일 때만 client id 를 프론트로 노출한다. client secret 은 절대 노출하지 않는다.
       ...(googleMode === "oauth" ? { clientId: googleClientId() } : {}),
       ...(googleMode === "disabled" ? { reason: "missing-client-id" as const } : {}),
+    },
+    apple: {
+      label: "Apple",
+      mode: appleMode,
+      redirectAvailable: isAuthorizationCodeFlowConfigured("apple"),
+      ...(appleMode === "disabled"
+        ? { reason: "missing-credentials" as const }
+        : {}),
     },
     github: {
       label: "GitHub",
@@ -470,6 +578,10 @@ export function buildAuthorizeUrl(
     u.searchParams.set("access_type", "offline");
     u.searchParams.set("prompt", "select_account");
   }
+  if (id === "apple") {
+    u.searchParams.set("response_mode", "form_post");
+    u.searchParams.set("nonce", appleNonceForState(state));
+  }
   if (id === "github") {
     const challenge = options.pkceCodeChallenge;
     if (!challenge || !PKCE_CHALLENGE_PATTERN.test(challenge)) return null;
@@ -531,6 +643,146 @@ export function selectGitHubVerifiedEmail(value: unknown): string | null {
   return verified.find((entry) => entry.primary)?.email ?? verified[0]?.email ?? null;
 }
 
+type AppleJwk = {
+  kty: "RSA";
+  kid: string;
+  use?: string;
+  alg?: string;
+  n: string;
+  e: string;
+};
+
+let appleJwksCache: { expiresAt: number; keys: AppleJwk[] } | null = null;
+
+function decodeJwtObject(value: string): JsonRecord {
+  try {
+    const decoded = Buffer.from(value, "base64url").toString("utf8");
+    return asRecord(JSON.parse(decoded));
+  } catch {
+    throw new Error("invalid Apple identity token encoding");
+  }
+}
+
+function isAppleJwk(value: unknown): value is AppleJwk {
+  const key = asRecord(value);
+  return key.kty === "RSA"
+    && typeof key.kid === "string"
+    && typeof key.n === "string"
+    && typeof key.e === "string";
+}
+
+async function appleJwks(now = Date.now()): Promise<AppleJwk[]> {
+  if (appleJwksCache && appleJwksCache.expiresAt > now) {
+    return appleJwksCache.keys;
+  }
+  const response = await fetch("https://appleid.apple.com/auth/keys", {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`Apple JWKS fetch failed (${response.status})`);
+  const payload = asRecord(await response.json());
+  const keys = Array.isArray(payload.keys)
+    ? payload.keys.filter(isAppleJwk)
+    : [];
+  if (keys.length === 0) throw new Error("Apple JWKS response had no usable keys");
+  appleJwksCache = { expiresAt: now + 60 * 60_000, keys };
+  return keys;
+}
+
+export function parseAppleUserName(value: unknown): string | null {
+  let raw = value;
+  if (typeof raw === "string") {
+    if (raw.length > 8_192) return null;
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  const user = asRecord(raw);
+  const name = asRecord(user.name);
+  const clean = (part: unknown) =>
+    typeof part === "string"
+      ? part.replace(/\p{Cc}+/gu, " ").replace(/\s+/gu, " ").trim().slice(0, 100)
+      : "";
+  const first = clean(name.firstName);
+  const last = clean(name.lastName);
+  const combined = [first, last].filter(Boolean).join(" ").trim();
+  return combined || null;
+}
+
+export async function verifyAppleIdentityToken(
+  idToken: string,
+  state: string,
+  now = Date.now(),
+): Promise<NormalizedProfile> {
+  const clientId = env("APPLE_SERVICE_ID") ?? env("APPLE_CLIENT_ID");
+  if (!clientId) throw new Error("Apple client id is not configured");
+  const token = idToken.trim();
+  const parts = token.split(".");
+  if (parts.length !== 3 || token.length > 16_384) {
+    throw new Error("invalid Apple identity token format");
+  }
+  const [headerPart, payloadPart, signaturePart] = parts;
+  const header = decodeJwtObject(headerPart);
+  const payload = decodeJwtObject(payloadPart);
+  if (header.alg !== "RS256" || typeof header.kid !== "string") {
+    throw new Error("unsupported Apple identity token header");
+  }
+  const keys = await appleJwks(now);
+  const jwk = keys.find(
+    (candidate) =>
+      candidate.kid === header.kid
+      && (candidate.alg === undefined || candidate.alg === "RS256")
+      && (candidate.use === undefined || candidate.use === "sig"),
+  );
+  if (!jwk) throw new Error("Apple identity token signing key was not found");
+  const publicKey = createPublicKey({
+    key: {
+      kty: jwk.kty,
+      n: jwk.n,
+      e: jwk.e,
+    },
+    format: "jwk",
+  });
+  const signature = Buffer.from(signaturePart, "base64url");
+  const verified = verifyPayload(
+    "RSA-SHA256",
+    Buffer.from(`${headerPart}.${payloadPart}`, "ascii"),
+    publicKey,
+    signature,
+  );
+  if (!verified) throw new Error("Apple identity token signature is invalid");
+
+  const nowSeconds = Math.floor(now / 1000);
+  const audience = payload.aud;
+  const audienceMatches = audience === clientId
+    || (Array.isArray(audience) && audience.includes(clientId));
+  if (payload.iss !== "https://appleid.apple.com" || !audienceMatches) {
+    throw new Error("Apple identity token issuer or audience is invalid");
+  }
+  if (typeof payload.exp !== "number" || payload.exp <= nowSeconds) {
+    throw new Error("Apple identity token is expired");
+  }
+  if (typeof payload.iat !== "number" || payload.iat > nowSeconds + 60) {
+    throw new Error("Apple identity token issued-at time is invalid");
+  }
+  if (payload.nonce !== appleNonceForState(state)) {
+    throw new Error("Apple identity token nonce is invalid");
+  }
+  const providerAccountId = normalizedProviderAccountId(payload.sub);
+  const email = normalizedEmail(payload.email);
+  const emailVerified = email !== null
+    && (payload.email_verified === true || payload.email_verified === "true");
+  return {
+    providerAccountId,
+    email: emailVerified ? email : null,
+    emailVerified,
+    name: null,
+    image: null,
+  };
+}
+
 async function exchangeCode(
   id: OAuthProviderId,
   code: string,
@@ -544,7 +796,8 @@ async function exchangeCode(
     redirect_uri: redirectUri(id),
     code,
   };
-  if (c.clientSecret) params.client_secret = c.clientSecret;
+  if (id === "apple") params.client_secret = createAppleClientSecret();
+  else if (c.clientSecret) params.client_secret = c.clientSecret;
   // Naver requires the callback state again during the authorization-code exchange.
   if (id === "naver") params.state = state;
   if (id === "github") {
@@ -931,12 +1184,21 @@ export async function handleOAuthCallback(
   code: string,
   state: string,
   pkceVerifier?: string,
-  options: { linkToUserId?: string } = {},
+  options: { linkToUserId?: string; appleUser?: unknown } = {},
 ): Promise<OAuthUser> {
   const tokens = await exchangeCode(id, code, state, pkceVerifier);
-  const accessToken = tokens.access_token as string | undefined;
-  if (!accessToken) throw new Error("no access_token");
-  const profile = await fetchProfile(id, accessToken);
+  let profile: NormalizedProfile;
+  if (id === "apple") {
+    const idToken = typeof tokens.id_token === "string" ? tokens.id_token : "";
+    if (!idToken) throw new Error("Apple token exchange returned no identity token");
+    profile = await verifyAppleIdentityToken(idToken, state);
+    const firstAuthorizationName = parseAppleUserName(options.appleUser);
+    if (firstAuthorizationName) profile.name = firstAuthorizationName;
+  } else {
+    const accessToken = tokens.access_token as string | undefined;
+    if (!accessToken) throw new Error("no access_token");
+    profile = await fetchProfile(id, accessToken);
+  }
   // 로그인 전용 OAuth 토큰은 저장하지 않는다. 제공자 신원을 확인한 뒤 자체 HttpOnly 세션을 사용한다.
   return options.linkToUserId
     ? linkOAuthUser(id, profile, options.linkToUserId)
