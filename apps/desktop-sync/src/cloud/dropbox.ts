@@ -28,7 +28,6 @@ export interface DropboxDesktopCloudProviderOptions {
   readonly credentialProfile?: string;
   readonly uploadSessionStore?: DesktopUploadSessionStore;
   readonly simpleUploadThresholdBytes?: number;
-  readonly now?: () => number;
 }
 
 const DROPBOX_API = "https://api.dropboxapi.com/2";
@@ -102,7 +101,6 @@ export class DropboxDesktopCloudProvider implements DesktopCloudProvider {
   private readonly credentialProfile: string;
   private readonly uploadSessionStore?: DesktopUploadSessionStore;
   private readonly simpleUploadThresholdBytes: number;
-  private readonly now: () => number;
   private rootEnsured = false;
 
   constructor(options: DropboxDesktopCloudProviderOptions) {
@@ -110,7 +108,6 @@ export class DropboxDesktopCloudProvider implements DesktopCloudProvider {
     this.rootLabel = this.rootPath;
     this.credentialProfile = options.credentialProfile?.trim() || "default";
     this.uploadSessionStore = options.uploadSessionStore;
-    this.now = options.now ?? Date.now;
     this.simpleUploadThresholdBytes = options.simpleUploadThresholdBytes
       ?? DROPBOX_SIMPLE_UPLOAD_BYTES;
     if (this.simpleUploadThresholdBytes < 1
@@ -558,49 +555,6 @@ export class DropboxDesktopCloudProvider implements DesktopCloudProvider {
         throw error;
       }
     }
-  }
-
-  private trashRelativePath(
-    file: DesktopCloudObject,
-    expectedVersion: string,
-  ): string {
-    const timestamp = new Date(this.now())
-      .toISOString()
-      .replace(/[^0-9]/gu, "")
-      .slice(0, 17);
-    const digest = sha256Bytes(new TextEncoder().encode([
-      file.id,
-      expectedVersion,
-      file.relativePath,
-    ].join("\u0000"))).slice(0, 16);
-    return `${DROPBOX_TRASH_ROOT}/${timestamp}-${digest}/${file.relativePath}`;
-  }
-
-  private async moveFile(
-    fromPath: string,
-    toPath: string,
-    signal?: AbortSignal,
-  ): Promise<DropboxMetadata> {
-    const response = await this.api(
-      "files/move_v2",
-      {
-        from_path: fromPath,
-        to_path: toPath,
-        autorename: false,
-        allow_ownership_transfer: false,
-      },
-      { signal },
-    );
-    const body = await jsonObject(response, this.id);
-    const metadata = dropboxMetadata(body.metadata);
-    if (!metadata) {
-      throw new DesktopCloudError(
-        this.id,
-        "invalid-response",
-        "Dropbox move response did not contain file metadata",
-      );
-    }
-    return metadata;
   }
 
   async deleteFile(input: {
