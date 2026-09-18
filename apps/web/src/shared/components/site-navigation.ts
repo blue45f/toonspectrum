@@ -218,10 +218,10 @@ export const SITE_NAVIGATION_ITEMS = {
     "research",
     "/research",
     BookOpen,
-    "참고자료",
-    "References",
-    "출처가 있는 자료를 한곳에",
-    "Collect sourced references in one place",
+    "리서치 데스크",
+    "Research desk",
+    "출처·작품·트렌드 자료를 창작 소재와 판단으로 연결",
+    "Turn sourced references, works and trends into creative direction",
   ),
   opportunities: item(
     "opportunities",
@@ -313,8 +313,8 @@ const I = SITE_NAVIGATION_ITEMS;
 export const TOONSTUDIO_PRIMARY_NAVIGATION = [
   I.production,
   I.studio,
-  I.studioAssets,
-  I.publish,
+  I.research,
+  I.market,
 ] as const;
 
 /** Reader navigation remains separate from the creation product. */
@@ -339,10 +339,10 @@ export const TOONSTUDIO_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
     id: "production-resources",
     label: { ko: "작품 준비", en: "Prepare the work" },
     description: {
-      ko: "작품 재료와 참고자료를 작업 가까이에",
-      en: "Keep assets and references close to the work",
+      ko: "리서치·소재·작품 재료를 작업 가까이에",
+      en: "Keep research, marketplace assets and project materials close to the work",
     },
-    items: [I.studioAssets, I.research, I.learn, I.technology],
+    items: [I.research, I.market, I.studioAssets, I.learn, I.technology],
   },
   {
     id: "production-delivery",
@@ -372,7 +372,7 @@ export const TOONSPECTRUM_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
       ko: "영감·자료·기회를 실제 작업으로",
       en: "Connect inspiration, research and opportunity",
     },
-    items: [I.now, I.fortune, I.research, I.opportunities, I.insights, I.technology],
+    items: [I.now, I.fortune, I.research, I.market, I.opportunities, I.insights, I.technology],
   },
   {
     id: "connect",

@@ -10,15 +10,7 @@ import { parseStudioDocumentLocation } from "../studio-document-workspace";
 import { StudioEditorRoute } from "../studio-router/routes/StudioEditorRoute";
 import { resolveStudioRoute } from "../studio-router/studio-route-manifest";
 import { useStudioI18nPriorityLoading } from "../studio-router/useStudioI18nPriorityLoading";
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
-
-const bi = <T,>(ko: T, en: T): T =>
-  translateBilingualValueForActiveLocale("StudioDocumentWorkspaceRoute", ko, en);
-
+import { StudioModeExperienceBoundary } from "./StudioModeExperienceBoundary";
 
 
 /**
@@ -48,7 +40,16 @@ export function StudioDocumentWorkspaceRoute() {
       if (currentHref !== routeResolution.canonicalHref) {
         return <Navigate replace state={location.state} to={routeResolution.canonicalHref} />;
       }
-      return <StudioEditorRoute resolution={routeResolution} />;
+      return (
+        <StudioModeExperienceBoundary
+          projectId={documentResolution.projectId}
+          documentId={documentResolution.documentId}
+          workspace={documentResolution.workspace}
+          locale={locale}
+        >
+          <StudioEditorRoute resolution={routeResolution} />
+        </StudioModeExperienceBoundary>
+      );
     }
   }
 

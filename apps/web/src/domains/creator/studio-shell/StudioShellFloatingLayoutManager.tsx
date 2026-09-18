@@ -21,10 +21,15 @@ import {
   useSyncExternalStore,
 } from "react";
 
+import { STUDIO_FLOATING_MENU_LAYOUTS } from "../studio-floating-menu-layouts";
 import {
   arrangeStudioFloatingSurfaces,
   requestStudioFloatingSurfaceLayoutReset,
 } from "../studio-floating-surface-stack";
+import {
+  STUDIO_DESKTOP_FLOATING_QUERY,
+  StudioDesktopFloatingSurface,
+} from "../StudioDesktopFloatingSurface";
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import {
   setStudioWorkspaceArranging,
@@ -41,6 +46,7 @@ import {
   type StudioShellFloatingVisibilityId,
 } from "./studio-shell-floating-layout";
 
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { Switch } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
@@ -76,6 +82,7 @@ function surfaceIdsForVisibility(
 
 export function StudioShellFloatingLayoutManager() {
   const shell = useStudioShellFloatingLayout();
+  const desktop = useMediaQuery(STUDIO_DESKTOP_FLOATING_QUERY);
   const arranging = useSyncExternalStore(
     subscribeStudioWorkspaceArranging,
     studioWorkspaceArrangingSnapshot,
@@ -162,59 +169,48 @@ export function StudioShellFloatingLayoutManager() {
     setNotice("상시 플로팅 UI와 열린 작업 패널의 위치·크기·잠금을 기본값으로 복원했어요.");
   };
 
-  return (
-    <>
-      <style>{`
-        [data-studio-shell-layout-hidden="true"]{display:none!important}
-        [data-studio-shell-drawing-auto-hidden="true"]{opacity:0!important;pointer-events:none!important;visibility:hidden!important}
-      `}</style>
-      {STUDIO_SHELL_FLOATING_SURFACES.map((definition) => (
-        <StudioShellFloatingTarget
-          key={definition.id}
-          surfaceId={definition.id}
-        />
-      ))}
+  const closeManager = (): void => {
+    setOpen(false);
+    launcherRef.current?.focus({ preventScroll: true });
+  };
 
-      <div
-        data-studio-shell-view-options="true"
-        data-studio-shell-drawing-auto-hide-active={drawingAutoHideRunning ? "true" : "false"}
-        aria-hidden={drawingAutoHideRunning ? true : undefined}
-        inert={drawingAutoHideRunning ? true : undefined}
-        className={cn(
-          "pointer-events-auto fixed bottom-[calc(var(--studio-canvas-bottom-inset,0px)+0.75rem)] left-3 z-[70] max-w-[calc(100vw-1.5rem)] text-fg print:hidden lg:bottom-3",
-          "transition-[opacity,transform] duration-150 motion-reduce:transition-none",
-          drawingAutoHideRunning && "pointer-events-none translate-y-2 opacity-0",
-        )}
-      >
-        {open ? (
-          <div
-            ref={panelRef}
-            role="dialog"
-            aria-modal="false"
-            aria-label="보기 및 플로팅 UI 설정"
-            className="mb-2 flex max-h-[min(68dvh,40rem)] w-[min(28rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-2xl border border-line-strong bg-panel/98 shadow-2xl backdrop-blur-xl sm:max-h-[min(78dvh,46rem)]"
-          >
+  const panel = (
+    <div
+      ref={panelRef}
+      role={desktop ? undefined : "dialog"}
+      aria-modal={desktop ? undefined : "false"}
+      aria-label={desktop ? undefined : "보기 및 플로팅 UI 설정"}
+      data-studio-shell-view-options-content="true"
+      className={cn(
+        "flex min-h-0 flex-col overflow-hidden",
+        desktop
+          ? "h-full"
+          : "mb-2 max-h-[min(68dvh,40rem)] w-[min(28rem,calc(100vw-1.5rem))] rounded-2xl border border-line-strong bg-panel/98 shadow-2xl backdrop-blur-xl sm:max-h-[min(78dvh,46rem)]",
+      )}
+    >
             <header className="flex items-start gap-3 border-b border-line p-4">
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
                 <MonitorCog size={18} aria-hidden />
               </span>
               <div className="min-w-0 flex-1">
-                <h2 className="text-sm font-black">보기 · 플로팅 UI</h2>
+                <h2 className="text-sm font-black">{desktop ? "플로팅 UI 작업공간" : "보기 · 플로팅 UI"}</h2>
                 <p className="mt-1 text-xs leading-5 text-fg-3">
                   표시 여부를 고르고, 배치 편집에서 화면을 보며 직접 이동·도킹·크기 조절할 수 있어요.
                 </p>
               </div>
-              <button
-                type="button"
-                aria-label="보기 설정 닫기"
-                className={cn(actionClass, "size-10 shrink-0 px-0 pointer-coarse:size-11")}
-                onClick={() => {
-                  setOpen(false);
-                  launcherRef.current?.focus({ preventScroll: true });
-                }}
-              >
-                <X size={16} aria-hidden />
-              </button>
+              {!desktop ? (
+                <button
+                  type="button"
+                  aria-label="보기 설정 닫기"
+                  className={cn(actionClass, "size-10 shrink-0 px-0 pointer-coarse:size-11")}
+                  onClick={() => {
+                    setOpen(false);
+                    launcherRef.current?.focus({ preventScroll: true });
+                  }}
+                >
+                  <X size={16} aria-hidden />
+                </button>
+              ) : null}
             </header>
 
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-4">
@@ -534,7 +530,56 @@ export function StudioShellFloatingLayoutManager() {
               {notice}
             </p>
           </div>
-        ) : null}
+  );
+
+  return (
+    <>
+      <style>{`
+        [data-studio-shell-layout-hidden="true"]{display:none!important}
+        [data-studio-shell-drawing-auto-hidden="true"]{opacity:0!important;pointer-events:none!important;visibility:hidden!important}
+      `}</style>
+      {STUDIO_SHELL_FLOATING_SURFACES.map((definition) => (
+        <StudioShellFloatingTarget
+          key={definition.id}
+          surfaceId={definition.id}
+        />
+      ))}
+
+      {open && desktop ? (
+        <StudioDesktopFloatingSurface
+          surfaceId="shell-floating-layout-manager"
+          label="보기 · 플로팅 UI"
+          defaultLayout={STUDIO_FLOATING_MENU_LAYOUTS.viewOptions}
+          onClose={closeManager}
+          minWidth={440}
+          minHeight={480}
+          maxWidth={760}
+          maxHeight={900}
+          insetTop={64}
+          zIndexFloor={70}
+          contentClassName="overflow-hidden"
+          participatesInWorkspaceArrangement={false}
+          rootDataAttributes={{
+            "data-studio-shell-view-options-panel": "true",
+            "data-studio-shortcut-boundary": "true",
+          }}
+        >
+          {panel}
+        </StudioDesktopFloatingSurface>
+      ) : null}
+
+      <div
+        data-studio-shell-view-options="true"
+        data-studio-shell-drawing-auto-hide-active={drawingAutoHideRunning ? "true" : "false"}
+        aria-hidden={drawingAutoHideRunning ? true : undefined}
+        inert={drawingAutoHideRunning ? true : undefined}
+        className={cn(
+          "pointer-events-auto fixed bottom-[calc(var(--studio-canvas-bottom-inset,0px)+0.75rem)] left-3 z-[70] max-w-[calc(100vw-1.5rem)] text-fg print:hidden lg:bottom-3",
+          "transition-[opacity,transform] duration-150 motion-reduce:transition-none",
+          drawingAutoHideRunning && "pointer-events-none translate-y-2 opacity-0",
+        )}
+      >
+        {open && !desktop ? panel : null}
 
         <button
           ref={launcherRef}

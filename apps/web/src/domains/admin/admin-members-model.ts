@@ -1,5 +1,5 @@
 export const MEMBER_ROLES = ["user", "creator", "operator", "admin"] as const;
-export const MEMBER_STATUSES = ["active", "suspended", "deleted"] as const;
+export const MEMBER_STATUSES = ["active", "suspended", "deleted", "merged"] as const;
 export const MEMBER_SORTS = [
   "created_desc",
   "created_asc",

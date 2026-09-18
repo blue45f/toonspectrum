@@ -3,6 +3,7 @@ import { useLocation, useParams } from "react-router-dom";
 
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 
 import {
   resolveStudioProjectView,
@@ -28,10 +29,6 @@ import {
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = string;
-const bi = <T,>(ko: T, en: T): T =>
-  translateBilingualValueForActiveLocale("StudioProjectIntegratedPage", ko, en);;
-
 const WEBTOON_ONBOARDING_PROFILE_PREFIX = "toonstudio:webtoon-onboarding:v1:";
 const LazyStudioWebtoonOnboardingPanel = lazy(async () => {
   const module = await import("./StudioWebtoonOnboardingPanel");
@@ -52,9 +49,9 @@ function StudioWebtoonOnboardingPanelSlot({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
-  useBilingualI18nRevision();
+  const l = useBilingualLocalizer("studioProjectIntegrated.onboarding");
   const [enabled, setEnabled] = useState(() => hasStoredWebtoonOnboarding(projectId));
 
   useEffect(() => {
@@ -69,7 +66,7 @@ function StudioWebtoonOnboardingPanelSlot({
         <div
           className="min-h-28 animate-pulse rounded-3xl border border-accent/20 bg-accent-soft/15"
           aria-busy="true"
-          aria-label={bi("제작 온보딩 불러오는 중", "Loading production onboarding")}
+          aria-label={l("제작 온보딩 불러오는 중", "Loading production onboarding")}
         />
       )}
     >
@@ -77,6 +74,11 @@ function StudioWebtoonOnboardingPanelSlot({
     </Suspense>
   );
 }
+
+const StudioCreatorIntelligencePanel = lazy(async () => {
+  const module = await import("../creator-intelligence/StudioCreatorIntelligencePanel");
+  return { default: module.StudioCreatorIntelligencePanel };
+});
 
 const StudioCompatibilityReportsPanel = lazy(async () => {
   const module = await import("../project-graph/StudioCompatibilityReportsPanel");
@@ -93,19 +95,19 @@ const StudioProjectVersionStackPanel = lazy(async () => {
   return { default: module.StudioProjectVersionStackPanel };
 });
 
-function ProjectGraphPanelFallback({ locale: _locale }: { readonly locale: Locale }) {
-  useBilingualI18nRevision();
+function ProjectGraphPanelFallback({ locale }: { readonly locale: string }) {
+  const l = useBilingualLocalizer("studioProjectIntegrated.graphFallback");
   return (
     <div
       className="min-h-20 animate-pulse rounded-2xl border border-line bg-card/80"
       role="status"
-      aria-label={bi("작품 버전 정보를 불러오는 중", "Loading project version data")}
+      aria-label={l("작품 버전 정보를 불러오는 중", "Loading project version data")}
     />
   );
 }
 
-function localeFromLanguage(language: string): Locale {
-  return language;
+function localeFromLanguage(language: string) {
+  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
 function decodeProjectId(projectId: string): string {
@@ -125,7 +127,7 @@ function SectionWorkflow({
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
   useBilingualI18nRevision();
   const showDelivery = section === "export" || (section === "settings" && view === "archive");
@@ -138,6 +140,11 @@ function SectionWorkflow({
         view={view}
         locale={locale}
       />
+      {section === "overview" && view === "intelligence" ? (
+        <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
+          <StudioCreatorIntelligencePanel projectId={projectId} locale={locale} />
+        </Suspense>
+      ) : null}
       {section === "production" ? (
         <StudioProductionCocreatorBridgePanel projectId={projectId} locale={locale} />
       ) : null}

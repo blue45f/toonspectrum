@@ -1,6 +1,6 @@
 /** Deterministic original geometry and comic construction assets; no external downloads. */
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 
 import { Document, NodeIO } from "@gltf-transform/core";
 import { BoxGeometry, CylinderGeometry, SphereGeometry, Matrix4, Quaternion, Vector3 } from "three";
@@ -23,9 +23,14 @@ function register(id: string, kind: string, label: Text, tags: string[], data: s
   const extension = kind.endsWith("3d") ? "glb" : "svg";
   const filename = `${id}.${extension}`;
   writeFileSync(new URL(filename, output), data);
-  if (preview) writeFileSync(new URL(`${id}.preview.svg`, output), preview);
+  const sourceTruthPropPreview = kind === "prop-3d" && Boolean(preview);
+  if (preview && !sourceTruthPropPreview) writeFileSync(new URL(`${id}.preview.svg`, output), preview);
+  const previewFilename = sourceTruthPropPreview ? `${id}.preview.png` : preview ? `${id}.preview.svg` : filename;
+  if (sourceTruthPropPreview && !existsSync(new URL(previewFilename, output))) {
+    throw new Error(`${id}: missing actual-GLB rendered preview. Run scripts/render-creator-essential-prop-thumbnails.py with Blender.`);
+  }
   const bytes = typeof data === "string" ? Buffer.from(data) : data;
-  assets.push({ id, kind, label, tags, url: `/creator-essentials/${filename}`, preview: `/creator-essentials/${preview ? `${id}.preview.svg` : filename}`, sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.byteLength, width, height });
+  assets.push({ id, kind, label, tags, url: `/creator-essentials/${filename}`, preview: `/creator-essentials/${previewFilename}`, sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.byteLength, width, height });
 }
 const part = (name: string, shape: Part["shape"], at: V3, size: V3, color = 0): Part => ({ name, shape, at, size, color });
 async function model(parts: Part[], name: string): Promise<Uint8Array> {

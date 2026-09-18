@@ -22,6 +22,10 @@ describe("3D mannequin direct-manipulation runtime boundary", () => {
   it("uses rounded high-detail geometry, soft shadows and joint double-click focus", () => {
     expect(source).toContain("new RoundedBoxGeometry(");
     expect(source).toContain("new THREE.CapsuleGeometry(primitive.radius, middleLength, 12, 28)");
+    expect(source).toContain("new THREE.CylinderGeometry(");
+    expect(source).toContain("const hasAnatomicalTaper");
+    expect(source).toContain("side: THREE.BackSide");
+    expect(source).toContain('outline.visible = currentMaterialStyle === "shaded"');
     expect(source).toContain("renderer.shadowMap.type = THREE.PCFSoftShadowMap");
     expect(source).toContain('addEventListener("dblclick", handleDoubleClick)');
   });

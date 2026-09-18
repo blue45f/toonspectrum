@@ -1,6 +1,13 @@
 import { CloudUpload, Link2, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useT } from "@/shared/lib/i18n";
+import {
+  defineBilingualText,
+  formatI18nTemplate,
+  translateBilingualMap,
+  type BilingualText,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 import type {
   PersonalCloudConnectionStatus,
@@ -13,47 +20,45 @@ import {
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = string;
-const bi = <T,>(ko: T, en: T): T =>
-  translateBilingualValueForActiveLocale("PersonalCloudUploadActions", ko, en);;
-
 interface ActiveUpload extends PersonalCloudUploadProgress {
   readonly provider: PersonalCloudProviderId;
 }
 
-function phaseLabel(
-  phase: PersonalCloudUploadProgress["phase"],
-  _locale,
-): string {
-  const labels = {
-    preparing: { ko: "프로젝트 준비 중", en: "Preparing project" },
-    checking: { ko: "원격 버전 확인 중", en: "Checking remote version" },
-    uploading: { ko: "업로드 중", en: "Uploading" },
-    finalizing: { ko: "저장 확인 중", en: "Finalizing" },
-  } as const;
-  return bi((labels[phase]).ko, (labels[phase]).en);
-}
+const PHASE_LABELS: Readonly<Record<PersonalCloudUploadProgress["phase"], BilingualText>> = {
+  preparing: { ko: "프로젝트 준비 중", en: "Preparing project" },
+  checking: { ko: "원격 버전 확인 중", en: "Checking remote version" },
+  uploading: { ko: "업로드 중", en: "Uploading" },
+  finalizing: { ko: "저장 확인 중", en: "Finalizing" },
+};
+
+const COPY = {
+  saveTo: defineBilingualText("personalCloudUpload", "saveTo", "{provider}에 저장", "Save to {provider}"),
+  connect: defineBilingualText("personalCloudUpload", "connect", "{provider} 연결", "Connect {provider}"),
+  needsSetup: defineBilingualText("personalCloudUpload", "needsSetup", "{provider} 설정 필요", "{provider} needs setup"),
+} as const;
 
 function percentage(progress: PersonalCloudUploadProgress): number {
   if (progress.totalBytes <= 0) return 0;
   return Math.min(100, Math.round((progress.uploadedBytes / progress.totalBytes) * 100));
 }
 export function PersonalCloudUploadActions({
-  locale,
+  locale: _locale,
   connections,
   busyProvider,
   progress,
   onAction,
   disabled = false,
 }: {
-  readonly locale: Locale;
+  /** @deprecated Global i18n state is used for visible copy. */
+  readonly locale?: string;
   readonly connections: readonly PersonalCloudConnectionStatus[];
   readonly busyProvider: PersonalCloudProviderId | null;
   readonly progress: ActiveUpload | null;
   readonly onAction: (provider: PersonalCloudProviderId) => void;
   readonly disabled?: boolean;
 }) {
-  useBilingualI18nRevision();
+  const t = useT();
+  const phaseLabels = translateBilingualMap(t, "personalCloudUpload.phase", PHASE_LABELS);
   return (
     <div>
       <div className="grid gap-2 sm:grid-cols-3">
@@ -78,11 +83,10 @@ export function PersonalCloudUploadActions({
                   ? <CloudUpload size={14} className="shrink-0" aria-hidden="true" />
                   : <Link2 size={14} className="shrink-0" aria-hidden="true" />}
               <span className="truncate">
-                {connected
-                  ? formatI18nTemplate(String(bi("{value0}에 저장", "Save to {value0}")), { value0: connection.label })
-                  : connection.configured
-                    ? formatI18nTemplate(String(bi("{value0} 연결", "Connect {value0}")), { value0: connection.label })
-                    : formatI18nTemplate(String(bi("{value0} 설정 필요", "{value0} needs setup")), { value0: connection.label })}
+                {formatI18nTemplate(
+                  t(connected ? COPY.saveTo : connection.configured ? COPY.connect : COPY.needsSetup),
+                  { provider: connection.label },
+                )}
               </span>
             </button>
           );
@@ -91,7 +95,7 @@ export function PersonalCloudUploadActions({
       {progress ? (
         <div className="mt-3 rounded-xl border border-accent/25 bg-accent-soft/15 px-3 py-2.5">
           <div className="flex items-center justify-between gap-3 text-[0.68rem] font-bold text-fg-2">
-            <span>{phaseLabel(progress.phase, locale)}</span>
+            <span>{phaseLabels[progress.phase]}</span>
             <span>{percentage(progress)}%</span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-panel">

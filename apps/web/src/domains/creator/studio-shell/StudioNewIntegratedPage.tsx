@@ -4,7 +4,12 @@ import { useSearchParams } from "react-router-dom";
 
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
-
+import { useT } from "@/shared/lib/i18n";
+import {
+  defineBilingualText,
+  formatI18nTemplate,
+  translateBilingualText,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 import {
   createStudioTemplateHandoff,
@@ -24,14 +29,27 @@ type Locale = string;
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("StudioNewIntegratedPage", ko, en);;
 
-
+const COPY = {
+  templateSelected: defineBilingualText("studioNewIntegrated", "templateSelected", "템플릿 선택됨", "Template selected"),
+  recommendedWorkspace: defineBilingualText(
+    "studioNewIntegrated",
+    "recommendedWorkspace",
+    "권장 작업공간: {workspace} · 새 문서가 열리면 기본 구조를 적용합니다.",
+    "Recommended workspace: {workspace} · Defaults apply when the new document opens.",
+  ),
+  startWithoutTemplate: defineBilingualText(
+    "studioNewIntegrated",
+    "startWithoutTemplate",
+    "템플릿 없이 시작",
+    "Start without template",
+  ),
+} as const;
 
 /** Preserve template intent while the existing new-project flow creates the document identity. */
 export function StudioNewIntegratedPage() {
   useBilingualI18nRevision();
   const [searchParams] = useSearchParams();
-
-
+  const t = useT();
   const template = studioTemplateById(searchParams.get("template"));
 
   useEffect(() => {
@@ -55,13 +73,13 @@ export function StudioNewIntegratedPage() {
                 <div className="min-w-0">
                   <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs font-black text-accent">
                     <CheckCircle2 size={14} className="shrink-0" aria-hidden="true" />
-                    <span className="break-words">{bi("템플릿 선택됨", "Template selected")}</span>
+                    <span className="break-words">{t(COPY.templateSelected)}</span>
                   </p>
                   <p className="mt-1 break-words text-sm font-black text-fg">
-                    {bi(template.titleKo, template.titleEn)}
+                    {translateBilingualText(t, "studioNewIntegrated.templateTitle", { ko: template.titleKo, en: template.titleEn })}
                   </p>
                   <p className="mt-0.5 break-words text-xs leading-5 text-fg-2">
-                    {formatI18nTemplate(String(bi("권장 작업공간: {value0} · 새 문서가 열리면 기본 구조를 적용합니다.", "Recommended workspace: {value0} · Defaults apply when the new document opens.")), { value0: template.recommendedWorkspace })}
+                    {formatI18nTemplate(t(COPY.recommendedWorkspace), { workspace: template.recommendedWorkspace })}
                   </p>
                 </div>
               </div>
@@ -70,7 +88,7 @@ export function StudioNewIntegratedPage() {
                 className="inline-flex min-h-10 w-full min-w-0 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3 text-xs font-bold text-fg-2 hover:text-fg sm:w-auto sm:shrink-0"
               >
                 <X size={14} className="shrink-0" aria-hidden="true" />
-                <span className="break-words">{bi("템플릿 없이 시작", "Start without template")}</span>
+                <span className="break-words">{t(COPY.startWithoutTemplate)}</span>
               </Link>
             </div>
           </Container>

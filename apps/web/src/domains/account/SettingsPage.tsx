@@ -1,15 +1,18 @@
 import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { AccountMergeSettings } from "./AccountMergeSettings";
 import { ConnectedAccountsSettings } from "./ConnectedAccountsSettings";
 import { LibraryBackupImport } from "./LibraryBackupImport";
+import { detectBrowserRegionSettings, planRegionSettingsSync, readLocalRegionSettings, writeLocalRegionSettings } from "./region-settings-client";
 
 import { AppearanceSettings } from "@/shared/components/appearance/AppearanceSettings";
+import { RegionalPreferences } from "@/shared/components/RegionalPreferences";
 import { useSiteExperience } from "@/shared/components/site-experience/site-experience-context";
 import { Container } from "@/shared/components/section";
 import { Switch } from "@/shared/components/ui/switch";
-import { getLanguageOptions, useI18n, useT } from "@/shared/lib/i18n";
+import { useI18n, useT } from "@/shared/lib/i18n";
 import { useApp, useHydrated, type RatingScale } from "@/shared/lib/store";
 import {
   getRememberFlag,
@@ -17,6 +20,8 @@ import {
   clearAllRememberedFilters,
 } from "@/shared/lib/use-remembered-filters";
 import { formatCount } from "@/shared/lib/utils";
+import { patchRegionSettings, type RegionSettings, type RegionSettingsPatch } from "@/shared/lib/region-settings";
+import { getMyProfile, updateMyProfile } from "@/infrastructure/me-client";
 
 function Choice<T extends string>({
   options,
@@ -99,18 +104,89 @@ export function SettingsPage() {
   const [dataReset, setDataReset] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const t = useT();
-  const languageGroups = useMemo(() => {
-    const options = getLanguageOptions(lang);
-    return {
-      translated: options.filter((option) => option.fullyTranslated),
-      automatic: options.filter((option) => !option.fullyTranslated),
-    };
-  }, [lang]);
+  const [regionPreferences, setRegionPreferences] = useState<RegionSettings>(() =>
+    detectBrowserRegionSettings(lang),
+  );
+  const [regionStatus, setRegionStatus] = useState<"loading" | "idle" | "saving" | "saved" | "error">("loading");
+  const [regionMessage, setRegionMessage] = useState<string | null>(null);
+  const langRef = useRef(lang);
+  langRef.current = lang;
   const scaleOptions: { id: RatingScale; label: string }[] = [
     { id: "star", label: t("settings.rating.star") },
     { id: "ten", label: t("settings.rating.ten") },
     { id: "hundred", label: t("settings.rating.hundred") },
   ];
+
+  useEffect(() => {
+    let cancelled = false;
+    const syncRegionPreferences = async () => {
+      setRegionStatus("loading");
+      setRegionMessage(null);
+      const detected = detectBrowserRegionSettings(langRef.current);
+      const local = readLocalRegionSettings();
+      const provisional = local ?? detected;
+      if (!local) writeLocalRegionSettings(provisional);
+      if (!cancelled) {
+        setRegionPreferences(provisional);
+        if (provisional.language !== langRef.current) {
+          setLang(provisional.language);
+        }
+      }
+
+      if (!userId) {
+        const plan = planRegionSettingsSync({
+          local,
+          remote: null,
+          detected,
+        });
+        if (cancelled) return;
+        if (plan.shouldWriteLocal) writeLocalRegionSettings(plan.settings);
+        setRegionPreferences(plan.settings);
+        if (plan.settings.language !== langRef.current) {
+          setLang(plan.settings.language);
+        }
+        setRegionStatus("idle");
+        return;
+      }
+      const profile = await getMyProfile(undefined, true);
+      const plan = planRegionSettingsSync({
+        local,
+        remote: profile.regionSettings,
+        detected,
+      });
+      if (cancelled) return;
+      if (plan.shouldWriteLocal) writeLocalRegionSettings(plan.settings);
+      setRegionPreferences(plan.settings);
+      if (plan.settings.language !== langRef.current) {
+        setLang(plan.settings.language);
+      }
+
+      if (plan.shouldPushRemote) {
+        const updated = await updateMyProfile({
+          regionSettings: plan.settings,
+        });
+        if (cancelled) return;
+        const canonical = updated.regionSettings ?? plan.settings;
+        writeLocalRegionSettings(canonical);
+        setRegionPreferences(canonical);
+      }
+      setRegionStatus("saved");
+    };
+
+    void syncRegionPreferences().catch(() => {
+      if (cancelled) return;
+      setRegionStatus("error");
+      setRegionMessage(
+        langRef.current.startsWith("ko")
+          ? "지역 설정을 서버와 동기화하지 못했습니다. 이 기기의 설정은 유지됩니다."
+          : "Could not sync region settings. Local preferences are preserved.",
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, setLang]);
 
   // 내 서재(별점·읽음·구독·컬렉션)는 이 브라우저에만 저장되므로 JSON 백업으로 내보내기/가져오기 지원.
   const doExport = () => {
@@ -157,6 +233,51 @@ export function SettingsPage() {
     setConfirmReset(false);
   };
 
+  const changeRegionPreference = (
+    field: "country" | "language" | "currency" | "timezone",
+    nextValue: string,
+  ) => {
+    const patch: RegionSettingsPatch = { [field]: nextValue };
+    const next = patchRegionSettings(regionPreferences, patch);
+    if (!next) {
+      setRegionStatus("error");
+      setRegionMessage(
+        lang.startsWith("ko")
+          ? "지원하지 않는 지역 설정입니다."
+          : "That regional preference is not supported.",
+      );
+      return;
+    }
+
+    setRegionPreferences(next);
+    writeLocalRegionSettings(next);
+    if (field === "language") setLang(next.language);
+
+    if (!userId) {
+      setRegionStatus("saved");
+      setRegionMessage(null);
+      return;
+    }
+
+    setRegionStatus("saving");
+    setRegionMessage(null);
+    void updateMyProfile({ regionSettings: next })
+      .then((profile) => {
+        const canonical = profile.regionSettings ?? next;
+        setRegionPreferences(canonical);
+        writeLocalRegionSettings(canonical);
+        setRegionStatus("saved");
+      })
+      .catch(() => {
+        setRegionStatus("error");
+        setRegionMessage(
+          lang.startsWith("ko")
+            ? "서버 저장에 실패했습니다. 이 기기의 설정은 유지됩니다."
+            : "Server save failed. Local preferences are preserved.",
+        );
+      });
+  };
+
   return (
     <Container size="prose" className="py-6 sm:py-14">
       <header className="mb-6">
@@ -181,34 +302,16 @@ export function SettingsPage() {
         <AppearanceSettings />
       </section>
 
+      <RegionalPreferences
+        value={regionPreferences}
+        disabled={regionStatus === "loading" || regionStatus === "saving"}
+        saved={regionStatus === "saved"}
+        message={regionMessage}
+        onChange={changeRegionPreference}
+      />
+
       {/* 표시 설정 */}
       <section className="rounded-2xl border border-line bg-panel/40 px-5">
-        <Row icon={Globe} title={t("settings.language.title")} desc={t("settings.language.desc")}>
-          <label className="block">
-            <span className="sr-only">{t("settings.language.title")}</span>
-            <select
-              value={lang}
-              onChange={(event) => setLang(event.target.value)}
-              aria-label={t("settings.language.title")}
-              className="h-9 w-[18rem] max-w-full rounded-lg border border-line bg-card px-2 py-1 text-sm text-fg outline-none transition-colors focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40"
-            >
-              <optgroup label={t("control.language.group.translated")}>
-                {languageGroups.translated.map((entry) => (
-                  <option key={entry.code} value={entry.code} title={entry.label}>
-                    {entry.label}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label={t("control.language.group.englishBase")}>
-                {languageGroups.automatic.map((entry) => (
-                  <option key={entry.code} value={entry.code} title={entry.label}>
-                    {entry.label}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </label>
-        </Row>
         {experience && <Row icon={Sparkles}
           title={lang.startsWith("ko") ? "화면 효과" : "Appearance"}
           desc={lang.startsWith("ko") ? "화려한 색채와 차분한 화면 중 선택하세요. 스튜디오는 변경되지 않습니다." : "Choose a vivid or calm appearance. Studio remains unchanged."}>
@@ -409,6 +512,9 @@ export function SettingsPage() {
           </Link>
         </Row>
         <ConnectedAccountsSettings
+          userId={typeof userId === "string" && userId ? userId : null}
+        />
+        <AccountMergeSettings
           userId={typeof userId === "string" && userId ? userId : null}
         />
       </section>

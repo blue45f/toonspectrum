@@ -829,7 +829,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-desk.glb",
-      "preview": "/creator-essentials/prop-desk.preview.svg",
+      "preview": "/creator-essentials/prop-desk.preview.png",
       "sha256": "2a8bc63abcceaeda4d7cbeed31f7d12151106785ec5915acc4293497ad0e27d8",
       "bytes": 3552,
       "width": 480,
@@ -851,7 +851,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-chair.glb",
-      "preview": "/creator-essentials/prop-chair.preview.svg",
+      "preview": "/creator-essentials/prop-chair.preview.png",
       "sha256": "6908f3f94e01d8e4532f8ee4c1e95890e99e71ba2e5ad82c4ccb1a8f3200d6c7",
       "bytes": 4004,
       "width": 480,
@@ -873,7 +873,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-bench.glb",
-      "preview": "/creator-essentials/prop-bench.preview.svg",
+      "preview": "/creator-essentials/prop-bench.preview.png",
       "sha256": "e9414063a8add28c1d182fea20cbf76b174ad88545431a9b6f425eece88d4d9d",
       "bytes": 4004,
       "width": 480,
@@ -895,7 +895,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-bookshelf.glb",
-      "preview": "/creator-essentials/prop-bookshelf.preview.svg",
+      "preview": "/creator-essentials/prop-bookshelf.preview.png",
       "sha256": "de183331d13b9f053cf523f5d8b7bc211e56147bc670f34a122a7e0450f85812",
       "bytes": 5944,
       "width": 480,
@@ -917,7 +917,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-streetlamp.glb",
-      "preview": "/creator-essentials/prop-streetlamp.preview.svg",
+      "preview": "/creator-essentials/prop-streetlamp.preview.png",
       "sha256": "052bf65b6f990f5a15a59e61da23db02280879dd2af932b14c982705ba704f3e",
       "bytes": 5480,
       "width": 480,
@@ -939,7 +939,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-window-wall.glb",
-      "preview": "/creator-essentials/prop-window-wall.preview.svg",
+      "preview": "/creator-essentials/prop-window-wall.preview.png",
       "sha256": "6249dad149d0afa4ea289d3f91cf4089e7993c61bbc4416d761d340222a48f94",
       "bytes": 3948,
       "width": 480,
@@ -961,7 +961,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-doorway.glb",
-      "preview": "/creator-essentials/prop-doorway.preview.svg",
+      "preview": "/creator-essentials/prop-doorway.preview.png",
       "sha256": "51b92c46e58c25505fe6bbf6b7b0b54e6f45c8525ff26c58715d46b0afb97a32",
       "bytes": 3448,
       "width": 480,
@@ -983,7 +983,7 @@
         "모델"
       ],
       "url": "/creator-essentials/prop-stairs.glb",
-      "preview": "/creator-essentials/prop-stairs.preview.svg",
+      "preview": "/creator-essentials/prop-stairs.preview.png",
       "sha256": "94f674bc3da2b998fa6f894d288cdef9c616d9d3accd3248c92dbad33227af2f",
       "bytes": 2496,
       "width": 480,

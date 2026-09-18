@@ -541,7 +541,22 @@ export function createStudioBg3dModelImportActions(
           if (attachment) storageModelIdByAttachmentIdRef.current.delete(attachment.id);
           const cacheEntry = modelRootCacheRef.current.get(id);
           modelRootCacheRef.current.delete(id);
-          if (cacheEntry) requestAnimationFrame(() => cacheEntry.dispose());
+          if (cacheEntry) {
+            let disposed = false;
+            let frame = 0;
+            let fallback: ReturnType<typeof setTimeout> | null = null;
+            const dispose = () => {
+              if (disposed) return;
+              disposed = true;
+              if (frame !== 0) cancelAnimationFrame(frame);
+              if (fallback !== null) clearTimeout(fallback);
+              cacheEntry.dispose();
+            };
+            // Prefer the next frame so the active render can release references,
+            // but guarantee disposal when background-tab rAF is heavily throttled.
+            frame = requestAnimationFrame(dispose);
+            fallback = setTimeout(dispose, 250);
+          }
           setSelectedIds((current) => new Set(
             [...current].filter((entityId) => !plan.removedEntityIds.has(entityId)),
           ));

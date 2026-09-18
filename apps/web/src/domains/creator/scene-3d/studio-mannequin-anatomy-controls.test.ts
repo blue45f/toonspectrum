@@ -26,8 +26,14 @@ describe("mannequin anatomical silhouette controls", () => {
     const defaults = clampStudioMannequinBodyParams(null);
     expect(defaults).toMatchObject({
       torsoDepth: 1,
+      chestWidth: 1,
+      pelvisDepth: 1,
       waistWidth: 1,
       limbThickness: 1,
+      upperArmThickness: 1,
+      forearmThickness: 1,
+      thighThickness: 1,
+      calfThickness: 1,
       handScale: 1,
       footScale: 1,
       neckThickness: 1,
@@ -36,18 +42,85 @@ describe("mannequin anatomical silhouette controls", () => {
     const clamped = clampStudioMannequinBodyParams({
       ...STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS,
       torsoDepth: 99,
+      chestWidth: 0,
+      pelvisDepth: 50,
       waistWidth: -5,
       limbThickness: Number.NaN,
+      upperArmThickness: 99,
+      forearmThickness: 0,
+      thighThickness: 99,
+      calfThickness: 0,
       handScale: 0,
       footScale: 50,
       neckThickness: Number.POSITIVE_INFINITY,
     });
     expect(clamped.torsoDepth).toBe(1.35);
+    expect(clamped.chestWidth).toBe(0.75);
+    expect(clamped.pelvisDepth).toBe(1.35);
     expect(clamped.waistWidth).toBe(0.7);
     expect(clamped.limbThickness).toBe(1);
+    expect(clamped.upperArmThickness).toBe(1.4);
+    expect(clamped.forearmThickness).toBe(0.7);
+    expect(clamped.thighThickness).toBe(1.45);
+    expect(clamped.calfThickness).toBe(0.7);
     expect(clamped.handScale).toBe(0.75);
     expect(clamped.footScale).toBe(1.3);
     expect(clamped.neckThickness).toBe(1);
+  });
+
+  it("creates tapered limb volumes and keeps segment thickness controls independent", () => {
+    const base = buildStudioMannequinSpec(STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS);
+    const tuned = buildStudioMannequinSpec({
+      ...STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS,
+      chestWidth: 1.2,
+      pelvisDepth: 1.25,
+      upperArmThickness: 1.3,
+      forearmThickness: 0.82,
+      thighThickness: 1.35,
+      calfThickness: 0.84,
+    });
+
+    const baseUpperArm = capsule(base, "leftUpperArm");
+    const tunedUpperArm = capsule(tuned, "leftUpperArm");
+    const baseForearm = capsule(base, "leftLowerArm");
+    const tunedForearm = capsule(tuned, "leftLowerArm");
+    const baseThigh = capsule(base, "leftUpperLeg");
+    const tunedThigh = capsule(tuned, "leftUpperLeg");
+    const baseCalf = capsule(base, "leftLowerLeg");
+    const tunedCalf = capsule(tuned, "leftLowerLeg");
+
+    for (const limb of [baseUpperArm, baseForearm, baseThigh, baseCalf]) {
+      expect(limb?.kind).toBe("capsule");
+      if (limb?.kind === "capsule") {
+        expect(limb.endRadius).toBeDefined();
+        expect(limb.radius).toBeGreaterThan(limb.endRadius ?? 0);
+      }
+    }
+    if (
+      baseUpperArm?.kind === "capsule" && tunedUpperArm?.kind === "capsule"
+      && baseForearm?.kind === "capsule" && tunedForearm?.kind === "capsule"
+      && baseThigh?.kind === "capsule" && tunedThigh?.kind === "capsule"
+      && baseCalf?.kind === "capsule" && tunedCalf?.kind === "capsule"
+    ) {
+      expect(tunedUpperArm.radius).toBeGreaterThan(baseUpperArm.radius);
+      expect(tunedForearm.radius).toBeLessThan(baseForearm.radius);
+      expect(tunedThigh.radius).toBeGreaterThan(baseThigh.radius);
+      expect(tunedCalf.radius).toBeLessThan(baseCalf.radius);
+    }
+
+    const baseChest = sphere(base, "chest");
+    const tunedChest = sphere(tuned, "chest");
+    const basePelvis = sphere(base, "pelvis");
+    const tunedPelvis = sphere(tuned, "pelvis");
+    if (baseChest?.kind === "sphere" && tunedChest?.kind === "sphere") {
+      expect(tunedChest.scale?.[0]).toBeGreaterThan(baseChest.scale?.[0] ?? 0);
+    }
+    if (basePelvis?.kind === "sphere" && tunedPelvis?.kind === "sphere") {
+      expect(tunedPelvis.scale?.[2]).toBeGreaterThan(basePelvis.scale?.[2] ?? 0);
+    }
+
+    expect(tuned.chains).toEqual(base.chains);
+    expect(studioMannequinRestStature(tuned)).toBeCloseTo(base.heightM, 12);
   });
 
   it("changes independent silhouette axes without changing stature or IK lengths", () => {

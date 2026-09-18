@@ -3,38 +3,24 @@
 // 따뜻한 잉크 중립축을 벗어나 풍부한 색을 쓰되, OKLCH로만 표현한다.
 
 export interface TarotVisual {
-  glyph: string; // 중앙 모티프
+  motif: number; // product-owned vector motif index
   hue: number; // OKLCH hue (카드별 고유 색)
   roman: string; // 로마 숫자 표기
 }
 
-export const TAROT_VISUALS: Record<number, TarotVisual> = {
-  0: { glyph: "🎒", hue: 82, roman: "0" }, // 광대 — 모험의 시작
-  1: { glyph: "🪄", hue: 300, roman: "I" }, // 마법사 — 창조
-  2: { glyph: "🌙", hue: 255, roman: "II" }, // 여사제 — 직관
-  3: { glyph: "🌷", hue: 150, roman: "III" }, // 여황제 — 풍요
-  4: { glyph: "👑", hue: 32, roman: "IV" }, // 황제 — 권위
-  5: { glyph: "🗝️", hue: 64, roman: "V" }, // 교황 — 전통
-  6: { glyph: "💞", hue: 350, roman: "VI" }, // 연인 — 사랑
-  7: { glyph: "🏇", hue: 238, roman: "VII" }, // 전차 — 돌진
-  8: { glyph: "🦁", hue: 44, roman: "VIII" }, // 힘 — 용기
-  9: { glyph: "🏮", hue: 72, roman: "IX" }, // 은둔자 — 성찰
-  10: { glyph: "🎡", hue: 128, roman: "X" }, // 운명의 수레바퀴
-  11: { glyph: "⚖️", hue: 205, roman: "XI" }, // 정의 — 균형
-  12: { glyph: "🙃", hue: 192, roman: "XII" }, // 매달린 사람 — 전환
-  13: { glyph: "🦋", hue: 322, roman: "XIII" }, // 죽음 — 재생
-  14: { glyph: "🍶", hue: 172, roman: "XIV" }, // 절제 — 정화
-  15: { glyph: "😈", hue: 18, roman: "XV" }, // 악마 — 유혹
-  16: { glyph: "⚡", hue: 8, roman: "XVI" }, // 탑 — 붕괴
-  17: { glyph: "⭐", hue: 228, roman: "XVII" }, // 별 — 희망
-  18: { glyph: "🌕", hue: 272, roman: "XVIII" }, // 달 — 무의식
-  19: { glyph: "☀️", hue: 88, roman: "XIX" }, // 태양 — 성공
-  20: { glyph: "🎺", hue: 52, roman: "XX" }, // 심판 — 부활
-  21: { glyph: "🌍", hue: 142, roman: "XXI" }, // 세계 — 완성
-};
+export const TAROT_VISUALS: Record<number, TarotVisual> = Object.fromEntries(
+  [
+    [0, 82, "0"], [1, 300, "I"], [2, 255, "II"], [3, 150, "III"],
+    [4, 32, "IV"], [5, 64, "V"], [6, 350, "VI"], [7, 238, "VII"],
+    [8, 44, "VIII"], [9, 72, "IX"], [10, 128, "X"], [11, 205, "XI"],
+    [12, 192, "XII"], [13, 322, "XIII"], [14, 172, "XIV"], [15, 18, "XV"],
+    [16, 8, "XVI"], [17, 228, "XVII"], [18, 272, "XVIII"], [19, 88, "XIX"],
+    [20, 52, "XX"], [21, 142, "XXI"],
+  ].map(([motif, hue, roman]) => [motif, { motif, hue, roman }]),
+) as Record<number, TarotVisual>;
 
 export function getTarotVisual(id: number): TarotVisual {
-  return TAROT_VISUALS[id] ?? { glyph: "✦", hue: 42, roman: String(id) };
+  return TAROT_VISUALS[id] ?? { motif: 17, hue: 42, roman: String(id) };
 }
 
 // 카드 페이스 그라디언트(어두운 카드 바탕)

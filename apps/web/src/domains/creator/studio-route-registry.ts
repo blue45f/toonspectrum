@@ -6,6 +6,13 @@ export const STUDIO_ROUTE_IDS = [
   "import",
   "templates",
   "assets",
+  "generate",
+  "ai-settings",
+  "ai-lab",
+  "ai-runtime",
+  "character-convert",
+  "ecosystem",
+  "ecosystem-viewer",
   "toolchain",
   "engines",
   "jobs",
@@ -76,6 +83,13 @@ export const STUDIO_ROUTE_REGISTRY: readonly StudioRouteRegistration[] = Object.
   route("import", "/studio/import", "studio", "none", "가져오기", "Import"),
   route("templates", "/studio/templates", "studio", "none", "템플릿", "Templates"),
   route("assets", "/studio/assets", "asset", "none", "에셋", "Assets", ["/market/library"]),
+  route("generate", "/studio/generate", "studio", "none", "생성형 제작", "Generative creation"),
+  route("ai-settings", "/studio/ai-settings", "studio", "none", "AI 설정", "AI settings"),
+  route("ai-lab", "/studio/ai-lab", "studio", "none", "개인 AI 실험실", "Personal AI lab"),
+  route("ai-runtime", "/studio/ai-runtime", "studio", "none", "AI 런타임", "AI runtime"),
+  route("character-convert", "/studio/character-convert", "studio", "none", "캐릭터 변환", "Character conversion"),
+  route("ecosystem", "/studio/ecosystem", "studio", "none", "제작 생태계", "Creator ecosystem"),
+  route("ecosystem-viewer", "/studio/ecosystem/viewer", "studio", "none", "생태계 뷰어", "Ecosystem viewer"),
   route("toolchain", "/studio/toolchain", "studio", "none", "제작 도구", "Production tools"),
   route("engines", "/studio/engines", "studio", "none", "설치·라이선스", "Engines & licenses"),
   route("jobs", "/studio/jobs", "studio", "none", "처리 중 작업", "Production jobs"),
@@ -104,6 +118,22 @@ export const STUDIO_ROUTE_REGISTRY: readonly StudioRouteRegistration[] = Object.
 
 const ROUTE_BY_ID = new Map(STUDIO_ROUTE_REGISTRY.map((registration) => [registration.id, registration]));
 
+/** Studio home/command surfaces should expose these specialist tools from the same route authority. */
+export const STUDIO_DISCOVERY_ROUTE_IDS = Object.freeze([
+  "generate",
+  "ai-lab",
+  "ai-runtime",
+  "character-convert",
+  "ecosystem",
+  "jobs",
+] as const satisfies readonly StudioRouteId[]);
+
+export function studioRouteRegistration(id: StudioRouteId): StudioRouteRegistration {
+  const registration = ROUTE_BY_ID.get(id);
+  if (!registration) throw new Error(`Unknown Studio route id: ${id}`);
+  return registration;
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
@@ -124,9 +154,7 @@ function normalizedPathname(pathname: string): string {
 }
 
 export function studioRoutePath(id: StudioRouteId): string {
-  const registration = ROUTE_BY_ID.get(id);
-  if (!registration) throw new Error(`Unknown Studio route id: ${id}`);
-  return registration.pattern;
+  return studioRouteRegistration(id).pattern;
 }
 
 export function studioProjectSectionPath(

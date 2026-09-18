@@ -174,7 +174,7 @@ export function SiteFooter() {
                 </div>
               </div>
               <ul className="space-y-1">
-                {group.items.map((item) => (
+                {group.items.filter((item) => item.id !== "technology").map((item) => (
                   <li key={item.id}>
                     <Link
                       href={item.href}

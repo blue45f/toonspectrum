@@ -69,3 +69,43 @@ The audit also reports inline SVG and emoji metadata so future visual debt stays
 - Creator Essentials regeneration: **48 assets / 32 SVG / 16 GLB**
 - full repository TypeScript check (`tsc -p tsconfig.json --noEmit`): **pass**
 - `git diff --check`: **pass**
+
+## Site-wide expansion pass
+
+The follow-up pass expanded beyond VRM/hair into the complete web asset surface and public route inventory.
+
+- tracked visual assets after source-of-truth replacements: 2,439
+- active VRM thumbnails >=768px: 88/88
+- referenced SVGs visually rendered into contact sheets: 80 before prop replacement
+- referenced raster files below 512px on either dimension: 19; these resolve to app/PWA icons, deliberate 640x400 environment cards, responsive brand variants, or test-only fixtures rather than primary production imagery
+- all-route desktop/light visual traversal: 172 registered routes
+- unexpected raster MIME mismatches: 0
+
+### Replaced during the site-wide pass
+
+- eight Creator Essentials 3D prop cards now use 768x768 Blender renders of their actual GLB source models instead of low-detail triangle-projection SVGs: desk, chair, bench, bookshelf, streetlamp, window wall, doorway, and stairs;
+- the obsolete eight `prop-*.preview.svg` assets were removed;
+- hand scanner and mannequin motion-capture controls no longer depend on OS emoji glyphs;
+- the VRM library guide uses the product icon system instead of a decorative OS emoji;
+- the native BGM theme selector no longer prepends OS emoji to option labels;
+- Major Arcana card faces and share cards now use product-owned vector motifs instead of platform-specific emoji art.
+
+### Intentionally retained
+
+Brand scene SVGs, comic balloons/panels, screentones, speed lines, texture motifs, PWA icons, CC0 browser thumbnails, and responsive brand raster variants were reviewed and retained. Their current representation is appropriate to their function; replacing them merely to increase primitive count or pixel dimensions would reduce fidelity or add unnecessary weight.
+
+The all-route UX traversal also reports `route-scene-missing` on routes whose page architecture does not expose one of the audit harness' expected scene markers. That is a route/layout concern rather than evidence of a broken or low-quality image, so it is deliberately not counted as an asset-replacement defect in this pass.
+
+### Remaining GPT Image 2.5 background set
+
+The 20 legacy portrait webtoon backgrounds remain the only material image-quality replacement batch that requires new generative pixels. Their `gpt-image-2.5-sunburst` / `max` recipes, negative constraints, target 1152x2048 dimensions, and output mapping are committed and contract-tested. Historical `overlay.tar.gz` / split-part recovery files were inspected and are explicitly documented as corrupt forensic payloads, so they are not a valid source for production images.
+
+### Follow-up validation evidence
+
+- Creator Essentials source-truth prop renders: 8/8 at 768x768; embedded Blender text/time metadata stripped from committed PNGs.
+- Creator Essentials inventory: 67/67 tests passed after extending preview validation to safe PNG renders.
+- Character Shaper full domain regression: 44 files / 642 tests passed.
+- Hand poser + mannequin + fortune focused regression: 5 files / 104 tests passed.
+- Core dark/mobile route audit: 15 of 16 audited routes clean; `/production` reports only the pre-existing `route-scene-missing` architecture marker, with no image-quality or overflow issue.
+- Full TypeScript check with the repository 12GB heap profile: passed.
+- `audit:visual-assets`, deep strict audit, GPT Image 2.5 replacement-map contract, Creator Essentials regeneration, and `git diff --check`: passed.

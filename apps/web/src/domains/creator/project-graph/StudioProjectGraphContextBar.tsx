@@ -11,6 +11,8 @@ import { useMemo } from "react";
 
 import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import type { StudioArtifactRecord } from "./studio-project-graph-contract";
@@ -25,11 +27,7 @@ import {
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = string;
-const bi = <T,>(ko: T, en: T): T =>
-  translateBilingualValueForActiveLocale("StudioProjectGraphContextBar", ko, en);;
-
-const STATUS_LABELS: Readonly<Record<StudioProjectGraphStatus, Readonly<Record<Locale, string>>>> = {
+const STATUS_LABELS: Readonly<Record<StudioProjectGraphStatus, BilingualText>> = {
   loading: { ko: "작품 연결 확인 중", en: "Checking project connection" },
   synced: { ko: "클라우드와 동기화됨", en: "Synced with cloud" },
   cached: { ko: "최근 동기화 상태", en: "Last synced state" },
@@ -67,11 +65,11 @@ function primaryArtifact(artifacts: readonly StudioArtifactRecord[]): StudioArti
   return artifacts[0] ?? null;
 }
 
-function updatedLabel(value: string | undefined, _locale): string | null {
+function updatedLabel(value: string | undefined, language: string): string | null {
   if (!value) return null;
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return null;
-  return new Intl.DateTimeFormat(getActiveI18nLocale(), {
+  return new Intl.DateTimeFormat(language || "en", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -81,25 +79,27 @@ function updatedLabel(value: string | undefined, _locale): string | null {
 
 export function StudioProjectGraphContextBar({
   projectId,
-  locale,
+  locale: _locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
-  useBilingualI18nRevision();
-  const controller = useStudioProjectGraph(projectId, locale);
+  const l = useBilingualLocalizer("studioProjectGraphContext");
+  const language = useI18n((state) => state.lang);
+  const legacyLocale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  const controller = useStudioProjectGraph(projectId, legacyLocale);
   const artifact = useMemo(
     () => primaryArtifact(controller.project?.artifacts ?? []),
     [controller.project?.artifacts],
   );
-  const syncedAt = updatedLabel(controller.project?.updatedAt, locale);
+  const syncedAt = updatedLabel(controller.project?.updatedAt, language);
   const authority = controller.project?.authorityVersion ?? "legacy-v2";
 
   return (
     <section
       data-studio-project-authority={authority}
       className="rounded-2xl border border-line bg-card p-3 shadow-sm sm:p-4"
-      aria-label={bi("작품 저장과 버전 상태", "Project save and version status")}
+      aria-label={l("작품 저장과 버전 상태", "Project save and version status")}
     >
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-2.5">
@@ -114,13 +114,13 @@ export function StudioProjectGraphContextBar({
             )}
           >
             <StatusGlyph status={controller.status} />
-            {bi((STATUS_LABELS[controller.status]).ko, (STATUS_LABELS[controller.status]).en)}
+            {l(STATUS_LABELS[controller.status].ko, STATUS_LABELS[controller.status].en)}
           </span>
           {controller.project ? (
             <>
               <span className="inline-flex items-center gap-1.5 text-xs text-fg-2">
                 <GitBranch size={14} aria-hidden="true" />
-                {formatI18nTemplate(String(bi("{value0}개 제작 문서", "{value0} production artifacts")), { value0: controller.project.artifacts.length })}
+                {l(`${controller.project.artifacts.length}개 제작 문서`, `${controller.project.artifacts.length} production artifacts`)}
               </span>
               {artifact ? (
                 <span className="max-w-full truncate text-xs text-fg-3">
@@ -130,18 +130,18 @@ export function StudioProjectGraphContextBar({
               {artifact?.approvedRevisionId ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-1 text-[0.65rem] font-bold text-success">
                   <ShieldCheck size={12} aria-hidden="true" />
-                  {bi("승인본 고정", "Approved revision")}
+                  {l("승인본 고정", "Approved revision")}
                 </span>
               ) : null}
               {syncedAt ? (
                 <span className="text-[0.68rem] text-fg-3">
-                  {formatI18nTemplate(String(bi("업데이트 {value0}", "Updated {value0}")), { value0: syncedAt })}
+                  {l(`업데이트 ${syncedAt}`, `Updated ${syncedAt}`)}
                 </span>
               ) : null}
             </>
           ) : (
             <span className="text-xs text-fg-3">
-              {bi("기존 로컬 저장·복구 권위로 계속 작업합니다. 클라우드 전환 전 원고는 변경하지 않습니다.", "Continue with existing local save and recovery. Pre-migration documents remain unchanged.")}
+              {l("기존 로컬 저장·복구 권위로 계속 작업합니다. 클라우드 전환 전 원고는 변경하지 않습니다.", "Continue with existing local save and recovery. Pre-migration documents remain unchanged.")}
             </span>
           )}
         </div>
@@ -158,7 +158,7 @@ export function StudioProjectGraphContextBar({
               className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
             >
               <History size={14} aria-hidden="true" />
-              {bi("버전", "Versions")}
+              {l("버전", "Versions")}
             </Link>
           ) : null}
           <button
@@ -172,7 +172,7 @@ export function StudioProjectGraphContextBar({
               aria-hidden="true"
               className={controller.status === "loading" ? "animate-spin" : undefined}
             />
-            {bi("상태 새로고침", "Refresh status")}
+            {l("상태 새로고침", "Refresh status")}
           </button>
         </div>
       </div>

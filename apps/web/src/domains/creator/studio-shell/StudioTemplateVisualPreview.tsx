@@ -13,6 +13,7 @@ import type {
   StudioTemplateLayoutKind,
 } from "../studio-template-system";
 
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 import {
   formatI18nTemplate,
@@ -20,13 +21,9 @@ import {
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = string;
-const bi = <T,>(ko: T, en: T): T =>
-  translateBilingualValueForActiveLocale("StudioTemplateVisualPreview", ko, en);;
-
 export interface StudioTemplateVisualPreviewProps {
   readonly template: StudioTemplateCatalogItem;
-  readonly locale: Locale;
+  readonly locale?: string;
   readonly compact?: boolean;
   readonly showNavigation?: boolean;
   readonly pageIndex?: number;
@@ -300,12 +297,14 @@ function renderLayout(
   return <Storyboard page={page} accent={accent} />;
 }
 
-function pageLabel(page: StudioTemplateCompositionPage, _locale): string {
-  return bi(page.labelKo, page.labelEn);
+type Localizer = (ko: string, en: string) => string;
+
+function pageLabel(page: StudioTemplateCompositionPage, localize: Localizer): string {
+  return localize(page.labelKo, page.labelEn);
 }
 
-function fallbackLabel(template: StudioTemplateCatalogItem, _locale): string {
-  return bi(template.titleKo, template.titleEn);
+function fallbackLabel(template: StudioTemplateCatalogItem, localize: Localizer): string {
+  return localize(template.titleKo, template.titleEn);
 }
 
 function normalizedIndex(index: number, length: number): number {
@@ -314,14 +313,14 @@ function normalizedIndex(index: number, length: number): number {
 }
 export function StudioTemplateVisualPreview({
   template,
-  locale,
+  locale: _locale,
   compact = false,
   showNavigation = false,
   pageIndex,
   onPageIndexChange,
   className,
 }: StudioTemplateVisualPreviewProps) {
-  useBilingualI18nRevision();
+  const l = useBilingualLocalizer("studioTemplatePreview");
   const composition = template.definition.composition;
   const [internalIndex, setInternalIndex] = useState(0);
 
@@ -346,7 +345,7 @@ export function StudioTemplateVisualPreview({
       <div className={cn("grid aspect-[4/3] place-items-center rounded-xl border border-line bg-panel", className)}>
         <div className="text-center text-xs text-fg-3">
           <ImageIcon size={22} className="mx-auto mb-2" aria-hidden />
-          {fallbackLabel(template, locale)}
+          {fallbackLabel(template, l)}
         </div>
       </div>
     );
@@ -371,11 +370,11 @@ export function StudioTemplateVisualPreview({
       </div>
       <figcaption className="flex min-h-11 items-center justify-between gap-2 border-t border-line bg-card px-3 py-2">
         <div className="min-w-0">
-          <p className="truncate text-xs font-black text-fg">{pageLabel(activePage, locale)}</p>
+          <p className="truncate text-xs font-black text-fg">{pageLabel(activePage, l)}</p>
           <p className="text-[0.65rem] text-fg-3">
             {activePage.panelCount > 0
-              ? (formatI18nTemplate(String(bi("{value0}개 컷·영역", "{value0} panels")), { value0: activePage.panelCount }))
-              : (bi("레이아웃", "Layout"))}
+              ? (l(`${activePage.panelCount}개 컷·영역`, `${activePage.panelCount} panels`))
+              : (l("레이아웃", "Layout"))}
           </p>
         </div>
         {showNavigation && pages.length > 1 ? (
@@ -383,7 +382,7 @@ export function StudioTemplateVisualPreview({
             <button
               type="button"
               onClick={() => setPage(activeIndex - 1)}
-              aria-label={bi("이전 템플릿 페이지", "Previous template page")}
+              aria-label={l("이전 템플릿 페이지", "Previous template page")}
               className="grid size-9 place-items-center rounded-lg border border-line text-fg-3 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               <ChevronLeft size={15} aria-hidden />
@@ -394,7 +393,7 @@ export function StudioTemplateVisualPreview({
             <button
               type="button"
               onClick={() => setPage(activeIndex + 1)}
-              aria-label={bi("다음 템플릿 페이지", "Next template page")}
+              aria-label={l("다음 템플릿 페이지", "Next template page")}
               className="grid size-9 place-items-center rounded-lg border border-line text-fg-3 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               <ChevronRight size={15} aria-hidden />

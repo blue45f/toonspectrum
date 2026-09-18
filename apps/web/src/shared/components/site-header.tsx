@@ -49,7 +49,6 @@ const STUDIO_ASSET_PREFIXES = [
   "/brush-lab",
   "/shaper",
   "/music",
-  "/market",
 ] as const;
 const STUDIO_CREATE_PREFIXES = [
   "/studio/new",
@@ -185,7 +184,6 @@ export function SiteHeader() {
   useSiteHeaderHeight(headerRef);
   const primaryNavigation = primarySiteNavigationForPath(pathname);
   const create = SITE_NAVIGATION_ITEMS.make;
-  const technology = SITE_NAVIGATION_ITEMS.technology;
   const brandHref = "/";
   const brandName = navigationContext === "studio" ? "ToonStudio" : t("app.name");
   const brandDescription = navigationContext === "studio"
@@ -258,17 +256,22 @@ export function SiteHeader() {
           >
             {primaryNavigation.map((item) => {
               const active = isPurposeActive(item.href, item.exact);
+              const featured = item.id === "research" || item.id === "market";
               return (
                 <Link
                   key={item.id}
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   title={siteNavigationText(item.description, locale)}
+                  data-navigation-entry={item.id}
+                  data-navigation-featured={featured || undefined}
                   className={cx(
                     "relative inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-xl px-3 py-2 text-[0.82rem] font-semibold transition-all duration-150",
                     active
                       ? "bg-card text-accent shadow-sm"
-                      : "text-fg-2 hover:bg-raised/70 hover:text-fg"
+                      : featured
+                        ? "bg-accent-soft/55 text-accent ring-1 ring-inset ring-accent/20 hover:bg-accent-soft hover:ring-accent/35"
+                        : "text-fg-2 hover:bg-raised/70 hover:text-fg"
                   )}
                 >
                   {siteNavigationText(item.label, locale)}
@@ -277,22 +280,9 @@ export function SiteHeader() {
               );
             })}
             <Link
-              href={technology.href}
-              aria-current={isPurposeActive(technology.href) ? "page" : undefined}
-              title={siteNavigationText(technology.description, locale)}
-              data-navigation-entry="technology"
-              className={cx(
-                "relative inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-xl border px-3 py-2 text-[0.82rem] font-bold transition-all duration-150",
-                isPurposeActive(technology.href)
-                  ? "border-accent bg-accent text-on-accent shadow-sm"
-                  : "border-accent/30 bg-accent-soft/70 text-accent hover:border-accent/50 hover:bg-accent-soft"
-              )}
-            >
-              {siteNavigationText(technology.label, locale)}
-            </Link>
-            <Link
               href="/sitemap"
-              title={bi("목적별 전체 메뉴 보기", "Browse every destination by purpose")}
+              data-navigation-entry="all-menu"
+              title={locale === "ko" ? "목적별 전체 메뉴 보기" : "Browse every destination by purpose"}
               className="inline-flex min-h-9 items-center rounded-xl px-3 py-2 text-[0.82rem] font-semibold text-fg-2 transition-colors hover:bg-raised/70 hover:text-fg"
             >
               {t("nav.allMenu")}

@@ -3,15 +3,10 @@ import { motion, useReducedMotion } from "motion/react";
 
 import Link from "@/compat/router-link";
 
-import "./studio-asset-visual-intro.css";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { useI18n, useT } from "@/shared/lib/i18n";
+import { translateParallelBilingualCopy } from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = string;
-const bi = <T,>(ko: T, en: T): T =>
-  translateBilingualValueForActiveLocale("StudioAssetVisualIntro", ko, en);;
+import "./studio-asset-visual-intro.css";
 
 const COPY = {
   ko: {
@@ -48,13 +43,14 @@ const COPY = {
 
 const CHIP_ICONS = [Brush, Image, UserRound, Box, Type, ShieldCheck] as const;
 
-export function StudioAssetVisualIntro({ locale }: { readonly locale: Locale }) {
-  useBilingualI18nRevision();
-  const copy = bi((COPY).ko, (COPY).en);
+export function StudioAssetVisualIntro({ locale: _locale }: { readonly locale?: string }) {
+  const t = useT();
+  const language = useI18n((state) => state.lang);
+  const copy = translateParallelBilingualCopy(t, "studioAssetVisualIntro", COPY);
   const reducedMotion = useReducedMotion();
 
   return (
-    <section className="studio-asset-visual-intro" aria-labelledby="studio-asset-visual-title" lang={locale}>
+    <section className="studio-asset-visual-intro" aria-labelledby="studio-asset-visual-title" lang={language}>
       <div className="studio-asset-visual-intro__hero">
         <motion.figure
           initial={reducedMotion ? false : { opacity: 0, y: 14 }}

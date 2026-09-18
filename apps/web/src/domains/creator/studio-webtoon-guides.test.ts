@@ -1,12 +1,31 @@
 import { describe, it, expect } from "vitest";
 
-import { STUDIO_WEBTOON_CANVAS_PRESETS } from "./studio-webtoon-canvas-presets";
+import { presetCanvasSize } from "./studio-magic-resize";
+import {
+  findStudioWebtoonCanvasPreset,
+  STUDIO_WEBTOON_CANVAS_PRESETS,
+  studioWebtoonCanvasMagicResizePreset,
+} from "./studio-webtoon-canvas-presets";
 import {
   WEBTOON_WIDTH_STANDARDS,
   episodeLengthLabel,
   safeAreaMargin,
   webtoonWidthGuides,
 } from "./studio-webtoon-guides";
+
+describe("studioWebtoonCanvasMagicResizePreset", () => {
+  it.each([
+    ["webtoon-vertical", 5_333],
+    ["webtoon-naver", 8_348],
+    ["webtoon-kakao", 8_000],
+    ["webtoon-canvas", 7_200],
+  ] as const)("maps %s to the fixed 720px editor width", (presetId, expectedHeight) => {
+    const platform = findStudioWebtoonCanvasPreset(presetId);
+    expect(platform).toBeDefined();
+    const preset = studioWebtoonCanvasMagicResizePreset(platform!);
+    expect(presetCanvasSize(preset, 720)).toEqual({ width: 720, height: expectedHeight });
+  });
+});
 
 describe("webtoonWidthGuides", () => {
   it("새 문서 플랫폼 프리셋과 같은 표준폭을 사용한다", () => {

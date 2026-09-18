@@ -16,16 +16,13 @@ import {
 } from "../studio-feature-surface-registry";
 import type { StudioProjectSection } from "../studio-project-views";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 import {
   formatI18nTemplate,
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
-
-type Locale = string;
-const bi = <T,>(ko: T, en: T): T =>
-  translateBilingualValueForActiveLocale("StudioFeatureOperationsPanel", ko, en);;
 
 const ICON_BY_TONE = {
   asset: BadgeCheck,
@@ -63,9 +60,9 @@ export function StudioFeatureOperationsPanel({
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
-  useBilingualI18nRevision();
+  const l = useBilingualLocalizer("studioFeatureOperations");
   const registrations = studioFeatureSurfacesForView(section, view);
   if (registrations.length === 0) return null;
 
@@ -86,10 +83,10 @@ export function StudioFeatureOperationsPanel({
             id="studio-feature-operations-title"
             className="mt-1 text-xl font-black tracking-tight text-fg"
           >
-            {bi("프로젝트 기능과 실제 작업 연결", "Connected project operations")}
+            {l("프로젝트 기능과 실제 작업 연결", "Connected project operations")}
           </h2>
           <p className="mt-1 text-sm leading-6 text-fg-2">
-            {bi("권리·품질·마켓·플러그인·게시·보관 기능을 현재 프로젝트의 정본 화면에서 실행합니다.", "Use rights, quality, market, plugin, publishing and archive capabilities from their canonical project surfaces.")}
+            {l("권리·품질·마켓·플러그인·게시·보관 기능을 현재 프로젝트의 정본 화면에서 실행합니다.", "Use rights, quality, market, plugin, publishing and archive capabilities from their canonical project surfaces.")}
           </p>
         </div>
       </div>
@@ -118,14 +115,14 @@ export function StudioFeatureOperationsPanel({
                   <Icon size={17} aria-hidden="true" />
                 </span>
                 <span className="rounded-full border border-line bg-card px-2.5 py-1 text-[0.62rem] font-bold text-fg-3">
-                  {formatI18nTemplate(String(bi("검증 연산 {value0}개", "{value0} validated operations")), { value0: operationCount })}
+                  {l(`검증 연산 ${operationCount}개`, `${operationCount} validated operations`)}
                 </span>
               </div>
               <h3 className="mt-4 text-base font-black text-fg">
-                {bi(registration.titleKo, registration.titleEn)}
+                {l(registration.titleKo, registration.titleEn)}
               </h3>
               <p className="mt-2 flex-1 text-sm leading-6 text-fg-2">
-                {bi(registration.descriptionKo, registration.descriptionEn)}
+                {l(registration.descriptionKo, registration.descriptionEn)}
               </p>
               <Link
                 to={href}
@@ -135,7 +132,7 @@ export function StudioFeatureOperationsPanel({
                   className: "mt-4 w-fit gap-1.5",
                 })}
               >
-                {bi(registration.primaryActionKo, registration.primaryActionEn)}
+                {l(registration.primaryActionKo, registration.primaryActionEn)}
                 <ExternalLink size={14} aria-hidden="true" />
               </Link>
             </article>

@@ -5,11 +5,6 @@ import { describe, expect, it } from "vitest";
 
 const WEB_SRC = path.resolve(process.cwd(), "apps/web/src");
 const LEGACY_LOCALE_ALIAS = /type\s+Locale\s*=\s*["']ko["']\s*\|\s*["']en["']/gu;
-const LEGACY_INLINE_COPY_TERNARY = /\blocale\s*===\s*["']ko["'](?:\s*\|\|\s*locale\s*===\s*["']en["'])?\s*\?/gu;
-const FUNCTIONAL_LOCALE_BRANCH_FILES = new Set([
-  "domains/creator/vrm/studio-vrm-display-name.ts",
-  "shared/lib/i18n-bilingual-copy.ts",
-]);
 
 type Finding = Readonly<{ file: string; pattern: string }>;
 
@@ -40,11 +35,11 @@ function collectLegacyBilingualUi(directory: string, findings: Finding[] = []): 
 }
 
 describe("legacy bilingual UI migration ratchet", () => {
-  it("keeps ko/en-only UI aliases and inline copy ternaries at zero", () => {
-    const findings = collectLegacyBilingualUi(WEB_SRC).sort((a, b) => a.file.localeCompare(b.file));
+  it("rejects ko/en-only Locale aliases from user-facing source", () => {
+    const findings = collectLegacyLocaleAliases(WEB_SRC).sort();
     expect(
       findings,
-      `legacy bilingual UI regressed:\n${findings.map((item) => `${item.file}: ${item.pattern}`).join("\n")}`,
+      `ko/en-only UI aliases must use the global locale pipeline:\n${findings.join("\n")}`,
     ).toEqual([]);
   });
 });

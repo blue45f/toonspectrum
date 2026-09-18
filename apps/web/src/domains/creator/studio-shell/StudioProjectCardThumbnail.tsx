@@ -1,6 +1,7 @@
 import { Image as ImageIcon, LoaderCircle } from "lucide-react";
 import { Suspense, useEffect, useRef, useState, type ReactElement, type RefObject } from "react";
 
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 import {
@@ -26,9 +27,6 @@ const LazyStudioPageThumbnail = lazyRetry(
   "StudioProjectCardThumbnail",
 );
 
-type Locale = string;
-const bi = <T,>(ko: T, en: T): T =>
-  translateBilingualValueForActiveLocale("StudioProjectCardThumbnail", ko, en);;
 type PreviewPhase = "idle" | "loading" | "ready" | "empty";
 
 interface PreviewCandidate {
@@ -180,26 +178,26 @@ function useNearViewport(): {
   return { nearViewport, rootRef };
 }
 
-function PreviewLoading({ locale: _locale }: { readonly locale: Locale }) {
-  useBilingualI18nRevision();
+function PreviewLoading({ locale: _locale }: { readonly locale: string }) {
+  const l = useBilingualLocalizer("studioProjectThumbnail.loading");
   return (
     <div className="grid h-full place-items-center bg-panel/70 text-fg-3">
       <div className="flex items-center gap-2 text-xs font-semibold">
         <LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
-        {bi("최근 작업 불러오는 중", "Loading recent work")}
+        {l("최근 작업 불러오는 중", "Loading recent work")}
       </div>
     </div>
   );
 }
 
-function PreviewEmpty({ locale: _locale }: { readonly locale: Locale }) {
-  useBilingualI18nRevision();
+function PreviewEmpty({ locale: _locale }: { readonly locale: string }) {
+  const l = useBilingualLocalizer("studioProjectThumbnail.empty");
   return (
     <div className="grid h-full place-items-center bg-panel/70 px-5 text-center text-fg-3">
       <div>
         <ImageIcon size={22} className="mx-auto" aria-hidden="true" />
         <p className="mt-2 text-xs font-semibold">
-          {bi("작업을 시작하면 미리보기가 표시됩니다.", "A preview appears after you start working.")}
+          {l("작업을 시작하면 미리보기가 표시됩니다.", "A preview appears after you start working.")}
         </p>
       </div>
     </div>
@@ -212,10 +210,10 @@ export function StudioProjectCardThumbnail({
   project,
 }: {
   readonly authUserId: string | null;
-  readonly locale: Locale;
+  readonly locale: string;
   readonly project: StudioProjectLibraryEntry;
 }): ReactElement {
-  useBilingualI18nRevision();
+  const l = useBilingualLocalizer("studioProjectThumbnail");
   const { nearViewport, rootRef } = useNearViewport();
   const [preview, setPreview] = useState<PreviewCandidate | null>(null);
   const [phase, setPhase] = useState<PreviewPhase>("idle");
@@ -272,7 +270,7 @@ export function StudioProjectCardThumbnail({
   const storedThumbnail = project.thumbnailUrl && !storedThumbnailFailed
     ? project.thumbnailUrl
     : null;
-  const previewLabel = formatI18nTemplate(String(bi("{value0} 최근 작업 미리보기", "Recent work preview for {value0}")), { value0: project.title });
+  const previewLabel = l(`${project.title} 최근 작업 미리보기`, `Recent work preview for ${project.title}`);
 
   return (
     <div
@@ -306,8 +304,8 @@ export function StudioProjectCardThumbnail({
       {preview || storedThumbnail ? (
         <span className="pointer-events-none absolute bottom-2 left-2 rounded-full border border-white/20 bg-black/65 px-2 py-1 text-[0.62rem] font-black text-white shadow-sm backdrop-blur-sm">
           {preview
-            ? bi("최근 자동 저장", "Latest autosave")
-            : bi("프로젝트 미리보기", "Project preview")}
+            ? l("최근 자동 저장", "Latest autosave")
+            : l("프로젝트 미리보기", "Project preview")}
         </span>
       ) : null}
     </div>

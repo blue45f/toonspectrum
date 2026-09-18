@@ -176,7 +176,7 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
     const colorProof = page.colorProof === undefined ? undefined : parseStudioColorProofDocument(page.colorProof);
     if (colorProof === null) throw new Error("페이지 ICC 설정이 손상되었거나 지원하지 않는 버전입니다.");
     const layerComps = page.layerComps === undefined ? undefined : parseStudioLayerComps(page.layerComps);
-    if (layerComps === null) throw new Error("페이지 레이어 콤프가 손상되었거나 허용 범위를 벗어났습니다.");
+    if (layerComps === null) throw new Error("페이지 레이어 보기 정보가 손상되었거나 허용 범위를 벗어났습니다.");
     const shared3dStage = page.shared3dStage === undefined
       ? undefined
       : migrateStudioShared3dStageCollectionDocument(page.shared3dStage);
@@ -221,7 +221,7 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
         // Use the same normalized, aggregate page envelope as collaboration.
         studioPageToCrdtPage(canonicalPage);
       } catch (cause) {
-        throw new Error("레이어 콤프와 페이지 설정이 저장 가능한 범위를 벗어났습니다.", { cause });
+        throw new Error("레이어 보기와 페이지 설정이 저장 가능한 범위를 벗어났습니다.", { cause });
       }
     }
     return canonicalPage;

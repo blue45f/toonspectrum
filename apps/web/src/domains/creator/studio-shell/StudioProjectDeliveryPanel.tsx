@@ -36,6 +36,8 @@ import {
 import { auditStudioRightsGraph } from "../studio-rights-graph";
 import type { StudioProjectSection } from "../studio-project-views";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -51,9 +53,6 @@ import {
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = string;
-const bi = <T,>(ko: T, en: T): T =>
-  translateBilingualValueForActiveLocale("StudioProjectDeliveryPanel", ko, en);;
 type DeliveryView = "publish" | "package" | "archive";
 
 const CHECKSUM_A = `sha256:${"a".repeat(64)}`;
@@ -100,7 +99,7 @@ function statusTone(status: string): string {
   return "border-warning/35 bg-warning-soft/15 text-warning";
 }
 
-function labelForStatus(status: string, _locale): string {
+function labelForStatus(status: string, localize: (ko: string, en: string) => string): string {
   const ko: Readonly<Record<string, string>> = {
     ready: "준비됨",
     review: "확인 필요",
@@ -123,32 +122,34 @@ function labelForStatus(status: string, _locale): string {
     warn: "Review",
     fail: "Fix required",
   };
-  return (bi(ko[status], en[status])) ?? status;
+  const koLabel = ko[status];
+  const enLabel = en[status];
+  return koLabel && enLabel ? localize(koLabel, enLabel) : status;
 }
 
 function sourceLabel(
   status: StudioPlatformSourceStatus,
   requiresOfficialRecheck: boolean,
-  _locale,
+  localize: (ko: string, en: string) => string,
 ): string {
   if (status === "official") {
     if (requiresOfficialRecheck) {
-      return bi("공식 문서 간 차이", "Official sources differ");
+      return localize("공식 문서 간 차이", "Official sources differ");
     }
-    return bi("공식 출처", "Official source");
+    return localize("공식 출처", "Official source");
   }
   if (status === "unverified") {
-    return bi("미검증 수치 포함", "Includes unverified values");
+    return localize("미검증 수치 포함", "Includes unverified values");
   }
-  return bi("외부 출처 포함", "Includes external sources");
+  return localize("외부 출처 포함", "Includes external sources");
 }
 
 function documentSizeLabel(
   document: { readonly width: number | null; readonly height: number | null } | null,
-  _locale,
+  localize: (ko: string, en: string) => string,
 ): string {
   if (!document || document.width === null || document.height === null) {
-    return bi("크기 정보 없음", "Dimensions unavailable");
+    return localize("크기 정보 없음", "Dimensions unavailable");
   }
   return `${document.width.toLocaleString()} × ${document.height.toLocaleString()}px`;
 }
@@ -181,14 +182,14 @@ function StatusPanel({
   title,
   status,
   description,
-  locale,
+  locale: _locale,
 }: {
   readonly title: string;
   readonly status: string;
   readonly description: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
-  useBilingualI18nRevision();
+  const l = useBilingualLocalizer("studioDelivery.status");
   return (
     <div className="rounded-2xl border border-line bg-panel p-4">
       <div className="flex items-start justify-between gap-3">
@@ -197,7 +198,7 @@ function StatusPanel({
           <p className="mt-1 text-xs leading-5 text-fg-3">{description}</p>
         </div>
         <span className={cn("shrink-0 rounded-full border px-2.5 py-1 text-[0.65rem] font-black", statusTone(status))}>
-          {labelForStatus(status, locale)}
+          {labelForStatus(status, l)}
         </span>
       </div>
     </div>
@@ -218,16 +219,18 @@ export function StudioProjectDeliveryPanel({
   projectId,
   section,
   view,
-  locale,
+  locale: _locale,
 }: {
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
-  useBilingualI18nRevision();
-  const workspace = useStudioProjectWorkspace(projectId, locale);
-  const documents = useStudioProjectDocuments(projectId, locale, "active");
+  const l = useBilingualLocalizer("studioDelivery");
+  const language = useI18n((state) => state.lang);
+  const legacyLocale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  const workspace = useStudioProjectWorkspace(projectId, legacyLocale);
+  const documents = useStudioProjectDocuments(projectId, legacyLocale, "active");
   const [deliveryView, setDeliveryView] = useState<DeliveryView>(() => defaultDeliveryView(section, view));
   const [platformId, setPlatformId] = useState<WebtoonPlatformId>("webtoon-canvas");
   const [platformDocumentId, setPlatformDocumentId] = useState("");
@@ -304,14 +307,14 @@ export function StudioProjectDeliveryPanel({
     nodes: [{
       id: documentId,
       kind: "document",
-      title: bi("현재 원고", "Current manuscript"),
+      title: l("현재 원고", "Current manuscript"),
       status: "allowed",
       licenseId: null,
       attributionText: null,
       sourceUrl: null,
     }],
     edges: [],
-  }, [documentId]), [documentId, locale]);
+  }, [documentId]), [documentId, l]);
 
   const packagePlan: StudioPublishingPackagePlan | null = useMemo(() => {
     if (!preflight || !state) return null;
@@ -339,8 +342,8 @@ export function StudioProjectDeliveryPanel({
         })),
         metadata: localeStates.map((item) => ({
           locale: item.locale,
-          title: bi("새 에피소드", "New episode"),
-          description: bi("ToonStudio에서 준비한 에피소드입니다.", "An episode prepared in ToonStudio."),
+          title: l("새 에피소드", "New episode"),
+          description: l("ToonStudio에서 준비한 에피소드입니다.", "An episode prepared in ToonStudio."),
           author: "ToonStudio Creator",
           contentRating: "general",
           tags: ["toonstudio", "webtoon"],
@@ -376,7 +379,7 @@ export function StudioProjectDeliveryPanel({
     } catch {
       return null;
     }
-  }, [connector.id, connector.policyVersion, documentId, locale, platformId, preflight, projectId, requestedAt, rights, state]);
+  }, [connector.id, connector.policyVersion, documentId, l, platformId, preflight, projectId, requestedAt, rights, state]);
 
   const packageDeliveryStatus = packagePlan === null
     ? null
@@ -457,22 +460,22 @@ export function StudioProjectDeliveryPanel({
             <PackageCheck size={14} aria-hidden="true" /> DELIVERY
           </p>
           <h2 id="delivery-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
-            {bi("검사한 결과를 안전하게 전달", "Deliver validated work safely")}
+            {l("검사한 결과를 안전하게 전달", "Deliver validated work safely")}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">
-            {bi("직접 게시, 업로드 패키지, 수동 게시와 완전한 프로젝트 보관을 같은 흐름에서 준비합니다. 외부 서비스가 연결되지 않으면 완료로 표시하지 않습니다.", "Prepare direct publishing, upload packages, manual delivery and complete project archives in one flow. External work is never marked complete without a configured service.")}
+            {l("직접 게시, 업로드 패키지, 수동 게시와 완전한 프로젝트 보관을 같은 흐름에서 준비합니다. 외부 서비스가 연결되지 않으면 완료로 표시하지 않습니다.", "Prepare direct publishing, upload packages, manual delivery and complete project archives in one flow. External work is never marked complete without a configured service.")}
           </p>
         </div>
         <button type="button" onClick={refresh} className={buttonClass({ variant: "outline", size: "sm" })}>
-          {bi("현재 상태로 다시 계산", "Recalculate")}
+          {l("현재 상태로 다시 계산", "Recalculate")}
         </button>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-2" role="tablist" aria-label={bi("전달 방식", "Delivery mode")}>
+      <div className="mt-5 flex flex-wrap gap-2" role="tablist" aria-label={l("전달 방식", "Delivery mode")}>
         {([
-          ["publish", Globe2, bi("플랫폼 게시", "Publish")],
-          ["package", FileArchive, bi("게시 패키지", "Package")],
-          ["archive", Archive, bi("완전한 사본", "Archive")],
+          ["publish", Globe2, l("플랫폼 게시", "Publish")],
+          ["package", FileArchive, l("게시 패키지", "Package")],
+          ["archive", Archive, l("완전한 사본", "Archive")],
         ] as const).map(([id, Icon, label]) => (
           <button
             key={id}
@@ -505,10 +508,10 @@ export function StudioProjectDeliveryPanel({
                   <FileCheck2 size={14} aria-hidden="true" /> 1. PLATFORM CHECK
                 </p>
                 <h3 id="platform-readiness-title" className="mt-1 text-lg font-black text-fg">
-                  {bi("올릴 곳을 고르고 규격부터 확인", "Choose a destination and check its rules")}
+                  {l("올릴 곳을 고르고 규격부터 확인", "Choose a destination and check its rules")}
                 </h3>
                 <p className="mt-1 max-w-3xl text-xs leading-5 text-fg-3">
-                  {bi("실제 원고 크기를 플랫폼별 규격표와 비교합니다. 출처가 약한 수치는 원고를 막지 않고 공식 안내 재확인으로 구분합니다.", "Compare real manuscript dimensions with platform rules. Low-confidence values never block delivery and are marked for official re-check.")}
+                  {l("실제 원고 크기를 플랫폼별 규격표와 비교합니다. 출처가 약한 수치는 원고를 막지 않고 공식 안내 재확인으로 구분합니다.", "Compare real manuscript dimensions with platform rules. Low-confidence values never block delivery and are marked for official re-check.")}
                 </p>
               </div>
               <span className={cn(
@@ -520,7 +523,7 @@ export function StudioProjectDeliveryPanel({
                 {sourceLabel(
                   platformDeliveryPlan.sourceStatus,
                   platformDeliveryPlan.requiresOfficialRecheck,
-                  locale,
+                  l,
                 )}
               </span>
             </div>
@@ -528,7 +531,7 @@ export function StudioProjectDeliveryPanel({
             <div className="mt-4 grid gap-5 xl:grid-cols-[20rem_minmax(0,1fr)]">
               <div className="space-y-4">
                 <label className="block text-xs font-black text-fg-2">
-                  {bi("원고", "Manuscript")}
+                  {l("원고", "Manuscript")}
                   <select
                     value={selectedDocument?.id ?? ""}
                     disabled={webtoonDocuments.length === 0}
@@ -536,17 +539,17 @@ export function StudioProjectDeliveryPanel({
                     className="mt-2 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg disabled:opacity-60"
                   >
                     {webtoonDocuments.length === 0 ? (
-                      <option value="">{bi("웹툰 원고 없음", "No webtoon manuscript")}</option>
+                      <option value="">{l("웹툰 원고 없음", "No webtoon manuscript")}</option>
                     ) : null}
                     {webtoonDocuments.map((document) => (
                       <option key={document.id} value={document.id}>
-                        {document.title} · {documentSizeLabel(document, locale)}
+                        {document.title} · {documentSizeLabel(document, l)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="block text-xs font-black text-fg-2">
-                  {bi("게시 플랫폼", "Publishing platform")}
+                  {l("게시 플랫폼", "Publishing platform")}
                   <select
                     value={platformId}
                     onChange={(event) => {
@@ -567,7 +570,7 @@ export function StudioProjectDeliveryPanel({
                   </select>
                 </label>
                 <label className="block text-xs font-black text-fg-2">
-                  {bi("출력 형식", "Output format")}
+                  {l("출력 형식", "Output format")}
                   <select
                     value={selectedFormat}
                     onChange={(event) => setOutputFormat(event.target.value as WebtoonImageFormat)}
@@ -590,32 +593,32 @@ export function StudioProjectDeliveryPanel({
                   <div className="rounded-2xl border border-warning/35 bg-warning-soft/15 p-4">
                     <h4 className="flex items-center gap-2 text-sm font-black text-fg">
                       <Smartphone size={17} className="text-warning" aria-hidden="true" />
-                      {bi("확인할 웹툰 원고가 없어요", "No webtoon manuscript to validate")}
+                      {l("확인할 웹툰 원고가 없어요", "No webtoon manuscript to validate")}
                     </h4>
                     <p className="mt-2 text-xs leading-5 text-fg-2">
-                      {bi("웹툰 원고를 만들거나 가져온 뒤 실제 크기로 플랫폼 규격을 검사할 수 있습니다. 임의 크기를 대신 넣지 않습니다.", "Create or import a webtoon manuscript to validate its real dimensions. ToonStudio does not substitute invented dimensions.")}
+                      {l("웹툰 원고를 만들거나 가져온 뒤 실제 크기로 플랫폼 규격을 검사할 수 있습니다. 임의 크기를 대신 넣지 않습니다.", "Create or import a webtoon manuscript to validate its real dimensions. ToonStudio does not substitute invented dimensions.")}
                     </p>
                     <Link
                       href="/studio/new?kind=webtoon&template=webtoon-vertical"
                       className="mt-3 inline-flex min-h-10 items-center rounded-xl bg-accent px-3 text-xs font-bold text-on-accent"
                     >
-                      {bi("웹툰 원고 만들기", "Create a webtoon")}
+                      {l("웹툰 원고 만들기", "Create a webtoon")}
                     </Link>
                   </div>
                 ) : platformDeliveryPlan.status === "needs-document-size" ? (
                   <div className="rounded-2xl border border-warning/35 bg-warning-soft/15 p-4">
                     <h4 className="flex items-center gap-2 text-sm font-black text-fg">
                       <CircleAlert size={17} className="text-warning" aria-hidden="true" />
-                      {bi("원고 크기 정보가 필요해요", "Manuscript dimensions are required")}
+                      {l("원고 크기 정보가 필요해요", "Manuscript dimensions are required")}
                     </h4>
                     <p className="mt-2 text-xs leading-5 text-fg-2">
-                      {bi("이 문서에는 가로·세로 크기가 기록되지 않아 규격 적합 여부를 계산하지 않았습니다. 편집기에서 원고 크기를 확인한 뒤 다시 계산하세요.", "This document has no recorded width or height, so no compatibility result was inferred. Confirm the canvas size in the editor and recalculate.")}
+                      {l("이 문서에는 가로·세로 크기가 기록되지 않아 규격 적합 여부를 계산하지 않았습니다. 편집기에서 원고 크기를 확인한 뒤 다시 계산하세요.", "This document has no recorded width or height, so no compatibility result was inferred. Confirm the canvas size in the editor and recalculate.")}
                     </p>
                     <Link
                       href={`/studio/p/${encodeURIComponent(projectId)}/d/${encodeURIComponent(selectedDocument.id)}?workspace=${encodeURIComponent(selectedDocument.defaultWorkspace)}`}
                       className={cn(buttonClass({ variant: "outline", size: "sm" }), "mt-3")}
                     >
-                      {bi("원고 크기 확인", "Check manuscript size")}
+                      {l("원고 크기 확인", "Check manuscript size")}
                     </Link>
                   </div>
                 ) : (
@@ -623,20 +626,20 @@ export function StudioProjectDeliveryPanel({
                     <StatusPanel
                       title={platformDeliveryPlan.platformName}
                       status={platformDeliveryPlan.grade ?? "review"}
-                      description={`${selectedDocument.title} · ${documentSizeLabel(selectedDocument, locale)} · ${selectedFormat.toUpperCase()}`}
-                      locale={locale}
+                      description={`${selectedDocument.title} · ${documentSizeLabel(selectedDocument, l)} · ${selectedFormat.toUpperCase()}`}
+                      locale={legacyLocale}
                     />
                     <div className="grid gap-3 sm:grid-cols-4">
-                      <Metric label={bi("현재 가로", "Current width")} value={selectedDocument.width === null ? "—" : `${selectedDocument.width}px`} />
-                      <Metric label={bi("권장 가로", "Recommended width")} value={`${platformSpec.recommendedWidthPx}px`} />
-                      <Metric label={bi("권장 분할", "Suggested slices")} value={platformDeliveryPlan.recommendedSliceCount ?? "—"} />
-                      <Metric label={bi("문서 페이지", "Document pages")} value={selectedDocument.pageCount} />
+                      <Metric label={l("현재 가로", "Current width")} value={selectedDocument.width === null ? "—" : `${selectedDocument.width}px`} />
+                      <Metric label={l("권장 가로", "Recommended width")} value={`${platformSpec.recommendedWidthPx}px`} />
+                      <Metric label={l("권장 분할", "Suggested slices")} value={platformDeliveryPlan.recommendedSliceCount ?? "—"} />
+                      <Metric label={l("문서 페이지", "Document pages")} value={selectedDocument.pageCount} />
                     </div>
                     {platformDeliveryPlan.issues.length === 0 ? (
                       <div className="flex items-start gap-3 rounded-xl border border-success/30 bg-success-soft/12 p-3">
                         <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />
                         <p className="text-xs leading-5 text-fg-2">
-                          {bi("현재 확인 가능한 폭·높이·형식 규격에 맞습니다. 파일 용량과 썸네일은 실제 출력 후 마지막으로 확인하세요.", "The available width, height and format checks pass. Verify final file size and thumbnails after rendering.")}
+                          {l("현재 확인 가능한 폭·높이·형식 규격에 맞습니다. 파일 용량과 썸네일은 실제 출력 후 마지막으로 확인하세요.", "The available width, height and format checks pass. Verify final file size and thumbnails after rendering.")}
                         </p>
                       </div>
                     ) : (
@@ -663,13 +666,13 @@ export function StudioProjectDeliveryPanel({
                         className={buttonClass({ variant: "outline", size: "sm", className: "gap-2" })}
                       >
                         <Download size={15} aria-hidden="true" />
-                        {bi("플랫폼 체크리스트 받기", "Download platform checklist")}
+                        {l("플랫폼 체크리스트 받기", "Download platform checklist")}
                       </button>
                       <Link
                         href={`/studio/p/${encodeURIComponent(projectId)}/d/${encodeURIComponent(selectedDocument.id)}?workspace=${encodeURIComponent(selectedDocument.defaultWorkspace)}`}
                         className={buttonClass({ variant: "quiet", size: "sm" })}
                       >
-                        {bi("원고 열기", "Open manuscript")}
+                        {l("원고 열기", "Open manuscript")}
                       </Link>
                     </div>
                   </>
@@ -682,13 +685,13 @@ export function StudioProjectDeliveryPanel({
             <div>
               <p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-accent">2. DELIVERY METHOD</p>
               <h3 id="delivery-method-title" className="mt-1 text-lg font-black text-fg">
-                {bi("검사 결과를 어떻게 전달할까요?", "How should the validated work be delivered?")}
+                {l("검사 결과를 어떻게 전달할까요?", "How should the validated work be delivered?")}
               </h3>
             </div>
             <div className="mt-4 grid gap-5 xl:grid-cols-[20rem_minmax(0,1fr)]">
               <div className="space-y-4">
             <label className="block text-xs font-black text-fg-2">
-              {bi("연결 방식", "Connection mode")}
+              {l("연결 방식", "Connection mode")}
               <select
                 value={connector.id}
                 onChange={(event) => {
@@ -708,7 +711,7 @@ export function StudioProjectDeliveryPanel({
               </select>
             </label>
             <label className="block text-xs font-black text-fg-2">
-              {bi("예약 게시", "Schedule")}
+              {l("예약 게시", "Schedule")}
               <input
                 type="datetime-local"
                 value={scheduledAt}
@@ -720,16 +723,16 @@ export function StudioProjectDeliveryPanel({
               <label className="flex min-h-12 items-center gap-3 rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg-2">
                 <input type="checkbox" checked={credentialsAvailable} onChange={(event) => setCredentialsAvailable(event.target.checked)} />
                 <KeyRound size={15} className="text-accent" aria-hidden="true" />
-                {bi("게시 계정 연결됨", "Publishing account connected")}
+                {l("게시 계정 연결됨", "Publishing account connected")}
               </label>
             ) : null}
             {connector.mode === "direct-api" ? (
               <label className="flex min-h-12 items-start gap-3 rounded-xl border border-warning/30 bg-warning-soft/12 px-3 py-3 text-xs font-bold text-fg-2">
                 <input className="mt-0.5" type="checkbox" checked={externalWriteConfirmed} onChange={(event) => setExternalWriteConfirmed(event.target.checked)} />
                 <span>
-                  {bi("외부 게시 직전 확인", "Confirm external publishing")}
+                  {l("외부 게시 직전 확인", "Confirm external publishing")}
                   <span className="mt-1 block font-normal leading-5 text-fg-3">
-                    {bi("실제 계정과 API가 구성된 환경에서만 게시 요청을 보냅니다.", "A request is sent only when a real account and API are configured.")}
+                    {l("실제 계정과 API가 구성된 환경에서만 게시 요청을 보냅니다.", "A request is sent only when a real account and API are configured.")}
                   </span>
                 </span>
               </label>
@@ -741,13 +744,13 @@ export function StudioProjectDeliveryPanel({
               <div className="rounded-2xl border border-warning/35 bg-warning-soft/15 p-4">
                 <h3 className="flex items-center gap-2 text-sm font-black text-fg">
                   <CircleAlert size={17} className="text-warning" aria-hidden="true" />
-                  {bi("먼저 내보내기 사전검사를 실행해 주세요", "Run export preflight first")}
+                  {l("먼저 내보내기 사전검사를 실행해 주세요", "Run export preflight first")}
                 </h3>
                 <p className="mt-2 text-xs leading-5 text-fg-2">
-                  {bi("규격·권리·현지화·열린 검토를 통과한 결과만 게시 계획에 사용할 수 있습니다.", "Only results checked for format, rights, localization and open reviews can be published.")}
+                  {l("규격·권리·현지화·열린 검토를 통과한 결과만 게시 계획에 사용할 수 있습니다.", "Only results checked for format, rights, localization and open reviews can be published.")}
                 </p>
                 <Link href={`/studio/p/${encodeURIComponent(projectId)}/export?view=preflight`} className="mt-3 inline-flex min-h-10 items-center rounded-xl bg-accent px-3 text-xs font-bold text-on-accent">
-                  {bi("사전검사로 이동", "Open preflight")}
+                  {l("사전검사로 이동", "Open preflight")}
                 </Link>
               </div>
             ) : publishPlan ? (
@@ -755,17 +758,17 @@ export function StudioProjectDeliveryPanel({
                 <StatusPanel
                   title={`${platformDeliveryPlan.platformName} · ${connector.platformName}`}
                   status={publishDeliveryStatus ?? publishPlan.status}
-                  description={formatI18nTemplate(String(bi("실행 방식: {value0} · 게시 언어 {value1}개", "Action: {value0} · {value1} publishing locales")), { value0: publishPlan.action, value1: publishPlan.publishLocales.length })}
-                  locale={locale}
+                  description={l(`실행 방식: ${publishPlan.action} · 게시 언어 ${publishPlan.publishLocales.length}개`, `Action: ${publishPlan.action} · ${publishPlan.publishLocales.length} publishing locales`)}
+                  locale={legacyLocale}
                 />
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <Metric label={bi("게시 언어", "Publish locales")} value={publishPlan.publishLocales.length} />
-                  <Metric label={bi("제외 언어", "Excluded locales")} value={publishPlan.unsupportedLocales.length} />
-                  <Metric label={bi("확인 사항", "Warnings")} value={publishPlan.warnings.length} />
+                  <Metric label={l("게시 언어", "Publish locales")} value={publishPlan.publishLocales.length} />
+                  <Metric label={l("제외 언어", "Excluded locales")} value={publishPlan.unsupportedLocales.length} />
+                  <Metric label={l("확인 사항", "Warnings")} value={publishPlan.warnings.length} />
                 </div>
                 {platformBlocksDelivery ? (
                   <p className="rounded-xl border border-danger/30 bg-danger-soft/12 px-3 py-2 text-xs text-danger">
-                    {bi("플랫폼 규격 점검에서 수정이 필요합니다. 원고 크기·형식을 고친 뒤 다시 계산하세요.", "The platform check requires changes. Fix manuscript dimensions or format, then recalculate.")}
+                    {l("플랫폼 규격 점검에서 수정이 필요합니다. 원고 크기·형식을 고친 뒤 다시 계산하세요.", "The platform check requires changes. Fix manuscript dimensions or format, then recalculate.")}
                   </p>
                 ) : null}
                 {publishPlan.blockingReasons.map((reason) => (
@@ -776,18 +779,18 @@ export function StudioProjectDeliveryPanel({
                     <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />
                     <p className="text-xs leading-5 text-fg-2">
                       {connector.mode === "direct-api"
-                        ? (bi("게시 요청을 보낼 준비가 됐습니다. 실제 전송은 구성된 서버 Connector에서만 수행합니다.", "The request is ready. A configured server connector is required for the actual publish."))
-                        : (bi("이 방식은 외부 게시 대신 안전한 패키지 또는 안내를 만듭니다.", "This mode creates a safe package or instructions instead of writing externally."))}
+                        ? (l("게시 요청을 보낼 준비가 됐습니다. 실제 전송은 구성된 서버 Connector에서만 수행합니다.", "The request is ready. A configured server connector is required for the actual publish."))
+                        : (l("이 방식은 외부 게시 대신 안전한 패키지 또는 안내를 만듭니다.", "This mode creates a safe package or instructions instead of writing externally."))}
                     </p>
                   </div>
                 ) : null}
               </>
             ) : (
               <StatusPanel
-                title={bi("게시 계획을 만들 수 없어요", "Publishing plan unavailable")}
+                title={l("게시 계획을 만들 수 없어요", "Publishing plan unavailable")}
                 status="blocked"
-                description={bi("예약 시간과 프로젝트 상태를 확인해 주세요.", "Check the schedule and project state.")}
-                locale={locale}
+                description={l("예약 시간과 프로젝트 상태를 확인해 주세요.", "Check the schedule and project state.")}
+                locale={legacyLocale}
               />
             )}
           </div>
@@ -800,7 +803,7 @@ export function StudioProjectDeliveryPanel({
         <div className="mt-5 space-y-4">
           <div className="flex flex-col gap-3 rounded-xl border border-line bg-panel/55 p-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-[0.65rem] font-semibold text-fg-3">{bi("대상 플랫폼", "Target platform")}</p>
+              <p className="text-[0.65rem] font-semibold text-fg-3">{l("대상 플랫폼", "Target platform")}</p>
               <p className="mt-1 text-sm font-black text-fg">{platformSpec.name}</p>
             </div>
             <button
@@ -808,34 +811,34 @@ export function StudioProjectDeliveryPanel({
               onClick={() => setDeliveryView("publish")}
               className={buttonClass({ variant: "quiet", size: "sm" })}
             >
-              {bi("플랫폼·규격 변경", "Change platform and rules")}
+              {l("플랫폼·규격 변경", "Change platform and rules")}
             </button>
           </div>
           {!packagePlan ? (
             <StatusPanel
-              title={bi("게시 패키지를 만들기 전에 사전검사가 필요해요", "Preflight is required before packaging")}
+              title={l("게시 패키지를 만들기 전에 사전검사가 필요해요", "Preflight is required before packaging")}
               status="blocked"
-              description={bi("내보내기 사전검사를 저장한 뒤 다시 열어 주세요.", "Save an export preflight and return here.")}
-              locale={locale}
+              description={l("내보내기 사전검사를 저장한 뒤 다시 열어 주세요.", "Save an export preflight and return here.")}
+              locale={legacyLocale}
             />
           ) : (
             <>
               <StatusPanel
-                title={formatI18nTemplate(String(bi("{value0} 게시 패키지", "{value0} publishing package")), { value0: platformSpec.name })}
+                title={l(`${platformSpec.name} 게시 패키지`, `${platformSpec.name} publishing package`)}
                 status={packageDeliveryStatus ?? packagePlan.status}
-                description={bi("파일 checksum, 언어별 메타데이터, 사용 권리, 출처와 정책 버전을 함께 보관합니다.", "Store checksums, localized metadata, rights, attribution and policy version together.")}
-                locale={locale}
+                description={l("파일 checksum, 언어별 메타데이터, 사용 권리, 출처와 정책 버전을 함께 보관합니다.", "Store checksums, localized metadata, rights, attribution and policy version together.")}
+                locale={legacyLocale}
               />
               {platformBlocksDelivery ? (
                 <p className="rounded-xl border border-danger/30 bg-danger-soft/12 px-3 py-2 text-xs text-danger">
-                  {bi("플랫폼 규격 점검을 통과하기 전에는 업로드용 Manifest를 준비 완료로 표시하지 않습니다.", "The upload manifest is not marked ready until the platform check passes.")}
+                  {l("플랫폼 규격 점검을 통과하기 전에는 업로드용 Manifest를 준비 완료로 표시하지 않습니다.", "The upload manifest is not marked ready until the platform check passes.")}
                 </p>
               ) : null}
               <div className="grid gap-3 sm:grid-cols-4">
-                <Metric label={bi("파일", "Files")} value={packagePlan.manifest?.files.length ?? 0} />
-                <Metric label={bi("언어", "Locales")} value={packagePlan.manifest?.locales.length ?? 0} />
-                <Metric label={bi("출처", "Credits")} value={packagePlan.manifest?.attributionTexts.length ?? 0} />
-                <Metric label={bi("예상 크기", "Estimated size")} value={`${Math.round((packagePlan.manifest?.totalSizeBytes ?? 0) / 1024 / 1024 * 10) / 10} MB`} />
+                <Metric label={l("파일", "Files")} value={packagePlan.manifest?.files.length ?? 0} />
+                <Metric label={l("언어", "Locales")} value={packagePlan.manifest?.locales.length ?? 0} />
+                <Metric label={l("출처", "Credits")} value={packagePlan.manifest?.attributionTexts.length ?? 0} />
+                <Metric label={l("예상 크기", "Estimated size")} value={`${Math.round((packagePlan.manifest?.totalSizeBytes ?? 0) / 1024 / 1024 * 10) / 10} MB`} />
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -848,11 +851,11 @@ export function StudioProjectDeliveryPanel({
                   className={buttonClass({ className: "gap-2" })}
                 >
                   <Download size={16} aria-hidden="true" />
-                  {bi("패키지 Manifest 받기", "Download package manifest")}
+                  {l("패키지 Manifest 받기", "Download package manifest")}
                 </button>
                 <Link href={`/studio/work/${encodeURIComponent(projectId)}/publish`} className={buttonClass({ variant: "outline", className: "gap-2" })}>
                   <Send size={16} aria-hidden="true" />
-                  {bi("실제 파일 생성으로", "Create output files")}
+                  {l("실제 파일 생성으로", "Create output files")}
                 </Link>
               </div>
               {[...packagePlan.blockingCodes, ...packagePlan.warningCodes].map((code) => (
@@ -866,16 +869,16 @@ export function StudioProjectDeliveryPanel({
       {deliveryView === "archive" ? (
         <div className="mt-5 space-y-4">
           <StatusPanel
-            title={bi("완전한 프로젝트 사본", "Complete project copy")}
+            title={l("완전한 프로젝트 사본", "Complete project copy")}
             status={archiveValidation.valid ? restorePlan.status : "blocked"}
-            description={bi("원고, 에셋 목록, 사용 권리, 프로젝트 설정과 미리보기를 의존 관계와 함께 보관합니다. 보관은 삭제가 아닙니다.", "Archive documents, asset inventory, rights, project settings and preview with dependencies. Archiving is not deletion.")}
-            locale={locale}
+            description={l("원고, 에셋 목록, 사용 권리, 프로젝트 설정과 미리보기를 의존 관계와 함께 보관합니다. 보관은 삭제가 아닙니다.", "Archive documents, asset inventory, rights, project settings and preview with dependencies. Archiving is not deletion.")}
+            locale={legacyLocale}
           />
           <div className="grid gap-3 sm:grid-cols-4">
-            <Metric label={bi("포함 파일", "Files")} value={archiveManifest.files.length} />
-            <Metric label={bi("필수 파일", "Required")} value={archiveManifest.files.filter((file) => file.required).length} />
-            <Metric label={bi("의존 관계", "Dependencies")} value={archiveManifest.dependencies.length} />
-            <Metric label={bi("검증 크기", "Validated size")} value={`${Math.round(archiveValidation.totalSizeBytes / 1024)} KB`} />
+            <Metric label={l("포함 파일", "Files")} value={archiveManifest.files.length} />
+            <Metric label={l("필수 파일", "Required")} value={archiveManifest.files.filter((file) => file.required).length} />
+            <Metric label={l("의존 관계", "Dependencies")} value={archiveManifest.dependencies.length} />
+            <Metric label={l("검증 크기", "Validated size")} value={`${Math.round(archiveValidation.totalSizeBytes / 1024)} KB`} />
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -885,11 +888,11 @@ export function StudioProjectDeliveryPanel({
               className={buttonClass({ className: "gap-2" })}
             >
               <Download size={16} aria-hidden="true" />
-              {bi("보관 Manifest 받기", "Download archive manifest")}
+              {l("보관 Manifest 받기", "Download archive manifest")}
             </button>
             <span className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-success/30 bg-success-soft/12 px-3 text-xs font-bold text-fg-2">
               <CheckCircle2 size={16} className="text-success" aria-hidden="true" />
-              {bi("복원 가능성 검사 완료", "Restore plan checked")}
+              {l("복원 가능성 검사 완료", "Restore plan checked")}
             </span>
           </div>
           {archiveValidation.issues.map((issue) => (
