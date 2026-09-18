@@ -19,7 +19,6 @@ import {
 import {
   isCommerceOrderStatus,
   type CommerceOrderPublicEntry,
-  type CommerceProvider,
 } from "../../../../../packages/core/src/commerce";
 import {
   commerceEntitlements,
@@ -317,7 +316,6 @@ export class CommerceService {
       });
     }
 
-    const config = await getCommerceConfig();
     const runtime = resolveCommerceProviderRuntime("toss");
     if (!runtime.tossConfig?.serverReady || !row.paymentKey && !identity.paymentKey) {
       throw new ServiceUnavailableException("결제 공급자 조회 설정이 준비되지 않았습니다.");

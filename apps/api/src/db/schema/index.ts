@@ -12,5 +12,4 @@ export * from "./production.schema";
 export * from "./messaging.schema";
 export * from "./studio-project-graph.schema";
 export * from "./business.schema";
-export * from "./supporter-payment.schema";
-export * from "./creator-support-program.schema";
+export * from "./commerce.schema";
