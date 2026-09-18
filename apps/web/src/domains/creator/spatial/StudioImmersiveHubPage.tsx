@@ -3,8 +3,6 @@ import {
   resolveUiLocale,
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   Box,
   Brush,
@@ -23,35 +21,25 @@ import {
   Sparkles,
   Upload,
   UserRound,
-} from "lucide-react";
-import { useEffect, useMemo, useState, type ComponentType } from "react";
-
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
-import Link from "@/compat/router-link";
-import { Container } from "@/shared/components/section";
-import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
-import { cn } from "@/shared/lib/utils";
-import {
-  inspectStudioImmersiveCapabilities,
+  } from "lucide-react"; import { useEffect,
+  useMemo,
+  useState,
+  type ComponentType } from "react"; import { useBilingual,
+  Container } from "@/shared/components/section"; import { buttonClass } from "@/shared/components/ui/button-utils"; import { useBilingualLocalizer,
+  cn } from "@/shared/lib/utils"; import { inspectStudioImmersiveCapabilities,
   studioImmersiveSupportLabel,
   type StudioImmersiveCapabilitySnapshot,
   type StudioImmersiveSupport,
-} from "./studio-immersive-capabilities";
-import {
-  STUDIO_IMMERSIVE_STAGES,
+  } from "./studio-immersive-capabilities"; import { STUDIO_IMMERSIVE_STAGES,
   STUDIO_IMMERSIVE_STARTER_KITS,
   STUDIO_IMMERSIVE_WORKFLOWS,
   type StudioImmersiveIcon,
   type StudioImmersiveStage,
-} from "./studio-immersive-workflows";
-import { SpatialWebtoonReaderLauncher } from "./SpatialWebtoonReaderLauncher";
-import {
-  formatI18nTemplate,
+  } from "./studio-immersive-workflows"; import { SpatialWebtoonReaderLauncher } from "./SpatialWebtoonReaderLauncher"; import { formatI18nTemplate,
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
-
+import Link from "@/compat/router-link";
 type Locale = string;
 type Icon = ComponentType<{ size?: number; className?: string; "aria-hidden"?: boolean }>;
 
