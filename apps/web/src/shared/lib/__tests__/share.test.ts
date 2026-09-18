@@ -64,6 +64,7 @@ describe("share channel targets", () => {
     ["line", "social-plugins.line.me"],
     ["x", "twitter.com"],
     ["facebook", "www.facebook.com"],
+    ["linkedin", "www.linkedin.com"],
     ["telegram", "t.me"],
   ] as const)("%s 채널의 공식 공유 호스트를 사용한다", (channel, host) => {
     expect(new URL(shareTargetUrl(channel, payload)).host).toBe(host);

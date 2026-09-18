@@ -12,6 +12,8 @@ export const STUDIO_ROUTE_IDS = [
   "ai-runtime",
   "character-convert",
   "ecosystem",
+  "growth-ip",
+  "environment-guide",
   "ecosystem-viewer",
   "toolchain",
   "engines",
@@ -89,6 +91,8 @@ export const STUDIO_ROUTE_REGISTRY: readonly StudioRouteRegistration[] = Object.
   route("ai-runtime", "/studio/ai-runtime", "studio", "none", "AI 런타임", "AI runtime"),
   route("character-convert", "/studio/character-convert", "studio", "none", "캐릭터 변환", "Character conversion"),
   route("ecosystem", "/studio/ecosystem", "studio", "none", "제작 생태계", "Creator ecosystem"),
+  route("growth-ip", "/studio/growth-ip", "studio", "none", "작가 성장·IP 확장", "Creator growth & IP"),
+  route("environment-guide", "/studio/environment", "reference", "none", "사용 환경 안내", "Environment guide"),
   route("ecosystem-viewer", "/studio/ecosystem/viewer", "studio", "none", "생태계 뷰어", "Ecosystem viewer"),
   route("toolchain", "/studio/toolchain", "studio", "none", "제작 도구", "Production tools"),
   route("engines", "/studio/engines", "studio", "none", "설치·라이선스", "Engines & licenses"),
@@ -125,6 +129,8 @@ export const STUDIO_DISCOVERY_ROUTE_IDS = Object.freeze([
   "ai-runtime",
   "character-convert",
   "ecosystem",
+  "growth-ip",
+  "environment-guide",
   "jobs",
 ] as const satisfies readonly StudioRouteId[]);
 

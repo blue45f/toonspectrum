@@ -238,11 +238,11 @@ export function resolveSiteRouteVisualKind(input: string): SiteRouteVisualKind {
   if (family(pathname, ["/studio/assets", "/market", "/research/assets", "/research/packs", "/research/3d-assets"])) return "assets";
   if (pathname.includes("/review") || family(pathname, ["/reviews", "/feedback"])) return "review";
   if (pathname.includes("/publish") || family(pathname, ["/showcase", "/create"])) return "publish";
-  if (family(pathname, ["/studio/manual", "/learn", "/help", "/guide", "/references", "/research", "/about/workflow", "/about/technology"])) return "learn";
+  if (family(pathname, ["/studio/manual", "/studio/environment", "/learn", "/help", "/guide", "/references", "/research", "/about/workflow", "/about/technology"])) return "learn";
   if (exact(pathname, ["/studio/toolchain", "/studio/engines", "/studio/jobs"])) return "production";
   if (exact(pathname, ["/studio/new", "/studio/import", "/studio/templates"])) return "create";
   if (exact(pathname, ["/studio/ai-settings"])) return "manage";
-  if (exact(pathname, ["/studio/ecosystem"])) return "workflow";
+  if (exact(pathname, ["/studio/ecosystem", "/studio/growth-ip"])) return "workflow";
   if (family(pathname, ["/collaborate", "/community", "/messages", "/contact", "/support"])) return "connect";
   if (family(pathname, ["/library", "/my", "/me", "/settings"])) return "manage";
   if (exact(pathname, ["/about", "/accessibility", "/about/data", "/about/crawler", "/copyright", "/design", "/privacy", "/sitemap", "/terms"])) return "trust";

@@ -34,6 +34,8 @@ describe("Studio route registry", () => {
       "ai-runtime",
       "character-convert",
       "ecosystem",
+      "growth-ip",
+      "environment-guide",
       "jobs",
     ]);
     for (const id of STUDIO_DISCOVERY_ROUTE_IDS) {

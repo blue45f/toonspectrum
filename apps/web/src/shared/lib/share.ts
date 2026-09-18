@@ -5,6 +5,7 @@ export type ShareChannel =
   | "line"
   | "x"
   | "facebook"
+  | "linkedin"
   | "telegram"
   | "email"
   | "copy"
@@ -108,6 +109,8 @@ export function shareTargetUrl(
       return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
     case "facebook":
       return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+    case "linkedin":
+      return `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
     case "telegram":
       return `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
     case "email": {

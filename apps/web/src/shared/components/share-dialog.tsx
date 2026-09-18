@@ -42,7 +42,8 @@ type Notice =
 
 interface ShareChannelOption {
   readonly channel: LinkShareChannel;
-  readonly labelKey: string;
+  readonly labelKey?: string;
+  readonly label?: string;
   readonly badge: string;
   readonly badgeClassName: string;
 }
@@ -71,6 +72,12 @@ const LINK_CHANNELS: readonly ShareChannelOption[] = [
     labelKey: "share.social.facebook",
     badge: "f",
     badgeClassName: "bg-[#1877f2] text-white",
+  },
+  {
+    channel: "linkedin",
+    label: "LinkedIn",
+    badge: "in",
+    badgeClassName: "bg-[#0a66c2] text-white",
   },
   {
     channel: "telegram",
@@ -318,7 +325,7 @@ export function ShareDialog({ payload, trigger, defaultOpen = false }: ShareDial
                   >
                     {email ? <Mail size={16} aria-hidden="true" /> : option.badge}
                   </span>
-                  {t(option.labelKey)}
+                  {option.label ?? (option.labelKey ? t(option.labelKey) : option.channel)}
                 </a>
               );
             })}

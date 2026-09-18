@@ -229,6 +229,8 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
       destination("/studio/ai-settings", "Studio AI 설정", "Studio AI settings", "Studio 생성 도구의 연결과 모델 설정", "Configure Studio generation connections and models"),
       destination("/settings/ai", "통합 AI 설정", "Unified AI settings", "모든 사용자 AI 연결과 키 보관함 관리", "Manage user-funded AI connections and the encrypted vault"),
       destination("/studio/ecosystem", "창작 생태계", "Creator ecosystem", "제작 도구·작업·리소스를 한곳에서 관리", "Manage creation tools, work and resources together"),
+      destination("/studio/growth-ip", "작가 성장·IP 확장", "Creator growth & IP", "신인 발굴·지원·웹소설 각색·판권·교육·협업 관리", "Manage creator support, adaptation, rights, education and collaboration"),
+      destination("/studio/environment", "사용 환경 안내", "Environment guide", "브라우저 기능·PWA 설치·권한·오프라인 준비 상태 점검", "Check browser capabilities, PWA installation, permissions and offline readiness"),
       destination("/studio/ecosystem/viewer", "생태계 뷰어", "Ecosystem viewer", "연결된 제작 자산과 흐름을 시각화", "Visualize connected creative assets and workflows"),
     ],
   },
