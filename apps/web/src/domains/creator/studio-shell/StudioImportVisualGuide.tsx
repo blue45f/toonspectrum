@@ -1,10 +1,9 @@
 import { ArrowDown, Cloud, FileImage, FolderOpen, Layers3, ShieldCheck } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
-import { useT } from "@/shared/lib/i18n";
-import { translateParallelBilingualCopy } from "@/shared/lib/i18n-bilingual-copy";
-
 import "./studio-import-visual-guide.css";
+
+type Locale = "ko" | "en";
 
 const COPY = {
   ko: {
@@ -46,13 +45,12 @@ const COPY = {
 const SOURCE_ICONS = [FileImage, Cloud, FolderOpen] as const;
 const STEP_ICONS = [FolderOpen, Layers3, ShieldCheck] as const;
 
-export function StudioImportVisualGuide({ locale }: { readonly locale: string }) {
-  const t = useT();
-  const copy = translateParallelBilingualCopy(t, "StudioImportVisualGuide", COPY);
+export function StudioImportVisualGuide({ locale }: { readonly locale: Locale }) {
+  const copy = COPY[locale];
   const reducedMotion = useReducedMotion();
 
   return (
-    <section className="studio-import-visual-guide" aria-labelledby="studio-import-visual-title" lang={language}>
+    <section className="studio-import-visual-guide" aria-labelledby="studio-import-visual-title" lang={locale}>
       <div className="studio-import-visual-guide__hero">
         <div className="studio-import-visual-guide__copy">
           <p className="studio-import-visual-guide__eyebrow">{copy.eyebrow}</p>
@@ -67,7 +65,8 @@ export function StudioImportVisualGuide({ locale }: { readonly locale: string })
         </div>
         <motion.figure
           initial={reducedMotion ? false : { opacity: 0, x: 18 }}
-          animate={reducedMotion ? undefined : { opacity: 1, x: 0 }}
+          whileInView={reducedMotion ? undefined : { opacity: 1, x: 0 }}
+          viewport={{ once: true, amount: .2 }}
           transition={{ duration: .48, ease: [0.16, 1, 0.3, 1] }}
         >
           <picture>
@@ -88,7 +87,8 @@ export function StudioImportVisualGuide({ locale }: { readonly locale: string })
             <motion.article
               key={title}
               initial={reducedMotion ? false : { opacity: 0, y: 12 }}
-              animate={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+              whileInView={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: .3 }}
               transition={{ duration: .38, delay: index * .06, ease: [0.16, 1, 0.3, 1] }}
             >
               <span>{number}</span><Icon size={19} aria-hidden="true" /><h3>{title}</h3><p>{body}</p>
