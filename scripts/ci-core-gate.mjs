@@ -2,21 +2,33 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Must match the real job dependencies in ci.yml; no configurable bypass. */
-export const REQUIRED_CORE_GATES = Object.freeze(["static", "serial", "build"]);
+/** Must match the real protected dependencies in .github/workflows/ci.yml. */
+export const REQUIRED_CORE_GATES = Object.freeze([
+  "lint",
+  "typecheck",
+  "static",
+  "serial",
+  "a11y",
+  "build",
+]);
 
 export function assertCoreResults(results) {
   if (!results || typeof results !== "object" || Array.isArray(results)) {
     throw new Error("core requires a non-empty GitHub needs object");
   }
+
   const unexpected = Object.keys(results).filter((key) => !REQUIRED_CORE_GATES.includes(key));
   if (unexpected.length > 0) {
     throw new Error(`core has unrecognized dependencies: ${unexpected.join(", ")}`);
   }
-  for (const name of REQUIRED_CORE_GATES) {
-    if (!Object.hasOwn(results, name) || results[name]?.result !== "success") {
-      throw new Error(`core requires actual success from ${name}; missing, skipped, cancelled and failed results are rejected`);
-    }
+
+  const failed = REQUIRED_CORE_GATES.filter(
+    (name) => !Object.hasOwn(results, name) || results[name]?.result !== "success",
+  );
+  if (failed.length > 0) {
+    throw new Error(
+      `core requires actual success from ${failed.join(", ")}; missing, skipped, cancelled and failed results are rejected`,
+    );
   }
 }
 

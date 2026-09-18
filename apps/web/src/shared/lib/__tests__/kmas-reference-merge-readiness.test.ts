@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
 import { test } from "vitest";
 
 import { appRoutes } from "../../../app/routes/route-manifest";
+import { SITEMAP_DIRECTORY_ENTRIES } from "../../../domains/legal/site-directory-data";
 import {
   mutateReferenceNotes, parseReferenceBackup, parseReferenceNotes, previewReferenceImport,
   REFERENCE_STORAGE_KEY,
@@ -90,10 +88,8 @@ test("reference discovery has one labeled route in the public manifest", () => {
 });
 
 test("reference discovery remains reachable from the public sitemap", () => {
-  const source = readFileSync(
-    resolve(process.cwd(), "apps/web/src/domains/legal/site-directory-data.ts"),
-    "utf8",
+  assert.equal(
+    SITEMAP_DIRECTORY_ENTRIES.filter((entry) => entry.href === "/references").length,
+    1,
   );
-  const destinationOccurrences = source.split('destination("/references",').length - 1;
-  assert.equal(destinationOccurrences, 1);
 });

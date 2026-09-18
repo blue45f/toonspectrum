@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Bubble Anchor Panel
  * 말풍선 꼬리 자동 부착 컨트롤 — 대상 요소(또는 고정 좌표)를 지정하면 이후 대상이나 말풍선이
@@ -57,19 +60,17 @@ export function StudioBubbleAnchorPanel({
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-xs font-semibold text-fg-2">
           <Anchor size={14} className="shrink-0 text-accent" aria-hidden />
-          꼬리 자동 부착
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAnchorPanel", "ko", "꼬리 자동 부착")}</p>
         {attached && (
           <button
             type="button"
             onClick={onDetach}
-            aria-label="꼬리 자동 부착 해제"
-            title="부착을 해제하고 수동으로 꼬리를 조절합니다."
+            aria-label={translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAnchorPanel", "ko", "꼬리 자동 부착 해제")}
+            title={translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAnchorPanel", "ko", "부착을 해제하고 수동으로 꼬리를 조절합니다.")}
             className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-line px-2.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-card pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:px-3"
           >
             <Unlink2 className="size-3.5 shrink-0" aria-hidden />
-            해제
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAnchorPanel", "ko", "해제")}</button>
         )}
       </div>
 
@@ -77,10 +78,10 @@ export function StudioBubbleAnchorPanel({
         <StudioToggleChip
           active={pickActive}
           onClick={onTogglePick}
-          title="켜고 캔버스에서 요소를 클릭하면 그 요소에 꼬리가 자동으로 부착됩니다. 빈 곳을 클릭하면 그 좌표에 고정됩니다."
+          title={translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAnchorPanel", "ko", "켜고 캔버스에서 요소를 클릭하면 그 요소에 꼬리가 자동으로 부착됩니다. 빈 곳을 클릭하면 그 좌표에 고정됩니다.")}
         >
           <Crosshair className="size-3.5 shrink-0" aria-hidden />
-          {pickActive ? "대상을 클릭하세요…" : attached ? "다시 지정" : "대상 지정"}
+          {pickActive ? translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAnchorPanel", "ko", "대상을 클릭하세요…") : attached ? translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAnchorPanel", "ko", "다시 지정") : translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAnchorPanel", "ko", "대상 지정")}
         </StudioToggleChip>
       </div>
 
@@ -89,34 +90,29 @@ export function StudioBubbleAnchorPanel({
           <p className="flex items-start gap-2 text-xs leading-relaxed text-fg-2" role="status" aria-live="polite" aria-atomic="true">
             <Link2 size={14} className="mt-0.5 shrink-0 text-good" aria-hidden />
             <span>
-              <strong className="font-semibold text-fg">{anchorTargetLabel}</strong>에 부착됨 — 대상이 움직이면
-              꼬리가 따라갑니다.
-            </span>
+              <strong className="font-semibold text-fg">{anchorTargetLabel}</strong>{translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAnchorPanel", "ko", "에 부착됨 — 대상이 움직이면 꼬리가 따라갑니다.")}</span>
           </p>
         ) : (
           <p className="flex items-start gap-2 text-xs leading-relaxed text-warn" role="status" aria-live="polite" aria-atomic="true">
             <TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden />
-            <span>부착 대상을 찾을 수 없어요(삭제됨). 부착이 자동으로 해제됩니다.</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAnchorPanel", "ko", "부착 대상을 찾을 수 없어요(삭제됨). 부착이 자동으로 해제됩니다.")}</span>
           </p>
         )
       ) : anchorPoint ? (
         <p className="flex items-start gap-2 text-xs leading-relaxed text-fg-2" role="status" aria-live="polite" aria-atomic="true">
           <MapPin size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
           <span>
-            고정 좌표
-            <span className="tabular-nums">({Math.round(anchorPoint.x)}, {Math.round(anchorPoint.y)})</span>에 부착됨 —
-            말풍선을 옮기면 꼬리 각도가 따라갑니다.
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAnchorPanel", "ko", "고정 좌표")}<span className="tabular-nums">({Math.round(anchorPoint.x)}, {Math.round(anchorPoint.y)})</span>{translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAnchorPanel", "ko", "에 부착됨 — 말풍선을 옮기면 꼬리 각도가 따라갑니다.")}</span>
         </p>
       ) : pickActive ? (
         <p className="flex items-start gap-2 text-xs leading-relaxed text-fg-3" role="status" aria-live="polite" aria-atomic="true">
           <MousePointerClick size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
-          <span>캔버스에서 요소를 클릭해 부착 대상으로 지정하세요. 빈 캔버스를 클릭하면 그 좌표에 고정됩니다.</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAnchorPanel", "ko", "캔버스에서 요소를 클릭해 부착 대상으로 지정하세요. 빈 캔버스를 클릭하면 그 좌표에 고정됩니다.")}</span>
         </p>
       ) : (
         <p className="flex items-start gap-2 text-xs leading-relaxed text-fg-3" role="status" aria-atomic="true">
           <Info size={14} className="mt-0.5 shrink-0" aria-hidden />
-          <span>대상을 지정하면 대상이나 말풍선이 움직여도 꼬리가 계속 그쪽을 가리켜요.</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAnchorPanel", "ko", "대상을 지정하면 대상이나 말풍선이 움직여도 꼬리가 계속 그쪽을 가리켜요.")}</span>
         </p>
       )}
     </div>

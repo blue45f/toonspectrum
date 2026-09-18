@@ -60,6 +60,7 @@ test("requests target fixed HTTPS APIs and request public-domain filtering", () 
   assert.equal(wiki.searchParams.get("srprop"), "timestamp");
 });
 test("unsafe URLs, credentials, deceptive hosts and non-HTTPS sources are rejected", () => {
+  // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
   for (const url of ["javascript:alert(1)", "data:text/html,bad", "http://www.artic.edu", "https://user:pass@www.artic.edu", "https://127.0.0.1", "https://localhost", "https://www.artic.edu:444/"]) assert.equal(safeOpenUrl(url), "");
   assert.equal(safeOpenUrl("https://www.artic.edu.evil.example/", ["www.artic.edu"]), "");
   assert.equal(safeOpenUrl("https://www.artic.edu/artworks/1", ["www.artic.edu"]), artwork.sourceUrl);

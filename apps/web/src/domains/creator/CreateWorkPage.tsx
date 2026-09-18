@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowLeft,
   Bookmark,
   ChevronLeft,
@@ -18,6 +22,7 @@ import {
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { SERIES_STATUS_LABEL } from "./creator-community-utils";
 import { resolveCreatorPublicationReaderPolicy } from "./creator-publication-reader";
 import { useCreatorPublicationPageMeta } from "./creator-publication-page-meta";
 import {
@@ -41,6 +46,11 @@ import { CoverImage } from "@/shared/components/cover-image";
 import { Container } from "@/shared/components/section";
 import { ThreadedCommentSection } from "@/shared/components/comments/threaded-comment-section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import {
+  canShareCreatorWork,
+  compactPublicShareDescription,
+  publicShareImageUrl,
+} from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
@@ -64,6 +74,11 @@ import {
   type WorkComment,
   type WorkDetail,
 } from "@/infrastructure/creator-client";
+
+const SharePageButton = lazy(async () => {
+  const module = await import("@/shared/components/share-page-button");
+  return { default: module.SharePageButton };
+});
 
 const MAX_COMMENT_LENGTH = 700;
 const BUBBLE_LABEL_BY_ID: ReadonlyMap<string, string> = new Map(
@@ -155,50 +170,44 @@ function WorkCommunityPanel({
         className="flex w-full items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium text-fg-2 transition-colors hover:text-fg"
       >
         <Settings2 size={13} className="text-accent" />
-        연재·챌린지 설정
-        <span className="ml-auto text-[0.7rem] text-fg-3">
-          {work.seriesTitle ? `시리즈: ${work.seriesTitle}` : "시리즈 미연결"}
+        {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "연재·챌린지 설정")}<span className="ml-auto text-[0.7rem] text-fg-3">
+          {work.seriesTitle ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "시리즈: {v0}"), { v0: String(work.seriesTitle) }) : translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "시리즈 미연결")}
           {" · "}
-          {work.challengeTitle ? `챌린지: ${work.challengeTitle}` : "챌린지 미참여"}
+          {work.challengeTitle ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "챌린지: {v0}"), { v0: String(work.challengeTitle) }) : translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "챌린지 미참여")}
         </span>
       </button>
       {open && (
         <div className="flex flex-col gap-2.5 border-t border-line px-3.5 py-3">
           <label className="flex flex-col gap-1 text-xs text-fg-2">
-            연재 시리즈 (선택 시 회차 번호 자동 부여)
-            <select
+            {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "연재 시리즈 (선택 시 회차 번호 자동 부여)")}<select
               value={seriesId}
               onChange={(event) => setSeriesId(event.target.value)}
               className="h-9 rounded-lg border border-line bg-canvas px-2 text-sm text-fg focus:border-accent/50"
             >
-              <option value="">시리즈에 연결하지 않음</option>
+              <option value="">{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "시리즈에 연결하지 않음")}</option>
               {mySeries.map((series) => (
                 <option key={series.id} value={series.id}>
-                  {series.title} ({series.episodes}화)
-                </option>
+                  {series.title} ({series.episodes}{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "화)")}</option>
               ))}
             </select>
           </label>
           {mySeries.length === 0 && (
             <p className="text-[0.7rem] text-fg-3">
-              아직 만든 시리즈가 없어요.{" "}
+              {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "아직 만든 시리즈가 없어요.")}{" "}
               <Link href="/create?tab=series" className="text-accent hover:underline">
-                창작 게시판 시리즈 탭
-              </Link>
-              에서 새 시리즈를 만들 수 있습니다.
-            </p>
+                {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "창작 게시판 시리즈 탭")}</Link>
+              {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "에서 새 시리즈를 만들 수 있습니다.")}</p>
           )}
           <label className="flex flex-col gap-1 text-xs text-fg-2">
-            창작 챌린지 참여
-            <select
+            {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "창작 챌린지 참여")}<select
               value={challengeId}
               onChange={(event) => setChallengeId(event.target.value)}
               className="h-9 rounded-lg border border-line bg-canvas px-2 text-sm text-fg focus:border-accent/50"
             >
-              <option value="">챌린지에 참여하지 않음</option>
+              <option value="">{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "챌린지에 참여하지 않음")}</option>
               {/* 이미 연결된(종료됐을 수도 있는) 챌린지는 유지 옵션으로 노출 */}
               {work.challengeId && !challenges.some((c) => c.id === work.challengeId) && (
-                <option value={work.challengeId}>{work.challengeTitle ?? "현재 참여 중인 챌린지"}</option>
+                <option value={work.challengeId}>{work.challengeTitle ?? translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "현재 참여 중인 챌린지")}</option>
               )}
               {challenges.map((challenge) => (
                 <option key={challenge.id} value={challenge.id}>
@@ -215,8 +224,7 @@ function WorkCommunityPanel({
               disabled={saving}
               className={buttonClass({ size: "sm", variant: "solid" })}
             >
-              설정 저장
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "설정 저장")}</button>
           </div>
         </div>
       )}
@@ -266,10 +274,10 @@ function WorkComments({ workId }: { workId: string }) {
         loading={loading}
         maxLength={MAX_COMMENT_LENGTH}
         maxDepth={4}
-        title="댓글"
-        description="작품 감상과 응원을 나누고, 다른 독자의 댓글에도 답해 보세요."
-        placeholder="응원의 한마디를 남겨 보세요."
-        draftStorageKey={`creator-work-comment-drafts:${workId}:${userId ?? "guest"}`}
+        title={translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "댓글")}
+        description={translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "작품 감상과 응원을 나누고, 다른 독자의 댓글에도 답해 보세요.")}
+        placeholder={translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "응원의 한마디를 남겨 보세요.")}
+        draftStorageKey={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "creator-work-comment-drafts:{v0}:{v1}"), { v0: String(workId), v1: String(userId ?? "guest") })}
         authorHref={(comment) => comment.author.id ? `/u/${encodeURIComponent(comment.author.id)}` : null}
         onCreate={(text, parentId) => postComment(workId, text, parentId)}
         onUpdate={(commentId, text) => updateComment(workId, commentId, text)}
@@ -391,11 +399,10 @@ function WorkInspector({ doc }: { doc: unknown }) {
       >
         <span className="flex items-center gap-1.5">
           <Layers size={15} className="text-accent" />
-          개체/레이어 탐색기 (Inspector)
-          <span className="numeral text-fg-3">{totalLayers}개 요소</span>
+          {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "개체/레이어 탐색기 (Inspector)")}<span className="numeral text-fg-3">{totalLayers}{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "개 요소")}</span>
         </span>
         <span className="text-xs text-accent hover:underline">
-          {open ? "닫기" : "레이어 트리 열기"}
+          {open ? translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "닫기") : translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "레이어 트리 열기")}
         </span>
       </button>
 
@@ -404,10 +411,10 @@ function WorkInspector({ doc }: { doc: unknown }) {
           {pages.map((p) => (
             <div key={p.pageIndex} className="space-y-1.5">
               <h4 className="font-semibold text-fg-2 border-b border-line pb-1 mb-2 border-solid">
-                Page {p.pageIndex}
+                {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "Page ")}{p.pageIndex}
               </h4>
               {p.layers.length === 0 ? (
-                <p className="text-fg-3 italic pl-3">이 페이지에는 개체가 없습니다.</p>
+                <p className="text-fg-3 italic pl-3">{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "이 페이지에는 개체가 없습니다.")}</p>
               ) : (
                 <div className="pl-2 space-y-1">
                   {p.layers.map((layer) => (
@@ -427,7 +434,7 @@ function WorkInspector({ doc }: { doc: unknown }) {
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0 text-fg-3">
                         {layer.opacity !== undefined && <span>op:{Math.round(layer.opacity * 100)}%</span>}
-                        {layer.hidden && <span className="text-bad">[숨김]</span>}
+                        {layer.hidden && <span className="text-bad">{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "[숨김]")}</span>}
                       </div>
                     </div>
                   ))}
@@ -460,6 +467,16 @@ export function CreateWorkPage() {
     () => resolveCreatorPublicationReaderPolicy(work?.doc),
     [work?.doc],
   );
+  const shareable = work ? canShareCreatorWork(work, publicationPolicy.directive) : false;
+  const sharePath = work ? `/create/${encodeURIComponent(work.id)}` : "/create";
+  const shareTitle = publicationPolicy.directive.socialTitle.trim() || work?.title || "창작 작품";
+  const shareDescription = compactPublicShareDescription(
+    publicationPolicy.directive.socialDescription || work?.description,
+    work
+      ? `${work.author.name} 창작자의 ${work.title} 작품을 감상해 보세요.`
+      : "툰스튜디오 창작 게시판의 작품을 감상해 보세요.",
+  );
+  const shareImage = publicShareImageUrl(work?.cover);
 
   useCreatorPublicationPageMeta({
     workId: work?.id ?? id ?? null,
@@ -580,7 +597,7 @@ export function CreateWorkPage() {
     return (
       <Container size="prose" className="py-10">
         <ErrorState
-          title="창작물을 불러오지 못했습니다."
+          title={translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "창작물을 불러오지 못했습니다.")}
           message={error}
           onRetry={() => setReloadKey((value) => value + 1)}
         />
@@ -597,8 +614,7 @@ export function CreateWorkPage() {
         className="mb-5 inline-flex items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg"
       >
         <ArrowLeft size={15} />
-        창작 게시판
-      </Link>
+        {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "창작 게시판")}</Link>
 
       <header className="mb-6">
         {/* 리믹스 원작 정보 배지 */}
@@ -606,25 +622,28 @@ export function CreateWorkPage() {
           <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-line bg-raised/50 px-2.5 py-1.5 text-xs text-fg-2 border-solid">
             <span className="font-semibold text-accent flex items-center gap-1">
               <WandSparkles size={13} />
-              Remix
-            </span>
-            <span>이 작품은 원작</span>
-            <Link href={`/create/${work.remixFromId}`} className="font-semibold text-fg hover:text-accent hover:underline">
-              {work.remixFromTitle || "원본 작품"}
+              {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "Remix")}</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "이 작품은 원작")}</span>
+            <Link href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create/{v0}"), { v0: String(work.remixFromId) })} className="font-semibold text-fg hover:text-accent hover:underline">
+              {work.remixFromTitle || translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "원본 작품")}
             </Link>
-            <span>의 리믹스 버전입니다.</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "의 리믹스 버전입니다.")}</span>
           </div>
         )}
         {/* 연재 시리즈 배지 — 시리즈 상세로 이동 */}
         {work.series && (
           <Link
-            href={`/create/series/${encodeURIComponent(work.series.id)}`}
+            href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create/series/{v0}"), { v0: String(encodeURIComponent(work.series.id)) })}
             className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-cool/40 bg-[oklch(0.8_0.11_232/0.1)] px-2.5 py-1 text-xs font-medium text-cool transition-colors hover:border-cool/70"
           >
             <Layers size={12} />
             {work.series.title}
-            {work.episodeNo != null && <span className="numeral">· {work.episodeNo}화</span>}
-            {work.series.status === "completed" && <span className="text-[0.7rem] opacity-80">(완결)</span>}
+            {work.episodeNo != null && <span className="numeral">· {work.episodeNo}{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "화")}</span>}
+            {work.series.status !== "ongoing" && (
+              <span className="text-[0.7rem] opacity-80">
+                ({SERIES_STATUS_LABEL[work.series.status]})
+              </span>
+            )}
           </Link>
         )}
         <h1 className="text-pretty text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
@@ -645,8 +664,7 @@ export function CreateWorkPage() {
             </span>
             {work.community.portfolio && (
               <span className="rounded-full border border-accent/35 bg-accent-soft/30 px-2.5 py-1 text-[0.7rem] font-medium text-accent">
-                포트폴리오
-              </span>
+                {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "포트폴리오")}</span>
             )}
           </div>
         )}
@@ -690,7 +708,7 @@ export function CreateWorkPage() {
             {work.tags.map((tag) => (
               <Link
                 key={tag}
-                href={`/create?tag=${encodeURIComponent(tag)}`}
+                href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create?tag={v0}"), { v0: String(encodeURIComponent(tag)) })}
                 className="inline-flex h-7 items-center rounded-full border border-line bg-card px-2.5 text-[0.72rem] text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
               >
                 #{tag}
@@ -702,22 +720,20 @@ export function CreateWorkPage() {
         <div className="flex flex-wrap items-center gap-2">
           {work.titleId && (
             <Link
-              href={`/title/${encodeURIComponent(work.titleId)}`}
+              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/title/{v0}"), { v0: String(encodeURIComponent(work.titleId)) })}
               className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-line bg-card px-3 py-2 text-xs text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
             >
               <Link2 size={14} className="text-accent" />
-              연관 웹툰 보러 가기
-            </Link>
+              {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "연관 웹툰 보러 가기")}</Link>
           )}
           {/* 챌린지 참여 배지 — 챌린지 페이지로 이동 */}
           {work.challenge && (
             <Link
-              href={`/create/challenges?c=${encodeURIComponent(work.challenge.slug)}`}
+              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create/challenges?c={v0}"), { v0: String(encodeURIComponent(work.challenge.slug)) })}
               className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-accent/40 bg-accent-soft/40 px-3 py-2 text-xs text-accent transition-colors hover:bg-accent-soft"
             >
               <Trophy size={14} />
-              {work.challenge.title} 챌린지 참여작
-            </Link>
+              {work.challenge.title} {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "챌린지 참여작")}</Link>
           )}
         </div>
 
@@ -727,7 +743,7 @@ export function CreateWorkPage() {
             onClick={onToggleLike}
             disabled={!userId || liking}
             aria-pressed={work.liked}
-            title={userId ? undefined : "로그인 후 좋아요를 누를 수 있습니다."}
+            title={userId ? undefined : translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "로그인 후 좋아요를 누를 수 있습니다.")}
             className={buttonClass({
               size: "sm",
               variant: work.liked ? "solid" : "outline",
@@ -742,7 +758,7 @@ export function CreateWorkPage() {
             onClick={onToggleBookmark}
             disabled={!userId || bookmarking}
             aria-pressed={Boolean(work.bookmarked)}
-            title={userId ? undefined : "로그인 후 북마크할 수 있습니다."}
+            title={userId ? undefined : translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "로그인 후 북마크할 수 있습니다.")}
             className={buttonClass({
               size: "sm",
               variant: work.bookmarked ? "solid" : "outline",
@@ -752,14 +768,26 @@ export function CreateWorkPage() {
             <Bookmark size={14} className={cn(work.bookmarked && "fill-current")} />
             <span className="numeral">{formatCount(work.bookmarks ?? 0)}</span>
           </button>
+          {shareable && (
+            <Suspense fallback={null}>
+              <SharePageButton
+                path={sharePath}
+                text={shareTitle}
+                description={shareDescription}
+                imageUrl={shareImage}
+                label="작품 공유"
+                actionLabel="작품 감상하기"
+                className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
+              />
+            </Suspense>
+          )}
           <span className="inline-flex items-center gap-1.5 text-xs text-fg-3">
             <Eye size={14} />
-            <span className="numeral">{formatCount(work.views)}</span> 조회
-          </span>
+            <span className="numeral">{formatCount(work.views)}</span> {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "조회")}</span>
 
           {publicationPolicy.remixAllowed ? (
             <Link
-              href={`/studio?remix=${encodeURIComponent(work.id)}`}
+              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/studio?remix={v0}"), { v0: String(encodeURIComponent(work.id)) })}
               className={buttonClass({
                 size: "sm",
                 variant: "outline",
@@ -767,13 +795,12 @@ export function CreateWorkPage() {
               })}
             >
               <WandSparkles size={14} />
-              <span>이어서 편집 (Remix)</span>
+              <span>{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "이어서 편집 (Remix)")}</span>
             </Link>
           ) : work.isOwner ? (
             <span className="ml-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-3">
               <WandSparkles size={14} aria-hidden />
-              리믹스 비허용
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "리믹스 비허용")}</span>
           ) : null}
 
           {!work.isOwner && (
@@ -797,8 +824,7 @@ export function CreateWorkPage() {
                   })}
                 >
                   <Mail size={14} />
-                  작가에게 문의
-                </Link>
+                  {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "작가에게 문의")}</Link>
               ) : null}
               <CreatorWorkReportControl workId={work.id} authenticated={Boolean(userId)} />
             </div>
@@ -809,14 +835,13 @@ export function CreateWorkPage() {
               <Link
                 href={
                   work.format === "upload"
-                    ? `/studio?mode=upload&id=${encodeURIComponent(work.id)}`
-                    : `/studio?id=${encodeURIComponent(work.id)}`
+                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/studio?mode=upload&id={v0}"), { v0: String(encodeURIComponent(work.id)) })
+                    : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/studio?id={v0}"), { v0: String(encodeURIComponent(work.id)) })
                 }
                 className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}
               >
                 <Pencil size={14} />
-                수정
-              </Link>
+                {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "수정")}</Link>
               <button
                 type="button"
                 onClick={onDelete}
@@ -824,8 +849,7 @@ export function CreateWorkPage() {
                 className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5 text-bad hover:text-bad" })}
               >
                 <Trash2 size={14} />
-                삭제
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "삭제")}</button>
             </div>
           )}
         </div>
@@ -890,14 +914,13 @@ export function CreateWorkPage() {
         <section className="mt-6 rounded-2xl border border-line bg-panel/30 p-4 sm:p-5">
           <h2 className="flex items-center gap-1.5 text-sm font-bold text-fg mb-4">
             <WandSparkles size={15} className="text-accent" />
-            이 작품을 이어서 그린 리믹스 작품들
-            <span className="numeral text-fg-3">{work.remixedChildren.length}</span>
+            {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "이 작품을 이어서 그린 리믹스 작품들")}<span className="numeral text-fg-3">{work.remixedChildren.length}</span>
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {work.remixedChildren.map((child) => (
               <Link
                 key={child.id}
-                href={`/create/${child.id}`}
+                href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create/{v0}"), { v0: String(child.id) })}
                 className="group flex flex-col overflow-hidden rounded-xl border border-line bg-card/60 transition-colors hover:border-line-strong"
               >
                 <div className="relative aspect-[3/4] overflow-hidden bg-raised/40">
@@ -911,7 +934,7 @@ export function CreateWorkPage() {
                   <h3 className="line-clamp-1 text-xs font-semibold leading-tight text-fg group-hover:text-accent">
                     {child.title}
                   </h3>
-                  <p className="truncate text-[0.72rem] text-fg-3">by {child.author.name}</p>
+                  <p className="truncate text-[0.72rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "by ")}{child.author.name}</p>
                 </div>
               </Link>
             ))}
@@ -921,18 +944,18 @@ export function CreateWorkPage() {
 
       {/* 시리즈 회차 내비게이션 — 이전화/시리즈 목록/다음화 */}
       {work.series && (
-        <nav aria-label="회차 이동" className="mb-8 grid grid-cols-3 gap-2">
+        <nav aria-label={translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "회차 이동")} className="mb-8 grid grid-cols-3 gap-2">
           {work.prevEpisode ? (
             <Link
-              href={`/create/${encodeURIComponent(work.prevEpisode.id)}`}
+              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create/{v0}"), { v0: String(encodeURIComponent(work.prevEpisode.id)) })}
               className="group flex min-w-0 items-center gap-1.5 rounded-xl border border-line bg-card px-3 py-2.5 text-sm text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
             >
               <ChevronLeft size={15} className="shrink-0" />
               <span className="min-w-0">
-                <span className="block text-[0.72rem] text-fg-3">이전화</span>
+                <span className="block text-[0.72rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "이전화")}</span>
                 <span className="block truncate text-xs font-medium">
                   {work.prevEpisode.episodeNo != null && (
-                    <span className="numeral">{work.prevEpisode.episodeNo}화 </span>
+                    <span className="numeral">{work.prevEpisode.episodeNo}{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "화 ")}</span>
                   )}
                   {work.prevEpisode.title}
                 </span>
@@ -940,28 +963,26 @@ export function CreateWorkPage() {
             </Link>
           ) : (
             <span className="grid place-items-center rounded-xl border border-dashed border-line px-3 py-2.5 text-xs text-fg-3">
-              첫 화입니다
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "첫 화입니다")}</span>
           )}
           <Link
-            href={`/create/series/${encodeURIComponent(work.series.id)}`}
+            href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create/series/{v0}"), { v0: String(encodeURIComponent(work.series.id)) })}
             className="grid place-items-center rounded-xl border border-line bg-card px-3 py-2.5 text-xs font-medium text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
           >
             <span className="inline-flex items-center gap-1">
               <Layers size={13} />
-              회차 목록
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "회차 목록")}</span>
           </Link>
           {work.nextEpisode ? (
             <Link
-              href={`/create/${encodeURIComponent(work.nextEpisode.id)}`}
+              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/create/{v0}"), { v0: String(encodeURIComponent(work.nextEpisode.id)) })}
               className="group flex min-w-0 items-center justify-end gap-1.5 rounded-xl border border-line bg-card px-3 py-2.5 text-right text-sm text-fg-2 transition-colors hover:border-accent/50 hover:text-accent"
             >
               <span className="min-w-0">
-                <span className="block text-[0.72rem] text-fg-3">다음화</span>
+                <span className="block text-[0.72rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "다음화")}</span>
                 <span className="block truncate text-xs font-medium">
                   {work.nextEpisode.episodeNo != null && (
-                    <span className="numeral">{work.nextEpisode.episodeNo}화 </span>
+                    <span className="numeral">{work.nextEpisode.episodeNo}{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "화 ")}</span>
                   )}
                   {work.nextEpisode.title}
                 </span>
@@ -970,8 +991,7 @@ export function CreateWorkPage() {
             </Link>
           ) : (
             <span className="grid place-items-center rounded-xl border border-dashed border-line px-3 py-2.5 text-xs text-fg-3">
-              최신화입니다
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "최신화입니다")}</span>
           )}
         </nav>
       )}
@@ -981,10 +1001,9 @@ export function CreateWorkPage() {
       ) : (
         <section className="rounded-2xl border border-line bg-panel/30 p-5 text-center">
           <MessageCircle size={18} className="mx-auto text-fg-3" aria-hidden />
-          <h2 className="mt-2 text-sm font-bold text-fg">댓글이 닫혀 있습니다</h2>
+          <h2 className="mt-2 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "댓글이 닫혀 있습니다")}</h2>
           <p className="mt-1 text-xs leading-relaxed text-fg-3">
-            작가가 이 작품의 댓글을 받지 않도록 게시했습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "작가가 이 작품의 댓글을 받지 않도록 게시했습니다.")}</p>
         </section>
       )}
     </Container>

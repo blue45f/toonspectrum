@@ -1,12 +1,10 @@
 import {
-  isFullyTranslatedAppLocale,
   loadAppI18nLocale,
   resolveAppI18nAssetLocale,
 } from "./i18n-asset-loader";
-import { builtinAppDictionaries } from "./i18n-built-in-dictionaries";
 import {
   DICT,
-  FALLBACK_LANG,
+  getI18nRuntimeTranslationSources,
   triggerTranslationBundleUpdate,
 } from "./i18n-core";
 import {
@@ -16,27 +14,17 @@ import {
 
 import type { Dict } from "./i18n-core";
 
-const RUNTIME_TRANSLATION_SOURCE = "en";
-const RUNTIME_TRANSLATION_CACHE_VERSION = 2;
+const RUNTIME_TRANSLATION_CACHE_VERSION = 3;
 const I18N_TRANSLATION_ENDPOINT = "https://api.mymemory.translated.net/get";
 const I18N_TRANSLATION_CONCURRENCY = 8;
 const RUNTIME_TRANSLATION_TIMEOUT_MS = 8_000;
 const RUNTIME_TRANSLATION_CACHE_TTL_MS = 1000 * 60 * 60 * 24;
 const RUNTIME_TRANSLATION_STORAGE_PREFIX = "toonspectrum-i18n-runtime";
 const RUNTIME_TRANSLATION_MAX_VALUE_CHARACTERS = 4_000;
+const RUNTIME_TRANSLATION_MAX_KEY_CHARACTERS = 256;
 const RUNTIME_TRANSLATION_PROGRESS_BATCH = 32;
-
-// Translate only the public app-shell source surface. Studio owns its own namespace-aware loader;
-// reading the immutable built-in dictionary also avoids coupling the runtime translator to route
-// dictionaries that are registered into DICT after startup.
-const RUNTIME_APP_SOURCE_DICTIONARY: Readonly<Dict> =
-  builtinAppDictionaries[RUNTIME_TRANSLATION_SOURCE];
-const RUNTIME_APP_SOURCE_KEYS = Object.freeze(
-  Object.keys(RUNTIME_APP_SOURCE_DICTIONARY),
-);
-const RUNTIME_APP_SOURCE_KEY_SET: ReadonlySet<string> = new Set(
-  RUNTIME_APP_SOURCE_KEYS,
-);
+const RUNTIME_TRANSLATION_KEY_RE = /^[\p{L}\p{N}_.:-]+$/u;
+const INTERPOLATION_TOKEN_RE = /\{[\p{L}\p{N}_.-]+\}/gu;
 
 const runtimeTranslationBundles = new Map<string, Dict>();
 const runtimeTranslationLoads = new Map<string, Promise<void>>();
@@ -48,6 +36,11 @@ type RuntimeTranslationCachePayload = {
   updatedAt: number;
   complete: true;
   dict: Dict;
+};
+
+type ProtectedTranslationSource = {
+  readonly source: string;
+  readonly restore: (translated: string) => string | null;
 };
 
 function normalizeTranslatorLocale(raw: string): string {
@@ -79,18 +72,6 @@ function getTranslatorLocaleCandidates(locale: string): string[] {
   return [...candidates];
 }
 
-function shouldAutoTranslateLocale(locale: string): boolean {
-  const normalized = normalizeLocaleCode(locale);
-  if (!normalized) return false;
-
-  const root = normalized.split("-")[0];
-  if (root === FALLBACK_LANG || root === RUNTIME_TRANSLATION_SOURCE) {
-    return false;
-  }
-
-  // High-coverage human-authored dictionaries should never be shadowed by machine translation.
-  return !isFullyTranslatedAppLocale(normalized);
-}
 
 function parseMymemoryResponse(data: unknown): string | null {
   if (typeof data !== "object" || data === null) return null;
@@ -120,6 +101,35 @@ function parseMymemoryResponse(data: unknown): string | null {
   return translated;
 }
 
+/**
+ * Machine translators occasionally translate or drop `{count}`-style interpolation markers.
+ * Protect them with opaque tokens and reject a result unless every token survives, otherwise a
+ * translated label can later crash interpolation or visibly leak a placeholder name.
+ */
+export function protectRuntimeTranslationPlaceholders(
+  source: string,
+): ProtectedTranslationSource {
+  const placeholders: string[] = [];
+  const protectedSource = source.replace(INTERPOLATION_TOKEN_RE, (placeholder) => {
+    const index = placeholders.length;
+    placeholders.push(placeholder);
+    return `__TSI18N_${index}__`;
+  });
+
+  return {
+    source: protectedSource,
+    restore: (translated) => {
+      let restored = translated;
+      for (let index = 0; index < placeholders.length; index += 1) {
+        const token = `__TSI18N_${index}__`;
+        if (!restored.includes(token)) return null;
+        restored = restored.replaceAll(token, placeholders[index] ?? "");
+      }
+      return restored;
+    },
+  };
+}
+
 function getRuntimeTranslationStorageKey(locale: string): string {
   return `${RUNTIME_TRANSLATION_STORAGE_PREFIX}:v${RUNTIME_TRANSLATION_CACHE_VERSION}:${locale}`;
 }
@@ -136,7 +146,9 @@ function isRuntimeTranslationDictionary(value: unknown): value is Dict {
 
   return Object.entries(value).every(
     ([key, entry]) =>
-      RUNTIME_APP_SOURCE_KEY_SET.has(key) &&
+      key.length > 0 &&
+      key.length <= RUNTIME_TRANSLATION_MAX_KEY_CHARACTERS &&
+      RUNTIME_TRANSLATION_KEY_RE.test(key) &&
       typeof entry === "string" &&
       entry.length > 0 &&
       entry.length <= RUNTIME_TRANSLATION_MAX_VALUE_CHARACTERS,
@@ -193,10 +205,12 @@ function writeRuntimeTranslationCache(locale: string, dict: Dict): void {
 
 async function translateViaMymemory(
   source: string,
+  sourceLocale: string,
   targetLocale: string,
 ): Promise<string | null> {
+  const normalizedSource = normalizeTranslatorLocale(sourceLocale);
   const normalizedTarget = normalizeTranslatorLocale(targetLocale);
-  if (!normalizedTarget) return null;
+  if (!normalizedSource || !normalizedTarget) return null;
 
   const controller = new AbortController();
   const timeout = setTimeout(
@@ -207,7 +221,7 @@ async function translateViaMymemory(
   try {
     const url = `${I18N_TRANSLATION_ENDPOINT}?${new URLSearchParams({
       q: source,
-      langpair: `${RUNTIME_TRANSLATION_SOURCE}|${normalizedTarget}`,
+      langpair: `${normalizedSource}|${normalizedTarget}`,
     }).toString()}`;
     const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) return null;
@@ -222,11 +236,19 @@ async function translateViaMymemory(
 
 async function translateViaMymemoryWithFallback(
   source: string,
+  sourceLocale: string,
   targetLocale: string,
 ): Promise<string | null> {
+  const protectedSource = protectRuntimeTranslationPlaceholders(source);
   for (const candidate of getTranslatorLocaleCandidates(targetLocale)) {
-    const translated = await translateViaMymemory(source, candidate);
-    if (translated) return translated;
+    const translated = await translateViaMymemory(
+      protectedSource.source,
+      sourceLocale,
+      candidate,
+    );
+    if (!translated) continue;
+    const restored = protectedSource.restore(translated);
+    if (restored) return restored;
   }
   return null;
 }
@@ -248,21 +270,45 @@ function getAttemptedKeys(locale: string): Set<string> {
   return created;
 }
 
-function getKeysNeedingAutomaticTranslation(locale: string): string[] {
-  const targetDictionary = getLocaleDictionary(locale);
-  const runtimeBundle = runtimeTranslationBundles.get(locale);
-  const attempted = getAttemptedKeys(locale);
+/**
+ * Runtime translation sources carry their authored source locale. Existing app/Admin/Studio
+ * dictionaries use English, while legacy static JSX can register Korean directly without sending
+ * user-generated DOM text to the translator.
+ */
+type RuntimeTranslationPendingEntry = {
+  readonly key: string;
+  readonly sourceLocale: string;
+  readonly source: string;
+};
 
-  return RUNTIME_APP_SOURCE_KEYS.filter((key) => {
-    const source = RUNTIME_APP_SOURCE_DICTIONARY[key];
-    if (!source || !/[\p{L}\p{N}]/u.test(source)) return false;
-    if (runtimeBundle?.[key] !== undefined || attempted.has(key)) return false;
+function getRuntimeTranslationPendingEntries(
+  locale: string,
+): readonly RuntimeTranslationPendingEntry[] {
+  const normalized = normalizeLocaleCode(locale);
+  if (!normalized) return [];
+
+  const targetRoot = normalized.split("-")[0];
+  const targetDictionary = getLocaleDictionary(normalized);
+  const runtimeBundle = runtimeTranslationBundles.get(normalized);
+  const attempted = getAttemptedKeys(normalized);
+
+  return getI18nRuntimeTranslationSources().flatMap(({ key, locale: rawSourceLocale }) => {
+    const sourceLocale = normalizeLocaleCode(rawSourceLocale);
+    if (!sourceLocale || sourceLocale.split("-")[0] === targetRoot) return [];
+
+    const source = DICT[sourceLocale]?.[key];
+    if (!source || !/[\p{L}\p{N}]/u.test(source)) return [];
+    if (runtimeBundle?.[key] !== undefined || attempted.has(key)) return [];
 
     const authoredValue = targetDictionary?.[key];
-    // Preserve every human-authored value that differs from the English source. Empty strings are
-    // intentional translations too and must not be replaced.
-    return authoredValue === undefined || authoredValue === source;
+    if (authoredValue !== undefined && authoredValue !== source) return [];
+
+    return [{ key, sourceLocale, source }];
   });
+}
+
+export function getRuntimeTranslationPendingKeys(locale: string): readonly string[] {
+  return getRuntimeTranslationPendingEntries(locale).map(({ key }) => key);
 }
 
 export function getRuntimeTranslationBundle(locale: string): Dict | undefined {
@@ -274,25 +320,26 @@ export async function loadRuntimeTranslationBundle(locale: string): Promise<void
   if (!normalized) return;
 
   await loadAppI18nLocale(normalized);
-  if (!shouldAutoTranslateLocale(normalized)) return;
 
   if (!runtimeTranslationBundles.has(normalized)) {
     const cached = readCachedRuntimeTranslation(normalized);
     if (cached) {
       runtimeTranslationBundles.set(normalized, cached);
       if (Object.keys(cached).length > 0) triggerTranslationBundleUpdate();
-      return;
+      // A persisted cache can predate lazy UI sources registered later in the same session. Only
+      // stop here when the current source registry has no additional keys to translate.
+      if (getRuntimeTranslationPendingKeys(normalized).length === 0) return;
     }
   }
 
   const inFlight = runtimeTranslationLoads.get(normalized);
   if (inFlight) {
     await inFlight;
-    return;
+    if (getRuntimeTranslationPendingKeys(normalized).length === 0) return;
   }
 
-  const keys = getKeysNeedingAutomaticTranslation(normalized);
-  if (keys.length === 0) return;
+  const pendingEntries = [...getRuntimeTranslationPendingEntries(normalized)];
+  if (pendingEntries.length === 0) return;
 
   const bundle = runtimeTranslationBundles.get(normalized) ?? {};
   runtimeTranslationBundles.set(normalized, bundle);
@@ -303,22 +350,20 @@ export async function loadRuntimeTranslationBundle(locale: string): Promise<void
     try {
       for (
         let index = 0;
-        index < keys.length;
+        index < pendingEntries.length;
         index += I18N_TRANSLATION_CONCURRENCY
       ) {
-        const chunkKeys = keys.slice(
+        const chunkEntries = pendingEntries.slice(
           index,
           index + I18N_TRANSLATION_CONCURRENCY,
         );
-        for (const key of chunkKeys) attempted.add(key);
+        for (const { key } of chunkEntries) attempted.add(key);
 
         const translatedEntries = await Promise.all(
-          chunkKeys.map(async (key) => {
-            const source = RUNTIME_APP_SOURCE_DICTIONARY[key];
-            if (!source) return null;
-
+          chunkEntries.map(async ({ key, sourceLocale, source }) => {
             const translated = await translateViaMymemoryWithFallback(
               source,
+              sourceLocale,
               normalized,
             );
             return translated ? ([key, translated] as const) : null;

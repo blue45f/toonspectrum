@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Bookmark,
   Check,
   ExternalLink,
@@ -18,10 +22,10 @@ import { formatReferenceDateRange } from "@/shared/lib/reference-assets";
 
 export function ResultSkeleton({ density }: { density: ReferenceDensity }) {
   return (
-    <div className={`grid gap-4 ${density === "compact" ? "sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5" : "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"}`} aria-hidden="true">
+    <div className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "en", "grid gap-4 {v0}"), { v0: String(density === "compact" ? "sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5" : "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4") })} aria-hidden="true">
       {Array.from({ length: 8 }, (_, index) => (
         <div key={index} className="overflow-hidden rounded-2xl border border-line bg-panel">
-          <div className={`${density === "compact" ? "aspect-square" : "aspect-[4/3]"} animate-pulse bg-raised`} />
+          <div className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "en", "{v0} animate-pulse bg-raised"), { v0: String(density === "compact" ? "aspect-square" : "aspect-[4/3]") })} />
           <div className="space-y-3 p-4">
             <div className="h-3 w-24 animate-pulse rounded bg-raised" />
             <div className="h-5 w-4/5 animate-pulse rounded bg-raised" />
@@ -60,65 +64,64 @@ export function AssetCard({
         type="button"
         className="relative block overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
         onClick={(event) => onOpen(event.currentTarget)}
-        aria-label={`${item.title} 상세 보기`}
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "ko", "{v0} 상세 보기"), { v0: String(item.title) })}
       >
-        <AssetImage item={item} className={`w-full p-3 transition duration-300 group-hover:scale-[1.02] ${density === "compact" ? "aspect-square" : "aspect-[4/3]"}`} />
+        <AssetImage item={item} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "en", "w-full p-3 transition duration-300 group-hover:scale-[1.02] {v0}"), { v0: String(density === "compact" ? "aspect-square" : "aspect-[4/3]") })} />
         <span className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
           <span className="inline-flex min-h-7 items-center rounded-full border border-white/20 bg-black/70 px-2.5 text-[0.68rem] font-bold text-white backdrop-blur">
             CC0
           </span>
           {asset?.isHighlight ? (
             <span className="inline-flex min-h-7 items-center gap-1 rounded-full bg-accent px-2.5 text-[0.68rem] font-bold text-white">
-              <Sparkles size={12} aria-hidden="true" /> 대표작
-            </span>
+              <Sparkles size={12} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "ko", "대표작")}</span>
           ) : null}
         </span>
         <span className="absolute bottom-3 right-3 grid size-9 place-items-center rounded-full bg-black/70 text-white opacity-0 backdrop-blur transition group-hover:opacity-100 group-focus-within:opacity-100">
           <Maximize2 size={16} aria-hidden="true" />
         </span>
       </button>
-      <div className={`flex flex-1 flex-col ${density === "compact" ? "p-3.5" : "p-5"}`}>
+      <div className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "en", "flex flex-1 flex-col {v0}"), { v0: String(density === "compact" ? "p-3.5" : "p-5") })}>
         <div className="flex flex-wrap gap-1.5">
           {asset?.department ? <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[0.68rem] font-semibold text-accent">{asset.department}</span> : null}
           {asset?.classification ? <span className="rounded-full bg-raised px-2.5 py-1 text-[0.68rem] font-semibold text-fg-2">{asset.classification}</span> : null}
         </div>
-        <h3 className={`mt-3 break-words font-bold leading-snug text-fg ${density === "compact" ? "text-sm" : "text-base"}`}>{item.title}</h3>
+        <h3 className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "en", "mt-3 break-words font-bold leading-snug text-fg {v0}"), { v0: String(density === "compact" ? "text-sm" : "text-base") })}>{item.title}</h3>
         <p className="mt-2 line-clamp-2 text-xs leading-5 text-fg-2">
-          {item.creator || "제작자 미상"}
+          {item.creator || translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "ko", "제작자 미상")}
           {date ? ` · ${date}` : ""}
         </p>
         {density === "comfortable" && asset?.medium ? <p className="mt-3 line-clamp-2 text-sm leading-6 text-fg-2">{asset.medium}</p> : null}
         <div className="mt-auto grid grid-cols-3 gap-2 pt-4">
           <button
             type="button"
-            className={`inline-flex min-h-10 items-center justify-center rounded-xl border text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${saved ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-2 hover:bg-raised"}`}
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "en", "inline-flex min-h-10 items-center justify-center rounded-xl border text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent {v0}"), { v0: String(saved ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-2 hover:bg-raised") })}
             aria-pressed={saved}
             disabled={savingDisabled}
             onClick={onToggleSaved}
-            title={saved ? "저장 해제" : "연구 보드에 저장"}
+            title={saved ? translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "ko", "저장 해제") : translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "ko", "연구 보드에 저장")}
           >
             {saved ? <Check size={15} aria-hidden="true" /> : <Bookmark size={15} aria-hidden="true" />}
-            <span className="sr-only">{saved ? "저장됨" : "저장"}</span>
+            <span className="sr-only">{saved ? translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "ko", "저장됨") : translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "ko", "저장")}</span>
           </button>
           <button
             type="button"
-            className={`inline-flex min-h-10 items-center justify-center rounded-xl border text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${compared ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-2 hover:bg-raised"}`}
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "en", "inline-flex min-h-10 items-center justify-center rounded-xl border text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent {v0}"), { v0: String(compared ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-2 hover:bg-raised") })}
             aria-pressed={compared}
             onClick={onToggleCompare}
-            title={compared ? "비교에서 제거" : "비교에 추가"}
+            title={compared ? translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "ko", "비교에서 제거") : translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "ko", "비교에 추가")}
           >
             <Scale size={15} aria-hidden="true" />
-            <span className="sr-only">{compared ? "비교에서 제거" : "비교"}</span>
+            <span className="sr-only">{compared ? translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "ko", "비교에서 제거") : translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "ko", "비교")}</span>
           </button>
           <a
             className="inline-flex min-h-10 items-center justify-center rounded-xl border border-line text-fg-2 transition hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             href={item.sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            title="Met 원문 열기"
+            title={translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "ko", "Met 원문 열기")}
           >
             <ExternalLink size={15} aria-hidden="true" />
-            <span className="sr-only">원문 열기</span>
+            <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.resources.ReferenceAssetGallery", "ko", "원문 열기")}</span>
           </a>
         </div>
       </div>

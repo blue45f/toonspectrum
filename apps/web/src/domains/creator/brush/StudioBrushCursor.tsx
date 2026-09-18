@@ -1,4 +1,5 @@
-import { useCallback } from "react";
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
+import { useCallback, useEffect, useRef } from "react";
 import {
   Circle as KCircle,
   Ellipse,
@@ -12,6 +13,7 @@ import {
   planStudioBrushCursorVisual,
   type StudioBrushCursorMode,
 } from "../canvas/studio-canvas-cursor";
+import { planStudioBrushCursorSensorVisual } from "./studio-brush-cursor-sensor";
 
 import type { StudioBrushCursorStyle } from "../studio-app-settings";
 import type Konva from "konva";
@@ -31,6 +33,7 @@ interface StudioBrushCursorProps {
 
 const CURSOR_DARK = "oklch(0.17 0.01 70 / 0.96)";
 const CURSOR_LIGHT = "oklch(0.97 0.01 85 / 0.98)";
+const CURSOR_SENSOR = "oklch(0.68 0.18 285 / 0.92)";
 
 interface StudioBrushCursorOutlineProps {
   dash?: readonly number[];
@@ -71,9 +74,16 @@ function StudioBrushCursorOutline({
   return <Ellipse {...shared} radiusX={radiusX} radiusY={radiusY} />;
 }
 
+function isCanvasPointerTarget(target: EventTarget | null): boolean {
+  return target instanceof Element
+    && Boolean(target.closest('[data-studio-canvas-viewport="true"]'));
+}
+
 /**
  * Exact-size, non-interactive drawing cursor. The dark/light nested outline stays legible over
  * white paper, dark ink, tones, and photo backgrounds without covering the pixels being edited.
+ * A secondary purple ghost visualizes live pen pressure/orientation without changing the exact
+ * configured brush footprint ring or any document/render state.
  */
 export function StudioBrushCursor({
   cursorRef,
@@ -86,6 +96,9 @@ export function StudioBrushCursor({
   tipAngleDeg,
   tipRoundness,
 }: StudioBrushCursorProps) {
+  const sensorRef = useRef<Konva.Group | null>(null);
+  const sensorRafRef = useRef<number | null>(null);
+  const pendingSensorEventRef = useRef<PointerEvent | null>(null);
   const visual = planStudioBrushCursorVisual({
     brushId,
     diameter,
@@ -98,10 +111,78 @@ export function StudioBrushCursor({
 
   // The cursor layer owns its own Konva canvas element. Tag it in the DOM so evidence tooling
   // (browser verifiers, recordings, exports) can exclude the transient cursor chrome from pixel
-  // measurements — the ring is UI, never document ink.
+  // measurements — the ring and sensor ghost are UI, never document ink.
   const tagCursorCanvas = useCallback((layer: Konva.Layer | null) => {
     layer?.getCanvas()._canvas.setAttribute("data-studio-brush-cursor-canvas", "true");
   }, []);
+
+  useEffect(() => {
+    const sensor = sensorRef.current;
+    if (!sensor) return undefined;
+
+    const hide = (): void => {
+      pendingSensorEventRef.current = null;
+      if (!sensor.visible()) return;
+      sensor.visible(false);
+      sensor.getLayer()?.batchDraw();
+    };
+
+    const render = (): void => {
+      sensorRafRef.current = null;
+      const event = pendingSensorEventRef.current;
+      pendingSensorEventRef.current = null;
+      if (!event || style === "none" || !isCanvasPointerTarget(event.target)) {
+        hide();
+        return;
+      }
+      const plan = planStudioBrushCursorSensorVisual(event);
+      if (!plan.visible) {
+        hide();
+        return;
+      }
+      sensor.visible(true);
+      // The sensor group sits inside the brush group, which already owns the configured brush-tip
+      // angle. Convert the absolute hardware orientation to a relative rotation so the resulting
+      // on-screen ghost follows the pen rather than double-applying the configured tip angle.
+      sensor.rotation(plan.rotationDeg - visual.rotationDeg);
+      sensor.scaleX(plan.scaleX);
+      sensor.scaleY(plan.scaleY);
+      sensor.opacity(plan.opacity);
+      sensor.getLayer()?.batchDraw();
+    };
+
+    const schedule = (event: PointerEvent): void => {
+      pendingSensorEventRef.current = event;
+      if (sensorRafRef.current !== null) return;
+      sensorRafRef.current = window.requestAnimationFrame(render);
+    };
+    const onPointerOut = (event: PointerEvent): void => {
+      if (!isCanvasPointerTarget(event.target)) return;
+      if (isCanvasPointerTarget(event.relatedTarget)) return;
+      hide();
+    };
+    const onCancel = (): void => hide();
+
+    window.addEventListener("pointerdown", schedule, { capture: true, passive: true });
+    window.addEventListener("pointermove", schedule, { capture: true, passive: true });
+    window.addEventListener("pointerrawupdate", schedule as EventListener, { capture: true, passive: true });
+    window.addEventListener("pointerup", schedule, { capture: true, passive: true });
+    window.addEventListener("pointerout", onPointerOut, { capture: true, passive: true });
+    window.addEventListener("pointercancel", onCancel, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", schedule, true);
+      window.removeEventListener("pointermove", schedule, true);
+      window.removeEventListener("pointerrawupdate", schedule as EventListener, true);
+      window.removeEventListener("pointerup", schedule, true);
+      window.removeEventListener("pointerout", onPointerOut, true);
+      window.removeEventListener("pointercancel", onCancel, true);
+      if (sensorRafRef.current !== null) {
+        window.cancelAnimationFrame(sensorRafRef.current);
+        sensorRafRef.current = null;
+      }
+      hide();
+    };
+  }, [style, visual.rotationDeg]);
 
   return (
     <Layer ref={tagCursorCanvas} listening={false} name="studio-brush-cursor-layer">
@@ -126,7 +207,7 @@ export function StudioBrushCursor({
         ref={cursorRef}
         visible={false}
         listening={false}
-        name={`studio-brush-cursor studio-brush-cursor-${mode}`}
+        name={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushCursor", "en", "studio-brush-cursor studio-brush-cursor-{v0}"), { v0: String(mode) })}
         rotation={visual.rotationDeg}
       >
         {visual.showOutline ? (
@@ -177,6 +258,34 @@ export function StudioBrushCursor({
             listening={false}
             perfectDrawEnabled={false}
           />
+        ) : null}
+        {style !== "none" ? (
+          <Group
+            ref={sensorRef}
+            visible={false}
+            listening={false}
+            name="studio-brush-cursor-sensor-ghost"
+          >
+            <Ellipse
+              radiusX={visual.radiusX}
+              radiusY={visual.radiusY}
+              fillEnabled={false}
+              stroke={CURSOR_SENSOR}
+              strokeWidth={1.25 / effectiveScale}
+              strokeScaleEnabled={false}
+              dash={[3 / effectiveScale, 2 / effectiveScale]}
+              listening={false}
+              perfectDrawEnabled={false}
+            />
+            <KLine
+              points={[-visual.radiusX * 0.7, 0, visual.radiusX * 0.7, 0]}
+              stroke={CURSOR_SENSOR}
+              strokeWidth={0.8 / effectiveScale}
+              strokeScaleEnabled={false}
+              listening={false}
+              perfectDrawEnabled={false}
+            />
+          </Group>
         ) : null}
       </Group>
     </Layer>

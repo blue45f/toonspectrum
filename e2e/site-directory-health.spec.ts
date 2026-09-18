@@ -12,6 +12,7 @@ interface RouteHealthResult {
   readonly visibleHeadingCount: number;
   readonly mainCount: number;
   readonly routeState: string | null;
+  readonly readinessSource: string | null;
   readonly surfaceIdentity: string | null;
   readonly bodyTextLength: number;
   readonly horizontalOverflow: number;
@@ -63,7 +64,8 @@ async function inspectRoute(page: Page, href: string): Promise<RouteHealthResult
     await page.locator("body").waitFor({ state: "visible", timeout: 15_000 });
     await page.waitForFunction(() => {
       const state = document.querySelector("[data-route-stage-key]")?.getAttribute("data-route-state");
-      return state === "ready" || state === "stalled";
+      return state === "ready" || state === "degraded" || state === "blocked"
+        || state === "error" || state === "stalled";
     }, undefined, { timeout: 20_000 }).catch(() => undefined);
     await page.waitForTimeout(100);
     return await page.evaluate((routeHref) => {
@@ -77,6 +79,7 @@ async function inspectRoute(page: Page, href: string): Promise<RouteHealthResult
         visibleHeadingCount: document.querySelectorAll("h1:not([data-route-semantic-heading])").length,
         mainCount: document.querySelectorAll("main").length,
         routeState: document.querySelector("[data-route-stage-key]")?.getAttribute("data-route-state") ?? null,
+        readinessSource: document.querySelector("[data-route-stage-key]")?.getAttribute("data-route-readiness-source") ?? null,
         surfaceIdentity: document.querySelector("[data-route-stage-key]")?.getAttribute("data-route-surface-identity") ?? null,
         bodyTextLength: bodyText.length,
         horizontalOverflow: Math.max(0, root.scrollWidth - root.clientWidth),
@@ -115,7 +118,7 @@ test.describe("site directory route health", () => {
       || result.headingCount !== 1
       || (result.visibleHeadingCount !== 1 && !result.surfaceIdentity)
       || result.mainCount !== 1
-      || result.routeState === "stalled"
+      || !["ready", "degraded", "blocked", "error"].includes(result.routeState ?? "")
       || result.bodyTextLength < 24
       || result.horizontalOverflow > 2
       || result.pageErrors.length > 0);
@@ -148,7 +151,7 @@ test.describe("site directory route health", () => {
       || result.headingCount !== 1
       || (result.visibleHeadingCount !== 1 && !result.surfaceIdentity)
       || result.mainCount !== 1
-      || result.routeState === "stalled"
+      || !["ready", "degraded", "blocked", "error"].includes(result.routeState ?? "")
       || result.bodyTextLength < 24
       || result.horizontalOverflow > 2);
 
@@ -160,6 +163,7 @@ test.describe("site directory route health", () => {
       await page.goto(href, { waitUntil: "domcontentloaded", timeout: 45_000 });
       const stage = page.locator("[data-route-stage-key]");
       await expect(stage).toHaveAttribute("data-route-state", "ready", { timeout: 20_000 });
+      await expect(stage).toHaveAttribute("data-route-readiness-source", "explicit");
       await expect(page.locator("main")).toHaveCount(1);
       await expect(page.locator("h1:not([data-route-semantic-heading])")).toHaveCount(1);
     }

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Isometric Grid Panel — 아이소메트릭 그리드 인스펙터: on/off 토글 + 각도 슬라이더
  * (15°/30°/45°/60° 프리셋 칩 포함) + 셀 크기 슬라이더 + 기준점 초기화 버튼. 캔버스 위
@@ -210,22 +214,22 @@ export function StudioIsometricGridPanel({
   return (
     <div className="pt-2.5 border-t border-line/35 space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-fg-3">아이소메트릭 그리드</p>
+        <p className="text-xs font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "아이소메트릭 그리드")}</p>
         <StudioToggleChip
           active={active}
           disabled={disabled}
           onClick={onToggleActive}
-          aria-label={`아이소메트릭 그리드 ${active ? "끄기" : "켜기"}`}
-          title={disabledReason ?? "자유곡선에는 안내선만 표시하고, 직선 도구는 3방향 축에 맞춥니다."}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "아이소메트릭 그리드 {v0}"), { v0: String(active ? "끄기" : "켜기") })}
+          title={disabledReason ?? translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "자유곡선에는 안내선만 표시하고, 직선 도구는 3방향 축에 맞춥니다.")}
         >
-          {active ? "켜짐" : "꺼짐"}
+          {active ? translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "켜짐") : translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "꺼짐")}
         </StudioToggleChip>
       </div>
 
       {active && (
         <div className="space-y-2 pl-1.5 border-l border-line/50 ml-1 py-1 animate-fade-in">
           <StudioSliderRow
-            label="각도"
+            label={translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "각도")}
             min={ISOMETRIC_ANGLE_MIN_DEG}
             max={ISOMETRIC_ANGLE_MAX_DEG}
             step={1}
@@ -242,7 +246,7 @@ export function StudioIsometricGridPanel({
                 active={config.angleDeg === preset}
                 disabled={disabled}
                 onClick={() => commitAngle(preset)}
-                title={disabledReason ?? `${preset}° 로 설정`}
+                title={disabledReason ?? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "{v0}° 로 설정"), { v0: String(preset) })}
               >
                 {preset}°
               </StudioPanelChip>
@@ -250,7 +254,7 @@ export function StudioIsometricGridPanel({
           </div>
 
           <StudioSliderRow
-            label="셀 크기"
+            label={translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "셀 크기")}
             min={ISOMETRIC_CELL_SIZE_MIN}
             max={ISOMETRIC_CELL_SIZE_MAX}
             step={1}
@@ -263,11 +267,11 @@ export function StudioIsometricGridPanel({
 
           {onCommitOrigin ? (
             <div className="space-y-1">
-              <p className="text-[0.68rem] font-semibold text-fg-3">기준점 좌표</p>
+              <p className="text-[0.68rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "기준점 좌표")}</p>
               <div className="flex gap-1.5">
                 <StudioCoordinateInput
                   label="X"
-                  ariaLabel="아이소메트릭 기준점 X"
+                  ariaLabel={translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "아이소메트릭 기준점 X")}
                   value={config.originX}
                   disabled={disabled}
                   onPreview={onPreviewOrigin
@@ -277,7 +281,7 @@ export function StudioIsometricGridPanel({
                 />
                 <StudioCoordinateInput
                   label="Y"
-                  ariaLabel="아이소메트릭 기준점 Y"
+                  ariaLabel={translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "아이소메트릭 기준점 Y")}
                   value={config.originY}
                   disabled={disabled}
                   onPreview={onPreviewOrigin
@@ -293,12 +297,11 @@ export function StudioIsometricGridPanel({
             type="button"
             onClick={onResetOrigin}
             disabled={disabled}
-            title={disabledReason ?? "기준점을 캔버스 중앙으로 되돌립니다."}
+            title={disabledReason ?? translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "기준점을 캔버스 중앙으로 되돌립니다.")}
             className="flex w-full items-center justify-center gap-1 rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11"
           >
             <RotateCcw className="size-3" aria-hidden />
-            기준점 초기화
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "기준점 초기화")}</button>
 
           {onInsertPrimitive ? (
             <div
@@ -306,9 +309,9 @@ export function StudioIsometricGridPanel({
               className="space-y-2 rounded border border-line/60 bg-card/55 p-2"
             >
               <label className="block space-y-1 text-[0.68rem] font-semibold text-fg-3">
-                <span>입체 종류</span>
+                <span>{translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "입체 종류")}</span>
                 <select
-                  aria-label="아이소메트릭 입체 종류"
+                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "아이소메트릭 입체 종류")}
                   value={primitiveKind}
                   disabled={primitiveControlsDisabled}
                   onChange={(event) => {
@@ -323,10 +326,10 @@ export function StudioIsometricGridPanel({
 
               <div className="grid grid-cols-3 gap-1.5">
                 <label className="space-y-1 text-[0.65rem] font-semibold text-fg-3">
-                  <span>너비(셀)</span>
+                  <span>{translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "너비(셀)")}</span>
                   <input
                     type="number"
-                    aria-label="아이소메트릭 입체 너비"
+                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "아이소메트릭 입체 너비")}
                     min={PRIMITIVE_CELL_MIN}
                     max={PRIMITIVE_CELL_MAX}
                     step={0.25}
@@ -337,10 +340,10 @@ export function StudioIsometricGridPanel({
                   />
                 </label>
                 <label className="space-y-1 text-[0.65rem] font-semibold text-fg-3">
-                  <span>깊이(셀)</span>
+                  <span>{translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "깊이(셀)")}</span>
                   <input
                     type="number"
-                    aria-label="아이소메트릭 입체 깊이"
+                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "아이소메트릭 입체 깊이")}
                     min={PRIMITIVE_CELL_MIN}
                     max={PRIMITIVE_CELL_MAX}
                     step={0.25}
@@ -351,10 +354,10 @@ export function StudioIsometricGridPanel({
                   />
                 </label>
                 <label className="space-y-1 text-[0.65rem] font-semibold text-fg-3">
-                  <span>높이(셀)</span>
+                  <span>{translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "높이(셀)")}</span>
                   <input
                     type="number"
-                    aria-label="아이소메트릭 입체 높이"
+                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "아이소메트릭 입체 높이")}
                     min={PRIMITIVE_CELL_MIN}
                     max={PRIMITIVE_CELL_MAX}
                     step={0.25}
@@ -368,10 +371,10 @@ export function StudioIsometricGridPanel({
 
               {primitiveKind === "stairs" ? (
                 <label className="block space-y-1 text-[0.68rem] font-semibold text-fg-3">
-                  <span>계단 수</span>
+                  <span>{translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "계단 수")}</span>
                   <input
                     type="number"
-                    aria-label="아이소메트릭 계단 수"
+                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "아이소메트릭 계단 수")}
                     min={STUDIO_ISOMETRIC_STAIRS_STEPS_MIN}
                     max={STUDIO_ISOMETRIC_STAIRS_STEPS_MAX}
                     step={1}
@@ -385,10 +388,10 @@ export function StudioIsometricGridPanel({
 
               {primitiveKind === "cylinder" ? (
                 <label className="block space-y-1 text-[0.68rem] font-semibold text-fg-3">
-                  <span>곡면 분할</span>
+                  <span>{translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "곡면 분할")}</span>
                   <input
                     type="number"
-                    aria-label="아이소메트릭 원기둥 분할 수"
+                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "아이소메트릭 원기둥 분할 수")}
                     min={STUDIO_ISOMETRIC_CYLINDER_SEGMENTS_MIN}
                     max={STUDIO_ISOMETRIC_CYLINDER_SEGMENTS_MAX}
                     step={2}
@@ -401,10 +404,9 @@ export function StudioIsometricGridPanel({
               ) : null}
 
               <p className="text-[0.62rem] leading-relaxed text-fg-3">
-                각 면은 닫힌 벡터로 생성되어 색상과 노드를 따로 편집할 수 있습니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "각 면은 닫힌 벡터로 생성되어 색상과 노드를 따로 편집할 수 있습니다.")}</p>
               <p role="status" aria-live="polite" className="sr-only">
-                {primitiveInsertPending ? "아이소메트릭 입체를 생성하고 있습니다." : ""}
+                {primitiveInsertPending ? translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "아이소메트릭 입체를 생성하고 있습니다.") : ""}
               </p>
             </div>
           ) : null}
@@ -416,16 +418,16 @@ export function StudioIsometricGridPanel({
               disabled={primitiveControlsDisabled}
               aria-busy={primitiveInsertPending}
               title={primitiveInsertPending
-                ? "아이소메트릭 입체를 생성하고 있습니다."
-                : disabledReason ?? `현재 각도·셀 크기·색상으로 편집 가능한 ${PRIMITIVE_KIND_LABELS[primitiveKind]}를 만듭니다.`}
+                ? translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "아이소메트릭 입체를 생성하고 있습니다.")
+                : disabledReason ?? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "현재 각도·셀 크기·색상으로 편집 가능한 {v0}를 만듭니다."), { v0: String(PRIMITIVE_KIND_LABELS[primitiveKind]) })}
               className="flex w-full items-center justify-center gap-1 rounded border border-accent/45 bg-accent/10 py-1.5 text-[0.68rem] font-semibold text-accent transition-colors hover:bg-accent/15 cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11"
             >
               <Box className="size-3" aria-hidden />
               {primitiveInsertPending
-                ? "생성 중…"
+                ? translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "생성 중…")
                 : onInsertPrimitive
-                ? `${PRIMITIVE_KIND_LABELS[primitiveKind]} 생성`
-                : "입체 상자 생성"}
+                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "{v0} 생성"), { v0: String(PRIMITIVE_KIND_LABELS[primitiveKind]) })
+                : translateCurrentStaticSourceText("domains.creator.StudioIsometricGridPanel", "ko", "입체 상자 생성")}
             </button>
           ) : null}
         </div>

@@ -84,6 +84,12 @@ describe("studio shell floating layout registry", () => {
       restored,
       DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY,
     )).toBe(true);
+
+    const autoHide = setStudioShellFloatingAutoHideWhileDrawing(restored, true);
+    expect(autoHide.autoHideWhileDrawing).toBe(true);
+    expect(studioShellFloatingVisibilityEqual(autoHide, restored)).toBe(false);
+    expect(setStudioShellFloatingSurfaceVisible(autoHide, "collaboration", false))
+      .toMatchObject({ autoHideWhileDrawing: true });
   });
 
   it("preserves the stroke-focus preference across visibility and preset changes", () => {
@@ -128,6 +134,14 @@ describe("studio shell floating layout registry", () => {
       .toEqual(STUDIO_SHELL_FLOATING_VISIBILITY_IDS);
     expect(applyStudioShellFloatingPreset("all"))
       .toBe(DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY);
+    const autoHide = setStudioShellFloatingAutoHideWhileDrawing(
+      DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY,
+      true,
+    );
+    expect(applyStudioShellFloatingPreset("production", autoHide))
+      .toMatchObject({ hidden: ["collaboration"], autoHideWhileDrawing: true });
+    expect(hideAllStudioShellFloatingSurfaces(autoHide))
+      .toMatchObject({ autoHideWhileDrawing: true });
   });
 
   it("resolves known surfaces and rejects unknown runtime IDs", () => {

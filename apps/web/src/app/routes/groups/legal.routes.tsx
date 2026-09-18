@@ -1,96 +1,32 @@
 import { defineAppRoutes } from "../app-route-definition";
-import { lazyRetry } from "@/shared/lib/lazy-retry";
-
-const AboutPage = lazyRetry(
-  () => import("@/domains/legal/AboutPage").then((module) => ({
-    default: module.AboutPage,
-  })),
-  "AboutPage",
-);
-const WebtoonWorkflowPage = lazyRetry(
-  () => import("@/domains/legal/WebtoonWorkflowPage").then((module) => ({
-    default: module.WebtoonWorkflowPage,
-  })),
-  "WebtoonWorkflowPage",
-);
-const TechnologyPage = lazyRetry(
-  () => import("@/domains/legal/TechnologyPage").then((module) => ({
-    default: module.TechnologyPage,
-  })),
-  "TechnologyPage",
-);
-const HelpCenterPage = lazyRetry(
-  () => import("@/domains/legal/HelpCenterPage").then((module) => ({
-    default: module.HelpCenterPage,
-  })),
-  "HelpCenterPage",
-);
-const AccessibilityPage = lazyRetry(
-  () => import("@/domains/legal/AccessibilityPage").then((module) => ({
-    default: module.AccessibilityPage,
-  })),
-  "AccessibilityPage",
-);
-const CrawlerPolicyPage = lazyRetry(
-  () => import("@/domains/legal/CrawlerPolicyPage").then((module) => ({
-    default: module.CrawlerPolicyPage,
-  })),
-  "CrawlerPolicyPage",
-);
-const DataSourcesPage = lazyRetry(
-  () => import("@/domains/creator-resources/SourcesPage").then((module) => ({
-    default: module.SourcesPage,
-  })),
-  "DataSourcesPage",
-);
-const DesignSystemPage = lazyRetry(
-  () => import("@/domains/legal/DesignSystemPage").then((module) => ({
-    default: module.DesignSystemPage,
-  })),
-  "DesignSystemPage",
-);
-const SitemapPage = lazyRetry(
-  () => import("@/domains/legal/SitemapPage").then((module) => ({
-    default: module.SitemapPage,
-  })),
-  "SitemapPage",
-);
-const CopyrightPage = lazyRetry(
-  () => import("@/domains/legal/CopyrightPage").then((module) => ({
-    default: module.CopyrightPage,
-  })),
-  "CopyrightPage",
-);
-const TermsPage = lazyRetry(
-  () => import("@/domains/legal/PolicyPage").then((module) => ({
-    default: module.TermsPage,
-  })),
-  "TermsPage",
-);
-const PrivacyPage = lazyRetry(
-  () => import("@/domains/legal/PolicyPage").then((module) => ({
-    default: module.PrivacyPage,
-  })),
-  "PrivacyPage",
-);
-const ContactPage = lazyRetry(
-  () => import("@/domains/legal/ContactPage").then((module) => ({
-    default: module.ContactPage,
-  })),
-  "ContactPage",
-);
-const SupportPage = lazyRetry(
-  () => import("@/domains/legal/SupportPage").then((module) => ({
-    default: module.SupportPage,
-  })),
-  "SupportPage",
-);
-const FeedbackPage = lazyRetry(
-  () => import("@/domains/legal/FeedbackPage").then((module) => ({
-    default: module.FeedbackPage,
-  })),
-  "FeedbackPage",
-);
+import {
+  AboutPage,
+  AccessibilityPage,
+  BusinessPage,
+  ContactPage,
+  CopyrightPage,
+  CreatorSupportPage,
+  CrawlerPolicyPage,
+  DataSourcesPage,
+  DesignSystemPage,
+  EngineeringDeckPage,
+  EngineeringFieldNotesPage,
+  EngineeringGuidesPage,
+  EngineeringLicensesPage,
+  EngineeringReferencesPage,
+  EngineeringStoryPage,
+  EngineeringVideosPage,
+  FeedbackPage,
+  HelpCenterPage,
+  PrivacyPage,
+  ProductPrinciplesPage,
+  SitemapPage,
+  SupportPage,
+  SupportUsPage,
+  TechnologyPage,
+  TermsPage,
+  WebtoonWorkflowPage,
+} from "./legal-route-pages";
 
 export const legalRoutes = defineAppRoutes([
   { id: "legal-about", path: "/about", element: <AboutPage /> },
@@ -104,6 +40,46 @@ export const legalRoutes = defineAppRoutes([
     path: "/about/technology",
     element: <TechnologyPage />,
   },
+  {
+    id: "legal-about-technology-story",
+    path: "/about/technology/story",
+    element: <EngineeringStoryPage />,
+  },
+  {
+    id: "legal-about-technology-guides",
+    path: "/about/technology/guides",
+    element: <EngineeringGuidesPage />,
+  },
+  {
+    id: "legal-about-technology-references",
+    path: "/about/technology/references",
+    element: <EngineeringReferencesPage />,
+  },
+  {
+    id: "legal-about-technology-field-notes",
+    path: "/about/technology/field-notes",
+    element: <EngineeringFieldNotesPage />,
+  },
+  {
+    id: "legal-about-technology-deck",
+    path: "/about/technology/deck",
+    element: <EngineeringDeckPage />,
+  },
+  {
+    id: "legal-about-technology-videos",
+    path: "/about/technology/videos",
+    element: <EngineeringVideosPage />,
+  },
+  {
+    id: "legal-about-technology-licenses",
+    path: "/about/technology/licenses",
+    element: <EngineeringLicensesPage />,
+  },
+  {
+    id: "legal-about-principles",
+    path: "/about/principles",
+    element: <ProductPrinciplesPage />,
+  },
   { id: "legal-help", path: "/help", element: <HelpCenterPage /> },
   { id: "legal-accessibility", path: "/accessibility", element: <AccessibilityPage /> },
   { id: "legal-data-sources", path: "/about/data", element: <DataSourcesPage /> },
@@ -114,6 +90,9 @@ export const legalRoutes = defineAppRoutes([
   { id: "legal-privacy", path: "/privacy", element: <PrivacyPage /> },
   { id: "legal-copyright", path: "/copyright", element: <CopyrightPage /> },
   { id: "legal-contact", path: "/contact", element: <ContactPage /> },
+  { id: "legal-business", path: "/business", element: <BusinessPage /> },
+  { id: "legal-support-us", path: "/support-us", element: <SupportUsPage /> },
+  { id: "legal-creator-support", path: "/support-creators", element: <CreatorSupportPage /> },
   { id: "legal-support", path: "/support", element: <SupportPage /> },
   { id: "legal-feedback", path: "/feedback", element: <FeedbackPage /> },
 ]);

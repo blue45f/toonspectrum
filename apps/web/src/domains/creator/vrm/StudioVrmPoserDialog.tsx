@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio VRM poser view slice extracted from `StudioVrmPoser.tsx` (behavior unchanged).
  * The caller passes one host object; this component destructures the original local names.
@@ -85,7 +89,7 @@ export function StudioVrmPoserDialog({ h }: { h: StudioVrmPoserHost }) {
       data-studio-vrm-dialog="true"
       data-studio-vrm-recent-persistence={recentPreferencesSnapshot.state}
       data-studio-vrm-recent-authority={
-        recentPreferencesSnapshot.state === "memory-only" ? "memory-only" : "sqlite-opfs"
+        recentPreferencesSnapshot.state === "memory-only" ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "en", "memory-only") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "en", "sqlite-opfs")
       }
       role="dialog"
       tabIndex={-1}
@@ -113,25 +117,24 @@ export function StudioVrmPoserDialog({ h }: { h: StudioVrmPoserHost }) {
           <div className="min-w-0">
             <p className="eyebrow flex items-center gap-1.5 text-accent">
               <UserRound size={14} aria-hidden />
-              VRM 캐릭터 빌더
-            </p>
-            <h2 id={dialogTitleId} className="mt-1 truncate text-lg font-bold tracking-tight text-fg sm:text-xl">3D 캐릭터 만들기</h2>
+              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "ko", "VRM 캐릭터 빌더")}</p>
+            <h2 id={dialogTitleId} className="mt-1 truncate text-lg font-bold tracking-tight text-fg sm:text-xl">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "ko", "3D 캐릭터 만들기")}</h2>
             <p id={dialogDescriptionId} className="mt-1 line-clamp-1 text-xs text-fg-3">
               {displayModelName
                 ? `${displayModelName} · ${transparentBackground ? "캐릭터만 투명 PNG로 패널에 추가" : "배경색 포함 PNG로 패널에 추가"}`
-                : "내 VRM을 불러와 패널에 추가"}
+                : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "ko", "내 VRM을 불러와 패널에 추가")}
             </p>
           </div>
           <button
             ref={closeButtonRef}
             type="button"
-            aria-label="닫기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "ko", "닫기")}
             title={
               isCapturing
-                ? "캡처가 끝난 뒤 닫을 수 있습니다."
+                ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "ko", "캡처가 끝난 뒤 닫을 수 있습니다.")
                 : texturePaintStrokeActive
-                  ? "닫기 · 진행 중인 표면 페인트 작업은 취소됩니다. (Esc)"
-                : "닫기 (Esc)"
+                  ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "ko", "닫기 · 진행 중인 표면 페인트 작업은 취소됩니다. (Esc)")
+                : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "ko", "닫기 (Esc)")
             }
             className={ICON_BUTTON}
             disabled={isCapturing}
@@ -158,8 +161,7 @@ export function StudioVrmPoserDialog({ h }: { h: StudioVrmPoserHost }) {
               className="shrink-0 rounded border border-warn/40 bg-card px-2.5 py-1 font-semibold hover:bg-raised"
               onClick={() => void recentPreferencesRuntime.retry()}
             >
-              SQLite/OPFS 다시 연결
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "ko", "SQLite/OPFS 다시 연결")}</button>
           </div>
         ) : null}
 
@@ -185,14 +187,14 @@ export function StudioVrmPoserDialog({ h }: { h: StudioVrmPoserHost }) {
               broadcastPreviewActive && "!hidden",
             )}
           >
-            <div role="tablist" aria-label="컨트롤 카테고리" className="grid shrink-0 grid-cols-5 gap-1 border-b border-line bg-panel/95 px-2 py-2 backdrop-blur sm:px-3">
+            <div role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "ko", "컨트롤 카테고리")} className="grid shrink-0 grid-cols-5 gap-1 border-b border-line bg-panel/95 px-2 py-2 backdrop-blur sm:px-3">
               {PANEL_TABS.map((tab) => {
                 const TabIcon = tab.icon;
                 const isActive = activePanelTab === tab.id;
                 return (
                   <button
                     key={tab.id}
-                    id={`vrm-tab-${tab.id}`}
+                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "en", "vrm-tab-{v0}"), { v0: String(tab.id) })}
                     type="button"
                     role="tab"
                     aria-selected={isActive}
@@ -208,13 +210,13 @@ export function StudioVrmPoserDialog({ h }: { h: StudioVrmPoserHost }) {
                     )}
                     onClick={() => handlePanelTabChange(tab.id)}
                   >
-                    <TabIcon size={17} aria-hidden className={isActive ? "" : "opacity-80 group-hover:opacity-100"} />
+                    <TabIcon size={17} aria-hidden className={isActive ? "" : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "en", "opacity-80 group-hover:opacity-100")} />
                     {tab.label}
                   </button>
                 );
               })}
             </div>
-            <div ref={panelScrollRef} id="vrm-panel-body" role="tabpanel" aria-labelledby={`vrm-tab-${activePanelTab}`} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-gutter:stable] sm:px-5">
+            <div ref={panelScrollRef} id="vrm-panel-body" role="tabpanel" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "en", "vrm-tab-{v0}"), { v0: String(activePanelTab) })} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-gutter:stable] sm:px-5">
               <StudioVrmPoserPanelBodyA h={h} />
               <StudioVrmPoserPanelBodyB h={h} />
               <StudioVrmPoserPanelBodyC h={h} />
@@ -231,8 +233,7 @@ export function StudioVrmPoserDialog({ h }: { h: StudioVrmPoserHost }) {
                   onClose();
                 }}
               >
-                닫기
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "ko", "닫기")}</button>
               <button
                 type="button"
                 className={cx(CONTROL_BUTTON, "min-w-36 border-accent/60 bg-accent text-on-accent hover:bg-accent/90")}
@@ -256,8 +257,7 @@ export function StudioVrmPoserDialog({ h }: { h: StudioVrmPoserHost }) {
                 onClick={handleInsert}
               >
                 {isCapturing ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}
-                이 포즈로 추가
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserDialog", "ko", "이 포즈로 추가")}</button>
             </footer>
           </aside>
         </div>

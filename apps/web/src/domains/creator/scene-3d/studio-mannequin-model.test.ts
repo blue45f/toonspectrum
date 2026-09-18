@@ -271,6 +271,49 @@ describe("studio-mannequin-model 비례 수학", () => {
     }
   });
 
+  it("헤드 슬라이더가 실제 얼굴 형상에 반영되고 신장 불변식은 유지된다", () => {
+    const base = buildStudioMannequinSpec(params());
+    const tuned = buildStudioMannequinSpec(params({
+      faceWidth: 1.2,
+      chinLength: 1.25,
+      eyeScale: 1.18,
+      noseHeight: 1.2,
+    }));
+
+    const headSpheres = (spec: ReturnType<typeof buildStudioMannequinSpec>) =>
+      spec.primitives.filter((primitive) => primitive.kind === "sphere" && primitive.jointId === "head");
+    const baseHead = headSpheres(base);
+    const tunedHead = headSpheres(tuned);
+    const mainHeadBase = baseHead.find((primitive) => primitive.kind === "sphere" && primitive.scale?.[1] === 1);
+    const mainHeadTuned = tunedHead.find((primitive) => primitive.kind === "sphere" && primitive.scale?.[1] === 1);
+    if (mainHeadBase?.kind === "sphere" && mainHeadTuned?.kind === "sphere") {
+      expect(mainHeadTuned.scale?.[0]).toBeGreaterThan(mainHeadBase.scale?.[0] ?? 0);
+    }
+
+    const eyeBase = baseHead.find((primitive) => primitive.kind === "sphere" && primitive.scale?.[2] === 0.38);
+    const eyeTuned = tunedHead.find((primitive) => primitive.kind === "sphere" && primitive.scale?.[2] === 0.38);
+    if (eyeBase?.kind === "sphere" && eyeTuned?.kind === "sphere") {
+      expect(eyeTuned.radius).toBeGreaterThan(eyeBase.radius);
+      expect(Math.abs(eyeTuned.center[0])).toBeGreaterThan(Math.abs(eyeBase.center[0]));
+    }
+
+    const noseBase = baseHead.find((primitive) => primitive.kind === "sphere" && primitive.scale?.[0] === 0.55);
+    const noseTuned = tunedHead.find((primitive) => primitive.kind === "sphere" && primitive.scale?.[0] === 0.55);
+    if (noseBase?.kind === "sphere" && noseTuned?.kind === "sphere") {
+      expect(noseTuned.scale?.[2]).toBeGreaterThan(noseBase.scale?.[2] ?? 0);
+      expect(noseTuned.center[2]).toBeGreaterThan(noseBase.center[2]);
+    }
+
+    const jawBase = baseHead.find((primitive) => primitive.kind === "sphere" && primitive.scale?.[2] === 0.72);
+    const jawTuned = tunedHead.find((primitive) => primitive.kind === "sphere" && primitive.scale?.[2] === 0.72);
+    if (jawBase?.kind === "sphere" && jawTuned?.kind === "sphere") {
+      expect(jawTuned.scale?.[0]).toBeGreaterThan(jawBase.scale?.[0] ?? 0);
+      expect(jawTuned.scale?.[1]).toBeGreaterThan(jawBase.scale?.[1] ?? 0);
+    }
+
+    expect(studioMannequinRestStature(tuned)).toBeCloseTo(tuned.heightM, 12);
+  });
+
   it("두 눈 가이드는 좌우 대칭이고 머리와 함께 정수리 신장 불변식을 보존한다", () => {
     const spec = buildStudioMannequinSpec(params());
     const eyes = spec.primitives.filter((primitive) =>
@@ -291,7 +334,7 @@ describe("studio-mannequin-model 재질 다양성", () => {
   it("청동과 백자를 포함한 재질 id/label이 중복 없이 노출된다", () => {
     const ids = STUDIO_MANNEQUIN_MATERIAL_STYLES.map((style) => style.id);
     const labels = STUDIO_MANNEQUIN_MATERIAL_STYLES.map((style) => style.label);
-    expect(ids).toEqual(expect.arrayContaining(["bronze", "porcelain"]));
+    expect(ids).toEqual(expect.arrayContaining(["bronze", "porcelain", "skin"]));
     expect(new Set(ids).size).toBe(ids.length);
     expect(new Set(labels).size).toBe(labels.length);
   });

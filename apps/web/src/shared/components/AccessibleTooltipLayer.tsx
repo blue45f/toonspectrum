@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   useEffect,
   useId,
@@ -700,9 +701,9 @@ export function AccessibleTooltipLayer(): ReactElement | null {
       role="tooltip"
       data-app-tooltip-layer="true"
       data-side={renderedPlacement.side}
-      data-state={closing ? "closing" : "open"}
-      data-positioned={placement ? "true" : "false"}
-      data-app-tooltip-reduced-motion={active.reducedMotion ? "true" : undefined}
+      data-state={closing ? translateCurrentStaticSourceText("shared.components.AccessibleTooltipLayer", "en", "closing") : translateCurrentStaticSourceText("shared.components.AccessibleTooltipLayer", "en", "open")}
+      data-positioned={placement ? translateCurrentStaticSourceText("shared.components.AccessibleTooltipLayer", "en", "true") : translateCurrentStaticSourceText("shared.components.AccessibleTooltipLayer", "en", "false")}
+      data-app-tooltip-reduced-motion={active.reducedMotion ? translateCurrentStaticSourceText("shared.components.AccessibleTooltipLayer", "en", "true") : undefined}
       className="pointer-events-auto fixed z-[240] w-max max-w-[min(18rem,calc(100vw-1.25rem))] rounded-lg border border-line/80 bg-panel/98 px-2.5 py-2 text-left shadow-[0_18px_48px_oklch(0.06_0.01_70/0.62)] backdrop-blur-xl"
       style={style}
     >

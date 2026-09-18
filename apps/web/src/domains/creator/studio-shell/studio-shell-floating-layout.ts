@@ -65,6 +65,8 @@ export interface StudioShellFloatingSurfaceDefinition {
   readonly zIndexFloor: number;
   readonly resizable: boolean;
   readonly applySize: boolean;
+  /** False only for controls that must remain reachable while layout editing is active. */
+  readonly hideWhileDrawing?: boolean;
   readonly safetyBehavior?: string;
 }
 
@@ -301,6 +303,7 @@ export const STUDIO_SHELL_FLOATING_SURFACES: readonly StudioShellFloatingSurface
       zIndexFloor: 69,
       resizable: false,
       applySize: false,
+      hideWhileDrawing: false,
       safetyBehavior: "기존 배치 도구에서 편집 중일 때는 완료·취소 동선을 위해 자동 표시됩니다.",
     },
   ] satisfies readonly StudioShellFloatingSurfaceDefinition[]);

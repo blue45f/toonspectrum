@@ -4,6 +4,11 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
+if (process.env.CI === "1" || process.env.CI === "true" || process.env.HUSKY === "0") {
+  console.log("Skipping Git hook setup in CI or when HUSKY=0.");
+  process.exit(0);
+}
+
 function isGitWorktree() {
   try {
     execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {

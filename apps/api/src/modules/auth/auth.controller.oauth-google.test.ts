@@ -620,6 +620,7 @@ describe("AuthController Google GIS/code-flow boundary", () => {
   it("logs only the stable GIS persistence reason for an unknown failure", async () => {
     const idToken = "header.id-token-never-log-this.signature";
     const internalMessage =
+      // secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic log-redaction fixture
       "postgresql://runtime:db-secret@example.invalid/internal private.artist@example.test";
     handleGoogleIdToken.mockRejectedValueOnce(new Error(internalMessage));
     const logger = vi

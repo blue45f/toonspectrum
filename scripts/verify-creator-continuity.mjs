@@ -6,6 +6,14 @@ import { chromium, expect } from "@playwright/test";
 const origin = process.env.CREATOR_HOME_ORIGIN || "http://127.0.0.1:4173";
 const output = "artifacts/creator-continuity";
 const storageKey = "toonstudio:creator-continuity:v1";
+const expectedIntentHrefs = [
+  "/story-lab",
+  "/studio/new",
+  "/studio/bg3d",
+  "/studio/assets",
+  "/production",
+  "/studio/publish",
+];
 mkdirSync(output, { recursive: true });
 
 for (let attempt = 0; attempt < 60; attempt += 1) {
@@ -63,7 +71,13 @@ try {
     await page.goto(origin, { waitUntil: "domcontentloaded", timeout: 60_000 });
     const intent = page.locator(".cf-intent");
     await intent.waitFor({ state: "visible", timeout: 60_000 });
-    await expect(intent.locator("nav a")).toHaveCount(7);
+    const intentLinks = intent.locator("nav a");
+    await expect(intentLinks).toHaveCount(expectedIntentHrefs.length);
+    assert.deepEqual(
+      await intentLinks.evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
+      expectedIntentHrefs,
+      `Unexpected creator intent destinations: ${name}`,
+    );
 
     const recent = intent.locator(".cf-recent-card");
     await expect(recent).toBeVisible();
@@ -115,6 +129,7 @@ try {
     results.push({
       name,
       viewport: [width, height],
+      intentDestinations: expectedIntentHrefs.length,
       recentCardVisible: true,
       sanitizedRecentHref: true,
       sanitizedOnHydration: true,
