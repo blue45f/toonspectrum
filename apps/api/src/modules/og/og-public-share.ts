@@ -84,7 +84,10 @@ function pathSegment(value: unknown, maximumLength = 180): string {
   if (
     !normalized
     || normalized.length > maximumLength
-    || /[\\/\u0000-\u001f\u007f]/u.test(normalized)
+    || [...normalized].some((character) => {
+      const code = character.charCodeAt(0);
+      return character === "\\" || character === "/" || code <= 0x1f || code === 0x7f;
+    })
   ) {
     return "";
   }

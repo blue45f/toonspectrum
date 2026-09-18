@@ -24,6 +24,7 @@ const initialProfile: MeProfile = {
   avatar: null,
   email: "artist@example.com",
   bio: null,
+  regionSettings: null,
   creatorRoleProfile: normalizeCreatorRoleProfile({
     version: 2,
     primaryRole: "story",

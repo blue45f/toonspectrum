@@ -1,33 +1,13 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
-  ArrowRight,
-  Box,
-  Brush,
-  Cloud,
-  FileCheck2,
-  PackageOpen,
-  Pause,
-  Play,
-  Sparkles,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
+import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import { ArrowRight, Box, Brush, Cloud, FileCheck2, PackageOpen, Pause, Play, Sparkles, Users, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 
 import Link from "@/compat/router-link";
 import { useI18n } from "@/shared/lib/i18n";
-import { resolveProductLocale } from "@/shared/lib/product-identity";
+import { resolveProductLocale, type ProductLocale } from "@/shared/lib/product-identity";
 
 import "./creator-feature-reels.css";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("CreatorFeatureReels", ko, en);

@@ -89,13 +89,13 @@ export function createStudioShellStrokeFocusController(
   };
 
   return Object.freeze({
-    begin(pointerId) {
+    begin(pointerId: number) {
       if (disposed) return;
       clearSettle();
       activePointers.add(pointerId);
       publish("drawing");
     },
-    end(pointerId) {
+    end(pointerId: number) {
       if (disposed || !activePointers.delete(pointerId) || activePointers.size > 0) return;
       clearSettle();
       publish("settling");

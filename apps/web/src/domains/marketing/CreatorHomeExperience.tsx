@@ -1,32 +1,9 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
-  Accessibility,
-  ArrowRight,
-  BookOpen,
-  Bot,
-  Boxes,
-  Brush,
-  Check,
-  ClipboardCheck,
-  FileOutput,
-  FolderKanban,
-  Handshake,
-  PackageCheck,
-  PanelsTopLeft,
-  ShieldCheck,
-  Sparkles,
-  Users,
-  Workflow,
-  type LucideIcon,
-} from "lucide-react";
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
+import { Accessibility, ArrowRight, BookOpen, Bot, Boxes, Brush, Check, ClipboardCheck, FileOutput, FolderKanban, Handshake, PackageCheck, PanelsTopLeft, ShieldCheck, Sparkles, Users, Workflow, type LucideIcon } from "lucide-react";
 
 import Link from "@/compat/router-link";
 import { ProductIntentStart } from "@/domains/creator-resources/ProductIntentStart";
-import { PRODUCT_IDENTITY, PRODUCT_START_DESTINATIONS, resolveProductLocale, type ProductStartDestinationId } from "@/shared/lib/product-identity";
+import { PRODUCT_IDENTITY, PRODUCT_START_DESTINATIONS, resolveProductLocale, type ProductLocale, type ProductStartDestinationId } from "@/shared/lib/product-identity";
 import { useI18n } from "@/shared/lib/i18n";
 import { useTheme } from "@/shared/lib/theme";
 
@@ -34,7 +11,11 @@ import "./creator-home-experience.css";
 import "./creator-prism.css";
 import "./creator-flagship.css";
 import "./creator-all-in-one.css";
+import "./creator-theme-gallery.css";
 import "./creator-home-spacing.css";
+
+import { CreatorSectionLink } from "./CreatorHomeNavigation";
+import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation";
 
 interface LocalizedText {
   readonly ko: string;
@@ -213,18 +194,18 @@ const COPY = {
   },
 } as const;
 
-function localeText(copy: LocalizedText, _locale) {
-  return bi((copy).ko, (copy).en);
+function localeText(copy: LocalizedText, locale: ProductLocale) {
+  return copy[locale];
 }
 
 export function CreatorHomeExperience() {
-  useBilingualI18nRevision();
   useCreatorHomeSectionNavigation();
   const language = useI18n((state) => state.lang);
   const resolvedTheme = useTheme((state) => state.resolvedTheme);
   const locale = resolveProductLocale(language);
-  const identity = bi((PRODUCT_IDENTITY).ko, (PRODUCT_IDENTITY).en);
-  const copy = bi((COPY).ko, (COPY).en);
+  const bi = (ko: string, en: string): string => locale === "ko" ? ko : en;
+  const identity = PRODUCT_IDENTITY[locale];
+  const copy = COPY[locale];
 
   return (
     <div
@@ -262,10 +243,10 @@ export function CreatorHomeExperience() {
       <div className="cf-shell cf-home-wayfinding">
         <ProductIntentStart />
         <nav className="cf-jump-nav" aria-label={locale === "ko" ? "홈 주요 영역" : "Home sections"}>
-          <a href="#creator-start">{copy.jumpStart}</a>
-          <a href="#creator-flow">{copy.jumpFlow}</a>
-          <a href="#creator-principles">{copy.jumpPrinciples}</a>
-          <a href="#creator-support">{copy.jumpSupport}</a>
+          <CreatorSectionLink sectionId="creator-start">{copy.jumpStart}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-flow">{copy.jumpFlow}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-principles">{copy.jumpPrinciples}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-support">{copy.jumpSupport}</CreatorSectionLink>
         </nav>
       </div>
 

@@ -175,7 +175,7 @@ function ensureBrowserListeners(): void {
   browserListenersInstalled = true;
   if (typeof BroadcastChannel !== "undefined") {
     channel = new BroadcastChannel(CHANNEL_NAME);
-    channel.addEventListener("message", (event: MessageEvent<unknown>) => {
+    const handleChannelMessage = (event: MessageEvent<unknown>) => {
       const value = event.data;
       if (!value || typeof value !== "object" || Array.isArray(value)) return;
       const record = value as Record<string, unknown>;
@@ -188,7 +188,12 @@ function ensureBrowserListeners(): void {
       if (typeof snapshotRecord.projectKey !== "string") return;
       const snapshot = parseStoredSnapshot(snapshotRecord, snapshotRecord.projectKey);
       if (snapshot) receiveSnapshot({ ...snapshot, source: "local" });
-    });
+    };
+    if (typeof channel.addEventListener === "function") {
+      channel.addEventListener("message", handleChannelMessage);
+    } else {
+      channel.onmessage = handleChannelMessage;
+    }
   }
   window.addEventListener("storage", (event) => {
     if (!event.key?.startsWith(STORAGE_PREFIX) || !event.newValue) return;

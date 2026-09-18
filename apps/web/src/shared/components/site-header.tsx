@@ -1,6 +1,8 @@
 import {
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Menu,
@@ -31,10 +33,6 @@ import { cx } from "@/shared/lib/cx";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { keepInlineText } from "@/shared/lib/text";
 import { useUi } from "@/shared/lib/ui-store";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("site-header", ko, en);
@@ -264,7 +262,7 @@ export function SiteHeader() {
                 <Link
                   key={item.id}
                   href={item.href}
-                  aria-current={active ? translateCurrentStaticSourceText("shared.components.site.header", "en", "page") : undefined}
+                  aria-current={active ? "page" : undefined}
                   title={siteNavigationText(item.description, locale)}
                   data-navigation-entry={item.id}
                   data-navigation-featured={featured || undefined}
@@ -314,7 +312,7 @@ export function SiteHeader() {
             <Link
               href={create.href}
               aria-label={siteNavigationText(create.label, locale)}
-              aria-current={isPurposeActive(create.href) ? translateCurrentStaticSourceText("shared.components.site.header", "en", "page") : undefined}
+              aria-current={isPurposeActive(create.href) ? "page" : undefined}
               title={siteNavigationText(create.description, locale)}
               className={cx(
                 "group relative hidden h-11 shrink-0 items-center gap-2 overflow-hidden whitespace-nowrap rounded-xl border px-3 text-sm font-bold [text-wrap:nowrap] [word-break:keep-all] shadow-sm transition-all duration-200 ease-out-expo sm:flex",

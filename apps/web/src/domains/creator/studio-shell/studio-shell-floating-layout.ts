@@ -432,6 +432,15 @@ export function applyStudioShellFloatingPreset(
   }
 }
 
+export function showAllStudioShellFloatingSurfaces(
+  state: StudioShellFloatingVisibilityState = DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY,
+): StudioShellFloatingVisibilityState {
+  return freezeVisibility(
+    [],
+    normalizeStudioShellFloatingVisibility(state).autoHideWhileDrawing,
+  );
+}
+
 export function hideAllStudioShellFloatingSurfaces(
   state: StudioShellFloatingVisibilityState = DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY,
 ): StudioShellFloatingVisibilityState {

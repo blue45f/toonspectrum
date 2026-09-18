@@ -7,6 +7,7 @@ import {
 } from "./me-client";
 
 import { getAuthSession, persistSession } from "@/compat/auth-session-state";
+import { normalizeCreatorRoleProfile } from "@/shared/lib/creator-role-contract";
 
 const { apiGet, apiPatch } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock("@/infrastructure/api", () => ({
   ),
 }));
 
-const creatorRoleProfile = {
+const creatorRoleProfile = normalizeCreatorRoleProfile({
   version: 1 as const,
   primaryRole: "line-art" as const,
   secondaryRoles: ["assistant" as const],
@@ -35,7 +36,7 @@ const creatorRoleProfile = {
   collaborationStatus: "limited" as const,
   roleVisibility: true,
   activeRole: "assistant" as const,
-};
+});
 
 describe("me profile client", () => {
   beforeEach(() => {

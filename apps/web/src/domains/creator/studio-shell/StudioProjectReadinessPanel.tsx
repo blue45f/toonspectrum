@@ -1,14 +1,5 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  RefreshCw,
-  ShieldAlert,
-} from "lucide-react";
+import { formatI18nTemplate, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import { AlertTriangle, CheckCircle2, RefreshCw, ShieldAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import Link from "@/compat/router-link";
@@ -16,24 +7,9 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
 import { STUDIO_PROJECT_DIAGNOSTICS_FAILED_EVENT } from "../studio-project-diagnostic-source-store";
-import {
-  STUDIO_PROJECT_READINESS_REQUEST_EVENT,
-  STUDIO_PROJECT_READINESS_UPDATED_EVENT,
-  parseStudioProjectReadinessSnapshot,
-  readStudioProjectReadinessSnapshot,
-  studioProjectReadinessStorageKey,
-  type StudioProjectReadinessSnapshot,
-} from "../studio-project-readiness-store";
+import { STUDIO_PROJECT_READINESS_REQUEST_EVENT, STUDIO_PROJECT_READINESS_UPDATED_EVENT, parseStudioProjectReadinessSnapshot, readStudioProjectReadinessSnapshot, studioProjectReadinessStorageKey, type StudioProjectReadinessSnapshot } from "../studio-project-readiness-store";
 
-import type {
-  StudioProjectReadinessSectionId,
-  StudioProjectReadinessStatus,
-} from "../studio-project-readiness";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
+import type { StudioProjectReadinessSectionId, StudioProjectReadinessStatus } from "../studio-project-readiness";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioProjectReadinessPanel", ko, en);
@@ -60,7 +36,7 @@ const SECTION_LABELS: Readonly<
 
 function statusLabel(
   status: StudioProjectReadinessStatus,
-  _locale,
+  _locale: string,
 ): string {
   if (status === "ready") return bi("준비됨", "Ready");
   if (status === "warning") return bi("확인 필요", "Review");
@@ -183,8 +159,8 @@ export function StudioProjectReadinessPanel({
           "mt-5 rounded-2xl border bg-card p-4 sm:p-5",
           failure ? "border-warning/40" : "border-line",
         )}
-        aria-live={failure ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectReadinessPanel", "en", "assertive") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectReadinessPanel", "en", "polite")}
-        role={failure ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectReadinessPanel", "en", "alert") : undefined}
+        aria-live={failure ? "assertive" : "polite"}
+        role={failure ? "alert" : undefined}
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>

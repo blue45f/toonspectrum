@@ -17,8 +17,8 @@ import { getActiveI18nLocale, useBilingualI18nRevision } from "@/shared/lib/i18n
 
 
 
-function localeFromLanguage(_language): "ko" | "en" {
-  return getActiveI18nLocale();
+function localeFromLanguage(_language: string): "ko" | "en" {
+  return getActiveI18nLocale() === "ko" ? "ko" : "en";
 }
 
 /**

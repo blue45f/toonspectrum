@@ -81,10 +81,9 @@ describe("studio team client", () => {
 
   it("팀원의 공개 직무만 보존하고 개인 작업 모드 필드는 폐기한다", () => {
     const input = snapshot("work-roles");
-    input.members[0] = {
-      ...input.members[0],
+    Object.assign(input.members[0]!, {
       creatorRoleProfile: {
-        version: 2,
+        version: 1,
         primaryRole: "background",
         secondaryRoles: ["reviewer"],
         specialties: ["background-3d"],
@@ -93,17 +92,16 @@ describe("studio team client", () => {
         activeRole: "producer",
         projectRolePreferences: [{ projectKey: "secret", activeRole: "producer" }],
       },
-    };
+    });
 
     const result = normalizeStudioTeamSnapshot(input, "work-roles");
     expect(result.members[0]?.creatorRoleProfile).toEqual({
-      version: 2,
+      version: 1,
       primaryRole: "background",
       secondaryRoles: ["reviewer"],
       specialties: ["background-3d"],
       experienceLevel: "professional",
       collaborationStatus: "available",
-      roleAliases: [],
     });
     expect(JSON.stringify(result)).not.toContain("projectRolePreferences");
     expect(JSON.stringify(result)).not.toContain("activeRole");

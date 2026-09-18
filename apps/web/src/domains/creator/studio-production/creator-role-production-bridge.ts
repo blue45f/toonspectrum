@@ -5,6 +5,7 @@ import {
   type CreatorRoleId,
   type CreatorRoleProfile,
   type CreatorSpecialtyId,
+  type PublicCreatorRoleProfile,
 } from "@/shared/lib/creator-role-contract";
 
 const ROLE_RECOMMENDATIONS: Readonly<Record<CreatorRoleId, readonly ProductionRole[]>> = {
@@ -77,16 +78,36 @@ function appendDistinct(
  */
 export function creatorProfileProductionRoleRecommendations(
   profile: CreatorRoleProfile | null | undefined,
+  projectKey?: string,
 ): readonly ProductionRole[] {
   if (!profile?.primaryRole) return [];
   const result: ProductionRole[] = [];
   const seen = new Set<ProductionRole>();
   const selectedRoles = creatorRoleSelection(profile);
-  const roleOrder = profile.activeRole
-    ? [profile.activeRole, ...selectedRoles.filter((role) => role !== profile.activeRole)]
+  const projectRole = projectKey
+    ? profile.projectRolePreferences.find((entry) => entry.projectKey === projectKey)?.activeRole ?? null
+    : null;
+  const preferredRole = projectRole ?? profile.activeRole;
+  const roleOrder = preferredRole
+    ? [preferredRole, ...selectedRoles.filter((role) => role !== preferredRole)]
     : selectedRoles;
 
   for (const role of roleOrder) appendDistinct(result, seen, ROLE_RECOMMENDATIONS[role]);
+  for (const specialty of profile.specialties) {
+    appendDistinct(result, seen, SPECIALTY_RECOMMENDATIONS[specialty]);
+  }
+  return result;
+}
+
+/** Recommend production roles from the deliberately privacy-safe public creator profile. */
+export function publicCreatorProfileProductionRoleRecommendations(
+  profile: PublicCreatorRoleProfile | null | undefined,
+): readonly ProductionRole[] {
+  if (!profile?.primaryRole) return [];
+  const result: ProductionRole[] = [];
+  const seen = new Set<ProductionRole>();
+  const roles = [profile.primaryRole, ...profile.secondaryRoles.filter((role) => role !== profile.primaryRole)];
+  for (const role of roles) appendDistinct(result, seen, ROLE_RECOMMENDATIONS[role]);
   for (const specialty of profile.specialties) {
     appendDistinct(result, seen, SPECIALTY_RECOMMENDATIONS[specialty]);
   }

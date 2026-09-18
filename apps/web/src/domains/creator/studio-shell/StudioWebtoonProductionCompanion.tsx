@@ -1,32 +1,14 @@
-import {
-  ArrowRight,
-  Check,
-  Circle,
-  ExternalLink,
-  Factory,
-  ShieldAlert,
-  Sparkles,
-} from "lucide-react";
+import { ArrowRight, Check, Circle, ExternalLink, Factory, ShieldAlert, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual, useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import {
-  webtoonProductionActionHref,
-  webtoonProductionStagesForProjectView,
-  type WebtoonProductionStageSupport,
-} from "@/shared/lib/webtoon-production-support";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
+import { webtoonProductionActionHref, webtoonProductionStagesForProjectView, type WebtoonProductionStageSupport } from "@/shared/lib/webtoon-production-support";
 import { cn } from "@/shared/lib/utils";
 
 import type { StudioProjectSection } from "../studio-project-views";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = string;
 type ProgressMap = Readonly<Record<string, readonly number[]>>;
 
 function progressKey(projectId: string, stageId: string): string {
@@ -57,8 +39,11 @@ function writeProgress(projectId: string, stageId: string, values: readonly numb
   }
 }
 
-function localizedStageTitle(stage: WebtoonProductionStageSupport, locale: Locale): string {
-  return bt(stage.titleKo, stage.titleEn);
+function localizedStageTitle(
+  stage: WebtoonProductionStageSupport,
+  localize: (ko: string, en: string) => string,
+): string {
+  return localize(stage.titleKo, stage.titleEn);
 }
 
 export function StudioWebtoonProductionCompanion({
@@ -73,6 +58,7 @@ export function StudioWebtoonProductionCompanion({
   readonly locale?: string;
 }) {
   const bt = useBilingual("StudioWebtoonProductionCompanion");
+  const l = useBilingualLocalizer("studioWebtoonProductionCompanion");
   const stages = useMemo(
     () => webtoonProductionStagesForProjectView(section, view),
     [section, view],

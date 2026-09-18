@@ -1,4 +1,4 @@
-import { getActiveI18nLocale } from "@/shared/lib/i18n-bilingual-copy";
+import { getActiveI18nLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
 
@@ -8,8 +8,8 @@ import { StudioImportVisualGuide } from "./StudioImportVisualGuide";
 
 
 
-function localeFromLanguage(_language): "ko" | "en" {
-  return getActiveI18nLocale();
+function localeFromLanguage(_language: string): "ko" | "en" {
+  return getActiveI18nLocale() === "ko" ? "ko" : "en";
 }
 
 /** Keeps the visual front door while adding the real preflight-to-editor import path below it. */

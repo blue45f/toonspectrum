@@ -1,34 +1,5 @@
-import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
-  ArrowRight,
-  BookOpen,
-  Boxes,
-  Brush,
-  FileImage,
-  FilePlus2,
-  FileText,
-  FileUp,
-  FolderKanban,
-  ImagePlus,
-  LayoutGrid,
-  Lightbulb,
-  Music2,
-  Palette,
-  PlayCircle,
-  Presentation,
-  Search,
-  Sparkles,
-  Store,
-  UserRoundPen,
-  Users,
-  UsersRound,
-  type LucideIcon,
-} from "lucide-react";
+import { translateCurrentStaticSourceText, getActiveI18nLocale, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import { ArrowRight, BookOpen, Boxes, Brush, FileImage, FilePlus2, FileText, FileUp, FolderKanban, ImagePlus, LayoutGrid, Lightbulb, Music2, Palette, PlayCircle, Presentation, Search, Sparkles, Store, UserRoundPen, Users, UsersRound, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import Link from "@/compat/router-link";
@@ -38,23 +9,12 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { WorkflowTrustBadge } from "@/shared/components/WorkflowTrustBadge";
 import { useI18n } from "@/shared/lib/i18n";
 
-import {
-  RecoverableActionNotice,
-  StudioIntentLauncher,
-  StudioTaskFlow,
-  type StudioIntentAction,
-  type StudioTaskFlowStep,
-} from "./StudioTaskFlow";
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { RecoverableActionNotice, StudioIntentLauncher, StudioTaskFlow, type StudioIntentAction, type StudioTaskFlowStep } from "./StudioTaskFlow";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioFrontDoorPages", ko, en);
 
-type StudioFrontDoorLocale = string;
+type StudioFrontDoorLocale = "ko" | "en";
 type StudioFrontDoorAuthoredLocale = "ko" | "en";
 
 type FrontDoorCard = Readonly<{
@@ -66,11 +26,11 @@ type FrontDoorCard = Readonly<{
 }>;
 
 /** Normalize an application language tag to a supported Studio front-door locale. */
-function studioFrontDoorLocale(_language): StudioFrontDoorLocale {
-  return getActiveI18nLocale();
+function studioFrontDoorLocale(_language: string): StudioFrontDoorLocale {
+  return getActiveI18nLocale() === "ko" ? "ko" : "en";
 }
 
-function intentActions(_locale): readonly StudioIntentAction[] {
+function intentActions(_locale: StudioFrontDoorLocale): readonly StudioIntentAction[] {
   return [
     {
       href: "/studio/new?kind=webtoon&template=webtoon-vertical",
@@ -112,7 +72,7 @@ function intentActions(_locale): readonly StudioIntentAction[] {
   ];
 }
 
-function productionFlow(_locale): readonly StudioTaskFlowStep[] {
+function productionFlow(_locale: StudioFrontDoorLocale): readonly StudioTaskFlowStep[] {
   const labels = bi([
       ["plan", "기획", "작품·캐릭터·회차 기준"],
       ["storyboard", "콘티", "대본을 컷과 스크롤로 구성"],

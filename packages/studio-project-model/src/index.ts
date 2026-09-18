@@ -26,6 +26,7 @@ export * from "./testing/fault-injection";
 export * from "./graph/scope-ref";
 export * from "./graph/artifact-revision";
 export * from "./graph/project-graph";
+export * from "./graph/external-file-binding";
 export * from "./authority/document-authority";
 export * from "./capability/capability-ledger";
 export * from "./interchange/compatibility-report";

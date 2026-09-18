@@ -339,7 +339,7 @@ function ThreePreview({
 
         if (mode === "thumbnail") {
           if (!poster) {
-            renderFrame();
+            render();
             const nextPoster = await canvasToDataUrlAsync(renderer.domElement, "image/webp", 0.86);
             if (cancelled) return;
             cacheThreePoster(preview.cacheKey, nextPoster);
@@ -380,8 +380,6 @@ function ThreePreview({
         controls.maxDistance = radius * 8;
         controls.autoRotateSpeed = 1.25;
         controls.target.set(0, 0, 0);
-        controlsChangeCleanup = () => controls?.removeEventListener("change", requestRender);
-        controls.addEventListener("change", requestRender);
         controls.update();
 
         let interacting = false;
@@ -441,8 +439,6 @@ function ThreePreview({
       requestRenderRef.current = null;
       cancelAnimationFrame(frame);
       wakeRendererRef.current = null;
-      visibilityCleanup?.();
-      controlsChangeCleanup?.();
       resizeObserver?.disconnect();
       detachControlEvents?.();
       controls?.dispose();

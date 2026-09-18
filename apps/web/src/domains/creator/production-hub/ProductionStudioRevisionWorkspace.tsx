@@ -31,7 +31,7 @@ interface ProductionStudioRevisionWorkspaceProps {
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly canEdit: boolean;
   readonly roleLens: ProductionStudioRoleLens;
-  readonly actorUserId: string | null;
+  readonly actorUserId?: string | null;
 }
 const ROLE_LABELS: Readonly<Record<ProductionStudioDocumentRole, string>> = {
   story: "대본",
@@ -100,7 +100,7 @@ export function ProductionStudioRevisionWorkspace({
   execute,
   canEdit,
   roleLens,
-  actorUserId,
+  actorUserId = null,
 }: ProductionStudioRevisionWorkspaceProps) {
   const episodes = aggregate.episodes.filter((episode) => episode.state !== "cancelled");
   const initialEpisodeId = episodes.find((episode) => aggregate.deliverables.some((deliverable) => (

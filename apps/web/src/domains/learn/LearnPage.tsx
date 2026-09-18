@@ -57,8 +57,6 @@ export function LearnPage() {
   }
 
   const isHome = normalizedPath === "/learn";
-  const resourceHub = normalizedPath === "/learn/resources" ? <LearningResourceHub /> : null;
-  const classroomPage = normalizedPath === "/learn/classroom" ? <LearningClassroomPage /> : null;
   const pathMatch = normalizedPath.match(/^\/learn\/paths\/([^/]+)$/u);
   const academyPage = normalizedPath === "/learn/resources"
     ? <LearningResourcesPage />

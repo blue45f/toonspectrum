@@ -1,11 +1,4 @@
 
-import {
-  translateBilingualValueForActiveLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-
-const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
-  translateBilingualValueForActiveLocale("creator-role-contract", ko, en);
-
 export const CREATOR_ROLE_PROFILE_VERSION = 1 as const;
 export const CREATOR_ROLE_MAX_SECONDARY = 5;
 export const CREATOR_ROLE_MAX_SPECIALTIES = 12;
@@ -628,8 +621,8 @@ const USAGE_PURPOSE_SET = new Set<string>(CREATOR_USAGE_PURPOSE_IDS);
 const NOTIFICATION_LEVEL_SET = new Set<string>(CREATOR_ROLE_NOTIFICATION_LEVELS);
 const ONBOARDING_STATUS_SET = new Set<string>(CREATOR_ROLE_ONBOARDING_STATUSES);
 
-export function creatorText(value: LocalizedCreatorText, _locale: CreatorRoleLocale): string {
-  return bi((value).ko, (value).en);
+export function creatorText(value: LocalizedCreatorText, locale: CreatorRoleLocale): string {
+  return locale === "ko" ? value.ko : value.en;
 }
 
 export function normalizeCreatorRoleId(value: unknown): CreatorRoleId | null {
@@ -928,7 +921,6 @@ export function normalizePublicCreatorRoleProfile(
     ),
     experienceLevel: normalizeCreatorExperienceLevel(record.experienceLevel),
     collaborationStatus: normalizeCreatorCollaborationStatus(record.collaborationStatus),
-    roleAliases: [],
   };
 }
 
@@ -942,7 +934,6 @@ export function publicCreatorRoleProfile(value: unknown): PublicCreatorRoleProfi
     specialties: profile.specialties,
     experienceLevel: profile.experienceLevel,
     collaborationStatus: profile.collaborationStatus,
-    roleAliases: profile.roleAliases,
   };
 }
 

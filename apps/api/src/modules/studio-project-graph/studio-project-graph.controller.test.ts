@@ -51,9 +51,7 @@ const artifactInput = {
     title: "12화 원고",
     scope: {
       projectId: "project-1",
-      kind: "episode" as const,
-      id: "episode-12",
-      ancestors: [{ kind: "project" as const, id: "project-1" }],
+      episodeId: "episode-12",
     },
   },
   initialRevision: {

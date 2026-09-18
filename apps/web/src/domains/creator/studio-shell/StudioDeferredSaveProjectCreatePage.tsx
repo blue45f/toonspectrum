@@ -1,65 +1,23 @@
-import {
-  Box,
-  Clapperboard,
-  ClipboardCheck,
-  FileImage,
-  Images,
-  LayoutTemplate,
-  PanelsTopLeft,
-  PenTool,
-  Presentation,
-  RefreshCw,
-  ShieldCheck,
-  Sparkles,
-  type LucideIcon,
-} from "lucide-react";
+import { Box, Clapperboard, ClipboardCheck, FileImage, Images, LayoutTemplate, PanelsTopLeft, PenTool, Presentation, RefreshCw, ShieldCheck, Sparkles, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type ChangeEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual, useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { WorkflowTrustBadge } from "@/shared/components/WorkflowTrustBadge";
 import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
-import {
-  DEFAULT_WEBTOON_ONBOARDING_SELECTION,
-  WEBTOON_CADENCES,
-  WEBTOON_ONBOARDING_GOALS,
-  WEBTOON_STARTING_POINTS,
-  WEBTOON_TEAM_MODELS,
-  buildWebtoonOnboardingPlan,
-  createStudioWebtoonOnboardingProfile,
-  webtoonOnboardingProjectHref,
-  webtoonOnboardingSelectionFromSearchParams,
-  writeStudioWebtoonOnboardingProfile,
-  type WebtoonCadenceId,
-  type WebtoonOnboardingGoalId,
-  type WebtoonOnboardingSelection,
-  type WebtoonStartingPointId,
-  type WebtoonTeamModelId,
-} from "@/shared/lib/webtoon-production-onboarding";
+import { DEFAULT_WEBTOON_ONBOARDING_SELECTION, WEBTOON_CADENCES, WEBTOON_ONBOARDING_GOALS, WEBTOON_STARTING_POINTS, WEBTOON_TEAM_MODELS, buildWebtoonOnboardingPlan, createStudioWebtoonOnboardingProfile, webtoonOnboardingProjectHref, webtoonOnboardingSelectionFromSearchParams, writeStudioWebtoonOnboardingProfile, type WebtoonCadenceId, type WebtoonOnboardingGoalId, type WebtoonOnboardingSelection, type WebtoonStartingPointId, type WebtoonTeamModelId } from "@/shared/lib/webtoon-production-onboarding";
 
-import {
-  STUDIO_PROJECT_CREATE_KINDS,
-  STUDIO_PROJECT_CREATE_TEMPLATES,
-  type StudioProjectCreateKindOption,
-} from "../save-first/studio-project-create-options";
+import { STUDIO_PROJECT_CREATE_KINDS, STUDIO_PROJECT_CREATE_TEMPLATES, type StudioProjectCreateKindOption } from "../save-first/studio-project-create-options";
 import { ensureStudioSaveProfile } from "../save-first/studio-save-profile";
 import { createStudioProjectWithInitialDocument } from "../studio-project-creation";
 import type { StudioProjectKind } from "../studio-project-library-store";
-import {
-  DisabledReason,
-  RecoverableActionNotice,
-  StudioTaskFlow,
-  StudioTaskSummary,
-  type StudioTaskFlowStep,
-} from "./StudioTaskFlow";
+import { DisabledReason, RecoverableActionNotice, StudioTaskFlow, StudioTaskSummary, type StudioTaskFlowStep } from "./StudioTaskFlow";
 
-type Locale = string;
 
 const KIND_ICONS: Readonly<Record<StudioProjectKind, LucideIcon>> = {
   webtoon: PanelsTopLeft,
@@ -142,8 +100,10 @@ export function StudioDeferredSaveProjectCreatePage() {
   const bt = useBilingual("StudioDeferredSaveProjectCreatePage");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const l = useBilingualLocalizer("studioDeferredCreate");
   const language = useI18n((state) => state.lang);
-  const locale = language;
+  const legacyLocale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  const locale = legacyLocale;
   const requestedTemplateId = searchParams.get("template");
   const requestedWebtoonSelection = webtoonOnboardingSelectionFromSearchParams(searchParams);
   const requestedKindId = requestedProjectKind(searchParams.get("kind"), requestedTemplateId);
@@ -522,7 +482,7 @@ export function StudioDeferredSaveProjectCreatePage() {
           <div className="mt-7 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <StudioTaskSummary
               eyebrow={bt("시작할 작업", "Ready to start")}
-              title={`${title.trim() || (bt("이름 없는 프로젝트", "Untitled project"))} · ${projectTitle(selected, locale)}`}
+              title={`${title.trim() || (bt("이름 없는 프로젝트", "Untitled project"))} · ${projectTitle(selected, bt)}`}
               description={structuredWebtoonFlow
                 ? (bt(`${onboardingPlan.titleKo} · ${onboardingPlan.milestoneKo}`, `${onboardingPlan.titleEn} · ${onboardingPlan.milestoneEn}`))
                 : bt(`${selectedTemplateLabel} 템플릿을 적용하고 드로잉 도구로 시작합니다.`, `Apply the ${selectedTemplateLabel} template and open the drawing tool.`)}

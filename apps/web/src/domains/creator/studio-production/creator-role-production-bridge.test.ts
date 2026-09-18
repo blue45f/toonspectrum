@@ -45,7 +45,7 @@ describe("creator role to production role bridge", () => {
 
   it("derives recommendations for other team members from privacy-safe public profiles", () => {
     expect(publicCreatorProfileProductionRoleRecommendations({
-      version: 2,
+      version: 1,
       primaryRole: "background",
       secondaryRoles: ["reviewer"],
       specialties: ["background-3d", "quality-control"],

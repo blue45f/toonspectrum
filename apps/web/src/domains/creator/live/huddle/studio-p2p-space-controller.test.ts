@@ -71,7 +71,7 @@ describe("StudioP2pSpaceController", () => {
 
   it("throttles rapid pointer movement but flushes the final location", () => {
     let now = 1_000;
-    const send = vi.fn(() => true);
+    const send = vi.fn<StudioLiveDirectPort["send"]>(() => true);
     const port: StudioLiveDirectPort = {
       getPeers: () => [B],
       subscribe: () => () => undefined,
@@ -95,9 +95,9 @@ describe("StudioP2pSpaceController", () => {
 
   it("expires peers that leave the authenticated direct peer set", () => {
     let now = 0;
-    let tick: (() => void) | null = null;
+    let tick: () => void = () => undefined;
     let peers: StudioLiveParticipant[] = [B];
-    let inbound: ((sender: StudioLiveParticipant, raw: string) => void) | null = null;
+    let inbound: (sender: StudioLiveParticipant, raw: string) => void = () => undefined;
     const deps: StudioP2pSpaceDependencies = {
       id: () => "epoch-a",
       now: () => now,
@@ -112,13 +112,13 @@ describe("StudioP2pSpaceController", () => {
       getPeers: () => peers,
       subscribe: (listener) => {
         inbound = listener;
-        return () => { inbound = null; };
+        return () => { inbound = () => undefined; };
       },
       send: () => true,
     };
     const controller = new StudioP2pSpaceController(A, port, deps);
     controller.start();
-    inbound?.(B, JSON.stringify({
+    inbound(B, JSON.stringify({
       kind: "space-state",
       epoch: "epoch-b",
       sequence: 1,
@@ -131,7 +131,7 @@ describe("StudioP2pSpaceController", () => {
 
     peers = [];
     now += STUDIO_P2P_SPACE_HEARTBEAT_MS;
-    tick?.();
+    tick();
     expect(controller.snapshot().peers).toHaveLength(0);
 
     controller.close();
@@ -139,7 +139,7 @@ describe("StudioP2pSpaceController", () => {
 
   it("does not start a space session for viewers", () => {
     const subscribe = vi.fn(() => () => undefined);
-    const send = vi.fn(() => true);
+    const send = vi.fn<StudioLiveDirectPort["send"]>(() => true);
     const controller = new StudioP2pSpaceController(
       { ...A, role: "viewer" },
       { getPeers: () => [B], subscribe, send },

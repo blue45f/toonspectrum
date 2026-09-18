@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createProductionDemoProject } from "./production-demo";
 import { deriveProductionManagementOverview } from "./production-management-overview";
 import { ProductionRecoveryScenarioPanel } from "./ProductionRecoveryScenarioPanel";
+import type { ProductionClientCommand } from "./production-api";
 
 const NOW = new Date("2026-09-17T00:00:00.000Z");
 

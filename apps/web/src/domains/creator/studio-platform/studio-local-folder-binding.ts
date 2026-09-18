@@ -137,7 +137,7 @@ export function createBrowserStudioLocalFolderPort(
     scan: async () => Object.freeze(
       (await scanDirectory(root)).sort((left, right) => left.path.localeCompare(right.path)),
     ),
-    write: async (path, bytes) => {
+    write: async (path: string, bytes: Uint8Array) => {
       const segments = normalizeStudioRelativePath(path).split("/");
       const filename = segments.pop()!;
       let directory = root;
@@ -147,7 +147,7 @@ export function createBrowserStudioLocalFolderPort(
       const fileHandle = await directory.getFileHandle(filename, { create: true });
       const writable = await fileHandle.createWritable();
       try {
-        await writable.write(bytes);
+        await writable.write(Uint8Array.from(bytes));
         await writable.close();
       } catch (error) {
         await writable.abort();

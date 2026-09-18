@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 import { builtinAppDictionaries } from "./i18n-built-in-dictionaries";
 
@@ -205,6 +205,30 @@ export function applyDocumentLocale(lang: string) {
   document.documentElement.dir = getLocaleDirection(normalized);
 }
 
+const safeI18nStorage = {
+  getItem(name: string): string | null {
+    try {
+      return typeof window === "undefined" ? null : window.localStorage.getItem(name);
+    } catch {
+      return null;
+    }
+  },
+  setItem(name: string, value: string): void {
+    try {
+      if (typeof window !== "undefined") window.localStorage.setItem(name, value);
+    } catch {
+      // Keep language state in memory when browser storage is blocked or full.
+    }
+  },
+  removeItem(name: string): void {
+    try {
+      if (typeof window !== "undefined") window.localStorage.removeItem(name);
+    } catch {
+      // Browser storage is optional.
+    }
+  },
+};
+
 export const useI18n = create<I18nState>()(
   persist(
     (set) => ({
@@ -219,6 +243,7 @@ export const useI18n = create<I18nState>()(
     }),
     {
       name: "toonspectrum-lang",
+      storage: createJSONStorage(() => safeI18nStorage),
       onRehydrateStorage: () => (state) => {
         if (state) {
           const normalized = resolveSelectableLocale(state.lang || FALLBACK_LANG);

@@ -1,6 +1,4 @@
-import {
-  translateBilingualValueForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -9,44 +7,17 @@ import { useI18n } from "@/shared/lib/i18n";
 
 import { removeStudioSaveProfilesBulk } from "../save-first/studio-save-profile-bulk";
 import type { StudioSaveProfile } from "../save-first/studio-save-profile";
-import {
-  chooseStudioProjectPackageSaveTarget,
-  studioProjectPackageFileName,
-  writeStudioProjectPackageToTarget,
-} from "../save-first/studio-project-package";
+import { chooseStudioProjectPackageSaveTarget, studioProjectPackageFileName, writeStudioProjectPackageToTarget } from "../save-first/studio-project-package";
 import { buildStudioProjectPackageWithWorkspace } from "../save-first/studio-project-package-with-workspace";
 import { readStudioSubmissions } from "../save-first/studio-submission-store";
-import {
-  ensureInitialStudioProjectDocument,
-  readStudioProjectDocuments,
-  studioProjectDocumentStorageKey,
-} from "../studio-project-document-store";
+import { ensureInitialStudioProjectDocument, readStudioProjectDocuments, studioProjectDocumentStorageKey } from "../studio-project-document-store";
 import { removeStudioExactResumeContext } from "../studio-exact-resume-context";
 import { resolveStudioProjectResumeTarget } from "../studio-project-resume-target";
-import {
-  activateStudioProjectsBulk,
-  archiveStudioProjectsBulk,
-  permanentlyDeleteStudioProjectsBulk,
-  restoreStudioProjectsBulk,
-  trashStudioProjectsBulk,
-  type StudioProjectBulkMutationResult,
-} from "../studio-project-library-bulk";
+import { activateStudioProjectsBulk, archiveStudioProjectsBulk, permanentlyDeleteStudioProjectsBulk, restoreStudioProjectsBulk, trashStudioProjectsBulk, type StudioProjectBulkMutationResult } from "../studio-project-library-bulk";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-store";
-import {
-  resolveStudioProjectLibraryManagementView,
-  sortStudioProjectLibraryProjects,
-  studioProjectIsTemporaryWork,
-  studioProjectLibraryLocale,
-  studioProjectLibrarySearchText,
-  type StudioProjectLibrarySortMode,
-} from "./studio-project-library-management-model";
+import { resolveStudioProjectLibraryManagementView, sortStudioProjectLibraryProjects, studioProjectIsTemporaryWork, studioProjectLibraryLocale, studioProjectLibrarySearchText, type StudioProjectLibrarySortMode } from "./studio-project-library-management-model";
 import { useStudioProjectLibrary } from "./useStudioProjectLibrary";
 import { useStudioSaveProfiles } from "./useStudioSaveProfiles";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("useStudioProjectLibraryManagementController", ko, en);
@@ -316,7 +287,7 @@ export function useStudioProjectLibraryManagementController() {
         exact: false,
       };
     }
-    return resolveStudioProjectResumeTarget(window.localStorage, project, locale);
+    return resolveStudioProjectResumeTarget(window.localStorage, project, locale === "ko" ? "ko" : "en");
   };
   const continueProjectHref = (project: StudioProjectLibraryEntry): string => (
     projectResumeTarget(project).href

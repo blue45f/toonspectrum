@@ -1,10 +1,4 @@
-import {
-  formatI18nTemplate,
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, translateCurrentStaticSourceText, getActiveI18nLocale, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, BookOpen, CalendarDays, Compass, Images, Library, MessageCircle, PenTool, Search, Sparkles, Store } from "lucide-react";
 import { useId } from "react";
 import { useLocation } from "react-router-dom";
@@ -15,11 +9,6 @@ import { useSiteExperience } from "./site-experience-context";
 import { EXPERIENCE_DESTINATIONS, nextExperienceDestinations } from "./site-experience-model";
 import Link from "@/compat/router-link";
 
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("SiteNextSteps", ko, en);
@@ -31,7 +20,7 @@ export function SiteNextSteps() {
   useBilingualI18nRevision();
   const { pathname } = useLocation();
 
-  const locale = getActiveI18nLocale();
+  const locale = getActiveI18nLocale() === "ko" ? "ko" : "en";
   const headingId = useId();
   const settings = useSiteExperience();
   const destinations = nextExperienceDestinations(pathname);

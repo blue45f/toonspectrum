@@ -1,20 +1,11 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { Compass, Search, Sparkles, type LucideIcon } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 import Link from "@/compat/router-link";
-import {
-  catalogDiscoveryHref,
-  type CatalogDiscoveryMode,
-} from "@/shared/lib/catalog-discovery-state";
+import { catalogDiscoveryHref, type CatalogDiscoveryMode } from "@/shared/lib/catalog-discovery-state";
 
 import { cn } from "@/shared/lib/utils";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("discovery-workspace-nav", ko, en);
@@ -83,7 +74,7 @@ export function DiscoveryWorkspaceNav({
             <Link
               key={destination.id}
               href={catalogDiscoveryHref(destination.id, params)}
-              aria-current={active ? translateCurrentStaticSourceText("shared.components.discovery.workspace.nav", "en", "page") : undefined}
+              aria-current={active ? "page" : undefined}
               className={cn(
                 "group flex min-h-16 min-w-0 items-center gap-3 rounded-2xl border px-3 py-2.5 transition-[border-color,background-color,transform]",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",

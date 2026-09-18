@@ -1,9 +1,4 @@
-import {
-  formatI18nTemplate,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowDown, ArrowRight, Box, Brush, Check, Layers, LayoutGrid, MousePointer2, Play, Plus, Square, Type } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -17,10 +12,6 @@ import "./creator-home-spacing.css";
 
 import { useI18n } from "@/shared/lib/i18n";
 import Link from "@/compat/router-link";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("CreatorHomePage", ko, en);
@@ -151,7 +142,7 @@ export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; loca
       {mode === "error" && <p className="ch-film-error" role="alert">{copy.filmError} <button type="button" onClick={() => playAt(0, true)}>{copy.retry}</button></p>}
       <div className="ch-film-chapters" aria-label={copy.filmLabel}>
         {CREATOR_FILM.chapters.map((seconds, index) => (
-          <button type="button" key={seconds} onClick={() => playAt(seconds)} aria-controls={mode === "playing" ? translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "creator-brand-video") : undefined} aria-current={mode === "playing" && activeChapter === index ? translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "step") : undefined}>
+          <button type="button" key={seconds} onClick={() => playAt(seconds)} aria-controls={mode === "playing" ? "creator-brand-video" : undefined} aria-current={mode === "playing" && activeChapter === index ? "step" : undefined}>
             <span>00:{String(seconds).padStart(2, "0")}</span>{copy.chapterLabels[index]}
           </button>
         ))}

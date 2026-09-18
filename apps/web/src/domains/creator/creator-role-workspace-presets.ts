@@ -64,6 +64,11 @@ const ROLE_WORKSPACE_PRESETS: Readonly<
     operationalLens: "background",
     reason: "포즈·카메라·공간 구성을 먼저 엽니다.",
   },
+  educator: {
+    workspaceId: "storyboard",
+    operationalLens: "planning",
+    reason: "교육용 예제와 제작 단계를 함께 설명하기 좋은 작업공간을 엽니다.",
+  },
   assistant: {
     workspaceId: "lineart",
     operationalLens: "drawing",

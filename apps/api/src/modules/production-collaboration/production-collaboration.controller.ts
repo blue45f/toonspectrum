@@ -125,8 +125,13 @@ export class ProductionCollaborationController {
     params: ProductionExternalReviewParamsDto,
     @Query(new ZodValidationPipe(ProductionExternalReviewQueryDto))
     query: ProductionExternalReviewQueryDto,
+    @Headers("authorization") authorization?: string,
   ) {
-    return this.service.getExternalReview(params.projectId, params.reviewId, query.token);
+    return this.service.getExternalReview(
+      params.projectId,
+      params.reviewId,
+      externalReviewToken(authorization, query.token),
+    );
   }
 
   @Post("/public-reviews/:projectId/:reviewId/responses")

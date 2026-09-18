@@ -1,27 +1,11 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText, useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { FileText, FileUp, Lightbulb, PlayCircle, UsersRound } from "lucide-react";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { WorkflowTrustBadge } from "@/shared/components/WorkflowTrustBadge";
 
-import {
-  StudioIntentLauncher,
-  StudioTaskFlow,
-  type StudioIntentAction,
-  type StudioTaskFlowStep,
-} from "./StudioTaskFlow";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { StudioIntentLauncher, StudioTaskFlow, type StudioIntentAction, type StudioTaskFlowStep } from "./StudioTaskFlow";
 
-const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
-  translateBilingualValueForActiveLocale("StudioProjectStartPanel", ko, en);
-
-export type StudioProjectStartLocale = string;
+export type StudioProjectStartLocale = "ko" | "en";
 
 function projectStartActions(bt: (ko: string, en: string) => string): readonly StudioIntentAction[] {
   return [

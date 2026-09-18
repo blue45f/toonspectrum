@@ -1,3 +1,4 @@
+import type { StudioMarketplaceImageAsset } from "./studio-marketplace-assets";
 import {
   formatI18nTemplate,
   translateCurrentStaticSourceText,
@@ -129,6 +130,12 @@ import {
 } from "@/infrastructure/creator-marketplace-client";
 import { NotFoundError } from "@/infrastructure/use-api-resource";
 
+
+function marketplaceImageAssetName(asset: StudioMarketplaceImageAsset): string {
+  if ("name" in asset && typeof asset.name === "string") return asset.name;
+  if ("title" in asset && typeof asset.title === "string") return asset.title;
+  return asset.id;
+}
 
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-panel";
@@ -936,15 +943,15 @@ function CommunityRecordCard({
         inserted
           ? tText(
             t,
-            `${selectedAsset.name}을(를) 현재 캔버스 위치에 삽입했습니다.`,
+            `${marketplaceImageAssetName(selectedAsset)}을(를) 현재 캔버스 위치에 삽입했습니다.`,
             "studio.community.useAsset.success",
-            { resourceName: selectedAsset.name },
+            { resourceName: marketplaceImageAssetName(selectedAsset) },
           )
           : tText(
             t,
-            `${selectedAsset.name}을(를) 삽입하지 못했습니다. 캔버스 잠금과 저장 상태를 확인해주세요.`,
+            `${marketplaceImageAssetName(selectedAsset)}을(를) 삽입하지 못했습니다. 캔버스 잠금과 저장 상태를 확인해주세요.`,
             "studio.community.useAsset.failed",
-            { resourceName: selectedAsset.name },
+            { resourceName: marketplaceImageAssetName(selectedAsset) },
           ),
         !inserted,
       );
@@ -1099,7 +1106,7 @@ function CommunityRecordCard({
             className={CONTROL}
           >
             {assetProjection.assets.map((asset) => (
-              <option key={asset.id} value={asset.id}>{asset.name}</option>
+              <option key={asset.id} value={asset.id}>{marketplaceImageAssetName(asset)}</option>
             ))}
           </select>
           <button

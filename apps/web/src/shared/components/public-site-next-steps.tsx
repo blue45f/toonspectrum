@@ -1,7 +1,4 @@
-import {
-  resolveUiLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { getActiveI18nLocale, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useId } from "react";
 
@@ -14,11 +11,6 @@ import Link from "@/compat/router-link";
 
 
 import "./public-site-vibrance.css";
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("public-site-next-steps", ko, en);
@@ -63,7 +55,7 @@ export function PublicSiteAtelierJourney({ pathname }: { pathname: string }) {
   useBilingualI18nRevision();
 
   if (pathname === "/" || !isPublicCreativeRoute(pathname)) return null;
-  const locale = getActiveI18nLocale();
+  const locale = getActiveI18nLocale() === "ko" ? "ko" : "en";
   return <>
     <div className="public-site-atelier"><SiteAtelierChapter pathname={pathname} locale={locale} /></div>
     <PublicSiteNextSteps pathname={pathname} />

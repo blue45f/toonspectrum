@@ -21,6 +21,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import { useAtelierMotion } from "./site-experience/use-atelier-motion";
+import { useT } from "@/shared/lib/i18n";
 
 import type { SiteRouteExperience } from "@/shared/lib/site-route-experience";
 import type {
@@ -30,7 +31,9 @@ import type {
 
 import "./route-purpose-scene.css";
 
-type Locale = "ko" | "en";
+function toBilingualLocale(locale: string): "ko" | "en" {
+  return locale.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+}
 
 const ICONS: Record<SiteRouteVisualKind, LucideIcon> = {
   workflow: Workflow,
@@ -72,7 +75,7 @@ function responsiveAtelierSrcSet(image: string): string | undefined {
 
 interface RoutePurposeSceneProps {
   readonly title: string;
-  readonly locale: Locale;
+  readonly locale: string;
   readonly experience: SiteRouteExperience;
   readonly profile: SiteRouteVisualProfile;
 }
@@ -87,15 +90,17 @@ export function RoutePurposeScene({
   experience,
   profile,
 }: RoutePurposeSceneProps) {
+  const copyLocale: "ko" | "en" = toBilingualLocale(locale) === "ko" ? "ko" : "en";
+  const t = useT();
   const Icon = ICONS[profile.kind];
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
   const { hostRef, motionAllowed, paused, running, setPaused } = useAtelierMotion();
-  const context = CONTEXT_LABELS[experience.contextLevel][locale];
-  const mobile = MOBILE_LABELS[experience.mobilePolicy][locale];
-  const purpose = experience.pagePurpose[locale];
-  const action = experience.primaryAction?.[locale] ?? null;
+  const context = CONTEXT_LABELS[experience.contextLevel][copyLocale];
+  const mobile = MOBILE_LABELS[experience.mobilePolicy][copyLocale];
+  const purpose = t(experience.pagePurpose);
+  const action = experience.primaryAction ? t(experience.primaryAction) : null;
   const imageSrcSet = responsiveAtelierSrcSet(profile.image);
   const videoEnabled = Boolean(profile.video) && motionAllowed && !videoFailed;
 
@@ -158,19 +163,19 @@ export function RoutePurposeScene({
         data-route-visual-kind={profile.kind}
         data-route-visual-motion={profile.motion}
         data-route-visual-running={running ? "true" : "false"}
-        aria-label={locale === "ko" ? `${title} 화면 안내` : `${title} page guide`}
+        aria-label={copyLocale === "ko" ? `${title} 화면 안내` : `${title} page guide`}
       >
         <div className="route-purpose-scene__copy">
           <p className="route-purpose-scene__eyebrow">
             <Sparkles size={14} aria-hidden="true" />
-            {profile.eyebrow[locale]}
+            {profile.eyebrow[copyLocale]}
           </p>
           <h2>{title}</h2>
           <p className="route-purpose-scene__purpose">{purpose}</p>
-          <div className="route-purpose-scene__meta" aria-label={locale === "ko" ? "페이지 사용 범위" : "Page scope"}>
+          <div className="route-purpose-scene__meta" aria-label={copyLocale === "ko" ? "페이지 사용 범위" : "Page scope"}>
             <span>{context}</span>
             <span>{mobile}</span>
-            {action ? <strong>{locale === "ko" ? "다음: " : "Next: "}{action}</strong> : null}
+            {action ? <strong>{copyLocale === "ko" ? "다음: " : "Next: "}{action}</strong> : null}
           </div>
         </div>
 
@@ -214,7 +219,7 @@ export function RoutePurposeScene({
             {profile.layers.map((layer, index) => (
               <span className="route-purpose-scene__card" data-card={index + 1} key={layer.en}>
                 <i />
-                <b>{layer[locale]}</b>
+                <b>{layer[copyLocale]}</b>
               </span>
             ))}
           </div>
@@ -227,17 +232,17 @@ export function RoutePurposeScene({
             className="route-purpose-scene__motion-toggle"
             aria-pressed={paused}
             aria-label={paused
-              ? locale === "ko" ? "페이지 모션 재생" : "Play page motion"
-              : locale === "ko" ? "페이지 모션 일시정지" : "Pause page motion"}
+              ? copyLocale === "ko" ? "페이지 모션 재생" : "Play page motion"
+              : copyLocale === "ko" ? "페이지 모션 일시정지" : "Pause page motion"}
             onClick={() => setPaused(!paused)}
             title={paused
-              ? locale === "ko" ? "페이지 모션 재생" : "Play page motion"
-              : locale === "ko" ? "페이지 모션 일시정지" : "Pause page motion"}
+              ? copyLocale === "ko" ? "페이지 모션 재생" : "Play page motion"
+              : copyLocale === "ko" ? "페이지 모션 일시정지" : "Pause page motion"}
           >
             {paused ? <Play size={15} aria-hidden="true" /> : <Pause size={15} aria-hidden="true" />}
             <span>{paused
-              ? locale === "ko" ? "재생" : "Play"
-              : locale === "ko" ? "정지" : "Pause"}</span>
+              ? copyLocale === "ko" ? "재생" : "Play"
+              : copyLocale === "ko" ? "정지" : "Pause"}</span>
           </button>
         ) : null}
       </section>
