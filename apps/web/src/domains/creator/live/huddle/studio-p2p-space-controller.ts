@@ -252,9 +252,11 @@ export class StudioP2pSpaceController {
 
   close(): void {
     if (this.closed) return;
-    const raw = JSON.stringify({ kind: "space-left", epoch: this.epoch } satisfies StudioP2pSpacePacket);
-    for (const peer of this.port.getPeers()) {
-      if (peer.role !== "viewer" && peer.sessionId !== this.self.sessionId) this.port.send(peer.sessionId, raw);
+    if (this.unsubscribe && this.self.role !== "viewer") {
+      const raw = JSON.stringify({ kind: "space-left", epoch: this.epoch } satisfies StudioP2pSpacePacket);
+      for (const peer of this.port.getPeers()) {
+        if (peer.role !== "viewer" && peer.sessionId !== this.self.sessionId) this.port.send(peer.sessionId, raw);
+      }
     }
     this.closed = true;
     if (this.timer !== null) (this.deps.clearInterval ?? clearInterval)(this.timer);
