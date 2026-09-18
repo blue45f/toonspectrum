@@ -269,7 +269,7 @@ export class MembershipWalletService {
       ),
       dbPool.query(
         `SELECT "creatorLevel", "trustLevel", "sellerLevel",
-                "trustScore", "updatedAt"
+                "trustScore", "updatedBy", "updatedAt"
          FROM member_level WHERE "userId" = $1`,
         [userId],
       ),
