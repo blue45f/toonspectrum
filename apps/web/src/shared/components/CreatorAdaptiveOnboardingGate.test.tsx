@@ -87,6 +87,9 @@ describe("CreatorAdaptiveOnboardingGate", () => {
     fireEvent.click(screen.getByRole("button", { name: "스토리·대본 집필" }));
     fireEvent.click(screen.getByRole("button", { name: "다음" }));
 
+    fireEvent.click(screen.getByRole("button", { name: /함께 작업해요/ }));
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+
     fireEvent.click(screen.getByRole("button", { name: /Production/ }));
     fireEvent.click(screen.getByRole("button", { name: "다음" }));
     fireEvent.click(screen.getByRole("button", { name: "이 작업실로 시작" }));
@@ -103,6 +106,7 @@ describe("CreatorAdaptiveOnboardingGate", () => {
     expect(mocks.saveWorkspace).toHaveBeenCalledWith(expect.objectContaining({
       activeRole: "story",
       usageGoals: ["story-writing"],
+      collaborationMode: "team",
       workspaceMode: "production",
       onboardingComplete: true,
     }));
