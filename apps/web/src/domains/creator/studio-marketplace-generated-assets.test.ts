@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { CREATOR_MARKETPLACE_GPT25_STARTER_RECORDS } from "@/shared/lib/creator-marketplace-gpt25-starter.generated";
+
 import { GENERATED_GPT25_ASSET_METADATA } from "./studio-2d-generated-backgrounds";
 import {
   createStudioMarketplaceImageRecord,
@@ -19,6 +21,14 @@ describe("reviewed GPT25 marketplace assets", () => {
       expect(findStudioMarketplaceImageAsset(`gpt25/${asset.id}`)).toBe(asset);
     }
     expect(findStudioMarketplaceImageAsset("gpt25/not-registered")).toBeNull();
+
+    const runtimeRefs = CREATOR_MARKETPLACE_GPT25_STARTER_RECORDS.map((record) => {
+      const [entry] = record.entries;
+      return entry?.delivery.mode === "builtin-ref" ? entry.delivery.runtimeRef : null;
+    });
+    expect(runtimeRefs).toEqual(
+      GENERATED_GPT25_ASSET_METADATA.map((asset) => `studio-asset:gpt25/${asset.id}`),
+    );
   });
 
   it("verifies bytes, sha256 and decoded dimensions before returning an insertable Studio asset", async () => {

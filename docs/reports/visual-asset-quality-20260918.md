@@ -119,5 +119,5 @@ The 20 legacy portrait webtoon backgrounds remain the only material image-qualit
 - 검수 완료 GPT25 배경 20종은 `studio-asset:gpt25/*` 신뢰 네임스페이스로 공식 마켓에 노출한다. 카드 미리보기뿐 아니라 실제 삽입 시 로컬 allowlist, 파일 크기, SHA-256, PNG 헤더, 디코드 해상도까지 재검증한다.
 - 마켓 레코드는 `containsAi: true`, `toonspectrum-standard`, first-party provenance로 명시한다. Studio 저장 레코드도 `sourceKind: ai-generated`와 AI 배지를 유지한다.
 - 완성 장면 성격이 강한 8종은 Creator Ecosystem의 “검수 완료 샘플 일러스트”로 재활용한다. 원본을 복제한 별도 파일을 만들지 않고 동일 검수 원본을 lazy-load하며, 해당 마켓 배경 검색으로 연결한다.
-- CC0 대규모 묶음은 기존 23장 review sheet와 개별 curation 상태를 유지한다. assembly-component/quarantine/mobile-budget 제외 항목을 단순 수량 확대 목적으로 승격하지 않는다.
+- CC0 대규모 묶음의 23장 contact sheet는 시각 QA 시 스테이징 출력에서 재생성할 수 있으므로 tracked/public에서는 제거한다(23파일, 약 4.3MB). 개별 curation 상태와 원본 preview는 유지하며 assembly-component/quarantine/mobile-budget 제외 항목을 단순 수량 확대 목적으로 승격하지 않는다.
 
