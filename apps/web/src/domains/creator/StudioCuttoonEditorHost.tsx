@@ -18539,6 +18539,7 @@ No text, logo, watermark, or copyrighted character.`;
         nodeEditTool,
         nudgeSelected,
         openPixelSelectionTransform,
+        openStudioQuickActionsAtCanvasPointer,
         openSelectedLayerCrop,
         openStudioFilter,
         panelSplitActive,
@@ -26117,6 +26118,26 @@ function clearSelectionForEdit() {
       openPixelSelectionTransform();
     }
   }
+  function openStudioQuickActionsAt(anchor: { x: number; y: number }): void {
+    setQuickActionsAnchor(anchor);
+    setMobileSheet(null);
+    setMenu(null);
+    setColorWheelOpen(false);
+    setQuickAccessPaletteOpen(false);
+    setQuickActionsOpen(true);
+  }
+
+  function openStudioQuickActionsAtCanvasPointer(): void {
+    const stage = stageRef.current;
+    const pointer = stage?.getPointerPosition();
+    const rect = stage?.container().getBoundingClientRect();
+    openStudioQuickActionsAt(
+      pointer && rect
+        ? { x: rect.left + pointer.x, y: rect.top + pointer.y }
+        : { x: globalThis.innerWidth / 2, y: globalThis.innerHeight / 2 }
+    );
+  }
+
   // 모바일 한 손 모드에서 퀵 메뉴 트리거 자체를 DOM 순서로 좌/우 끝에 옮긴다.
   // flex-row-reverse를 쓰지 않아 보이는 순서와 키보드/스위치 제어 순서가 항상 일치한다.
   // useMemo: 모바일 독 memo 자식 prop 안정성 — 클로저가 stable setter만 사용한다.
@@ -26125,15 +26146,11 @@ function clearSelectionForEdit() {
       type="button"
       onClick={(event) => {
         const rect = event.currentTarget.getBoundingClientRect();
-        setQuickActionsAnchor({
+        openStudioQuickActionsAt({
           // 트리거가 좌우 끝으로 이동해도 방사형 메뉴는 화면 중앙 기준으로 열어 모든 슬롯을 안전 영역에 둔다.
           x: globalThis.innerWidth / 2,
           y: rect.top + rect.height / 2,
         });
-        setMobileSheet(null);
-        setMenu(null);
-        setColorWheelOpen(false);
-        setQuickActionsOpen(true);
       }}
       aria-haspopup="menu"
       aria-expanded={quickActionsOpen}
@@ -28243,33 +28260,11 @@ function clearSelectionForEdit() {
     pixelTool !== null ||
     smudgeActive ||
     wetMixActive;
-  /**
-   * 선택 옵션 줄은 "선택 도구가 켜져 있는 동안" 항상 같은 높이를 차지한다.
-   * 예전에는 선택이 생기는 순간에만 44px 스트립이 flow 로 끼어들어 툴 레일·페이지
-   * 패널·캔버스·인스펙터가 통째로 아래로 밀렸다(브라우저 실측: 선택할 때마다 캔버스
-   * 원점이 95px 이동, 그중 44px 이 이 스트립). Photoshop/CSP 처럼 도구 옵션 줄을
-   * 상시 유지해 선택 상태가 캔버스 기하를 건드리지 못하게 한다.
-   */
-  const selectOptionsStripArmed = tool === "select" && !canvasOnlyMode && !selectionOptionsSuppressed;
-  /**
-   * ...그리고 그 줄은 "도구와 무관하게" 항상 같은 높이를 차지한다. 도구를 select 로 바꾸는
-   * 순간에만 스트립이 flow 에 들어오면, 선택이 아니라 도구 전환이 캔버스 기하를 바꾼다
-   * (브라우저 실측: 펜 y=121/h=599 ↔ 선택 y=165/h=555 — 전환 1회마다 원점 44px 이동).
-   * 픽셀 도구·크롭·리퀴파이처럼 selectionOptionsSuppressed 를 켜는 무장도 같은 점프를
-   * 만들었으므로, 레인 예약은 그 조건들과도 분리한다. 오버레이로 띄우지 않는 이유는 선택
-   * 명령 레인과 동일하다 — absolute 로 겹치면 흰 원고 위를 덮는다.
-   */
-  /**
-   * ...단, 그 예약이 값을 하는 곳은 **데스크톱뿐이다.** 360px 모바일에서 이 44px 은 그대로
-   * 그리기 면적 손실인데, 정작 레인이 주는 복제·앞뒤·삭제·잠금·대사 편집은 요소를 고르는
-   * 순간 뜨는 플로팅 "선택 항목 빠른 작업" 바가 이미 엄지 영역에 제공한다. 그래서 모바일은
-   * 레인을 **예약도 렌더도 하지 않는다**(선택 명령 레인도 같은 이유로 함께 빠진다).
-   *
-   * 조건이 선택 상태가 아니라 뷰포트라는 점이 이 분기의 안전장치다 — 모바일에서는 선택 유무와
-   * 무관하게 항상 없으므로 "선택 시 레이아웃 이동 0px" 불변식이 그대로 성립한다.
-   */
+  // Selection replaces the drawing context in the fixed bottom lane. Keep the model desktop-only
+  // because mobile already owns selection actions in its thumb editing dock.
+  const selectOptionsStripArmed =
+    tool === "select" && !canvasOnlyMode && !selectionOptionsSuppressed;
   const selectionLaneMounted = !isMobile;
-  const selectOptionsLaneReserved = !canvasOnlyMode && selectionLaneMounted;
 
   const studioOptionsBarsSelectionModel = useMemo<StudioOptionsBarsSelectionModel>(() => {
     const count = marqueeIds.length > 0 ? marqueeIds.length : selectedId ? 1 : 0;
@@ -29114,8 +29109,6 @@ function clearSelectionForEdit() {
       scrollPos={scrollPos}
       scrollPreviewOpen={scrollPreviewOpen}
       scrollViewportStore={scrollViewportStore}
-      selectOptionsLaneReserved={selectOptionsLaneReserved}
-      selectOptionsStripArmed={selectOptionsStripArmed}
       selected={selected}
       selectedBg3dEditSource={selectedBg3dEditSource}
       selectedBubbleTailGeometry={selectedBubbleTailGeometry}

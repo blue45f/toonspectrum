@@ -1,7 +1,6 @@
 import { memo, Suspense } from "react";
 
 import { DRAW_COLOR_SWATCHES } from "./brush/studio-draw-color-swatches";
-import { StudioDrawingInputDeck } from "./brush/StudioDrawingInputDeck";
 import {
   StudioDrawOptionsBar,
   StudioSelectOptionsBar,
@@ -152,14 +151,14 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
   stableHandlers,
 }: StudioOptionsBarsProps) {
   const isMobile = useIsMobile();
-  const drawingInputDeckVisible =
-    draw.drawMode === "pen" || draw.drawMode === "eraser";
+  const selectionVisible = selection.visible && selection.count > 0;
+  const drawVisible = draw.visible && !selectionVisible;
 
   return (
     <>
-      {draw.visible ? (
-        // The dock is fixed and consumes no document flow. A non-null fallback shifts the canvas
-        // when the lazy chunk resolves, which can make a just-finished stroke appear to jump.
+      {drawVisible ? (
+        // One persistent context surface at a time. Selection replaces drawing instead of stacking
+        // a second strip over the canvas.
         <Suspense fallback={null}>
           <StudioDrawOptionsBar
             key={draw.drawMode}
@@ -209,9 +208,7 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
             onToggleQuickShape={stableHandlers.toggleQuickShape}
             onSetDrawMode={stableHandlers.setDrawMode}
             shapeKind={draw.drawShape}
-            onShapeKindChange={(kind) =>
-              stableHandlers.setDrawShape(kind as DrawShapeKind)
-            }
+            onShapeKindChange={(kind) => stableHandlers.setDrawShape(kind as DrawShapeKind)}
             shapeFill={draw.shapeFill}
             onShapeFillChange={stableHandlers.setShapeFill}
             onRecallBrushSlot={stableHandlers.recallBrushSlot}
@@ -230,8 +227,7 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
                 ? undefined
                 : {
                     ...draw.livingInk,
-                    onPhysicalModeEnabledChange:
-                      stableHandlers.setLivingInkPhysicalModeEnabled,
+                    onPhysicalModeEnabledChange: stableHandlers.setLivingInkPhysicalModeEnabled,
                     onModeChange: stableHandlers.setLivingInkMode,
                     onScopeChange: stableHandlers.setLivingInkScope,
                     onFix: stableHandlers.applyLivingInkFix,
@@ -240,41 +236,14 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
                   }
             }
           />
-          {drawingInputDeckVisible ? (
-            <StudioDrawingInputDeck
-              brushLabel={draw.activeCatalogBrushName ?? draw.brushId}
-              mobile={isMobile}
-              dockInsets={draw.dockInsets}
-              stabilizer={draw.stabilizer}
-              stabilizerMode={draw.stabilizerMode}
-              postCorrection={draw.postCorrection}
-              pressureCurveId={draw.pressureCurveId}
-              stampTuning={draw.stampTuning}
-              onStabilizerChange={stableHandlers.setStabilizer}
-              onStabilizerModeChange={stableHandlers.setStabilizerMode}
-              onPostCorrectionChange={stableHandlers.setPostCorrection}
-              onPressureCurveChange={stableHandlers.setPressureCurvePreset}
-              onStampTuningChange={stableHandlers.setStampTuning}
-              onOpenBrushStudio={stableHandlers.openBrushStudio}
-            />
-          ) : null}
         </Suspense>
       ) : null}
 
-      {selection.visible ? (
-        // `null` fallback would collapse the 44px bar lane for the one frame the lazy chunk
-        // takes to resolve, so the canvas below drops and springs back — the second half of the
-        // measured two-step selection shift. The placeholder holds the exact bar geometry.
-        <Suspense
-          fallback={
-            <div
-              aria-hidden="true"
-              data-studio-select-options-pending="true"
-              className="relative z-[40] h-11 min-h-11 shrink-0 border-b border-line"
-            />
-          }
-        >
+      {selectionVisible ? (
+        <Suspense fallback={null}>
           <StudioSelectOptionsBar
+            docked
+            dockInsets={draw.dockInsets}
             selectionCount={selection.count}
             selectionLabel={selection.label}
             locked={selection.locked}
@@ -283,21 +252,9 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
             onBringFront={() => stableHandlers.reorderSelection("front")}
             onSendBack={() => stableHandlers.reorderSelection("back")}
             textEditLabel={selection.textEditLabel}
-            onEditText={
-              selection.textEditLabel
-                ? stableHandlers.editSelectionText
-                : undefined
-            }
-            onFitBubble={
-              selection.canFitBubble
-                ? stableHandlers.fitSelectionBubble
-                : undefined
-            }
-            onToggleLock={
-              selection.canToggleLock
-                ? stableHandlers.toggleSelectedLock
-                : undefined
-            }
+            onEditText={selection.textEditLabel ? stableHandlers.editSelectionText : undefined}
+            onFitBubble={selection.canFitBubble ? stableHandlers.fitSelectionBubble : undefined}
+            onToggleLock={selection.canToggleLock ? stableHandlers.toggleSelectedLock : undefined}
           />
         </Suspense>
       ) : null}

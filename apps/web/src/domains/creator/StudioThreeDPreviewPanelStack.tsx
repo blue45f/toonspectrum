@@ -465,17 +465,15 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   return (
     <>
       <Suspense fallback={null}>
-        {isMobile ? (
-          <StudioQuickActionsMenu
-            open={quickActionsOpen}
-            anchor={quickActionsAnchor}
-            preferences={quickActionsPreferences}
-            disabledActions={[...quickActionsDisabledActions]}
-            onExecute={executeQuickAction}
-            onPreferencesChange={setQuickActionsPreferences}
-            onClose={() => setQuickActionsOpen(false)}
-          />
-        ) : null}
+        <StudioQuickActionsMenu
+          open={quickActionsOpen}
+          anchor={quickActionsAnchor}
+          preferences={quickActionsPreferences}
+          disabledActions={[...quickActionsDisabledActions]}
+          onExecute={executeQuickAction}
+          onPreferencesChange={setQuickActionsPreferences}
+          onClose={() => setQuickActionsOpen(false)}
+        />
       </Suspense>
 
       <Suspense fallback={<PoserLoadingOverlay />}>

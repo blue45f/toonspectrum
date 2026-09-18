@@ -190,8 +190,6 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
     sceneTemplates,
     sceneTemplatesError,
     sceneTemplatesLoading,
-    selectOptionsLaneReserved,
-    selectOptionsStripArmed,
     selectedForInspector,
     serverAiProvider,
     serverAiStatus,
@@ -713,27 +711,6 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
         ) : null}
       </div>
 
-      {/*
-        선택 옵션 줄의 자리를 미리 확보한다 — 선택이 생겨도 스트립이 새로 flow 에
-        끼어들지 않으므로 캔버스 원점이 0px 이동한다. 빈 줄로 두면 고장처럼 보여서
-        같은 높이의 안내 줄을 세워 둔다(오버레이가 아니라 예약이라 캔버스를 가리지도
-        않는다).
-      */}
-      {selectOptionsLaneReserved && !studioOptionsBarsSelectionModel.visible ? (
-        <div
-          data-studio-select-options-reserve="true"
-          data-studio-select-options-armed={selectOptionsStripArmed ? "true" : "false"}
-          data-studio-icon-first="true"
-          className="relative z-[40] flex h-11 min-h-11 shrink-0 items-center gap-1.5 overflow-hidden border-b border-line bg-panel/70 px-2.5 text-[0.7rem] text-fg-3"
-        >
-          <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-line" />
-          <span className="truncate">
-            {selectOptionsStripArmed
-              ? "요소를 클릭하면 선택 옵션이 여기에 표시됩니다 · 드래그로 여러 개 선택"
-              : "선택 도구(V)로 요소를 고르면 복제·정렬·잠금 옵션이 여기에 표시됩니다"}
-          </span>
-        </div>
-      ) : null}
       <StudioOptionsBars
         draw={studioOptionsBarsDrawModel}
         selection={studioOptionsBarsSelectionModel}

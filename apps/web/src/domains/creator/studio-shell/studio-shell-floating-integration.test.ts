@@ -21,8 +21,9 @@ describe("studio shell floating integration", () => {
       .toContain("data-studio-shell-force-visible");
     expect(source("brush/StudioDrawOptionsBar.tsx"))
       .toContain('data-studio-draw-options-dock={docked ? "true" : undefined}');
-    expect(source("brush/StudioDrawingInputDeck.tsx"))
-      .toContain('data-studio-drawing-input-deck-trigger="true"');
+    // Device calibration remains available as a dedicated panel, but it is no longer a permanent
+    // canvas launcher. Drawing and selection share the canonical bottom context surface instead.
+    expect(source("StudioOptionsBars.tsx")).not.toContain("StudioDrawingInputDeck");
     expect(source("brush/StudioDrawingInputDeckPanel.tsx"))
       .toContain('data-studio-drawing-input-deck-panel="true"');
     expect(source("offline/StudioOfflinePanel.tsx"))

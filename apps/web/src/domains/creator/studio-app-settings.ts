@@ -87,15 +87,16 @@ export const DEFAULT_STUDIO_RAIL_TOOL_ORDER: StudioRailToolId[] = STUDIO_RAIL_TO
  * Persisted users keep their own `visibleIds`; this list is only the fallback for new/invalid state.
  */
 export const DEFAULT_STUDIO_RAIL_VISIBLE_IDS = [
+  // Eight calm first-run families: pointer · draw · erase · paint · select · shape · text · assets.
+  // Every specialized tool remains available from More and the toolbar customizer.
   "select",
   "pen",
   "eraser",
   "fill",
-  "eyedropper",
+  "marquee-rect",
+  "smart-shape",
   "text",
-  "bubble",
   "image",
-  "zoom-fit",
 ] as const satisfies readonly StudioRailToolId[];
 
 /** Customizable shortcut action ids (subset wired in StudioPage). */
@@ -126,6 +127,7 @@ export const STUDIO_SHORTCUT_ACTIONS = [
   { id: "deselect-pixels", label: "선택 해제", labelKey: "studio.settings.shortcut.deselectPixels", defaultKeys: "Mod+D" },
   { id: "invert-pixels", label: "픽셀 선택 반전", labelKey: "studio.settings.shortcut.invertPixels", defaultKeys: "Mod+Shift+I" },
   { id: "toggle-chrome", label: "캔버스만 보기", labelKey: "studio.settings.shortcut.toggleCanvas", defaultKeys: "`" },
+  { id: "quick-hud", label: "캔버스 퀵 HUD", labelKey: "studio.settings.shortcut.quickHud", defaultKeys: "Shift+Space" },
   { id: "swap-colors", label: "주·보조 색 교체", labelKey: "studio.settings.shortcut.swapColors", defaultKeys: "X" },
   { id: "brush-smaller", label: "브러시 작게", labelKey: "studio.settings.shortcut.brushSmaller", defaultKeys: "[" },
   { id: "brush-larger", label: "브러시 크게", labelKey: "studio.settings.shortcut.brushLarger", defaultKeys: "]" },
