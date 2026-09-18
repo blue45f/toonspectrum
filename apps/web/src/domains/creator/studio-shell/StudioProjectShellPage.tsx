@@ -342,7 +342,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
               <Link
                 key={id}
                 href={projectSectionHref(displayProjectId, id)}
-                aria-current={active ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectShellPage", "en", "page") : undefined}
+                aria-current={active ? "page" : undefined}
                 className={cn(
                   "inline-flex min-h-10 items-center rounded-xl px-3.5 text-sm font-semibold transition-colors",
                   active ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
@@ -380,7 +380,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
               <Link
                 key={view}
                 href={projectViewHref(displayProjectId, section, view, location.search)}
-                aria-current={active ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectShellPage", "en", "page") : undefined}
+                aria-current={active ? "page" : undefined}
                 className={cn(
                   "inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-semibold transition-colors",
                   active
