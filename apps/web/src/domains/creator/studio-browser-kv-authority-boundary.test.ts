@@ -442,6 +442,9 @@ const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   // Realtime collaboration v19 view preferences: remote-cursor visibility mode and trail on/off.
   // Presentation state for one viewer's own overlay — no room, document, or peer data is stored.
   allow("apps/web/src/domains/creator/live/studio-live-viewport-preferences.ts", "local-storage-write", "\"toonspectrum:studio-live:viewport-preferences:v1\"", 1, UI_ONLY, UI_PROOF),
+  // Exact-resume checkpoint: bounded page/selection ids plus normalized zoom/scroll ratios only.
+  // Project content, history, comments, collaboration and source files remain outside this store.
+  allow("apps/web/src/domains/creator/studio-resume-checkpoint.ts", "durable-storage-write", "\"toonstudio:studio-resume-checkpoints:v1\"", 1, UI_ONLY, UI_PROOF),
   allow("apps/web/src/domains/creator/studio-workspaces.ts", "durable-storage-write", "studioWorkspaceStorageKey(userId)", 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
 
   // Injected localStorage-compatible codecs retained outside product authority selection.

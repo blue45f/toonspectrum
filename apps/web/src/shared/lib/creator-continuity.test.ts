@@ -9,6 +9,7 @@ import {
   clearCreatorPlanInState,
   clearCreatorRecentInState,
   creatorDestinationLabel,
+  creatorRecentDestinationDescription,
   formatCreatorRelativeTime,
   getCreatorLaunchRecommendation,
   parseCreatorContinuity,
@@ -17,17 +18,19 @@ import {
 } from "./creator-continuity";
 
 describe("creator continuity", () => {
-  it("keeps only allow-listed route identities and strips document-shaped query data", () => {
+  it("preserves canonical Studio document context while stripping room, token and arbitrary data", () => {
     const now = 1_800_000_000_000;
     let state = addCreatorDestinationInState(
       EMPTY_CREATOR_CONTINUITY,
-      "/studio/comic/work-secret",
-      "?workId=private&token=secret",
+      "/studio/p/project one/d/episode%202",
+      "?workspace=comic&focus=cut%3A18&language=ko-KR&version=approved-4&room=private&token=secret",
       now,
     );
-    expect(state.recent).toEqual([
-      { id: "comic", href: "/studio/comic", visitedAt: now },
-    ]);
+    expect(state.recent).toEqual([{
+      id: "studio",
+      href: "/studio/p/project%20one/d/episode%202?focus=cut%3A18&language=ko-KR&version=approved-4&workspace=comic",
+      visitedAt: now,
+    }]);
 
     state = addCreatorDestinationInState(
       state,
@@ -40,6 +43,7 @@ describe("creator continuity", () => {
       href: "/studio?preset=illustration",
       visitedAt: now + 1,
     });
+    expect(state.recent[1]?.href).toContain("/studio/p/project%20one/d/episode%202");
 
     const unchanged = addCreatorDestinationInState(
       state,
@@ -48,6 +52,32 @@ describe("creator continuity", () => {
       now + 2,
     );
     expect(unchanged).toBe(state);
+  });
+
+  it("keeps multiple Studio documents but deduplicates the same canonical document", () => {
+    const now = 1_800_000_000_000;
+    let state = addCreatorDestinationInState(
+      EMPTY_CREATOR_CONTINUITY,
+      "/studio/p/project-1/d/document-1",
+      "?workspace=draw",
+      now,
+    );
+    state = addCreatorDestinationInState(
+      state,
+      "/studio/p/project-1/d/document-2",
+      "?workspace=storyboard",
+      now + 1,
+    );
+    state = addCreatorDestinationInState(
+      state,
+      "/studio/p/project-1/d/document-1",
+      "?workspace=draw&room=discarded",
+      now + 2,
+    );
+    expect(state.recent.map((item) => item.href)).toEqual([
+      "/studio/p/project-1/d/document-1?workspace=draw",
+      "/studio/p/project-1/d/document-2?workspace=storyboard",
+    ]);
   });
 
   it("deduplicates by destination and bounds the recent list", () => {
@@ -85,13 +115,18 @@ describe("creator continuity", () => {
     const parsed = parseCreatorContinuity(JSON.stringify({
       version: CREATOR_CONTINUITY_VERSION,
       recent: [
-        { id: "studio", href: "/studio?workId=secret", visitedAt: now },
+        { id: "studio", href: "/studio/p/project-1/d/document-1?workspace=3d&room=secret&token=secret", visitedAt: now },
+        { id: "studio", href: "https://evil.example/studio/p/project-2/d/document-2", visitedAt: now },
         { id: "unknown", href: "https://evil.example", visitedAt: now },
         { id: "market", href: "/market", visitedAt: now - CREATOR_CONTINUITY_MAX_AGE_MS - 1 },
       ],
       plan: { goal: "unknown", pace: "quick", updatedAt: now },
     }), now);
-    expect(parsed.recent).toEqual([{ id: "studio", href: "/studio", visitedAt: now }]);
+    expect(parsed.recent).toEqual([{
+      id: "studio",
+      href: "/studio/p/project-1/d/document-1?workspace=3d",
+      visitedAt: now,
+    }]);
     expect(parsed.plan).toBeNull();
     expect(parseCreatorContinuity("not-json", now)).toBe(EMPTY_CREATOR_CONTINUITY);
   });
@@ -122,6 +157,11 @@ describe("creator continuity", () => {
     const now = 1_800_000_000_000;
     expect(creatorDestinationLabel("studio", "ko")).toBe("창작 스튜디오");
     expect(creatorDestinationLabel("studio", "en")).toBe("Creative studio");
+    expect(creatorRecentDestinationDescription({
+      id: "studio",
+      href: "/studio/p/project-1/d/document-1?workspace=storyboard",
+      visitedAt: now,
+    }, "ko")).toContain("콘티 문서의 마지막 페이지·선택·화면 위치");
     expect(formatCreatorRelativeTime(now - 5 * 60_000, "ko", now)).toBe("5분 전");
     expect(formatCreatorRelativeTime(now - 24 * 60 * 60_000, "en", now)).toBe("Yesterday");
   });
