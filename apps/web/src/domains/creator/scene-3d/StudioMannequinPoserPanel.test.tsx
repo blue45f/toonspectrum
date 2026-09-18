@@ -746,7 +746,7 @@ describe("StudioMannequinPoserPanel", () => {
     renderPanel();
     fireEvent.click(screen.getByRole("button", { name: /^체형/ }));
 
-    expect(screen.getByText("3D 헤드 모델 (Face Proportions)")).toBeDefined();
+    expect(screen.getByText("얼굴 비율")).toBeDefined();
     expect(screen.getByRole("button", { name: /웹툰\/애니형/ })).toBeDefined();
     expect(screen.getByRole("button", { name: /날카로운 턱/ })).toBeDefined();
 
