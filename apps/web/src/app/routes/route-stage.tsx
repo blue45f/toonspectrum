@@ -17,7 +17,7 @@ import {
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("route-stage", ko, en);
 
 interface RouteStageProps {
