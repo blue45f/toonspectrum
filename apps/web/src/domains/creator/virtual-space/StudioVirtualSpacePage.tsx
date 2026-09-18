@@ -48,7 +48,6 @@ import {
   startStudioConnectivityRuntime,
   subscribeStudioConnectivity,
 } from "../offline/studio-connectivity";
-
 import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaborationProvider";
 import { useStudioLiveCollaboration } from "../live/studio-live-collaboration-context";
 import { openStudioP2pHuddle } from "../live/huddle/studio-p2p-huddle-events";
@@ -259,17 +258,34 @@ function ConnectionBadge({
 }) {
   const bt = useBilingual("StudioVirtualSpaceConnectionBadge");
   const live = useStudioLiveCollaboration();
+  const connectivity = useSyncExternalStore(
+    subscribeStudioConnectivity,
+    getStudioConnectivitySnapshot,
+    getStudioConnectivityServerSnapshot,
+  );
   const direct = Boolean(live.room?.direct && live.availability === "ready");
-  const tone = direct ? "bg-good" : live.availability === "error" ? "bg-danger" : "bg-warn";
-  const label = preparing
-    ? bt("실시간 연결 준비 중", "Preparing live connection")
+  const tone = connectivity.localOnly
+    ? "bg-warn"
     : direct
-      ? bt("P2P Direct", "P2P Direct")
-      : live.availability === "ready"
-        ? bt("Presence 연결됨", "Presence connected")
-        : live.availability === "error"
-          ? bt("연결 확인 필요", "Connection needs attention")
-          : bt("연결 중", "Connecting");
+      ? "bg-good"
+      : live.availability === "error"
+        ? "bg-danger"
+        : "bg-warn";
+  const label = connectivity.mode === "offline"
+    ? bt("오프라인 · 로컬 작업", "Offline · local work")
+    : connectivity.mode === "server-unavailable"
+      ? bt("서버 연결 없음 · 로컬 작업", "Server unavailable · local work")
+      : connectivity.mode === "reconnecting"
+        ? bt("온라인 복구 중", "Reconnecting")
+        : preparing
+          ? bt("실시간 연결 준비 중", "Preparing live connection")
+          : direct
+            ? bt("P2P Direct", "P2P Direct")
+            : live.availability === "ready"
+              ? bt("Presence 연결됨", "Presence connected")
+              : live.availability === "error"
+                ? bt("연결 확인 필요", "Connection needs attention")
+                : bt("연결 중", "Connecting");
   return (
     <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-card/90 px-3 text-xs font-bold text-fg-2 shadow-sm">
       <span className={cn("size-2 rounded-full", tone)} />
@@ -442,7 +458,7 @@ function VirtualSpaceExperience({
 
   useEffect(() => {
     const room = live.room;
-    if (!room?.direct || live.availability !== "ready") {
+    if (!connectivity.serverAvailable || !room?.direct || live.availability !== "ready") {
       controllerRef.current?.close();
       controllerRef.current = null;
       setSnapshot((current) => ({
@@ -468,7 +484,7 @@ function VirtualSpaceExperience({
       controller.close();
       if (controllerRef.current === controller) controllerRef.current = null;
     };
-  }, [live.availability, live.room]);
+  }, [connectivity.serverAvailable, live.availability, live.room]);
 
   const updatePosition = useCallback((
     point: StudioVirtualSpacePoint,
@@ -602,13 +618,34 @@ function VirtualSpaceExperience({
         </header>
 
         {connectivity.localOnly ? (
-          <div role="status" className="mt-4 flex items-start gap-3 rounded-2xl border border-warning/35 bg-warning-soft/10 p-4 text-sm text-fg-2">
-            <CloudOff size={18} className="mt-0.5 shrink-0 text-warning" aria-hidden />
-            <div>
-              <p className="font-bold text-fg">{bt("서버 연결 없이 로컬 공간을 탐색하고 있어요.", "Exploring this space locally while the server is unavailable.")}</p>
-              <p className="mt-1 text-xs leading-5 text-fg-3">{bt("이동과 화면 탐색은 계속 사용할 수 있지만 팀원 발견과 P2P 대화는 서버 연결이 복구된 뒤 다시 활성화됩니다.", "Movement and local exploration remain available. Teammate discovery and P2P huddles resume after the server connection recovers.")}</p>
+          <section
+            className="mt-4 flex flex-col gap-3 rounded-2xl border border-warning/35 bg-warning-soft/10 p-4 sm:flex-row sm:items-center sm:justify-between"
+            role="status"
+            aria-live="polite"
+            data-studio-virtual-offline="true"
+          >
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-warning-soft/20 text-warning">
+                <CloudOff size={17} aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <strong className="text-sm text-fg">
+                  {connectivity.mode === "offline"
+                    ? bt("오프라인 로컬 모드", "Offline local mode")
+                    : bt("서버 연결 없이 로컬 모드", "Local mode without server connection")}
+                </strong>
+                <p className="mt-1 text-xs leading-5 text-fg-3">
+                  {bt(
+                    "공간 탐색과 캐시된 프로젝트 작업은 계속할 수 있습니다. 팀원 발견·P2P 대화·화상·실시간 동기화는 잠시 중지되고 온라인 복귀 시 자동으로 다시 연결됩니다.",
+                    "You can keep exploring the space and working with cached project data. Teammate discovery, P2P huddles, video and live sync pause temporarily and reconnect automatically when the network returns.",
+                  )}
+                </p>
+              </div>
             </div>
-          </div>
+            <span className="shrink-0 rounded-full border border-warning/30 bg-card/70 px-3 py-2 text-[0.68rem] font-bold text-warning">
+              {bt("로컬 작업 유지", "Local work stays available")}
+            </span>
+          </section>
         ) : null}
 
         <section className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
@@ -751,7 +788,9 @@ function VirtualSpaceExperience({
 
             <section className="rounded-3xl border border-line bg-panel/70 p-4 shadow-sm">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-black">{connectivity.localOnly ? bt("로컬 상태", "Local state") : bt("접속 중", "Online")}</h2>
+                <h2 className="text-sm font-black">
+                  {connectivity.localOnly ? bt("로컬 작업", "Local work") : bt("접속 중", "Online")}
+                </h2>
                 <span className="text-xs font-bold text-fg-3">{visibleParticipantCount}</span>
               </div>
               <div className="mt-3 space-y-2">

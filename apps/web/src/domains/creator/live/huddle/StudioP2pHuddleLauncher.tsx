@@ -228,13 +228,14 @@ export default function StudioP2pHuddleLauncher() {
       </div>
     </section>
     <button type="button" aria-expanded={open} className="ml-auto flex min-h-11 items-center gap-2 rounded-full border border-accent/40 bg-panel px-4 text-xs font-bold text-fg shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-      onClick={() => setOpen((value) => {
-        if (!value) {
+      onClick={() => {
+        const nextOpen = !open;
+        if (nextOpen) {
           proximityPeerIds.current = null;
           controller.current?.refreshPeers();
         }
-        return !value;
-      })}>
+        setOpen(nextOpen);
+      }}>
       <MessageCircle size={16} />{active ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "P2P 대화 중 · {v0}명"), { v0: String((snapshot?.peers.length ?? 0) + 1) }) : translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "채팅·통화")}
       {active && <span className="size-2 rounded-full bg-good" aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "대화 참여 중")} />}
     </button>
