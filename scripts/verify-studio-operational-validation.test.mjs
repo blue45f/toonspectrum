@@ -18,13 +18,14 @@ test("committed operational manifest is complete and claim-safe", async () => {
 
   assert.deepEqual(validation.laneIds, [
     "performance-and-soak",
+    "drawing-engine-integrity",
     "file-roundtrip-integrity",
     "fault-and-collaboration-recovery",
     "accessibility-and-security",
   ]);
-  assert.equal(validation.testPaths.length, 18);
+  assert.equal(validation.testPaths.length, 30);
   assert.equal(validation.artifacts.length, 3);
-  assert.equal(evidence.tests.length, 18);
+  assert.equal(evidence.tests.length, 30);
   assert.equal(evidence.artifacts.length, 3);
   assert.ok(evidence.tests.every((entry) => entry.bytes > 0));
   assert.ok(evidence.tests.every((entry) => /^[a-f0-9]{64}$/u.test(entry.sha256)));
@@ -102,7 +103,7 @@ test("receipt never upgrades bounded automation into external certification", as
   assert.equal(receipt.currentCommitEightHourSoakCertified, false);
   assert.equal(receipt.realHardwareBrowserCertificationAllowed, false);
   assert.equal(receipt.professionalReplacementClaimAllowed, false);
-  assert.equal(receipt.externalReleaseGates.length, 6);
+  assert.equal(receipt.externalReleaseGates.length, 7);
   assert.ok(receipt.lanes.every((lane) => lane.status === "passed"));
 });
 
