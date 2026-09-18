@@ -179,6 +179,40 @@ export function MembershipPolicyPage() {
           </section>
         )}
 
+        {overview && overview.recentLedger.length > 0 && (
+          <section className="mt-6 rounded-3xl border border-line bg-panel p-6" aria-labelledby="wallet-history-title">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-black tracking-[0.14em] text-accent">WALLET LEDGER</p>
+                <h2 id="wallet-history-title" className="mt-1 text-xl font-black text-fg">최근 포인트·Credit 내역</h2>
+              </div>
+              <span className="text-xs font-semibold text-fg-3">최근 {Math.min(overview.recentLedger.length, 8)}건</span>
+            </div>
+            <div className="mt-4 divide-y divide-line/70">
+              {overview.recentLedger.slice(0, 8).map((entry) => {
+                const unit = entry.asset === "reward_point" ? "P" : "C";
+                const delta = entry.deltaAvailable;
+                const amount = delta === 0 ? entry.amount : Math.abs(delta);
+                const sign = delta > 0 ? "+" : delta < 0 ? "-" : "";
+                return (
+                  <div key={entry.id} className="grid gap-2 py-3 text-sm sm:grid-cols-[7rem_1fr_auto] sm:items-center">
+                    <span className="font-bold text-fg">
+                      {entry.asset === "reward_point" ? "Reward Point" : "Studio Credit"}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="font-semibold text-fg-2">{ledgerActionLabels[entry.entryType] ?? entry.entryType}</span>
+                      <span className="ml-2 text-xs text-fg-3">{entry.reason}</span>
+                    </span>
+                    <span className="font-black tabular-nums text-fg">
+                      {sign}{number.format(amount)} {unit}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {overview && (
           <section className="mt-10 rounded-3xl border border-line bg-panel p-6 sm:p-8" aria-labelledby="creator-level-title">
             <div className="flex flex-wrap items-start justify-between gap-4">
