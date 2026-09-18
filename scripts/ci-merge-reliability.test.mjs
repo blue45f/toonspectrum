@@ -68,10 +68,10 @@ test("superseded PR heads cancel while main and merge-group verification finish"
 });
 
 test("lint, typecheck and semantic regression shards are independent installed lanes", () => {
-  for (const [name, command] of [
+  const expectations = [
     ["lint", "pnpm run lint:strict"],
     ["typecheck", "pnpm run typecheck"],
-    ["static", "node scripts/run-core-vitest.mjs"],
+    ["static", "node scripts/ci-core-regression-shards.mjs"],
   ];
   for (const [name, command] of expectations) {
     const block = job(name);
