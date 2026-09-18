@@ -159,6 +159,21 @@ function kstDayBounds(date = new Date()): {
   return { dayKey, start, end };
 }
 
+function kstMonthBounds(date = new Date()) {
+  const shifted = new Date(date.getTime() + KST_OFFSET_MS);
+  const year = shifted.getUTCFullYear();
+  const month = shifted.getUTCMonth();
+  const cycleKey = year + "-" + String(month + 1).padStart(2, "0");
+  const start = new Date(Date.UTC(year, month, 1) - KST_OFFSET_MS);
+  const end = new Date(Date.UTC(year, month + 1, 1) - KST_OFFSET_MS);
+  return { cycleKey, start, end };
+}
+
+function rewardPointExpiry(from = new Date()): Date | null {
+  const days = MEMBERSHIP_ECONOMY_POLICY.pointExpiryDays;
+  return days === null ? null : new Date(from.getTime() + days * 86_400_000);
+}
+
 function isCreatorLevel(value: unknown): value is MemberCreatorLevel {
   return typeof value === "string"
     && (MEMBER_CREATOR_LEVELS as readonly string[]).includes(value);
@@ -214,6 +229,11 @@ export class MembershipWalletService {
 
     const overrides = await this.loadPolicyOverrides();
     const plan = await this.effectivePlanPolicy(planId, overrides);
+    await this.ensureMonthlyMembershipCredits(
+      userId,
+      planId,
+      Number(plan.entitlements["credit.monthlyIncluded"]),
+    );
     await dbPool.query(
       `INSERT INTO member_level ("userId") VALUES ($1)
        ON CONFLICT ("userId") DO NOTHING`,
@@ -264,6 +284,26 @@ export class MembershipWalletService {
       ),
     ]);
 
+    const { start: creditDayStart, end: creditDayEnd } = kstDayBounds();
+    const dailyCreditUsage = await dbPool.query<{ used: string | number }>(
+      `SELECT COALESCE(SUM(
+           CASE
+             WHEN reservation.status = 'reserved' THEN reservation."requestedAmount"
+             WHEN reservation.status = 'captured' THEN reservation."capturedAmount"
+             ELSE 0
+           END
+         ), 0)::bigint AS used
+       FROM wallet_reservation AS reservation
+       INNER JOIN wallet_account AS account ON account.id = reservation."accountId"
+       WHERE reservation."userId" = $1
+         AND account.asset = 'studio_credit'
+         AND reservation."createdAt" >= $2
+         AND reservation."createdAt" < $3`,
+      [userId, creditDayStart, creditDayEnd],
+    );
+    const spentToday = asInt(dailyCreditUsage.rows[0]?.used ?? 0);
+    const dailyLimit = Number(plan.entitlements["credit.dailyLimit"]);
+
     const balance = (asset: WalletAsset) => {
       const row = accounts.rows.find((entry) => entry.asset === asset);
       return {
@@ -289,6 +329,15 @@ export class MembershipWalletService {
       economy: MEMBERSHIP_ECONOMY_POLICY,
       wallet: {
         points: balance(PUBLIC_WALLET_ASSET),
+        studioCredits: balance("studio_credit"),
+      },
+      creditCycle: {
+        monthlyIncluded: Number(plan.entitlements["credit.monthlyIncluded"]),
+        dailyLimit,
+        spentToday,
+        remainingToday: Math.max(0, dailyLimit - spentToday),
+        monthlyResetsAt: kstMonthBounds().end.toISOString(),
+        dailyResetsAt: creditDayEnd.toISOString(),
       },
       levels: levels.rows[0] ?? {
         creatorLevel: "new",
@@ -331,11 +380,22 @@ export class MembershipWalletService {
     feature: CreditFeatureKey;
     units?: number;
     idempotencyKey: string;
+    dailyLimit?: number;
     metadata?: Record<string, unknown>;
   }) {
     await this.ensureBetaFounderPromotion(input.userId);
     await this.releaseExpiredReservations(input.userId);
     await this.expireAvailableLots(input.userId);
+    const planId = await this.resolveMembershipPlan(input.userId);
+    const plan = await this.effectivePlanPolicy(
+      planId,
+      await this.loadPolicyOverrides(),
+    );
+    await this.ensureMonthlyMembershipCredits(
+      input.userId,
+      planId,
+      Number(plan.entitlements["credit.monthlyIncluded"]),
+    );
     const estimate = await this.estimateCredits(input.feature, input.units ?? 1);
     return this.reserveAsset({
       userId: input.userId,
@@ -343,7 +403,7 @@ export class MembershipWalletService {
       amount: estimate.credits,
       featureKey: input.feature,
       idempotencyKey: input.idempotencyKey,
-
+      dailyLimit: Number(plan.entitlements["credit.dailyLimit"]),
       metadata: input.metadata ?? {},
     });
   }
@@ -361,6 +421,38 @@ export class MembershipWalletService {
 
   async releaseCreditReservation(reservationId: string) {
     return this.settleReservation(reservationId, 0, "released");
+  }
+
+  private async ensureMonthlyMembershipCredits(
+    userId: string,
+    planId: MembershipPlanId,
+    targetAmount: number,
+  ): Promise<void> {
+    if (!Number.isSafeInteger(targetAmount) || targetAmount <= 0) return;
+    const { cycleKey, end } = kstMonthBounds();
+    const existing = await dbPool.query<{ granted: string | number }>(
+      `SELECT COALESCE(SUM("grantedAmount"), 0)::bigint AS granted
+       FROM wallet_lot
+       WHERE "userId" = $1
+         AND asset = 'studio_credit'
+         AND source = 'membership'
+         AND "sourceRef" = $2`,
+      [userId, cycleKey],
+    );
+    const granted = asInt(existing.rows[0]?.granted ?? 0);
+    const missing = Math.max(0, targetAmount - granted);
+    if (missing <= 0) return;
+    await this.grantAsset({
+      userId,
+      asset: "studio_credit",
+      amount: missing,
+      source: "membership",
+      sourceKey: "membership-credit:" + cycleKey + ":target:" + targetAmount,
+      sourceRef: cycleKey,
+      expiresAt: end,
+      reason: planId + " monthly Studio Credit",
+      metadata: { planId, cycleKey, targetAmount },
+    });
   }
 
   private async transaction<T>(
@@ -641,6 +733,10 @@ export class MembershipWalletService {
     }
 
     return this.transaction(async (client) => {
+      await client.query(
+        `SELECT pg_advisory_xact_lock(hashtext($1))`,
+        ["wallet-reservation:" + input.userId + ":" + input.asset],
+      );
       const account = await this.ensureAccount(
         client,
         input.userId,
@@ -657,6 +753,41 @@ export class MembershipWalletService {
       );
       if (existing.rows[0]) {
         return this.projectReservation(existing.rows[0]);
+      }
+
+      if (
+        input.asset === "studio_credit"
+        && Number.isSafeInteger(input.dailyLimit)
+        && Number(input.dailyLimit) > 0
+      ) {
+        const { start, end } = kstDayBounds();
+        const daily = await client.query<{ used: string | number }>(
+          `SELECT COALESCE(SUM(
+               CASE
+                 WHEN status = 'reserved' THEN "requestedAmount"
+                 WHEN status = 'captured' THEN "capturedAmount"
+                 ELSE 0
+               END
+             ), 0)::bigint AS used
+           FROM wallet_reservation
+           WHERE "accountId" = $1
+             AND "createdAt" >= $2
+             AND "createdAt" < $3`,
+          [account.id, start, end],
+        );
+        const used = asInt(daily.rows[0]?.used ?? 0);
+        const dailyLimit = Number(input.dailyLimit);
+        if (used + amountToReserve > dailyLimit) {
+          throw new ConflictException({
+            code: "studio_credit_daily_limit_exceeded",
+            dailyLimit,
+            used,
+            requested: amountToReserve,
+            remaining: Math.max(0, dailyLimit - used),
+            nextResetAt: end.toISOString(),
+            message: "오늘 사용할 수 있는 Studio Credit 한도를 초과했습니다.",
+          });
+        }
       }
 
       const reservationId = randomUUID();
@@ -1298,7 +1429,7 @@ export class MembershipWalletService {
         source,
         sourceKey,
         sourceRef,
-        expiresAt: null,
+        expiresAt: rewardPointExpiry(),
         reason: policy.label,
         metadata: {
           ...(input.metadata ?? {}),
@@ -1374,7 +1505,7 @@ export class MembershipWalletService {
       source: "event",
       sourceKey: `reward:${milestone}:${sourceRef}`,
       sourceRef,
-      expiresAt: null,
+      expiresAt: rewardPointExpiry(),
       reason: policy.label,
       metadata: { milestone },
     });
@@ -1501,11 +1632,11 @@ export class MembershipWalletService {
     if (!targetUserId) {
       throw new BadRequestException("대상 사용자 ID가 필요합니다.");
     }
-    if (input.asset !== PUBLIC_WALLET_ASSET) {
-      throw new BadRequestException("현재 사용자에게 지급할 수 있는 자산은 포인트뿐입니다.");
+    if (input.asset !== PUBLIC_WALLET_ASSET && input.asset !== "studio_credit") {
+      throw new BadRequestException("지원하지 않는 지갑 자산입니다.");
     }
-    const asset: WalletAsset = PUBLIC_WALLET_ASSET;
-    const delta = signedNonZeroInteger(input.delta, "포인트 조정량");
+    const asset: WalletAsset = input.asset;
+    const delta = signedNonZeroInteger(input.delta, "지갑 조정량");
     const requestKey = boundedText(input.requestKey, 160);
     if (!requestKey) {
       throw new BadRequestException("지급 요청 식별자가 필요합니다.");
@@ -1520,7 +1651,7 @@ export class MembershipWalletService {
           source: "admin",
           sourceKey: ["admin", adminId, requestKey].join(":"),
           sourceRef: requestKey,
-          expiresAt: null,
+          expiresAt: asset === PUBLIC_WALLET_ASSET ? rewardPointExpiry() : null,
           reason,
           metadata: { adminId, delta },
         })
