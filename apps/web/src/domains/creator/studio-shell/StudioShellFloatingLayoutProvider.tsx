@@ -16,9 +16,8 @@ import {
   hideAllStudioShellFloatingSurfaces,
   isStudioShellFloatingSurfaceVisible,
   normalizeStudioShellFloatingVisibility,
-  setStudioShellFloatingAutoHideDuringStroke,
+  setStudioShellFloatingAutoHideWhileDrawing,
   setStudioShellFloatingSurfaceVisible,
-  showAllStudioShellFloatingSurfaces,
   studioShellFloatingVisibilityEqual,
   type StudioShellFloatingPresetId,
   type StudioShellFloatingSurfaceId,
@@ -36,6 +35,10 @@ import {
   studioWorkspaceArrangingSnapshot,
   subscribeStudioWorkspaceArranging,
 } from "../studio-workspace-arrangement";
+import {
+  studioStrokeFocusActivitySnapshot,
+  subscribeStudioStrokeFocusActivity,
+} from "../studio-stroke-focus-activity";
 
 import type {
   StudioShellFloatingVisibilityRepository,
@@ -96,7 +99,7 @@ export function StudioShellFloatingLayoutProvider({
   const [failure, setFailure] =
     useState<StudioShellFloatingLayoutRuntime["failure"]>(null);
   const [resetRevisions, setResetRevisions] = useState(createStudioShellFloatingResetRevisions);
-  const [drawingAutoHideActive, setDrawingAutoHideActive] = useState(false);
+  const [pointerAutoHideActive, setPointerAutoHideActive] = useState(false);
   const [focusModeActive, setFocusModeActive] = useState(false);
   const [mountedSurfaceIds, setMountedSurfaceIds] =
     useState<readonly StudioShellFloatingSurfaceId[]>([]);
@@ -105,6 +108,14 @@ export function StudioShellFloatingLayoutProvider({
     studioWorkspaceArrangingSnapshot,
     () => false,
   );
+  const strokeFocusPhase = useSyncExternalStore(
+    subscribeStudioStrokeFocusActivity,
+    studioStrokeFocusActivitySnapshot,
+    () => "idle",
+  );
+  const drawingAutoHideActive = visibility.autoHideWhileDrawing
+    && !arranging
+    && (pointerAutoHideActive || strokeFocusPhase !== "idle");
   const drawingPointerId = useRef<number | null>(null);
   const drawingReleaseTimer = useRef<number | null>(null);
   const liveVisibility = useRef(visibility);
@@ -146,14 +157,68 @@ export function StudioShellFloatingLayoutProvider({
   }, [repository]);
 
   useEffect(() => {
+    const clearReleaseTimer = (): void => {
+      if (drawingReleaseTimer.current === null) return;
+      window.clearTimeout(drawingReleaseTimer.current);
+      drawingReleaseTimer.current = null;
+    };
+    const stopImmediately = (): void => {
+      clearReleaseTimer();
+      drawingPointerId.current = null;
+      setPointerAutoHideActive(false);
+    };
+    if (!visibility.autoHideWhileDrawing || arranging) {
+      stopImmediately();
+      return undefined;
+    }
+    const start = (event: PointerEvent): void => {
+      if (
+        event.pointerType !== "pen"
+        || event.isPrimary === false
+        || event.button !== 0
+        || !isStudioShellDrawingSurfaceTarget(event.target)
+      ) return;
+      clearReleaseTimer();
+      drawingPointerId.current = event.pointerId;
+      setPointerAutoHideActive(true);
+    };
+    const finish = (event: PointerEvent): void => {
+      if (drawingPointerId.current !== event.pointerId) return;
+      drawingPointerId.current = null;
+      clearReleaseTimer();
+      drawingReleaseTimer.current = window.setTimeout(() => {
+        drawingReleaseTimer.current = null;
+        setPointerAutoHideActive(false);
+      }, STUDIO_SHELL_DRAWING_AUTO_HIDE_RELEASE_MS);
+    };
+    const visibilityChange = (): void => {
+      if (document.visibilityState !== "visible") stopImmediately();
+    };
+    window.addEventListener("pointerdown", start, true);
+    window.addEventListener("pointerup", finish, true);
+    window.addEventListener("pointercancel", finish, true);
+    window.addEventListener("blur", stopImmediately);
+    document.addEventListener("visibilitychange", visibilityChange);
+    return () => {
+      window.removeEventListener("pointerdown", start, true);
+      window.removeEventListener("pointerup", finish, true);
+      window.removeEventListener("pointercancel", finish, true);
+      window.removeEventListener("blur", stopImmediately);
+      document.removeEventListener("visibilitychange", visibilityChange);
+      clearReleaseTimer();
+      drawingPointerId.current = null;
+    };
+  }, [arranging, visibility.autoHideWhileDrawing]);
+
+  useEffect(() => {
     if (typeof document === "undefined") return undefined;
     const root = document.documentElement;
     root.setAttribute(
       "data-studio-shell-stroke-auto-hide",
-      visibility.autoHideDuringStroke ? "true" : "false",
+      visibility.autoHideWhileDrawing && !arranging ? "true" : "false",
     );
     return () => root.removeAttribute("data-studio-shell-stroke-auto-hide");
-  }, [visibility.autoHideDuringStroke]);
+  }, [arranging, visibility.autoHideWhileDrawing]);
 
   const commit = useCallback((next: StudioShellFloatingVisibilityState) => {
     const normalized = normalizeStudioShellFloatingVisibility(next);
@@ -208,19 +273,30 @@ export function StudioShellFloatingLayoutProvider({
     setVisible(id, !isStudioShellFloatingSurfaceVisible(liveVisibility.current, id));
   }, [setVisible]);
 
-  const setAutoHideDuringStroke = useCallback((enabled: boolean) => {
-    commit(setStudioShellFloatingAutoHideDuringStroke(liveVisibility.current, enabled));
+  const setAutoHideWhileDrawing = useCallback((enabled: boolean) => {
+    commit(setStudioShellFloatingAutoHideWhileDrawing(liveVisibility.current, enabled));
   }, [commit]);
 
+  const enterFocusMode = useCallback(() => {
+    setFocusModeActive(true);
+  }, []);
+
+  const exitFocusMode = useCallback(() => {
+    setFocusModeActive(false);
+  }, []);
+
   const applyPreset = useCallback((preset: StudioShellFloatingPresetId) => {
+    setFocusModeActive(false);
     commit(applyStudioShellFloatingPreset(preset, liveVisibility.current));
   }, [commit]);
 
   const showAll = useCallback(() => {
-    commit(showAllStudioShellFloatingSurfaces(liveVisibility.current));
+    setFocusModeActive(false);
+    commit(applyStudioShellFloatingPreset("all", liveVisibility.current));
   }, [commit]);
 
   const hideAll = useCallback(() => {
+    setFocusModeActive(false);
     commit(hideAllStudioShellFloatingSurfaces(liveVisibility.current));
   }, [commit]);
 
@@ -254,7 +330,9 @@ export function StudioShellFloatingLayoutProvider({
     setSurfaceMounted,
     setVisible,
     toggleVisible,
-    setAutoHideDuringStroke,
+    setAutoHideWhileDrawing,
+    enterFocusMode,
+    exitFocusMode,
     applyPreset,
     showAll,
     hideAll,
@@ -273,7 +351,8 @@ export function StudioShellFloatingLayoutProvider({
     resetAllSurfaces,
     resetRevisions,
     resetSurface,
-    setAutoHideDuringStroke,
+    setAutoHideWhileDrawing,
+    setSurfaceMounted,
     setVisible,
     showAll,
     toggleVisible,

@@ -1,8 +1,13 @@
 import {
   resolveUiLocale,
+  translateBilingualValueForActiveLocale,
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
   translateLocaleBranchForLocale,
+  useBilingual,
+  useBilingualI18nRevision,
+  useBilingualLocalizer,
+  type BilingualText,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
@@ -29,13 +34,13 @@ import {
 import { useMemo } from "react";
 import { Navigate, useLocation, useParams } from "react-router-dom";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
+
 import { cn } from "@/shared/lib/utils";
 
 import { STUDIO_PROJECT_NAVIGATION } from "../studio-product-ia";
@@ -49,10 +54,7 @@ import { resolveStudioProjectViewDestination } from "../studio-project-view-dest
 import { StudioCompetitorCapabilityPanel } from "./StudioCompetitorCapabilityPanel";
 import { StudioProjectDiagnosticsBridge } from "./StudioProjectDiagnosticsBridge";
 import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
+
 
 export type StudioProjectSection = StudioProjectSectionId;
 

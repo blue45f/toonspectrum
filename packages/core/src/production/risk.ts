@@ -329,7 +329,7 @@ function collectTaskCandidates(
         && signal.sourceEntityId === task.id
         && signal.state !== "cleared");
       const recoveryFactor = previousCapacitySignal
-        ? Math.max(0.5, 1 - policy.thresholdHysteresisPercent / 100)
+        ? Math.max(0.5, 1 - (policy.thresholdHysteresisPercent ?? 10) / 100)
         : 1;
       const warningThreshold = policy.capacityWarningPercent * recoveryFactor;
       const criticalThreshold = policy.capacityCriticalPercent * recoveryFactor;
@@ -807,7 +807,7 @@ function synchronizeAutomaticRisks(
     const crossesOpenThreshold = activeSignals.some((signal) =>
       severityRank(signal.severity) >= threshold);
     const crossesConfidenceThreshold = activeSignals.some((signal) =>
-      confidenceRank(signal.confidence) >= confidenceRank(policy.autoOpenMinimumConfidence)
+      confidenceRank(signal.confidence) >= confidenceRank(policy.autoOpenMinimumConfidence ?? "medium")
       || signal.severity === "critical"
       || isOccurredSignal(signal));
     if (!current && (!crossesOpenThreshold || !crossesConfidenceThreshold)) continue;
@@ -821,7 +821,7 @@ function synchronizeAutomaticRisks(
       signal.confidence === "high"
       || signal.severity === "critical"
       || isOccurredSignal(signal));
-    if (!current && !canOpenImmediately && stableForHours < policy.autoOpenStableHours) continue;
+    if (!current && !canOpenImmediately && stableForHours < (policy.autoOpenStableHours ?? 2)) continue;
 
     touchedRiskIds.add(effectiveRiskId);
     generated.push(riskFromSignals(aggregate, activeSignals, current, now));
@@ -1013,26 +1013,26 @@ export function transitionProductionRiskResponse(
   }
   return Object.freeze({
     ...response,
-    revision: response.revision + 1,
+    revision: (response.revision ?? 0) + 1,
     status: target,
     actualEffect: target === "completed"
       ? actualEffect
       : target === "proposed" ? null : response.actualEffect,
     cancellationReason: target === "cancelled"
       ? reason
-      : target === "proposed" ? null : response.cancellationReason,
+      : target === "proposed" ? null : response.cancellationReason ?? null,
     approvedAt: target === "approved"
       ? response.approvedAt ?? input.at
-      : target === "proposed" ? null : response.approvedAt,
+      : target === "proposed" ? null : response.approvedAt ?? null,
     startedAt: target === "in-progress"
       ? response.startedAt ?? input.at
-      : target === "proposed" ? null : response.startedAt,
+      : target === "proposed" ? null : response.startedAt ?? null,
     completedAt: target === "completed"
       ? input.at
       : target === "proposed" ? null : response.completedAt,
     cancelledAt: target === "cancelled"
       ? input.at
-      : target === "proposed" ? null : response.cancelledAt,
+      : target === "proposed" ? null : response.cancelledAt ?? null,
     updatedAt: input.at,
   });
 }
