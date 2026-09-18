@@ -20,6 +20,7 @@ const validDocument = {
   },
   usageGoals: ["team-production" as const],
   workspaceMode: "creator" as const,
+  collaborationMode: "team" as const,
   capacity: {
     weeklyCapacityHours: 20,
     currentAssignedHours: 8,
@@ -48,6 +49,13 @@ describe("creator role workspace DTO", () => {
       baseRevision: 2,
       document: validDocument,
     }).baseRevision).toBe(2);
+  });
+
+  it("defaults older workspace documents to solo collaboration", () => {
+    const { collaborationMode: _ignored, ...legacyDocument } = validDocument;
+    expect(
+      CreatorRoleWorkspaceDocumentSchema.parse(legacyDocument).collaborationMode,
+    ).toBe("solo");
   });
 
   it("rejects unknown role, unsafe project key and oversized team scans", () => {
