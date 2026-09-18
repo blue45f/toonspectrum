@@ -353,11 +353,14 @@ export class MembershipWalletService {
         monthlyResetsAt: kstMonthBounds().end.toISOString(),
         dailyResetsAt: creditDayEnd.toISOString(),
       },
-      levels: levels.rows[0] ?? {
-        creatorLevel: "new",
-        trustLevel: "new",
-        sellerLevel: "none",
-        trustScore: 0,
+      levels: {
+        ...storedLevels,
+        creatorLevel: effectiveCreatorLevel,
+      },
+      creatorProgress: {
+        ...creatorProgress,
+        effectiveLevel: effectiveCreatorLevel,
+        manuallyManaged: creatorLevelManaged,
       },
       recentLedger: ledger.rows.map((entry) => ({
         ...entry,
