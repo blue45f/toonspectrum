@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 
 const WEB_SRC = path.resolve(process.cwd(), "apps/web/src");
 const LEGACY_LOCALE_ALIAS = /type\s+Locale\s*=\s*["']ko["']\s*\|\s*["']en["']/gu;
-const MAX_REMAINING_LEGACY_LOCALE_ALIASES = 35;
 
 function collectLegacyLocaleAliases(directory: string, findings: string[] = []): string[] {
   for (const name of readdirSync(directory)) {
@@ -26,11 +25,11 @@ function collectLegacyLocaleAliases(directory: string, findings: string[] = []):
 }
 
 describe("legacy bilingual UI migration ratchet", () => {
-  it("never increases the remaining ko/en-only Locale aliases", () => {
+  it("rejects ko/en-only Locale aliases from user-facing source", () => {
     const findings = collectLegacyLocaleAliases(WEB_SRC).sort();
     expect(
-      findings.length,
-      `ko/en-only UI aliases regressed (${findings.length}):\n${findings.join("\n")}`,
-    ).toBeLessThanOrEqual(MAX_REMAINING_LEGACY_LOCALE_ALIASES);
+      findings,
+      `ko/en-only UI aliases must use the global locale pipeline:\n${findings.join("\n")}`,
+    ).toEqual([]);
   });
 });
