@@ -82,13 +82,13 @@ describe("share events", () => {
     const listener = vi.fn<(event: Event) => void>();
     window.addEventListener(TOONSPECTRUM_SHARE_EVENT, listener);
 
-    emitShareEvent("copy", "success", payload);
+    emitShareEvent("copy", "completed", payload);
 
     expect(listener).toHaveBeenCalledTimes(1);
     const event = listener.mock.calls[0]?.[0] as CustomEvent<ShareEventDetail>;
     expect(event.detail).toEqual({
       channel: "copy",
-      outcome: "success",
+      outcome: "completed",
       path: "/title/test-work",
     });
 

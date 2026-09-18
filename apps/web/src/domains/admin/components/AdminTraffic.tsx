@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Activity,
   Clock3,
@@ -43,9 +44,24 @@ import {
   TrafficRealtimeBars,
   TrafficTrendChart,
 } from "./AdminTrafficCharts";
+import { AdminTrafficSharing } from "./AdminTrafficSharing";
 
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
+
+const EMPTY_SHARING: TrafficOverview["sharing"] = {
+  attempts: 0,
+  opened: 0,
+  completed: 0,
+  failed: 0,
+  cancelled: 0,
+  uniqueSharers: 0,
+  attributedPageViews: 0,
+  attributedVisitors: 0,
+  attributedSessions: 0,
+  channels: [],
+  topContent: [],
+};
 
 function withPulse(
   overview: TrafficOverview,
@@ -198,6 +214,7 @@ export function AdminTraffic({ uid }: { uid: string }) {
         locale,
       )}`
     : null;
+  const sharing = data.sharing ?? EMPTY_SHARING;
 
   return (
     <div className="space-y-5">
@@ -239,7 +256,7 @@ export function AdminTraffic({ uid }: { uid: string }) {
           <div className="flex flex-wrap items-center gap-2">
             <div
               className="inline-flex rounded-xl border border-line bg-canvas p-1"
-              aria-label="Traffic range"
+              aria-label={translateCurrentStaticSourceText("domains.admin.components.AdminTraffic", "en", "Traffic range")}
             >
               {TRAFFIC_RANGE_DAYS.map((range) => (
                 <button
@@ -391,6 +408,8 @@ export function AdminTraffic({ uid }: { uid: string }) {
             <TrafficSourceList sources={data.sources} t={t} />
           </div>
 
+          <AdminTrafficSharing sharing={sharing} t={t} />
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <TrafficBreakdownList
               title={t("admin.traffic.devices")}
@@ -419,7 +438,7 @@ export function AdminTraffic({ uid }: { uid: string }) {
       <aside className="flex items-start gap-2 rounded-2xl border border-line bg-card px-4 py-3 text-xs leading-relaxed text-fg-3">
         <Wifi className="mt-0.5 size-4 shrink-0 text-accent" />
         <p>
-          {t("admin.traffic.privacy")} · {data.retentionDays}d retention ·{" "}
+          {t("admin.traffic.privacy")} · {data.retentionDays}{translateCurrentStaticSourceText("domains.admin.components.AdminTraffic", "en", "d retention ·")}{" "}
           {data.storageMode}
         </p>
       </aside>

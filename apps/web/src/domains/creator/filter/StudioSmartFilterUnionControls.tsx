@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useId, type ReactElement } from "react";
 
 import {
@@ -241,9 +244,9 @@ export function StudioSmartFilterUnionControls({
     <>
       {engine === "polar-coordinates" ? (
         <UnionSelectControl
-          label="좌표 모드"
+          label={translateCurrentStaticSourceText("domains.creator.filter.StudioSmartFilterUnionControls", "ko", "좌표 모드")}
           paramKey="mode"
-          value={params.mode === "polar-to-rectangular" ? "polar-to-rectangular" : "rectangular-to-polar"}
+          value={params.mode === "polar-to-rectangular" ? translateCurrentStaticSourceText("domains.creator.filter.StudioSmartFilterUnionControls", "en", "polar-to-rectangular") : translateCurrentStaticSourceText("domains.creator.filter.StudioSmartFilterUnionControls", "en", "rectangular-to-polar")}
           options={[
             { value: "rectangular-to-polar", label: "직교 → 극좌표" },
             { value: "polar-to-rectangular", label: "극좌표 → 직교" },
@@ -254,9 +257,9 @@ export function StudioSmartFilterUnionControls({
       ) : null}
       {GEOMETRY_ENGINE_SET.has(engine) ? (
         <UnionSelectControl
-          label="보간"
+          label={translateCurrentStaticSourceText("domains.creator.filter.StudioSmartFilterUnionControls", "ko", "보간")}
           paramKey="interpolation"
-          value={params.interpolation === "nearest" ? "nearest" : "bilinear"}
+          value={params.interpolation === "nearest" ? translateCurrentStaticSourceText("domains.creator.filter.StudioSmartFilterUnionControls", "en", "nearest") : translateCurrentStaticSourceText("domains.creator.filter.StudioSmartFilterUnionControls", "en", "bilinear")}
           options={[
             { value: "bilinear", label: "부드러운 보간" },
             { value: "nearest", label: "최근접 · 픽셀 보존" },

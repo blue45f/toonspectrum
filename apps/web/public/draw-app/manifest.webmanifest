@@ -1,0 +1,68 @@
+{
+  "name": "툰스튜디오 드로잉 · ToonStudio Draw",
+  "short_name": "툰드로잉",
+  "description": "툰스튜디오의 동일한 전문 드로잉 엔진을 캔버스 중심 앱 UI로 실행합니다.",
+  "lang": "ko-KR",
+  "categories": [
+    "graphics_design",
+    "productivity"
+  ],
+  "id": "/draw-app",
+  "start_url": "/studio?drawingShell=app&uiMode=focus&startTool=draw&source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "theme_color": "#10182d",
+  "background_color": "#10182d",
+  "icons": [
+    {
+      "src": "/brand/spectrum-ribbon-v2/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/spectrum-ribbon-v2/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/spectrum-ribbon-v2/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/spectrum-ribbon-v2/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/brand/spectrum-ribbon-v2/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "드로잉 스튜디오",
+      "short_name": "드로잉",
+      "description": "캔버스 중심 순수 드로잉 프레젠테이션으로 시작",
+      "url": "/studio?drawingShell=app&uiMode=focus&startTool=draw"
+    },
+    {
+      "name": "전체 툰스튜디오",
+      "short_name": "전체 스튜디오",
+      "description": "동일 프로젝트를 전체 제작 UI로 열기",
+      "url": "/studio?drawingShell=integrated"
+    }
+  ]
+}

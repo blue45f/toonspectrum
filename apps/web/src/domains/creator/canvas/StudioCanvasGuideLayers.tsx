@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense, useRef, type Dispatch, type SetStateAction } from "react";
 import {
   Circle as KCircle,
@@ -134,7 +135,7 @@ export function StudioCanvasGuideUnderlay({
           />
           {webtoonGuides.webtoonWidthGuides(canvasWidth).map((guide) => (
             <Line
-              key={`wg-${guide.pos}-${guide.label}`}
+              key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasGuideLayers", "en", "wg-{v0}-{v1}"), { v0: String(guide.pos), v1: String(guide.label) })}
               points={[guide.pos, 0, guide.pos, canvasHeight]}
               stroke="rgba(70, 150, 255, 0.55)"
               strokeWidth={1 / effScale}
@@ -264,7 +265,7 @@ export function StudioCanvasGuideOverlayLayers({
             const points = [segment.x1, segment.y1, segment.x2, segment.y2];
             const visual = (
               <Line
-                key={`${key}-visual`}
+                key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasGuideLayers", "en", "{v0}-visual"), { v0: String(key) })}
                 points={points}
                 stroke="rgba(14, 165, 233, 0.75)"
                 strokeWidth={1.5 / effScale}
@@ -346,7 +347,7 @@ export function StudioCanvasGuideOverlayLayers({
         <Layer listening={false}>
           {guides.x.map((guideX) => (
             <Line
-              key={`gx-${guideX}`}
+              key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasGuideLayers", "en", "gx-{v0}"), { v0: String(guideX) })}
               points={[guideX, 0, guideX, canvasHeight]}
               stroke="#f43f5e"
               strokeWidth={1 / effScale}
@@ -355,7 +356,7 @@ export function StudioCanvasGuideOverlayLayers({
           ))}
           {guides.y.map((guideY) => (
             <Line
-              key={`gy-${guideY}`}
+              key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasGuideLayers", "en", "gy-{v0}"), { v0: String(guideY) })}
               points={[0, guideY, canvasWidth, guideY]}
               stroke="#f43f5e"
               strokeWidth={1 / effScale}
@@ -369,7 +370,7 @@ export function StudioCanvasGuideOverlayLayers({
         <Layer listening={false}>
           {smartGuides.segments.map((segment, index) => (
             <Line
-              key={`sgseg-${index}`}
+              key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasGuideLayers", "en", "sgseg-{v0}"), { v0: String(index) })}
               points={segment.axis === "v"
                 ? [segment.pos, segment.from, segment.pos, segment.to]
                 : [segment.from, segment.pos, segment.to, segment.pos]}
@@ -379,9 +380,9 @@ export function StudioCanvasGuideOverlayLayers({
             />
           ))}
           {smartGuides.spacings.map((spacing, index) => (
-            <Group key={`sgsp-${index}`}>
+            <Group key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasGuideLayers", "en", "sgsp-{v0}"), { v0: String(index) })}>
               {spacing.spans.map((span, spanIndex) => (
-                <Group key={`sgsp-${index}-${spanIndex}`}>
+                <Group key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasGuideLayers", "en", "sgsp-{v0}-{v1}"), { v0: String(index), v1: String(spanIndex) })}>
                   <Line
                     points={spacing.axis === "x"
                       ? [span.from, spacing.at, span.to, spacing.at]
@@ -411,7 +412,7 @@ export function StudioCanvasGuideOverlayLayers({
                       ? spacing.at + 6 / effScale
                       : (span.from + span.to) / 2 - 6 / effScale}
                     width={48 / effScale}
-                    align={spacing.axis === "x" ? "center" : "left"}
+                    align={spacing.axis === "x" ? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasGuideLayers", "en", "center") : translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasGuideLayers", "en", "left")}
                     text={`${Math.round(spacing.gap)}`}
                     fontSize={12 / effScale}
                     fontStyle="bold"
@@ -427,7 +428,7 @@ export function StudioCanvasGuideOverlayLayers({
       {userGuides.length > 0 && (
         <Layer>
           {userGuides.map((guide) => (
-            <Group key={`user-guide-${guide.id}`}>
+            <Group key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasGuideLayers", "en", "user-guide-{v0}"), { v0: String(guide.id) })}>
               <Line
                 points={guide.type === "v"
                   ? [guide.pos, 0, guide.pos, canvasHeight]
@@ -567,7 +568,7 @@ export function StudioCanvasGuideOverlayLayers({
                 const length = Math.max(canvasWidth, canvasHeight) * 1.5;
                 return (
                   <Line
-                    key={`radial-${index}`}
+                    key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasGuideLayers", "en", "radial-{v0}"), { v0: String(index) })}
                     points={[
                       symmetryCenterX,
                       symmetryCenterY,
@@ -614,7 +615,7 @@ export function StudioCanvasGuideOverlayLayers({
                 const length = Math.max(canvasWidth, canvasHeight) * 1.5;
                 return (
                   <Line
-                    key={`kaleido-wedge-${index}`}
+                    key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasGuideLayers", "en", "kaleido-wedge-{v0}"), { v0: String(index) })}
                     points={[
                       symmetryCenterX,
                       symmetryCenterY,
@@ -636,7 +637,7 @@ export function StudioCanvasGuideOverlayLayers({
                 const sin = Math.sin(angle);
                 return (
                   <Line
-                    key={`kaleido-mirror-${index}`}
+                    key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasGuideLayers", "en", "kaleido-mirror-{v0}"), { v0: String(index) })}
                     points={[
                       symmetryCenterX - length * cos,
                       symmetryCenterY - length * sin,

@@ -1,8 +1,10 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { CheckCircle2, MonitorCog, Save, Trash2, TriangleAlert } from "lucide-react";
 import { useId } from "react";
 
 import type { StudioCompanionWindowLayoutSurface } from "./studio-companion-window-layout";
 
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
 export type StudioCompanionWindowSurface = StudioCompanionWindowLayoutSurface;
@@ -116,8 +118,7 @@ export function StudioCompanionWindowLayoutControls({
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             <h2 id={titleId} className="min-w-0 text-xs font-semibold text-fg-2">
-              {surfaceLabel} 창 배치
-            </h2>
+              {surfaceLabel} {translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowLayoutControls", "ko", "창 배치")}</h2>
             <span
               className={cn(
                 "inline-flex max-w-full items-center gap-1 rounded-full border px-1.5 py-0.5 text-[0.61rem] font-semibold leading-none",
@@ -135,8 +136,7 @@ export function StudioCompanionWindowLayoutControls({
             </span>
           </div>
           <p id={descriptionId} className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">
-            역할마다 독립적으로 위치와 크기를 복원합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowLayoutControls", "ko", "역할마다 독립적으로 위치와 크기를 복원합니다.")}</p>
         </div>
       </div>
 
@@ -159,22 +159,8 @@ export function StudioCompanionWindowLayoutControls({
           )}
         >
           <span className="min-w-0 text-[0.68rem] font-semibold leading-tight">
-            위치·크기 기억
-          </span>
-          <span
-            aria-hidden
-            className={cn(
-              "flex h-6 w-10 shrink-0 items-center rounded-full border px-0.5 transition-colors duration-150 motion-reduce:transition-none",
-              enabled ? "border-accent bg-accent" : "border-line-strong bg-panel"
-            )}
-          >
-            <span
-              className={cn(
-                "size-4 rounded-full shadow-sm transition-transform duration-150 motion-reduce:transition-none",
-                enabled ? "translate-x-4 bg-on-accent" : "translate-x-0 bg-fg-3"
-              )}
-            />
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowLayoutControls", "ko", "위치·크기 기억")}</span>
+          <SwitchIndicator checked={enabled} />
         </button>
 
         <button
@@ -191,8 +177,7 @@ export function StudioCompanionWindowLayoutControls({
           )}
         >
           <Save className="size-3.5 shrink-0" aria-hidden />
-          현재 위치 저장
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowLayoutControls", "ko", "현재 위치 저장")}</button>
 
         <button
           type="button"
@@ -208,8 +193,7 @@ export function StudioCompanionWindowLayoutControls({
           )}
         >
           <Trash2 className="size-3.5 shrink-0" aria-hidden />
-          저장 배치 삭제
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowLayoutControls", "ko", "저장 배치 삭제")}</button>
       </div>
 
       <p
@@ -224,9 +208,7 @@ export function StudioCompanionWindowLayoutControls({
         {persistence.detail}
       </p>
       <p id={privacyId} className="mt-0.5 break-words text-[0.61rem] leading-relaxed text-fg-3">
-        창 위치·크기와 복원에 필요한 최소한의 모니터 크기·배율·상대 배치 특성만 이 기기에 저장합니다.
-        모니터 이름·ID와 작품·세션·계정 정보는 저장하지 않습니다.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.StudioCompanionWindowLayoutControls", "ko", "창 위치·크기와 복원에 필요한 최소한의 모니터 크기·배율·상대 배치 특성만 이 기기에 저장합니다. 모니터 이름·ID와 작품·세션·계정 정보는 저장하지 않습니다.")}</p>
     </section>
   );
 }

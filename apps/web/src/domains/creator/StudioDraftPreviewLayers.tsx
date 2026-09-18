@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { memo, useLayoutEffect, useRef, useSyncExternalStore, type RefObject } from "react";
 import { Layer } from "react-konva/lib/ReactKonvaCore";
 
@@ -79,7 +80,7 @@ const StudioDraftPreviewSettledRunLayer = memo(
     return (
       <Layer
         ref={layerRef}
-        name={`studio-draft-preview-settled-${run.mode}-${runIndex}`}
+        name={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDraftPreviewLayers", "en", "studio-draft-preview-settled-{v0}-{v1}"), { v0: String(run.mode), v1: String(runIndex) })}
         listening={false}
       >
         {run.elements.map((element) => (

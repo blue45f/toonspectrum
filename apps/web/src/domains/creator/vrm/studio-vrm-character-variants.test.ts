@@ -92,6 +92,9 @@ describe("studio VRM character variants (CHR-017)", () => {
     for (const variant of STUDIO_VRM_CHARACTER_VARIANTS) {
       const applied = applyStudioVrmCharacterVariant(createAvatarForgeState(), variant.id);
       expect(applied.hair.style).toBe(variant.hair.style ?? applied.hair.style);
+      expect(applied.hair.replaceOriginal).toBe(true);
+      if (variant.hair.volume !== undefined) expect(applied.hair.volume).toBe(variant.hair.volume);
+      if (variant.hair.length !== undefined) expect(applied.hair.length).toBe(variant.hair.length);
       for (const value of Object.values(applied.proportions)) {
         expect(Number.isFinite(value)).toBe(true);
       }

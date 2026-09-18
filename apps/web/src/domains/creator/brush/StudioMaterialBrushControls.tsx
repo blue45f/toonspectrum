@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { StudioBrushTopologyControls } from "./StudioBrushTopologyControls";
 import { brushStudioV6Topology } from "../brush-lab/brush-studio-v6-topology-catalog";
 import { useId, useState } from "react";
@@ -86,10 +90,10 @@ export function StudioMaterialBrushControls({ material, programSet, currentSnaps
     }
   };
 
-  return <section className="space-y-3 rounded-2xl border border-line bg-card/35 p-3" aria-label="커스텀 재료 브러시 설정">
+  return <section className="space-y-3 rounded-2xl border border-line bg-card/35 p-3" aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioMaterialBrushControls", "ko", "커스텀 재료 브러시 설정")}>
     <div className="rounded-xl border border-line bg-bg-2/60 p-3">
       <h3 className="text-sm font-bold text-fg">{label}</h3>
-      <p className="mt-1 text-xs leading-5 text-fg-3">다음 획부터 반영됩니다. 크기·기본 색·불투명도는 브러시의 기본 도구 설정에서 조절하세요.</p>
+      <p className="mt-1 text-xs leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.StudioMaterialBrushControls", "ko", "다음 획부터 반영됩니다. 크기·기본 색·불투명도는 브러시의 기본 도구 설정에서 조절하세요.")}</p>
     </div>
     <StudioBrushTopologyControls material={material} onChange={(next) => onChange({ ...programSet, material: next })} />
     <div className="space-y-2">
@@ -102,18 +106,17 @@ export function StudioMaterialBrushControls({ material, programSet, currentSnaps
           }} className="mt-1 min-h-8 w-full accent-accent" />
       </div>)}
     </div>
-    <label htmlFor={`${instanceId}-secondary`} className="flex min-h-11 items-center justify-between gap-3 text-xs font-semibold text-fg-2">혼합·문양 색
-      <input id={`${instanceId}-secondary`} type="color" value={material.tuning.secondaryColor} disabled={!active.has("secondaryColor")}
-        aria-describedby={!active.has("secondaryColor") ? `${instanceId}-secondary-inactive` : undefined} className="h-9 w-16 rounded-lg disabled:opacity-55"
+    <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioMaterialBrushControls", "en", "{v0}-secondary"), { v0: String(instanceId) })} className="flex min-h-11 items-center justify-between gap-3 text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.brush.StudioMaterialBrushControls", "ko", "혼합·문양 색")}<input id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioMaterialBrushControls", "en", "{v0}-secondary"), { v0: String(instanceId) })} type="color" value={material.tuning.secondaryColor} disabled={!active.has("secondaryColor")}
+        aria-describedby={!active.has("secondaryColor") ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioMaterialBrushControls", "en", "{v0}-secondary-inactive"), { v0: String(instanceId) }) : undefined} className="h-9 w-16 rounded-lg disabled:opacity-55"
         onChange={(event) => {
           const next = normalizeBrushStudioV6MaterialConfig({ ...material, tuning: { ...material.tuning, secondaryColor: event.currentTarget.value } });
           if (next) onChange({ ...programSet, material: next });
         }} />
     </label>
-    {!active.has("secondaryColor") ? <p id={`${instanceId}-secondary-inactive`} className="text-[0.65rem] leading-4 text-fg-3">현재 재료 조합에서 사용하지 않음</p> : null}
+    {!active.has("secondaryColor") ? <p id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioMaterialBrushControls", "en", "{v0}-secondary-inactive"), { v0: String(instanceId) })} className="text-[0.65rem] leading-4 text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.StudioMaterialBrushControls", "ko", "현재 재료 조합에서 사용하지 않음")}</p> : null}
     <div className="flex flex-wrap gap-2">
-      <button type="button" onClick={openEditor} className={`inline-flex min-h-11 items-center rounded-xl border border-line px-3 py-2 text-xs font-semibold text-fg transition-colors hover:bg-raised ${STUDIO_FOCUS_RING}`}>브러시 편집기에서 비교·실험</button>
-      <button type="button" onClick={() => onChange(null)} className={`min-h-11 rounded-xl border border-line px-3 py-2 text-xs font-semibold text-fg-3 transition-colors hover:bg-raised ${STUDIO_FOCUS_RING}`}>기본 브러시로 전환</button>
+      <button type="button" onClick={openEditor} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioMaterialBrushControls", "en", "inline-flex min-h-11 items-center rounded-xl border border-line px-3 py-2 text-xs font-semibold text-fg transition-colors hover:bg-raised {v0}"), { v0: String(STUDIO_FOCUS_RING) })}>{translateCurrentStaticSourceText("domains.creator.brush.StudioMaterialBrushControls", "ko", "브러시 편집기에서 비교·실험")}</button>
+      <button type="button" onClick={() => onChange(null)} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioMaterialBrushControls", "en", "min-h-11 rounded-xl border border-line px-3 py-2 text-xs font-semibold text-fg-3 transition-colors hover:bg-raised {v0}"), { v0: String(STUDIO_FOCUS_RING) })}>{translateCurrentStaticSourceText("domains.creator.brush.StudioMaterialBrushControls", "ko", "기본 브러시로 전환")}</button>
     </div>
     {notice ? <p role="status" className="text-xs leading-5 text-fg-3">{notice}</p> : null}
   </section>;

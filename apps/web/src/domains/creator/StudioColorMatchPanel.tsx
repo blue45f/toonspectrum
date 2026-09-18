@@ -1,17 +1,9 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
- * StudioColorMatchPanel.tsx
- *
- * CLIP STUDIO PAINT Ver.3.0 Parity:
- * - Color Match (컬러 매치 / 색상 일치):
- *   - Intuitively harmonizes colors of artwork based on a reference image or palette mood.
- *   - Extracts reference color distribution (mean & standard deviation per RGB channel)
- *     and maps target layer tones toward the reference atmosphere.
- *   - Features:
- *     - Curated Webtoon Atmospheric Presets (Warm Sunset, Cyberpunk Neon, Vintage Pastel, Dramatic Noir, Golden Hour, Mystic Forest)
- *     - Custom Reference Image File Upload / Paste
- *     - Adjustable Match Strength (0..100%), Luminance Preservation, Clip Sigma
- *     - Before/After Split Comparison View (A/B 분할 비교 슬라이더)
- *     - One-click Apply to active canvas or layer
+ * Reference-driven color harmonization panel.
+ * User-facing language follows ToonStudio's task vocabulary rather than competitor labels.
  */
 
 import {
@@ -146,19 +138,16 @@ export function StudioColorMatchPanel({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 p-3.5 text-xs bg-slate-900/90 text-slate-100 rounded-lg border border-slate-800 shadow-xl",
+        "flex flex-col gap-3 rounded-xl border border-line bg-card p-3 text-xs text-fg shadow-sm",
         className,
       )}
       data-testid="studio-color-match-panel"
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-        <div className="flex items-center gap-1.5 font-semibold text-slate-200">
-          <Sparkles size={15} className="text-amber-400" />
-          <span>컬러 매치 (Color Match)</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium">
-            CSP 3.0
-          </span>
+      <div className="flex items-center justify-between border-b border-line/60 pb-2">
+        <div className="flex items-center gap-1.5 font-semibold text-fg-2">
+          <Sparkles size={15} className="text-accent" aria-hidden />
+          <span>색감 맞추기</span>
         </div>
         <button
           type="button"
@@ -168,33 +157,32 @@ export function StudioColorMatchPanel({
             variant: showSplitView ? "solid" : "ghost",
             className: cn(
               "h-6 px-2 text-[11px] gap-1",
-              showSplitView ? "bg-slate-700 text-white" : "text-slate-400",
+              showSplitView ? "border-accent/45 bg-accent-soft text-fg" : "text-fg-3 hover:bg-raised hover:text-fg",
             ),
           })}
-          title="Before/After 분할 비교 토글"
+          title="원본과 결과를 나눠 비교"
         >
           <Eye size={12} />
-          <span>{showSplitView ? "비교 뷰 On" : "단일 뷰"}</span>
+          <span>{showSplitView ? "비교 보기" : "한 화면"}</span>
         </button>
       </div>
 
       {/* Description */}
-      <p className="text-[11px] text-slate-400 leading-relaxed">
-        참조 이미지나 분위기 프리셋의 색채 분포(평균/표준편차)를 분석하여 선화
-        디테일을 보존하면서 색조를 자연스럽게 조화시킵니다.
+      <p className="text-[11px] leading-relaxed text-fg-3">
+        참고 이미지나 분위기를 기준으로 현재 그림의 색감을 자연스럽게 맞춥니다.
       </p>
 
       {/* Preset Mood Selector */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <span className="font-medium text-slate-300">참조 분위기 프리셋</span>
+          <span className="font-medium text-fg-2">참고 색감</span>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+            className="flex items-center gap-1 text-[11px] font-medium text-accent hover:text-fg"
           >
             <Upload size={12} />
-            <span>이미지 직접 올리기</span>
+            <span>사진으로 맞추기</span>
           </button>
           <input
             ref={fileInputRef}
@@ -206,9 +194,9 @@ export function StudioColorMatchPanel({
         </div>
 
         {customRefName && (
-          <div className="flex items-center justify-between px-2 py-1 bg-indigo-950/40 border border-indigo-500/40 rounded text-[11px] text-indigo-200">
+          <div className="flex items-center justify-between rounded-lg border border-accent/35 bg-accent-soft/25 px-2 py-1 text-[11px] text-fg-2">
             <span className="truncate max-w-[200px]">
-              사용자 이미지: {customRefName}
+              {translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "사용자 이미지: ")}{customRefName}
             </span>
             <button
               type="button"
@@ -216,10 +204,9 @@ export function StudioColorMatchPanel({
                 setCustomRefImage(null);
                 setCustomRefName(null);
               }}
-              className="text-slate-400 hover:text-slate-200 text-[10px]"
+              className="text-[10px] text-fg-3 hover:text-fg"
             >
-              초기화
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "초기화")}</button>
           </div>
         )}
 
@@ -239,12 +226,12 @@ export function StudioColorMatchPanel({
                 className={cn(
                   "flex items-center gap-2 p-1.5 rounded border text-left transition-colors",
                   isSelected
-                    ? "bg-amber-950/40 border-amber-500/60 text-white"
-                    : "bg-slate-800/40 border-slate-800 hover:bg-slate-800/80 text-slate-300",
+                    ? "border-accent/55 bg-accent-soft/35 text-fg"
+                    : "border-line/70 bg-panel/45 text-fg-2 hover:bg-raised",
                 )}
               >
                 <div
-                  className="w-5 h-5 rounded-full border border-white/20 shrink-0 shadow"
+                  className="size-5 shrink-0 rounded-full border border-line/70 shadow-sm"
                   style={{ background: preset.previewGradient }}
                 />
                 <div className="flex flex-col truncate">
@@ -259,11 +246,11 @@ export function StudioColorMatchPanel({
       </div>
 
       {/* Adjustments Controls */}
-      <div className="flex flex-col gap-2.5 pt-1 border-t border-slate-800">
+      <div className="flex flex-col gap-2.5 border-t border-line/60 pt-2">
         <div className="flex flex-col gap-1">
           <div className="flex justify-between text-[11px]">
-            <span className="text-slate-400">적용 강도 (Match Strength)</span>
-            <span className="font-semibold text-slate-200">{strengthPercent}%</span>
+            <span className="text-fg-3">적용 강도</span>
+            <span className="font-semibold tabular-nums text-fg-2">{strengthPercent}%</span>
           </div>
           <input
             type="range"
@@ -271,15 +258,16 @@ export function StudioColorMatchPanel({
             max={100}
             step={1}
             value={strengthPercent}
+            aria-label="색감 적용 강도"
             onChange={(e) => setStrengthPercent(Number(e.target.value))}
-            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
+            className="h-6 w-full cursor-pointer accent-accent"
           />
         </div>
 
         <div className="flex flex-col gap-1">
           <div className="flex justify-between text-[11px]">
-            <span className="text-slate-400">대비 클램핑 (Clip Sigma)</span>
-            <span className="font-semibold text-slate-200">{clipSigma.toFixed(1)}σ</span>
+            <span className="text-fg-3">색 변화 범위</span>
+            <span className="font-semibold tabular-nums text-fg-2">{clipSigma.toFixed(1)}×</span>
           </div>
           <input
             type="range"
@@ -287,6 +275,7 @@ export function StudioColorMatchPanel({
             max={4.0}
             step={0.1}
             value={clipSigma}
+            aria-label="색 변화 범위"
             onChange={(e) => setClipSigma(Number(e.target.value))}
             className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
           />
@@ -295,8 +284,8 @@ export function StudioColorMatchPanel({
         {showSplitView && (
           <div className="flex flex-col gap-1">
             <div className="flex justify-between text-[11px]">
-              <span className="text-slate-400">비교 분할 (Before / After)</span>
-              <span className="font-semibold text-slate-200">{splitPercent}%</span>
+              <span className="text-fg-3">비교 위치</span>
+              <span className="font-semibold tabular-nums text-fg-2">{splitPercent}%</span>
             </div>
             <input
               type="range"
@@ -304,15 +293,16 @@ export function StudioColorMatchPanel({
               max={100}
               step={1}
               value={splitPercent}
+              aria-label="원본 비교 위치"
               onChange={(e) => setSplitPercent(Number(e.target.value))}
-              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-400"
+              className="h-6 w-full cursor-pointer accent-accent"
             />
           </div>
         )}
       </div>
 
       {/* Commit Actions */}
-      <div className="pt-2 border-t border-slate-800 flex items-center justify-end gap-2">
+      <div className="flex items-center justify-end gap-2 border-t border-line/60 pt-2">
         <button
           type="button"
           onClick={() => {
@@ -323,11 +313,11 @@ export function StudioColorMatchPanel({
           className={buttonClass({
             size: "sm",
             variant: "ghost",
-            className: "h-7 px-2 text-[11px] text-slate-400 hover:text-slate-200 gap-1",
+            className: "h-7 gap-1 px-2 text-[11px] text-fg-3 hover:bg-raised hover:text-fg",
           })}
         >
           <RefreshCw size={11} />
-          <span>재설정</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "재설정")}</span>
         </button>
 
         <button
@@ -340,13 +330,13 @@ export function StudioColorMatchPanel({
             className: cn(
               "h-7 px-3 text-[11px] font-medium gap-1.5",
               matchResult
-                ? "bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-900/30"
-                : "bg-slate-800 text-slate-500 cursor-not-allowed",
+                ? "bg-accent text-on-accent hover:bg-accent-2"
+                : "cursor-not-allowed bg-raised text-fg-3",
             ),
           })}
         >
           <Check size={13} />
-          <span>컬러 매치 적용</span>
+          <span>색감 적용</span>
         </button>
       </div>
     </div>

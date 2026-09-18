@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useState } from "react";
 
 import { SplashScreen } from "./SplashScreen";
@@ -32,7 +33,7 @@ function IntroSplashLoading() {
       aria-hidden="true"
       className="fixed inset-0 z-[1000000] grid place-items-center overflow-hidden bg-[#060309] text-white"
     >
-      <span className="font-black tracking-[0.14em]">TOONSPECTRUM</span>
+      <span className="font-black tracking-[0.14em]">{translateCurrentStaticSourceText("shared.components.RandomIntro", "en", "TOONSPECTRUM")}</span>
     </div>
   );
 }

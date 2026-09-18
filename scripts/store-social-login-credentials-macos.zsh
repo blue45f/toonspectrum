@@ -10,6 +10,10 @@ readonly -a REQUIRED_KEYS=(
   NAVER_OAUTH_CLIENT_SECRET
   GITHUB_OAUTH_CLIENT_ID
   GITHUB_OAUTH_CLIENT_SECRET
+  APPLE_SERVICE_ID
+  APPLE_TEAM_ID
+  APPLE_KEY_ID
+  APPLE_PRIVATE_KEY
 )
 
 usage() {
@@ -18,7 +22,7 @@ Usage:
   scripts/store-social-login-credentials-macos.zsh [vault-file]
   scripts/store-social-login-credentials-macos.zsh --status
 
-Imports the six production social-login credentials into macOS Keychain using
+Imports the ten production social-login credentials into macOS Keychain using
 service names such as toonstudio:KAKAO_REST_API_KEY. Values are never printed.
 TEXT
 }
@@ -74,7 +78,7 @@ import_vault() {
     key="${line%%=*}"
     value="${line#*=}"
     case "$key" in
-      KAKAO_REST_API_KEY|KAKAO_CLIENT_SECRET|NAVER_OAUTH_CLIENT_ID|NAVER_OAUTH_CLIENT_SECRET|GITHUB_OAUTH_CLIENT_ID|GITHUB_OAUTH_CLIENT_SECRET)
+      KAKAO_REST_API_KEY|KAKAO_CLIENT_SECRET|NAVER_OAUTH_CLIENT_ID|NAVER_OAUTH_CLIENT_SECRET|GITHUB_OAUTH_CLIENT_ID|GITHUB_OAUTH_CLIENT_SECRET|APPLE_SERVICE_ID|APPLE_TEAM_ID|APPLE_KEY_ID|APPLE_PRIVATE_KEY)
         values[$key]="$value"
         ;;
     esac

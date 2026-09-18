@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   useId,
   useLayoutEffect,
@@ -197,9 +198,7 @@ export function StudioInsertHubDirectDragBoundary({
       data-studio-insert-direct-drag-boundary="true"
     >
       <span id={helpId} className="sr-only">
-        캔버스의 원하는 위치로 끌어 놓을 수 있습니다. 클릭과 키보드 실행은
-        기존 삽입 동작을 그대로 사용합니다.
-      </span>
+        {translateCurrentStaticSourceText("domains.creator.StudioInsertHubDirectDragBoundary", "ko", "캔버스의 원하는 위치로 끌어 놓을 수 있습니다. 클릭과 키보드 실행은 기존 삽입 동작을 그대로 사용합니다.")}</span>
       {children}
     </div>
   );

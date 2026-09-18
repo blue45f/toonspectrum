@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Photo Filter Panel
  * 선택된 이미지의 포토 필터(Photo Filter) 보정 인스펙터 — 원클릭 색조 프리셋 +
@@ -36,17 +37,16 @@ export function StudioPhotoFilterPanel({
     <div className="space-y-2">
       {/* 헤더 + 항등 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">포토 필터 (Photo Filter)</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioPhotoFilterPanel", "ko", "포토 필터 (Photo Filter)")}</p>
         <button
           type="button"
           onClick={onReset}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title="포토 필터를 제거하고 색조 없는 원본으로 되돌립니다."
+          title={translateCurrentStaticSourceText("domains.creator.StudioPhotoFilterPanel", "ko", "포토 필터를 제거하고 색조 없는 원본으로 되돌립니다.")}
         >
           <RotateCcw className="size-3.5" />
-          원본으로
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioPhotoFilterPanel", "ko", "원본으로")}</button>
       </div>
 
       {/* 원클릭 색조 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). 스와치는 프리셋 색으로 칠한다. */}
@@ -65,8 +65,7 @@ export function StudioPhotoFilterPanel({
 
       {/* 필터 색 — input[type=color]는 빈 값 불가라 항상 #rrggbb를 들고 있다. */}
       <label className="flex items-center gap-2 text-xs text-fg-2">
-        필터 색
-        <input
+        {translateCurrentStaticSourceText("domains.creator.StudioPhotoFilterPanel", "ko", "필터 색")}<input
           type="color"
           value={value.color}
           onChange={(e) => onPatch({ color: e.target.value })}
@@ -76,7 +75,7 @@ export function StudioPhotoFilterPanel({
 
       {/* 농도(density) 슬라이더 — 범위는 PHOTO_FILTER_DENSITY_RANGE에서. 0이면 항등. */}
       <StudioSliderRow
-        label="농도 (Density)"
+        label={translateCurrentStaticSourceText("domains.creator.StudioPhotoFilterPanel", "ko", "농도 (Density)")}
         min={PHOTO_FILTER_DENSITY_RANGE.min}
         max={PHOTO_FILTER_DENSITY_RANGE.max}
         step={PHOTO_FILTER_DENSITY_RANGE.step}
@@ -93,8 +92,7 @@ export function StudioPhotoFilterPanel({
           onChange={(e) => onPatch({ preserveLuminosity: e.target.checked })}
           className="size-3.5 accent-accent cursor-pointer"
         />
-        광도 유지 (Preserve Luminosity)
-      </label>
+        {translateCurrentStaticSourceText("domains.creator.StudioPhotoFilterPanel", "ko", "광도 유지 (Preserve Luminosity)")}</label>
     </div>
   );
 }

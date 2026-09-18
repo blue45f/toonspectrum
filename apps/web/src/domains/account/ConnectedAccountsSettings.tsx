@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { CheckCircle2, Link2, Loader2, Unlink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -9,7 +12,7 @@ import { GoogleIdentityButton } from "@/domains/auth/components/google-identity-
 import { persistSession } from "@/compat/auth-session-store";
 import { api, apiPath } from "@/infrastructure/api";
 
-type ProviderId = "google" | "kakao" | "naver" | "github";
+type ProviderId = "google" | "apple" | "kakao" | "naver" | "github";
 
 type LinkedAccounts = {
   password: boolean;
@@ -22,6 +25,7 @@ const PROVIDERS: ReadonlyArray<{
   label: string;
 }> = [
   { id: "google", label: "Google" },
+  { id: "apple", label: "Apple" },
   { id: "kakao", label: "카카오" },
   { id: "naver", label: "네이버" },
   { id: "github", label: "GitHub" },
@@ -167,8 +171,7 @@ export function ConnectedAccountsSettings({ userId }: { userId: string | null })
   if (!userId) {
     return (
       <div className="rounded-xl border border-line bg-card/50 p-4 text-sm text-fg-2">
-        로그인하면 연결된 로그인 수단을 관리할 수 있어요.
-      </div>
+        {translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "로그인하면 연결된 로그인 수단을 관리할 수 있어요.")}</div>
     );
   }
 
@@ -176,8 +179,7 @@ export function ConnectedAccountsSettings({ userId }: { userId: string | null })
     return (
       <div className="flex min-h-24 items-center justify-center gap-2 text-sm text-fg-3">
         <Loader2 className="size-4 animate-spin" aria-hidden />
-        로그인 수단 확인 중…
-      </div>
+        {translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "로그인 수단 확인 중…")}</div>
     );
   }
 
@@ -188,10 +190,9 @@ export function ConnectedAccountsSettings({ userId }: { userId: string | null })
           <Link2 size={16} aria-hidden />
         </span>
         <div>
-          <h3 className="text-sm font-semibold text-fg">연결된 로그인 수단</h3>
+          <h3 className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "연결된 로그인 수단")}</h3>
           <p className="mt-0.5 text-[0.78rem] leading-relaxed text-fg-2">
-            같은 이메일만으로 계정을 합치지 않아요. 로그인한 상태에서 직접 연결해 주세요.
-          </p>
+            {translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "같은 이메일만으로 계정을 합치지 않아요. 로그인한 상태에서 직접 연결해 주세요.")}</p>
         </div>
       </div>
 
@@ -208,19 +209,18 @@ export function ConnectedAccountsSettings({ userId }: { userId: string | null })
       <div className="rounded-xl border border-line bg-card/50">
         <div className="flex items-center justify-between gap-3 border-b border-line/60 px-3 py-3">
           <div>
-            <p className="text-sm font-medium text-fg">이메일과 비밀번호</p>
+            <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "이메일과 비밀번호")}</p>
             <p className="mt-0.5 text-xs text-fg-3">
               {accounts?.emailVerified
-                ? "확인된 이메일로 로그인할 수 있어요."
-                : "이메일 확인이 필요해요."}
+                ? translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "확인된 이메일로 로그인할 수 있어요.")
+                : translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "이메일 확인이 필요해요.")}
             </p>
           </div>
           {accounts?.password ? (
             <span className="inline-flex items-center gap-1 text-xs font-semibold text-good">
-              <CheckCircle2 size={14} aria-hidden /> 연결됨
-            </span>
+              <CheckCircle2 size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "연결됨")}</span>
           ) : (
-            <span className="text-xs font-medium text-fg-3">미설정</span>
+            <span className="text-xs font-medium text-fg-3">{translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "미설정")}</span>
           )}
         </div>
 
@@ -245,10 +245,10 @@ export function ConnectedAccountsSettings({ userId }: { userId: string | null })
                 <p className="text-sm font-medium text-fg">{label}</p>
                 <p className="mt-0.5 text-xs text-fg-3">
                   {linked
-                    ? "이 계정으로 로그인할 수 있어요."
+                    ? translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "이 계정으로 로그인할 수 있어요.")
                     : canLink
-                      ? "직접 인증한 뒤 현재 회원 계정에 연결해요."
-                      : "현재 계정 연결을 사용할 수 없어요."}
+                      ? translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "직접 인증한 뒤 현재 회원 계정에 연결해요.")
+                      : translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "현재 계정 연결을 사용할 수 없어요.")}
                 </p>
               </div>
               <div className="sm:min-w-44 sm:text-right">
@@ -257,7 +257,7 @@ export function ConnectedAccountsSettings({ userId }: { userId: string | null })
                     type="button"
                     disabled={isBusy || lastMethod}
                     onClick={() => { void unlinkProvider(id); }}
-                    title={lastMethod ? "마지막 로그인 수단은 해제할 수 없어요." : undefined}
+                    title={lastMethod ? translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "마지막 로그인 수단은 해제할 수 없어요.") : undefined}
                     className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 transition-colors hover:border-bad/50 hover:bg-bad/5 hover:text-bad disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     {isBusy ? (
@@ -265,7 +265,7 @@ export function ConnectedAccountsSettings({ userId }: { userId: string | null })
                     ) : (
                       <Unlink size={14} aria-hidden />
                     )}
-                    {confirmProvider === id ? "연결 해제 확인" : "연결 해제"}
+                    {confirmProvider === id ? translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "연결 해제 확인") : translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "연결 해제")}
                   </button>
                 ) : canUseGoogleIdentity && provider?.clientId ? (
                   <div className="ml-auto w-full max-w-72">
@@ -292,10 +292,9 @@ export function ConnectedAccountsSettings({ userId }: { userId: string | null })
                     ) : (
                       <Link2 size={14} aria-hidden />
                     )}
-                    계정 연결
-                  </button>
+                    {translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "계정 연결")}</button>
                 ) : (
-                  <span className="text-xs font-medium text-fg-3">설정 필요</span>
+                  <span className="text-xs font-medium text-fg-3">{translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "설정 필요")}</span>
                 )}
               </div>
             </div>
@@ -303,8 +302,7 @@ export function ConnectedAccountsSettings({ userId }: { userId: string | null })
         })}
       </div>
       <p className="text-[0.72rem] leading-relaxed text-fg-3">
-        연결 해제 시 보안을 위해 모든 기기에서 로그아웃돼요. 다른 로그인 수단이 하나 이상 있어야 해제할 수 있어요.
-      </p>
+        {translateCurrentStaticSourceText("domains.account.ConnectedAccountsSettings", "ko", "연결 해제 시 보안을 위해 모든 기기에서 로그아웃돼요. 다른 로그인 수단이 하나 이상 있어야 해제할 수 있어요.")}</p>
     </div>
   );
 }

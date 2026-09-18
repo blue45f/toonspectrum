@@ -14,7 +14,10 @@ vi.mock("@/shared/components/search-explorer", async () => {
     },
   };
 });
-vi.mock("@/shared/lib/i18n", () => ({ useT: () => (key: string) => key }));
+vi.mock("@/shared/lib/i18n", () => ({
+  useI18n: (selector: (state: { lang: string }) => unknown) => selector({ lang: "en" }),
+  useT: () => (key: string) => key,
+}));
 
 afterEach(cleanup);
 

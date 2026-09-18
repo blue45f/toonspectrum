@@ -43,23 +43,27 @@ jobs:
     env:
       HUSKY: '0'
       CI: 'true'
-      NODE_OPTIONS: --max-old-space-size=8192
+      NODE_OPTIONS: --max-old-space-size=12288
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 11.4.0
+          run_install: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24.16.0
-          package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - name: Install the locked dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
+      - name: Lint the focused asset implementation without rewriting source
         run: |
-          npm install --global pnpm@11.4.0 --ignore-scripts --no-audit --no-fund
-          pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
-      - name: Check the asset implementation without rewriting source
-        run: |
+          # Repository-wide typecheck and build are required once by CI/core.
+          # Keeping this lane focused prevents unrelated domain errors from fanning out here.
           pnpm exec eslint --max-warnings=0 apps/web/src/domains/creator/studio-cc0-curation.ts apps/web/src/domains/creator/studio-cc0-curation.test.ts apps/web/src/domains/creator/StudioCc0AssetLibraryPanel.tsx scripts/verify-studio-cc0-curated-ui.mjs scripts/studio-cc0-lifecycle-checks.mjs
-          pnpm exec tsc -p tsconfig.json --pretty false
       - name: Verify the catalog and existing asset contracts
         run: |
           pnpm exec vitest run apps/web/src/domains/creator/studio-cc0-curation.test.ts apps/web/src/domains/creator/studio-cc0-asset-delivery.test.ts apps/web/src/domains/creator/studio-original-free-asset-packs.test.ts apps/web/src/domains/creator/StudioOriginalAssetMarketplacePanel.test.tsx apps/web/src/domains/creator/studio-shared-asset-drag.test.ts apps/web/src/domains/creator/vrm/studio-vrm-outfit-static-asset-audit.test.ts
@@ -74,7 +78,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/studio-cc0-ui"
           git rev-parse HEAD > "$RUNNER_TEMP/studio-cc0-ui/tested-revision.txt"
           git diff --exit-code -- apps/web/src/domains/creator scripts
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
           name: studio-cc0-library-${{ github.run_id }}-${{ github.run_attempt }}
