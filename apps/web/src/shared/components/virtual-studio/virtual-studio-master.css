@@ -18,3 +18,8 @@
 @media(prefers-reduced-motion:reduce){.vs-master-speech,.vs-master-pet{animation:none}}
 @media(max-width:900px){.vs-master-world{min-height:580px;border-radius:16px}.vs-master-room-hotspot>span{transform:scale(.88)}.vs-master-actor{scale:.82}.vs-master-speech{display:none}}
 @media(max-width:580px){.vs-master-world{min-height:540px}.vs-master-room-hotspot>span{display:none}.vs-master-actor{scale:.68}.vs-master-pet{font-size:20px}}
+
+.vs-master-reference-backdrop{position:absolute;inset:0;overflow:hidden;background:#17181b}
+.vs-master-reference-image{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover;object-position:center;user-select:none;pointer-events:none}
+
+.studio-vspace-ambient-creators{display:none}

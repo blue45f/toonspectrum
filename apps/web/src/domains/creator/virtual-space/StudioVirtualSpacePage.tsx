@@ -397,13 +397,25 @@ function ChibiAvatar({
       data-self={self || undefined}
       aria-label={name}
     >
-      <StudioChibiSprite
-        variant={variant}
-        direction={facing}
-        motion={motion}
-        size={104}
-        online={activity !== "away"}
-      />
+      <span
+        className="studio-vspace-reference-player"
+        data-motion={motion}
+        data-direction={facing}
+        style={{ "--studio-reference-hue": `${variant * 27}deg` } as CSSProperties}
+        aria-hidden="true"
+      >
+        <img
+          src="/assets/virtual-studio/reference/player-pink.png"
+          alt=""
+          draggable={false}
+        />
+        <i
+          className={cn(
+            "studio-vspace-reference-online",
+            activity === "away" && "is-away",
+          )}
+        />
+      </span>
       {reactionEmoji ? (
         <span
           className="studio-vspace-reaction absolute -top-5 left-1/2 z-50 grid size-10 -translate-x-1/2 place-items-center rounded-2xl border border-white/30 bg-panel/95 text-xl shadow-xl backdrop-blur"
@@ -651,7 +663,13 @@ function LiveStudioSidebar({
   const reviewHref = studioVirtualSpaceDestination(projectId, "review") ?? "/production";
   const assetHref = studioVirtualSpaceDestination(projectId, "assets") ?? "/studio/assets";
   const storyHref = studioVirtualSpaceDestination(projectId, "story") ?? "/story-lab";
-  const items = [
+  const items: readonly {
+    readonly href: string;
+    readonly ko: string;
+    readonly en: string;
+    readonly icon: typeof Home;
+    readonly active?: boolean;
+  }[] = [
     { href: "/", ko: "홈", en: "Home", icon: Home },
     { href: `/studio/p/${encodeURIComponent(projectId)}/overview`, ko: "프로젝트", en: "Project", icon: FolderKanban },
     { href: `/studio/p/${encodeURIComponent(projectId)}/space`, ko: "스튜디오", en: "Studio", icon: Sparkles, active: true },

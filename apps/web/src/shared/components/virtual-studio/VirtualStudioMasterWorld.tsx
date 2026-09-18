@@ -54,7 +54,7 @@ const ACTORS: readonly MasterActor[] = [
   { name: "트리", variant: 6, x: 93, y: 87, size: 72, motion: "idle" },
 ] as const;
 
-function Plant({ x, y, scale = 1 }: { readonly x: number; readonly y: number; readonly scale?: number }) {
+function _Plant({ x, y, scale = 1 }: { readonly x: number; readonly y: number; readonly scale?: number }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${scale})`} className="vs-master-plant">
       <ellipse cx="0" cy="22" rx="12" ry="5" fill="#4d3425" opacity=".45" />
@@ -69,7 +69,7 @@ function Plant({ x, y, scale = 1 }: { readonly x: number; readonly y: number; re
   );
 }
 
-function Desk({ x, y, scale = 1, monitors = 1 }: { readonly x: number; readonly y: number; readonly scale?: number; readonly monitors?: number }) {
+function _Desk({ x, y, scale = 1, monitors = 1 }: { readonly x: number; readonly y: number; readonly scale?: number; readonly monitors?: number }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${scale})`} className="vs-master-prop">
       <rect x="-42" y="-7" width="84" height="25" rx="4" fill="#9d6a42" />
@@ -91,7 +91,7 @@ function Desk({ x, y, scale = 1, monitors = 1 }: { readonly x: number; readonly 
   );
 }
 
-function Sofa({ x, y, scale = 1 }: { readonly x: number; readonly y: number; readonly scale?: number }) {
+function _Sofa({ x, y, scale = 1 }: { readonly x: number; readonly y: number; readonly scale?: number }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${scale})`} className="vs-master-prop">
       <rect x="-54" y="-17" width="108" height="41" rx="13" fill="#c8a17d" />
@@ -103,7 +103,7 @@ function Sofa({ x, y, scale = 1 }: { readonly x: number; readonly y: number; rea
   );
 }
 
-function Bookshelf({ x, y, scale = 1 }: { readonly x: number; readonly y: number; readonly scale?: number }) {
+function _Bookshelf({ x, y, scale = 1 }: { readonly x: number; readonly y: number; readonly scale?: number }) {
   const books = ["#bf6372", "#5f82b8", "#dda957", "#6e9566", "#8e68a9"];
   return (
     <g transform={`translate(${x} ${y}) scale(${scale})`} className="vs-master-prop">
@@ -120,7 +120,7 @@ function Bookshelf({ x, y, scale = 1 }: { readonly x: number; readonly y: number
   );
 }
 
-function StoryboardWall() {
+function _StoryboardWall() {
   return (
     <g transform="translate(726 80)">
       <rect x="-89" y="-52" width="178" height="104" rx="6" fill="#f6e8d3" stroke="#b7865a" strokeWidth="4" />
@@ -140,109 +140,16 @@ function StoryboardWall() {
 
 export function VirtualStudioMasterBackdrop() {
   return (
-    <svg className="vs-master-world-svg" viewBox="0 0 850 798" aria-hidden="true">
-      <defs>
-        <linearGradient id="worldFloor" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#bd906a" />
-          <stop offset=".5" stopColor="#d9b58f" />
-          <stop offset="1" stopColor="#b47d5a" />
-        </linearGradient>
-        <linearGradient id="roomWall" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#f0d8bf" />
-          <stop offset="1" stopColor="#d5b08d" />
-        </linearGradient>
-        <radialGradient id="plazaGlow">
-          <stop offset="0" stopColor="#fff" />
-          <stop offset=".2" stopColor="#d8c7ff" />
-          <stop offset=".45" stopColor="#997aff" />
-          <stop offset="1" stopColor="#574581" />
-        </radialGradient>
-        <filter id="softShadow" x="-40%" y="-40%" width="180%" height="180%">
-          <feDropShadow dx="0" dy="8" stdDeviation="8" floodColor="#1a1015" floodOpacity=".34" />
-        </filter>
-        <filter id="plazaLight" x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur stdDeviation="10" />
-        </filter>
-        <pattern id="floorGrid" width="34" height="34" patternUnits="userSpaceOnUse">
-          <path d="M34 0H0V34" fill="none" stroke="#fff" strokeOpacity=".075" />
-        </pattern>
-      </defs>
-      <rect width="850" height="798" rx="24" fill="#5b4338" />
-      <rect x="4" y="4" width="842" height="790" rx="22" fill="url(#worldFloor)" />
-      <rect x="4" y="4" width="842" height="790" rx="22" fill="url(#floorGrid)" />
-
-      <g className="vs-master-room-bases" filter="url(#softShadow)">
-        <path d="M0 0h264v243H0z" fill="#7c563f" />
-        <path d="M274 0h264v243H274z" fill="#78533d" />
-        <path d="M548 0h302v243H548z" fill="#76523d" />
-        <path d="M0 253h264v221H0z" fill="#704d3b" />
-        <path d="M586 253h264v221H586z" fill="#704d3b" />
-        <path d="M0 484h352v314H0z" fill="#684739" />
-        <path d="M565 484h285v314H565z" fill="#684739" />
-      </g>
-
-      <g className="vs-master-room-walls">
-        <path d="M8 8h248v46H8zM8 8h42v227H8z" fill="url(#roomWall)" />
-        <path d="M282 8h248v46H282zM282 8h42v227h-42z" fill="url(#roomWall)" />
-        <path d="M556 8h286v46H556zM800 8h42v227h-42z" fill="url(#roomWall)" />
-        <path d="M8 261h248v42H8zM8 261h40v205H8z" fill="url(#roomWall)" />
-        <path d="M594 261h248v42H594zM802 261h40v205h-40z" fill="url(#roomWall)" />
-        <path d="M8 492h336v46H8zM8 492h42v298H8z" fill="url(#roomWall)" />
-        <path d="M573 492h269v46H573zM802 492h40v298h-40z" fill="url(#roomWall)" />
-      </g>
-
-      <g opacity=".95">
-        <Sofa x={116} y={126} scale={.86} />
-        <rect x="62" y="183" width="96" height="34" rx="9" fill="#a06e49" />
-        <ellipse cx="110" cy="192" rx="28" ry="12" fill="#7f543b" />
-        <Bookshelf x={396} y={102} scale={.85} />
-        <Desk x={420} y={175} scale={.75} monitors={1} />
-        <StoryboardWall />
-        <Bookshelf x={95} y={365} scale={1.02} />
-        <Desk x={725} y={385} scale={.82} monitors={3} />
-        <rect x="620" y="338" width="56" height="84" rx="6" fill="#9a6d4b" />
-        <rect x="631" y="348" width="34" height="55" rx="4" fill="#5e3e31" />
-        <Desk x={202} y={676} scale={1.04} monitors={1} />
-        <Sofa x={160} y={736} scale={.92} />
-        <Desk x={705} y={678} scale={.92} monitors={2} />
-        <rect x="770" y="594" width="58" height="95" rx="5" fill="#f4ead7" stroke="#a67c55" strokeWidth="3" />
-        {Array.from({ length: 5 }, (_, i) => <path key={i} d={`M783 ${615 + i * 13}h30`} stroke="#7184b1" strokeWidth="3" strokeLinecap="round" />)}
-      </g>
-
-      <g>
-        <Plant x={33} y={204} scale={1.15} /><Plant x={249} y={207} scale={.95} />
-        <Plant x={290} y={206} scale={.88} /><Plant x={533} y={202} scale={.95} />
-        <Plant x={568} y={205} scale={1.02} /><Plant x={813} y={205} scale={1.25} />
-        <Plant x={45} y={448} scale={.95} /><Plant x={244} y={445} scale={1.1} />
-        <Plant x={604} y={444} scale={1.05} /><Plant x={815} y={443} scale={.9} />
-        <Plant x={54} y={760} scale={1.2} /><Plant x={330} y={749} scale={.95} />
-        <Plant x={590} y={748} scale={1.05} /><Plant x={815} y={748} scale={1.2} />
-      </g>
-
-      <g className="vs-master-plaza">
-        <ellipse cx="425" cy="365" rx="124" ry="100" fill="#3f2f43" opacity=".48" filter="url(#plazaLight)" />
-        <ellipse cx="425" cy="365" rx="105" ry="82" fill="#66536e" stroke="#8e77aa" strokeWidth="7" />
-        <ellipse cx="425" cy="365" rx="79" ry="59" fill="#344047" stroke="#bd9cff" strokeWidth="5" />
-        <ellipse cx="425" cy="365" rx="55" ry="40" fill="url(#plazaGlow)" opacity=".24" />
-        <circle cx="425" cy="351" r="38" fill="url(#plazaGlow)" filter="url(#softShadow)" />
-        <path d="M407 347c7-20 30-20 36 0 11 4 15 14 10 23-10 12-45 12-56 0-5-9 0-19 10-23z" fill="#fff9ff" opacity=".9" />
-        <circle cx="416" cy="354" r="3" fill="#8b73b5" /><circle cx="435" cy="354" r="3" fill="#8b73b5" />
-        <path d="M421 363c4 3 7 3 10 0" fill="none" stroke="#ab8fd0" strokeWidth="2" strokeLinecap="round" />
-        <rect x="366" y="423" width="118" height="48" rx="7" fill="#20283b" stroke="#4d5874" strokeWidth="3" />
-        <text x="425" y="444" textAnchor="middle" fill="#fff" fontSize="17" fontWeight="800">ToonSpectrum</text>
-        <text x="425" y="459" textAnchor="middle" fill="#aeb7d5" fontSize="8" letterSpacing="2">VIRTUAL STUDIO</text>
-      </g>
-
-      <g className="vs-master-entry">
-        <rect x="344" y="615" width="165" height="106" rx="7" fill="#6d4a4c" opacity=".82" />
-        <text x="426" y="651" textAnchor="middle" fill="#ffc27b" fontSize="13" fontWeight="800" letterSpacing="1.5">TOGETHER</text>
-        <text x="426" y="671" textAnchor="middle" fill="#ffc27b" fontSize="13" fontWeight="800" letterSpacing="1.5">CREATORS</text>
-        <text x="426" y="691" textAnchor="middle" fill="#ffc27b" fontSize="13" fontWeight="800" letterSpacing="1.5">A BRIGHTER TOMORROW</text>
-      </g>
-    </svg>
+    <div className="vs-master-reference-backdrop" aria-hidden="true">
+      <img
+        src="/assets/virtual-studio/reference/master-central-reference.jpg"
+        alt=""
+        draggable={false}
+        className="vs-master-reference-image"
+      />
+    </div>
   );
 }
-
 export function VirtualStudioAmbientActors({
   compact = false,
 }: {
@@ -291,10 +198,7 @@ export function VirtualStudioMasterWorld() {
           <span><strong>{room.label}</strong><small>{room.sublabel}</small></span>
         </Link>
       ))}
-      <VirtualStudioAmbientActors />
-      <span className="vs-master-pet vs-master-pet--cat" aria-hidden="true">🐈</span>
-      <span className="vs-master-pet vs-master-pet--dog" aria-hidden="true">🐕</span>
-      <span className="vs-master-pet vs-master-pet--bun" aria-hidden="true">🐇</span>
+      {/* Master reference contains the room occupants/pets. Runtime peers are only layered in the playable space. */}
     </div>
   );
 }
