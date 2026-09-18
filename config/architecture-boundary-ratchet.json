@@ -1,0 +1,10 @@
+{
+  "webToAdmin": 0,
+  "adminToWeb": 0,
+  "apiToWeb": 0,
+  "apiToAdmin": 0,
+  "adminSharedToDomain": 0,
+  "adminCrossDomainDeepImport": 0,
+  "webSharedToDomain": null,
+  "webCrossDomainDeepImport": null
+}
