@@ -38,7 +38,6 @@ interface StudioBg3dProfessionalWorkspaceProps {
   readonly viewport: ReactNode;
   readonly inspector: ReactNode;
   readonly scopeKey?: string | null;
-  readonly experienceMode?: StudioBg3dExperienceMode;
 }
 
 interface ResizeGesture {
@@ -76,7 +75,6 @@ export function StudioBg3dProfessionalWorkspace({
   viewport,
   inspector,
   scopeKey = null,
-  experienceMode = "pro",
 }: StudioBg3dProfessionalWorkspaceProps) {
   const canonicalStorageKey = studioBg3dProfessionalWorkspaceStorageKey(scopeKey);
   const [layout, setLayout] = useState(() =>
@@ -165,9 +163,6 @@ export function StudioBg3dProfessionalWorkspace({
     setLayout((current) => setStudioBg3dWorkspacePanelVisible(current, panel, !visible));
   };
 
-  const simpleMode = experienceMode === "simple";
-  const outlinerVisible = !simpleMode && layout.outlinerVisible;
-  const inspectorVisible = simpleMode || layout.inspectorVisible;
   const reversed = layout.dockOrder === "inspector-viewport-outliner";
   const workspaceStyle = {
     "--studio-bg3d-outliner-width": `${layout.outlinerWidth}px`,
@@ -195,7 +190,7 @@ export function StudioBg3dProfessionalWorkspace({
         aria-valuemax={bounds.max}
         aria-valuenow={value}
         tabIndex={0}
-        data-testid={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalWorkspace", "en", "studio-bg3d-{v0}-resizer"), { v0: String(panel) })}
+        data-testid={`studio-bg3d-${panel}-resizer`}
         className="group hidden min-h-0 w-1.5 shrink-0 touch-none cursor-col-resize items-stretch justify-center bg-panel/70 outline-none hover:bg-accent-soft focus-visible:bg-accent-soft xl:flex"
         style={{ order: orderVariable }}
         onDoubleClick={() => resetPanelWidth(panel)}
@@ -214,9 +209,9 @@ export function StudioBg3dProfessionalWorkspace({
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div
-        className={simpleMode ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalWorkspace", "en", "hidden") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalWorkspace", "en", "hidden min-h-10 shrink-0 items-center gap-1.5 border-b border-line bg-panel/90 px-2 xl:flex")}
+        className="hidden min-h-10 shrink-0 items-center gap-1.5 border-b border-line bg-panel/90 px-2 xl:flex"
         role="toolbar"
-        aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalWorkspace", "ko", "3D 전문가 작업공간")}
+        aria-label="3D 전문가 작업공간"
       >
         {(Object.keys(PRESET_LABELS) as Array<Exclude<StudioBg3dWorkspacePresetId, "custom">>).map((preset) => (
           <button
@@ -236,26 +231,30 @@ export function StudioBg3dProfessionalWorkspace({
           className="min-h-8 rounded-md border border-line bg-card px-2.5 text-[0.65rem] font-semibold text-fg-2 hover:border-accent/60 aria-pressed:border-accent aria-pressed:text-accent"
           onClick={() => togglePanel("outliner")}
         >
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalWorkspace", "ko", "계층")}</button>
+          계층
+        </button>
         <button
           type="button"
           aria-pressed={layout.inspectorVisible}
           className="min-h-8 rounded-md border border-line bg-card px-2.5 text-[0.65rem] font-semibold text-fg-2 hover:border-accent/60 aria-pressed:border-accent aria-pressed:text-accent"
           onClick={() => togglePanel("inspector")}
         >
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalWorkspace", "ko", "속성")}</button>
+          속성
+        </button>
         <button
           type="button"
           className="min-h-8 rounded-md border border-line bg-card px-2.5 text-[0.65rem] font-semibold text-fg-2 hover:border-accent/60 hover:text-accent"
           onClick={() => setLayout((current) => swapStudioBg3dWorkspaceDockOrder(current))}
         >
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalWorkspace", "ko", "좌우 바꾸기")}</button>
+          좌우 바꾸기
+        </button>
         <button
           type="button"
           className="ml-auto min-h-8 rounded-md border border-line bg-card px-2.5 text-[0.65rem] font-semibold text-fg-2 hover:border-accent/60 hover:text-accent"
           onClick={() => setLayout(DEFAULT_STUDIO_BG3D_PROFESSIONAL_WORKSPACE_LAYOUT)}
         >
-          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalWorkspace", "ko", "기본 배치")}</button>
+          기본 배치
+        </button>
       </div>
 
       <div
@@ -264,21 +263,21 @@ export function StudioBg3dProfessionalWorkspace({
         style={workspaceStyle}
       >
         <aside
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalWorkspace", "en", "{v0} min-h-0 shrink-0 flex-col overflow-hidden border-r border-line bg-panel/70 xl:w-[var(--studio-bg3d-outliner-width)]"), { v0: String(outlinerVisible ? "hidden xl:flex" : "hidden") })}
+          className={`${layout.outlinerVisible ? "hidden xl:flex" : "hidden"} min-h-0 shrink-0 flex-col overflow-hidden border-r border-line bg-panel/70 xl:w-[var(--studio-bg3d-outliner-width)]`}
           style={{ order: "var(--studio-bg3d-outliner-order)" }}
         >
           {outliner}
         </aside>
-        {outlinerVisible ? renderSeparator("outliner") : null}
+        {layout.outlinerVisible ? renderSeparator("outliner") : null}
         <div
           className="contents xl:flex xl:min-h-0 xl:min-w-0 xl:flex-1"
           style={{ order: "var(--studio-bg3d-viewport-order)" }}
         >
           {viewport}
         </div>
-        {inspectorVisible ? renderSeparator("inspector") : null}
+        {layout.inspectorVisible ? renderSeparator("inspector") : null}
         <div
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProfessionalWorkspace", "en", "{v0} xl:min-h-0 xl:shrink-0 xl:overflow-hidden xl:w-[var(--studio-bg3d-inspector-width)]"), { v0: String(inspectorVisible ? "contents xl:flex" : "contents xl:hidden") })}
+          className={`${layout.inspectorVisible ? "contents xl:flex" : "contents xl:hidden"} xl:min-h-0 xl:shrink-0 xl:overflow-hidden xl:w-[var(--studio-bg3d-inspector-width)]`}
           style={{ order: "var(--studio-bg3d-inspector-order)" }}
         >
           {inspector}
