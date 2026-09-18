@@ -9,6 +9,7 @@ import {
   type StudioShellFloatingVisibilityState,
 } from "./studio-shell-floating-layout";
 
+import type { StudioShellStrokeFocusPhase } from "./studio-shell-stroke-focus";
 import type {
   StudioShellFloatingVisibilityPersistenceFailure,
 } from "./studio-shell-floating-visibility-sqlite";
@@ -29,6 +30,9 @@ export interface StudioShellFloatingLayoutRuntime {
     | StudioShellFloatingVisibilityPersistenceFailure
     | "storage-unavailable"
     | null;
+  readonly strokeFocusPhase: StudioShellStrokeFocusPhase;
+  readonly autoHideDuringStroke: boolean;
+  readonly setAutoHideDuringStroke: (enabled: boolean) => void;
   readonly resetRevisions: Readonly<Record<StudioShellFloatingSurfaceId, number>>;
   readonly isVisible: (id: StudioShellFloatingVisibilityId) => boolean;
   readonly isConfiguredVisible: (id: StudioShellFloatingVisibilityId) => boolean;
@@ -59,6 +63,9 @@ const FALLBACK_RUNTIME: StudioShellFloatingLayoutRuntime = Object.freeze({
   mountedSurfaceIds: Object.freeze([]),
   authority: "session-only" as const,
   failure: null,
+  strokeFocusPhase: "idle" as const,
+  autoHideDuringStroke: true,
+  setAutoHideDuringStroke: () => undefined,
   resetRevisions: Object.freeze(createStudioShellFloatingResetRevisions()),
   isVisible: () => true,
   isConfiguredVisible: () => true,
