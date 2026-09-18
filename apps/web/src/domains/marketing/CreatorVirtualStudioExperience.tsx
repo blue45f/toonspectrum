@@ -8,9 +8,9 @@ import {
 import Link from "@/compat/router-link";
 import { CreatorExperienceModeSwitch } from "@/shared/components/CreatorExperienceModeSwitch";
 import { useI18n } from "@/shared/lib/i18n";
-import { StudioChibiSprite } from "../creator/virtual-space/StudioChibiSprite";
-import { VirtualStudioMasterWorld } from "./VirtualStudioMasterWorld";
-import "./creator-virtual-studio.css";
+import { StudioChibiSprite } from "@/shared/components/virtual-studio/StudioChibiSprite";
+import { VirtualStudioMasterWorld } from "@/shared/components/virtual-studio/VirtualStudioMasterWorld";
+import "@/shared/components/virtual-studio/virtual-studio-shell.css";
 
 const NAV = [
   ["/", "홈", "Home", Home],

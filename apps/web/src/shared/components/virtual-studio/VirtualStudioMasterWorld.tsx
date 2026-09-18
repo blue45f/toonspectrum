@@ -4,7 +4,7 @@ import Link from "@/compat/router-link";
 import {
   StudioChibiSprite,
   type StudioChibiMotion,
-} from "../creator/virtual-space/StudioChibiSprite";
+} from "./StudioChibiSprite";
 
 import "./virtual-studio-master.css";
 
@@ -243,6 +243,34 @@ export function VirtualStudioMasterBackdrop() {
   );
 }
 
+export function VirtualStudioAmbientActors({
+  compact = false,
+}: {
+  readonly compact?: boolean;
+}) {
+  const actors = compact ? ACTORS.filter((_, index) => index % 2 === 0) : ACTORS;
+  return (
+    <div className="vs-master-actors" aria-hidden="true">
+      {actors.map((actor, index) => (
+        <span
+          key={actor.name + index}
+          className="vs-master-actor"
+          style={{ left: `${actor.x}%`, top: `${actor.y}%` } as CSSProperties}
+        >
+          {!compact && actor.message ? <span className="vs-master-speech">{actor.message}</span> : null}
+          <StudioChibiSprite
+            variant={actor.variant}
+            motion={actor.motion}
+            size={compact ? Math.round(actor.size * 0.9) : actor.size}
+            label={compact ? undefined : actor.name}
+            online
+          />
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function VirtualStudioMasterWorld() {
   return (
     <div className="vs-master-world">
@@ -263,24 +291,7 @@ export function VirtualStudioMasterWorld() {
           <span><strong>{room.label}</strong><small>{room.sublabel}</small></span>
         </Link>
       ))}
-      <div className="vs-master-actors" aria-hidden="true">
-        {ACTORS.map((actor, index) => (
-          <span
-            key={actor.name + index}
-            className="vs-master-actor"
-            style={{ left: `${actor.x}%`, top: `${actor.y}%` } as CSSProperties}
-          >
-            {actor.message ? <span className="vs-master-speech">{actor.message}</span> : null}
-            <StudioChibiSprite
-              variant={actor.variant}
-              motion={actor.motion}
-              size={actor.size}
-              label={actor.name}
-              online
-            />
-          </span>
-        ))}
-      </div>
+      <VirtualStudioAmbientActors />
       <span className="vs-master-pet vs-master-pet--cat" aria-hidden="true">🐈</span>
       <span className="vs-master-pet vs-master-pet--dog" aria-hidden="true">🐕</span>
       <span className="vs-master-pet vs-master-pet--bun" aria-hidden="true">🐇</span>

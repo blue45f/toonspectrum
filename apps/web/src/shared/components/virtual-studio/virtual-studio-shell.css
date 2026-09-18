@@ -61,3 +61,63 @@
 @media(max-width:900px){.vs2-shell{display:block;min-height:100dvh;overflow:auto}.vs2-topbar{position:sticky;top:0;z-index:90;display:flex;height:58px;justify-content:space-between}.vs2-brand{width:auto;border:0;padding:0 10px}.vs2-brand>span:last-child{display:grid}.vs2-project{display:none}.vs2-top-actions{margin-left:auto}.vs2-sidebar{position:sticky;top:58px;z-index:80;display:block;border-right:0;border-bottom:1px solid var(--vs2-line);overflow-x:auto}.vs2-sidebar nav{display:flex;width:max-content;padding:6px}.vs2-sidebar nav a{height:36px;padding:0 11px}.vs2-sidebar nav span{display:inline}.vs2-promo,.vs2-self{display:none}.vs2-world-wrap{padding:10px;background:#0f1621}.vs2-rightbar{display:grid;grid-template-columns:1fr 1fr;padding:10px;border-left:0}.vs2-members{grid-column:1/-1}.vs2-bottom{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:240px;padding:10px}.vs2-footer{height:40px}.vs2-mode-switch{right:10px;top:64px}}
 @media(max-width:580px){.vs2-brand small{display:none}.vs2-top-actions>a:first-child,.vs2-top-actions>button,.vs2-mascot{display:none}.vs2-world-wrap{padding:8px}.vs2-rightbar{grid-template-columns:1fr}.vs2-members{grid-column:auto}.vs2-bottom{grid-template-columns:1fr;grid-auto-rows:240px}.vs2-footer span{display:none}.vs2-feature>header strong{font-size:11px}}
 @media(prefers-reduced-motion:reduce){.vs2-shell *{scroll-behavior:auto!important}}
+
+/* Live project shell: reuse the reference-image chrome while the center stays the real P2P RPG world. */
+.vs2-live-container{display:contents}
+.vs2-live-layout{display:contents}
+.vs2-shell--project{height:100dvh;min-height:760px}
+.vs2-shell--project .vs2-topbar{grid-area:top}
+.vs2-shell--project .vs2-sidebar{grid-area:side}
+.vs2-world-wrap--live{grid-area:world;position:relative;min-width:0;min-height:0;padding:0;overflow:hidden;background:#17181b}
+.vs2-live-stage-host{position:absolute;inset:0;min-width:0;min-height:0}
+.vs2-shell--project .studio-vspace-stage{width:100%!important;height:100%!important;min-height:100%!important;aspect-ratio:auto!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+.vs2-shell--project .studio-vspace-master-backdrop{border-radius:0}
+.vs2-shell--project .studio-vspace-minimap{top:.65rem;right:.65rem}
+.vs2-shell--project .vs2-rightbar{grid-area:right}
+.vs2-rightbar--live{padding:8px;gap:8px}
+.vs2-rightbar--live>.vs2-panel{border:1px solid var(--vs2-line);border-radius:10px;background:#121d2b;box-shadow:none}
+.vs2-live-huddle{padding:10px}
+.vs2-live-huddle>div:first-child{padding:0 0 8px;border-bottom:1px solid var(--vs2-line)}
+.vs2-live-huddle button{min-height:34px}
+.vs2-live-members{padding:10px;overflow:auto}
+.vs2-live-members>div:first-child{position:sticky;top:-10px;z-index:2;margin:-10px -10px 6px;padding:10px;background:#121d2bee;border-bottom:1px solid var(--vs2-line);backdrop-filter:blur(10px)}
+.vs2-live-bottom{grid-area:bottom}
+.vs2-shell--project .vs2-footer{grid-area:foot}
+.vs2-shell--project [data-studio-virtual-offline=true]{grid-area:world;z-index:70;align-self:start;margin:10px 12px 0;max-width:calc(100% - 24px);border-color:#d6a74d66;background:#312619e8;box-shadow:0 12px 30px #0005}
+.vs2-live-feature-illustration{display:flex;align-items:center;justify-content:space-around;background:linear-gradient(150deg,#fbfbfa,#e8eef8);color:#6c76a0}
+.vs2-live-feature-review{display:grid;place-items:center;background:#fbfaf8;color:#748098}.vs2-live-feature-review .eye{font-size:72px;line-height:1;color:#9aa2b0}.vs2-live-feature-review .mark{position:absolute;left:29%;bottom:18%;width:58px;height:42px;border:4px solid #ff6c87;border-radius:50%;color:transparent;rotate:-12deg}.vs2-live-feature-review>span:last-child{position:absolute;right:8px;bottom:8px;padding:5px 7px;border-radius:8px;background:#fff;color:#263247;font-size:7px;font-weight:800;box-shadow:0 4px 12px #0002}
+.vs2-live-feature-board{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:auto 1fr;gap:1px;background:#d8d1c6;color:#354056}.vs2-live-feature-board>*{padding:7px;background:#f4efe5;font-size:7px}.vs2-live-feature-board b{font-size:6.5px}.vs2-live-feature-board span{display:grid;place-items:start}
+.vs2-live-topbar .studio-vspace-avatar,.vs2-live-sidebar .studio-vspace-avatar{transform:none!important;height:auto!important;width:auto!important}
+.vs2-live-topbar .vs2-tiny-avatar>.studio-vspace-avatar,.vs2-live-sidebar .vs2-tiny-avatar>.studio-vspace-avatar{position:static}
+.vs2-live-topbar .vs2-tiny-avatar .studio-chibi,.vs2-live-sidebar .vs2-tiny-avatar .studio-chibi{scale:.66}
+.vs2-shell--project .studio-vspace-hotspot-label{background:#101925e8;border-color:#35465d;color:#fff}
+.vs2-shell--project .studio-vspace-zone{z-index:6}
+.vs2-shell--project .studio-vspace-peer{z-index:24}
+.vs2-shell--project .studio-vspace-avatar[data-self=true]{z-index:30}
+.vs2-shell--project .studio-vspace-world{overflow:visible}
+@media(max-width:1180px){
+  .vs2-shell--project{height:auto;min-height:100dvh}
+  .vs2-shell--project .vs2-rightbar{min-height:650px}
+}
+@media(max-width:900px){
+  .vs2-shell--project{display:block;height:auto;min-height:100dvh}
+  .vs2-live-container{display:block}
+  .vs2-live-layout{display:block}
+  .vs2-world-wrap--live{height:680px;margin:0 10px 10px;border:1px solid var(--vs2-line);border-radius:16px}
+  .vs2-live-stage-host{position:absolute}
+  .vs2-shell--project .studio-vspace-stage{border-radius:16px!important}
+  .vs2-shell--project .vs2-rightbar{display:grid;min-height:auto}
+  .vs2-live-bottom{display:grid}
+  .vs2-shell--project [data-studio-virtual-offline=true]{position:fixed;left:10px;right:10px;top:118px;margin:0;z-index:100;max-width:none}
+}
+@media(max-width:580px){
+  .vs2-world-wrap--live{height:600px;margin-inline:8px}
+  .vs2-shell--project .studio-vspace-minimap{display:none}
+  .vs2-shell--project .vs2-rightbar{display:block}
+  .vs2-shell--project .vs2-rightbar>.vs2-panel{margin-bottom:8px}
+}
+
+.vs2-live-chat>header{height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;border-bottom:1px solid var(--vs2-line)}
+.vs2-live-chat>header strong{font-size:10px}.vs2-live-chat>header svg{color:#9b8bff}
+.vs2-live-chat-body{display:grid;gap:7px;padding:9px}.vs2-live-chat-body>div{display:flex;align-items:center;gap:7px;min-width:0}.vs2-live-chat-body>div>span{display:grid;min-width:0;flex:1}.vs2-live-chat-body strong{font-size:8.5px}.vs2-live-chat-body small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#73839a;font-size:7px}.vs2-live-chat-body i{color:#51da8b;font-size:7px;font-style:normal}.vs2-live-chat-body>p{margin:0;padding:6px;color:#7f8da0;font-size:8px;line-height:1.5}
+.vs2-live-chat-button{margin:0 8px 8px;width:calc(100% - 16px);min-height:34px;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid #4a3c81;border-radius:8px;background:#272044;color:#cfc3ff;font-size:8px;font-weight:800}.vs2-live-chat-button:disabled{opacity:.42;cursor:not-allowed}

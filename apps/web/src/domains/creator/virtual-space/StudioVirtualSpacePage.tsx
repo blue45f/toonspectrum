@@ -1,27 +1,31 @@
 import {
+  Bell,
   Bot,
   BookOpen,
   Boxes,
   Brush,
+  CalendarDays,
   CircleDot,
-  Clapperboard,
+  ClipboardCheck,
   CloudOff,
   Coffee,
   ExternalLink,
   Footprints,
+  FolderKanban,
   Gamepad2,
+  GalleryHorizontalEnd,
   Headphones,
   Heart,
+  Home,
   LayoutGrid,
   Map,
   MessageCircle,
   Mic2,
   MousePointer2,
   Radio,
+  Settings,
   Sparkles,
   UsersRound,
-  Video,
-  WandSparkles,
 } from "lucide-react";
 import {
   useCallback,
@@ -37,7 +41,10 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
-import { VirtualStudioMasterBackdrop } from "../../marketing/VirtualStudioMasterWorld";
+import {
+  VirtualStudioAmbientActors,
+  VirtualStudioMasterBackdrop,
+} from "@/shared/components/virtual-studio/VirtualStudioMasterWorld";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -94,9 +101,10 @@ import {
   studioVirtualSpaceStepToward,
 } from "./studio-virtual-space-navigation";
 import { StudioVirtualSpaceJoystick } from "./StudioVirtualSpaceJoystick";
-import { StudioChibiSprite } from "./StudioChibiSprite";
+import { StudioChibiSprite } from "@/shared/components/virtual-studio/StudioChibiSprite";
 
 import "./studio-virtual-space.css";
+import "@/shared/components/virtual-studio/virtual-studio-shell.css";
 
 const KEYBOARD_MOVEMENT_KEYS = new Set(["arrowleft", "arrowright", "arrowup", "arrowdown", "a", "d", "w", "s"]);
 const MOBILE_CAMERA_SCALE = 0.72;
@@ -568,6 +576,163 @@ function MobileZoneCard({
   return <div className={className}>{body}</div>;
 }
 
+function LiveStudioTopbar({
+  projectId,
+  preparing,
+  snapshot,
+  fallbackIdentity,
+  localName,
+}: {
+  readonly projectId: string;
+  readonly preparing: boolean;
+  readonly snapshot: StudioVirtualSpaceSnapshot;
+  readonly fallbackIdentity: string;
+  readonly localName: string;
+}) {
+  const bt = useBilingual("LiveStudioTopbar");
+  const peers = snapshot.peers.slice(0, 4);
+  return (
+    <header className="vs2-topbar vs2-live-topbar">
+      <Link href="/" className="vs2-brand" aria-label="ToonSpectrum">
+        <span className="vs2-brand-mark"><Sparkles size={17} aria-hidden /></span>
+        <span><strong>ToonSpectrum</strong><small>Together, We Create Amazing Stories</small></span>
+      </Link>
+      <div className="vs2-project">
+        <span className="vs2-project-icon"><Sparkles size={15} aria-hidden /></span>
+        <strong>{projectId}</strong><span aria-hidden>⌄</span>
+        <em>EP 38⌄</em>
+        <span className="vs2-studio-pill">◉ {bt("스튜디오", "Studio")}</span>
+        <ConnectionBadge preparing={preparing} />
+        <span className="vs2-online">● {snapshot.peers.length + 1}{bt("명 접속 중", " online")}</span>
+        <div className="vs2-stack" aria-label={bt("접속 중인 멤버", "Online members")}>
+          <span className="vs2-tiny-avatar" title={localName}>
+            <ChibiAvatar
+              identity={fallbackIdentity}
+              name={localName}
+              compact
+              activity={snapshot.self.activity}
+              avatarIndex={snapshot.self.avatarIndex}
+            />
+          </span>
+          {peers.map((peer) => (
+            <span className="vs2-tiny-avatar" key={peer.participant.sessionId} title={peer.participant.displayName}>
+              <ChibiAvatar
+                identity={peer.participant.sessionId}
+                name={peer.participant.displayName}
+                compact
+                activity={peer.state.activity}
+                avatarIndex={peer.state.avatarIndex}
+              />
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="vs2-top-actions">
+        <Link href="/calendar" aria-label={bt("캘린더", "Calendar")}><CalendarDays size={17} /></Link>
+        <button type="button" aria-label={bt("알림", "Notifications")}><Bell size={17} /><i /></button>
+        <Link href={`/studio/p/${encodeURIComponent(projectId)}/settings`} aria-label={bt("프로젝트 설정", "Project settings")}><Settings size={17} /></Link>
+        <span className="vs2-mascot"><StudioChibiSprite variant={10} size={45} motion="idle" /></span>
+        <span className="vs2-slogan">{bt("좋은 이야기가", "Good stories")}<br />{bt("세상을 바꿔요! ✨", "change the world! ✨")}</span>
+      </div>
+    </header>
+  );
+}
+
+function LiveStudioSidebar({
+  projectId,
+  localName,
+  snapshot,
+}: {
+  readonly projectId: string;
+  readonly localName: string;
+  readonly snapshot: StudioVirtualSpaceSnapshot;
+}) {
+  const bt = useBilingual("LiveStudioSidebar");
+  const reviewHref = studioVirtualSpaceDestination(projectId, "review") ?? "/production";
+  const assetHref = studioVirtualSpaceDestination(projectId, "assets") ?? "/studio/assets";
+  const storyHref = studioVirtualSpaceDestination(projectId, "story") ?? "/story-lab";
+  const items = [
+    { href: "/", ko: "홈", en: "Home", icon: Home },
+    { href: `/studio/p/${encodeURIComponent(projectId)}/overview`, ko: "프로젝트", en: "Project", icon: FolderKanban },
+    { href: `/studio/p/${encodeURIComponent(projectId)}/space`, ko: "스튜디오", en: "Studio", icon: Sparkles, active: true },
+    { href: `/studio/work/${encodeURIComponent(projectId)}/canvas`, ko: "작품 관리", en: "Works", icon: GalleryHorizontalEnd },
+    { href: "/collaborate", ko: "멤버", en: "Members", icon: UsersRound },
+    { href: reviewHref, ko: "작업 보드", en: "Production", icon: ClipboardCheck },
+    { href: assetHref, ko: "에셋 라이브러리", en: "Assets", icon: Boxes },
+    { href: "/studio/ai-settings", ko: "AI 프로듀서", en: "AI Producer", icon: Bot },
+    { href: "/community", ko: "커뮤니티", en: "Community", icon: MessageCircle },
+    { href: storyHref, ko: "스토리", en: "Story", icon: BookOpen },
+  ] as const;
+  return (
+    <aside className="vs2-sidebar vs2-live-sidebar">
+      <nav aria-label={bt("Virtual Studio 메뉴", "Virtual Studio navigation")}>
+        {items.map(({ href, ko, en, icon: Icon, active }) => (
+          <Link key={href + ko} href={href} className={active ? "is-active" : undefined}>
+            <Icon size={17} aria-hidden /><span>{bt(ko, en)}</span>{active ? null : <i />}
+          </Link>
+        ))}
+      </nav>
+      <Link href="/showcase" className="vs2-promo">
+        <span className="vs2-promo-art"><StudioChibiSprite variant={4} size={104} motion="idle" /></span>
+        <span><strong>{bt("함께 만드는", "Together we make")}</strong><b>{bt("더 큰 이야기", "bigger stories")}</b></span>
+        <Heart size={19} fill="currentColor" />
+      </Link>
+      <div className="vs2-self">
+        <span className="vs2-tiny-avatar">
+          <ChibiAvatar
+            identity="local-self"
+            name={localName}
+            compact
+            activity={snapshot.self.activity}
+            avatarIndex={snapshot.self.avatarIndex}
+          />
+        </span>
+        <span><strong>{localName}</strong><small>● {bt("온라인", "Online")}</small></span>
+        <Settings size={15} aria-hidden />
+      </div>
+    </aside>
+  );
+}
+
+function LiveStudioBottom({
+  projectId,
+  openAssistant,
+}: {
+  readonly projectId: string;
+  readonly openAssistant: () => void;
+}) {
+  const bt = useBilingual("LiveStudioBottom");
+  const reviewHref = studioVirtualSpaceDestination(projectId, "review") ?? "/production";
+  return (
+    <section className="vs2-bottom vs2-live-bottom" aria-label={bt("스튜디오 기능", "Studio features")}>
+      <Link href={`/studio/work/${encodeURIComponent(projectId)}/canvas?live=1`} className="vs2-feature">
+        <header><strong>{bt("실시간 드로잉 협업", "Live drawing collaboration")}</strong><small>{bt("같은 캔버스에서 함께 그려요", "Draw together on one canvas")}</small></header>
+        <div className="vs2-feature-body vs2-live-feature-illustration"><Brush size={42} /><StudioChibiSprite variant={0} size={72} motion="draw" /></div>
+      </Link>
+      <Link href={reviewHref} className="vs2-feature">
+        <header><strong>{bt("리뷰 & 코멘트", "Review & comments")}</strong><small>{bt("정확한 위치에 피드백을 남겨요", "Pin feedback precisely")}</small></header>
+        <div className="vs2-feature-body vs2-live-feature-review"><span className="eye">◉</span><span className="mark">○</span><span>{bt("눈을 조금 더 크게!", "Make the eyes bigger!")}</span></div>
+      </Link>
+      <Link href="/production" className="vs2-feature">
+        <header><strong>{bt("작업 보드 & 진행 상황", "Production board")}</strong><small>{bt("누가, 무엇을, 언제까지", "Who, what, by when")}</small></header>
+        <div className="vs2-feature-body vs2-live-feature-board"><b>To Do</b><b>In Progress</b><b>Review</b><span>38화 콘티</span><span>선화 작업</span><span>승인 대기</span></div>
+      </Link>
+      <button type="button" className="vs2-feature text-left" onClick={openAssistant}>
+        <header><strong>{bt("AI 프로듀서", "AI Producer")}</strong><small>{bt("항상 함께하는 든든한 PD", "Your always-on production partner")}</small></header>
+        <div className="vs2-feature-body vs2-ai-card"><span className="orb"><Bot size={42} /></span><span className="bubble">{bt("제가 프로젝트를 도와드릴게요!", "I’ll help with the project!")}</span></div>
+      </button>
+      <Link href={`/studio/work/${encodeURIComponent(projectId)}/canvas?live=1`} className="vs2-feature">
+        <header><strong>{bt("라이브 드로잉 이벤트", "Live drawing events")}</strong><small>{bt("작가와 함께하는 특별한 시간", "Create live together")}</small></header>
+        <div className="vs2-feature-body vs2-live-card"><span className="live-pill">LIVE ●</span><StudioChibiSprite variant={7} size={112} motion="draw" /></div>
+      </Link>
+      <Link href="/community" className="vs2-feature">
+        <header><strong>{bt("크리에이터 커뮤니티", "Creator community")}</strong><small>{bt("새로운 사람들과 더 많은 기회", "More creators, more opportunities")}</small></header>
+        <div className="vs2-feature-body vs2-community-card"><span className="sign">ToonSpectrum<br /><small>CREATOR PLAZA</small></span><div className="crew">{[0,1,3,5].map((variant)=><StudioChibiSprite key={variant} variant={variant} size={55} motion="idle" />)}</div></div>
+      </Link>
+    </section>
+  );
+}
+
 function VirtualSpaceExperience({
   projectId,
   preparing,
@@ -985,6 +1150,11 @@ function VirtualSpaceExperience({
     });
   }, [connectivity.serverAvailable, snapshot.nearbyPeers]);
 
+  const openStudioChat = useCallback(() => {
+    if (!connectivity.serverAvailable) return;
+    openStudioP2pHuddle({ source: "virtual-space" });
+  }, [connectivity.serverAvailable]);
+
   const sendReaction = useCallback((reaction: StudioVirtualSpaceReaction) => {
     const controller = controllerRef.current;
     if (controller) {
@@ -1045,53 +1215,20 @@ function VirtualSpaceExperience({
   }, []);
 
   return (
-    <main className="min-h-screen bg-canvas pb-16 text-fg">
-      <Container size="wide" className="py-5 sm:py-7">
-        <header className="overflow-hidden rounded-[2rem] border border-line bg-panel/75 shadow-sm">
-          <div className="relative grid gap-5 p-5 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center">
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-accent/10 blur-3xl"
-            />
-            <div className="relative">
-              <Link href={`/studio/p/${encodeURIComponent(projectId)}/overview`} className="text-xs font-bold text-accent hover:text-accent-2">
-                ← {bt("프로젝트로 돌아가기", "Back to project")}
-              </Link>
-              <p className="mt-4 text-[0.66rem] font-black uppercase tracking-[0.18em] text-accent">
-                TOONSPECTRUM / VIRTUAL PRODUCTION STUDIO
-              </p>
-              <h1 className="mt-2 text-pretty text-2xl font-black tracking-tight sm:text-4xl">
-                {bt("함께 만드는 가상 창작 스튜디오", "A virtual studio for creating together")}
-              </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2">
-                {bt(
-                  "서버에는 입장·권한·피어 발견만 맡기고, 이동·근처 대화·화상·화면 공유는 가능한 한 브라우저끼리 직접 연결합니다.",
-                  "The server handles admission, permissions and peer discovery while movement, nearby huddles, video and screen sharing stay browser-to-browser whenever possible.",
-                )}
-              </p>
-            </div>
-            <div className="relative flex flex-wrap items-center gap-2 lg:justify-end">
-              <ConnectionBadge preparing={preparing} />
-              {connectivity.localOnly ? (
-                <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-warning/35 bg-warning-soft/15 px-3 text-xs font-bold text-warning">
-                  <CloudOff size={14} aria-hidden />
-                  {bt("로컬 탐색 모드", "Local exploration")}
-                </span>
-              ) : null}
-              <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-card/90 px-3 text-xs font-bold text-fg-2">
-                <UsersRound size={14} aria-hidden />
-                {visibleParticipantCount}{connectivity.localOnly ? bt("명 로컬", " local") : bt("명 접속", " online")}
-              </span>
-              <Link
-                href={`/studio/work/${encodeURIComponent(projectId)}/canvas`}
-                className={buttonClass({ className: "gap-2" })}
-              >
-                <Brush size={15} aria-hidden />
-                {bt("원고 열기", "Open manuscript")}
-              </Link>
-            </div>
-          </div>
-        </header>
+    <main className="vs2-shell vs2-shell--project" data-studio-live-shell="true">
+      <Container size="wide" className="vs2-live-container">
+        <LiveStudioTopbar
+          projectId={projectId}
+          preparing={preparing}
+          snapshot={snapshot}
+          fallbackIdentity={fallbackIdentity}
+          localName={localName}
+        />
+        <LiveStudioSidebar
+          projectId={projectId}
+          localName={localName}
+          snapshot={snapshot}
+        />
 
         {connectivity.localOnly ? (
           <section
@@ -1124,9 +1261,9 @@ function VirtualSpaceExperience({
           </section>
         ) : null}
 
-        <section className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
-          <div className="min-w-0">
-            <div className="block">
+        <section className="vs2-live-layout">
+          <div className="vs2-world-wrap vs2-world-wrap--live">
+            <div className="vs2-live-stage-host">
               <div
                 ref={stageRef}
                 role="application"
@@ -1144,6 +1281,9 @@ function VirtualSpaceExperience({
                 >
                   <div className="studio-vspace-master-backdrop absolute inset-0 z-0" aria-hidden>
                     <VirtualStudioMasterBackdrop />
+                  </div>
+                  <div className="studio-vspace-ambient-creators absolute inset-0 z-[8] pointer-events-none">
+                    <VirtualStudioAmbientActors compact />
                   </div>
                   {STUDIO_VIRTUAL_SPACE_ZONES.map((zone) => (
                     <ZoneSurface
@@ -1363,7 +1503,7 @@ function VirtualSpaceExperience({
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:hidden">
+            <div className="vs2-mobile-zone-cards grid gap-3 sm:grid-cols-2 lg:hidden">
               {STUDIO_VIRTUAL_SPACE_ZONES.map((zone) => (
                 <MobileZoneCard
                   key={zone.id}
@@ -1375,8 +1515,8 @@ function VirtualSpaceExperience({
             </div>
           </div>
 
-          <aside className="space-y-4">
-            <section className="rounded-3xl border border-line bg-panel/70 p-4 shadow-sm">
+          <aside className="vs2-rightbar vs2-rightbar--live">
+            <section className="vs2-panel vs2-live-huddle">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-[0.64rem] font-black uppercase tracking-[0.14em] text-accent">NEARBY HUDDLE</p>
@@ -1429,7 +1569,50 @@ function VirtualSpaceExperience({
               ) : null}
             </section>
 
-            <section className="rounded-3xl border border-line bg-panel/70 p-4 shadow-sm">
+            <section className="vs2-panel vs2-live-chat">
+              <header>
+                <strong># {bt("스튜디오 채팅", "Studio chat")}</strong>
+                <MessageCircle size={15} aria-hidden />
+              </header>
+              <div className="vs2-live-chat-body">
+                {snapshot.peers.length ? (
+                  snapshot.peers.slice(0, 3).map((peer) => (
+                    <div key={peer.participant.sessionId}>
+                      <ChibiAvatar
+                        identity={peer.participant.sessionId}
+                        name={peer.participant.displayName}
+                        compact
+                        activity={peer.state.activity}
+                        avatarIndex={peer.state.avatarIndex}
+                      />
+                      <span>
+                        <strong>{peer.participant.displayName}</strong>
+                        <small>
+                          {bt(
+                            STUDIO_VIRTUAL_SPACE_ZONES.find((zone) => zone.id === peer.state.zoneId)?.labelKo ?? "스튜디오",
+                            STUDIO_VIRTUAL_SPACE_ZONES.find((zone) => zone.id === peer.state.zoneId)?.labelEn ?? "Studio",
+                          )}
+                        </small>
+                      </span>
+                      <i aria-hidden>●</i>
+                    </div>
+                  ))
+                ) : (
+                  <p>{bt("같은 프로젝트에 다른 팀원이 들어오면 P2P 채팅을 시작할 수 있어요.", "When teammates join this project, you can start P2P chat here.")}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={openStudioChat}
+                disabled={!signedIn || !connectivity.serverAvailable || !snapshot.direct}
+                className="vs2-live-chat-button"
+              >
+                <MessageCircle size={14} aria-hidden />
+                {bt("P2P 채팅 열기", "Open P2P chat")}
+              </button>
+            </section>
+
+            <section className="vs2-panel vs2-live-members">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-black">
                   {connectivity.localOnly ? bt("로컬 작업", "Local work") : bt("접속 중", "Online")}
@@ -1561,66 +1744,13 @@ function VirtualSpaceExperience({
           </aside>
         </section>
 
-        <section className="mt-4 grid gap-3 md:grid-cols-3">
-          <button
-            type="button"
-            onClick={openAssistant}
-            className="group rounded-3xl border border-line bg-gradient-to-br from-fuchsia-100/50 via-card to-card p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-accent/40 dark:from-fuchsia-950/20"
-          >
-            <span className="grid size-10 place-items-center rounded-2xl bg-accent-soft text-accent">
-              <WandSparkles size={18} aria-hidden />
-            </span>
-            <strong className="mt-4 block text-sm font-black">{bt("AI 프로듀서", "AI Producer")}</strong>
-            <span className="mt-1 block text-xs leading-5 text-fg-3">
-              {bt("현재 프로젝트 맥락에서 회의 후속 작업, 검토, 다음 액션을 빠르게 찾아요.", "Find meeting follow-ups, review work and next actions in the current project context.")}
-            </span>
-          </button>
-          <Link
-            href={`/studio/work/${encodeURIComponent(projectId)}/canvas?live=1`}
-            className="group rounded-3xl border border-line bg-gradient-to-br from-rose-100/50 via-card to-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-accent/40 dark:from-rose-950/20"
-          >
-            <span className="grid size-10 place-items-center rounded-2xl bg-accent-soft text-accent">
-              <Clapperboard size={18} aria-hidden />
-            </span>
-            <strong className="mt-4 block text-sm font-black">{bt("라이브 드로잉", "Live Drawing")}</strong>
-            <span className="mt-1 block text-xs leading-5 text-fg-3">
-              {bt("기존 실시간 캔버스·커서·따라가기·P2P 화면 공유를 그대로 사용합니다.", "Reuse the existing live canvas, cursors, follow mode and P2P screen sharing.")}
-            </span>
-          </Link>
-          <Link
-            href="/showcase"
-            className="group rounded-3xl border border-line bg-gradient-to-br from-sky-100/50 via-card to-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-accent/40 dark:from-sky-950/20"
-          >
-            <span className="grid size-10 place-items-center rounded-2xl bg-accent-soft text-accent">
-              <Heart size={18} aria-hidden />
-            </span>
-            <strong className="mt-4 block text-sm font-black">{bt("크리에이터 플라자", "Creator Plaza")}</strong>
-            <span className="mt-1 block text-xs leading-5 text-fg-3">
-              {bt("작품 전시·라이브 이벤트·협업 모집으로 이어지는 공개 공간의 진입점입니다.", "An entry point to public showcases, live events and collaboration discovery.")}
-            </span>
-          </Link>
-        </section>
+        <LiveStudioBottom projectId={projectId} openAssistant={openAssistant} />
 
-        <section className="mt-4 rounded-3xl border border-line bg-panel/60 p-4 sm:p-5">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="flex gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent"><Radio size={15} /></span>
-              <div><strong className="text-xs">{bt("P2P 우선", "P2P first")}</strong><p className="mt-1 text-[0.68rem] leading-5 text-fg-3">{bt("위치와 대화 데이터는 RTC direct lane으로 보냅니다.", "Spatial and huddle data use the RTC direct lane.")}</p></div>
-            </div>
-            <div className="flex gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent"><Video size={15} /></span>
-              <div><strong className="text-xs">{bt("영상은 필요할 때만", "Video on demand")}</strong><p className="mt-1 text-[0.68rem] leading-5 text-fg-3">{bt("기본 상태에서는 카메라·마이크 스트림을 만들지 않습니다.", "No camera or microphone stream exists by default.")}</p></div>
-            </div>
-            <div className="flex gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent"><UsersRound size={15} /></span>
-              <div><strong className="text-xs">{bt("근처 최대 3명", "Up to 3 nearby peers")}</strong><p className="mt-1 text-[0.68rem] leading-5 text-fg-3">{bt("소규모 mesh로 업로드 대역폭과 CPU를 제한합니다.", "Small mesh cohorts bound upload bandwidth and CPU.")}</p></div>
-            </div>
-            <div className="flex gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent"><Sparkles size={15} /></span>
-              <div><strong className="text-xs">{bt("원고 동기화 분리", "Document sync separated")}</strong><p className="mt-1 text-[0.68rem] leading-5 text-fg-3">{bt("이 공간에서는 CRDT를 띄우지 않고 실제 편집 화면에서만 동기화합니다.", "The space skips CRDT; document sync starts only inside an editor.")}</p></div>
-            </div>
-          </div>
-        </section>
+        <footer className="vs2-footer">
+          <strong>ToonSpectrum</strong>
+          <span>{bt("혼자가 아닌, 함께 만드는 더 큰 이야기.", "Bigger stories, made together.")}</span>
+          <em>Creators for a Brighter Tomorrow ♥</em>
+        </footer>
       </Container>
     </main>
   );
