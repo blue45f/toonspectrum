@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Panel Split Tool — 자유선(임의 각도) 패널 분할 도구.
  * studio-panel-split 순수 기하를 Konva 오버레이(캔버스 미리보기)와 사이드 패널(토글/여백/안내)로
@@ -63,7 +67,7 @@ export function StudioPanelSplitOverlay({ preview, gutterPx, scale }: StudioPane
         <KText
           x={labelX}
           y={labelY}
-          text={`여백 ${gutterPx}px`}
+          text={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPanelSplitTool", "ko", "여백 {v0}px"), { v0: String(gutterPx) })}
           fontSize={12 / scale}
           fill={VALID_COLOR}
           offsetX={20 / scale}
@@ -99,15 +103,15 @@ export function StudioPanelSplitPanel({
     <div className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5">
       {/* 헤더 + 모드 토글 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">자유선 분할</p>
+        <p className="text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioPanelSplitTool", "ko", "자유선 분할")}</p>
         <StudioToggleChip
           active={active}
           onClick={onToggle}
-          title={active ? "분할 도구를 끕니다." : "패널 위에 원하는 각도로 선을 그으면, 그은 선을 따라 정확히 두 칸으로 나뉩니다."}
+          title={active ? translateCurrentStaticSourceText("domains.creator.StudioPanelSplitTool", "ko", "분할 도구를 끕니다.") : translateCurrentStaticSourceText("domains.creator.StudioPanelSplitTool", "ko", "패널 위에 원하는 각도로 선을 그으면, 그은 선을 따라 정확히 두 칸으로 나뉩니다.")}
         >
           <span className="inline-flex items-center gap-1">
             <Scissors className="size-3" aria-hidden />
-            {active ? "분할선 그리는 중" : "자유선 분할 시작"}
+            {active ? translateCurrentStaticSourceText("domains.creator.StudioPanelSplitTool", "ko", "분할선 그리는 중") : translateCurrentStaticSourceText("domains.creator.StudioPanelSplitTool", "ko", "자유선 분할 시작")}
           </span>
         </StudioToggleChip>
       </div>
@@ -115,19 +119,17 @@ export function StudioPanelSplitPanel({
       {active && (
         <>
           <StudioSliderRow
-            label="여백(Gutter)"
+            label={translateCurrentStaticSourceText("domains.creator.StudioPanelSplitTool", "ko", "여백(Gutter)")}
             min={0}
             max={PANEL_SPLIT_MAX_GUTTER_PX}
             step={2}
             value={gutterPx}
             onChange={onGutterChange}
-            readout={`${gutterPx}px`}
+            readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPanelSplitTool", "en", "{v0}px"), { v0: String(gutterPx) })}
           />
 
           <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
-            패널 위를 가로질러 드래그하면 그은 선을 따라 정확히 둘로 나뉩니다. 대각선도 가능해요.
-            이미 나뉜 칸을 다시 드래그하면 계속 잘라나갈 수 있어요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioPanelSplitTool", "ko", "패널 위를 가로질러 드래그하면 그은 선을 따라 정확히 둘로 나뉩니다. 대각선도 가능해요. 이미 나뉜 칸을 다시 드래그하면 계속 잘라나갈 수 있어요.")}</p>
 
           {hint && (
             <p className="text-bad text-[0.72rem] leading-relaxed" role="status">

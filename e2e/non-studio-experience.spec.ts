@@ -136,8 +136,11 @@ test("all-in-one home keeps contrast surfaces, reduced motion and responsive bou
   const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
   const heroArtwork = home.locator(".cf-home-preview img");
   await expect(home).toBeVisible();
-  await expect(home.locator("img")).toHaveCount(3);
   await expect(heroArtwork).toBeVisible();
+  await expect(home.locator(".cf-intent-visual-nav img")).toHaveCount(6);
+  await expect(home.locator(".cf-intent-film img")).toBeVisible();
+  await expect(home.locator(".cf-bridge-visual img")).toBeVisible();
+  await expect(home.locator(".cf-production-journey img")).toBeVisible();
   await expect(home.locator("h1")).toContainText("기획부터 연재까지");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBe(true);
   await capturePageEvidence(page, testInfo, "home-320-light");

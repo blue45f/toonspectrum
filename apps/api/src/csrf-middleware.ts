@@ -64,6 +64,31 @@ export function isStudioRealtimeTicketMutationRequest(req: Request): boolean {
   );
 }
 
+/**
+ * Sign in with Apple is the one intentional cross-site unsafe-method callback.
+ * Apple posts the authorization response as form-urlencoded when name/email
+ * scopes are requested. The controller still requires a signed, browser-bound
+ * state cookie and validates the ID-token nonce, so this exception is limited
+ * to the exact callback transport rather than weakening auth POSTs generally.
+ */
+export function isAppleOAuthFormPostCallback(req: Request): boolean {
+  if (req.method.toUpperCase() !== "POST") return false;
+  const contentType = singleHeaderValue(req.headers["content-type"])
+    ?.toLowerCase()
+    .split(";", 1)[0]
+    ?.trim();
+  if (contentType !== "application/x-www-form-urlencoded") return false;
+  const candidates = [
+    normalizedRequestPath(req.path),
+    normalizedRequestPath(req.originalUrl),
+  ];
+  return candidates.some(
+    (path) =>
+      path === "/auth/oauth/apple/callback"
+      || path === "/api/auth/oauth/apple/callback",
+  );
+}
+
 function singleHeaderValue(value: string | string[] | undefined): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
@@ -129,8 +154,8 @@ function rejectCsrfRequest(res: Response): void {
  * Protect ambient-cookie mutations before Nest route matching.
  *
  * Header-authenticated CLI/server calls bypass this browser-only boundary.
- * There are deliberately no unsafe-method path exceptions: OAuth callbacks
- * and downloads are GET/HEAD endpoints and are exempt solely by HTTP method.
+ * Unsafe-method path exceptions are forbidden except the exact Apple form_post
+ * callback above; that route carries its own signed state + nonce proof.
  */
 export function createCsrfProtectionMiddleware(
   env: NodeJS.ProcessEnv = process.env,
@@ -141,6 +166,10 @@ export function createCsrfProtectionMiddleware(
     next: NextFunction,
   ): void {
     if (!isCsrfProtectedMethod(req.method)) {
+      next();
+      return;
+    }
+    if (isAppleOAuthFormPostCallback(req)) {
       next();
       return;
     }

@@ -7,6 +7,8 @@ import {
   normalizeTrafficCampaignToken,
   normalizeTrafficPath,
   normalizeTrafficScreenClass,
+  requireTrafficShareChannel,
+  requireTrafficShareOutcome,
 } from "./traffic-analytics-model";
 
 describe("traffic analytics privacy boundaries", () => {
@@ -72,6 +74,24 @@ describe("traffic analytics privacy boundaries", () => {
     expect(normalizeTrafficCampaignToken("01012345678")).toBeNull();
     expect(normalizeTrafficCampaignToken("campaign?id=123")).toBeNull();
     expect(normalizeTrafficCampaignToken("한글 캠페인")).toBeNull();
+  });
+
+  it("accepts only the reviewed share channels and outcomes", () => {
+    expect(requireTrafficShareChannel("kakao")).toBe("kakao");
+    expect(requireTrafficShareChannel("copy")).toBe("copy");
+    expect(requireTrafficShareOutcome("opened")).toBe("opened");
+    expect(requireTrafficShareOutcome("completed")).toBe("completed");
+    expect(requireTrafficShareOutcome("cancelled")).toBe("cancelled");
+
+    expect(() => requireTrafficShareChannel("javascript:alert(1)")).toThrow(
+      "공유 채널이 올바르지 않습니다.",
+    );
+    expect(() => requireTrafficShareChannel(undefined)).toThrow(
+      "공유 채널이 올바르지 않습니다.",
+    );
+    expect(() => requireTrafficShareOutcome("success")).toThrow(
+      "공유 결과가 올바르지 않습니다.",
+    );
   });
 
   it("prioritizes explicit campaign attribution over referrer inference", () => {

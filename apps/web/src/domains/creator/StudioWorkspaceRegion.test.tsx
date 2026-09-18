@@ -132,6 +132,24 @@ describe("StudioWorkspaceRegion", () => {
     expect(parseFloat(regionNode().style.height)).toBeLessThanOrEqual(912);
     expect(regionNode().dataset.studioRegionFloating).toBe("true");
   });
+  it("provides minimum, recommended, and maximum presets for detached regions", async () => {
+    render(<Harness />); await edit(); fireEvent.click(screen.getByRole("button", { name: "영역 분리" }));
+    const region = regionNode();
+    expect(region.querySelector('[data-studio-floating-content="true"]')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "테스트 도구 배치 설정" })); await screen.findByText("드래그 없이 배치");
+    fireEvent.click(screen.getByRole("button", { name: "테스트 도구 최소 크기" }));
+    expect(region.style.width).toBe("280px"); expect(region.style.height).toBe("180px");
+    expect(region.dataset.studioFloatingSize).toBe("compact");
+
+    fireEvent.click(screen.getByRole("button", { name: "테스트 도구 배치 설정" })); await screen.findByText("드래그 없이 배치");
+    fireEvent.click(screen.getByRole("button", { name: "테스트 도구 권장 크기" }));
+    expect(region.style.width).toBe("440px"); expect(region.style.height).toBe("600px");
+
+    fireEvent.click(screen.getByRole("button", { name: "테스트 도구 최대 크기" }));
+    expect(region.style.width).toBe("1416px"); expect(region.style.height).toBe("912px");
+    expect(region.dataset.studioFloatingSize).toBe("wide");
+  });
   it("cancels all arrangement edits without touching the child", async () => {
     render(<Harness />); const child = screen.getByRole("button", { name: "도구 실행" });
     await edit(); fireEvent.click(screen.getByRole("button", { name: "영역 분리" }));

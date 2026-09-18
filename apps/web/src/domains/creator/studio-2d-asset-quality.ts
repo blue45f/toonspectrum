@@ -70,8 +70,10 @@ export interface Studio2dFilters {
   readonly sort?: Studio2dSort;
 }
 
+const GENERATED_GPT25_IDS = new Set(GENERATED_GPT25_ASSET_METADATA.map((asset) => asset.id));
+
 export const STUDIO_2D_ASSET_METADATA: readonly Studio2dAssetMetadata[] = Object.freeze([
-  ...legacyManifest.assets,
+  ...legacyManifest.assets.filter((asset) => !GENERATED_GPT25_IDS.has(asset.id)),
   ...cc0Manifest.assets,
   ...GENERATED_GPT25_ASSET_METADATA,
 ] as unknown as Studio2dAssetMetadata[]);

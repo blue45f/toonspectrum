@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Injectable,
+  Inject,
   Post,
   Put,
   ServiceUnavailableException,
@@ -38,7 +39,10 @@ export class CreatorInferenceGateway {
 
 @Controller("studio-ai/inference")
 export class CreatorInferenceController {
-  constructor(private readonly gateway: CreatorInferenceGateway) {}
+  constructor(
+    @Inject(CreatorInferenceGateway)
+    private readonly gateway: CreatorInferenceGateway,
+  ) {}
 
   @Get("status")
   @Header("Cache-Control", "no-store")

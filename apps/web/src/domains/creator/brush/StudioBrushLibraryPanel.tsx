@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 // 브러시 라이브러리 패널 — OPFS SQLite를 제품 권위로 사용하고 StudioPage가 소유한 배열은
 // 기존 데스크톱/모바일 소비자를 위한 controlled projection으로 갱신한다. 이름 붙은 브러시 설정을
 // 저장·고정·복제·이름변경·안전 삭제하고,
@@ -199,7 +203,7 @@ function SavedBrushStrokePreview({ brush }: { brush: StudioSavedBrush }) {
               fill="none"
               stroke={brush.color}
               strokeWidth={strokeWidth}
-              strokeLinecap={brush.tipRoundness < 0.35 ? "butt" : "round"}
+              strokeLinecap={brush.tipRoundness < 0.35 ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "en", "butt") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "en", "round")}
               strokeLinejoin="round"
               strokeDasharray={dash}
               opacity={opacity}
@@ -905,7 +909,7 @@ export function StudioBrushLibraryPanel({
     <section
       ref={sectionRef}
       className="space-y-2 border-t border-line/35 pt-2"
-      aria-label="내 브러시"
+      aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "내 브러시")}
       data-studio-brush-library-scope="saved"
       data-studio-brush-surface-role="user-library-management"
       data-studio-brush-library-authority={repositoryAuthority}
@@ -915,7 +919,7 @@ export function StudioBrushLibraryPanel({
     >
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-[0.68rem] font-semibold text-fg-2">내 브러시 · 사용자 설정</p>
+          <p className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "내 브러시 · 사용자 설정")}</p>
           <p className="text-[0.6rem] tabular-nums text-fg-3">
             {brushLibraryAuthorityLabel(repositoryAuthority, displayedTotal)}
           </p>
@@ -924,11 +928,11 @@ export function StudioBrushLibraryPanel({
           {importing
             ? <LoaderCircle size={12} className="animate-spin" aria-hidden />
             : <Upload size={12} aria-hidden />}
-          {importing ? "변환 중…" : "가져오기"}
+          {importing ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "변환 중…") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "가져오기")}
           <input
             type="file"
             accept={STUDIO_BRUSH_PACK_ACCEPT}
-            aria-label="브러시 설정 · Photoshop ABR · Clip Studio SUT/SUTG · libmypaint MYB · Krita KPP/번들 가져오기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "브러시 설정 · Photoshop ABR · Clip Studio SUT/SUTG · libmypaint MYB · Krita KPP/번들 가져오기")}
             className="sr-only"
             disabled={importing}
             onChange={handleImportFile}
@@ -941,13 +945,13 @@ export function StudioBrushLibraryPanel({
           type="search"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="이름·프리셋 검색"
-          aria-label="내 브러시 검색"
+          placeholder={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "이름·프리셋 검색")}
+          aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "내 브러시 검색")}
           className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-panel px-2 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent lg:h-8"
         />
         <button
           type="button"
-          aria-label="고정 브러시만 보기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "고정 브러시만 보기")}
           aria-pressed={pinnedOnly}
           onClick={() => setPinnedOnly((active) => !active)}
           className={cx(
@@ -955,9 +959,8 @@ export function StudioBrushLibraryPanel({
             pinnedOnly ? "bg-accent-soft text-accent" : "text-fg-3 hover:bg-raised hover:text-fg",
           )}
         >
-          <Pin size={12} className={pinnedOnly ? "fill-current" : undefined} aria-hidden />
-          고정만
-        </button>
+          <Pin size={12} className={pinnedOnly ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "en", "fill-current") : undefined} aria-hidden />
+          {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "고정만")}</button>
       </div>
 
       {error ? <p className="text-[0.64rem] leading-relaxed text-bad" role="alert">{error}</p> : null}
@@ -976,10 +979,10 @@ export function StudioBrushLibraryPanel({
       >
         <Save size={13} aria-hidden />
         {repositoryAuthority === "sqlite"
-          ? "현재 브러시 저장"
+          ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "현재 브러시 저장")
           : repositoryAuthority === "memory-session"
-            ? "현재 브러시 세션에 보관"
-            : "브러시 카탈로그 준비 중"}
+            ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "현재 브러시 세션에 보관")
+            : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "브러시 카탈로그 준비 중")}
       </button>
       {creatorOpen ? (
         <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-card p-2">
@@ -987,8 +990,8 @@ export function StudioBrushLibraryPanel({
             type="text"
             value={newName}
             onChange={(event) => setNewName(event.target.value)}
-            placeholder="브러시 이름"
-            aria-label="새 브러시 이름"
+            placeholder={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "브러시 이름")}
+            aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "새 브러시 이름")}
             // eslint-disable-next-line jsx-a11y/no-autofocus -- 명시적 저장 동작 뒤 열리는 짧은 이름 입력 단계다.
             autoFocus
             onKeyDown={(event) => {
@@ -1001,17 +1004,17 @@ export function StudioBrushLibraryPanel({
             className="h-11 rounded-lg border border-line bg-panel px-2 text-xs text-fg outline-none focus:border-accent lg:h-8"
           />
           <button type="button" onClick={() => void handleSaveCurrent()} className="min-h-11 rounded-lg bg-accent text-[0.68rem] font-semibold text-on-accent hover:bg-accent-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:min-h-8">
-            {repositoryAuthority === "sqlite" ? "저장" : "세션에 보관"}
+            {repositoryAuthority === "sqlite" ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "저장") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "세션에 보관")}
           </button>
         </div>
       ) : null}
 
       {orderedBrushes.length > 0 ? (
         <div className="flex min-w-0 items-center justify-between gap-2">
-          <span className="shrink-0 text-[0.62rem] font-semibold text-fg-3">노출</span>
+          <span className="shrink-0 text-[0.62rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "노출")}</span>
           <div
             role="group"
-            aria-label="브러시 노출 단계 필터"
+            aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "브러시 노출 단계 필터")}
             className="grid min-w-0 flex-1 grid-cols-3 rounded-xl border border-line bg-card p-0.5"
           >
             {EXPOSURE_TIER_OPTIONS.map((option) => (
@@ -1038,16 +1041,16 @@ export function StudioBrushLibraryPanel({
 
       {orderedBrushes.length > 0 ? (
         <div className="flex min-w-0 items-center justify-between gap-2">
-          <span className="shrink-0 text-[0.62rem] font-semibold text-fg-3">표시</span>
+          <span className="shrink-0 text-[0.62rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "표시")}</span>
           <div
             role="group"
-            aria-label="내 브러시 표시 방식"
+            aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "내 브러시 표시 방식")}
             className="grid min-w-0 flex-1 grid-cols-2 rounded-xl border border-line bg-card p-0.5"
           >
             <button
               type="button"
-              title="내 브러시 획 미리보기"
-              aria-label="내 브러시 획 미리보기"
+              title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "내 브러시 획 미리보기")}
+              aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "내 브러시 획 미리보기")}
               aria-pressed={viewMode === "stroke"}
               data-studio-saved-brush-view-option="stroke"
               onClick={() => setViewMode("stroke")}
@@ -1059,12 +1062,11 @@ export function StudioBrushLibraryPanel({
               )}
             >
               <Waves size={13} strokeWidth={1.8} aria-hidden />
-              획
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "획")}</button>
             <button
               type="button"
-              title="내 브러시 이름 목록"
-              aria-label="내 브러시 이름 목록"
+              title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "내 브러시 이름 목록")}
+              aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "내 브러시 이름 목록")}
               aria-pressed={viewMode === "text"}
               data-studio-saved-brush-view-option="text"
               onClick={() => setViewMode("text")}
@@ -1076,8 +1078,7 @@ export function StudioBrushLibraryPanel({
               )}
             >
               <Rows3 size={13} strokeWidth={1.8} aria-hidden />
-              목록
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "목록")}</button>
           </div>
         </div>
       ) : null}
@@ -1085,10 +1086,10 @@ export function StudioBrushLibraryPanel({
       {orderedBrushes.length === 0 ? (
         <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-[0.64rem] leading-relaxed text-fg-3">
           {repositoryAuthority === "sqlite"
-            ? "현재 펜 설정을 저장하면 모바일에서도 바로 꺼내 쓸 수 있어요."
+            ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "현재 펜 설정을 저장하면 모바일에서도 바로 꺼내 쓸 수 있어요.")
             : repositoryAuthority === "memory-session"
-              ? "현재 펜 설정을 이 세션에 보관할 수 있어요. 브라우저를 닫기 전에 파일로 내보내 주세요."
-              : "브러시 카탈로그를 준비하고 있어요."}
+              ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "현재 펜 설정을 이 세션에 보관할 수 있어요. 브라우저를 닫기 전에 파일로 내보내 주세요.")
+              : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "브러시 카탈로그를 준비하고 있어요.")}
         </p>
       ) : (
         <>
@@ -1126,7 +1127,7 @@ export function StudioBrushLibraryPanel({
                     type="text"
                     value={renamingName}
                     onChange={(event) => setRenamingName(event.target.value)}
-                    aria-label={`${brush.name} 새 이름`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "{v0} 새 이름"), { v0: String(brush.name) })}
                     onBlur={() => void commitRename(false)}
                     onKeyDown={handleRenameKeyDown}
                     // eslint-disable-next-line jsx-a11y/no-autofocus -- 사용자가 복제/이름 변경을 요청한 직후의 인라인 편집이다.
@@ -1140,21 +1141,20 @@ export function StudioBrushLibraryPanel({
                 )}
                 {activeBrushId === brush.id ? (
                   <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.55rem] font-bold text-accent">
-                    <Check size={10} strokeWidth={3} aria-hidden /> 사용 중
-                  </span>
+                    <Check size={10} strokeWidth={3} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "사용 중")}</span>
                 ) : null}
                 <button
                   type="button"
                   onClick={() => void handleTogglePinned(brush.id)}
                   aria-label={`${brush.name} ${brush.pinned ? "고정 해제" : "빠른 선반에 고정"}`}
                   aria-pressed={brush.pinned}
-                  title={brush.pinned ? "고정 해제" : "빠른 선반에 고정"}
+                  title={brush.pinned ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "고정 해제") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "빠른 선반에 고정")}
                   className={cx(
                     "grid size-11 shrink-0 place-items-center rounded-lg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:size-8",
                     brush.pinned ? "text-accent" : "text-fg-3"
                   )}
                 >
-                  <Pin size={14} className={brush.pinned ? "fill-current" : undefined} aria-hidden />
+                  <Pin size={14} className={brush.pinned ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "en", "fill-current") : undefined} aria-hidden />
                 </button>
               </div>
 
@@ -1162,7 +1162,7 @@ export function StudioBrushLibraryPanel({
                 type="button"
                 onClick={() => void handleApplySavedBrush(brush)}
                 aria-pressed={activeBrushId === brush.id}
-                aria-label={`${brush.name} 브러시 적용, ${savedBrushPresetLabel(brush)}, ${brush.strokeWidth}px, ${Math.round(brush.brushOpacity * 100)}퍼센트`}
+                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "{v0} 브러시 적용, {v1}, {v2}px, {v3}퍼센트"), { v0: String(brush.name), v1: String(savedBrushPresetLabel(brush)), v2: String(brush.strokeWidth), v3: String(Math.round(brush.brushOpacity * 100)) })}
                 className={cx(
                   "flex w-full items-center gap-2 rounded-lg border border-line/60 bg-panel/50 px-2 text-left transition-colors hover:border-accent hover:bg-accent-soft/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
                   viewMode === "stroke" ? "min-h-16" : "min-h-12"
@@ -1189,11 +1189,11 @@ export function StudioBrushLibraryPanel({
                   </span>
                 )}
                 <span className="min-w-0 flex-1 text-[0.62rem] leading-snug text-fg-3">
-                  <span className="block truncate text-fg-2">{savedBrushPresetLabel(brush)} · {brush.strokeWidth}px · {Math.round(brush.brushOpacity * 100)}%</span>
+                  <span className="block truncate text-fg-2">{savedBrushPresetLabel(brush)} · {brush.strokeWidth}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "en", "px · ")}{Math.round(brush.brushOpacity * 100)}%</span>
                   {viewMode === "stroke" ? (
                     <>
-                      <span className="block">{stabilizerModeLabel(brush.stabilizerMode)} {brush.stabilizer} · 후보정 {brush.postCorrection}</span>
-                      {brush.brushId === "calligraphy" ? <span className="block">촉 {Math.round(brush.tipAngle)}° · 원형도 {Math.round(brush.tipRoundness * 100)}%</span> : null}
+                      <span className="block">{stabilizerModeLabel(brush.stabilizerMode)} {brush.stabilizer} {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "· 후보정 ")}{brush.postCorrection}</span>
+                      {brush.brushId === "calligraphy" ? <span className="block">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "촉 ")}{Math.round(brush.tipAngle)}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "° · 원형도 ")}{Math.round(brush.tipRoundness * 100)}%</span> : null}
                     </>
                   ) : null}
                 </span>
@@ -1205,9 +1205,9 @@ export function StudioBrushLibraryPanel({
                   data-studio-brush-variant-group={variantGroup.id}
                 >
                   <summary
-                    title={`${variantGroup.intent} · 형제 프리셋: ${variantSiblings
+                    title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "{v0} · 형제 프리셋: {v1}"), { v0: String(variantGroup.intent), v1: String(variantSiblings
                       .map((entry) => entry.label)
-                      .join(", ")}`}
+                      .join(", ")) })}
                     onKeyDown={(event) => {
                       if (event.key !== "Escape") return;
                       event.preventDefault();
@@ -1217,7 +1217,7 @@ export function StudioBrushLibraryPanel({
                     }}
                     className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg px-2 text-[0.62rem] font-semibold text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8 [&::-webkit-details-marker]:hidden"
                   >
-                    <span>변형군 · 형제 {variantSiblings.length}종</span>
+                    <span>{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "변형군 · 형제 ")}{variantSiblings.length}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "종")}</span>
                     <ChevronDown
                       size={13}
                       className="transition-transform group-open:rotate-180"
@@ -1225,7 +1225,7 @@ export function StudioBrushLibraryPanel({
                     />
                   </summary>
                   <ul
-                    aria-label={`${brush.name} 변형군 형제 프리셋`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "{v0} 변형군 형제 프리셋"), { v0: String(brush.name) })}
                     className="flex flex-wrap gap-1 pt-1"
                   >
                     {variantSiblings.map((entry) => {
@@ -1236,14 +1236,14 @@ export function StudioBrushLibraryPanel({
                             <button
                               type="button"
                               onClick={() => void handleApplySavedBrush(sibling)}
-                              aria-label={`${entry.label} 변형 브러시 적용 · 저장 브러시 ${sibling.name}`}
+                              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "{v0} 변형 브러시 적용 · 저장 브러시 {v1}"), { v0: String(entry.label), v1: String(sibling.name) })}
                               className="flex min-h-11 items-center rounded-lg border border-line px-2 text-[0.6rem] font-medium text-fg-2 transition-colors hover:border-accent hover:bg-accent-soft/30 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8"
                             >
                               {entry.label}
                             </button>
                           ) : (
                             <span
-                              title="이 변형 프리셋으로 저장한 브러시가 없어요 — 브러시 카탈로그에서 선택할 수 있어요"
+                              title={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "이 변형 프리셋으로 저장한 브러시가 없어요 — 브러시 카탈로그에서 선택할 수 있어요")}
                               className="flex min-h-11 items-center rounded-lg border border-dashed border-line/60 px-2 text-[0.6rem] text-fg-3 lg:min-h-8"
                             >
                               {entry.label}
@@ -1267,7 +1267,7 @@ export function StudioBrushLibraryPanel({
                   }}
                   className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg px-2 text-[0.62rem] font-semibold text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8 [&::-webkit-details-marker]:hidden"
                 >
-                  <span>관리 · 덮어쓰기, 복제, 공유</span>
+                  <span>{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "관리 · 덮어쓰기, 복제, 공유")}</span>
                   <ChevronDown
                     size={13}
                     className="transition-transform group-open:rotate-180"
@@ -1275,24 +1275,18 @@ export function StudioBrushLibraryPanel({
                   />
                 </summary>
                 <div className="grid grid-cols-3 gap-1 pt-1 sm:grid-cols-6">
-                <button type="button" onClick={() => void handleOverwrite(brush)} aria-label={`${brush.name} 브러시를 지금 설정으로 덮어쓰기`} title={repositoryAuthority === "sqlite" ? "지금 설정으로 덮어쓰기 (같은 브러시에 저장)" : "지금 설정으로 덮어쓰기 (현재 세션에만 반영)"} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
-                  <RefreshCw size={12} aria-hidden /> 덮어쓰기
-                </button>
-                <button type="button" onClick={() => void handleDuplicate(brush.id)} aria-label={`${brush.name} 복제`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
-                  <Copy size={12} aria-hidden /> 복제
-                </button>
-                <button type="button" onClick={(event) => startRename(brush, event.currentTarget)} aria-label={`${brush.name} 이름 변경`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
-                  <Pencil size={12} aria-hidden /> 이름
-                </button>
-                <button type="button" onClick={() => handleExport(brush)} aria-label={`${brush.name} 내보내기`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
-                  <Download size={12} aria-hidden /> 내보내기
-                </button>
-                <button type="button" onClick={() => void handleShare(brush)} aria-label={`${brush.name} 브러시 공유`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
-                  <Share2 size={12} aria-hidden /> 공유
-                </button>
-                <button type="button" onClick={() => void handleDelete(brush.id)} aria-label={`${brush.name} 브러시 삭제`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
-                  <Trash2 size={12} aria-hidden /> 삭제
-                </button>
+                <button type="button" onClick={() => void handleOverwrite(brush)} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "{v0} 브러시를 지금 설정으로 덮어쓰기"), { v0: String(brush.name) })} title={repositoryAuthority === "sqlite" ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "지금 설정으로 덮어쓰기 (같은 브러시에 저장)") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "지금 설정으로 덮어쓰기 (현재 세션에만 반영)")} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                  <RefreshCw size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "덮어쓰기")}</button>
+                <button type="button" onClick={() => void handleDuplicate(brush.id)} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "{v0} 복제"), { v0: String(brush.name) })} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                  <Copy size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "복제")}</button>
+                <button type="button" onClick={(event) => startRename(brush, event.currentTarget)} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "{v0} 이름 변경"), { v0: String(brush.name) })} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                  <Pencil size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "이름")}</button>
+                <button type="button" onClick={() => handleExport(brush)} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "{v0} 내보내기"), { v0: String(brush.name) })} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                  <Download size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "내보내기")}</button>
+                <button type="button" onClick={() => void handleShare(brush)} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "{v0} 브러시 공유"), { v0: String(brush.name) })} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                  <Share2 size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "공유")}</button>
+                <button type="button" onClick={() => void handleDelete(brush.id)} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "{v0} 브러시 삭제"), { v0: String(brush.name) })} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                  <Trash2 size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "삭제")}</button>
                 </div>
               </details>
             </li>
@@ -1308,7 +1302,7 @@ export function StudioBrushLibraryPanel({
               className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-line text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-60 lg:min-h-9"
             >
               {pageLoading ? <LoaderCircle size={13} className="animate-spin" aria-hidden /> : null}
-              {pageLoading ? "불러오는 중…" : `더 불러오기 (${brushes.length}/${displayedTotal})`}
+              {pageLoading ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "불러오는 중…") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibraryPanel", "ko", "더 불러오기 ({v0}/{v1})"), { v0: String(brushes.length), v1: String(displayedTotal) })}
             </button>
           ) : null}
         </>

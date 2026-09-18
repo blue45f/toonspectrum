@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight } from "lucide-react";
 
 import { HeroBannerBadge } from "./hero-banner-badge";
@@ -27,14 +31,14 @@ export function HeroBannerStatic({
     <div
       className="group relative"
       role="group"
-      aria-label="이 주의 추천 작품"
+      aria-label={translateCurrentStaticSourceText("shared.components.hero.banner.static", "ko", "이 주의 추천 작품")}
       onPointerEnter={onActivate}
       onFocusCapture={onActivate}
     >
       <HeroBannerBadge />
 
       <div className="sheen-sweep overflow-hidden rounded-2xl border border-line bg-card surface-hl">
-        <Link href={`/title/${first.slug}`} className="group/slide relative block">
+        <Link href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.hero.banner.static", "en", "/title/{v0}"), { v0: String(first.slug) })} className="group/slide relative block">
           <div className="absolute inset-0" aria-hidden>
             {first.coverImage && !isRestricted ? (
               // Ken Burns — 인터랙티브 배너(hero-banner-slide)와 동일한 배경 표지 드리프트.
@@ -65,7 +69,7 @@ export function HeroBannerStatic({
               {first.coverImage && !isRestricted ? (
                 <img
                   src={first.coverImage}
-                  alt={`${first.title} 표지`}
+                  alt={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.hero.banner.static", "ko", "{v0} 표지"), { v0: String(first.title) })}
                   loading="eager"
                   fetchPriority="high"
                   className="absolute inset-0 size-full object-cover contrast-[1.03] saturate-[1.04]"
@@ -81,7 +85,7 @@ export function HeroBannerStatic({
               <div className="absolute inset-0 bg-[linear-gradient(to_top,oklch(0.13_0.012_70/0.86),oklch(0.13_0.012_70/0.22)_46%,oklch(0.13_0.012_70/0.08))]" />
               <div className="absolute left-0 top-0 flex items-center gap-1.5 p-4">
                 <span className="rounded-md border border-[oklch(0.95_0.01_85/0.28)] bg-[oklch(0.16_0.01_70/0.56)] px-1.5 py-0.5 text-xs font-semibold uppercase text-white/90 backdrop-blur-sm">
-                  {isRestricted ? "19+" : first.type === "webnovel" ? "NOVEL" : "TOON"}
+                  {isRestricted ? "19+" : first.type === "webnovel" ? translateCurrentStaticSourceText("shared.components.hero.banner.static", "en", "NOVEL") : translateCurrentStaticSourceText("shared.components.hero.banner.static", "en", "TOON")}
                 </span>
               </div>
               <div className="absolute inset-x-0 bottom-0 p-4">
@@ -112,7 +116,7 @@ export function HeroBannerStatic({
               </div>
               <p className="truncate text-xs text-fg-2">
                 {first.author}
-                {first.artist && first.artist !== first.author ? ` · 그림 ${first.artist}` : ""}
+                {first.artist && first.artist !== first.author ? formatI18nTemplate(translateCurrentStaticSourceText("shared.components.hero.banner.static", "ko", " · 그림 {v0}"), { v0: String(first.artist) }) : ""}
               </p>
               {/* 모바일은 한 줄(스크롤 억제), sm 이상은 두 줄. */}
               <p className="line-clamp-1 max-w-prose font-serif text-[0.8125rem] italic leading-relaxed text-fg-2 sm:line-clamp-2 sm:text-sm">
@@ -120,11 +124,10 @@ export function HeroBannerStatic({
               </p>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-2 sm:mt-1">
                 <span className="rounded-full border border-line bg-card/50 px-2.5 py-1 text-[0.72rem] font-medium text-fg-2">
-                  {first.availability.length > 0 ? `${first.availability.length}개 플랫폼` : "플랫폼 확인 중"}
+                  {first.availability.length > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("shared.components.hero.banner.static", "ko", "{v0}개 플랫폼"), { v0: String(first.availability.length) }) : translateCurrentStaticSourceText("shared.components.hero.banner.static", "ko", "플랫폼 확인 중")}
                 </span>
                 <span className="ml-auto inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-[0.78rem] font-semibold text-on-accent transition-transform duration-150 ease-out-expo group-hover/slide:translate-x-0.5">
-                  보러가기
-                  <ArrowRight size={14} />
+                  {translateCurrentStaticSourceText("shared.components.hero.banner.static", "ko", "보러가기")}<ArrowRight size={14} />
                 </span>
               </div>
             </div>
@@ -142,7 +145,7 @@ export function HeroBannerStatic({
           {items.slice(0, 6).map((title, index) => (
             <span
               key={title.id}
-              className={index === 0 ? "h-1.5 w-5 rounded-full bg-accent" : "size-1.5 rounded-full bg-line"}
+              className={index === 0 ? translateCurrentStaticSourceText("shared.components.hero.banner.static", "en", "h-1.5 w-5 rounded-full bg-accent") : translateCurrentStaticSourceText("shared.components.hero.banner.static", "en", "size-1.5 rounded-full bg-line")}
             />
           ))}
         </div>

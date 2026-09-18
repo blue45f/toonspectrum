@@ -1,3 +1,6 @@
+
+import { getActiveI18nLocale } from "@/shared/lib/i18n-bilingual-copy";
+
 export const CREATOR_FILM = {
   src: "/brand/toonstudio-intro.mp4",
   poster: "/brand/toonstudio-film-poster.jpg",
@@ -79,6 +82,6 @@ export const HOME_COPY = {
 } as const;
 
 export type CreatorHomeCopy = (typeof HOME_COPY)[keyof typeof HOME_COPY];
-export function creatorHomeLocale(locale: string): keyof typeof HOME_COPY {
-  return locale.toLowerCase().split(/[-_]/)[0] === "ko" ? "ko" : "en";
+export function creatorHomeLocale(_locale): keyof typeof HOME_COPY {
+  return getActiveI18nLocale();
 }

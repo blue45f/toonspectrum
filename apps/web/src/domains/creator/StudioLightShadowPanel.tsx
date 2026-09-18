@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio 3D 광원 및 그림자 컨트롤러 UI 패널(Light & Shadow Gizmo Panel).
  *
@@ -65,17 +69,16 @@ export function StudioLightShadowPanel({
   return (
     <div className="space-y-3">
       <StudioSectionHeader
-        title="광원·그림자"
-        description="방위각/고도각으로 광원 방향을 조절하고, 그림자 농도·퍼짐을 커스터마이징하세요."
+        title={translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "광원·그림자")}
+        description={translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "방위각/고도각으로 광원 방향을 조절하고, 그림자 농도·퍼짐을 커스터마이징하세요.")}
         action={
           <button
             type="button"
             onClick={handleReset}
             className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })}
-            title="광원·그림자 초기화"
+            title={translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "광원·그림자 초기화")}
           >
-            <RotateCcw size={13} aria-hidden /> 초기화
-          </button>
+            <RotateCcw size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "초기화")}</button>
         }
       />
 
@@ -83,9 +86,8 @@ export function StudioLightShadowPanel({
       <div className="space-y-1">
         <span className="text-xs font-semibold text-fg-2">
           <Lightbulb size={12} className="mr-1 inline-block align-[-2px]" aria-hidden />
-          무드 프리셋
-        </span>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="무드 광원 프리셋">
+          {translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "무드 프리셋")}</span>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "무드 광원 프리셋")}>
           {STUDIO_MOOD_LIGHTING_PRESETS.map((preset) => (
             <StudioPanelChip
               key={preset.id}
@@ -102,10 +104,9 @@ export function StudioLightShadowPanel({
       <div className="space-y-2">
         <span className="text-xs font-semibold text-fg-2">
           <Sun size={12} className="mr-1 inline-block align-[-2px]" aria-hidden />
-          광원 방향
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "광원 방향")}</span>
         <StudioSliderRow
-          label="방위각(Azimuth)"
+          label={translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "방위각(Azimuth)")}
           min={0}
           max={360}
           step={1}
@@ -116,7 +117,7 @@ export function StudioLightShadowPanel({
           readout={`${Math.round(lightDirection.azimuthDeg)}°`}
         />
         <StudioSliderRow
-          label="고도각(Elevation)"
+          label={translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "고도각(Elevation)")}
           min={-90}
           max={90}
           step={1}
@@ -130,9 +131,9 @@ export function StudioLightShadowPanel({
 
       {/* 그림자 설정 */}
       <div className="space-y-2">
-        <span className="text-xs font-semibold text-fg-2">그림자</span>
+        <span className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "그림자")}</span>
         <StudioSliderRow
-          label="그림자 농도"
+          label={translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "그림자 농도")}
           min={0}
           max={100}
           step={1}
@@ -143,13 +144,13 @@ export function StudioLightShadowPanel({
           readout={`${Math.round(shadowConfig.opacity * 100)}%`}
         />
         <StudioSliderRow
-          label="퍼짐(Blur)"
+          label={translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "퍼짐(Blur)")}
           min={0}
           max={24}
           step={1}
           value={shadowConfig.blurPx}
           onChange={(v) => onShadowConfigChange({ ...shadowConfig, blurPx: v })}
-          readout={`${shadowConfig.blurPx}px`}
+          readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "en", "{v0}px"), { v0: String(shadowConfig.blurPx) })}
         />
       </div>
 
@@ -159,12 +160,12 @@ export function StudioLightShadowPanel({
         onClick={() => setShowAdvanced((prev) => !prev)}
         className="text-[0.7rem] text-accent hover:underline"
       >
-        {showAdvanced ? "▲ 고급 설정 접기" : "▼ 고급 설정 펼치기"}
+        {showAdvanced ? translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "▲ 고급 설정 접기") : translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "▼ 고급 설정 펼치기")}
       </button>
       {showAdvanced ? (
         <div className="space-y-2 pl-1">
           <StudioSliderRow
-            label="그림자 X 오프셋"
+            label={translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "그림자 X 오프셋")}
             min={-20}
             max={20}
             step={0.5}
@@ -175,7 +176,7 @@ export function StudioLightShadowPanel({
             readout={shadowConfig.shadowVectorX.toFixed(1)}
           />
           <StudioSliderRow
-            label="그림자 Y 오프셋"
+            label={translateCurrentStaticSourceText("domains.creator.StudioLightShadowPanel", "ko", "그림자 Y 오프셋")}
             min={-20}
             max={20}
             step={0.5}

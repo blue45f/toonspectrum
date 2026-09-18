@@ -9,6 +9,10 @@ const MAXIMUM_RESPONSE_BYTES = 32_768;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 const REDIRECT_PROVIDERS = Object.freeze({
+  apple: Object.freeze({
+    hostname: "appleid.apple.com",
+    pathname: "/auth/authorize",
+  }),
   kakao: Object.freeze({
     hostname: "kauth.kakao.com",
     pathname: "/oauth/authorize",
@@ -78,7 +82,7 @@ function assertNoSensitiveFields(provider, value) {
 export function validateSocialLoginDiscovery(payload) {
   if (!isRecord(payload)) throw new Error("provider discovery must be an object");
 
-  const expected = ["google", "kakao", "naver", "github"];
+  const expected = ["google", "apple", "kakao", "naver", "github"];
   const result = {};
 
   for (const provider of expected) {
@@ -130,7 +134,8 @@ function requireCookieAttributes(setCookie, provider, cookieName) {
   if (!lower.includes(`${cookieName.toLowerCase()}=`)) {
     throw new Error(`${provider} start response is missing ${cookieName}`);
   }
-  for (const attribute of ["httponly", "secure", "samesite=lax"]) {
+  const sameSite = provider === "apple" ? "samesite=none" : "samesite=lax";
+  for (const attribute of ["httponly", "secure", sameSite]) {
     if (!lower.includes(attribute)) {
       throw new Error(`${provider} state cookie is missing ${attribute}`);
     }
@@ -155,6 +160,20 @@ function validateProviderSpecificAuthorizeUrl(provider, location) {
   if (provider === "naver") {
     if (location.searchParams.has("scope")) {
       throw new Error("naver authorize URL must rely on console-configured consent fields");
+    }
+    return;
+  }
+
+  if (provider === "apple") {
+    const scope = new Set((location.searchParams.get("scope") ?? "").split(/\s+/u));
+    if (!scope.has("name") || !scope.has("email")) {
+      throw new Error("apple authorize scope must request name and email");
+    }
+    if (location.searchParams.get("response_mode") !== "form_post") {
+      throw new Error("apple authorize URL must use form_post");
+    }
+    if (!/^[A-Za-z0-9_-]{43}$/u.test(location.searchParams.get("nonce") ?? "")) {
+      throw new Error("apple authorize URL has an invalid nonce");
     }
     return;
   }

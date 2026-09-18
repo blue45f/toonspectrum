@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /* Extracted from StudioBackground3D. Closures keep original identifiers via an `any` host bag. */
 // @ts-nocheck
 "use no memo";
@@ -479,7 +480,7 @@ export function bindStudioBg3dEditorSceneGraph(h) {
   );
   const immersiveCameraNode = immersiveStagePlan ? (
     <group
-      key={`studio-bg3d-xr-camera-${immersiveStagePlan.mode}`}
+      key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSceneGraph", "en", "studio-bg3d-xr-camera-{v0}"), { v0: String(immersiveStagePlan.mode) })}
       position={[...immersiveStagePlan.cameraRigTransform.position]}
       quaternion={[...immersiveStagePlan.cameraRigTransform.quaternion]}
       scale={immersiveStagePlan.cameraRigTransform.uniformScale}

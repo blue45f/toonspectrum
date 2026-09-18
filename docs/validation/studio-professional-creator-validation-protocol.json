@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "protocolId": "studio-professional-creator-v1",
+  "title": "ToonStudio professional creator replacement validation",
+  "minimumParticipants": 12,
+  "requiredRoles": {
+    "solo-author": 4,
+    "line-artist": 2,
+    "color-artist": 2,
+    "background-artist": 2,
+    "pd-reviewer": 2
+  },
+  "eligibleTools": [
+    "clip-studio-paint",
+    "photoshop",
+    "procreate",
+    "medibang",
+    "sketchup"
+  ],
+  "requiredTasks": [
+    {
+      "id": "storyboard-20-panels",
+      "label": "Create a 20-panel storyboard from the supplied script"
+    },
+    {
+      "id": "finish-10-panels",
+      "label": "Finish line art, color and lettering for 10 panels"
+    },
+    {
+      "id": "edit-live-3d-background",
+      "label": "Edit a 3D background and reconnect it to a 2D panel"
+    },
+    {
+      "id": "psd-roundtrip",
+      "label": "Import, edit and export the supplied PSD with a loss report"
+    },
+    {
+      "id": "offline-cross-device-resume",
+      "label": "Continue offline and resume the same project on another device"
+    },
+    {
+      "id": "review-revise-approve",
+      "label": "Request review, resolve a positioned comment and approve a fixed revision"
+    },
+    {
+      "id": "publish-package",
+      "label": "Generate a platform-ready publish package and preflight report"
+    }
+  ],
+  "thresholds": {
+    "minimumTaskCompletionRate": 0.9,
+    "maximumFatalDataLossCount": 0,
+    "maximumPublishPreflightMissCount": 0,
+    "maximumPsdLossReportMismatchCount": 0,
+    "minimumMedianSusScore": 80,
+    "maximumCriticalAccessibilityFindings": 0,
+    "maximumCriticalSecurityFindings": 0
+  },
+  "attestationStatementVersion": "toonstudio-professional-validation-v1",
+  "consentScope": "anonymous-aggregate-and-technical-logs"
+}

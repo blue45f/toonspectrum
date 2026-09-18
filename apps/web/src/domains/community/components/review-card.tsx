@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { EyeOff, Heart } from "lucide-react";
 import { useState } from "react";
 
@@ -82,7 +83,7 @@ export function ReviewCard({
                 <span className="truncate text-sm font-semibold text-fg">{review.author}</span>
               )}
               {review.progress && (
-                <Badge tone={PROGRESS_TONE[review.progress] ?? "neutral"}>
+                <Badge tone={PROGRESS_TONE[review.progress] ?? translateCurrentStaticSourceText("domains.community.components.review.card", "en", "neutral")}>
                   {t(PROGRESS_LABEL_KEY[review.progress] ?? "review.progress.unknown")}
                 </Badge>
               )}
@@ -97,7 +98,7 @@ export function ReviewCard({
 
         {showTitle && title && (
           <Link
-            href={`/title/${title.slug}`}
+            href={formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.review.card", "en", "/title/{v0}"), { v0: String(title.slug) })}
             className="flex items-center gap-2 rounded-lg bg-raised/60 px-2.5 py-1.5 text-xs text-fg-2 transition-colors hover:text-fg"
           >
             <span
@@ -145,7 +146,7 @@ export function ReviewCard({
               hydrated && liked ? "text-accent" : "text-fg-3 hover:text-fg-2"
             )}
           >
-            <Heart size={14} className={hydrated && liked ? "fill-accent" : ""} />
+            <Heart size={14} className={hydrated && liked ? translateCurrentStaticSourceText("domains.community.components.review.card", "en", "fill-accent") : ""} />
             <span className="tnum">{likeCount.toLocaleString("ko-KR")}</span>
           </button>
         </footer>

@@ -106,6 +106,14 @@ function destination(
         "Combine story, production, asset, review, localization and export state into actionable readiness checks.",
       );
     }
+    if (view === "intelligence") {
+      return owned(
+        "포즈·레퍼런스·연속성·레터링·현지화·협업·3D·장면·효과음·검수·메타데이터 탐색을 프로젝트 단위로 연결합니다.",
+        "Connect pose, references, continuity, lettering, localization, collaboration, 3D, scene, SFX, preflight and metadata tools at project scope.",
+        "창작 인텔리전스 열기",
+        "Open Creator Intelligence",
+      );
+    }
     return owned(
       "이어서 할 작업, 진행 상황, 검토 요청과 공개 준비 상태를 한눈에 확인합니다.",
       "See next actions, progress, review requests and release readiness at a glance.",

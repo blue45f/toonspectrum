@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { FlipHorizontal2, FlipVertical2, ScanSearch } from "lucide-react";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -25,8 +28,8 @@ export function StudioTransformQuickActions({
           type="button"
           disabled={disabled}
           onClick={onZoomToSelection}
-          title={disabledReason ?? "선택 영역으로 확대 (⇧F)"}
-          aria-label="선택 영역으로 확대"
+          title={disabledReason ?? translateCurrentStaticSourceText("domains.creator.StudioTransformQuickActions", "ko", "선택 영역으로 확대 (⇧F)")}
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioTransformQuickActions", "ko", "선택 영역으로 확대")}
           data-inspector-control-id="selection.zoom"
           data-inspector-priority="advanced"
           className={buttonClass({ size: "sm", variant: "quiet", className })}
@@ -39,8 +42,8 @@ export function StudioTransformQuickActions({
           type="button"
           disabled={disabled}
           onClick={onFlipHorizontal}
-          title={disabledReason ?? "좌우 반전 (⇧H)"}
-          aria-label="선택 좌우 반전"
+          title={disabledReason ?? translateCurrentStaticSourceText("domains.creator.StudioTransformQuickActions", "ko", "좌우 반전 (⇧H)")}
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioTransformQuickActions", "ko", "선택 좌우 반전")}
           data-inspector-control-id="selection.flip-horizontal"
           data-inspector-priority="advanced"
           className={buttonClass({ size: "sm", variant: "quiet", className })}
@@ -53,8 +56,8 @@ export function StudioTransformQuickActions({
           type="button"
           disabled={disabled}
           onClick={onFlipVertical}
-          title={disabledReason ?? "상하 반전 (⇧V)"}
-          aria-label="선택 상하 반전"
+          title={disabledReason ?? translateCurrentStaticSourceText("domains.creator.StudioTransformQuickActions", "ko", "상하 반전 (⇧V)")}
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioTransformQuickActions", "ko", "선택 상하 반전")}
           data-inspector-control-id="selection.flip-vertical"
           data-inspector-priority="advanced"
           className={buttonClass({ size: "sm", variant: "quiet", className })}

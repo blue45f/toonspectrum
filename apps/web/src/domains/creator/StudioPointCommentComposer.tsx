@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { LoaderCircle, MapPin, Send, X } from "lucide-react";
 import {
   useEffect,
@@ -256,7 +260,7 @@ export function StudioPointCommentComposer({
         ref={cardRef}
         role="dialog"
         tabIndex={-1}
-        aria-label="위치 댓글 작성"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "ko", "위치 댓글 작성")}
         aria-modal={false}
         aria-describedby={error
           ? `${hintId} ${errorId}`
@@ -266,13 +270,12 @@ export function StudioPointCommentComposer({
         aria-busy={saving}
         data-studio-point-comment-composer="true"
         data-studio-point-comment-layout={position.mode}
-        data-presentation={position.mode === "sheet" ? "bottom-sheet" : "anchored-popover"}
+        data-presentation={position.mode === "sheet" ? translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "en", "bottom-sheet") : translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "en", "anchored-popover")}
         data-studio-shortcut-boundary="true"
         onSubmit={submit}
-        className={`fixed z-[92] flex flex-col overflow-hidden border border-line-strong bg-panel/98 text-fg backdrop-blur-xl [scrollbar-width:thin] motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none ${position.mode === "sheet"
+        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "en", "fixed z-[92] flex flex-col overflow-hidden border border-line-strong bg-panel/98 text-fg backdrop-blur-xl [scrollbar-width:thin] motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none {v0}"), { v0: String(position.mode === "sheet"
           ? "rounded-t-2xl border-b-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] shadow-[0_-18px_54px_oklch(0.06_0.02_70/0.5)] motion-safe:slide-in-from-bottom-4"
-          : "rounded-lg shadow-[0_22px_70px_oklch(0.06_0.02_70/0.58)] motion-safe:zoom-in-95"
-        }`}
+          : "rounded-lg shadow-[0_22px_70px_oklch(0.06_0.02_70/0.58)] motion-safe:zoom-in-95") })}
         style={{
           left: position.left,
           top: position.top,
@@ -286,7 +289,7 @@ export function StudioPointCommentComposer({
             {initial(authorName)}
           </span>
           <span className="min-w-0 flex-1">
-            <strong className="block truncate text-xs font-bold">위치 댓글</strong>
+            <strong className="block truncate text-xs font-bold">{translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "ko", "위치 댓글")}</strong>
             <span className="block truncate text-[0.65rem] text-fg-3">
               {Math.round(anchor.x * 100)}%, {Math.round(anchor.y * 100)}% · {authorName}
             </span>
@@ -302,22 +305,21 @@ export function StudioPointCommentComposer({
                 }
                 onOpenReview();
               }}
-              aria-label="댓글 검토함 열기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "ko", "댓글 검토함 열기")}
               aria-disabled={body.trim() ? true : undefined}
               title={body.trim()
-                ? "작성 중인 댓글을 등록하거나 취소한 뒤 검토함을 열 수 있어요"
-                : "댓글 검토함 열기"}
+                ? translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "ko", "작성 중인 댓글을 등록하거나 취소한 뒤 검토함을 열 수 있어요")
+                : translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "ko", "댓글 검토함 열기")}
               className="min-h-11 rounded-lg px-2 text-[0.68rem] font-semibold text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
             >
-              검토함
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "ko", "검토함")}</button>
           ) : null}
           <button
             type="button"
             disabled={saving}
             onClick={onCancel}
-            aria-label="위치 댓글 작성 취소"
-            title="취소 (Esc)"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "ko", "위치 댓글 작성 취소")}
+            title={translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "ko", "취소 (Esc)")}
             className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
           >
             <X size={15} aria-hidden />
@@ -331,10 +333,10 @@ export function StudioPointCommentComposer({
             rows={3}
             readOnly={saving}
             aria-readonly={saving}
-            aria-label="위치 댓글 내용"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "ko", "위치 댓글 내용")}
             aria-keyshortcuts="Meta+Enter Control+Enter Escape"
             aria-describedby={`${hintId} ${countId}${error ? ` ${errorId}` : notice ? ` ${noticeId}` : ""}`}
-            placeholder="이 위치에서 확인할 점이나 수정 의견을 남겨 주세요."
+            placeholder={translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "ko", "이 위치에서 확인할 점이나 수정 의견을 남겨 주세요.")}
             onChange={(event) => {
               setBody(event.target.value.slice(0, STUDIO_COMMENTS_MAX_BODY_LENGTH));
               if (error) setError(null);
@@ -372,8 +374,7 @@ export function StudioPointCommentComposer({
           ) : null}
           <footer className="mt-2 flex items-center gap-2">
             <span id={hintId} className="min-w-0 flex-1 text-[0.65rem] text-fg-3">
-              Esc 취소 · ⌘/Ctrl + Enter 등록
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "ko", "Esc 취소 · ⌘/Ctrl + Enter 등록")}</span>
             <span id={countId} className="text-[0.62rem] tabular-nums text-fg-3">
               {body.length.toLocaleString("ko-KR")}/{STUDIO_COMMENTS_MAX_BODY_LENGTH.toLocaleString("ko-KR")}
             </span>
@@ -391,7 +392,7 @@ export function StudioPointCommentComposer({
               ) : (
                 <Send size={13} aria-hidden />
               )}
-              {saving ? "저장 중" : "등록"}
+              {saving ? translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "ko", "저장 중") : translateCurrentStaticSourceText("domains.creator.StudioPointCommentComposer", "ko", "등록")}
             </button>
           </footer>
         </div>

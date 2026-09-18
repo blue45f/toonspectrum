@@ -19,7 +19,7 @@
 import {
   Compass,
   Eraser,
-  FilePlus2,
+  Scaling,
   Grid3x3,
   Languages,
   MessageSquare,
@@ -48,10 +48,10 @@ function requestStudioShellFloatingLayoutManagerOpen(): void {
 }
 
 const STUDIO_PLATFORM_CANVAS_MENU_ITEMS = [
-  { id: "new-webtoon-vertical", commandId: "canvas.new-webtoon-vertical", presetId: "webtoon-vertical" },
-  { id: "new-webtoon-naver", commandId: "canvas.new-webtoon-naver", presetId: "webtoon-naver" },
-  { id: "new-webtoon-kakao", commandId: "canvas.new-webtoon-kakao", presetId: "webtoon-kakao" },
-  { id: "new-webtoon-canvas", commandId: "canvas.new-webtoon-canvas", presetId: "webtoon-canvas" },
+  { id: "apply-webtoon-vertical", commandId: "canvas.apply-webtoon-vertical", presetId: "webtoon-vertical" },
+  { id: "apply-webtoon-naver", commandId: "canvas.apply-webtoon-naver", presetId: "webtoon-naver" },
+  { id: "apply-webtoon-kakao", commandId: "canvas.apply-webtoon-kakao", presetId: "webtoon-kakao" },
+  { id: "apply-webtoon-canvas", commandId: "canvas.apply-webtoon-canvas", presetId: "webtoon-canvas" },
 ] as const satisfies readonly {
   readonly id: string;
   readonly commandId: string;
@@ -106,12 +106,12 @@ export function buildStudioCanvasSurfaceMenuItems({
       return [{
         id: item.id,
         commandId: item.commandId,
-        label: `새 캔버스 · ${preset.labelKo}`,
-        labelEn: `New canvas · ${preset.labelEn}`,
-        icon: FilePlus2,
+        label: `현재 캔버스 · ${preset.labelKo}`,
+        labelEn: `Current canvas · ${preset.labelEn}`,
+        icon: Scaling,
         separatorAfter: index === STUDIO_PLATFORM_CANVAS_MENU_ITEMS.length - 1,
         onSelect: () => {
-          ui.openQuickStart(preset.id);
+          ui.applyWebtoonCanvasPreset(preset.id);
         },
       }];
     },

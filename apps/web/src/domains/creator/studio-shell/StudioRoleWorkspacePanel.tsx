@@ -1,4 +1,8 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   BriefcaseBusiness,
   CheckCircle2,
@@ -13,6 +17,7 @@ import { useSession } from "@/compat/auth-session-store";
 import { getMyProfile, updateMyProfile, type MeProfile } from "@/infrastructure/me-client";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
+  CREATOR_STAGE_LABELS,
   creatorRoleDefinition,
   creatorRoleSelection,
   creatorText,
@@ -20,10 +25,32 @@ import {
   type CreatorRoleId,
   type CreatorRoleLocale,
 } from "@/shared/lib/creator-role-contract";
+import { creatorRoleExperience } from "@/shared/lib/creator-role-experience";
+import {
+  GLOBAL_CREATOR_ROLE_WORKSPACE_KEY,
+  creatorWorkspaceStudioUiMode,
+  type CreatorWorkspaceMode,
+} from "@/shared/lib/creator-role-workspace-contract";
+import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
 import { cn } from "@/shared/lib/utils";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
-function localized(locale: CreatorRoleLocale, ko: string, en: string): string {
-  return locale === "ko" ? ko : en;
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioRoleWorkspacePanel", ko, en);
+
+function localized(_locale, ko: string, en: string): string {
+  return bi(ko, en);
+}
+
+function hrefForWorkspaceMode(href: string, mode: CreatorWorkspaceMode): string {
+  if (!href.startsWith("/studio")) return href;
+  const [pathname, query = ""] = href.split("?", 2);
+  const params = new URLSearchParams(query);
+  params.set("uiMode", creatorWorkspaceStudioUiMode(mode));
+  return `${pathname}?${params.toString()}`;
 }
 
 export function StudioRoleWorkspacePanel({
@@ -31,11 +58,17 @@ export function StudioRoleWorkspacePanel({
 }: {
   readonly locale: CreatorRoleLocale;
 }) {
+  useBilingualI18nRevision();
   const { status } = useSession();
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [savingRole, setSavingRole] = useState<CreatorRoleId | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const globalWorkspace = useCreatorRoleWorkspace(
+    GLOBAL_CREATOR_ROLE_WORKSPACE_KEY,
+    profile?.creatorRoleProfile,
+    status === "authenticated",
+  );
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -94,7 +127,7 @@ export function StudioRoleWorkspacePanel({
               <BriefcaseBusiness size={20} aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.15em] text-accent">ROLE WORKSPACE</p>
+              <p className="text-[0.68rem] font-black uppercase tracking-[0.15em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRoleWorkspacePanel", "en", "ROLE WORKSPACE")}</p>
               <h2 id="studio-role-setup-title" className="mt-1 text-lg font-black text-fg">
                 {localized(locale, "내 직무에 맞는 작업 화면을 설정하세요", "Set up a workspace for your role")}
               </h2>
@@ -122,6 +155,11 @@ export function StudioRoleWorkspacePanel({
   const activeDefinition = creatorRoleDefinition(activeRole);
   const selectedRoles = creatorRoleSelection(roleProfile);
   if (!activeDefinition) return null;
+  const experience = creatorRoleExperience(activeRole);
+  const workspaceMode = globalWorkspace.snapshot.document.workspaceMode;
+  const stageLabel = roleProfile.creatorStage
+    ? creatorText(CREATOR_STAGE_LABELS[roleProfile.creatorStage], locale)
+    : null;
 
   const changeRole = async (role: CreatorRoleId) => {
     if (role === activeRole || savingRole) return;
@@ -142,14 +180,21 @@ export function StudioRoleWorkspacePanel({
   };
 
   return (
-    <section className="relative mt-7 overflow-hidden rounded-3xl border border-accent/30 bg-card shadow-sm" aria-labelledby="studio-role-workspace-title">
+    <section
+      className={cn(
+        "relative mt-7 overflow-hidden rounded-3xl border border-accent/30 bg-card shadow-sm",
+        workspaceMode === "production" && "border-line-strong",
+      )}
+      aria-labelledby="studio-role-workspace-title"
+      data-workspace-mode={workspaceMode}
+    >
       <div className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-accent/10 blur-3xl" aria-hidden="true" />
       <div className="relative p-5 sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 max-w-3xl">
             <div className="flex items-center gap-2 text-accent">
               <Sparkles size={15} aria-hidden="true" />
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.15em]">ROLE WORKSPACE</p>
+              <p className="text-[0.68rem] font-black uppercase tracking-[0.15em]">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRoleWorkspacePanel", "en", "ROLE WORKSPACE")}</p>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <h2 id="studio-role-workspace-title" className="text-xl font-black tracking-tight text-fg sm:text-2xl">
@@ -157,6 +202,14 @@ export function StudioRoleWorkspacePanel({
               </h2>
               <span className="inline-flex min-h-7 items-center rounded-full border border-accent/35 bg-accent-soft px-2.5 text-xs font-black text-accent">
                 {creatorText(activeDefinition.label, locale)}
+              </span>
+              {stageLabel ? (
+                <span className="inline-flex min-h-7 items-center rounded-full border border-line bg-panel px-2.5 text-xs font-bold text-fg-2">
+                  {stageLabel}
+                </span>
+              ) : null}
+              <span className="inline-flex min-h-7 items-center rounded-full border border-line bg-panel px-2.5 text-xs font-bold text-fg-2">
+                {workspaceMode === "guided" ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRoleWorkspacePanel", "en", "Guided") : workspaceMode === "production" ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRoleWorkspacePanel", "en", "Production") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRoleWorkspacePanel", "en", "Creator")}
               </span>
             </div>
             <p className="mt-2 text-sm leading-6 text-fg-2">
@@ -206,24 +259,85 @@ export function StudioRoleWorkspacePanel({
           </p>
         ) : null}
 
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
-          {activeDefinition.actions.map((action, index) => (
-            <Link
-              key={`${activeDefinition.id}-${action.href}`}
-              href={action.href}
-              className="group flex min-h-28 flex-col rounded-2xl border border-line bg-panel p-4 transition-colors hover:border-accent/40 hover:bg-raised"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <span className="flex size-8 items-center justify-center rounded-xl bg-accent-soft text-xs font-black text-accent">
+        <div className={cn(
+          "mt-5 grid gap-3",
+          workspaceMode === "production"
+            ? "xl:grid-cols-[minmax(15rem,0.7fr)_minmax(0,1.8fr)]"
+            : "xl:grid-cols-[minmax(18rem,0.85fr)_minmax(0,1.65fr)]",
+        )}>
+          <Link
+            href={hrefForWorkspaceMode(experience.primaryAction.href, workspaceMode)}
+            className={cn(
+              "group flex flex-col justify-between rounded-2xl border border-accent/35 bg-accent-soft/45 p-5 transition-all hover:-translate-y-0.5 hover:border-accent/55 hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 motion-reduce:transform-none",
+              workspaceMode === "production" ? "min-h-36" : "min-h-44",
+            )}
+          >
+            <div>
+              <p className="text-[0.66rem] font-black uppercase tracking-[0.15em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRoleWorkspacePanel", "en", "TODAY · PRIMARY ACTION")}</p>
+              <h3 className="mt-3 text-lg font-black text-fg">
+                {localized(locale, experience.primaryAction.labelKo, experience.primaryAction.labelEn)}
+              </h3>
+              {workspaceMode !== "production" ? (
+                <p className="mt-2 text-sm leading-6 text-fg-2">
+                  {localized(locale, experience.primaryAction.descriptionKo, experience.primaryAction.descriptionEn)}
+                </p>
+              ) : null}
+            </div>
+            <span className="mt-5 inline-flex items-center gap-1.5 text-xs font-black text-accent">
+              {localized(locale, "바로 이어가기", "Resume now")}
+              <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" aria-hidden="true" />
+            </span>
+          </Link>
+
+          <nav
+            aria-label={localized(locale, "직무별 주요 메뉴", "Role navigation")}
+            className={cn("grid gap-2", workspaceMode === "production" ? "sm:grid-cols-3" : "sm:grid-cols-2")}
+          >
+            {experience.navigation.map((item, index) => (
+              <Link
+                key={`${experience.role}-${item.id}`}
+                href={hrefForWorkspaceMode(item.href, workspaceMode)}
+                className={cn(
+                  "group flex items-start gap-3 rounded-2xl border border-line bg-panel p-3.5 transition-colors hover:border-accent/40 hover:bg-raised",
+                  workspaceMode === "production" ? "min-h-16" : "min-h-20",
+                )}
+              >
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-card text-[0.68rem] font-black text-accent">
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <ArrowRight size={15} className="text-fg-3 transition-transform group-hover:translate-x-0.5 group-hover:text-accent" aria-hidden="true" />
-              </div>
-              <h3 className="mt-3 text-sm font-black text-fg">{creatorText(action.label, locale)}</h3>
-              <p className="mt-1 text-xs leading-5 text-fg-2">{creatorText(action.description, locale)}</p>
-            </Link>
-          ))}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-black text-fg">{localized(locale, item.labelKo, item.labelEn)}</span>
+                  {workspaceMode !== "production" ? (
+                    <span className="mt-1 block text-[0.7rem] leading-5 text-fg-3">{localized(locale, item.descriptionKo, item.descriptionEn)}</span>
+                  ) : null}
+                </span>
+                <ArrowRight size={13} className="mt-1 shrink-0 text-fg-3 transition-transform group-hover:translate-x-0.5 group-hover:text-accent" aria-hidden="true" />
+              </Link>
+            ))}
+          </nav>
         </div>
+
+        {workspaceMode === "guided" ? (
+          <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-line bg-panel p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
+                <Sparkles size={16} aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-xs font-black text-fg">
+                  {localized(locale, "필요할 때 배우고 바로 실습하세요", "Learn only when you need it, then practice immediately")}
+                </p>
+                <p className="mt-1 text-[0.7rem] leading-5 text-fg-3">
+                  {localized(locale, "Guided 모드는 설명과 추천 학습 동선을 더 보여주지만 모든 전문 도구는 그대로 사용할 수 있습니다.", "Guided mode surfaces explanations and learning paths while keeping every professional tool available.")}
+                </p>
+              </div>
+            </div>
+            <Link href="/learn" className={buttonClass({ variant: "quiet", size: "sm", className: "shrink-0 gap-1.5" })}>
+              {localized(locale, "교육 자료 보기", "Browse learning resources")}
+              <ArrowRight size={13} aria-hidden="true" />
+            </Link>
+          </div>
+        ) : null}
       </div>
     </section>
   );

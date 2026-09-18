@@ -1,41 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  commitStudioProjectRevision,
-  createStudioExternalFileBinding,
-  listStudioExternalFileBindings,
-  loadStudioProjectGraph,
-  removeStudioExternalFileBinding,
-  StudioProjectGraphConflictError,
-  StudioProjectGraphContractError,
-  updateStudioExternalFileBinding,
+  getStudioProjectByWork,
+  listStudioArtifactRevisions,
+  newStudioMutationKey,
+  newStudioProjectGraphId,
+  restoreStudioRevision,
 } from "./studio-project-graph-client";
 
 const http = vi.hoisted(() => ({
-  delete: vi.fn(),
   get: vi.fn(),
-  patch: vi.fn(),
   post: vi.fn(),
 }));
-const httpState = vi.hoisted(() => ({ conflict: false }));
 
-vi.mock("@/infrastructure/api", () => ({
-  api: http,
-  isHttpError: () => httpState.conflict,
-  toApiError: async (error: unknown, fallback: string) =>
-    error instanceof Error ? error : new Error(fallback),
-}));
+vi.mock("@/infrastructure/api", () => ({ api: http }));
 
-const NOW = "2026-09-17T00:00:00.000Z";
 const HASH = "a".repeat(64);
+const NOW = "2026-09-17T05:30:00.000Z";
 
-function projectResponse() {
+function projectRecord() {
   return {
     id: "project-1",
     workId: "work-1",
-    schemaVersion: 3 as const,
-    authorityVersion: "project-graph-v3" as const,
-    ownerUserId: "user-1",
+    schemaVersion: 3,
+    authorityVersion: "project-graph-v3",
+    ownerUserId: "owner-1",
     createdAt: NOW,
     updatedAt: NOW,
     access: {
@@ -43,17 +32,22 @@ function projectResponse() {
       comment: true,
       edit: true,
       manageMembers: true,
-      respondInvite: true,
+      respondInvite: false,
       owner: true,
-      role: "owner" as const,
+      role: "owner",
     },
     artifacts: [{
       id: "artifact-1",
       projectId: "project-1",
-      kind: "canvas-2d" as const,
+      kind: "canvas-2d",
       title: "1화 원고",
-      scope: { projectId: "project-1", episodeId: "episode-1" },
-      headRevisionId: "revision-1",
+      scope: {
+        projectId: "project-1",
+        kind: "project",
+        id: "project-1",
+        ancestors: [],
+      },
+      headRevisionId: "revision-head",
       approvedRevisionId: null,
       ownerWorkspaceId: "workspace-1",
       createdAt: NOW,
@@ -62,169 +56,104 @@ function projectResponse() {
   };
 }
 
-function bindingResponse() {
+function revisionRecord() {
   return {
-    id: "binding-1",
+    id: "revision-head",
     artifactId: "artifact-1",
-    provider: "dropbox" as const,
-    providerAccountId: "dropbox-account-1",
-    remoteFileId: "remote-file-1",
-    displayPath: "/작품/1화.psd",
-    syncMode: "bidirectional" as const,
-    remoteVersion: null,
-    remoteEtag: null,
-    contentHash: null,
-    lastSyncedRevisionId: null,
-    lastSyncedAt: null,
+    kind: "checkpoint",
+    parentIds: [],
+    rootGraphHash: HASH,
+    operationFirst: null,
+    operationLast: null,
+    createdBy: "owner-1",
+    deviceId: "device-1",
     createdAt: NOW,
-    updatedAt: NOW,
+    message: "첫 체크포인트",
+    compatibilityReportId: null,
+    provenanceManifestId: null,
+    blobRefs: [],
   };
 }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  httpState.conflict = false;
-});
+describe("Studio ProjectGraph browser client", () => {
+  beforeEach(() => vi.clearAllMocks());
 
-describe("Studio ProjectGraph web client", () => {
-  it("loads and validates the project envelope", async () => {
-    http.get.mockResolvedValueOnce(projectResponse());
-    await expect(loadStudioProjectGraph("project-1")).resolves.toMatchObject({
+  it("loads a project through the work identity and validates the complete authority record", async () => {
+    http.get.mockResolvedValueOnce(projectRecord());
+
+    await expect(getStudioProjectByWork("work / 1")).resolves.toMatchObject({
       id: "project-1",
-      artifacts: [{ id: "artifact-1", headRevisionId: "revision-1" }],
+      artifacts: [{ id: "artifact-1", kind: "canvas-2d" }],
     });
     expect(http.get).toHaveBeenCalledWith(
-      "/studio-project-graph/projects/project-1",
-      { signal: undefined },
+      "/studio-project-graph/works/work%20%2F%201/project",
     );
   });
 
-  it("fails closed when a project response omits authority evidence", async () => {
-    const invalid = projectResponse() as Record<string, unknown>;
-    delete invalid.authorityVersion;
+  it("rejects incomplete server records instead of silently treating them as synced", async () => {
+    const invalid = projectRecord();
+    delete (invalid.access as Partial<typeof invalid.access>).edit;
     http.get.mockResolvedValueOnce(invalid);
-    await expect(loadStudioProjectGraph("project-1")).rejects.toThrow(
-      StudioProjectGraphContractError,
+
+    await expect(getStudioProjectByWork("work-1")).rejects.toThrow();
+  });
+
+  it("lists immutable revisions with strict blob and timestamp contracts", async () => {
+    http.get.mockResolvedValueOnce([revisionRecord()]);
+    await expect(listStudioArtifactRevisions("artifact-1")).resolves.toEqual([
+      revisionRecord(),
+    ]);
+    expect(http.get).toHaveBeenCalledWith(
+      "/studio-project-graph/artifacts/artifact-1/revisions",
     );
   });
 
-  it("commits a revision with strong head and idempotency headers", async () => {
+  it("restores as a new checkpoint with strong concurrency and retry headers", async () => {
     http.post.mockResolvedValueOnce({
       artifactId: "artifact-1",
-      revisionId: "revision-2",
-      headRevisionId: "revision-2",
+      revisionId: "revision-restored",
+      headRevisionId: "revision-restored",
       approvedRevisionId: null,
-      sequence: 2,
+      sequence: 7,
       replayed: false,
     });
     const input = {
-      revisionId: "revision-2",
-      kind: "checkpoint" as const,
-      parentIds: ["revision-1"],
-      rootGraphHash: HASH,
+      revisionId: "revision-restored",
+      commandId: "command-restore-1",
       deviceId: "device-1",
       createdAt: NOW,
-      command: {
-        id: "command-2",
-        type: "document.checkpoint",
-        scope: { projectId: "project-1" },
-        payloadHash: HASH,
-        issuedAt: NOW,
-      },
+      message: "검수 전 상태 복원",
     };
-    await expect(commitStudioProjectRevision(
+
+    await expect(restoreStudioRevision(
       "artifact-1",
-      "revision-1",
-      "mutation-0001",
+      "revision-old",
+      "revision-head",
       input,
-    )).resolves.toMatchObject({ headRevisionId: "revision-2" });
+      "restore-request-1234",
+    )).resolves.toMatchObject({ headRevisionId: "revision-restored" });
+
     expect(http.post).toHaveBeenCalledWith(
-      "/studio-project-graph/artifacts/artifact-1/revisions",
+      "/studio-project-graph/artifacts/artifact-1/revisions/revision-old/restore",
       input,
       {
-        signal: undefined,
         headers: {
-          "If-Match": '"revision-1"',
-          "Idempotency-Key": "mutation-0001",
+          "Idempotency-Key": "restore-request-1234",
+          "If-Match": '"revision-head"',
         },
       },
     );
+    const options = http.post.mock.calls[0]?.[2] as { headers: Record<string, string> };
+    expect(options.headers).not.toHaveProperty("x-user-id");
   });
 
-  it("surfaces the current server head on a conflict", async () => {
-    httpState.conflict = true;
-    http.post.mockRejectedValueOnce({
-      response: { status: 409 },
-      data: { currentRevisionId: "revision-9" },
-    });
-    await expect(commitStudioProjectRevision(
-      "artifact-1",
-      "revision-1",
-      "mutation-0002",
-      {
-        revisionId: "revision-2",
-        kind: "checkpoint",
-        parentIds: ["revision-1"],
-        rootGraphHash: HASH,
-        deviceId: "device-1",
-        createdAt: NOW,
-        command: {
-          id: "command-2",
-          type: "document.checkpoint",
-          scope: { projectId: "project-1" },
-          payloadHash: HASH,
-          issuedAt: NOW,
-        },
-      },
-    )).rejects.toMatchObject({
-      name: StudioProjectGraphConflictError.name,
-      currentRevisionId: "revision-9",
-    });
-  });
-
-  it("lists, creates, updates, and removes external file bindings", async () => {
-    const binding = bindingResponse();
-    http.get.mockResolvedValueOnce([binding]);
-    http.post.mockResolvedValueOnce(binding);
-    http.patch.mockResolvedValueOnce({
-      ...binding,
-      contentHash: HASH,
-      lastSyncedRevisionId: "revision-2",
-      lastSyncedAt: NOW,
-    });
-    http.delete.mockResolvedValueOnce(undefined);
-
-    await expect(listStudioExternalFileBindings("artifact-1")).resolves.toHaveLength(1);
-    await expect(createStudioExternalFileBinding("artifact-1", {
-      id: "binding-1",
-      provider: "dropbox",
-      providerAccountId: "dropbox-account-1",
-      remoteFileId: "remote-file-1",
-      displayPath: "/작품/1화.psd",
-      syncMode: "bidirectional",
-    })).resolves.toMatchObject({ provider: "dropbox" });
-    await expect(updateStudioExternalFileBinding("binding-1", {
-      contentHash: HASH,
-      lastSyncedRevisionId: "revision-2",
-      lastSyncedAt: NOW,
-    })).resolves.toMatchObject({
-      contentHash: HASH,
-      lastSyncedRevisionId: "revision-2",
-    });
-    await expect(removeStudioExternalFileBinding("binding-1")).resolves.toBeUndefined();
-
-    expect(http.get).toHaveBeenCalledWith(
-      "/studio-project-graph/artifacts/artifact-1/external-bindings",
-      { signal: undefined },
-    );
-    expect(http.patch).toHaveBeenCalledWith(
-      "/studio-project-graph/external-bindings/binding-1",
-      expect.objectContaining({ lastSyncedRevisionId: "revision-2" }),
-      { signal: undefined },
-    );
-    expect(http.delete).toHaveBeenCalledWith(
-      "/studio-project-graph/external-bindings/binding-1",
-      { signal: undefined },
-    );
+  it("generates bounded identifiers that satisfy the shared entity grammar", () => {
+    const id = newStudioProjectGraphId("Revision Restore");
+    const key = newStudioMutationKey("Revision Restore");
+    expect(id).toMatch(/^revision-restore-[a-z0-9-]+$/u);
+    expect(id.length).toBeLessThanOrEqual(160);
+    expect(key).toMatch(/^revision-restore:/u);
+    expect(key.length).toBeGreaterThanOrEqual(8);
+    expect(key.length).toBeLessThanOrEqual(240);
   });
 });

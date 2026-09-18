@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioElementsPanel — PicsArt/Canva-class elements: shapes + 3D object insert rail.
  * 2D: search + category chips + recent MRU. Placement via onAdd(svg, w, h, id).
@@ -139,8 +143,8 @@ function ElementTile({
       </span>
     </button>
     <div className="studio-catalog-card-actions grid grid-cols-2 gap-1 border-t border-line/60 p-1">
-      <button type="button" aria-label={`${item.label} 상세 미리보기`} onClick={() => onPreview(item)} className={STUDIO_CATALOG_CONTROL}><Eye size={14} className="mx-auto" aria-hidden /></button>
-      <button type="button" aria-label={`${item.label} 즐겨찾기`} aria-pressed={favorite} onClick={() => onFavorite(item)} className={`${STUDIO_CATALOG_CONTROL} ${favorite ? "text-accent" : ""}`}><Star size={14} className="mx-auto" fill={favorite ? "currentColor" : "none"} aria-hidden /></button>
+      <button type="button" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "{v0} 상세 미리보기"), { v0: String(item.label) })} onClick={() => onPreview(item)} className={STUDIO_CATALOG_CONTROL}><Eye size={14} className="mx-auto" aria-hidden /></button>
+      <button type="button" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "{v0} 즐겨찾기"), { v0: String(item.label) })} aria-pressed={favorite} onClick={() => onFavorite(item)} className={`${STUDIO_CATALOG_CONTROL} ${favorite ? "text-accent" : ""}`}><Star size={14} className="mx-auto" fill={favorite ? translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "en", "none")} aria-hidden /></button>
     </div>
     </article>
   );
@@ -282,12 +286,12 @@ export function StudioElementsPanel({
         <Sparkles size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
         <div className="min-w-0">
           <p className="text-[0.72rem] font-semibold text-fg">
-            {surface === "object3d" ? "요소 · 3D 오브젝트" : "요소 · 도형"}
+            {surface === "object3d" ? translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "요소 · 3D 오브젝트") : translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "요소 · 도형")}
           </p>
           <p className="text-[0.62rem] leading-snug text-fg-3">
             {surface === "object3d"
-              ? "기본 입체·소품·씬 템플릿을 검색해 BG3D·VRM 도구로 바로 엽니다."
-              : "고급 도형·컷 패널·효과음·효과선·배경 패턴을 검색해 바로 배치합니다."}
+              ? translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "기본 입체·소품·씬 템플릿을 검색해 BG3D·VRM 도구로 바로 엽니다.")
+              : translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "고급 도형·컷 패널·효과음·효과선·배경 패턴을 검색해 바로 배치합니다.")}
           </p>
         </div>
       </div>
@@ -296,7 +300,7 @@ export function StudioElementsPanel({
         <div
           className="grid grid-cols-2 gap-1 rounded-xl border border-line bg-card p-1"
           role="tablist"
-          aria-label="요소 표면"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "요소 표면")}
           data-studio-elements-surface={surface}
         >
           <button
@@ -313,8 +317,7 @@ export function StudioElementsPanel({
                 : "text-fg-3 hover:bg-raised",
             )}
           >
-            2D 도형
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "2D 도형")}</button>
           <button
             type="button"
             role="tab"
@@ -330,15 +333,13 @@ export function StudioElementsPanel({
             )}
           >
             <Box size={12} aria-hidden />
-            3D 오브젝트
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "3D 오브젝트")}</button>
         </div>
       ) : null}
 
       {preferenceAuthority === "memory-only" ? (
         <p role="status" className="rounded-lg border border-warning/40 bg-warning/10 px-2 py-1 text-[0.62rem] text-fg-2">
-          최근 요소는 저장소를 다시 연결하기 전까지 이번 탭에서만 유지됩니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "최근 요소는 저장소를 다시 연결하기 전까지 이번 탭에서만 유지됩니다.")}</p>
       ) : null}
 
       <div
@@ -347,11 +348,11 @@ export function StudioElementsPanel({
       >
         <span className="flex min-h-11 items-center gap-1.5 rounded-lg bg-panel/65 px-2">
           <MousePointer2 size={12} className="shrink-0 text-accent" aria-hidden />
-          <span><strong className="font-bold text-fg">클릭·탭</strong><br />선택 컷·현재 화면</span>
+          <span><strong className="font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "클릭·탭")}</strong><br />{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "선택 컷·현재 화면")}</span>
         </span>
         <span className="flex min-h-11 items-center gap-1.5 rounded-lg bg-panel/65 px-2">
           <Grip size={12} className="shrink-0 text-accent" aria-hidden />
-          <span><strong className="font-bold text-fg">끌어 놓기</strong><br />정확한 위치 · Esc 취소</span>
+          <span><strong className="font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "끌어 놓기")}</strong><br />{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "정확한 위치 · Esc 취소")}</span>
         </span>
       </div>
 
@@ -368,11 +369,11 @@ export function StudioElementsPanel({
           <span className="inline-flex min-w-0 items-center gap-2">
             <MessageCircle size={14} className="shrink-0 text-accent" aria-hidden />
             <span>
-              <strong className="block font-semibold text-fg">편집 가능한 말풍선</strong>
-              <span className="block text-[0.58rem] text-fg-3">대사·꼬리·모양은 전용 도구에서</span>
+              <strong className="block font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "편집 가능한 말풍선")}</strong>
+              <span className="block text-[0.58rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "대사·꼬리·모양은 전용 도구에서")}</span>
             </span>
           </span>
-          <span className="shrink-0 font-semibold text-accent">열기 →</span>
+          <span className="shrink-0 font-semibold text-accent">{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "열기 →")}</span>
         </button>
       ) : null}
 
@@ -390,17 +391,17 @@ export function StudioElementsPanel({
           onChange={(e) => setQuery(e.target.value.slice(0, 240))}
           placeholder={
             surface === "object3d"
-              ? "3D 검색 (검, 교실, 상자…)"
-              : "이름·용도 검색 (나선, 4컷, 집중선…)"
+              ? translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "3D 검색 (검, 교실, 상자…)")
+              : translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "이름·용도 검색 (나선, 4컷, 집중선…)")
           }
           className="min-h-10 min-h-11 w-full rounded-lg border border-line bg-card py-1 pl-8 pr-10 text-xs placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40"
-          aria-label={surface === "object3d" ? "3D 오브젝트 검색" : "요소 검색"}
+          aria-label={surface === "object3d" ? translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "3D 오브젝트 검색") : translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "요소 검색")}
         />
         {query ? (
           <button
             type="button"
               onClick={() => setQuery("")}
-              aria-label="검색어 지우기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "검색어 지우기")}
               className="absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-lg text-fg-3 hover:bg-raised"
             >
               <X size={12} aria-hidden />
@@ -413,7 +414,7 @@ export function StudioElementsPanel({
           <div
             className="flex max-w-full gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [scrollbar-width:thin]"
             role="tablist"
-            aria-label="3D 오브젝트 분류"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "3D 오브젝트 분류")}
           >
             <button
               type="button"
@@ -429,8 +430,7 @@ export function StudioElementsPanel({
                   : "border-line bg-card text-fg-3 hover:bg-raised",
               )}
             >
-              전체
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "전체")}</button>
             {objectFamilies.map((family) => (
               <button
                 key={family.id}
@@ -454,9 +454,9 @@ export function StudioElementsPanel({
           </div>
           <p className="text-[0.64rem] font-medium text-fg-3" role="status" aria-live="polite">
             {objectFamily === "all"
-              ? "전체 3D"
+              ? translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "전체 3D")
               : objectFamilies.find((family) => family.id === objectFamily)?.label}
-            <span className="ml-1 tabular-nums text-fg-3/80">{objectItems.length}개</span>
+            <span className="ml-1 tabular-nums text-fg-3/80">{objectItems.length}{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "개")}</span>
           </p>
           <div
             id={resultsId}
@@ -466,10 +466,9 @@ export function StudioElementsPanel({
           >
             {objectItems.length === 0 ? (
               <div className="col-span-2 flex h-24 flex-col items-center justify-center rounded-lg border border-dashed border-line text-center">
-                <p className="text-xs font-semibold text-fg-2">검색 결과가 없습니다</p>
+                <p className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "검색 결과가 없습니다")}</p>
                 <p className="mt-1 text-[0.62rem] text-fg-3">
-                  ‘검’, ‘교실’, ‘상자’처럼 소품·씬·도형 이름으로 찾아보세요.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "‘검’, ‘교실’, ‘상자’처럼 소품·씬·도형 이름으로 찾아보세요.")}</p>
               </div>
             ) : (
               objectItems.map((item) => (
@@ -495,10 +494,10 @@ export function StudioElementsPanel({
                   <span className="inline-flex w-full items-center justify-between gap-1 text-[0.52rem] font-medium text-accent">
                     <span>
                       {item.openTarget === "vrm-poser"
-                        ? "VRM 포저 열기"
+                        ? translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "VRM 포저 열기")
                         : item.openTarget === "bg3d-templates"
-                          ? "BG3D 템플릿"
-                          : "BG3D 편집기"}
+                          ? translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "BG3D 템플릿")
+                          : translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "BG3D 편집기")}
                     </span>
                     <Grip
                       size={10}
@@ -517,7 +516,7 @@ export function StudioElementsPanel({
             className="flex max-w-full gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [scrollbar-width:thin]"
             role="tablist"
             tabIndex={-1}
-            aria-label="요소 카테고리"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "요소 카테고리")}
             onKeyDown={(event) => {
               if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(event.key) || event.nativeEvent.isComposing) return;
               const tabs = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
@@ -554,11 +553,11 @@ export function StudioElementsPanel({
 
           {recentItems.length > 0 && !query && !favoritesOnly ? (
             <>
-              <p className="text-[0.64rem] font-medium text-fg-3">최근 사용</p>
+              <p className="text-[0.64rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "최근 사용")}</p>
               <div className="studio-catalog-grid" data-view="compact">
                 {recentItems.slice(0, 8).map((item) => (
                   <ElementTile
-                    key={`recent-${item.id}`}
+                    key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "en", "recent-{v0}"), { v0: String(item.id) })}
                     item={item}
                     onPick={handlePick}
                     onPreview={setPreviewItem}
@@ -573,15 +572,15 @@ export function StudioElementsPanel({
           ) : null}
 
           <p className="text-[0.64rem] font-medium text-fg-3" role="status" aria-live="polite">
-            {category === "all" ? "전체 요소" : STUDIO_ELEMENT_CATEGORY_CHIPS.find((c) => c.id === category)?.label}
-            <span className="ml-1 tabular-nums text-fg-3/80">{items.length}개</span>
+            {category === "all" ? translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "전체 요소") : STUDIO_ELEMENT_CATEGORY_CHIPS.find((c) => c.id === category)?.label}
+            <span className="ml-1 tabular-nums text-fg-3/80">{items.length}{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "개")}</span>
           </p>
           <div id={resultsId} role="tabpanel" aria-labelledby={`${resultsId}-${category}`}>
             {items.length === 0 ? (
               <div className="flex h-24 flex-col items-center justify-center rounded-lg border border-dashed border-line text-center">
-                <p className="text-xs font-semibold text-fg-2">검색 결과가 없습니다</p>
-                <p className="mt-1 text-xs text-fg-3">검색어·형태·즐겨찾기 조건을 줄여보세요.</p>
-                <button type="button" onClick={resetCatalogFilters} className={`${STUDIO_CATALOG_CONTROL} mt-2`}>필터 초기화 · 전체 보기</button>
+                <p className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "검색 결과가 없습니다")}</p>
+                <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "검색어·형태·즐겨찾기 조건을 줄여보세요.")}</p>
+                <button type="button" onClick={resetCatalogFilters} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "en", "{v0} mt-2"), { v0: String(STUDIO_CATALOG_CONTROL) })}>{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "필터 초기화 · 전체 보기")}</button>
               </div>
             ) : (
               <div className="studio-catalog-grid max-h-96 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin]" data-view={catalog.state.view}>
@@ -600,19 +599,19 @@ export function StudioElementsPanel({
               </div>
             )}
           </div>
-          {items.length > visibleItems.length && <button type="button" className={STUDIO_CATALOG_CONTROL} onClick={() => setVisibleLimit((limit) => limit + 60)}>더 보기 ({visibleItems.length}/{items.length})</button>}
-          {(query || category !== "shape" || orientation !== "all" || favoritesOnly) && <button type="button" className={STUDIO_CATALOG_CONTROL} onClick={resetCatalogFilters}>필터 초기화</button>}
+          {items.length > visibleItems.length && <button type="button" className={STUDIO_CATALOG_CONTROL} onClick={() => setVisibleLimit((limit) => limit + 60)}>{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "더 보기 (")}{visibleItems.length}/{items.length})</button>}
+          {(query || category !== "shape" || orientation !== "all" || favoritesOnly) && <button type="button" className={STUDIO_CATALOG_CONTROL} onClick={resetCatalogFilters}>{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "필터 초기화")}</button>}
         </>
       )}
       {previewItem && <StudioCatalogPreviewDialog title={previewItem.label} onClose={() => setPreviewItem(null)}
         preview={<StudioSvgAssetPreview assetId={previewItem.id} svg={previewItem.svg} width={previewItem.width} height={previewItem.height} requested tournament={previewTournament} />}
         actions={<>
-          <button type="button" className={`${STUDIO_CATALOG_CONTROL} flex-1`} aria-pressed={catalog.state.favoriteIds.includes(previewItem.id)} onClick={() => toggleFavorite(previewItem)}>즐겨찾기 {catalog.state.favoriteIds.includes(previewItem.id) ? "해제" : "추가"}</button>
-          <button type="button" className={`${STUDIO_CATALOG_PRIMARY_CONTROL} flex-1`} onClick={() => { handlePick(previewItem); setPreviewItem(null); }}>캔버스에 추가</button>
+          <button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "en", "{v0} flex-1"), { v0: String(STUDIO_CATALOG_CONTROL) })} aria-pressed={catalog.state.favoriteIds.includes(previewItem.id)} onClick={() => toggleFavorite(previewItem)}>{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "즐겨찾기 ")}{catalog.state.favoriteIds.includes(previewItem.id) ? translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "해제") : translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "추가")}</button>
+          <button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "en", "{v0} flex-1"), { v0: String(STUDIO_CATALOG_PRIMARY_CONTROL) })} onClick={() => { handlePick(previewItem); setPreviewItem(null); }}>{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "캔버스에 추가")}</button>
         </>}>
-        <p className="font-medium text-fg">{STUDIO_ELEMENT_CATEGORY_CHIPS.find((chip) => chip.id === previewItem.category)?.label} · {previewItem.width} × {previewItem.height} 기준 크기</p>
-        <p>내장 SVG 원본 · 캔버스에는 이미지 요소로 삽입됩니다. 내부 대사·선·도형은 개별 편집되지 않습니다.</p>
-        <p className="text-xs text-fg-3">미리보기 배경과 확대는 캔버스 원본에 영향을 주지 않습니다.</p>
+        <p className="font-medium text-fg">{STUDIO_ELEMENT_CATEGORY_CHIPS.find((chip) => chip.id === previewItem.category)?.label} · {previewItem.width} × {previewItem.height} {translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "기준 크기")}</p>
+        <p>{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "내장 SVG 원본 · 캔버스에는 이미지 요소로 삽입됩니다. 내부 대사·선·도형은 개별 편집되지 않습니다.")}</p>
+        <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioElementsPanel", "ko", "미리보기 배경과 확대는 캔버스 원본에 영향을 주지 않습니다.")}</p>
         <div className="flex flex-wrap gap-1">{previewItem.keywords.slice(0, 8).map((keyword) => <span key={keyword} className="rounded-full border border-line px-2 py-1 text-xs">{keyword}</span>)}</div>
       </StudioCatalogPreviewDialog>}
     </div>

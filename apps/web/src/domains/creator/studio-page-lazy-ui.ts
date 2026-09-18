@@ -591,6 +591,10 @@ const StudioAiAssistHub = lazyRetry(
   () => import("./ai/StudioAiAssistHub").then((mod) => ({ default: mod.StudioAiAssistHub })),
   "StudioAiAssistHub"
 );
+const StudioAdvancedAiTools = lazyRetry(
+  () => import("./ai/StudioAdvancedAiTools").then((mod) => ({ default: mod.StudioAdvancedAiTools })),
+  "StudioAdvancedAiTools"
+);
 const StudioAiBackgroundPanel = lazyRetry(
   () => import("./ai/StudioAiBackgroundPanel").then((mod) => ({ default: mod.StudioAiBackgroundPanel })),
   "StudioAiBackgroundPanel"
@@ -789,6 +793,7 @@ function preloadStudioColorPopover(): void {
 
 export {
   StudioAiAssistHub,
+  StudioAdvancedAiTools,
   StudioAdvancedRulerOverlay,
   StudioAdvancedRulerPanel,
   StudioAiBackgroundPanel,

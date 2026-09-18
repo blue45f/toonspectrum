@@ -123,7 +123,7 @@ describe("resolveStudioDraftSaveCenter", () => {
     }));
 
     expect(model.phase).toBe("local-risk");
-    expect(model.saveActionLabel).toBe("저장 권한 확인");
+    expect(model.saveActionLabel).toBe("서버 초안 잠김");
     expect(model.saveActionDisabled).toBe(true);
   });
 
@@ -166,7 +166,7 @@ describe("resolveStudioDraftSaveCenter", () => {
 
     expect(model.phase).toBe("blocked");
     expect(model.saveActionDisabled).toBe(true);
-    expect(model.saveActionLabel).toBe("저장 권한 확인");
+    expect(model.saveActionLabel).toBe("서버 초안 잠김");
   });
 
   it("keeps local checkpoints available before the first server revision", () => {

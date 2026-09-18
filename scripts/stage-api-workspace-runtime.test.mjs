@@ -19,6 +19,16 @@ test("stages workspace packages inside the emitted API boundary", async () => {
   try {
     await compiledPackage(
       root,
+      "packages/core/src/index.js",
+      '"use strict"; module.exports = { core: "ready" };\n',
+    );
+    await compiledPackage(
+      root,
+      "packages/core/src/production/index.js",
+      '"use strict"; module.exports = { production: "risk-v2" };\n',
+    );
+    await compiledPackage(
+      root,
       "packages/studio-project-model/src/index.js",
       '"use strict"; module.exports = { model: "v3" };\n',
     );
@@ -35,11 +45,18 @@ test("stages workspace packages inside the emitted API boundary", async () => {
 
     const staged = await stageApiWorkspaceRuntime(root);
     assert.deepEqual(staged.map((entry) => entry.name), [
+      "@toonspectrum/core",
       "@toonspectrum/studio-project-model",
       "@toonspectrum/studio-format-gateway",
     ]);
 
     const requireFromApi = createRequire(caller);
+    assert.deepEqual(requireFromApi("@toonspectrum/core"), {
+      core: "ready",
+    });
+    assert.deepEqual(requireFromApi("@toonspectrum/core/production"), {
+      production: "risk-v2",
+    });
     assert.deepEqual(requireFromApi("@toonspectrum/studio-project-model"), {
       model: "v3",
     });
@@ -49,6 +66,7 @@ test("stages workspace packages inside the emitted API boundary", async () => {
 
     const canonicalRoot = await realpath(root);
     for (const name of [
+      "@toonspectrum/core",
       "@toonspectrum/studio-project-model",
       "@toonspectrum/studio-format-gateway",
     ]) {
@@ -60,6 +78,40 @@ test("stages workspace packages inside the emitted API boundary", async () => {
       ));
       assert.equal(packageJson.main, "./index.js");
     }
+
+    const corePackageJson = JSON.parse(await readFile(
+      resolve(root, "node_modules", "@toonspectrum", "core", "package.json"),
+      "utf8",
+    ));
+    assert.equal(corePackageJson.exports["./production"], "./production/index.js");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("fails when an exported workspace subpath was not compiled", async () => {
+  const root = await mkdtemp(join(tmpdir(), "toonstudio-api-runtime-subpath-missing-"));
+  try {
+    await compiledPackage(
+      root,
+      "packages/core/src/index.js",
+      '"use strict"; module.exports = { core: "ready" };\n',
+    );
+    await compiledPackage(
+      root,
+      "packages/studio-project-model/src/index.js",
+      '"use strict"; module.exports = { model: "v3" };\n',
+    );
+    await compiledPackage(
+      root,
+      "packages/studio-format-gateway/src/index.js",
+      '"use strict"; module.exports = { gateway: "compatibility" };\n',
+    );
+
+    await assert.rejects(
+      stageApiWorkspaceRuntime(root),
+      /packages\/core\/src\/production\/index\.js/u,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

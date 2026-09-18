@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils";
@@ -185,7 +186,7 @@ export function StudioInlineScrubber({
       data-layer-row-control
       data-studio-inline-scrubber={surface ?? label}
       data-studio-layer-row-action={rowAction}
-      title={title ?? `${label} · 드래그하거나 방향키로 조절`}
+      title={title ?? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInlineScrubber", "ko", "{v0} · 드래그하거나 방향키로 조절"), { v0: String(label) })}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
