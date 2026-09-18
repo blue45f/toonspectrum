@@ -304,6 +304,19 @@ export class MembershipWalletService {
     );
     const spentToday = asInt(dailyCreditUsage.rows[0]?.used ?? 0);
     const dailyLimit = Number(plan.entitlements["credit.dailyLimit"]);
+    const creatorProgress = await this.creatorLevelSignals(userId);
+    const storedLevels = levels.rows[0] ?? {
+      creatorLevel: "new",
+      trustLevel: "new",
+      sellerLevel: "none",
+      trustScore: 0,
+      updatedBy: null,
+    };
+    const creatorLevelManaged =
+      Boolean(storedLevels.updatedBy) || storedLevels.creatorLevel === "partner";
+    const effectiveCreatorLevel = creatorLevelManaged
+      ? storedLevels.creatorLevel
+      : creatorProgress.automaticLevel;
 
     const balance = (asset: WalletAsset) => {
       const row = accounts.rows.find((entry) => entry.asset === asset);
