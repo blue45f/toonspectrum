@@ -344,8 +344,9 @@ function credit(
 }
 
 /**
- * Future/internal cost model only. These values are intentionally not exposed as
- * a purchasable user wallet while MEMBERSHIP_ECONOMY_POLICY.creditPurchasesEnabled is false.
+ * Studio Credit cost catalog for operator-funded features. Current BYOK,
+ * personal-runtime and browser-local work must not consume this wallet.
+ * Purchases stay disabled while creditPurchasesEnabled is false.
  */
 export const CREDIT_COST_POLICIES = Object.freeze({
   "ai.text.generate": credit("ai.text.generate", "AI text generation", 1, 1, 20),
