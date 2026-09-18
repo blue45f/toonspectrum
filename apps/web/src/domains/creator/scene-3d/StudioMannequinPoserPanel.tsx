@@ -322,8 +322,8 @@ export function StudioMannequinBodySection({
 
       <div className="space-y-3 pt-3 border-t border-line/60">
         <StudioSectionHeader
-          title="3D 헤드 모델 (Face Proportions)"
-          description="CSP 2.0 3D 헤드 모델: 웹툰/애니형, 턱선, 눈, 코 비율을 조절합니다."
+          title="얼굴 비율"
+          description="웹툰·애니 스타일의 머리 형태와 턱선·눈·코 비율을 조절합니다."
         />
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="헤드 프리셋">
           {(Object.keys(STUDIO_MANNEQUIN_HEAD_PRESETS) as StudioMannequinHeadPresetId[]).map(

@@ -90,7 +90,7 @@ const ARTICLES: readonly StudioGuidedHelpArticle[] = [
     outcome: "원하는 항목의 실제 위치와 현재 실행 가능 여부를 확인하고 바로 이동합니다.",
     steps: [
       { title: "F1 누르기", body: "캔버스에 포커스가 있어도 기능·설정 찾기가 열립니다." },
-      { title: "익숙한 말로 검색", body: "ToonStudio 이름뿐 아니라 CSP·Photoshop·Krita·Procreate에서 쓰던 용어도 입력할 수 있습니다." },
+      { title: "익숙한 말로 검색", body: "ToonStudio 이름뿐 아니라 다른 앱에서 쓰던 용어도 입력할 수 있습니다." },
       { title: "배지 확인 후 열기", body: "실행·이동·튜토리얼·도움말 배지가 실제 연결 상태를 알려 줍니다. Enter는 표시된 동작만 수행합니다." },
     ],
     checks: ["텍스트를 편집 중일 때는 F1을 가로채지 않습니다.", "범위를 좁혔다가 결과가 없으면 전체 범위 결과 수를 안내합니다."],
