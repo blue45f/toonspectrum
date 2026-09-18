@@ -37,7 +37,7 @@ import {
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("ProductPrinciplesPage", ko, en);
 
 const GROUP_ICONS: Readonly<Record<(typeof PRODUCT_PRINCIPLE_GROUPS)[number]["id"], LucideIcon>> = {
