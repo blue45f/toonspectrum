@@ -1,3 +1,6 @@
+import {
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Box, Brush, Image, Library, ShieldCheck, Store, Type, UserRound } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 

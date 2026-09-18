@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Compass, Search } from "lucide-react";
 
 import { Container } from "@/shared/components/section";

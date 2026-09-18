@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Bone,
   Box,
   ChevronDown,
@@ -103,7 +107,7 @@ export function StudioGeneric3dModelModePanel({
 
   return (
     <section
-      aria-labelledby={`${id}-title`}
+      aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "en", "{v0}-title"), { v0: String(id) })}
       className="overflow-hidden rounded-xl border border-line bg-panel"
     >
       <div className="flex items-start gap-3 px-3 py-3">
@@ -112,12 +116,10 @@ export function StudioGeneric3dModelModePanel({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <h3 id={`${id}-title`} className="min-w-0 truncate text-sm font-bold text-fg">
-              범용 3D 모델
-            </h3>
+            <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "en", "{v0}-title"), { v0: String(id) })} className="min-w-0 truncate text-sm font-bold text-fg">
+              {translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "범용 3D 모델")}</h3>
             <span className="rounded-md border border-line px-1.5 py-0.5 text-[0.62rem] font-bold text-fg-3">
-              VRM과 별도
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "VRM과 별도")}</span>
           </div>
           <p className="mt-0.5 truncate text-xs font-semibold text-fg-2" title={manifest.name}>
             {manifest.name}
@@ -137,7 +139,7 @@ export function StudioGeneric3dModelModePanel({
               ? "text-bad"
               : "text-warn",
         )}
-        role={manifest.admission.status === "blocked" ? "alert" : "status"}
+        role={manifest.admission.status === "blocked" ? translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "en", "status")}
       >
         {manifest.admission.status === "ready" ? (
           <ShieldCheck className="mt-0.5 shrink-0" size={14} aria-hidden />
@@ -152,7 +154,7 @@ export function StudioGeneric3dModelModePanel({
 
       <div className="px-3 py-3">
         <fieldset>
-          <legend className="text-[0.68rem] font-bold text-fg-2">모델 용도</legend>
+          <legend className="text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "모델 용도")}</legend>
           <div className="mt-1.5 grid grid-cols-3 gap-1.5">
             {CLASSIFICATIONS.map((classification) => {
               const selected = manifest.classification === classification;
@@ -176,13 +178,13 @@ export function StudioGeneric3dModelModePanel({
           </div>
           <p className="mt-1.5 text-[0.62rem] leading-relaxed text-fg-3">
             {manifest.classificationSource === "manual"
-              ? "사용자가 지정한 분류입니다."
-              : "파일명·태그·노드 이름으로 제안한 분류이며 언제든 바꿀 수 있습니다."}
+              ? translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "사용자가 지정한 분류입니다.")
+              : translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "파일명·태그·노드 이름으로 제안한 분류이며 언제든 바꿀 수 있습니다.")}
           </p>
         </fieldset>
 
         <fieldset className="mt-3 border-t border-line pt-3">
-          <legend className="text-[0.68rem] font-bold text-fg-2">조작 모드</legend>
+          <legend className="text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "조작 모드")}</legend>
           <div className="mt-1.5 grid grid-cols-3 gap-1.5">
             {MODE_DEFINITIONS.map((mode) => {
               const Icon = mode.icon;
@@ -194,7 +196,7 @@ export function StudioGeneric3dModelModePanel({
                   key={mode.id}
                   type="button"
                   aria-pressed={selected}
-                  aria-describedby={`${id}-${mode.id}-hint`}
+                  aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "en", "{v0}-{v1}-hint"), { v0: String(id), v1: String(mode.id) })}
                   disabled={disabled}
                   className={cx(
                     CONTROL_BUTTON,
@@ -207,7 +209,7 @@ export function StudioGeneric3dModelModePanel({
                   <Icon size={14} aria-hidden />
                   {mode.label}
                   {capability.availability === "limited" ? (
-                    <span className="sr-only">제한됨</span>
+                    <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "제한됨")}</span>
                   ) : null}
                 </button>
               );
@@ -215,7 +217,7 @@ export function StudioGeneric3dModelModePanel({
           </div>
           <div className="sr-only">
             {MODE_DEFINITIONS.map((mode) => (
-              <p key={mode.id} id={`${id}-${mode.id}-hint`}>
+              <p key={mode.id} id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "en", "{v0}-{v1}-hint"), { v0: String(id), v1: String(mode.id) })}>
                 {getStudioGeneric3dCapability(manifest, mode.capability).detail}
               </p>
             ))}
@@ -225,9 +227,9 @@ export function StudioGeneric3dModelModePanel({
         {controlMode === "pose" ? (
           <div className="mt-3 border-t border-line pt-3">
             <div className="flex items-center justify-between gap-2">
-              <h4 className="text-[0.68rem] font-bold text-fg-2">포즈 대상</h4>
+              <h4 className="text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "포즈 대상")}</h4>
               <span className="text-[0.62rem] font-semibold text-fg-3">
-                조작 가능 {proxies.filter((item) => item.canApply).length}/{proxies.length}
+                {translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "조작 가능 ")}{proxies.filter((item) => item.canApply).length}/{proxies.length}
               </span>
             </div>
             <div className="mt-1.5 grid max-h-48 grid-cols-2 gap-1.5 overflow-y-auto pr-1">
@@ -257,27 +259,26 @@ export function StudioGeneric3dModelModePanel({
               })}
             </div>
             <p className="mt-1.5 text-[0.62rem] leading-relaxed text-fg-3">
-              가이드는 구도 참고용이며 메시를 변형하지 않습니다. 정적 부위 이동은 이음새가 벌어질 수 있습니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "가이드는 구도 참고용이며 메시를 변형하지 않습니다. 정적 부위 이동은 이음새가 벌어질 수 있습니다.")}</p>
           </div>
         ) : null}
       </div>
 
-      <div className="grid grid-cols-3 border-t border-line" aria-label="3D 모델 구조 요약">
+      <div className="grid grid-cols-3 border-t border-line" aria-label={translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "3D 모델 구조 요약")}>
         <div className="px-2 py-2 text-center">
-          <span className="block text-[0.6rem] font-semibold text-fg-3">삼각형</span>
+          <span className="block text-[0.6rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "삼각형")}</span>
           <strong className="mt-0.5 block text-[0.7rem] tabular-nums text-fg">
             {formatNumber(manifest.structure.triangles)}
           </strong>
         </div>
         <div className="border-x border-line px-2 py-2 text-center">
-          <span className="block text-[0.6rem] font-semibold text-fg-3">부위 / 본</span>
+          <span className="block text-[0.6rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "부위 / 본")}</span>
           <strong className="mt-0.5 block text-[0.7rem] tabular-nums text-fg">
             {formatNumber(manifest.structure.parts)} / {formatNumber(manifest.structure.bones)}
           </strong>
         </div>
         <div className="px-2 py-2 text-center">
-          <span className="block text-[0.6rem] font-semibold text-fg-3">애니메이션</span>
+          <span className="block text-[0.6rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "애니메이션")}</span>
           <strong className="mt-0.5 block text-[0.7rem] tabular-nums text-fg">
             {formatNumber(manifest.structure.animations)}
           </strong>
@@ -287,9 +288,9 @@ export function StudioGeneric3dModelModePanel({
       <div className="flex items-center gap-2 border-t border-line px-3 py-2 text-[0.66rem] text-fg-3">
         <CircleGauge size={13} className="shrink-0 text-fg-2" aria-hidden />
         <span className="min-w-0 flex-1 truncate">
-          {manifest.admission.profile ? `${manifest.admission.profile === "mobile" ? "모바일" : "데스크톱"} 예산 통과` : "기기 예산 확인 전"}
+          {manifest.admission.profile ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "{v0} 예산 통과"), { v0: String(manifest.admission.profile === "mobile" ? "모바일" : "데스크톱") }) : translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "기기 예산 확인 전")}
         </span>
-        <span className={manifest.rights.reviewRequired ? "text-warn" : "text-good"}>
+        <span className={manifest.rights.reviewRequired ? translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "en", "text-warn") : translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "en", "text-good")}>
           {RIGHTS_LABELS[manifest.rights.status]}
         </span>
       </div>
@@ -297,14 +298,14 @@ export function StudioGeneric3dModelModePanel({
       <details className="group border-t border-line">
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-bold text-fg marker:content-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent">
           <TriangleAlert size={14} className="shrink-0 text-warn" aria-hidden />
-          <span className="min-w-0 flex-1">제한 사항 {manifest.limitations.length}개</span>
+          <span className="min-w-0 flex-1">{translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "제한 사항 ")}{manifest.limitations.length}{translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "개")}</span>
           <ChevronDown
             size={14}
             className="shrink-0 text-fg-3 transition-transform duration-200 group-open:rotate-180"
             aria-hidden
           />
         </summary>
-        <ul className="border-t border-line px-3 py-2" aria-label="3D 모델 제한 사항">
+        <ul className="border-t border-line px-3 py-2" aria-label={translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "3D 모델 제한 사항")}>
           {manifest.limitations.length > 0 ? manifest.limitations.map((item) => (
             <li key={item.code} className="py-1 text-[0.66rem] leading-relaxed text-fg-3">
               <strong className={cx(
@@ -320,7 +321,7 @@ export function StudioGeneric3dModelModePanel({
               <span> · {item.detail}</span>
             </li>
           )) : (
-            <li className="py-1 text-[0.66rem] text-good">확인된 제한 사항이 없습니다.</li>
+            <li className="py-1 text-[0.66rem] text-good">{translateCurrentStaticSourceText("domains.creator.StudioGeneric3dModelModePanel", "ko", "확인된 제한 사항이 없습니다.")}</li>
           )}
         </ul>
       </details>

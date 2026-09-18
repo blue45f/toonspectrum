@@ -1,3 +1,9 @@
+import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, Brush, Check, Clapperboard, Layers, LayoutGrid, Pause, Play, SlidersHorizontal, SwatchBook } from "lucide-react";
 import { useId, useState, type CSSProperties, type KeyboardEvent } from "react";
 
@@ -59,7 +65,7 @@ export function AtelierWorkbenchDemo({ locale = "ko", initialScene = "ink" }: { 
           return <button key={key} id={`${id}-${key}`} type="button" role="tab" aria-selected={scene === key} aria-controls={`${id}-panel`} tabIndex={scene === key ? 0 : -1} onClick={() => setScene(key)} onKeyDown={(event) => onTabKey(event, index)}><Icon size={17} aria-hidden="true" /><span>{bi((ATELIER_SCENES[key]).ko, (ATELIER_SCENES[key]).en)[0]}</span></button>;
         })}
       </div>
-      <div id={`${id}-panel`} role="tabpanel" tabIndex={0} aria-labelledby={`${id}-${scene}`} className="atelier-workbench__panel">
+      <div id={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.site.experience.AtelierWorkbenchDemo", "en", "{v0}-panel"), { v0: String(id) })} role="tabpanel" tabIndex={0} aria-labelledby={`${id}-${scene}`} className="atelier-workbench__panel">
         <div className="atelier-workbench__visual" data-color={layers.color} data-line={layers.line} data-dialogue={layers.dialogue} data-vertical={vertical}>
           {failedImage !== src ? <img className="atelier-workbench__art" src={src} width={1536} height={1024} loading="lazy" decoding="async" alt={bi(`${label} 표현을 설명하는 ToonStudio 브랜드 콘셉트 아트`, `ToonStudio brand concept art illustrating ${label.toLowerCase()}`)} onError={() => setFailedImage(src)} /> : <div className="atelier-workbench__fallback"><Brush size={42} aria-hidden="true" /><p>{bi("이미지 없이도 아래 조작과 설명을 살펴볼 수 있어요.", "You can still explore the controls and explanation without the image.")}</p></div>}
           {scene === "ink" && <div className="atelier-workbench__strokes" aria-hidden="true">{MARKS.map((mark, index) => <div key={mark}><span>0{index + 1}</span><svg viewBox="0 0 366 80"><path d={mark} pathLength={1} /></svg><small>{["INK", "GRAPHITE", "PIGMENT", "DRY BRUSH"][index]}</small></div>)}</div>}

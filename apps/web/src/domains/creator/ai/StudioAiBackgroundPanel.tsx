@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 // AI 배경 생성 패널 — 텍스트 프롬프트로 배경 이미지를 생성해 캔버스에 삽입한다.
 // Presentation only; generate + notice gate owned by StudioPage.
 import { ImageIcon, Loader2, Sparkles } from "lucide-react";
@@ -39,32 +42,31 @@ export function StudioAiBackgroundPanel({
     >
       <div className="flex items-center gap-1.5 text-sm font-bold text-fg">
         <ImageIcon size={14} className="text-accent" aria-hidden />
-        AI 배경 생성
-      </div>
+        {translateCurrentStaticSourceText("domains.creator.ai.StudioAiBackgroundPanel", "ko", "AI 배경 생성")}</div>
 
       {!configured ? (
         <AiRecoveryNotice
           code="not_configured"
-          message="프롬프트와 크기는 먼저 준비할 수 있어요. 이미지 생성은 통합 AI 설정에서 개인 이미지 API 키와 모델을 연결한 뒤 실행됩니다."
+          message={translateCurrentStaticSourceText("domains.creator.ai.StudioAiBackgroundPanel", "ko", "프롬프트와 크기는 먼저 준비할 수 있어요. 이미지 생성은 통합 AI 설정에서 개인 이미지 API 키와 모델을 연결한 뒤 실행됩니다.")}
           compact
         />
       ) : null}
 
       <div className="grid gap-1">
         <div className="flex items-center justify-between gap-2 text-[0.62rem] font-semibold text-fg-2">
-          <span>무엇을 그릴까요?</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.ai.StudioAiBackgroundPanel", "ko", "무엇을 그릴까요?")}</span>
           <span className="font-mono font-normal tabular-nums text-fg-3">
             {prompt.length}/{BACKGROUND_PROMPT_MAX}
           </span>
         </div>
         <textarea
-          aria-label="무엇을 그릴까요?"
+          aria-label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiBackgroundPanel", "ko", "무엇을 그릴까요?")}
           value={prompt}
           onChange={(e) => onPromptChange(e.target.value.slice(0, BACKGROUND_PROMPT_MAX))}
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canGenerate) onGenerate();
           }}
-          placeholder="예: 교실, 낮, 창문으로 햇빛이 들어오는 풍경"
+          placeholder={translateCurrentStaticSourceText("domains.creator.ai.StudioAiBackgroundPanel", "ko", "예: 교실, 낮, 창문으로 햇빛이 들어오는 풍경")}
           rows={3}
           disabled={busy}
           className="min-h-[4.5rem] w-full resize-none rounded-lg border border-line bg-panel px-2.5 py-2 text-[0.68rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/30 disabled:opacity-60"
@@ -72,8 +74,8 @@ export function StudioAiBackgroundPanel({
       </div>
 
       <div>
-        <p className="mb-1 text-[0.62rem] font-semibold text-fg-2">크기</p>
-        <div className="flex flex-wrap gap-1" role="group" aria-label="생성 이미지 크기">
+        <p className="mb-1 text-[0.62rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiBackgroundPanel", "ko", "크기")}</p>
+        <div className="flex flex-wrap gap-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiBackgroundPanel", "ko", "생성 이미지 크기")}>
           {STUDIO_AI_IMAGE_SIZES.map((opt) => {
             const active = size === opt.value;
             return (
@@ -113,7 +115,7 @@ export function StudioAiBackgroundPanel({
         )}
       >
         {busy ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Sparkles size={15} aria-hidden />}
-        {busy ? "그리는 중…" : "배경 생성"}
+        {busy ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiBackgroundPanel", "ko", "그리는 중…") : translateCurrentStaticSourceText("domains.creator.ai.StudioAiBackgroundPanel", "ko", "배경 생성")}
       </button>
 
       {error ? (
@@ -124,8 +126,7 @@ export function StudioAiBackgroundPanel({
         />
       ) : (
         <p className="text-[0.62rem] leading-relaxed text-fg-3">
-          선택한 칸이 있으면 그 칸에, 여러 칸이면 전부에, 없으면 캔버스 배경으로 들어가요.
-          <span className="mt-0.5 block text-fg-3/90">단축키: ⌘/Ctrl + Enter</span>
+          {translateCurrentStaticSourceText("domains.creator.ai.StudioAiBackgroundPanel", "ko", "선택한 칸이 있으면 그 칸에, 여러 칸이면 전부에, 없으면 캔버스 배경으로 들어가요.")}<span className="mt-0.5 block text-fg-3/90">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiBackgroundPanel", "ko", "단축키: ⌘/Ctrl + Enter")}</span>
         </p>
       )}
     </div>

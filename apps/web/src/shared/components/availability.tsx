@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, Clock3, CreditCard, Gift, Ticket } from "lucide-react";
 
 import { PRICING_TONE } from "./availability-utils";
@@ -32,7 +36,7 @@ export function AvailabilityDots({
   const shown = availability.slice(0, max);
   const rest = availability.length - shown.length;
   return (
-    <span role="img" className={cx("inline-flex items-center gap-1.5", className)} aria-label="연재 플랫폼">
+    <span role="img" className={cx("inline-flex items-center gap-1.5", className)} aria-label={translateCurrentStaticSourceText("shared.components.availability", "ko", "연재 플랫폼")}>
       {shown.map((a) => {
         const p = PLATFORMS[a.platformId];
         return (
@@ -120,23 +124,22 @@ export function AvailabilityRouter({
               <span className={cx("mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium", PRICING_TONE[a.pricing])}>
                 <PricingIcon size={12} />
                 {PRICING_FULL[a.pricing]}
-                {a.isOriginal && <span className="ml-1.5 text-accent">· 독점</span>}
+                {a.isOriginal && <span className="ml-1.5 text-accent">{translateCurrentStaticSourceText("shared.components.availability", "ko", "· 독점")}</span>}
               </span>
             </span>
             {hasUrl ? (
               <span className="flex items-center gap-1 text-xs text-fg-3 transition-colors group-hover:text-fg">
-                보러가기
-                <ArrowUpRight size={14} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                {translateCurrentStaticSourceText("shared.components.availability", "ko", "보러가기")}<ArrowUpRight size={14} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </span>
             ) : (
-              <span className="text-xs text-fg-3">링크 준비 중</span>
+              <span className="text-xs text-fg-3">{translateCurrentStaticSourceText("shared.components.availability", "ko", "링크 준비 중")}</span>
             )}
           </>
         );
         return hasUrl ? (
           <a
             key={a.platformId}
-            href={`/api/go/${a.platformId}?to=${encodeURIComponent(a.url ?? "")}`}
+            href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.availability", "en", "/api/go/{v0}?to={v1}"), { v0: String(a.platformId), v1: String(encodeURIComponent(a.url ?? "")) })}
             target="_blank"
             rel="noopener noreferrer"
             className="group flex items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-3 transition-[background,border-color,transform] duration-150 hover:-translate-y-0.5 hover:border-line-strong hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"

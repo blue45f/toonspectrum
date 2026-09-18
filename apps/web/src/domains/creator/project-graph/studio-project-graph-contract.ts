@@ -13,124 +13,15 @@ import {
   type ReviewAnchor,
   type ScopeRef,
 } from "@toonspectrum/studio-project-model";
+import {
+  compatibilityItemSchema,
+  compatibilityReportSchema,
+  sourceCreativeFormatSchema,
+  type CompatibilityItem,
+  type CompatibilityReport,
+  type SourceCreativeFormat,
+} from "@toonspectrum/studio-format-gateway";
 import { z } from "zod";
-
-export const sourceCreativeFormatSchema = z.enum([
-  "psd",
-  "psb",
-  "png",
-  "jpeg",
-  "webp",
-  "tiff",
-  "clip",
-  "cmc",
-  "ora",
-  "svg",
-  "gltf",
-  "glb",
-  "vrm",
-  "obj",
-  "fbx",
-  "usd",
-  "usdz",
-  "dae",
-  "stl",
-  "hdr",
-  "exr",
-  "unknown",
-]);
-export type SourceCreativeFormat = z.infer<typeof sourceCreativeFormatSchema>;
-
-export const compatibilityDispositionSchema = z.enum([
-  "preserved",
-  "converted",
-  "approximated",
-  "rasterized",
-  "ignored",
-  "opaque-preserved",
-  "blocked",
-]);
-export const compatibilitySeveritySchema = z.enum([
-  "info",
-  "warning",
-  "error",
-  "blocker",
-]);
-
-export const compatibilityItemSchema = z
-  .object({
-    id: studioEntityIdSchema,
-    path: z.string().trim().min(1).max(4_096),
-    sourceFeature: z.string().trim().min(1).max(240),
-    sourceObjectId: z.string().trim().min(1).max(1_024).optional(),
-    disposition: compatibilityDispositionSchema,
-    severity: compatibilitySeveritySchema,
-    targetFeature: z.string().trim().min(1).max(240).optional(),
-    message: z.string().trim().min(1).max(4_096),
-    sourceBounds: z
-      .object({
-        x: z.number().finite(),
-        y: z.number().finite(),
-        width: z.number().finite().positive(),
-        height: z.number().finite().positive(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
-export type CompatibilityItem = z.infer<typeof compatibilityItemSchema>;
-
-export const compatibilitySummarySchema = z
-  .object({
-    total: z.number().int().nonnegative(),
-    preserved: z.number().int().nonnegative(),
-    converted: z.number().int().nonnegative(),
-    approximated: z.number().int().nonnegative(),
-    rasterized: z.number().int().nonnegative(),
-    ignored: z.number().int().nonnegative(),
-    opaquePreserved: z.number().int().nonnegative(),
-    blocked: z.number().int().nonnegative(),
-  })
-  .strict();
-export type CompatibilitySummary = z.infer<typeof compatibilitySummarySchema>;
-
-export const compatibilitySourceBlobSchema = z
-  .object({
-    id: studioEntityIdSchema,
-    sha256: sha256Schema,
-    size: z.number().int().nonnegative(),
-    mediaType: z.string().trim().min(1).max(160),
-    role: z.literal("source"),
-  })
-  .strict();
-
-export const compatibilitySourceSchema = z
-  .object({
-    sourceFileName: z.string().trim().min(1).max(1_024),
-    sourceFormat: sourceCreativeFormatSchema,
-    sourceHash: sha256Schema,
-    sourceSize: z.number().int().nonnegative(),
-    sourceBlob: compatibilitySourceBlobSchema,
-    immutable: z.literal(true),
-    importedAt: isoTimestampSchema,
-  })
-  .strict();
-
-export const compatibilityReportSchema = z
-  .object({
-    id: studioEntityIdSchema,
-    artifactId: studioEntityIdSchema.optional(),
-    source: compatibilitySourceSchema,
-    grade: z.enum(["A", "B", "C", "D"]),
-    items: z.array(compatibilityItemSchema),
-    summary: compatibilitySummarySchema,
-    requiresApproval: z.boolean(),
-    approvedBy: studioEntityIdSchema.optional(),
-    approvedAt: isoTimestampSchema.optional(),
-    createdAt: isoTimestampSchema,
-  })
-  .strict();
-export type CompatibilityReport = z.infer<typeof compatibilityReportSchema>;
 
 export const studioProjectAccessSchema = z
   .object({
@@ -408,4 +299,9 @@ export interface StudioCompatibilityReportCreateInput {
   readonly createdAt: string;
 }
 
-export type { BlobRole };
+export {
+  compatibilityItemSchema,
+  compatibilityReportSchema,
+  sourceCreativeFormatSchema,
+};
+export type { BlobRole, CompatibilityReport };

@@ -1,4 +1,8 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   BriefcaseBusiness,
   CheckCircle2,
@@ -123,7 +127,7 @@ export function StudioRoleWorkspacePanel({
               <BriefcaseBusiness size={20} aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.15em] text-accent">ROLE WORKSPACE</p>
+              <p className="text-[0.68rem] font-black uppercase tracking-[0.15em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRoleWorkspacePanel", "en", "ROLE WORKSPACE")}</p>
               <h2 id="studio-role-setup-title" className="mt-1 text-lg font-black text-fg">
                 {localized(locale, "내 직무에 맞는 작업 화면을 설정하세요", "Set up a workspace for your role")}
               </h2>
@@ -190,7 +194,7 @@ export function StudioRoleWorkspacePanel({
           <div className="min-w-0 max-w-3xl">
             <div className="flex items-center gap-2 text-accent">
               <Sparkles size={15} aria-hidden="true" />
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.15em]">ROLE WORKSPACE</p>
+              <p className="text-[0.68rem] font-black uppercase tracking-[0.15em]">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRoleWorkspacePanel", "en", "ROLE WORKSPACE")}</p>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <h2 id="studio-role-workspace-title" className="text-xl font-black tracking-tight text-fg sm:text-2xl">
@@ -205,7 +209,7 @@ export function StudioRoleWorkspacePanel({
                 </span>
               ) : null}
               <span className="inline-flex min-h-7 items-center rounded-full border border-line bg-panel px-2.5 text-xs font-bold text-fg-2">
-                {workspaceMode === "guided" ? "Guided" : workspaceMode === "production" ? "Production" : "Creator"}
+                {workspaceMode === "guided" ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRoleWorkspacePanel", "en", "Guided") : workspaceMode === "production" ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRoleWorkspacePanel", "en", "Production") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRoleWorkspacePanel", "en", "Creator")}
               </span>
             </div>
             <p className="mt-2 text-sm leading-6 text-fg-2">
@@ -269,7 +273,7 @@ export function StudioRoleWorkspacePanel({
             )}
           >
             <div>
-              <p className="text-[0.66rem] font-black uppercase tracking-[0.15em] text-accent">TODAY · PRIMARY ACTION</p>
+              <p className="text-[0.66rem] font-black uppercase tracking-[0.15em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRoleWorkspacePanel", "en", "TODAY · PRIMARY ACTION")}</p>
               <h3 className="mt-3 text-lg font-black text-fg">
                 {localized(locale, experience.primaryAction.labelKo, experience.primaryAction.labelEn)}
               </h3>

@@ -1,4 +1,12 @@
 import {
+  formatI18nTemplate,
+  getCurrentUiLocale,
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   CheckCircle2,
   CloudOff,
   Copy,
@@ -416,7 +424,7 @@ export function StudioSaveFirstProjectLibraryPage({
                 <Link
                   key={candidate}
                   href={viewHref(candidate)}
-                  aria-current={candidate === view ? "page" : undefined}
+                  aria-current={candidate === view ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "en", "page") : undefined}
                   className={cn(
                     "inline-flex min-h-11 items-center rounded-xl px-3 text-xs font-bold",
                     candidate === view ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
@@ -432,7 +440,7 @@ export function StudioSaveFirstProjectLibraryPage({
               <Link
                 key={candidate}
                 href={viewHref(candidate)}
-                aria-current={candidate === view ? "page" : undefined}
+                aria-current={candidate === view ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "en", "page") : undefined}
                 className={cn(
                   "inline-flex min-h-10 items-center rounded-xl px-3 text-xs font-semibold",
                   candidate === view ? "bg-raised text-accent" : "text-fg-3 hover:bg-card hover:text-fg",

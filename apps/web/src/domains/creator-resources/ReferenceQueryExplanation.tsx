@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { resolveReferenceQuery } from "@toonspectrum/core/reference-query-language";
 import { useSearchParams } from "react-router-dom";
 

@@ -127,9 +127,7 @@ export const PRODUCT_TOUR = {
   ],
 } as const;
 
-export type ProductTourLocale = "ko" | "en";
-
-export const PRODUCT_TOUR_COPY = {
+export type ProductTourLocale = string;export const PRODUCT_TOUR_COPY = {
   ko: {
     pageTitle: "툰스튜디오 전체 제품 투어",
     metaDescription: "기획, 드로잉, 컷 연출, 3D, AI 보조, 협업, 학습과 게시 준비까지 툰스튜디오 전체 창작 흐름을 8분대 Remotion 제품 투어와 실제 제품 화면으로 살펴보세요.",

@@ -1,3 +1,4 @@
+import { translateLocaleBranchForLocale } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect } from "react";
 
 import "./reference-labels";
@@ -9,14 +10,7 @@ import { decodePathSegment } from "@/shared/lib/decode-path-segment";
 import { resolveSiteRouteAuthority } from "@/shared/lib/site-route-authority";
 import { canonicalSitePath } from "@/shared/lib/site-route-metadata";
 import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route";
-import { PRODUCT_IDENTITY, resolveProductLocale } from "@/shared/lib/product-identity";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
-
-const bi = <T,>(ko: T, en: T): T =>
-  translateBilingualValueForActiveLocale("route-titles", ko, en);
+import { PRODUCT_IDENTITY, resolveProductLocale, type ProductLocale } from "@/shared/lib/product-identity";
 
 // Static route browser titles. Detail pages that own richer content titles remain responsible for
 // updating the document, while this table still provides an accessible route-level fallback.
@@ -84,7 +78,7 @@ type Translator = ReturnType<typeof useT>;
 
 export function resolveRouteTitle(pathname: string, t: Translator, productLocale?: ProductLocale): string {
   const canonicalPath = canonicalSitePath(pathname);
-  if (canonicalPath === "/") return productLocale ? bi((PRODUCT_IDENTITY).ko, (PRODUCT_IDENTITY).en).seoTitle : `${t("app.name")} · ${t("home.creatorTitle")}`;
+  if (canonicalPath === "/") return productLocale ? PRODUCT_IDENTITY[productLocale].seoTitle : `${t("app.name")} · ${t("home.creatorTitle")}`;
   if (Object.hasOwn(CREATOR_RESOURCE_TITLES, canonicalPath)) return CREATOR_RESOURCE_TITLES[canonicalPath];
   const authority = resolveSiteRouteAuthority(canonicalPath);
   if (authority) return t(authority.titleKey);

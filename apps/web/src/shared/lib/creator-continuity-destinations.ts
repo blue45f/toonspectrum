@@ -1,3 +1,7 @@
+import {
+  translateBilingualValueForLocale,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import type {
   CreatorContinuityLocale,
   CreatorDestinationId,
@@ -13,8 +17,8 @@ const bi = <T,>(ko: T, en: T): T =>
 export interface CreatorDestinationDefinition {
   readonly id: CreatorDestinationId;
   readonly pathname: string;
-  readonly label: Record<CreatorContinuityLocale, string>;
-  readonly description: Record<CreatorContinuityLocale, string>;
+  readonly label: Record<"ko" | "en", string>;
+  readonly description: Record<"ko" | "en", string>;
 }
 
 // Specific nested paths come first so they never collapse into a parent route.

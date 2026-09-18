@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   ArrowRight,
   BadgeCheck,
@@ -91,30 +95,27 @@ export function ProductionLandingPage() {
       <div className="mx-auto max-w-[90rem] px-4 py-6 sm:px-6 lg:px-8">
         <header className="rounded-3xl border border-line bg-panel p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-accent">
-            <span>ToonStudio</span><span aria-hidden="true">/</span><span>웹툰 제작 관리</span>
+            <span>ToonStudio</span><span aria-hidden="true">/</span><span>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "웹툰 제작 관리")}</span>
           </div>
           <div className="mt-5 grid gap-6 lg:grid-cols-[1.3fr_0.7fr] lg:items-end">
             <div>
               <h1 className="max-w-4xl text-3xl font-black tracking-tight text-fg sm:text-5xl">
-                흩어진 웹툰 제작을 하나의 흐름으로
-              </h1>
+                {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "흩어진 웹툰 제작을 하나의 흐름으로")}</h1>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base">
-                기획·회차·담당자·일정·파일·검수·계약을 연결해, 팀과 1인 작가 모두 다음 할 일을 바로 알 수 있습니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "기획·회차·담당자·일정·파일·검수·계약을 연결해, 팀과 1인 작가 모두 다음 할 일을 바로 알 수 있습니다.")}</p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link className={buttonClass({ size: "lg" })} to="/production/projects/sample-project/overview">
-                  기능 미리 보기 <ArrowRight className="size-4" aria-hidden="true" />
+                  {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "기능 미리 보기 ")}<ArrowRight className="size-4" aria-hidden="true" />
                 </Link>
                 <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/studio/projects">
-                  내 프로젝트 열기
-                </Link>
+                  {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "내 프로젝트 열기")}</Link>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Metric label="작업 기준" value="3" detail="스토리·그림·최종본 연결" icon={GitBranch} tone="accent" />
-              <Metric label="확인 단계" value="4" detail="기획 · 넘기기 · 콘티 · 최종 검수" icon={LockKeyhole} tone="success" />
-              <Metric label="역할·권한" value="11" detail="항목별 제안·승인·거부 권한" icon={ShieldCheck} />
-              <Metric label="연결 범위" value="100%" detail="회차부터 계약·크레딧까지" icon={FileKey2} tone="warning" />
+              <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "작업 기준")} value="3" detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "스토리·그림·최종본 연결")} icon={GitBranch} tone="accent" />
+              <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "확인 단계")} value="4" detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "기획 · 넘기기 · 콘티 · 최종 검수")} icon={LockKeyhole} tone="success" />
+              <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "역할·권한")} value="11" detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "항목별 제안·승인·거부 권한")} icon={ShieldCheck} />
+              <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "연결 범위")} value="100%" detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "회차부터 계약·크레딧까지")} icon={FileKey2} tone="warning" />
             </div>
           </div>
         </header>
@@ -122,12 +123,12 @@ export function ProductionLandingPage() {
         {userId ? (
           <SectionCard
             className="mt-6"
-            title="내 제작 포트폴리오"
-            description="여러 작품의 다음 연재, 일정 안정도, 차단·검수·인력 공백을 같은 기준으로 비교합니다. 위험한 작품을 먼저 표시합니다."
-            action={<Link className={buttonClass({ variant: "outline", size: "sm" })} to="/studio/projects">프로젝트 만들기</Link>}
+            title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "내 제작 포트폴리오")}
+            description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "여러 작품의 다음 연재, 일정 안정도, 차단·검수·인력 공백을 같은 기준으로 비교합니다. 위험한 작품을 먼저 표시합니다.")}
+            action={<Link className={buttonClass({ variant: "outline", size: "sm" })} to="/studio/projects">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "프로젝트 만들기")}</Link>}
           >
             {projectsLoading ? (
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="프로젝트 목록 불러오는 중">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "프로젝트 목록 불러오는 중")}>
                 {[0, 1, 2].map((index) => <div key={index} className="h-44 animate-pulse rounded-2xl bg-raised" />)}
               </div>
             ) : projectsError ? (
@@ -135,15 +136,15 @@ export function ProductionLandingPage() {
             ) : projects.length > 0 ? (
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <Metric label="운영 작품" value={String(projects.length)} detail={`진행 회차 ${projects.reduce((sum, project) => sum + project.activeEpisodeCount, 0)}개`} icon={LayoutDashboard} tone="accent" />
-                  <Metric label="위험 작품" value={String(projects.filter((project) => project.healthScore < 64).length)} detail={`기한 초과 ${projects.reduce((sum, project) => sum + project.overdueTaskCount, 0)}건`} icon={AlertTriangle} tone={projects.some((project) => project.healthScore < 64) ? "danger" : "success"} />
-                  <Metric label="완성 비축" value={`${projects.reduce((sum, project) => sum + project.readyBufferCount, 0)}회`} detail="게시 준비가 끝난 미공개 회차" icon={BadgeCheck} tone="success" />
-                  <Metric label="검수 대기" value={String(projects.reduce((sum, project) => sum + project.reviewTaskCount, 0))} detail={`미배정 ${projects.reduce((sum, project) => sum + project.unassignedTaskCount, 0)}건`} icon={ClipboardCheck} tone="warning" />
+                  <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "운영 작품")} value={String(projects.length)} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "진행 회차 {v0}개"), { v0: String(projects.reduce((sum, project) => sum + project.activeEpisodeCount, 0)) })} icon={LayoutDashboard} tone="accent" />
+                  <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "위험 작품")} value={String(projects.filter((project) => project.healthScore < 64).length)} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "기한 초과 {v0}건"), { v0: String(projects.reduce((sum, project) => sum + project.overdueTaskCount, 0)) })} icon={AlertTriangle} tone={projects.some((project) => project.healthScore < 64) ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "en", "success")} />
+                  <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "완성 비축")} value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "{v0}회"), { v0: String(projects.reduce((sum, project) => sum + project.readyBufferCount, 0)) })} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "게시 준비가 끝난 미공개 회차")} icon={BadgeCheck} tone="success" />
+                  <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "검수 대기")} value={String(projects.reduce((sum, project) => sum + project.reviewTaskCount, 0))} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "미배정 {v0}건"), { v0: String(projects.reduce((sum, project) => sum + project.unassignedTaskCount, 0)) })} icon={ClipboardCheck} tone="warning" />
                 </div>
                 <div className="rounded-2xl border border-line bg-card p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div><h3 className="text-sm font-black text-fg">내 통합 작업함</h3><p className="mt-1 text-xs text-fg-2">모든 작품에서 오늘 제출·진행·검수·입력 대기 업무를 우선순위 순으로 모았습니다.</p></div>
-                    <span className="rounded-full border border-accent/35 bg-accent-soft px-2.5 py-1 text-xs font-black text-accent">조치 {inboxItems.length}건</span>
+                    <div><h3 className="text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "내 통합 작업함")}</h3><p className="mt-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "모든 작품에서 오늘 제출·진행·검수·입력 대기 업무를 우선순위 순으로 모았습니다.")}</p></div>
+                    <span className="rounded-full border border-accent/35 bg-accent-soft px-2.5 py-1 text-xs font-black text-accent">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "조치 ")}{inboxItems.length}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "건")}</span>
                   </div>
                   <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                     {inboxItems.slice(0, 8).map((item) => {
@@ -163,7 +164,7 @@ export function ProductionLandingPage() {
                       return (
                         <Link
                           key={`${item.bucket}:${item.projectId}:${item.taskId}`}
-                          to={`/production/projects/${encodeURIComponent(item.projectId)}/production?task=${encodeURIComponent(item.taskId)}`}
+                          to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "en", "/production/projects/{v0}/production?task={v1}"), { v0: String(encodeURIComponent(item.projectId)), v1: String(encodeURIComponent(item.taskId)) })}
                           className="rounded-xl border border-line bg-panel p-3 transition-colors hover:border-accent/40 hover:bg-raised"
                         >
                           <div className="flex items-center justify-between gap-2"><Pill tone={tone}>{bucketLabel}</Pill><span className="text-[0.625rem] text-fg-3">{formatDay(item.dueAt)}</span></div>
@@ -172,7 +173,7 @@ export function ProductionLandingPage() {
                         </Link>
                       );
                     })}
-                    {inboxItems.length === 0 ? <div className="rounded-xl border border-dashed border-line p-5 text-center text-xs text-fg-3 md:col-span-2 xl:col-span-4">현재 사용자에게 배정된 조치 업무가 없습니다.</div> : null}
+                    {inboxItems.length === 0 ? <div className="rounded-xl border border-dashed border-line p-5 text-center text-xs text-fg-3 md:col-span-2 xl:col-span-4">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "현재 사용자에게 배정된 조치 업무가 없습니다.")}</div> : null}
                   </div>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -181,26 +182,26 @@ export function ProductionLandingPage() {
                     return (
                       <Link
                         key={project.projectId}
-                        to={`/production/projects/${encodeURIComponent(project.projectId)}/overview`}
+                        to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "en", "/production/projects/{v0}/overview"), { v0: String(encodeURIComponent(project.projectId)) })}
                         className="group rounded-2xl border border-line bg-panel p-4 transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0"><p className="truncate text-base font-black text-fg">{project.title}</p><p className="mt-1 text-[0.6875rem] text-fg-3">{project.collaborationModel} · r{project.revision}</p></div>
-                          <Pill tone={healthTone}>안정도 {project.healthScore}</Pill>
+                          <Pill tone={healthTone}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "안정도 ")}{project.healthScore}</Pill>
                         </div>
                         <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[0.6875rem]">
-                          <div className="rounded-lg border border-line bg-card p-2"><p className="text-fg-3">진행 회차</p><p className="mt-1 font-black text-fg">{project.activeEpisodeCount}</p></div>
-                          <div className="rounded-lg border border-line bg-card p-2"><p className="text-fg-3">차단·지연</p><p className={cn("mt-1 font-black", project.blockedTaskCount + project.overdueTaskCount > 0 ? "text-bad" : "text-fg")}>{project.blockedTaskCount + project.overdueTaskCount}</p></div>
-                          <div className="rounded-lg border border-line bg-card p-2"><p className="text-fg-3">비축</p><p className="mt-1 font-black text-fg">{project.readyBufferCount}회</p></div>
+                          <div className="rounded-lg border border-line bg-card p-2"><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "진행 회차")}</p><p className="mt-1 font-black text-fg">{project.activeEpisodeCount}</p></div>
+                          <div className="rounded-lg border border-line bg-card p-2"><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "차단·지연")}</p><p className={cn("mt-1 font-black", project.blockedTaskCount + project.overdueTaskCount > 0 ? "text-bad" : "text-fg")}>{project.blockedTaskCount + project.overdueTaskCount}</p></div>
+                          <div className="rounded-lg border border-line bg-card p-2"><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "비축")}</p><p className="mt-1 font-black text-fg">{project.readyBufferCount}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "회")}</p></div>
                         </div>
-                        <div className="mt-3 flex items-center justify-between gap-3 text-xs text-fg-2"><span>다음 공개 {formatDay(project.nextReleaseAt)}</span><span className="flex items-center gap-1 font-bold text-accent">운영 열기 <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></span></div>
+                        <div className="mt-3 flex items-center justify-between gap-3 text-xs text-fg-2"><span>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "다음 공개 ")}{formatDay(project.nextReleaseAt)}</span><span className="flex items-center gap-1 font-bold text-accent">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "운영 열기 ")}<ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></span></div>
                       </Link>
                     );
                   })}
                 </div>
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-line p-8 text-center"><LayoutDashboard className="mx-auto size-8 text-fg-3" aria-hidden="true" /><p className="mt-3 text-sm font-black text-fg">운영 중인 제작 프로젝트가 없습니다</p><p className="mt-1 text-xs text-fg-2">Studio 프로젝트에서 제작 관리 프로젝트를 연결해 주세요.</p></div>
+              <div className="rounded-2xl border border-dashed border-line p-8 text-center"><LayoutDashboard className="mx-auto size-8 text-fg-3" aria-hidden="true" /><p className="mt-3 text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "운영 중인 제작 프로젝트가 없습니다")}</p><p className="mt-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "Studio 프로젝트에서 제작 관리 프로젝트를 연결해 주세요.")}</p></div>
             )}
           </SectionCard>
         ) : null}
@@ -220,7 +221,7 @@ export function ProductionLandingPage() {
           ))}
         </section>
 
-        <SectionCard className="mt-6" title="현재 제작 흐름" description="한 화면에서 단계별 상태와 다음 결정자를 확인합니다.">
+        <SectionCard className="mt-6" title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "현재 제작 흐름")} description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionLandingPage", "ko", "한 화면에서 단계별 상태와 다음 결정자를 확인합니다.")}>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
             {["기획 확정", "작업 넘기기", "콘티", "최종 원고", "검수·수정", "내보내기"].map((label, index) => (
               <div key={label} className="relative rounded-xl border border-line bg-panel p-3">

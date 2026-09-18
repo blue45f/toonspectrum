@@ -1,3 +1,7 @@
+import {
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { SITE_URL } from "@toonspectrum/core";
 import {
   ArrowLeft,
@@ -174,8 +178,7 @@ export function BrandFilmPage() {
           </Link>
           <p className="ch-eyebrow">
             <Sparkles size={14} aria-hidden="true" />
-            TOONSTUDIO BRAND FILM
-          </p>
+            {translateCurrentStaticSourceText("domains.marketing.BrandFilmPage", "en", "TOONSTUDIO BRAND FILM")}</p>
           <h1>
             {copy.title[0]}
             <br />
@@ -237,7 +240,7 @@ export function BrandFilmPage() {
         aria-labelledby="brand-film-closing-title"
       >
         <div>
-          <p className="ch-eyebrow">CREATE YOUR NEXT STORY</p>
+          <p className="ch-eyebrow">{translateCurrentStaticSourceText("domains.marketing.BrandFilmPage", "en", "CREATE YOUR NEXT STORY")}</p>
           <h2 id="brand-film-closing-title">{copy.closingTitle}</h2>
           <p>{copy.closingBody}</p>
         </div>

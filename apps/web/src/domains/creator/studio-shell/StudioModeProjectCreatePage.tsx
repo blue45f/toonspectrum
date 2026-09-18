@@ -1,4 +1,10 @@
 import {
+  getCurrentUiLocale,
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   Box,
   Clapperboard,
@@ -276,8 +282,7 @@ export function StudioModeProjectCreatePage() {
           <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">
-                <Sparkles size={14} aria-hidden="true" /> TOONSTUDIO CREATE
-              </p>
+                <Sparkles size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioModeProjectCreatePage", "en", "TOONSTUDIO CREATE")}</p>
               <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-4xl">
                 {bt("무엇을 만들지 고르면 작업공간도 바뀝니다", "Choose what to make — the workspace changes with it")}
               </h1>

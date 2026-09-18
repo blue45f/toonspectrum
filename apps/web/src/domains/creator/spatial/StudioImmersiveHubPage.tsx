@@ -1,4 +1,10 @@
 import {
+  formatI18nTemplate,
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   Box,
   Brush,
@@ -187,8 +193,7 @@ export function StudioImmersiveHubPage() {
         <section className="grid items-center gap-7 lg:grid-cols-[1.05fr_0.95fr]" aria-labelledby="immersive-hub-title">
           <div>
             <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">
-              <Sparkles size={14} aria-hidden /> TOONSTUDIO IMMERSIVE
-            </p>
+              <Sparkles size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.spatial.StudioImmersiveHubPage", "en", "TOONSTUDIO IMMERSIVE")}</p>
             <h1 id="immersive-hub-title" className="mt-3 max-w-3xl text-4xl font-black tracking-[-0.035em] text-fg sm:text-5xl">
               {bt("웹툰을 그리고, 세우고, 공간에서 검수하세요", "Draw, stage and review webtoons in space")}
             </h1>
@@ -213,7 +218,7 @@ export function StudioImmersiveHubPage() {
         <section className="mt-12 rounded-[2rem] border border-line bg-panel/70 p-5 shadow-sm sm:p-7" aria-labelledby="immersive-capability-title">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">DEVICE PREFLIGHT</p>
+              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.spatial.StudioImmersiveHubPage", "en", "DEVICE PREFLIGHT")}</p>
               <h2 id="immersive-capability-title" className="mt-2 text-2xl font-black text-fg">
                 {bt("권한 없이 먼저 확인했습니다", "Checked before asking for permissions")}
               </h2>
@@ -287,7 +292,7 @@ export function StudioImmersiveHubPage() {
         </section>
         <section className="mt-14" aria-labelledby="immersive-workflow-title">
           <div className="max-w-3xl">
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">PRODUCTION FLOW</p>
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.spatial.StudioImmersiveHubPage", "en", "PRODUCTION FLOW")}</p>
             <h2 id="immersive-workflow-title" className="mt-2 text-3xl font-black tracking-tight text-fg">
               {bt("도구 목록이 아니라 하나의 제작 동선", "One production flow, not a pile of tools")}
             </h2>
@@ -297,7 +302,7 @@ export function StudioImmersiveHubPage() {
           </div>
           <div className="mt-7 space-y-5">
             {STUDIO_IMMERSIVE_STAGES.map((stage, stageIndex) => (
-              <section key={stage.id} className="grid gap-3 lg:grid-cols-[10rem_1fr]" aria-labelledby={`immersive-stage-${stage.id}`}>
+              <section key={stage.id} className="grid gap-3 lg:grid-cols-[10rem_1fr]" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.spatial.StudioImmersiveHubPage", "en", "immersive-stage-{v0}"), { v0: String(stage.id) })}>
                 <div className="flex items-start gap-3 lg:block">
                   <span className={cn("inline-flex size-10 shrink-0 items-center justify-center rounded-full border text-sm font-black", STAGE_TONE[stage.id])}>
                     {stageIndex + 1}
@@ -338,7 +343,7 @@ export function StudioImmersiveHubPage() {
         <section className="mt-14" aria-labelledby="immersive-kit-title">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">STARTER CONTENT</p>
+              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.spatial.StudioImmersiveHubPage", "en", "STARTER CONTENT")}</p>
               <h2 id="immersive-kit-title" className="mt-2 text-3xl font-black tracking-tight text-fg">
                 {bt("빈 화면 대신 제작 목적에서 시작", "Start from an outcome, not a blank screen")}
               </h2>
@@ -387,7 +392,7 @@ export function StudioImmersiveHubPage() {
         <section id="spatial-reader" className="mt-14 scroll-mt-24 rounded-[2rem] border border-accent/25 bg-[linear-gradient(135deg,var(--color-panel),oklch(0.68_0.16_285/0.08))] p-5 shadow-lg sm:p-8" aria-labelledby="spatial-reader-title">
           <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
             <div>
-              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">LOCAL SPATIAL PREVIEW</p>
+              <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.spatial.StudioImmersiveHubPage", "en", "LOCAL SPATIAL PREVIEW")}</p>
               <h2 id="spatial-reader-title" className="mt-2 text-3xl font-black tracking-tight text-fg">
                 {bt("내 원고를 업로드 없이 바로 펼치기", "Open your pages in space without uploading")}
               </h2>

@@ -1,4 +1,8 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   Check,
   Circle,
@@ -106,7 +110,7 @@ export function StudioWebtoonProductionCompanion({
             <Factory size={20} aria-hidden="true" />
           </span>
           <div>
-            <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">WEBTOON PRODUCTION COMPANION</p>
+            <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioWebtoonProductionCompanion", "en", "WEBTOON PRODUCTION COMPANION")}</p>
             <h2 id="webtoon-production-companion-title" className="mt-1 text-xl font-black text-fg sm:text-2xl">
               {bt("현재 화면과 연결된 실제 제작 단계", "Production stages connected to this workspace")}
             </h2>
@@ -142,24 +146,24 @@ export function StudioWebtoonProductionCompanion({
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-xl bg-canvas p-3">
-                  <p className="text-xs font-black text-fg">입력</p>
+                  <p className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioWebtoonProductionCompanion", "ko", "입력")}</p>
                   <p className="mt-1 text-xs leading-5 text-fg-2">{stage.inputKo}</p>
                 </div>
                 <div className="rounded-xl bg-canvas p-3">
-                  <p className="text-xs font-black text-fg">다음 인계</p>
+                  <p className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioWebtoonProductionCompanion", "ko", "다음 인계")}</p>
                   <p className="mt-1 text-xs leading-5 text-fg-2">{stage.handoffKo}</p>
                 </div>
               </div>
 
               <div className="mt-3 flex items-start gap-2 rounded-xl border border-warning/25 bg-warning-soft/10 p-3">
                 <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
-                <p className="text-xs leading-5 text-fg-2"><strong className="text-warning">재작업 위험 · </strong>{stage.reworkRiskKo}</p>
+                <p className="text-xs leading-5 text-fg-2"><strong className="text-warning">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioWebtoonProductionCompanion", "ko", "재작업 위험 · ")}</strong>{stage.reworkRiskKo}</p>
               </div>
 
               <div className="mt-4 rounded-xl border border-line bg-canvas p-3">
                 <div className="flex items-center gap-2">
                   <Sparkles className="size-4 text-accent" aria-hidden="true" />
-                  <p className="text-xs font-black text-fg">이 단계에서 줄이는 반복 작업</p>
+                  <p className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioWebtoonProductionCompanion", "ko", "이 단계에서 줄이는 반복 작업")}</p>
                 </div>
                 <ul className="mt-2 space-y-1 text-xs leading-5 text-fg-2">
                   {stage.conveniencesKo.map((item) => <li key={item}>• {item}</li>)}
@@ -168,8 +172,8 @@ export function StudioWebtoonProductionCompanion({
 
               <div className="mt-4">
                 <div className="flex items-end justify-between gap-3">
-                  <p className="text-xs font-black text-fg">다음 단계 전 확인</p>
-                  <p className="text-[0.65rem] font-bold text-fg-3">보조 체크 · 정식 승인을 대체하지 않음</p>
+                  <p className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioWebtoonProductionCompanion", "ko", "다음 단계 전 확인")}</p>
+                  <p className="text-[0.65rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioWebtoonProductionCompanion", "ko", "보조 체크 · 정식 승인을 대체하지 않음")}</p>
                 </div>
                 <div className="mt-2 grid gap-2">
                   {stage.readinessChecksKo.map((item, index) => {
@@ -188,7 +192,7 @@ export function StudioWebtoonProductionCompanion({
                         <span className={cn("mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border", checked ? "border-success bg-success text-white" : "border-line text-fg-3")}>
                           {checked ? <Check size={12} aria-hidden="true" /> : <Circle size={12} aria-hidden="true" />}
                         </span>
-                        <span className={checked ? "line-through" : undefined}>{item}</span>
+                        <span className={checked ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioWebtoonProductionCompanion", "en", "line-through") : undefined}>{item}</span>
                       </button>
                     );
                   })}

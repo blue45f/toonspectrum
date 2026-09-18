@@ -1,3 +1,4 @@
+import { resolveUiLocale } from "@/shared/lib/i18n-bilingual-copy";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
 

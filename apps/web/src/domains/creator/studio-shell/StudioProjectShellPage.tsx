@@ -1,4 +1,10 @@
 import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   BookOpen,
   Boxes,
@@ -331,7 +337,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
               <Link
                 key={id}
                 href={projectSectionHref(displayProjectId, id)}
-                aria-current={active ? "page" : undefined}
+                aria-current={active ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectShellPage", "en", "page") : undefined}
                 className={cn(
                   "inline-flex min-h-10 items-center rounded-xl px-3.5 text-sm font-semibold transition-colors",
                   active ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
@@ -369,7 +375,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
               <Link
                 key={view}
                 href={projectViewHref(displayProjectId, section, view, location.search)}
-                aria-current={active ? "page" : undefined}
+                aria-current={active ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectShellPage", "en", "page") : undefined}
                 className={cn(
                   "inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-semibold transition-colors",
                   active
@@ -391,7 +397,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-              {destination.owner === "project-shell" ? "PROJECT OWNED" : "CONNECTED WORKSPACE"}
+              {destination.owner === "project-shell" ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectShellPage", "en", "PROJECT OWNED") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectShellPage", "en", "CONNECTED WORKSPACE")}
             </p>
             <h2 className="mt-1 text-lg font-black text-fg">
               {bt(destination.labelKo, destination.labelEn)}

@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense } from "react";
 
 import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
@@ -29,7 +30,7 @@ export function StudioBg3dProductionIntentPanel() {
   if (!runtime?.sceneSummary) return null;
 
   return (
-    <Suspense fallback={<ProductionPanelLoading label="제작 프리셋 불러오는 중…" />}>
+    <Suspense fallback={<ProductionPanelLoading label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionWorkflowBoundary", "ko", "제작 프리셋 불러오는 중…")} />}>
       <LazyProductionIntentPanel />
     </Suspense>
   );
@@ -41,7 +42,7 @@ export function StudioBg3dProductionWorkflowPanel(props: StudioBg3dProductionWor
   if (!runtime?.sceneSummary) return null;
 
   return (
-    <Suspense fallback={<ProductionPanelLoading label="3D 제작 흐름 불러오는 중…" />}>
+    <Suspense fallback={<ProductionPanelLoading label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dProductionWorkflowBoundary", "ko", "3D 제작 흐름 불러오는 중…")} />}>
       <LazyProductionWorkflowPanel {...props} />
     </Suspense>
   );

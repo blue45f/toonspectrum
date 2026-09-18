@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioColorSlidersPanel.tsx
  *
@@ -63,7 +67,7 @@ export function StudioColorSlidersPanel({
       {/* Color Space Toggle */}
       <div
         role="tablist"
-        aria-label="색상 공간 선택"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "색상 공간 선택")}
         className="flex flex-wrap rounded-xl border border-line/70 bg-raised/50 p-1 backdrop-blur-sm"
       >
         {(["rgb", "hsv", "hsl", "cmyk", "lab"] as const).map((space, index, spaces) => {
@@ -87,13 +91,11 @@ export function StudioColorSlidersPanel({
                 setColorSpace(spaces[next]!);
                 event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
               }}
-              aria-label={`${labels[space]} 슬라이더`}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "{v0} 슬라이더"), { v0: String(labels[space]) })}
               onClick={() => setColorSpace(space)}
-              className={`min-w-12 flex-1 rounded-lg px-1 py-1 text-[0.64rem] font-medium uppercase transition-all ${
-                isActive
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "en", "min-w-12 flex-1 rounded-lg px-1 py-1 text-[0.64rem] font-medium uppercase transition-all {v0}"), { v0: String(isActive
                   ? "bg-card text-accent font-semibold shadow-sm border border-accent/40"
-                  : "text-fg-3 hover:text-fg-1"
-              }`}
+                  : "text-fg-3 hover:text-fg-1") })}
             >
               {labels[space]}
             </button>
@@ -118,7 +120,7 @@ export function StudioColorSlidersPanel({
               min={0}
               max={255}
               value={rgb.r}
-              aria-label="빨강 채널 R"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "빨강 채널 R")}
               onChange={(e) => handleRgbChange("r", Number(e.target.value))}
               className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full shadow-inner"
               style={{
@@ -130,7 +132,7 @@ export function StudioColorSlidersPanel({
               min={0}
               max={255}
               value={rgb.r}
-              aria-label="빨강 수치 입력"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "빨강 수치 입력")}
               onChange={(e) => handleRgbChange("r", Number(e.target.value))}
               className="h-6 w-12 rounded-lg border border-line bg-card text-center font-mono text-xs tabular-nums text-fg focus:border-accent focus:outline-none shadow-sm"
             />
@@ -146,7 +148,7 @@ export function StudioColorSlidersPanel({
               min={0}
               max={255}
               value={rgb.g}
-              aria-label="초록 채널 G"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "초록 채널 G")}
               onChange={(e) => handleRgbChange("g", Number(e.target.value))}
               className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full shadow-inner"
               style={{
@@ -158,7 +160,7 @@ export function StudioColorSlidersPanel({
               min={0}
               max={255}
               value={rgb.g}
-              aria-label="초록 수치 입력"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "초록 수치 입력")}
               onChange={(e) => handleRgbChange("g", Number(e.target.value))}
               className="h-6 w-12 rounded-lg border border-line bg-card text-center font-mono text-xs tabular-nums text-fg focus:border-accent focus:outline-none shadow-sm"
             />
@@ -174,7 +176,7 @@ export function StudioColorSlidersPanel({
               min={0}
               max={255}
               value={rgb.b}
-              aria-label="파랑 채널 B"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "파랑 채널 B")}
               onChange={(e) => handleRgbChange("b", Number(e.target.value))}
               className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full shadow-inner"
               style={{
@@ -186,7 +188,7 @@ export function StudioColorSlidersPanel({
               min={0}
               max={255}
               value={rgb.b}
-              aria-label="파랑 수치 입력"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "파랑 수치 입력")}
               onChange={(e) => handleRgbChange("b", Number(e.target.value))}
               className="h-6 w-12 rounded-lg border border-line bg-card text-center font-mono text-xs tabular-nums text-fg focus:border-accent focus:outline-none shadow-sm"
             />
@@ -207,7 +209,7 @@ export function StudioColorSlidersPanel({
               min={0}
               max={360}
               value={hsv.h}
-              aria-label="색상 H (Hue)"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "색상 H (Hue)")}
               onChange={(e) => handleHsvChange("h", Number(e.target.value))}
               className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full shadow-inner"
               style={{
@@ -230,7 +232,7 @@ export function StudioColorSlidersPanel({
               min={0}
               max={100}
               value={hsv.s}
-              aria-label="채도 S (Saturation)"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "채도 S (Saturation)")}
               onChange={(e) => handleHsvChange("s", Number(e.target.value))}
               className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full shadow-inner"
               style={{
@@ -252,7 +254,7 @@ export function StudioColorSlidersPanel({
               min={0}
               max={100}
               value={hsv.v}
-              aria-label="명도 V (Value/Brightness)"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "명도 V (Value/Brightness)")}
               onChange={(e) => handleHsvChange("v", Number(e.target.value))}
               className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full shadow-inner"
               style={{
@@ -270,7 +272,7 @@ export function StudioColorSlidersPanel({
       {colorSpace === "lab" && (
         <div className="space-y-2.5">
           <div className="flex items-center justify-between text-[0.62rem] text-fg-3 px-0.5">
-            <span>지각 균일 색공간 (CIELAB)</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "지각 균일 색공간 (CIELAB)")}</span>
             <span className="font-mono text-fg-2 font-medium">{formatLabString(lab)}</span>
           </div>
 
@@ -284,7 +286,7 @@ export function StudioColorSlidersPanel({
               min={0}
               max={100}
               value={Math.round(lab.l)}
-              aria-label="CIELAB 명도 L*"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "CIELAB 명도 L*")}
               onChange={(e) => handleLabChange("l", Number(e.target.value))}
               className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full accent-accent shadow-inner"
               style={{
@@ -306,7 +308,7 @@ export function StudioColorSlidersPanel({
               min={-128}
               max={127}
               value={Math.round(lab.a)}
-              aria-label="CIELAB 적녹 a*"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "CIELAB 적녹 a*")}
               onChange={(e) => handleLabChange("a", Number(e.target.value))}
               className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full accent-accent shadow-inner"
               style={{
@@ -328,7 +330,7 @@ export function StudioColorSlidersPanel({
               min={-128}
               max={127}
               value={Math.round(lab.b)}
-              aria-label="CIELAB 황청 b*"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorSlidersPanel", "ko", "CIELAB 황청 b*")}
               onChange={(e) => handleLabChange("b", Number(e.target.value))}
               className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full accent-accent shadow-inner"
               style={{

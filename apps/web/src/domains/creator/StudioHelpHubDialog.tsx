@@ -1,4 +1,11 @@
 import {
+  formatI18nTemplate,
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowLeft,
   BookOpen,
   Bookmark,
@@ -118,7 +125,7 @@ interface HelpHubCopy {
   readonly updatesSeen: string;
 }
 
-const COPY: Readonly<Record<StudioHelpLocale, HelpHubCopy>> = {
+const COPY: Readonly<Record<"ko" | "en", HelpHubCopy>> = {
   ko: {
     title: "도움말 · 배우기",
     subtitle: "지금 하는 작업에 맞춰 찾고, 따라 하고, 문제를 해결하세요.",
@@ -193,7 +200,7 @@ const COPY: Readonly<Record<StudioHelpLocale, HelpHubCopy>> = {
 
 const NAV_ITEMS: readonly {
   readonly id: StudioHelpHubTab;
-  readonly label: Readonly<Record<StudioHelpLocale, string>>;
+  readonly label: Readonly<Record<"ko" | "en", string>>;
   readonly icon: LucideIcon;
 }[] = [
   { id: "home", label: { ko: "홈", en: "Home" }, icon: Home },
@@ -204,7 +211,7 @@ const NAV_ITEMS: readonly {
 ];
 
 const TECHNICAL_SECTION_LABELS: Readonly<
-  Record<Extract<StudioHelpCenterSection, "terminology" | "diagnostics" | "recovery" | "bug-report">, Readonly<Record<StudioHelpLocale, string>>>
+  Record<Extract<StudioHelpCenterSection, "terminology" | "diagnostics" | "recovery" | "bug-report">, Readonly<Record<"ko" | "en", string>>>
 > = {
   terminology: { ko: "용어 사전 열기", en: "Open terminology" },
   diagnostics: { ko: "기기 · 브라우저 진단", en: "Device and browser diagnostics" },
@@ -284,7 +291,7 @@ function ArticleCard({
         aria-pressed={bookmarked}
         className="absolute right-2 top-2 grid size-9 place-items-center rounded-lg text-fg-3 hover:bg-panel hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
       >
-        <Bookmark className={`size-4 ${bookmarked ? "fill-current text-accent" : ""}`} aria-hidden />
+        <Bookmark className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "size-4 {v0}"), { v0: String(bookmarked ? "fill-current text-accent" : "") })} aria-hidden />
       </button>
     </article>
   );
@@ -528,7 +535,7 @@ export function StudioHelpHubDialog({
             aria-pressed={bookmarks.includes(article.id)}
             className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl border border-line px-3 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
-            <Bookmark className={`size-4 ${bookmarks.includes(article.id) ? "fill-current text-accent" : ""}`} aria-hidden />
+            <Bookmark className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "size-4 {v0}"), { v0: String(bookmarks.includes(article.id) ? "fill-current text-accent" : "") })} aria-hidden />
             {bookmarks.includes(article.id) ? copy.removeBookmark : copy.bookmark}
           </button>
         </div>
@@ -582,7 +589,7 @@ export function StudioHelpHubDialog({
             type="button"
             onClick={() => setArticleFeedback(article.id, "yes")}
             aria-pressed={feedback[article.id] === "yes"}
-            className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${feedback[article.id] === "yes" ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-2 hover:bg-raised"}`}
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent {v0}"), { v0: String(feedback[article.id] === "yes" ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-2 hover:bg-raised") })}
           >
             <ThumbsUp className="size-4" aria-hidden />
             {bi("예", "Yes")}
@@ -591,7 +598,7 @@ export function StudioHelpHubDialog({
             type="button"
             onClick={() => setArticleFeedback(article.id, "no")}
             aria-pressed={feedback[article.id] === "no"}
-            className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${feedback[article.id] === "no" ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-2 hover:bg-raised"}`}
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent {v0}"), { v0: String(feedback[article.id] === "no" ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-2 hover:bg-raised") })}
           >
             <ThumbsDown className="size-4" aria-hidden />
             {bi("아니요", "No")}
@@ -826,7 +833,7 @@ export function StudioHelpHubDialog({
                         onChange={() => toggleGuideStep(guide.id, step.id)}
                         className="peer sr-only"
                       />
-                      <span className={`grid size-5 place-items-center rounded-md border ${checked ? "border-accent bg-accent text-on-accent" : "border-line bg-card"}`} aria-hidden>
+                      <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "grid size-5 place-items-center rounded-md border {v0}"), { v0: String(checked ? "border-accent bg-accent text-on-accent" : "border-line bg-card") })} aria-hidden>
                         {checked ? <Check className="size-3.5" /> : null}
                       </span>
                       <span className="sr-only">{studioHelpText(step.label, locale)}</span>
@@ -837,7 +844,7 @@ export function StudioHelpHubDialog({
                       onClick={() => article && openArticle(article)}
                       className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-1.5 py-2 text-left hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                     >
-                      <span className={`truncate text-sm ${checked ? "text-fg-3 line-through" : "font-medium text-fg"}`}>{studioHelpText(step.label, locale)}</span>
+                      <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "truncate text-sm {v0}"), { v0: String(checked ? "text-fg-3 line-through" : "font-medium text-fg") })}>{studioHelpText(step.label, locale)}</span>
                       <ChevronRight className="size-4 shrink-0 text-fg-3" aria-hidden />
                     </button>
                   </li>
@@ -947,7 +954,7 @@ export function StudioHelpHubDialog({
   if (!open) return null;
 
   const content = (
-    <div ref={overlayRef} className={`fixed inset-0 ${STUDIO_Z_CLASS.help} flex items-end justify-center bg-canvas/75 backdrop-blur-sm sm:items-center sm:p-5`}>
+    <div ref={overlayRef} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "fixed inset-0 {v0} flex items-end justify-center bg-canvas/75 backdrop-blur-sm sm:items-center sm:p-5"), { v0: String(STUDIO_Z_CLASS.help) })}>
       <button type="button" tabIndex={-1} aria-label={copy.close} className="absolute inset-0 cursor-default" onClick={onClose} />
       <div
         ref={dialogRef}
@@ -1024,8 +1031,8 @@ export function StudioHelpHubDialog({
                       setActiveTab(item.id);
                       setSelectedArticleId(null);
                     }}
-                    aria-current={active ? "page" : undefined}
-                    className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:w-full ${active ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised"}`}
+                    aria-current={active ? translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "page") : undefined}
+                    className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:w-full {v0}"), { v0: String(active ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised") })}
                   >
                     <Icon className="size-4" aria-hidden />
                     {bi((item.label).ko, (item.label).en)}

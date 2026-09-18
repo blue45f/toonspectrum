@@ -1,3 +1,8 @@
+import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { FolderOpen, HardDrive } from "lucide-react";
 
 import type { StudioProjectLibraryEntry } from "../studio-project-library-store";
@@ -48,7 +53,7 @@ export function StudioProjectLibraryManagementContent({
         busy={busyProjectId !== null}
         continueHref={continueProjectHref(project)}
         overviewHref={projectOverviewHref(project)}
-        storageHref={`/studio?view=storage&project=${encodeURIComponent(project.id)}`}
+        storageHref={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectLibraryManagementContent", "en", "/studio?view=storage&project={v0}"), { v0: String(encodeURIComponent(project.id)) })}
         onToggle={() => setSelection(project.id, !checked)}
         onTouch={() => { library.touch(project.id, project.lastOpenedDocumentId); }}
         onOpenSave={() => setSaveTarget(project)}

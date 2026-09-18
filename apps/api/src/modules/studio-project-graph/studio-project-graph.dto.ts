@@ -4,8 +4,6 @@ import { z } from "zod";
 import {
   artifactKindSchema,
   blobRoleSchema,
-  externalFileProviderSchema,
-  externalFileSyncModeSchema,
   isoTimestampSchema,
   revisionKindSchema,
   reviewAnchorSchema,
@@ -39,9 +37,14 @@ export const StudioArtifactParamsSchema = z
 export class StudioArtifactParamsDto extends createZodDto(StudioArtifactParamsSchema) {}
 
 export const StudioRevisionParamsSchema = z
-  .object({ artifactId: studioEntityIdSchema, revisionId: studioEntityIdSchema })
+  .object({
+    artifactId: studioEntityIdSchema,
+    revisionId: studioEntityIdSchema,
+  })
   .strict();
-export class StudioRevisionParamsDto extends createZodDto(StudioRevisionParamsSchema) {}
+export class StudioRevisionParamsDto extends createZodDto(
+  StudioRevisionParamsSchema,
+) {}
 
 export const StudioReviewParamsSchema = z
   .object({ reviewId: studioEntityIdSchema })
@@ -51,19 +54,14 @@ export class StudioReviewParamsDto extends createZodDto(StudioReviewParamsSchema
 export const StudioReviewCommentParamsSchema = z
   .object({ commentId: studioEntityIdSchema })
   .strict();
-export class StudioReviewCommentParamsDto extends createZodDto(StudioReviewCommentParamsSchema) {}
+export class StudioReviewCommentParamsDto extends createZodDto(
+  StudioReviewCommentParamsSchema,
+) {}
 
 export const StudioReportParamsSchema = z
   .object({ reportId: studioEntityIdSchema })
   .strict();
 export class StudioReportParamsDto extends createZodDto(StudioReportParamsSchema) {}
-
-export const StudioExternalBindingParamsSchema = z
-  .object({ bindingId: studioEntityIdSchema })
-  .strict();
-export class StudioExternalBindingParamsDto extends createZodDto(
-  StudioExternalBindingParamsSchema,
-) {}
 
 export const StudioBlobCommitRefSchema = z
   .object({
@@ -267,10 +265,17 @@ export class CreateStudioReviewCommentDto extends createZodDto(
 
 export const DecideStudioReviewSchema = z
   .object({
-    status: z.enum(["changes-requested", "approved", "rejected", "cancelled"]),
+    status: z.enum([
+      "changes-requested",
+      "approved",
+      "rejected",
+      "cancelled",
+    ]),
   })
   .strict();
-export class DecideStudioReviewDto extends createZodDto(DecideStudioReviewSchema) {}
+export class DecideStudioReviewDto extends createZodDto(
+  DecideStudioReviewSchema,
+) {}
 
 export const ResolveStudioReviewCommentSchema = z
   .object({
@@ -280,77 +285,6 @@ export const ResolveStudioReviewCommentSchema = z
   .strict();
 export class ResolveStudioReviewCommentDto extends createZodDto(
   ResolveStudioReviewCommentSchema,
-) {}
-
-export const CreateStudioExternalFileBindingSchema = z
-  .object({
-    id: studioEntityIdSchema,
-    provider: externalFileProviderSchema,
-    providerAccountId: z.string().trim().min(1).max(512).optional(),
-    remoteFileId: z.string().trim().min(1).max(2_048),
-    displayPath: z.string().trim().min(1).max(4_096),
-    syncMode: externalFileSyncModeSchema,
-  })
-  .strict()
-  .superRefine((binding, context) => {
-    const cloud = binding.provider !== "local-file"
-      && binding.provider !== "filesystem-handle";
-    if (cloud && !binding.providerAccountId) {
-      context.addIssue({
-        code: "custom",
-        path: ["providerAccountId"],
-        message: "cloud binding requires providerAccountId",
-      });
-    }
-    if (!cloud && binding.providerAccountId) {
-      context.addIssue({
-        code: "custom",
-        path: ["providerAccountId"],
-        message: "local binding must not carry a cloud account id",
-      });
-    }
-  });
-export class CreateStudioExternalFileBindingDto extends createZodDto(
-  CreateStudioExternalFileBindingSchema,
-) {}
-
-export const UpdateStudioExternalFileBindingSchema = z
-  .object({
-    displayPath: z.string().trim().min(1).max(4_096).optional(),
-    syncMode: externalFileSyncModeSchema.optional(),
-    remoteVersion: z.string().trim().min(1).max(1_024).nullable().optional(),
-    remoteEtag: z.string().trim().min(1).max(1_024).nullable().optional(),
-    contentHash: sha256Schema.nullable().optional(),
-    lastSyncedRevisionId: studioEntityIdSchema.nullable().optional(),
-    lastSyncedAt: isoTimestampSchema.nullable().optional(),
-  })
-  .strict()
-  .superRefine((binding, context) => {
-    const hasRevision = binding.lastSyncedRevisionId !== undefined;
-    const hasTime = binding.lastSyncedAt !== undefined;
-    if (hasRevision !== hasTime) {
-      context.addIssue({
-        code: "custom",
-        path: ["lastSyncedRevisionId"],
-        message: "sync revision and timestamp must be updated together",
-      });
-    }
-    if (
-      hasRevision
-      && ((binding.lastSyncedRevisionId === null) !== (binding.lastSyncedAt === null))
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["lastSyncedAt"],
-        message: "sync revision and timestamp must both be set or both be cleared",
-      });
-    }
-  })
-  .refine((binding) => Object.keys(binding).length > 0, {
-    message: "at least one binding field must be updated",
-  });
-export class UpdateStudioExternalFileBindingDto extends createZodDto(
-  UpdateStudioExternalFileBindingSchema,
 ) {}
 
 export const CreateCompatibilityReportSchema = z
@@ -383,9 +317,3 @@ export type DecideStudioReview = z.infer<typeof DecideStudioReviewSchema>;
 export type ResolveStudioReviewComment = z.infer<typeof ResolveStudioReviewCommentSchema>;
 export type CreateStudioReviewComment = z.infer<typeof CreateStudioReviewCommentSchema>;
 export type CreateCompatibilityReport = z.infer<typeof CreateCompatibilityReportSchema>;
-export type CreateStudioExternalFileBinding = z.infer<
-  typeof CreateStudioExternalFileBindingSchema
->;
-export type UpdateStudioExternalFileBinding = z.infer<
-  typeof UpdateStudioExternalFileBindingSchema
->;

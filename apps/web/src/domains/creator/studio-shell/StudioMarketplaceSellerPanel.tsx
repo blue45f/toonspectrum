@@ -1,4 +1,9 @@
 import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   CheckCircle2,
   CircleAlert,
   FileCheck2,
@@ -192,8 +197,7 @@ export function StudioMarketplaceSellerPanel({
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            <Store size={14} aria-hidden="true" /> SELLER CENTER
-          </p>
+            <Store size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioMarketplaceSellerPanel", "en", "SELLER CENTER")}</p>
           <h2 id="seller-panel-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
             {bt("파일부터 권리·심사까지 한 번에", "From files to rights and review")}
           </h2>
@@ -248,10 +252,10 @@ export function StudioMarketplaceSellerPanel({
             <label className="text-xs font-black text-fg-2">
               {bt("라이선스", "License")}
               <select disabled={!editable} value={submission.licenseId} onChange={(event) => patch("licenseId", event.target.value)} className={FIELD_CLASS}>
-                <option value="commercial-standard">Commercial Standard</option>
-                <option value="commercial-extended">Commercial Extended</option>
-                <option value="editorial-only">Editorial only</option>
-                <option value="custom">Custom</option>
+                <option value="commercial-standard">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioMarketplaceSellerPanel", "en", "Commercial Standard")}</option>
+                <option value="commercial-extended">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioMarketplaceSellerPanel", "en", "Commercial Extended")}</option>
+                <option value="editorial-only">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioMarketplaceSellerPanel", "en", "Editorial only")}</option>
+                <option value="custom">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioMarketplaceSellerPanel", "en", "Custom")}</option>
               </select>
             </label>
             <label className="text-xs font-black text-fg-2">

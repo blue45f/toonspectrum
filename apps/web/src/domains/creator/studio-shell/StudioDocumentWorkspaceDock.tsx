@@ -1,3 +1,7 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { PanelRightOpen, X } from "lucide-react";
 import { Suspense, useEffect, useId, useMemo, useRef, useState } from "react";
 

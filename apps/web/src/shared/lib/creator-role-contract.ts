@@ -30,7 +30,7 @@ export const CREATOR_ROLE_IDS = [
 export type CreatorRoleId = (typeof CREATOR_ROLE_IDS)[number];
 export type CreatorRoleGroup = "story" | "art" | "support" | "production";
 export type CreatorRoleLens = "story" | "art" | "producer";
-export type CreatorRoleLocale = "ko" | "en";
+export type CreatorRoleLocale = string;
 
 export const CREATOR_STAGE_IDS = [
   "student",

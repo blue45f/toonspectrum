@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /* eslint-disable react-refresh/only-export-components -- Pure visual-summary helpers are the preview renderer's canonical contract. */
 import { useId, type ReactNode } from "react";
 
@@ -404,7 +405,7 @@ export function StudioVrmAvatarForgePreview({
   return (
     <svg
       aria-label={accessibleLabel}
-      className={`${svgHeightClass} w-full overflow-visible ${className}`}
+      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePreview", "en", "{v0} w-full overflow-visible {v1}"), { v0: String(svgHeightClass), v1: String(className) })}
       data-forge-preview="true"
       data-hair-style={safe.hair.style}
       data-bang-style={safe.hair.bangStyle}
@@ -434,7 +435,7 @@ export function StudioVrmAvatarForgePreview({
         </filter>
       </defs>
 
-      <rect fill={`url(#${backgroundGradientId})`} height="196" rx="18" width="156" x="2" y="2" />
+      <rect fill={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePreview", "en", "url(#{v0})"), { v0: String(backgroundGradientId) })} height="196" rx="18" width="156" x="2" y="2" />
       <path d="M24 184c8-22 25-35 56-35s48 13 56 35v12H24Z" fill="var(--color-raised, #ddd1c7)" />
       {showBody ? (
         <g>
@@ -445,7 +446,7 @@ export function StudioVrmAvatarForgePreview({
             strokeLinejoin="round"
             strokeWidth="2"
           />
-          <path d={`M67 143v${Math.min(18, legHeight * 0.3)}h26v-${Math.min(18, legHeight * 0.3)}Z`} fill={`url(#${skinGradientId})`} />
+          <path d={`M67 143v${Math.min(18, legHeight * 0.3)}h26v-${Math.min(18, legHeight * 0.3)}Z`} fill={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePreview", "en", "url(#{v0})"), { v0: String(skinGradientId) })} />
         </g>
       ) : null}
 
@@ -465,7 +466,7 @@ export function StudioVrmAvatarForgePreview({
       <ellipse
         cx={headCx - headWidth * 0.52}
         cy={headCy + 3}
-        fill={`url(#${skinGradientId})`}
+        fill={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePreview", "en", "url(#{v0})"), { v0: String(skinGradientId) })}
         rx="5.5"
         ry="11"
         stroke="#b98772"
@@ -474,7 +475,7 @@ export function StudioVrmAvatarForgePreview({
       <ellipse
         cx={headCx + headWidth * 0.52}
         cy={headCy + 3}
-        fill={`url(#${skinGradientId})`}
+        fill={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePreview", "en", "url(#{v0})"), { v0: String(skinGradientId) })}
         rx="5.5"
         ry="11"
         stroke="#b98772"
@@ -483,7 +484,7 @@ export function StudioVrmAvatarForgePreview({
       <ellipse
         cx={headCx}
         cy={headCy}
-        fill={`url(#${skinGradientId})`}
+        fill={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarForgePreview", "en", "url(#{v0})"), { v0: String(skinGradientId) })}
         rx={headWidth / 2}
         ry={headHeight / 2}
         stroke="#9f6f5d"

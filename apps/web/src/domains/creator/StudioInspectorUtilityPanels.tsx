@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ChevronDown,
   ChevronUp,
   LayoutGrid,
@@ -42,7 +46,7 @@ export function StudioInspectorDisabledReasons({
       aria-live="polite"
       className="rounded-xl border border-bad/35 bg-bad/10 px-3 py-2 text-[0.64rem] leading-relaxed text-bad"
     >
-      <p className="font-semibold">우측 메뉴가 잠긴 이유</p>
+      <p className="font-semibold">{translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "우측 메뉴가 잠긴 이유")}</p>
       <ul className="mt-1 list-disc space-y-0.5 pl-4">
         {reasons.map((reason) => (
           <li key={reason}>{reason}</li>
@@ -77,7 +81,7 @@ export function StudioInspectorCurrentBrushSummary({
 }) {
   return (
     <section
-      aria-label="현재 기본 프리셋 요약"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "현재 기본 프리셋 요약")}
       data-studio-inspector-brush-summary="true"
       className="space-y-1.5"
     >
@@ -91,12 +95,11 @@ export function StudioInspectorCurrentBrushSummary({
         strokeWidth={strokeWidth}
         tipAngle={tipAngle}
         tipRoundness={tipRoundness}
-        label="현재 기본 프리셋"
+        label={translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "현재 기본 프리셋")}
       />
       <div className="flex items-center justify-between gap-2 px-1">
         <p className="min-w-0 text-[0.62rem] leading-relaxed text-fg-3">
-          하단 빠른 바와 같은 브러시 목록을 사용합니다. 선화·번짐·에어 모두 크기·농도·색 조작은 같습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "하단 빠른 바와 같은 브러시 목록을 사용합니다. 선화·번짐·에어 모두 크기·농도·색 조작은 같습니다.")}</p>
         {onOpenBrushCatalog ? (
           <button
             type="button"
@@ -105,8 +108,7 @@ export function StudioInspectorCurrentBrushSummary({
             className="hidden min-h-9 shrink-0 items-center gap-1 rounded-md border border-line bg-card px-2 text-[0.62rem] font-semibold text-fg-2 transition-colors hover:border-accent/40 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:inline-flex"
           >
             <LayoutGrid size={13} aria-hidden />
-            기본 브러시
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "기본 브러시")}</button>
         ) : null}
       </div>
     </section>
@@ -128,8 +130,7 @@ export function StudioInspectorBrushCatalogButton({
       className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
     >
       <LayoutGrid size={14} aria-hidden />
-      브러시 목록
-    </button>
+      {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "브러시 목록")}</button>
   );
 }
 
@@ -165,7 +166,7 @@ export function StudioInspectorDrawColorControls({
     <div className="space-y-1.5 border-t border-line/35 pt-1.5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-          <p className="text-[0.66rem] font-medium text-fg-3 mr-0.5">색상</p>
+          <p className="text-[0.66rem] font-medium text-fg-3 mr-0.5">{translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "색상")}</p>
           <button
             type="button"
             onClick={() =>
@@ -177,10 +178,9 @@ export function StudioInspectorDrawColorControls({
                 ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/40"
                 : "text-fg-4 hover:text-fg-2 border-line/40 hover:bg-raised",
             )}
-            title="클립스튜디오 4코너 중간색 그리드 팔레트 열기"
+            title={translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "클립스튜디오 4코너 중간색 그리드 팔레트 열기")}
           >
-            중간색 (CSP)
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "중간색 (CSP)")}</button>
           <button
             type="button"
             onClick={() =>
@@ -192,10 +192,9 @@ export function StudioInspectorDrawColorControls({
                 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
                 : "text-fg-4 hover:text-fg-2 border-line/40 hover:bg-raised",
             )}
-            title="클립스튜디오 근사색 팔레트 열기"
+            title={translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "클립스튜디오 근사색 팔레트 열기")}
           >
-            근사색 (CSP)
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "근사색 (CSP)")}</button>
           <button
             type="button"
             onClick={() => {
@@ -208,10 +207,9 @@ export function StudioInspectorDrawColorControls({
                 ? "bg-violet-500/20 text-violet-300 border-violet-500/40"
                 : "text-fg-4 hover:text-fg-2 border-line/40 hover:bg-raised",
             )}
-            title="클립스튜디오 컬러 히스토리 팔레트 열기"
+            title={translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "클립스튜디오 컬러 히스토리 팔레트 열기")}
           >
-            히스토리 (CSP)
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "히스토리 (CSP)")}</button>
         </div>
         <button
           type="button"
@@ -219,10 +217,10 @@ export function StudioInspectorDrawColorControls({
           aria-pressed={eyedropperActive}
           aria-label={
             eyedropperActive
-              ? "스포이드 끄기"
-              : "스포이드로 캔버스 색상 선택"
+              ? translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "스포이드 끄기")
+              : translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "스포이드로 캔버스 색상 선택")
           }
-          title="스포이드 — 캔버스를 클릭해 그 지점의 색을 그대로 가져와요 (펜 도구 중엔 Alt+클릭으로도 가능)"
+          title={translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "스포이드 — 캔버스를 클릭해 그 지점의 색을 그대로 가져와요 (펜 도구 중엔 Alt+클릭으로도 가능)")}
           className={cn(
             "grid size-11 place-items-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:size-5 lg:rounded",
             eyedropperActive
@@ -242,7 +240,7 @@ export function StudioInspectorDrawColorControls({
             aria-pressed={color.toLowerCase() === swatch.toLowerCase()}
             className="group grid size-11 place-items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:size-5 lg:rounded"
             title={swatch}
-            aria-label={`${swatch} 색상 선택`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "{v0} 색상 선택"), { v0: String(swatch) })}
           >
             <span
               aria-hidden
@@ -258,14 +256,14 @@ export function StudioInspectorDrawColorControls({
         ))}
         <label
           className="relative grid size-11 cursor-pointer place-items-center rounded-lg focus-within:ring-2 focus-within:ring-accent lg:size-5 lg:rounded"
-          title="사용자 정의 색상"
+          title={translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "사용자 정의 색상")}
         >
           <input
             type="color"
             value={color}
             onChange={(event) => selectColor(event.target.value)}
             className="absolute inset-0 size-full cursor-pointer opacity-0"
-            aria-label="사용자 정의 색상 선택"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "사용자 정의 색상 선택")}
           />
           <span
             aria-hidden
@@ -334,8 +332,7 @@ export function StudioInspectorMutationLockNotice({
           className: "shrink-0",
         })}
       >
-        활성 도구 종료
-      </button>
+        {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "활성 도구 종료")}</button>
     </div>
   );
 }
@@ -371,7 +368,7 @@ export function StudioInspectorPageGradeSurface({
     <div
       id={panelId}
       role="tabpanel"
-      aria-label={panelLabelledBy ? undefined : "페이지 색보정"}
+      aria-label={panelLabelledBy ? undefined : translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "페이지 색보정")}
       aria-labelledby={panelLabelledBy}
       hidden={!active}
       className="rounded-xl border border-line bg-panel/40 p-3"
@@ -385,20 +382,20 @@ export function StudioInspectorPageGradeSurface({
               aria-expanded={true}
               aria-controls={contentId}
               className="inline-flex items-center gap-0.5 rounded text-[0.68rem] text-fg-3 transition-colors hover:text-fg"
-              title="색보정 패널 접기"
+              title={translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "색보정 패널 접기")}
             >
-              접기 <ChevronUp size={13} aria-hidden />
+              {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "접기 ")}<ChevronUp size={13} aria-hidden />
             </button>
           </div>
           <div id={contentId}>
-            <Suspense fallback={<StudioPanelLoading label="색보정 패널을 여는 중..." />}>
+            <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "색보정 패널을 여는 중...")} />}>
               <fieldset
                 disabled={gate.disabled}
                 aria-disabled={gate.disabled}
                 title={gate.reason}
                 className="m-0 min-w-0 border-0 p-0 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50 disabled:[&_input]:cursor-not-allowed disabled:[&_input]:opacity-55"
               >
-                <legend className="sr-only">페이지 색보정 설정</legend>
+                <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "페이지 색보정 설정")}</legend>
                 <StudioPageGradePanel
                   grade={grade}
                   onPatch={onPatch}
@@ -420,10 +417,9 @@ export function StudioInspectorPageGradeSurface({
           >
             <span className="min-w-0">
               <span className="block text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
-                페이지 색보정
-              </span>
+                {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "페이지 색보정")}</span>
               <span className="mt-0.5 block text-xs text-fg-2">
-                {gradeActive ? "보정 적용됨" : "무드 프리셋·밝기·대비"}
+                {gradeActive ? translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "보정 적용됨") : translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "무드 프리셋·밝기·대비")}
               </span>
             </span>
             <ChevronDown size={14} aria-hidden className="shrink-0 text-fg-3" />
@@ -445,29 +441,23 @@ export function StudioInspectorEmptySelection({
   return (
     <div
       role="tabpanel"
-      aria-label="선택 요소 속성"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "선택 요소 속성")}
       className="rounded-xl border border-line bg-panel/40 px-4 py-8 text-center"
     >
       <div className="mx-auto mb-2 grid size-11 place-items-center rounded-xl border border-line bg-card text-fg-3">
         <MousePointer2 size={20} aria-hidden />
       </div>
       <p className="text-pretty text-xs font-semibold text-fg-2">
-        편집할 요소를 선택하세요
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "편집할 요소를 선택하세요")}</p>
       <p className="mx-auto mt-1.5 max-w-[30ch] text-pretty text-[0.68rem] leading-relaxed text-fg-3">
-        캔버스에서 프레임·말풍선·획을 고르면 여기에 기본·전문 설정이 나타납니다. 펜 도구(B)로
-        바로 그릴 수도 있어요.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "캔버스에서 프레임·말풍선·획을 고르면 여기에 기본·전문 설정이 나타납니다. 펜 도구(B)로 바로 그릴 수도 있어요.")}</p>
       <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-[0.62rem] text-fg-3">
         <span className="rounded-full border border-line bg-card px-2 py-1 font-semibold">
-          레이어 탭 · 순서
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "레이어 탭 · 순서")}</span>
         <span className="rounded-full border border-line bg-card px-2 py-1 font-semibold">
-          검색 · 채우기/마스크
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "검색 · 채우기/마스크")}</span>
         <span className="rounded-full border border-line bg-card px-2 py-1 font-semibold">
-          게시 · 내보내기
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "게시 · 내보내기")}</span>
       </div>
     </div>
   );
@@ -536,7 +526,7 @@ export function StudioInspectorPublishPanel({
     <form
       id={panelId}
       role="tabpanel"
-      aria-label={panelLabelledBy ? undefined : "작품 정보"}
+      aria-label={panelLabelledBy ? undefined : translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "작품 정보")}
       aria-labelledby={panelLabelledBy}
       hidden={!active}
       className="rounded-xl border border-line bg-panel/40 p-3"
@@ -553,16 +543,14 @@ export function StudioInspectorPublishPanel({
         onContinuePendingSave();
       }}
     >
-      <p className="text-xs font-semibold text-fg">작품 정보</p>
+      <p className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "작품 정보")}</p>
       <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
-        초안 저장과 게시에 함께 쓰는 기본 정보입니다.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "초안 저장과 게시에 함께 쓰는 기본 정보입니다.")}</p>
       <label
         htmlFor={titleId}
         className="mt-3 block text-[0.7rem] font-semibold text-fg-2"
       >
-        작품 제목 (필수)
-      </label>
+        {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "작품 제목 (필수)")}</label>
       <input
         id={titleId}
         ref={titleInputRef}
@@ -571,7 +559,7 @@ export function StudioInspectorPublishPanel({
         aria-describedby={titleHelpId}
         aria-invalid={titleInvalid || undefined}
         aria-required="true"
-        placeholder="작품 제목"
+        placeholder={translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "작품 제목")}
         required
         maxLength={STUDIO_WORK_TITLE_MAX_LENGTH}
         spellCheck
@@ -583,27 +571,25 @@ export function StudioInspectorPublishPanel({
         className={cn("mt-1 text-[0.62rem]", titleOverLength ? "text-bad" : "text-fg-3")}
       >
         {titleOverLength
-          ? `${title.length}/${STUDIO_WORK_TITLE_MAX_LENGTH}자 · ${STUDIO_WORK_TITLE_MAX_LENGTH}자 이하로 줄여 주세요.`
-          : `초안 저장과 게시에 공통으로 사용됩니다. ${title.length}/${STUDIO_WORK_TITLE_MAX_LENGTH}자`}
+          ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "{v0}/{v1}자 · {v2}자 이하로 줄여 주세요."), { v0: String(title.length), v1: String(STUDIO_WORK_TITLE_MAX_LENGTH), v2: String(STUDIO_WORK_TITLE_MAX_LENGTH) })
+          : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "초안 저장과 게시에 공통으로 사용됩니다. {v0}/{v1}자"), { v0: String(title.length), v1: String(STUDIO_WORK_TITLE_MAX_LENGTH) })}
       </p>
 
       <fieldset className="mt-3 border-t border-line/70 pt-3">
         <legend className="pr-2 text-[0.7rem] font-semibold text-fg-2">
-          게시용 정보 (선택)
-        </legend>
+          {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "게시용 정보 (선택)")}</legend>
         <label
           htmlFor={descriptionId}
           className="mt-1 block text-[0.68rem] font-medium text-fg-2"
         >
-          게시용 설명
-        </label>
+          {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "게시용 설명")}</label>
         <textarea
           id={descriptionId}
           value={description}
           onChange={(event) => onDescriptionChange(event.target.value)}
           aria-describedby={descriptionHelpId}
           aria-invalid={descriptionOverLength || undefined}
-          placeholder="작품을 소개해 주세요."
+          placeholder={translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "작품을 소개해 주세요.")}
           maxLength={STUDIO_WORK_DESCRIPTION_MAX_LENGTH}
           spellCheck
           rows={3}
@@ -617,23 +603,21 @@ export function StudioInspectorPublishPanel({
             descriptionOverLength ? "text-bad" : "text-fg-3",
           )}
         >
-          {description.length.toLocaleString("ko-KR")}/{STUDIO_WORK_DESCRIPTION_MAX_LENGTH.toLocaleString("ko-KR")}자
-          {descriptionOverLength ? " · 입력 제한 이하로 줄여 주세요." : null}
+          {description.length.toLocaleString("ko-KR")}/{STUDIO_WORK_DESCRIPTION_MAX_LENGTH.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "자")}{descriptionOverLength ? translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", " · 입력 제한 이하로 줄여 주세요.") : null}
         </p>
 
         <label
           htmlFor={tagsId}
           className="mt-2 block text-[0.68rem] font-medium text-fg-2"
         >
-          게시용 태그
-        </label>
+          {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "게시용 태그")}</label>
         <input
           id={tagsId}
           value={tags}
           onChange={(event) => onTagsChange(event.target.value)}
           aria-describedby={tagsHelpId}
           aria-invalid={tagsInvalid || undefined}
-          placeholder="로맨스, 일상"
+          placeholder={translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "로맨스, 일상")}
           readOnly={readOnly}
           className="mt-1 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent read-only:cursor-default read-only:text-fg-2"
         />
@@ -642,18 +626,17 @@ export function StudioInspectorPublishPanel({
           className={cn("mt-1 text-[0.62rem]", tagsInvalid ? "text-bad" : "text-fg-3")}
         >
           {tagsOverCount
-            ? `${parsedTags.length}개 입력됨 · 최대 ${STUDIO_WORK_TAG_MAX_COUNT}개까지 입력할 수 있어요.`
+            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "{v0}개 입력됨 · 최대 {v1}개까지 입력할 수 있어요."), { v0: String(parsedTags.length), v1: String(STUDIO_WORK_TAG_MAX_COUNT) })
             : tagsOverLength
-              ? `태그 하나는 ${STUDIO_WORK_TAG_MAX_LENGTH}자 이하여야 합니다.`
-              : `최대 ${STUDIO_WORK_TAG_MAX_COUNT}개 · 태그당 ${STUDIO_WORK_TAG_MAX_LENGTH}자 · 쉼표 또는 공백으로 구분`}
+              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "태그 하나는 {v0}자 이하여야 합니다."), { v0: String(STUDIO_WORK_TAG_MAX_LENGTH) })
+              : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "최대 {v0}개 · 태그당 {v1}자 · 쉼표 또는 공백으로 구분"), { v0: String(STUDIO_WORK_TAG_MAX_COUNT), v1: String(STUDIO_WORK_TAG_MAX_LENGTH) })}
         </p>
       </fieldset>
 
       {pendingSaveIntent ? (
         <div className="mt-3 rounded-lg border border-accent/35 bg-accent-soft/45 p-2.5">
           <p className="text-[0.65rem] leading-relaxed text-fg-2">
-            필수 정보와 입력 제한을 확인하면 요청한 저장 흐름을 여기서 바로 이어갈 수 있어요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "필수 정보와 입력 제한을 확인하면 요청한 저장 흐름을 여기서 바로 이어갈 수 있어요.")}</p>
           <button
             type="submit"
             disabled={
@@ -670,7 +653,7 @@ export function StudioInspectorPublishPanel({
               className: "mt-2 w-full pointer-coarse:min-h-11",
             })}
           >
-            {saving ? "저장 중…" : continueLabel}
+            {saving ? translateCurrentStaticSourceText("domains.creator.StudioInspectorUtilityPanels", "ko", "저장 중…") : continueLabel}
           </button>
         </div>
       ) : null}

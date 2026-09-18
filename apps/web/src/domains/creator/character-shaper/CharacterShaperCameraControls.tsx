@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import { STUDIO_VRM_INSPECTION_VIEWS } from "../vrm/studio-vrm-inspection-framing";
 import { CAMERA_PRESETS } from "../vrm/studio-vrm-poser-catalogs";
@@ -18,7 +22,7 @@ export function CharacterShaperCameraControls({ h, compact }: Pick<CharacterShap
     .filter((preset): preset is (typeof CAMERA_PRESETS)[number] => preset !== null);
   const controls = (
     <>
-      <div role="group" aria-label="카메라 프리셋"
+      <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperCameraControls", "ko", "카메라 프리셋")}
         className={cn(
           "pointer-events-auto flex gap-1 overflow-x-auto rounded-2xl border border-line/60 bg-panel/80 p-1 backdrop-blur",
           "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
@@ -26,7 +30,7 @@ export function CharacterShaperCameraControls({ h, compact }: Pick<CharacterShap
         )}>
         {presets.map((preset) => (
           <button key={preset.id} type="button" aria-pressed={preset.id === activeCameraId}
-            disabled={disabled} title={`카메라: ${preset.label}`}
+            disabled={disabled} title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperCameraControls", "ko", "카메라: {v0}"), { v0: String(preset.label) })}
             onClick={() => h.setActiveCameraId(preset.id)}
             className={cn(
               "min-h-11 shrink-0 rounded-xl px-3 text-[0.72rem] font-semibold transition-colors motion-reduce:transition-none",
@@ -36,8 +40,8 @@ export function CharacterShaperCameraControls({ h, compact }: Pick<CharacterShap
             )}>{preset.label}</button>
         ))}
       </div>
-      <select aria-label="부위·방향 확대 검사"
-        title="측면·후면과 착장 접점을 확대합니다. 드래그로 자유롭게 회전할 수 있습니다."
+      <select aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperCameraControls", "ko", "부위·방향 확대 검사")}
+        title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperCameraControls", "ko", "측면·후면과 착장 접점을 확대합니다. 드래그로 자유롭게 회전할 수 있습니다.")}
         disabled={disabled}
         value={STUDIO_VRM_INSPECTION_VIEWS.some((view) => view.id === activeCameraId) ? activeCameraId : ""}
         onChange={(event) => { if (event.target.value) h.setActiveCameraId(event.target.value); }}
@@ -47,7 +51,7 @@ export function CharacterShaperCameraControls({ h, compact }: Pick<CharacterShap
           "disabled:cursor-not-allowed disabled:opacity-40",
           STUDIO_FOCUS_RING,
         )}>
-        <option value="" disabled>부위·방향 확대 검사</option>
+        <option value="" disabled>{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperCameraControls", "ko", "부위·방향 확대 검사")}</option>
         {STUDIO_VRM_INSPECTION_VIEWS.map((view) => <option key={view.id} value={view.id}>{view.label}</option>)}
       </select>
     </>

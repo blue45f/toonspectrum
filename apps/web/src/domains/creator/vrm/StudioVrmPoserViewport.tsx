@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
   type PropInstance,
   type StudioVrmTexturePaintPanelSettings,
@@ -235,8 +238,8 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
               >
                 <p id={viewportInstructionsId} className="sr-only">
                   {texturePaintModeSelected
-                    ? "3D 캐릭터 표면 페인트 모드입니다. 캐릭터 회전은 잠겨 있습니다. B로 직접 그리기, F로 ColorDrop, I로 스포이드를 선택합니다. 직접 그리기는 검증된 round 촉으로 UV 경계를 안전하게 나누고, 한 번의 제스처를 하나의 실행 취소 단계로 저장합니다."
-                    : "3D 캐릭터 편집 뷰포트입니다. 관절 원을 끌면 해당 부위를 직접 회전하고 손·발 마름모를 끌면 IK 목표를 이동합니다. 우클릭 또는 터치 길게 누르기로 관절을 잠그며, 빈 공간 드래그와 휠·핀치로 시점을 조절하세요."}
+                    ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "3D 캐릭터 표면 페인트 모드입니다. 캐릭터 회전은 잠겨 있습니다. B로 직접 그리기, F로 ColorDrop, I로 스포이드를 선택합니다. 직접 그리기는 검증된 round 촉으로 UV 경계를 안전하게 나누고, 한 번의 제스처를 하나의 실행 취소 단계로 저장합니다.")
+                    : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "3D 캐릭터 편집 뷰포트입니다. 관절 원을 끌면 해당 부위를 직접 회전하고 손·발 마름모를 끌면 IK 목표를 이동합니다. 우클릭 또는 터치 길게 누르기로 관절을 잠그며, 빈 공간 드래그와 휠·핀치로 시점을 조절하세요.")}
                 </p>
                 <Canvas
                   role="group"
@@ -244,8 +247,8 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                   aria-keyshortcuts="B F I"
                   aria-label={
                     texturePaintModeSelected
-                      ? "3D 캐릭터 표면 페인트 뷰포트"
-                      : "3D 캐릭터 편집 뷰포트"
+                      ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "3D 캐릭터 표면 페인트 뷰포트")
+                      : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "3D 캐릭터 편집 뷰포트")
                   }
                   aria-describedby={viewportInstructionsId}
                   onKeyDown={(event) => {
@@ -514,16 +517,16 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                         disabled={!viewportCanUndo}
                         unavailableReason={
                           texturePaintStrokeActive
-                            ? "표면 페인트 획을 마친 뒤 실행 취소할 수 있습니다."
+                            ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "표면 페인트 획을 마친 뒤 실행 취소할 수 있습니다.")
                             : !viewportCanUndo
-                              ? "되돌릴 캐릭터 변경이 없습니다."
+                              ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "되돌릴 캐릭터 변경이 없습니다.")
                               : undefined
                         }
                         preferredSide="right"
                       >
                         <button
                           type="button"
-                          aria-label="실행 취소"
+                          aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "실행 취소")}
                           disabled={!viewportCanUndo}
                           className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
                           onClick={doUndo}
@@ -536,16 +539,16 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                         disabled={!viewportCanRedo}
                         unavailableReason={
                           texturePaintStrokeActive
-                            ? "표면 페인트 획을 마친 뒤 다시 실행할 수 있습니다."
+                            ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "표면 페인트 획을 마친 뒤 다시 실행할 수 있습니다.")
                             : !viewportCanRedo
-                              ? "다시 적용할 캐릭터 변경이 없습니다."
+                              ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "다시 적용할 캐릭터 변경이 없습니다.")
                               : undefined
                         }
                         preferredSide="right"
                       >
                         <button
                           type="button"
-                          aria-label="다시 실행"
+                          aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "다시 실행")}
                           disabled={!viewportCanRedo}
                           className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
                           onClick={doRedo}
@@ -558,30 +561,30 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                       <StudioToolHintTarget
                         hint={VRM_VIEWPORT_HINTS.zoomIn}
                         disabled={viewportCameraInteractionLocked}
-                        unavailableReason={viewportCameraInteractionLocked ? "3D 캡처 중에는 카메라를 고정합니다." : undefined}
+                        unavailableReason={viewportCameraInteractionLocked ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "3D 캡처 중에는 카메라를 고정합니다.") : undefined}
                         preferredSide="left"
                       >
-                        <button type="button" aria-label="확대" disabled={viewportCameraInteractionLocked} className={VIEWPORT_BTN} onClick={() => zoomViewport(0.82)}>
+                        <button type="button" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "확대")} disabled={viewportCameraInteractionLocked} className={VIEWPORT_BTN} onClick={() => zoomViewport(0.82)}>
                           <ZoomIn size={16} aria-hidden />
                         </button>
                       </StudioToolHintTarget>
                       <StudioToolHintTarget
                         hint={VRM_VIEWPORT_HINTS.zoomOut}
                         disabled={viewportCameraInteractionLocked}
-                        unavailableReason={viewportCameraInteractionLocked ? "3D 캡처 중에는 카메라를 고정합니다." : undefined}
+                        unavailableReason={viewportCameraInteractionLocked ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "3D 캡처 중에는 카메라를 고정합니다.") : undefined}
                         preferredSide="left"
                       >
-                        <button type="button" aria-label="축소" disabled={viewportCameraInteractionLocked} className={VIEWPORT_BTN} onClick={() => zoomViewport(1.22)}>
+                        <button type="button" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "축소")} disabled={viewportCameraInteractionLocked} className={VIEWPORT_BTN} onClick={() => zoomViewport(1.22)}>
                           <ZoomOut size={16} aria-hidden />
                         </button>
                       </StudioToolHintTarget>
                       <StudioToolHintTarget
                         hint={VRM_VIEWPORT_HINTS.resetView}
                         disabled={viewportCameraInteractionLocked}
-                        unavailableReason={viewportCameraInteractionLocked ? "3D 캡처 중에는 카메라를 고정합니다." : undefined}
+                        unavailableReason={viewportCameraInteractionLocked ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "3D 캡처 중에는 카메라를 고정합니다.") : undefined}
                         preferredSide="left"
                       >
-                        <button type="button" aria-label="시점 초기화" disabled={viewportCameraInteractionLocked} className={VIEWPORT_BTN} onClick={handleViewReset}>
+                        <button type="button" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "시점 초기화")} disabled={viewportCameraInteractionLocked} className={VIEWPORT_BTN} onClick={handleViewReset}>
                           <Maximize2 size={16} aria-hidden />
                         </button>
                       </StudioToolHintTarget>
@@ -590,16 +593,16 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                         disabled={texturePaintModeSelected || viewportCameraInteractionLocked}
                         unavailableReason={
                           viewportCameraInteractionLocked
-                            ? "3D 캡처 중에는 카메라를 고정합니다."
+                            ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "3D 캡처 중에는 카메라를 고정합니다.")
                           : texturePaintModeSelected
-                            ? "표면 페인트 중에는 캐릭터가 움직이지 않도록 턴테이블을 잠급니다."
+                            ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "표면 페인트 중에는 캐릭터가 움직이지 않도록 턴테이블을 잠급니다.")
                             : undefined
                         }
                         preferredSide="left"
                       >
                         <button
                           type="button"
-                          aria-label={turntable ? "턴테이블 회전 중지" : "턴테이블 회전 시작"}
+                          aria-label={turntable ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "턴테이블 회전 중지") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "턴테이블 회전 시작")}
                           aria-pressed={turntable}
                           disabled={texturePaintModeSelected || viewportCameraInteractionLocked}
                           className={cx(
@@ -612,7 +615,7 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                             setViewportHinted(true);
                           }}
                         >
-                          <RotateCw size={16} aria-hidden className={turntable ? "animate-spin [animation-duration:3s]" : ""} />
+                          <RotateCw size={16} aria-hidden className={turntable ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "en", "animate-spin [animation-duration:3s]") : ""} />
                         </button>
                       </StudioToolHintTarget>
                     </div>
@@ -627,10 +630,10 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                           )}
                         >
                           {texturePaintModeSelected
-                            ? "표면 칠하기 · 회전 잠김 · 휠·핀치 또는 우측 줌 버튼"
+                            ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "표면 칠하기 · 회전 잠김 · 휠·핀치 또는 우측 줌 버튼")
                             : activePanelTab === "pose" && jointHandlesVisible
-                              ? "관절 원 드래그: 회전 · 손발 마름모: IK · 우클릭/길게: 잠금"
-                              : "빈 공간 드래그: 시점 회전 · 휠·핀치: 확대/축소"}
+                              ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "관절 원 드래그: 회전 · 손발 마름모: IK · 우클릭/길게: 잠금")
+                              : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "빈 공간 드래그: 시점 회전 · 휠·핀치: 확대/축소")}
                         </span>
                       </div>
                     ) : null}
@@ -643,10 +646,9 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                       <div className="mx-auto grid size-12 place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent">
                         <Upload size={22} aria-hidden />
                       </div>
-                      <p className="mt-4 text-sm font-bold text-fg">VRM 모델을 불러와 장면을 시작하세요.</p>
+                      <p className="mt-4 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "VRM 모델을 불러와 장면을 시작하세요.")}</p>
                       <p className="mt-2 text-xs leading-relaxed text-fg-3">
-                        내 .vrm 파일을 업로드하거나 모델 라이브러리에서 준비된 모델을 선택하세요. 불러온 뒤 조형, 포즈, 의상과 소품을 자유롭게 편집할 수 있습니다.
-                      </p>
+                        {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "내 .vrm 파일을 업로드하거나 모델 라이브러리에서 준비된 모델을 선택하세요. 불러온 뒤 조형, 포즈, 의상과 소품을 자유롭게 편집할 수 있습니다.")}</p>
                       <div className="mt-4 flex justify-center gap-2">
                         <button
                           type="button"
@@ -657,11 +659,9 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                           }}
                         >
                           <Upload size={14} aria-hidden />
-                          모델 라이브러리
-                        </button>
+                          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "모델 라이브러리")}</button>
                         <button type="button" className={cx(CONTROL_BUTTON, "border-line bg-panel text-fg-2 hover:bg-raised hover:text-fg")} onClick={handleSampleLoad}>
-                          루미 불러오기
-                        </button>
+                          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "루미 불러오기")}</button>
                       </div>
                     </div>
                   </div>
@@ -671,7 +671,7 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                   <div className="absolute inset-0 grid place-items-center bg-card/45 p-6 text-center backdrop-blur-sm" role="status" aria-live="polite">
                     <div>
                       <Loader2 className="mx-auto animate-spin text-accent" size={30} aria-hidden />
-                      <p className="mt-3 text-sm font-semibold text-fg">VRM을 불러오는 중입니다.</p>
+                      <p className="mt-3 text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "VRM을 불러오는 중입니다.")}</p>
                     </div>
                   </div>
                 ) : null}
@@ -681,8 +681,8 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="mt-0.5 shrink-0 text-accent" size={16} aria-hidden />
                       <div>
-                        <p className="font-semibold text-fg">불러오기에 실패했습니다.</p>
-                        <p className="mt-0.5 text-xs leading-relaxed text-fg-3">{error || "파일 형식 또는 경로를 확인해 주세요."}</p>
+                        <p className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "불러오기에 실패했습니다.")}</p>
+                        <p className="mt-0.5 text-xs leading-relaxed text-fg-3">{error || translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserViewport", "ko", "파일 형식 또는 경로를 확인해 주세요.")}</p>
                       </div>
                     </div>
                   </div>

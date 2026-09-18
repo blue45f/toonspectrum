@@ -1,3 +1,8 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { CircleAlert, ExternalLink } from "lucide-react";
 import { Navigate, useParams } from "react-router-dom";
 

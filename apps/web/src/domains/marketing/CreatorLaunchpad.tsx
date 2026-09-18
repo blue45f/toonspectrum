@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   Box,
   Brush,
@@ -248,7 +253,7 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
             </div>
             <p>{copy.installBody}</p>
             <div className="clp-statuses">
-              <span className={pwa.online ? "is-ready" : "is-warning"}>{pwa.online ? <Wifi size={14} aria-hidden="true" /> : <WifiOff size={14} aria-hidden="true" />}{pwa.online ? copy.online : copy.offline}</span>
+              <span className={pwa.online ? translateCurrentStaticSourceText("domains.marketing.CreatorLaunchpad", "en", "is-ready") : translateCurrentStaticSourceText("domains.marketing.CreatorLaunchpad", "en", "is-warning")}>{pwa.online ? <Wifi size={14} aria-hidden="true" /> : <WifiOff size={14} aria-hidden="true" />}{pwa.online ? copy.online : copy.offline}</span>
               {swReady && <span className="is-ready"><Check size={14} aria-hidden="true" />{pwa.serviceWorkerStatus === "update-waiting" ? copy.updateReady : copy.offlineReady}</span>}
               {pwa.status === "available" && <span className="is-ready"><Download size={14} aria-hidden="true" />{copy.installReady}</span>}
             </div>

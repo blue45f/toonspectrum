@@ -1,3 +1,4 @@
+import { translateLocaleBranchForLocale } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
   BookOpen,

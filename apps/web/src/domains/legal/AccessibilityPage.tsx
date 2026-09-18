@@ -1,3 +1,8 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Eye, Keyboard, MousePointer2, Move, Smartphone, Sparkles } from "lucide-react";
 
 import { AccessibilityLab } from "./AccessibilityLab";

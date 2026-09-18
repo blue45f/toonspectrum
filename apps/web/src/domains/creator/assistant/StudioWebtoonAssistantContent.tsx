@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   BookOpen,
   Check,
@@ -444,8 +448,7 @@ export function StudioWebtoonAssistantModal({
             <Sparkles className="size-5 shrink-0 text-accent" aria-hidden />
             <div className="min-w-0">
               <h2 id={TITLE_ID} className="text-sm font-bold text-fg">
-                웹툰 창작 보조 센터 (Webtoon Creator Assistant)
-              </h2>
+                {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "웹툰 창작 보조 센터 (Webtoon Creator Assistant)")}</h2>
               <p className="text-[0.68rem] text-fg-3">
                 플랫폼 규격 검사 · 스크롤 페이싱 · 효과음 · 컬러 · 포커스 타이머 · 크로키 · 작업 맥락 학습
               </p>
@@ -455,7 +458,7 @@ export function StudioWebtoonAssistantModal({
             type="button"
             onClick={onClose}
             data-autofocus="true"
-            aria-label="보조 센터 닫기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "보조 센터 닫기")}
             className={cn(
               "inline-flex shrink-0 items-center justify-center rounded-lg px-2 text-fg-3",
               "hover:bg-card hover:text-fg",
@@ -517,7 +520,7 @@ export function StudioWebtoonAssistantModal({
                     >
                       <span className="font-bold">{spec.name}</span>
                       <span className="text-[0.65rem] text-fg-3">
-                        가로 {spec.recommendedWidthPx}px · 세로 최대{" "}
+                        {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "가로 ")}{spec.recommendedWidthPx}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "px · 세로 최대")}{" "}
                         {spec.maxSliceHeightPx.toLocaleString()}px
                       </span>
                     </button>
@@ -547,15 +550,14 @@ export function StudioWebtoonAssistantModal({
                   <div className="flex flex-wrap items-center justify-between gap-1">
                     <span className="text-[0.8rem] font-bold">{auditResult.summary}</span>
                     <span className="font-mono text-[0.68rem] text-fg-3">
-                      현재 캔버스 {canvasWidth}px × {canvasHeight.toLocaleString()}px · JPG 내보내기 기준
-                    </span>
+                      {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "현재 캔버스 ")}{canvasWidth}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "en", "px × ")}{canvasHeight.toLocaleString()}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "px · JPG 내보내기 기준")}</span>
                   </div>
                   {auditResult.issues.length > 0 && (
                     <ul className="mt-2 flex flex-col gap-1 text-[0.68rem]">
                       {auditResult.issues.map((issue, idx) => (
                         <li key={idx} className="flex flex-col">
                           <span className="font-semibold">• {issue.message}</span>
-                          <span className="pl-2 text-fg-3">↳ 권장 조치: {issue.recommendation}</span>
+                          <span className="pl-2 text-fg-3">{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "↳ 권장 조치: ")}{issue.recommendation}</span>
                         </li>
                       ))}
                     </ul>
@@ -568,23 +570,21 @@ export function StudioWebtoonAssistantModal({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 font-bold">
                     <Scissors className="size-4 text-accent" aria-hidden />
-                    <span>ToonSlicer 컷 안전 분할 계획 (Auto Slice Plan)</span>
+                    <span>{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "ToonSlicer 컷 안전 분할 계획 (Auto Slice Plan)")}</span>
                   </div>
                   <span className="rounded bg-accent/20 px-2 py-0.5 font-mono text-[0.68rem] font-bold text-accent">
-                    안전 분할 성공률 {slicePlan.safeSplitSuccessRate}%
+                    {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "안전 분할 성공률 ")}{slicePlan.safeSplitSuccessRate}%
                   </span>
                 </div>
                 <p className="text-[0.65rem] text-fg-3">
-                  인물 얼굴, 대사 말풍선, 컷 테두리가 절단되지 않도록 컷 사이 빈 여백(Gutter)을 자동 감지하여 분할합니다.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "인물 얼굴, 대사 말풍선, 컷 테두리가 절단되지 않도록 컷 사이 빈 여백(Gutter)을 자동 감지하여 분할합니다.")}</p>
 
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-card p-2">
                   <label
                     htmlFor="studio-assistant-slice-height"
                     className="text-[0.68rem] font-semibold text-fg-2"
                   >
-                    분할 목표 높이
-                  </label>
+                    {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "분할 목표 높이")}</label>
                   <input
                     id="studio-assistant-slice-height"
                     type="range"
@@ -603,8 +603,7 @@ export function StudioWebtoonAssistantModal({
                     )}
                   />
                   <span className="font-mono text-[0.68rem] font-bold text-fg">
-                    {sliceTargetHeight.toLocaleString()}px · {slicePlan.sliceCount}개 파일
-                  </span>
+                    {sliceTargetHeight.toLocaleString()}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "en", "px · ")}{slicePlan.sliceCount}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "개 파일")}</span>
                   <button
                     type="button"
                     onClick={() =>
@@ -617,22 +616,21 @@ export function StudioWebtoonAssistantModal({
                     }
                     className={cn(chipClass, "border-line bg-raised text-fg hover:bg-card")}
                   >
-                    권장값 {activeSpec.recommendedSliceHeightPx.toLocaleString()}px
+                    {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "권장값 ")}{activeSpec.recommendedSliceHeightPx.toLocaleString()}px
                   </button>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
                   {protectedRegions.length > 0 ? (
                     <span className="inline-flex shrink-0 items-center gap-1 rounded border border-good/35 bg-good/10 px-1.5 py-0.5 text-[0.58rem] font-bold text-good">
-                      <CheckCircle2 size={11} aria-hidden /> 실제 원고 컷 {protectedRegions.length}곳 분석
-                    </span>
+                      <CheckCircle2 size={11} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "실제 원고 컷 ")}{protectedRegions.length}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "곳 분석")}</span>
                   ) : (
-                    <SampleDataBadge>현재 원고에서 컷을 찾지 못함</SampleDataBadge>
+                    <SampleDataBadge>{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "현재 원고에서 컷을 찾지 못함")}</SampleDataBadge>
                   )}
                   <span className="text-[0.6rem] text-fg-3">
                     {protectedRegions.length > 0
-                      ? "현재 페이지의 컷 경계를 보호 영역으로 사용해 절단 위치를 계산합니다."
-                      : "컷 경계가 없으므로 캔버스 높이만 기준으로 분할합니다."}
+                      ? translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "현재 페이지의 컷 경계를 보호 영역으로 사용해 절단 위치를 계산합니다.")
+                      : translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "컷 경계가 없으므로 캔버스 높이만 기준으로 분할합니다.")}
                   </span>
                 </div>
 
@@ -644,8 +642,7 @@ export function StudioWebtoonAssistantModal({
                     >
                       <div className="flex min-w-0 flex-col">
                         <span className="font-bold">
-                          #{slice.sliceIndex} 파일 ({slice.heightPx.toLocaleString()}px)
-                        </span>
+                          #{slice.sliceIndex} {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "파일 (")}{slice.heightPx.toLocaleString()}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "en", "px)")}</span>
                         <span className="font-mono text-[0.62rem] text-fg-3">
                           Y: {slice.topY.toLocaleString()} ~ {slice.bottomY.toLocaleString()}
                         </span>
@@ -656,7 +653,7 @@ export function StudioWebtoonAssistantModal({
                           slice.isGutterCut ? "bg-good/10 text-good" : "bg-warn/10 text-warn",
                         )}
                       >
-                        {slice.isGutterCut ? "안전 여백 절단" : "비여백 절단"}
+                        {slice.isGutterCut ? translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "안전 여백 절단") : translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "비여백 절단")}
                       </span>
                     </div>
                   ))}
@@ -671,38 +668,34 @@ export function StudioWebtoonAssistantModal({
               <div className="flex flex-wrap items-center gap-2">
                 {panels.length > 0 ? (
                   <span className="inline-flex shrink-0 items-center gap-1 rounded border border-good/35 bg-good/10 px-1.5 py-0.5 text-[0.58rem] font-bold text-good">
-                    <CheckCircle2 size={11} aria-hidden /> 실제 원고 컷 {panels.length}개 분석
-                  </span>
+                    <CheckCircle2 size={11} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "실제 원고 컷 ")}{panels.length}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "개 분석")}</span>
                 ) : (
-                  <SampleDataBadge>현재 원고에서 컷을 찾지 못함</SampleDataBadge>
+                  <SampleDataBadge>{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "현재 원고에서 컷을 찾지 못함")}</SampleDataBadge>
                 )}
                 <span className="text-[0.6rem] text-fg-3">
                   {panels.length > 0
-                    ? "현재 페이지의 실제 컷 위치와 컷 안의 대사 요소를 기준으로 페이싱을 계산합니다."
-                    : "컷을 추가하면 현재 페이지 기준 페이싱 분석이 자동으로 활성화됩니다."}
+                    ? translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "현재 페이지의 실제 컷 위치와 컷 안의 대사 요소를 기준으로 페이싱을 계산합니다.")
+                    : translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "컷을 추가하면 현재 페이지 기준 페이싱 분석이 자동으로 활성화됩니다.")}
                 </span>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="flex flex-col items-center justify-center rounded-xl border border-line bg-card/60 p-3 text-center">
-                  <span className="text-[0.68rem] text-fg-3">페이싱 건강도 점수</span>
+                  <span className="text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "페이싱 건강도 점수")}</span>
                   <span className="mt-1 font-mono text-2xl font-black text-accent">
-                    {pacingResult.pacingHealthScore}점
-                  </span>
+                    {pacingResult.pacingHealthScore}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "점")}</span>
                 </div>
                 <div className="flex flex-col items-center justify-center rounded-xl border border-line bg-card/60 p-3 text-center">
-                  <span className="text-[0.68rem] text-fg-3">평균 컷 간격</span>
+                  <span className="text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "평균 컷 간격")}</span>
                   <span className="mt-1 font-mono text-2xl font-black text-fg">
                     {pacingResult.averageGutterPx}px
                   </span>
                 </div>
                 <div className="flex flex-col items-center justify-center rounded-xl border border-line bg-card/60 p-3 text-center">
                   <span className="text-[0.68rem] text-fg-3">
-                    {activeReaderProfile.label} 완독 예상 시간
-                  </span>
+                    {activeReaderProfile.label} {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "완독 예상 시간")}</span>
                   <span className="mt-1 font-mono text-2xl font-black text-fg">
-                    약 {pacingResult.estimatedReadingSeconds[readerSpeed]}초
-                  </span>
+                    {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "약 ")}{pacingResult.estimatedReadingSeconds[readerSpeed]}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "초")}</span>
                 </div>
               </div>
 
@@ -723,10 +716,10 @@ export function StudioWebtoonAssistantModal({
 
               {/* Reading Profile Comparison */}
               <div className={cardClass}>
-                <span className="text-[0.75rem] font-bold">독자 독서 성향별 체감 시간</span>
+                <span className="text-[0.75rem] font-bold">{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "독자 독서 성향별 체감 시간")}</span>
                 <div
                   role="group"
-                  aria-label="독자 독서 성향"
+                  aria-label={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "독자 독서 성향")}
                   className="mt-2 grid grid-cols-1 gap-2 text-center text-[0.68rem] sm:grid-cols-3"
                 >
                   {READER_SPEED_PROFILES.map((profile) => {
@@ -756,8 +749,7 @@ export function StudioWebtoonAssistantModal({
                             isSelected ? "text-accent" : "text-fg",
                           )}
                         >
-                          {pacingResult.estimatedReadingSeconds[profile.id]}초
-                        </span>
+                          {pacingResult.estimatedReadingSeconds[profile.id]}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "초")}</span>
                       </button>
                     );
                   })}
@@ -766,7 +758,7 @@ export function StudioWebtoonAssistantModal({
 
               {/* Pacing Beat Visual Breakdown */}
               <div className={cn("flex flex-col gap-2", cardClass)}>
-                <span className="text-[0.75rem] font-bold">컷 구간별 호흡 &amp; 리듬 분석</span>
+                <span className="text-[0.75rem] font-bold">{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "컷 구간별 호흡 &amp; 리듬 분석")}</span>
                 <div className="flex flex-col gap-1.5">
                   {pacingResult.beats.map((beat, idx) => (
                     <div
@@ -778,7 +770,7 @@ export function StudioWebtoonAssistantModal({
                           #{beat.fromPanelIndex} → #{beat.toPanelIndex}
                         </span>
                         <span className="font-bold text-fg">{beat.label}</span>
-                        <span className="text-fg-3">({beat.gutterDistancePx}px)</span>
+                        <span className="text-fg-3">({beat.gutterDistancePx}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "en", "px)")}</span>
                       </div>
                       <span className="text-[0.62rem] text-fg-3">{beat.guidance}</span>
                     </div>
@@ -822,8 +814,8 @@ export function StudioWebtoonAssistantModal({
                     type="search"
                     value={sfxQuery}
                     onChange={(e) => setSfxQuery(e.target.value)}
-                    aria-label="효과음 검색"
-                    placeholder="상황별 의성어·의태어 검색 (예: 쿵, 쾅, 심장, 번개, 문, 폭발)..."
+                    aria-label={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "효과음 검색")}
+                    placeholder={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "상황별 의성어·의태어 검색 (예: 쿵, 쾅, 심장, 번개, 문, 폭발)...")}
                     className={cn(
                       "w-full rounded-md border border-line bg-card pl-8 pr-3 text-xs text-fg",
                       STUDIO_FOCUS_RING,
@@ -833,16 +825,15 @@ export function StudioWebtoonAssistantModal({
                 </div>
 
                 <p aria-live="polite" className="text-[0.62rem] text-fg-3">
-                  검색 결과 {filteredSfx.length}건
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "검색 결과 ")}{filteredSfx.length}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "건")}</p>
               </div>
 
               {/* SFX Cards Grid */}
               {filteredSfx.length === 0 ? (
                 <StudioEmptyState
                   icon={<Search size={20} aria-hidden />}
-                  title="검색 결과가 없습니다"
-                  description="카테고리를 '전체 효과음'으로 바꾸거나 다른 낱말로 찾아보세요."
+                  title={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "검색 결과가 없습니다")}
+                  description={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "카테고리를 '전체 효과음'으로 바꾸거나 다른 낱말로 찾아보세요.")}
                   action={
                     <button
                       type="button"
@@ -852,8 +843,7 @@ export function StudioWebtoonAssistantModal({
                       }}
                       className={cn(chipClass, "border-line bg-raised text-fg hover:bg-card")}
                     >
-                      검색 조건 초기화
-                    </button>
+                      {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "검색 조건 초기화")}</button>
                   }
                 />
               ) : (
@@ -922,7 +912,7 @@ export function StudioWebtoonAssistantModal({
                               <Copy className="size-3" aria-hidden />
                             )}
                             <span>
-                              {copyResult ? (copyResult.ok ? "복사됨" : "복사 실패") : "텍스트 복사"}
+                              {copyResult ? (copyResult.ok ? translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "복사됨") : translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "복사 실패")) : translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "텍스트 복사")}
                             </span>
                           </button>
                           {onInsertSfxText && (
@@ -935,7 +925,7 @@ export function StudioWebtoonAssistantModal({
                               )}
                             >
                               <Type className="size-3" aria-hidden />
-                              <span>캔버스 삽입</span>
+                              <span>{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "캔버스 삽입")}</span>
                             </button>
                           )}
                         </div>
@@ -952,7 +942,7 @@ export function StudioWebtoonAssistantModal({
             <div className="flex flex-col gap-4">
               {/* 5 Skin Tone Archetypes */}
               <div className={cn("flex flex-col gap-2", cardClass)}>
-                <span className="text-[0.75rem] font-bold">웹툰 캐릭터 5대 표준 피부톤 팔레트</span>
+                <span className="text-[0.75rem] font-bold">{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "웹툰 캐릭터 5대 표준 피부톤 팔레트")}</span>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {SKIN_TONE_IDS.map((sid) => {
                     const pal = colorAssistant.getSkinPalette(sid);
@@ -979,11 +969,11 @@ export function StudioWebtoonAssistantModal({
                         <span className="text-[0.7rem] font-bold">{pal.name}</span>
                         <span className="mt-0.5 text-[0.62rem] text-fg-3">{pal.description}</span>
                         <div className="mt-2 flex h-5 w-full overflow-hidden rounded-md border border-line">
-                          <div className="flex-1" style={{ backgroundColor: pal.highlight }} title="하이라이트" />
-                          <div className="flex-1" style={{ backgroundColor: pal.base }} title="기본 밑색" />
-                          <div className="flex-1" style={{ backgroundColor: pal.shadow1 }} title="1차 셀 음영" />
-                          <div className="flex-1" style={{ backgroundColor: pal.shadow2 }} title="2차 딥 음영" />
-                          <div className="flex-1" style={{ backgroundColor: pal.blushTint }} title="볼터치 틴트" />
+                          <div className="flex-1" style={{ backgroundColor: pal.highlight }} title={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "하이라이트")} />
+                          <div className="flex-1" style={{ backgroundColor: pal.base }} title={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "기본 밑색")} />
+                          <div className="flex-1" style={{ backgroundColor: pal.shadow1 }} title={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "1차 셀 음영")} />
+                          <div className="flex-1" style={{ backgroundColor: pal.shadow2 }} title={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "2차 딥 음영")} />
+                          <div className="flex-1" style={{ backgroundColor: pal.blushTint }} title={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "볼터치 틴트")} />
                         </div>
                       </button>
                     );
@@ -996,23 +986,20 @@ export function StudioWebtoonAssistantModal({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 font-bold">
                     <Palette className="size-4 text-accent" aria-hidden />
-                    <span>만화 색상환 쿨톤 음영 자동 생성기 (Hue-Shift Shadow Generator)</span>
+                    <span>{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "만화 색상환 쿨톤 음영 자동 생성기 (Hue-Shift Shadow Generator)")}</span>
                   </div>
                   <span className="rounded bg-accent/20 px-2 py-0.5 text-[0.62rem] font-bold text-accent">
-                    탁한 회색 방지 (Anti-Muddy)
-                  </span>
+                    {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "탁한 회색 방지 (Anti-Muddy)")}</span>
                 </div>
                 <p className="text-[0.65rem] text-fg-3">
-                  기본 밑색을 기준으로 채도를 올리고 색상환을 파랑/보라 방향으로 자연스럽게 회전시켜 맑은 그림자를 생성합니다.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "기본 밑색을 기준으로 채도를 올리고 색상환을 파랑/보라 방향으로 자연스럽게 회전시켜 맑은 그림자를 생성합니다.")}</p>
 
                 <div className="mt-2 flex items-center gap-2">
                   <label
                     htmlFor="studio-assistant-base-color"
                     className="text-[0.68rem] font-semibold text-fg-2"
                   >
-                    밑색 선택
-                  </label>
+                    {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "밑색 선택")}</label>
                   <input
                     id="studio-assistant-base-color"
                     type="color"
@@ -1051,7 +1038,7 @@ export function StudioWebtoonAssistantModal({
 
               {/* 4 Scene Mood Palettes */}
               <div className={cn("flex flex-col gap-2", cardClass)}>
-                <span className="text-[0.75rem] font-bold">장르별 조명 및 환경 무드 팔레트</span>
+                <span className="text-[0.75rem] font-bold">{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "장르별 조명 및 환경 무드 팔레트")}</span>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {SCENE_MOOD_PALETTES.map((mood) => (
                     <div
@@ -1063,11 +1050,11 @@ export function StudioWebtoonAssistantModal({
                         <span className="text-[0.6rem] text-fg-3">{mood.genre}</span>
                       </div>
                       <div className="mt-1.5 flex h-4 w-full overflow-hidden rounded border border-line">
-                        <div className="flex-1" style={{ backgroundColor: mood.skyTint }} title="하늘" />
-                        <div className="flex-1" style={{ backgroundColor: mood.ambientLight }} title="환경광" />
-                        <div className="flex-1" style={{ backgroundColor: mood.directSun }} title="태양광" />
-                        <div className="flex-1" style={{ backgroundColor: mood.shadowCast }} title="그림자" />
-                        <div className="flex-1" style={{ backgroundColor: mood.rimLight }} title="림라이트" />
+                        <div className="flex-1" style={{ backgroundColor: mood.skyTint }} title={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "하늘")} />
+                        <div className="flex-1" style={{ backgroundColor: mood.ambientLight }} title={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "환경광")} />
+                        <div className="flex-1" style={{ backgroundColor: mood.directSun }} title={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "태양광")} />
+                        <div className="flex-1" style={{ backgroundColor: mood.shadowCast }} title={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "그림자")} />
+                        <div className="flex-1" style={{ backgroundColor: mood.rimLight }} title={translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "림라이트")} />
                       </div>
                     </div>
                   ))}
@@ -1081,7 +1068,7 @@ export function StudioWebtoonAssistantModal({
             <div className="flex flex-col gap-4">
               {/* Production Stages Selector */}
               <div className={cn("flex flex-col gap-2", cardClass)}>
-                <span className="text-[0.75rem] font-bold">현재 작업 공정 선택</span>
+                <span className="text-[0.75rem] font-bold">{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "현재 작업 공정 선택")}</span>
                 <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
                   {PRODUCTION_STAGES.map((st) => {
                     const isSelected = timerState.activeStage === st.id;
@@ -1106,8 +1093,7 @@ export function StudioWebtoonAssistantModal({
                       >
                         <span className="text-[0.68rem]">{st.label}</span>
                         <span className="mt-0.5 font-mono text-[0.6rem]">
-                          {Math.floor(timerState.stageSecondsMap[st.id] / 60)}분 기록
-                        </span>
+                          {Math.floor(timerState.stageSecondsMap[st.id] / 60)}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "분 기록")}</span>
                       </button>
                     );
                   })}
@@ -1122,7 +1108,7 @@ export function StudioWebtoonAssistantModal({
                     timerState.isResting ? "bg-warn/10 text-warn" : "bg-good/10 text-good",
                   )}
                 >
-                  {timerState.isResting ? "휴식 시간 (Rest Cycle)" : "집중 작업 중 (Focus Mode)"}
+                  {timerState.isResting ? translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "휴식 시간 (Rest Cycle)") : translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "집중 작업 중 (Focus Mode)")}
                 </span>
 
                 <div className="my-3 font-mono text-5xl font-black tracking-wider text-fg">
@@ -1151,7 +1137,7 @@ export function StudioWebtoonAssistantModal({
                     ) : (
                       <Play className="size-4" aria-hidden />
                     )}
-                    <span>{timerState.isRunning ? "일시정지" : "타이머 시작"}</span>
+                    <span>{timerState.isRunning ? translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "일시정지") : translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "타이머 시작")}</span>
                   </button>
 
                   <button
@@ -1163,7 +1149,7 @@ export function StudioWebtoonAssistantModal({
                     className={cn(chipClass, "gap-1 border-line bg-raised px-3 text-xs text-fg hover:bg-card")}
                   >
                     <RotateCcw className="size-3.5" aria-hidden />
-                    <span>리셋</span>
+                    <span>{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "리셋")}</span>
                   </button>
                 </div>
 
@@ -1191,8 +1177,7 @@ export function StudioWebtoonAssistantModal({
                 </div>
 
                 <p className="mt-3 max-w-[38ch] text-[0.6rem] leading-relaxed text-fg-3">
-                  타이머는 보조 센터를 닫아도 계속 흘러 공정별 작업 시간을 적립합니다.
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "타이머는 보조 센터를 닫아도 계속 흘러 공정별 작업 시간을 적립합니다.")}</p>
               </div>
             </div>
           )}
@@ -1204,7 +1189,7 @@ export function StudioWebtoonAssistantModal({
               <div className={cn("flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between", cardClass)}>
                 <div className="flex flex-wrap items-center gap-2">
                   <Timer className="size-4 text-accent" aria-hidden />
-                  <span className="text-[0.75rem] font-bold">인체 크로키 인터벌 트레이닝</span>
+                  <span className="text-[0.75rem] font-bold">{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "인체 크로키 인터벌 트레이닝")}</span>
                   <div className="flex gap-1">
                     {CROQUIS_INTERVALS.map((sec) => (
                       <button
@@ -1223,8 +1208,7 @@ export function StudioWebtoonAssistantModal({
                             : "border-line bg-card text-fg-3 hover:text-fg",
                         )}
                       >
-                        {sec}초
-                      </button>
+                        {sec}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "초")}</button>
                     ))}
                   </div>
                 </div>
@@ -1242,7 +1226,7 @@ export function StudioWebtoonAssistantModal({
                       "border-transparent bg-accent text-on-accent hover:opacity-90",
                     )}
                   >
-                    {croquisRunning ? "정지" : "시작"}
+                    {croquisRunning ? translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "정지") : translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "시작")}
                   </button>
                   <button
                     type="button"
@@ -1252,8 +1236,7 @@ export function StudioWebtoonAssistantModal({
                     }}
                     className={cn(chipClass, "border-line bg-card text-fg hover:bg-raised")}
                   >
-                    다음 포즈
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "다음 포즈")}</button>
                 </div>
               </div>
 
@@ -1261,22 +1244,22 @@ export function StudioWebtoonAssistantModal({
               <div className="rounded-xl border border-accent/40 bg-accent-soft p-3.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-[0.8rem] font-bold text-accent">
-                    추천 크로키 포즈: {currentPosePrompt.title}
+                    {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "추천 크로키 포즈: ")}{currentPosePrompt.title}
                   </span>
                   <span className="rounded bg-card px-2 py-0.5 font-mono text-[0.62rem] font-bold text-fg">
-                    핵심 동세선: {currentPosePrompt.lineOfActionCurve}
+                    {translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "핵심 동세선: ")}{currentPosePrompt.lineOfActionCurve}
                   </span>
                 </div>
                 <p className="mt-1 text-[0.68rem] text-fg">{currentPosePrompt.description}</p>
                 <div className="mt-2 text-[0.62rem] text-fg-3">
-                  <span className="font-bold text-accent">해부학/구조 주의점:</span>{" "}
+                  <span className="font-bold text-accent">{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "해부학/구조 주의점:")}</span>{" "}
                   {currentPosePrompt.keyAnatomyFocus}
                 </div>
               </div>
 
               {/* 4 Perspective Guide Overlays */}
               <div className={cn("flex flex-col gap-2", cardClass)}>
-                <span className="text-[0.75rem] font-bold">투시 원근 및 카메라 앵글 가이드</span>
+                <span className="text-[0.75rem] font-bold">{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "투시 원근 및 카메라 앵글 가이드")}</span>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {PERSPECTIVE_PRESETS.map((preset) => {
                     const g = PERSPECTIVE_GUIDES[preset];
@@ -1309,11 +1292,11 @@ export function StudioWebtoonAssistantModal({
                   <svg
                     viewBox="0 0 160 90"
                     role="img"
-                    aria-label={`${perspectiveShortLabel(perspectiveGuide.label)} 가이드 미리보기`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "{v0} 가이드 미리보기"), { v0: String(perspectiveShortLabel(perspectiveGuide.label)) })}
                     className="h-24 w-full shrink-0 rounded border border-line/60 bg-canvas text-accent sm:w-40"
                   >
                     <g
-                      transform={`rotate(${perspectiveGuide.tiltAngleDeg} 80 45)`}
+                      transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "en", "rotate({v0} 80 45)"), { v0: String(perspectiveGuide.tiltAngleDeg) })}
                       stroke="currentColor"
                       fill="none"
                     >
@@ -1342,22 +1325,21 @@ export function StudioWebtoonAssistantModal({
                   </svg>
                   <dl className="grid flex-1 grid-cols-3 gap-2 text-center text-[0.62rem]">
                     <div className="rounded border border-line bg-raised p-1.5">
-                      <dt className="text-fg-3">지평선 위치</dt>
+                      <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "지평선 위치")}</dt>
                       <dd className="mt-0.5 font-mono font-bold text-fg">
                         {Math.round(perspectiveGuide.horizonRatioY * 100)}%
                       </dd>
                     </div>
                     <div className="rounded border border-line bg-raised p-1.5">
-                      <dt className="text-fg-3">화면 기울기</dt>
+                      <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "화면 기울기")}</dt>
                       <dd className="mt-0.5 font-mono font-bold text-fg">
                         {perspectiveGuide.tiltAngleDeg}°
                       </dd>
                     </div>
                     <div className="rounded border border-line bg-raised p-1.5">
-                      <dt className="text-fg-3">소실점</dt>
+                      <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "소실점")}</dt>
                       <dd className="mt-0.5 font-mono font-bold text-fg">
-                        {perspectiveGuide.vanishingPointCount}점
-                      </dd>
+                        {perspectiveGuide.vanishingPointCount}{translateCurrentStaticSourceText("domains.creator.assistant.StudioWebtoonAssistantContent", "ko", "점")}</dd>
                     </div>
                   </dl>
                 </div>

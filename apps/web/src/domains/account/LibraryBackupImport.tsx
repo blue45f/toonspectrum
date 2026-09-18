@@ -1,3 +1,8 @@
+import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Upload } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -15,7 +20,7 @@ const bi = <T,>(ko: T, en: T): T =>
 
 export function LibraryBackupImport({ onRestore, locale: _locale, ownerId }: {
   onRestore: (data: HydratePayload) => void;
-  locale: "ko" | "en";
+  locale: string;
   ownerId: string | null;
 }) {
   useBilingualI18nRevision();
@@ -72,7 +77,7 @@ export function LibraryBackupImport({ onRestore, locale: _locale, ownerId }: {
         const file = event.target.files?.[0]; event.target.value = "";
         if (file) void selectFile(file);
       }} />
-      {message && <p className={`mt-3 break-words text-xs leading-6 ${failed ? "text-bad" : "text-good"}`} role={failed ? "alert" : "status"}>{message}</p>}
+      {message && <p className={formatI18nTemplate(translateCurrentStaticSourceText("domains.account.LibraryBackupImport", "en", "mt-3 break-words text-xs leading-6 {v0}"), { v0: String(failed ? "text-bad" : "text-good") })} role={failed ? translateCurrentStaticSourceText("domains.account.LibraryBackupImport", "en", "alert") : translateCurrentStaticSourceText("domains.account.LibraryBackupImport", "en", "status")}>{message}</p>}
       {pending && <div ref={preview} tabIndex={-1} role="region" aria-labelledby={id} className="mt-3 rounded-xl border border-accent/35 bg-accent-soft/35 p-4 outline-none focus-visible:ring-2 focus-visible:ring-accent">
         <h3 id={id} className="font-semibold text-fg">{bi("백업 복원 미리보기", "Review backup before restoring")}</h3>
         <p className="mt-2 break-all text-xs text-fg-2">{pending.fileName}</p>

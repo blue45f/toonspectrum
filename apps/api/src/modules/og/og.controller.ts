@@ -12,6 +12,7 @@ import { CollaborationRepository } from "../collaboration/collaboration.reposito
 import { CreatorMarketplaceService } from "../creator-marketplace/creator-marketplace.service";
 import { PromotionService } from "../promotion/promotion.service";
 import { renderOgPage } from "./og-page";
+import { PUBLIC_SHARE_OG_READERS } from "./og-readers";
 
 import type { Response } from "express";
 
@@ -33,14 +34,7 @@ export class OgController {
       userAgent,
       canonicalHost: process.env.CANONICAL_HOST,
       readers: {
-        readAuthor: (name) => getAuthorData(encodeURIComponent(name)),
-        readCreatorProfile: (userId) => getCreatorPublicProfile(userId),
-        readCreatorWork: (identifier) => getWork(identifier),
-        readCreatorSeries: (identifier) => getSeries(identifier),
-        readCommunityPost: (identifier) => getFanPost(identifier),
-        readCommunityCafe: (slug) => getGovernedCafeBySlug(slug, null),
-        readCollaboration: (identifier) => this.collaboration.get(identifier),
-        readPromotion: (identifier) => this.promotion.accessible(identifier),
+        ...PUBLIC_SHARE_OG_READERS,
         readMarketResource: (identifier) => this.marketplace.getById(identifier),
       },
     });

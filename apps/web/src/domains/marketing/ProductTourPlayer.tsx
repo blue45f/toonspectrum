@@ -1,3 +1,9 @@
+import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Captions, LoaderCircle, Play, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -145,7 +151,7 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
         <summary>{copy.transcript}</summary>
         <ol>
           {PRODUCT_TOUR.chapters.map((chapter) => (
-            <li key={`${chapter.id}-transcript`}>
+            <li key={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.ProductTourPlayer", "en", "{v0}-transcript"), { v0: String(chapter.id) })}>
               <button type="button" onClick={() => seekTo(chapter.start)}>{formatTime(chapter.start)}</button>
               <div>
                 <strong>{bi((chapter).ko, (chapter).en)}</strong>

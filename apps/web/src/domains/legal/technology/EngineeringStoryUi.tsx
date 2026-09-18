@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   BookOpen,
   CheckCircle2,
   CircleDashed,
@@ -145,7 +150,7 @@ export function EngineeringStoryNav({ className }: { readonly className?: string
             <Link
               key={item.href}
               href={item.href}
-              aria-current={active ? "page" : undefined}
+              aria-current={active ? translateCurrentStaticSourceText("domains.legal.technology.EngineeringStoryUi", "en", "page") : undefined}
               className={cx(
                 "group flex min-h-12 items-center gap-2.5 rounded-2xl border px-3 py-2 text-sm font-bold transition-colors",
                 active

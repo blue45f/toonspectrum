@@ -1,9 +1,13 @@
+import {
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowDown, Cloud, FileImage, FolderOpen, Layers3, ShieldCheck } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
 import "./studio-import-visual-guide.css";
 
-type Locale = "ko" | "en";
+type Locale = string;
 
 const COPY = {
   ko: {
@@ -46,7 +50,7 @@ const SOURCE_ICONS = [FileImage, Cloud, FolderOpen] as const;
 const STEP_ICONS = [FolderOpen, Layers3, ShieldCheck] as const;
 
 export function StudioImportVisualGuide({ locale }: { readonly locale: Locale }) {
-  const copy = COPY[locale];
+  const copy = translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioImportVisualGuide", COPY);
   const reducedMotion = useReducedMotion();
 
   return (
@@ -75,8 +79,8 @@ export function StudioImportVisualGuide({ locale }: { readonly locale: Locale })
             <img src="/brand/atelier-world.webp" alt={copy.heroAlt} loading="lazy" decoding="async" />
           </picture>
           <span className="studio-import-visual-guide__float studio-import-visual-guide__float--file"><FileImage size={17} aria-hidden="true" />PSD</span>
-          <span className="studio-import-visual-guide__float studio-import-visual-guide__float--layers"><Layers3 size={17} aria-hidden="true" />Layers</span>
-          <span className="studio-import-visual-guide__float studio-import-visual-guide__float--safe"><ShieldCheck size={17} aria-hidden="true" />Safe open</span>
+          <span className="studio-import-visual-guide__float studio-import-visual-guide__float--layers"><Layers3 size={17} aria-hidden="true" />{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioImportVisualGuide", "en", "Layers")}</span>
+          <span className="studio-import-visual-guide__float studio-import-visual-guide__float--safe"><ShieldCheck size={17} aria-hidden="true" />{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioImportVisualGuide", "en", "Safe open")}</span>
         </motion.figure>
       </div>
 

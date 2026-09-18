@@ -1,3 +1,7 @@
+import {
+  resolveUiLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useId } from "react";
 

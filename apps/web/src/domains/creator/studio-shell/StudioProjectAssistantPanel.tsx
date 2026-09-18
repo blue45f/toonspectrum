@@ -1,3 +1,8 @@
+import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Check, Sparkles, WandSparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -126,8 +131,7 @@ export function StudioProjectAssistantPanel({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-2xl">
           <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            <Sparkles size={14} aria-hidden="true" /> TOONSTUDIO ASSISTANT
-          </p>
+            <Sparkles size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectAssistantPanel", "en", "TOONSTUDIO ASSISTANT")}</p>
           <h2 id="project-assistant-title" className="mt-2 text-xl font-black tracking-tight text-fg">
             {bt("현재 작업에서 바로 도움받기", "Get help with the current task")}
           </h2>

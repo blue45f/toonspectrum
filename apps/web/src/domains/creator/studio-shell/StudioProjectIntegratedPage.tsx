@@ -1,3 +1,7 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 
@@ -6,6 +10,9 @@ import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
 import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 
+import { StudioCompatibilityReportsPanel } from "../project-graph/StudioCompatibilityReportsPanel";
+import { StudioProjectGraphContextBar } from "../project-graph/StudioProjectGraphContextBar";
+import { StudioProjectVersionStackPanel } from "../project-graph/StudioProjectVersionStackPanel";
 import {
   resolveStudioProjectView,
   studioProjectDefaultView,
@@ -163,18 +170,14 @@ function SectionWorkflow({
         <StudioSeriesKitPanel projectId={projectId} locale={locale} />
       ) : null}
       {section === "review" && view === "versions" ? (
-        <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
-          <StudioProjectVersionStackPanel projectId={projectId} locale={locale} />
-        </Suspense>
+        <StudioProjectVersionStackPanel projectId={projectId} locale={locale} />
       ) : null}
       {section === "review" ? (
         <StudioReviewPanel projectId={projectId} locale={locale} />
       ) : null}
       {(section === "assets" && (view === "missing" || view === "rights"))
         || (section === "export" && view === "preflight") ? (
-          <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
-            <StudioCompatibilityReportsPanel projectId={projectId} locale={locale} />
-          </Suspense>
+          <StudioCompatibilityReportsPanel projectId={projectId} locale={locale} />
         ) : null}
       {section === "export" ? (
         <StudioExportPanel projectId={projectId} locale={locale} />
@@ -220,17 +223,7 @@ export function StudioProjectIntegratedPage({
       <StudioProjectShellPage section={section} />
       {decodedProjectId ? (
         <Container size="wide" className="-mt-3 space-y-5 pb-10 sm:-mt-5 sm:pb-14">
-          <StudioWebtoonOnboardingPanelSlot projectId={decodedProjectId} locale={locale} />
-          <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
-            <StudioProjectGraphContextBar projectId={decodedProjectId} locale={locale} />
-          </Suspense>
-
-          <StudioWebtoonProductionCompanion
-            projectId={decodedProjectId}
-            section={section}
-            view={view}
-            locale={locale}
-          />
+          <StudioProjectGraphContextBar projectId={decodedProjectId} locale={locale} />
           <SectionWorkflow
             projectId={decodedProjectId}
             section={section}

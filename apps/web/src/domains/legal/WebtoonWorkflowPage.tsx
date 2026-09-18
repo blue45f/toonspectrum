@@ -1,4 +1,11 @@
 import {
+  formatI18nTemplate,
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   BookOpen,
   CalendarDays,
@@ -220,7 +227,7 @@ export function WebtoonWorkflowPage() {
 
       <section className="py-14 sm:py-20" aria-labelledby="workflow-stage-picker-title">
         <div className="max-w-3xl">
-          <p className="eyebrow text-accent">WHERE ARE YOU NOW?</p>
+          <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.WebtoonWorkflowPage", "en", "WHERE ARE YOU NOW?")}</p>
           <h2
             id="workflow-stage-picker-title"
             className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl"
@@ -242,7 +249,7 @@ export function WebtoonWorkflowPage() {
             return (
               <a
                 key={copy.title}
-                href={`#workflow-stage-${index + 1}`}
+                href={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.WebtoonWorkflowPage", "en", "#workflow-stage-{v0}"), { v0: String(index + 1) })}
                 className="group flex min-h-14 items-center gap-3 rounded-2xl border border-line/70 bg-card/65 px-4 py-3 text-sm font-semibold text-fg-2 transition-all hover:border-accent/40 hover:bg-raised hover:text-fg"
               >
                 <span className="font-display text-[0.65rem] font-bold tracking-[0.12em] text-accent">
@@ -258,7 +265,7 @@ export function WebtoonWorkflowPage() {
       <section aria-labelledby="workflow-all-stages-title">
         <div className="flex items-end justify-between gap-4 border-b border-line pb-5">
           <div>
-            <p className="eyebrow text-accent">THE SEVEN-STAGE FLOW</p>
+            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.WebtoonWorkflowPage", "en", "THE SEVEN-STAGE FLOW")}</p>
             <h2
               id="workflow-all-stages-title"
               className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl"
@@ -267,8 +274,7 @@ export function WebtoonWorkflowPage() {
             </h2>
           </div>
           <span className="hidden font-display text-xs font-bold uppercase tracking-[0.14em] text-fg-3 sm:block">
-            TOONSTUDIO WORKFLOW
-          </span>
+            {translateCurrentStaticSourceText("domains.legal.WebtoonWorkflowPage", "en", "TOONSTUDIO WORKFLOW")}</span>
         </div>
 
         <ol className="divide-y divide-line">
@@ -279,7 +285,7 @@ export function WebtoonWorkflowPage() {
             return (
               <li
                 key={copy.title}
-                id={`workflow-stage-${index + 1}`}
+                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.WebtoonWorkflowPage", "en", "workflow-stage-{v0}"), { v0: String(index + 1) })}
                 className="scroll-mt-36 py-8 sm:py-10"
               >
                 <article className="grid gap-6 lg:grid-cols-[8rem_minmax(0,1fr)_18rem] lg:gap-10">
@@ -338,7 +344,7 @@ export function WebtoonWorkflowPage() {
         <div className="grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:gap-12">
           <div>
             <UsersRound size={24} className="text-accent" aria-hidden="true" />
-            <p className="mt-5 eyebrow text-accent">WHEN ROLES ARE SEPARATE</p>
+            <p className="mt-5 eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.WebtoonWorkflowPage", "en", "WHEN ROLES ARE SEPARATE")}</p>
             <h2
               id="workflow-handoff-title"
               className="mt-3 text-balance text-2xl font-bold tracking-tight text-fg sm:text-3xl"
@@ -360,7 +366,7 @@ export function WebtoonWorkflowPage() {
                   className="relative rounded-2xl border border-line/70 bg-card/65 p-5"
                 >
                   <span className="font-display text-[0.62rem] font-bold tracking-[0.14em] text-accent">
-                    HANDOFF {String(index + 1).padStart(2, "0")}
+                    {translateCurrentStaticSourceText("domains.legal.WebtoonWorkflowPage", "en", "HANDOFF ")}{String(index + 1).padStart(2, "0")}
                   </span>
                   <h3 className="mt-3 text-lg font-bold text-fg">{title}</h3>
                   <p className="mt-2 text-sm leading-6 text-fg-2">{body}</p>

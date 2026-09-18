@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useRef } from "react";
 import {
   Circle as KCircle,
@@ -206,7 +207,7 @@ export function StudioBrushCursor({
         ref={cursorRef}
         visible={false}
         listening={false}
-        name={`studio-brush-cursor studio-brush-cursor-${mode}`}
+        name={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushCursor", "en", "studio-brush-cursor studio-brush-cursor-{v0}"), { v0: String(mode) })}
         rotation={visual.rotationDeg}
       >
         {visual.showOutline ? (

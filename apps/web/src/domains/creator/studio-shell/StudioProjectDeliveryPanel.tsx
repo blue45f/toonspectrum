@@ -1,4 +1,9 @@
 import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Archive,
   CheckCircle2,
   CircleAlert,
@@ -455,8 +460,7 @@ export function StudioProjectDeliveryPanel({
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            <PackageCheck size={14} aria-hidden="true" /> DELIVERY
-          </p>
+            <PackageCheck size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectDeliveryPanel", "en", "DELIVERY")}</p>
           <h2 id="delivery-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
             {bt("검사한 결과를 안전하게 전달", "Deliver validated work safely")}
           </h2>
@@ -503,8 +507,7 @@ export function StudioProjectDeliveryPanel({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.14em] text-accent">
-                  <FileCheck2 size={14} aria-hidden="true" /> 1. PLATFORM CHECK
-                </p>
+                  <FileCheck2 size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectDeliveryPanel", "en", "1. PLATFORM CHECK")}</p>
                 <h3 id="platform-readiness-title" className="mt-1 text-lg font-black text-fg">
                   {bt("올릴 곳을 고르고 규격부터 확인", "Choose a destination and check its rules")}
                 </h3>
@@ -613,7 +616,7 @@ export function StudioProjectDeliveryPanel({
                       {bt("이 문서에는 가로·세로 크기가 기록되지 않아 규격 적합 여부를 계산하지 않았습니다. 편집기에서 원고 크기를 확인한 뒤 다시 계산하세요.", "This document has no recorded width or height, so no compatibility result was inferred. Confirm the canvas size in the editor and recalculate.")}
                     </p>
                     <Link
-                      href={`/studio/p/${encodeURIComponent(projectId)}/d/${encodeURIComponent(selectedDocument.id)}?workspace=${encodeURIComponent(selectedDocument.defaultWorkspace)}`}
+                      href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectDeliveryPanel", "en", "/studio/p/{v0}/d/{v1}?workspace={v2}"), { v0: String(encodeURIComponent(projectId)), v1: String(encodeURIComponent(selectedDocument.id)), v2: String(encodeURIComponent(selectedDocument.defaultWorkspace)) })}
                       className={cn(buttonClass({ variant: "outline", size: "sm" }), "mt-3")}
                     >
                       {bt("원고 크기 확인", "Check manuscript size")}
@@ -667,7 +670,7 @@ export function StudioProjectDeliveryPanel({
                         {bt("플랫폼 체크리스트 받기", "Download platform checklist")}
                       </button>
                       <Link
-                        href={`/studio/p/${encodeURIComponent(projectId)}/d/${encodeURIComponent(selectedDocument.id)}?workspace=${encodeURIComponent(selectedDocument.defaultWorkspace)}`}
+                        href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectDeliveryPanel", "en", "/studio/p/{v0}/d/{v1}?workspace={v2}"), { v0: String(encodeURIComponent(projectId)), v1: String(encodeURIComponent(selectedDocument.id)), v2: String(encodeURIComponent(selectedDocument.defaultWorkspace)) })}
                         className={buttonClass({ variant: "quiet", size: "sm" })}
                       >
                         {bt("원고 열기", "Open manuscript")}
@@ -681,7 +684,7 @@ export function StudioProjectDeliveryPanel({
 
           <section className="border-t border-line pt-5" aria-labelledby="delivery-method-title">
             <div>
-              <p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-accent">2. DELIVERY METHOD</p>
+              <p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectDeliveryPanel", "en", "2. DELIVERY METHOD")}</p>
               <h3 id="delivery-method-title" className="mt-1 text-lg font-black text-fg">
                 {bt("검사 결과를 어떻게 전달할까요?", "How should the validated work be delivered?")}
               </h3>
@@ -851,7 +854,7 @@ export function StudioProjectDeliveryPanel({
                   <Download size={16} aria-hidden="true" />
                   {bt("패키지 Manifest 받기", "Download package manifest")}
                 </button>
-                <Link href={`/studio/work/${encodeURIComponent(projectId)}/publish`} className={buttonClass({ variant: "outline", className: "gap-2" })}>
+                <Link href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectDeliveryPanel", "en", "/studio/work/{v0}/publish"), { v0: String(encodeURIComponent(projectId)) })} className={buttonClass({ variant: "outline", className: "gap-2" })}>
                   <Send size={16} aria-hidden="true" />
                   {bt("실제 파일 생성으로", "Create output files")}
                 </Link>

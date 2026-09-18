@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   BookOpenCheck,
   ChevronLeft,
   ChevronRight,
@@ -89,7 +93,7 @@ function PagedPublishedWorkReader({
 
   return (
     <section
-      aria-label="페이지 넘김 독자 보기"
+      aria-label={translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "ko", "페이지 넘김 독자 보기")}
       className="mb-8 overflow-hidden rounded-2xl border border-line bg-panel"
       data-reading-direction={direction}
       onKeyDown={onKeyDown}
@@ -97,19 +101,17 @@ function PagedPublishedWorkReader({
     >
       {pages.length === 0 ? (
         <p className="px-4 py-16 text-center text-sm text-fg-3">
-          표시할 페이지가 없습니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "ko", "표시할 페이지가 없습니다.")}</p>
       ) : (
         <>
           <div className="grid min-h-[36rem] place-items-center bg-canvas/60 p-3 sm:p-6">
             <CoverImage
               src={pages[pageIndex] ?? ""}
-              alt={`${title} ${pageIndex + 1}페이지`}
+              alt={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "ko", "{v0} {v1}페이지"), { v0: String(title), v1: String(pageIndex + 1) })}
               className="max-h-[78vh] max-w-full rounded-lg object-contain shadow-lg"
               fallback={
                 <span className="grid aspect-[3/4] w-full max-w-xl place-items-center rounded-lg bg-raised/40 text-xs text-fg-3">
-                  이미지를 불러올 수 없습니다.
-                </span>
+                  {translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "ko", "이미지를 불러올 수 없습니다.")}</span>
               }
             />
           </div>
@@ -150,7 +152,7 @@ function PagedPublishedWorkReader({
 
           {pages.length > 1 && (
             <nav
-              aria-label="페이지 바로가기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "ko", "페이지 바로가기")}
               className="flex gap-2 overflow-x-auto border-t border-line px-3 py-3"
             >
               {pages.map((page, index) => (
@@ -158,13 +160,11 @@ function PagedPublishedWorkReader({
                   key={`${index}-${page.slice(0, 24)}`}
                   type="button"
                   onClick={() => setPageIndex(index)}
-                  aria-label={`${index + 1}페이지로 이동`}
-                  aria-current={index === pageIndex ? "page" : undefined}
-                  className={`relative h-16 w-12 shrink-0 overflow-hidden rounded-md border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-                    index === pageIndex
+                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "ko", "{v0}페이지로 이동"), { v0: String(index + 1) })}
+                  aria-current={index === pageIndex ? translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "en", "page") : undefined}
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "en", "relative h-16 w-12 shrink-0 overflow-hidden rounded-md border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent {v0}"), { v0: String(index === pageIndex
                       ? "border-accent ring-1 ring-accent/30"
-                      : "border-line hover:border-line-strong"
-                  }`}
+                      : "border-line hover:border-line-strong") })}
                 >
                   <CoverImage
                     src={page}
@@ -204,8 +204,7 @@ export function PublishedWorkReader({
     <section aria-labelledby="published-work-reader-heading">
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
         <h2 id="published-work-reader-heading" className="sr-only">
-          작품 독자 보기
-        </h2>
+          {translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "ko", "작품 독자 보기")}</h2>
         <span className="inline-flex items-center gap-1 rounded-full border border-line bg-card px-2.5 py-1 text-[0.7rem] font-semibold text-fg-2">
           {policy.directive.readingMode === "vertical" ? (
             <ScrollText size={12} aria-hidden />
@@ -215,11 +214,9 @@ export function PublishedWorkReader({
           {policy.readingLabel}
         </span>
         <span
-          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold ${
-            policy.directive.contentRating === "mature"
+          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "en", "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold {v0}"), { v0: String(policy.directive.contentRating === "mature"
               ? "border-bad/35 bg-bad/10 text-bad"
-              : "border-line bg-card text-fg-2"
-          }`}
+              : "border-line bg-card text-fg-2") })}
         >
           <ShieldAlert size={12} aria-hidden />
           {policy.contentRatingLabel}
@@ -227,14 +224,12 @@ export function PublishedWorkReader({
         {!policy.commentsAllowed && (
           <span className="inline-flex items-center gap-1 rounded-full border border-line bg-card px-2.5 py-1 text-[0.7rem] font-semibold text-fg-3">
             <MessageCircleOff size={12} aria-hidden />
-            댓글 닫힘
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "ko", "댓글 닫힘")}</span>
         )}
         {!policy.remixAllowed && (
           <span className="inline-flex items-center gap-1 rounded-full border border-line bg-card px-2.5 py-1 text-[0.7rem] font-semibold text-fg-3">
             <Repeat2 size={12} aria-hidden />
-            리믹스 비허용
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "ko", "리믹스 비허용")}</span>
         )}
       </div>
 
@@ -247,12 +242,9 @@ export function PublishedWorkReader({
             <ShieldAlert size={22} aria-hidden />
           </span>
           <h3 id="mature-content-heading" className="mt-4 text-lg font-bold text-fg">
-            성인 대상 콘텐츠입니다
-          </h3>
+            {translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "ko", "성인 대상 콘텐츠입니다")}</h3>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-fg-2">
-            작가가 성인 대상 등급으로 게시한 작품입니다. 민감하거나 강한 표현이 포함될 수
-            있으므로 내용을 확인한 뒤 열어 주세요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "ko", "작가가 성인 대상 등급으로 게시한 작품입니다. 민감하거나 강한 표현이 포함될 수 있으므로 내용을 확인한 뒤 열어 주세요.")}</p>
           <button
             type="button"
             onClick={() => setConfirmedPolicyKey(maturePolicyKey)}
@@ -262,8 +254,7 @@ export function PublishedWorkReader({
               className: "mt-5",
             })}
           >
-            확인하고 작품 보기
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.PublishedWorkReader", "ko", "확인하고 작품 보기")}</button>
         </section>
       ) : policy.directive.readingMode === "vertical" ? (
         <WebtoonFxPlayer pages={pages} fx={fx} title={title} />

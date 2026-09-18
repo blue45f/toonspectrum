@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Accessibility,
   ArrowRight,
   BookOpen,
@@ -319,7 +324,7 @@ export function CreatorHomeExperience() {
           </div>
           <figure className="cf-process-art cf-production-journey">
             <img src="/brand/production-os-journey.svg" alt={copy.flowAlt} width="1600" height="680" loading="lazy" />
-            <figcaption><span>TOONSTUDIO · ALL-IN-ONE CREATION FLOW</span><span>{copy.flowCaption}</span></figcaption>
+            <figcaption><span>{translateCurrentStaticSourceText("domains.marketing.CreatorHomeExperience", "en", "TOONSTUDIO · ALL-IN-ONE CREATION FLOW")}</span><span>{copy.flowCaption}</span></figcaption>
           </figure>
           <ol className="cf-flow-grid">
             {copy.flow.map(({ icon: Icon, title, body, href, action }, index) => (

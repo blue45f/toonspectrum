@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   Check,
@@ -90,6 +91,7 @@ const CHANNEL_CLASS =
 export interface ShareDialogProps {
   readonly payload: SharePayload;
   readonly trigger: ReactElement;
+  readonly defaultOpen?: boolean;
 }
 
 function shareHost(url: string): string {
@@ -100,9 +102,9 @@ function shareHost(url: string): string {
   }
 }
 
-export function ShareDialog({ payload, trigger }: ShareDialogProps) {
+export function ShareDialog({ payload, trigger, defaultOpen = false }: ShareDialogProps) {
   const t = useT();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState<"native" | "kakao" | "qr" | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -303,8 +305,8 @@ export function ShareDialog({ payload, trigger }: ShareDialogProps) {
                 <a
                   key={option.channel}
                   href={shareTargetUrl(option.channel, payload)}
-                  target={email ? undefined : "_blank"}
-                  rel={email ? undefined : "noopener noreferrer"}
+                  target={email ? undefined : translateCurrentStaticSourceText("shared.components.share.dialog", "en", "_blank")}
+                  rel={email ? undefined : translateCurrentStaticSourceText("shared.components.share.dialog", "en", "noopener noreferrer")}
                   onClick={() => recordLinkShare(option.channel)}
                   className={CHANNEL_CLASS}
                 >
@@ -375,7 +377,7 @@ export function ShareDialog({ payload, trigger }: ShareDialogProps) {
 
           {notice && (
             <p
-              role={notice.kind === "error" ? "alert" : "status"}
+              role={notice.kind === "error" ? translateCurrentStaticSourceText("shared.components.share.dialog", "en", "alert") : translateCurrentStaticSourceText("shared.components.share.dialog", "en", "status")}
               aria-live="polite"
               className={cn(
                 "mt-4 rounded-xl border px-3 py-2 text-xs font-medium",

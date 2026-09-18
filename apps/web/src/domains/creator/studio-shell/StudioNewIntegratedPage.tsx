@@ -1,3 +1,7 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { CheckCircle2, LayoutTemplate, X } from "lucide-react";
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";

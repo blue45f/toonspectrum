@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   CheckCircle2,
   Languages,
   Plus,
@@ -391,8 +396,7 @@ export function StudioLocalizationPanel({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            <Languages size={14} aria-hidden="true" /> LOCALIZATION
-          </p>
+            <Languages size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioLocalizationPanel", "en", "LOCALIZATION")}</p>
           <h2 id="localization-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
             {bt("번역부터 레터링 QA까지 한 흐름으로", "From translation to lettering QA in one flow")}
           </h2>

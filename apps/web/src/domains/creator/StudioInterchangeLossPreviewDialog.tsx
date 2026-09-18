@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   Blend,
   CheckCircle2,
@@ -162,7 +166,7 @@ function FindingRow({
                 : "border-line bg-panel text-fg-3",
             )}
           >
-            {finding.gate === "blocking" ? "진행 차단" : "안내"}
+            {finding.gate === "blocking" ? translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "진행 차단") : translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "안내")}
           </span>
         </div>
         <p className="mt-1 break-words text-xs leading-relaxed text-fg-2 [overflow-wrap:anywhere]">
@@ -171,18 +175,18 @@ function FindingRow({
         {detailsOpen ? (
           <div className="mt-2 border-t border-line/75 pt-2 text-[0.68rem] leading-relaxed text-fg-3">
             <dl className="grid grid-cols-[3.2rem_minmax(0,1fr)] gap-x-2 gap-y-1">
-              <dt className="font-semibold text-fg-3">원본</dt>
+              <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "원본")}</dt>
               <dd className="min-w-0 break-words text-fg-2 [overflow-wrap:anywhere]">
                 {finding.sourceValue}
               </dd>
-              <dt className="font-semibold text-fg-3">가져온 뒤</dt>
+              <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "가져온 뒤")}</dt>
               <dd className="min-w-0 break-words text-fg-2 [overflow-wrap:anywhere]">
                 {finding.resultValue}
               </dd>
             </dl>
             <p className="mt-1.5">{finding.detail}</p>
             {finding.notes.length > 0 ? (
-              <ul className="mt-1.5 space-y-1" aria-label={`${finding.label} 추가 안내`}>
+              <ul className="mt-1.5 space-y-1" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "{v0} 추가 안내"), { v0: String(finding.label) })}>
                 {finding.notes.map((note, index) => (
                   <li key={`${finding.category}-${index}`} className="flex items-start gap-1.5">
                     <Info size={12} className="mt-0.5 shrink-0" aria-hidden />
@@ -272,19 +276,17 @@ export function StudioInterchangeLossPreviewDialog({
             <ShieldAlert size={17} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[0.65rem] font-bold uppercase text-accent">{summary.formatLabel} 가져오기</p>
+            <p className="text-[0.65rem] font-bold uppercase text-accent">{summary.formatLabel} {translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "가져오기")}</p>
             <h2 id={titleId} className="mt-0.5 break-words text-sm font-bold tracking-tight text-fg [overflow-wrap:anywhere]">
-              변환 전 손실 확인
-            </h2>
+              {translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "변환 전 손실 확인")}</h2>
             <p id={descriptionId} className="mt-0.5 break-words text-[0.7rem] leading-relaxed text-fg-3 [overflow-wrap:anywhere]">
-              <span className="font-semibold text-fg-2">{summary.fileName}</span>을 가져온 뒤 유지되는 내용을 먼저 확인하세요.
-            </p>
+              <span className="font-semibold text-fg-2">{summary.fileName}</span>{translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "을 가져온 뒤 유지되는 내용을 먼저 확인하세요.")}</p>
           </div>
           <button
             type="button"
             onClick={dismiss}
             disabled={busy}
-            aria-label="손실 확인 창 닫기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "손실 확인 창 닫기")}
             className={cn(
               "grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised hover:text-fg disabled:cursor-wait disabled:opacity-45 sm:size-10 pointer-coarse:size-11",
               STUDIO_EASE,
@@ -301,7 +303,7 @@ export function StudioInterchangeLossPreviewDialog({
               "flex items-start gap-3 rounded-xl border p-3",
               STATUS_CLASSES[summary.status],
             )}
-            role={summary.status === "blocked" ? "alert" : "status"}
+            role={summary.status === "blocked" ? translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "en", "status")}
           >
             <span className={cn("grid size-9 shrink-0 place-items-center rounded-lg", STATUS_ICON_CLASSES[summary.status])}>
               <StatusIcon status={summary.status} />
@@ -320,10 +322,9 @@ export function StudioInterchangeLossPreviewDialog({
               disabled={busy}
               aria-describedby={selectionMissing ? `${choicesHintId} ${choicesErrorId}` : choicesHintId}
             >
-              <legend className="px-1 text-xs font-bold text-fg">가져올 위치</legend>
+              <legend className="px-1 text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "가져올 위치")}</legend>
               <p id={choicesHintId} className="mb-2 text-[0.68rem] leading-relaxed text-fg-3">
-                원본 구조와 현재 작업 흐름에 맞는 배치 방식을 선택하세요.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "원본 구조와 현재 작업 흐름에 맞는 배치 방식을 선택하세요.")}</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {visibleChoices.map((choice) => {
                   const selected = choice.id === selectedChoiceId && !choice.disabled;
@@ -342,7 +343,7 @@ export function StudioInterchangeLossPreviewDialog({
                     >
                       <input
                         type="radio"
-                        name={`${id}-destination`}
+                        name={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "en", "{v0}-destination"), { v0: String(id) })}
                         value={choice.id}
                         aria-label={`${choice.label}. ${choice.description}`}
                         aria-describedby={choicesHintId}
@@ -365,8 +366,7 @@ export function StudioInterchangeLossPreviewDialog({
                           {choice.label}
                           {choice.recommended ? (
                             <span className="rounded-full bg-good/10 px-2 py-0.5 text-[0.6rem] font-bold text-good">
-                              권장
-                            </span>
+                              {translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "권장")}</span>
                           ) : null}
                         </span>
                         <span className="mt-0.5 block break-words text-[0.68rem] leading-relaxed text-fg-3 [overflow-wrap:anywhere]">
@@ -383,16 +383,15 @@ export function StudioInterchangeLossPreviewDialog({
                   className="mt-2 flex items-center gap-1.5 text-[0.68rem] font-semibold text-warn"
                   role="status"
                 >
-                  <AlertTriangle size={13} aria-hidden /> 가져올 위치를 선택해야 계속할 수 있습니다.
-                </p>
+                  <AlertTriangle size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "가져올 위치를 선택해야 계속할 수 있습니다.")}</p>
               ) : null}
             </fieldset>
           ) : null}
 
           <div className="mt-3 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="text-xs font-bold text-fg">변환 항목</h3>
-              <p className="mt-0.5 text-[0.68rem] text-fg-3">원본과 가져온 뒤 상태를 7개 기준으로 비교합니다.</p>
+              <h3 className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "변환 항목")}</h3>
+              <p className="mt-0.5 text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "원본과 가져온 뒤 상태를 7개 기준으로 비교합니다.")}</p>
             </div>
             <button
               type="button"
@@ -405,7 +404,7 @@ export function StudioInterchangeLossPreviewDialog({
                 STUDIO_FOCUS_RING,
               )}
             >
-              {detailsOpen ? "세부 정보 접기" : "세부 정보 보기"}
+              {detailsOpen ? translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "세부 정보 접기") : translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "세부 정보 보기")}
               <ChevronDown
                 size={14}
                 className={cn("transition-transform motion-reduce:transition-none", detailsOpen && "rotate-180")}
@@ -414,7 +413,7 @@ export function StudioInterchangeLossPreviewDialog({
             </button>
           </div>
 
-          <ol id={detailsId} className="mt-2 grid gap-2 sm:grid-cols-2" aria-label="가져오기 변환 항목">
+          <ol id={detailsId} className="mt-2 grid gap-2 sm:grid-cols-2" aria-label={translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "가져오기 변환 항목")}>
             {summary.findings.map((finding) => (
               <FindingRow key={finding.category} finding={finding} detailsOpen={detailsOpen} />
             ))}
@@ -425,8 +424,7 @@ export function StudioInterchangeLossPreviewDialog({
           {busy ? (
             <p className="mb-2 flex items-center gap-2 text-[0.68rem] font-semibold text-accent" role="status" aria-live="polite">
               <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
-              파일을 안전하게 가져오는 중입니다. 필요하면 아래에서 중단할 수 있어요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "파일을 안전하게 가져오는 중입니다. 필요하면 아래에서 중단할 수 있어요.")}</p>
           ) : null}
           <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
             <button
@@ -442,7 +440,7 @@ export function StudioInterchangeLossPreviewDialog({
                 STUDIO_FOCUS_RING,
               )}
             >
-              {busy ? "가져오기 중단" : "취소"}
+              {busy ? translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "가져오기 중단") : translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "취소")}
             </button>
             <button
               type="button"
@@ -458,7 +456,7 @@ export function StudioInterchangeLossPreviewDialog({
               )}
             >
               {busy ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-              {summary.status === "blocked" ? "먼저 문제 해결" : resolvedConfirmLabel}
+              {summary.status === "blocked" ? translateCurrentStaticSourceText("domains.creator.StudioInterchangeLossPreviewDialog", "ko", "먼저 문제 해결") : resolvedConfirmLabel}
             </button>
           </div>
         </footer>

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { LoaderCircle, LogOut, Library, Mail, RotateCcw, UserRound, Settings as SettingsIcon, Shield } from "lucide-react";
 import { useState, useEffect, useId, useRef } from "react";
@@ -181,7 +185,7 @@ export function AuthMenu({
         className="relative grid size-10 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent outline-none transition-transform active:scale-95"
         aria-label={
           unreadMessageCount > 0
-            ? `${t("auth.menu.triggerLabel")} · 읽지 않은 메시지 ${unreadMessageCount.toLocaleString("ko-KR")}개`
+            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.auth.components.auth.menu", "ko", "{v0} · 읽지 않은 메시지 {v1}개"), { v0: String(t("auth.menu.triggerLabel")), v1: String(unreadMessageCount.toLocaleString("ko-KR")) })
             : t("auth.menu.triggerLabel")
         }
       >
@@ -223,7 +227,7 @@ export function AuthMenu({
           <DropdownMenu.Item asChild>
             <Link href="/messages" className={ITEM_CLASS}>
               <Mail size={15} />
-              <span>메시지</span>
+              <span>{translateCurrentStaticSourceText("domains.auth.components.auth.menu", "ko", "메시지")}</span>
               {unreadMessageCount > 0 ? (
                 <span className="ml-auto min-w-5 rounded-full bg-accent px-1.5 py-0.5 text-center text-[0.65rem] font-bold text-on-accent">
                   {unreadMessageCount > 99 ? "99+" : unreadMessageCount}
