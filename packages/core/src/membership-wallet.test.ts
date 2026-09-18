@@ -14,10 +14,13 @@ describe("membership wallet policy", () => {
     expect(highestMembershipPlan([])).toBe("free");
   });
 
-  it("keeps credits internal while exposing activity points", () => {
+  it("separates membership credits from reward points while payments stay off", () => {
     expect(MEMBERSHIP_ECONOMY_POLICY.publicAsset).toBe("reward_point");
+    expect(MEMBERSHIP_ECONOMY_POLICY.studioCreditsEnabled).toBe(true);
+    expect(MEMBERSHIP_ECONOMY_POLICY.membershipCreditsEnabled).toBe(true);
     expect(MEMBERSHIP_ECONOMY_POLICY.creditPurchasesEnabled).toBe(false);
     expect(MEMBERSHIP_ECONOMY_POLICY.paymentsEnabled).toBe(false);
+    expect(MEMBERSHIP_ECONOMY_POLICY.pointExpiryDays).toBe(365);
     expect(ACTIVITY_POINT_POLICIES["creator.work.published"].points).toBe(100);
     expect(ACTIVITY_POINT_POLICIES["community.comment.created"].dailyGrantLimit).toBe(10);
   });
@@ -42,6 +45,11 @@ describe("membership wallet policy", () => {
     expect(team.entitlements["collaboration.members"]).toBeGreaterThan(
       creator.entitlements["collaboration.members"] as number,
     );
+    expect(free.entitlements["storage.bytes"]).toBe(10_000_000_000);
+    expect(creator.entitlements["storage.bytes"]).toBe(100_000_000_000);
+    expect(team.entitlements["storage.bytes"]).toBe(1_000_000_000_000);
+    expect(free.entitlements["credit.monthlyIncluded"]).toBe(500);
+    expect(team.entitlements["credit.sharedPool"]).toBe(true);
     expect(free.entitlements["storage.warningRatio"]).toBe(0.8);
   });
 });
