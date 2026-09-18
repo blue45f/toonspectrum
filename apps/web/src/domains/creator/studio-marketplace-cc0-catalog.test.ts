@@ -16,8 +16,8 @@ afterEach(() => vi.unstubAllGlobals());
 describe("reviewed market CC0 delivery", () => {
   it("pins every marketplace-ready entry to the actual delivery manifest and file bytes", () => {
     const catalog = parseStudioCc0Catalog(JSON.parse(readFileSync(new URL("manifest.json", root), "utf8")));
-    expect(STUDIO_MARKETPLACE_CC0_ASSETS).toHaveLength(338);
-    expect(new Set(STUDIO_MARKETPLACE_CC0_ASSETS.map(a => a.id)).size).toBe(338);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS).toHaveLength(334);
+    expect(new Set(STUDIO_MARKETPLACE_CC0_ASSETS.map(a => a.id)).size).toBe(334);
     expect(STUDIO_MARKETPLACE_CC0_ASSETS).toEqual(catalog.filter(isStudioCc0MarketplaceReady).toSorted((a, b) =>
       ["background", "prop-image", "model", "surface-texture", "effect-mask"].indexOf(a.kind)
         - ["background", "prop-image", "model", "surface-texture", "effect-mask"].indexOf(b.kind)
@@ -39,7 +39,7 @@ describe("reviewed market CC0 delivery", () => {
     expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "prop-image")).toHaveLength(71);
     expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "model")).toHaveLength(50);
     expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "surface-texture")).toHaveLength(82);
-    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "effect-mask")).toHaveLength(96);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "effect-mask")).toHaveLength(92);
     for (const asset of STUDIO_MARKETPLACE_CC0_ASSETS) {
       if (asset.kind === "model") {
         expect(asset.studioRuntimeVerified).toBe(true);

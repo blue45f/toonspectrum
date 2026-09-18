@@ -61,3 +61,18 @@ Validation for this completion pass:
 - pre-commit ESLint + secret scan: pass.
 
 The repository-wide TypeScript and Vite bundle gates remain blocked by unrelated failures already present on the current `main`. A clean TypeScript replay reports no diagnostics in any TS/TSX/MTS file changed by this branch; the bundle reaches duplicate declaration/import failures in unrelated legal/i18n and Studio-shell sources. Those files are unchanged by this curation branch, while the asset-specific tests and audits above pass.
+
+
+## Post-curation hardening — 2026-09-18
+
+The follow-up pass converts the remaining cleanup work into repeatable quality gates instead of one-off manual decisions.
+
+- Creator Essentials pose entries now share one source-of-truth hero preview between matching 2D turnaround and 3D mannequin records. Eight duplicate SVG aliases were removed without changing the public manifest IDs or pose content.
+- The repository-wide visual audit now classifies exact duplicate groups. On the current main-derived tree it reports **2,451 tracked visual assets**, **28 exact-duplicate groups / 68 files**, and **0 unexpected duplicate groups**. The remaining duplicates are explicit Android/iOS splash contracts, install/brand aliases, legacy background URL compatibility, or one reviewed assembly-model preview collision.
+- Four legacy Studio backgrounds (`webtoon-cafe`, `webtoon-classroom`, `webtoon-corridor`, `webtoon-street`) remain outside the default picker because their provenance is still unverified and their content contains people and/or text. Their compatibility paths are retained for previously saved documents instead of deleting a live legacy contract.
+- All **1,427** reviewed CC0 records are now classified: **334 Marketplace-ready**, **4 Studio-only finished assets**, **291 Studio assembly components**, and **798 runtime-pending 3D models**. There are no unclassified or review-pending records.
+- Marketplace similarity auditing evaluates the **338** policy-qualified candidates in a real Chromium image decoder using dHash, aHash and a 16×16 luminance/alpha signature. Five near-duplicate relationships collapse four effect-mask aliases (`star-02`, `trace-02`, `trace-02-rotated`, `trace-03`) onto retained canonical siblings. The final **334** Marketplace records contain no unresolved near-duplicate pairs at the committed thresholds, and every exclusion is anchored to a retained canonical asset.
+- CC0 parsing now binds the known provider name to its official hostname and validates the canonical CC0 license URL plus optional review date shape, preventing a trusted provider label from being paired with another host.
+- The generated Marketplace CC0 catalogue is isolated into its own named bundle chunk and excluded from entry-document modulepreload so unrelated routes do not eagerly prioritize the ~300 KiB source data leaf.
+
+These gates are available through `pnpm run verify:asset-postcuration` and are backed by the focused Studio/Marketplace regression suite.

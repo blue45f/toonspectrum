@@ -1,6 +1,6 @@
 /** Deterministic original geometry and comic construction assets; no external downloads. */
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 
 import { Document, NodeIO } from "@gltf-transform/core";
 import { BoxGeometry, CylinderGeometry, SphereGeometry, Matrix4, Quaternion, Vector3 } from "three";
@@ -19,15 +19,33 @@ const xml = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&
 function svg(body: string, label: string, width = 480, height = 480): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img"><title>${xml(label)}</title>${body}</svg>\n`;
 }
-function register(id: string, kind: string, label: Text, tags: string[], data: string | Uint8Array, preview?: string, width = 480, height = 480) {
+function register(
+  id: string,
+  kind: string,
+  label: Text,
+  tags: string[],
+  data: string | Uint8Array,
+  preview?: string,
+  width = 480,
+  height = 480,
+  sharedPreviewFilename?: string,
+) {
   const extension = kind.endsWith("3d") ? "glb" : "svg";
   const filename = `${id}.${extension}`;
   writeFileSync(new URL(filename, output), data);
   const sourceTruthPropPreview = kind === "prop-3d" && Boolean(preview);
-  if (preview && !sourceTruthPropPreview) writeFileSync(new URL(`${id}.preview.svg`, output), preview);
-  const previewFilename = sourceTruthPropPreview ? `${id}.preview.png` : preview ? `${id}.preview.svg` : filename;
-  if (sourceTruthPropPreview && !existsSync(new URL(previewFilename, output))) {
-    throw new Error(`${id}: missing actual-GLB rendered preview. Run scripts/render-creator-essential-prop-thumbnails.py with Blender.`);
+  const ownedPreviewFilename = `${id}.preview.svg`;
+  if (sharedPreviewFilename) {
+    // 2D turnaround and 3D mannequin entries for the same pose intentionally share the
+    // exact same hero poster. Keep one source-of-truth binary instead of tracking an alias.
+    rmSync(new URL(ownedPreviewFilename, output), { force: true });
+  } else if (preview && !sourceTruthPropPreview) {
+    writeFileSync(new URL(ownedPreviewFilename, output), preview);
+  }
+  const previewFilename = sharedPreviewFilename
+    ?? (sourceTruthPropPreview ? `${id}.preview.png` : preview ? ownedPreviewFilename : filename);
+  if ((sourceTruthPropPreview || sharedPreviewFilename) && !existsSync(new URL(previewFilename, output))) {
+    throw new Error(`${id}: missing source-of-truth preview ${previewFilename}.`);
   }
   const bytes = typeof data === "string" ? Buffer.from(data) : data;
   assets.push({ id, kind, label, tags, url: `/creator-essentials/${filename}`, preview: `/creator-essentials/${previewFilename}`, sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.byteLength, width, height });
@@ -219,7 +237,17 @@ for (const [id,label,overrides] of poses) {
   const views = [0,Math.PI/2,0.62].map((angle,index) => poseThumbnail(overrides,label.ko,angle,index<2 ? 0 : 0.2).replace("<svg ",`<svg x="${index*480}" y="36" `)).join("");
   const captions = ["FRONT","SIDE","THREE-QUARTER"].map((caption,index) => `<text x="${240+index*480}" y="536" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#243743">${caption}</text>`).join("");
   const sheet = svg(`<rect width="1440" height="550" fill="#f4f1eb"/><text x="24" y="25" font-family="sans-serif" font-size="18" fill="#243743">${xml(label.ko)} · ${xml(label.en)}</text>${views}${captions}`,label.ko,1440,550);
-  register(`pose-${id}-2d`,"pose-2d",label,["character","pose","turnaround","캐릭터","포즈","3면도"],sheet,poster,1440,550);
+  register(
+    `pose-${id}-2d`,
+    "pose-2d",
+    label,
+    ["character", "pose", "turnaround", "캐릭터", "포즈", "3면도"],
+    sheet,
+    poster,
+    1440,
+    550,
+    `pose-${id}-3d.preview.svg`,
+  );
 }
 for (const [id,label,parts] of props) register(`prop-${id}`,"prop-3d",label,["background","prop","model","배경","소품","모델"],await model(parts,label.en),thumbnail(parts,label.ko));
 const manifest = { version: 1, license: "CC0-1.0", generator: "scripts/generate-creator-essentials.mts", purpose: "Original construction references; no rigging, animation or automated image reconstruction", assets };

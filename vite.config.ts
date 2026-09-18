@@ -40,6 +40,7 @@ const ENTRY_PRELOAD_EXCLUSIONS = [
   "three-vrm.module",
   "GLTFLoader",
   "lucide-studio-core-icons",
+  "studio-marketplace-cc0-catalog",
   "i18n",
 ];
 const INITIAL_ICON_MODULES = new Set([
