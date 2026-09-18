@@ -24,10 +24,9 @@ import {
   type StudioProjectDocumentEntry,
   type StudioProjectDocumentState,
 } from "../studio-project-document-store";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { removeStudioExactResumeContext } from "../studio-exact-resume-context";
+
+type Locale = "ko" | "en";
 
 export interface StudioProjectDocumentsController {
   readonly state: StudioProjectDocumentState | null;
@@ -140,6 +139,7 @@ export function useStudioProjectDocuments(
   )), [projectId, run]);
   const removePermanently = useCallback((documentId: string) => run(() => {
     permanentlyDeleteStudioProjectDocument(window.localStorage, projectId, documentId, { target: window });
+    removeStudioExactResumeContext(window.localStorage, projectId, documentId);
     return true;
   }) ?? false, [projectId, run]);
   const setWorkspace = useCallback((documentId: string, workspace: StudioDocumentWorkspace) => run(() => (

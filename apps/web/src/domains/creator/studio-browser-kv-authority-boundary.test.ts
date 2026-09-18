@@ -446,6 +446,7 @@ const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   // Project content, history, comments, collaboration and source files remain outside this store.
   allow("apps/web/src/domains/creator/studio-resume-checkpoint.ts", "durable-storage-write", "\"toonstudio:studio-resume-checkpoints:v1\"", 1, UI_ONLY, UI_PROOF),
   allow("apps/web/src/domains/creator/studio-workspaces.ts", "durable-storage-write", "studioWorkspaceStorageKey(userId)", 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
+  allow("apps/web/src/domains/creator/studio-exact-resume-context.ts", "durable-storage-write", "studioExactResumeStorageKey(context.projectId,context.documentId)", 1, UI_ONLY, UI_PROOF),
 
   // Injected localStorage-compatible codecs retained outside product authority selection.
   allow("apps/web/src/domains/creator/studio-animatic-timeline.ts", "durable-storage-write", "studioAnimaticStorageKey(document.workScope)", 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
