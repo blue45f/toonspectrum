@@ -96,6 +96,7 @@ export function translateBilingualText(
   scope: string,
   value: BilingualText,
 ): string {
+  if (value.ko === value.en) return value.ko;
   return t(defineBilingualAutoText(scope, value.ko, value.en));
 }
 
