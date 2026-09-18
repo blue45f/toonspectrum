@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 
 import {
   ACTIVITY_POINT_POLICIES,
+  CREATOR_LEVEL_AUTO_POLICIES,
   MEMBERSHIP_ECONOMY_POLICY,
   MEMBERSHIP_PLAN_POLICIES,
 } from "../../../../../packages/core/src/membership-wallet";
@@ -30,6 +31,24 @@ import {
 import { useApp } from "@/shared/lib/store";
 
 const number = new Intl.NumberFormat("ko-KR");
+const creatorLevelLabels: Record<string, string> = {
+  new: "New",
+  verified: "Verified",
+  active: "Active Creator",
+  trusted: "Trusted Creator",
+  professional: "Professional",
+  partner: "Partner",
+};
+const ledgerActionLabels: Record<string, string> = {
+  grant: "지급",
+  reserve: "사용 예약",
+  capture: "사용 확정",
+  release: "예약 해제",
+  refund: "환불",
+  expire: "만료",
+  adjustment: "조정",
+  reversal: "취소",
+};
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1_000_000_000) {
@@ -108,9 +127,9 @@ export function MembershipPolicyPage() {
               오래 창작할 수 있게.
             </h1>
             <p className="mt-5 max-w-3xl text-base leading-7 text-fg-2 sm:text-lg">
-              현재는 실제 결제를 받지 않습니다. 사용자에게 보이는 재화는 활동 포인트 하나로
-              운영하고, 멤버십은 저장공간·업로드·협업 같은 서비스 자원 한도를 정의하는
-              권한 등급으로 사용합니다.
+              현재는 실제 결제를 받지 않습니다. 활동 보상은 Reward Point로,
+              향후 ToonSpectrum이 비용을 부담하는 AI·서버 렌더에는 Studio Credit을 사용합니다.
+              개인 API 키·Creator Runtime·브라우저 로컬 작업에는 Credit을 차감하지 않습니다.
             </p>
             <div className="mt-6 flex flex-wrap gap-2 text-xs font-bold">
               <span className="rounded-full border border-line bg-card px-3 py-2">
@@ -127,7 +146,7 @@ export function MembershipPolicyPage() {
         </header>
 
         {overview && (
-          <section className="mt-6 grid gap-4 sm:grid-cols-3" aria-label="내 멤버십 현황">
+          <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="내 멤버십 현황">
             <article className="rounded-2xl border border-line bg-panel p-5">
               <BadgeCheck className="text-accent" size={20} aria-hidden />
               <p className="mt-3 text-xs font-bold text-fg-3">현재 멤버십</p>
@@ -141,12 +160,114 @@ export function MembershipPolicyPage() {
               </p>
             </article>
             <article className="rounded-2xl border border-line bg-panel p-5">
+              <Sparkles className="text-accent" size={20} aria-hidden />
+              <p className="mt-3 text-xs font-bold text-fg-3">Studio Credit</p>
+              <p className="mt-1 text-2xl font-black tabular-nums text-fg">
+                {number.format(overview.wallet.studioCredits.available)} C
+              </p>
+              <p className="mt-1 text-xs text-fg-3">
+                월 {number.format(overview.creditCycle.monthlyIncluded)} C · 오늘 잔여 {number.format(overview.creditCycle.remainingToday)} C
+              </p>
+            </article>
+            <article className="rounded-2xl border border-line bg-panel p-5">
               <Gauge className="text-accent" size={20} aria-hidden />
               <p className="mt-3 text-xs font-bold text-fg-3">누적 활동 포인트</p>
               <p className="mt-1 text-2xl font-black tabular-nums text-fg">
                 {number.format(overview.wallet.points.lifetimeGranted)} P
               </p>
             </article>
+          </section>
+        )}
+
+        {overview && overview.recentLedger.length > 0 && (
+          <section className="mt-6 rounded-3xl border border-line bg-panel p-6" aria-labelledby="wallet-history-title">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-black tracking-[0.14em] text-accent">WALLET LEDGER</p>
+                <h2 id="wallet-history-title" className="mt-1 text-xl font-black text-fg">최근 포인트·Credit 내역</h2>
+              </div>
+              <span className="text-xs font-semibold text-fg-3">최근 {Math.min(overview.recentLedger.length, 8)}건</span>
+            </div>
+            <div className="mt-4 divide-y divide-line/70">
+              {overview.recentLedger.slice(0, 8).map((entry) => {
+                const unit = entry.asset === "reward_point" ? "P" : "C";
+                const delta = entry.deltaAvailable;
+                const amount = delta === 0 ? entry.amount : Math.abs(delta);
+                const sign = delta > 0 ? "+" : delta < 0 ? "-" : "";
+                return (
+                  <div key={entry.id} className="grid gap-2 py-3 text-sm sm:grid-cols-[7rem_1fr_auto] sm:items-center">
+                    <span className="font-bold text-fg">
+                      {entry.asset === "reward_point" ? "Reward Point" : "Studio Credit"}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="font-semibold text-fg-2">{ledgerActionLabels[entry.entryType] ?? entry.entryType}</span>
+                      <span className="ml-2 text-xs text-fg-3">{entry.reason}</span>
+                    </span>
+                    <span className="font-black tabular-nums text-fg">
+                      {sign}{number.format(amount)} {unit}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {overview && (
+          <section className="mt-10 rounded-3xl border border-line bg-panel p-6 sm:p-8" aria-labelledby="creator-level-title">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-black tracking-[0.14em] text-accent">CREATOR LEVEL</p>
+                <h2 id="creator-level-title" className="mt-2 text-2xl font-black text-fg">
+                  활동과 검증을 분리한 창작자 등급
+                </h2>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-fg-2">
+                  결제 멤버십과 창작자 등급은 별개입니다. Creator 인증, 공개 작품 수,
+                  서버가 확인한 정상 활동 포인트로 자동 등급을 계산하고 Partner는 운영 검토로만 부여합니다.
+                </p>
+              </div>
+              <span className="rounded-full border border-accent/30 bg-accent-soft px-4 py-2 text-sm font-black text-accent">
+                {creatorLevelLabels[overview.creatorProgress.effectiveLevel] ?? overview.creatorProgress.effectiveLevel}
+              </span>
+            </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-card/55 p-4">
+                <p className="text-xs font-bold text-fg-3">Creator 인증</p>
+                <p className="mt-1 font-black text-fg">
+                  {overview.creatorProgress.metrics.verifiedCreator ? "완료" : "필요"}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-card/55 p-4">
+                <p className="text-xs font-bold text-fg-3">공개 작품</p>
+                <p className="mt-1 font-black text-fg">
+                  {number.format(overview.creatorProgress.metrics.publishedWorks)}개
+                </p>
+              </div>
+              <div className="rounded-2xl bg-card/55 p-4">
+                <p className="text-xs font-bold text-fg-3">등급 산정 활동 포인트</p>
+                <p className="mt-1 font-black text-fg">
+                  {number.format(overview.creatorProgress.metrics.activityPoints)} P
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              {Object.entries(CREATOR_LEVEL_AUTO_POLICIES)
+                .filter(([level]) => level !== "new")
+                .map(([level, policy]) => (
+                  <div key={level} className="rounded-2xl border border-line bg-card/35 p-4 text-sm">
+                    <p className="font-black text-fg">{creatorLevelLabels[level] ?? level}</p>
+                    <p className="mt-2 text-xs leading-5 text-fg-3">
+                      Creator 인증 {policy.verifiedCreator ? "필수" : "선택"}
+                      {policy.publishedWorks > 0 ? ` · 공개 작품 ${number.format(policy.publishedWorks)}+` : ""}
+                      {policy.activityPoints > 0 ? ` · 활동 ${number.format(policy.activityPoints)}P+` : ""}
+                    </p>
+                  </div>
+                ))}
+            </div>
+            <p className="mt-4 text-xs leading-5 text-fg-3">
+              Trust Level과 Seller Level은 신고·저작권·판매자 검증 등 별도 운영 신호로 관리하며,
+              Creator Level과 합산하지 않습니다. 관리자 수동 등급이 있으면 자동 계산이 덮어쓰지 않습니다.
+            </p>
           </section>
         )}
 
@@ -175,6 +296,18 @@ export function MembershipPolicyPage() {
                     <dt className="text-fg-3">저장공간</dt>
                     <dd className="font-bold text-fg">
                       {formatBytes(Number(plan.entitlements["storage.bytes"]))}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-fg-3">월 Studio Credit</dt>
+                    <dd className="font-bold text-fg">
+                      {number.format(Number(plan.entitlements["credit.monthlyIncluded"]))} C
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-fg-3">일일 Credit 한도</dt>
+                    <dd className="font-bold text-fg">
+                      {number.format(Number(plan.entitlements["credit.dailyLimit"]))} C
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3">
@@ -253,11 +386,12 @@ export function MembershipPolicyPage() {
           <div className="space-y-4">
             <article className="rounded-3xl border border-line bg-panel p-6">
               <ShieldCheck className="text-accent" size={22} aria-hidden />
-              <h2 className="mt-4 text-xl font-black text-fg">지금은 크레딧을 따로 팔지 않습니다</h2>
+              <h2 className="mt-4 text-xl font-black text-fg">Studio Credit은 멤버십 포함분으로 운영합니다</h2>
               <p className="mt-3 text-sm leading-6 text-fg-2">
-                실제 결제가 없는 현재 단계에서는 포인트와 크레딧을 두 개의 잔액으로 보여주지
-                않습니다. 유료 AI·서버 렌더처럼 실제 비용형 기능이 생길 때만 별도 크레딧 도입을
-                다시 검토합니다.
+                매월 멤버십에 포함된 Studio Credit이 지급되며 다음 월로 이월되지 않습니다.
+                플랜 승급 시에는 해당 월 목표량과의 차액만 추가 지급됩니다. 현재 운영 중인 개인
+                API 키·개인 Creator Runtime·브라우저 로컬 작업에는 차감하지 않으며, 향후 플랫폼
+                비용형 AI·서버 렌더 기능이 활성화될 때만 사용합니다. 추가 구매는 현재 비활성입니다.
               </p>
             </article>
             <article className="rounded-3xl border border-line bg-panel p-6">
@@ -277,7 +411,8 @@ export function MembershipPolicyPage() {
           <ul className="mt-5 grid gap-3 text-sm leading-6 text-fg-2 md:grid-cols-2">
             <li className="rounded-2xl bg-card/55 p-4">• 베타 무료 이용 중에도 저장공간·파일 크기·동시 처리량 같은 안전 한도는 유지됩니다.</li>
             <li className="rounded-2xl bg-card/55 p-4">• 표시된 파일 한도는 계정의 상위 한도입니다. PSD·3D·실시간 동기화 등 포맷별 안전 한도가 더 낮으면 해당 기능의 기술 한도가 우선합니다.</li>
-            <li className="rounded-2xl bg-card/55 p-4">• 활동 포인트는 {economy.pointExpiryDays === null ? "현재 만료되지 않습니다." : "유효기간이 적용됩니다."}</li>
+            <li className="rounded-2xl bg-card/55 p-4">• 활동 포인트는 지급일로부터 {economy.pointExpiryDays ?? "무기한"}일 동안 유효하며, 만료가 가까운 무료 재화부터 먼저 사용합니다.</li>
+            <li className="rounded-2xl bg-card/55 p-4">• 멤버십 Studio Credit은 월별로 새로 지급되고 이월되지 않으며, 플랜별 일일 사용 한도도 함께 적용됩니다.</li>
             <li className="rounded-2xl bg-card/55 p-4">• 같은 글·댓글·작품 ID는 중복 적립되지 않으며 활동별 하루 적립 횟수가 제한됩니다.</li>
             <li className="rounded-2xl bg-card/55 p-4">• 멤버십 상향은 포인트를 자동 소모하지 않으며, 현재는 베타·프로모션·운영 정책으로 별도 부여됩니다.</li>
           </ul>
