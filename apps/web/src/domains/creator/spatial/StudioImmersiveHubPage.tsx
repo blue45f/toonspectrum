@@ -1,8 +1,12 @@
 import {
   formatI18nTemplate,
   resolveUiLocale,
+  translateBilingualValueForActiveLocale,
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
+  useBilingual,
+  useBilingualI18nRevision,
+  useBilingualLocalizer,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
@@ -26,11 +30,11 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
+
 import { cn } from "@/shared/lib/utils";
 import {
   inspectStudioImmersiveCapabilities,
@@ -46,10 +50,7 @@ import {
   type StudioImmersiveStage,
 } from "./studio-immersive-workflows";
 import { SpatialWebtoonReaderLauncher } from "./SpatialWebtoonReaderLauncher";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
+
 
 type Locale = string;
 type Icon = ComponentType<{ size?: number; className?: string; "aria-hidden"?: boolean }>;
