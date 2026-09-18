@@ -457,3 +457,26 @@ export function selectNextAlarmAt(
   ];
   return candidates.length > 0 ? Math.min(...candidates) : null;
 }
+
+export function selectAlarmCoveringCleanupWindow(
+  nowMs: number,
+  cleanupIntervalMs: number,
+  currentAlarmAt: number | null,
+  connectionExpirations: readonly number[],
+): number | null {
+  const cleanupDeadline = nowMs + cleanupIntervalMs;
+  const candidates = [
+    ...(currentAlarmAt !== null && currentAlarmAt > nowMs
+      ? [currentAlarmAt]
+      : []),
+    ...connectionExpirations.filter(
+      (expiresAtMs) =>
+        Number.isSafeInteger(expiresAtMs) && expiresAtMs > nowMs,
+    ),
+  ];
+  if (candidates.length === 0) {
+    return null;
+  }
+  const earliestAlarmAt = Math.min(...candidates);
+  return earliestAlarmAt <= cleanupDeadline ? earliestAlarmAt : null;
+}

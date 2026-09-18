@@ -42,6 +42,16 @@ describe("P2P launcher consent and lifetime", () => {
     fireEvent.click(screen.getByRole("button", { name: "나가기" }));
     expect(track.stop).toHaveBeenCalledOnce();
   });
+  it("starts the virtual studio only after explicit P2P participation", () => {
+    environment(); render(view(fixture()));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
+    expect(screen.queryByRole("application", { name: /가상 스튜디오 지도/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }));
+    expect(screen.getByRole("application", { name: /가상 스튜디오 지도/ })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: /근접 미디어/ })).toBeTruthy();
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
   it("collapses an expanded huddle during a canvas stroke without leaving", () => {
     environment(); render(view(fixture()));
     fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));

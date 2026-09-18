@@ -337,8 +337,27 @@ function securityHeaders(contentType: string): Record<string, string> {
 }
 
 function safeErrorCode(error: unknown): string {
-  if (error instanceof DesktopSyncConflictResolutionError) return error.code;
-  if (error instanceof DesktopConflictServerError) return error.code;
+  if (error instanceof DesktopSyncConflictResolutionError) {
+    switch (error.code) {
+      case "decision-invalid": return "decision-invalid";
+      case "decision-missing": return "decision-missing";
+      case "integrity": return "integrity";
+      case "no-conflicts": return "no-conflicts";
+      case "stale-report": return "stale-report";
+      case "unresolved-after-apply": return "unresolved-after-apply";
+    }
+  }
+  if (error instanceof DesktopConflictServerError) {
+    switch (error.code) {
+      case "invalid-json": return "invalid-json";
+      case "invalid-request": return "invalid-request";
+      case "preview-not-found": return "preview-not-found";
+      case "preview-stale": return "preview-stale";
+      case "preview-too-large": return "preview-too-large";
+      case "preview-unsupported": return "preview-unsupported";
+      case "request-too-large": return "request-too-large";
+    }
+  }
   return "conflict-resolution-failed";
 }
 

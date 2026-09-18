@@ -514,6 +514,15 @@ const ROOM_SCHEMA_V3 = `
     END;
 `;
 
+const ROOM_SCHEMA_V4 = `
+  -- rate_budget is bounded by active actor × channel and is read by its
+  -- primary key. Its expiry index is only used by periodic cleanup, but every
+  -- accepted realtime publish updates expires_at_ms and therefore rewrites
+  -- this index. Dropping it removes hot-path write amplification without
+  -- changing rate-limit semantics.
+  DROP INDEX IF EXISTS rate_budget_expiry_idx;
+`;
+
 const SCHEMA_MIGRATION_TABLE = `
   CREATE TABLE IF NOT EXISTS _sql_schema_migrations (
     version INTEGER PRIMARY KEY,
@@ -537,6 +546,11 @@ const APPLICATION_SCHEMA_MIGRATIONS = [
     version: 3,
     name: "predecessor-bound-teardown-acks",
     sql: ROOM_SCHEMA_V3,
+  },
+  {
+    version: 4,
+    name: "drop-rate-budget-expiry-index",
+    sql: ROOM_SCHEMA_V4,
   },
 ] as const;
 
@@ -1986,20 +2000,25 @@ export class RealtimeRoomStore {
   }
 
   hasExpiringRows(): boolean {
+    // This method only needs a boolean. COUNT(*) scans every matching row and
+    // turns a cleanup-scheduling probe into billable Durable Objects read
+    // amplification as replay/receipt tables grow. EXISTS can stop at the
+    // first row in each table while preserving the exact scheduling contract.
     const row = firstRow(
       this.sql
         .exec<CountRow>(
-          `SELECT
-             (SELECT COUNT(*) FROM event_log) +
-             (SELECT COUNT(*) FROM idempotency_receipt) +
-             (SELECT COUNT(*) FROM teardown_idempotency_receipt) +
-             (SELECT COUNT(*) FROM teardown_ack_tombstone) +
-             (SELECT COUNT(*) FROM ticket_nonce) +
-             (SELECT COUNT(*) FROM connection_registry) +
-             (SELECT COUNT(*) FROM rate_budget) +
-             (SELECT COUNT(*) FROM screen_share) +
-             (SELECT COUNT(*) FROM screen_session_member) +
-             (SELECT COUNT(*) FROM screen_peer) AS count`,
+          `SELECT CASE WHEN
+             EXISTS(SELECT 1 FROM event_log LIMIT 1) OR
+             EXISTS(SELECT 1 FROM idempotency_receipt LIMIT 1) OR
+             EXISTS(SELECT 1 FROM teardown_idempotency_receipt LIMIT 1) OR
+             EXISTS(SELECT 1 FROM teardown_ack_tombstone LIMIT 1) OR
+             EXISTS(SELECT 1 FROM ticket_nonce LIMIT 1) OR
+             EXISTS(SELECT 1 FROM connection_registry LIMIT 1) OR
+             EXISTS(SELECT 1 FROM rate_budget LIMIT 1) OR
+             EXISTS(SELECT 1 FROM screen_share LIMIT 1) OR
+             EXISTS(SELECT 1 FROM screen_session_member LIMIT 1) OR
+             EXISTS(SELECT 1 FROM screen_peer LIMIT 1)
+           THEN 1 ELSE 0 END AS count`,
         )
         .toArray(),
     );

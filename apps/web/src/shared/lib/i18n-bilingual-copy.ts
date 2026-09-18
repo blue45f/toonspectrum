@@ -4,6 +4,10 @@ import {
   getLang,
   registerI18nEnglishSourceEntries,
   registerI18nLocaleEntries,
+  registerI18nRuntimeSourceEntries,
+  resolveTranslationForDisplay,
+  triggerTranslationBundleUpdate,
+  useI18n,
   useT,
 } from "./i18n-core";
 import { normalizeLocaleCode } from "./i18n-intl-utils";
@@ -18,11 +22,11 @@ export type TranslationResolver = (key: string) => string;
 
 type StringTree = string | readonly StringTree[] | { readonly [key: string]: StringTree };
 
-type TranslatedStringTree<T extends StringTree> =
+type _TranslatedStringTree<T extends StringTree> =
   T extends string ? string
-    : T extends readonly (infer U extends StringTree)[] ? readonly TranslatedStringTree<U>[]
+    : T extends readonly (infer U extends StringTree)[] ? readonly _TranslatedStringTree<U>[]
       : T extends { readonly [key: string]: StringTree }
-        ? { readonly [K in keyof T]: T[K] extends StringTree ? TranslatedStringTree<T[K]> : never }
+        ? { readonly [K in keyof T]: T[K] extends StringTree ? _TranslatedStringTree<T[K]> : never }
         : never;
 
 function normalizeKeyPart(value: string): string {

@@ -36,12 +36,15 @@ const ITEM_CLASS =
 export function AuthMenu({
   defaultOpen = false,
   defaultMenuOpen = false,
+  defaultMode = "login",
 }: {
   defaultOpen?: boolean;
   defaultMenuOpen?: boolean;
+  defaultMode?: "login" | "signup";
 }) {
   const { data: session, status } = useSession();
   const [modal, setModal] = useState(defaultOpen);
+  const [modalMode, setModalMode] = useState<"login" | "signup">(defaultMode);
   const [isAdmin, setIsAdmin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(defaultMenuOpen);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
@@ -54,12 +57,15 @@ export function AuthMenu({
   const uid = session?.user?.id;
 
   useEffect(() => {
-    if (defaultOpen) setModal(true);
-  }, [defaultOpen]);
+    if (!defaultOpen) return;
+    setModalMode(defaultMode);
+    setModal(true);
+  }, [defaultMode, defaultOpen]);
 
-  useEffect(() => subscribeAuthModalRequests(() => {
+  useEffect(() => subscribeAuthModalRequests((detail) => {
     if (status === "authenticated") return;
     setMenuOpen(false);
+    setModalMode(detail.mode ?? "login");
     setModal(true);
   }), [status]);
 
@@ -118,7 +124,10 @@ export function AuthMenu({
       <>
         <button
           ref={loginTriggerRef}
-          onClick={() => setModal(true)}
+          onClick={() => {
+            setModalMode("login");
+            setModal(true);
+          }}
           aria-label={t("nav.login")}
           className="flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-line bg-card px-3 text-sm font-medium text-fg-2 [text-wrap:nowrap] [word-break:keep-all] transition-colors hover:border-line-strong hover:text-fg"
         >
@@ -131,6 +140,7 @@ export function AuthMenu({
           <AuthModal
             onClose={() => setModal(false)}
             returnFocusRef={loginTriggerRef}
+            initialMode={modalMode}
           />
         )}
       </>

@@ -1,7 +1,8 @@
 import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { UserRound } from "lucide-react";
-import { lazy, Suspense, useState, type ComponentType } from "react";
+import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
 
+import { subscribeAuthModalRequests } from "@/compat/auth-modal-intent";
 import { useT } from "@/shared/lib/i18n";
 import { keepInlineText } from "@/shared/lib/text";
 import { useSession } from "@/compat/auth-session-store";
@@ -9,6 +10,7 @@ import { useSession } from "@/compat/auth-session-store";
 type AuthMenuProps = {
   defaultOpen?: boolean;
   defaultMenuOpen?: boolean;
+  defaultMode?: "login" | "signup";
 };
 type AuthMenuModule = { default: ComponentType<AuthMenuProps> };
 
@@ -67,9 +69,19 @@ export function AuthMenuShell() {
   const [enabled, setEnabled] = useState(false);
   const [defaultOpen, setDefaultOpen] = useState(false);
   const [defaultMenuOpen, setDefaultMenuOpen] = useState(false);
+  const [defaultMode, setDefaultMode] = useState<"login" | "signup">("login");
+
+  useEffect(() => subscribeAuthModalRequests((detail) => {
+    if (status === "authenticated") return;
+    setDefaultMode(detail.mode ?? "login");
+    setDefaultOpen(true);
+    setDefaultMenuOpen(false);
+    setEnabled(true);
+  }), [status]);
 
   const openAuth = () => {
     const authenticated = status === "authenticated";
+    setDefaultMode("login");
     setDefaultOpen(!authenticated);
     setDefaultMenuOpen(authenticated);
     setEnabled(true);
@@ -81,7 +93,11 @@ export function AuthMenuShell() {
 
   return (
     <Suspense fallback={<AuthMenuFallback onClick={openAuth} />}>
-      <AuthMenu defaultOpen={defaultOpen} defaultMenuOpen={defaultMenuOpen} />
+      <AuthMenu
+        defaultOpen={defaultOpen}
+        defaultMenuOpen={defaultMenuOpen}
+        defaultMode={defaultMode}
+      />
     </Suspense>
   );
 }

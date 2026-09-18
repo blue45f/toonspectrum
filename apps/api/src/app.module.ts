@@ -11,6 +11,7 @@ import { CommerceModule } from "./modules/commerce/commerce.module";
 import { CreatorModule } from "./modules/creator/creator.module";
 import { CreatorSupportModule } from "./modules/creator-support/creator-support.module";
 import { CreatorMarketplaceModule } from "./modules/creator-marketplace/creator-marketplace.module";
+import { CreatorEcosystemModule } from "./modules/creator-ecosystem/creator-ecosystem.module";
 import { CreatorIntelligenceModule } from "./modules/creator-intelligence/creator-intelligence.module";
 import { CreatorResourcesModule } from "./modules/creator-resources/creator-resources.module";
 import { FeedbackModule } from "./modules/feedback/feedback.module";
@@ -51,6 +52,7 @@ const studioRealtimeTicketModule =
     BusinessInquiryModule,
     SupporterPaymentModule,
     CreatorMarketplaceModule,
+    CreatorEcosystemModule,
     CreatorIntelligenceModule,
     CreatorModule,
     CreatorSupportModule,

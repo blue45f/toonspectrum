@@ -55,6 +55,7 @@ export function FanCafePanel({
   targetId,
   targetLabel,
   compact = false,
+  initialKind = "all",
   composeLock = null,
   onTopLevelReplyDelta,
   onTopLevelPostCreated,
@@ -63,6 +64,7 @@ export function FanCafePanel({
   targetId?: string;
   targetLabel: string;
   compact?: boolean;
+  initialKind?: FanCafeKindFilter;
   composeLock?: FanCafeComposeLock | null;
   onTopLevelReplyDelta?: (post: FanCafePost, delta: number) => void;
   onTopLevelPostCreated?: (post: FanCafePost) => void;
@@ -72,8 +74,8 @@ export function FanCafePanel({
   const [posts, setPosts] = useState<FanCafePost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterKind, setFilterKind] = useState<FanCafeKindFilter>("all");
-  const [composeKind, setComposeKind] = useState<FanCafePostKind>("talk");
+  const [filterKind, setFilterKind] = useState<FanCafeKindFilter>(initialKind);
+  const [composeKind, setComposeKind] = useState<FanCafePostKind>(initialKind === "all" ? "talk" : initialKind);
   const [sort, setSort] = useState<"popular" | "recent">("recent");
   const [searchText, setSearchText] = useState("");
   const [queryText, setQueryText] = useState("");

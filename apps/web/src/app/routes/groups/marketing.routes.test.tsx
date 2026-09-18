@@ -19,10 +19,26 @@ describe("marketing film routes", () => {
     expect(isPublicCreativeRoute("/product-tour/")).toBe(true);
   });
 
-  it("provides shell titles while both pages own localized metadata", () => {
+  it("registers the reusable event hub and beta opening detail as public routes", () => {
+    expect(marketingRoutes).toContainEqual(
+      expect.objectContaining({ id: "marketing-events", path: "/events" }),
+    );
+    expect(marketingRoutes).toContainEqual(
+      expect.objectContaining({ id: "marketing-event-beta-open", path: "/events/beta-open" }),
+    );
+    expect(isPublicCreativeRoute("/events")).toBe(true);
+    expect(isPublicCreativeRoute("/events/beta-open")).toBe(true);
+    expect(isPublicCreativeRoute("/events/future-campaign")).toBe(true);
+  });
+
+  it("provides shell titles while marketing pages own localized metadata", () => {
     expect(CREATOR_RESOURCE_TITLES["/brand-film"]).toBe("툰스튜디오 브랜드 필름");
     expect(CREATOR_RESOURCE_TITLES["/product-tour"]).toBe("툰스튜디오 전체 제품 투어");
+    expect(CREATOR_RESOURCE_TITLES["/events"]).toBe("이벤트");
+    expect(CREATOR_RESOURCE_TITLES["/events/beta-open"]).toBe("베타 오픈 이벤트");
     expect(shouldAppRouterOwnDocumentTitle({ pathname: "/brand-film" })).toBe(false);
     expect(shouldAppRouterOwnDocumentTitle({ pathname: "/product-tour" })).toBe(false);
+    expect(shouldAppRouterOwnDocumentTitle({ pathname: "/events" })).toBe(false);
+    expect(shouldAppRouterOwnDocumentTitle({ pathname: "/events/beta-open" })).toBe(false);
   });
 });
