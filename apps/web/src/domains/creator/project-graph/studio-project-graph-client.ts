@@ -20,6 +20,7 @@ import {
   type StudioBlobRegistrationInput,
   type StudioCompatibilityReportCreateInput,
   type StudioProjectBootstrapInput,
+  type StudioArtifactRecord,
   type StudioProjectCreateResponse,
   type StudioProjectRecord,
   type StudioRestoreRevisionInput,
@@ -87,8 +88,12 @@ export async function getStudioProject(
 
 export async function getStudioProjectByWork(
   workId: string,
+  signal?: AbortSignal,
 ): Promise<StudioProjectRecord> {
-  const body = await api.get<unknown>(`${BASE}/works/${resourceId(workId)}/project`);
+  const path = `${BASE}/works/${resourceId(workId)}/project`;
+  const body = await (signal
+    ? api.get<unknown>(path, { signal })
+    : api.get<unknown>(path));
   return studioProjectRecordSchema.parse(body);
 }
 
@@ -128,10 +133,12 @@ export async function registerStudioBlob(
 
 export async function listStudioArtifactRevisions(
   artifactId: string,
+  signal?: AbortSignal,
 ): Promise<readonly StudioRevisionRecord[]> {
-  const body = await api.get<unknown>(
-    `${BASE}/artifacts/${resourceId(artifactId)}/revisions`,
-  );
+  const path = `${BASE}/artifacts/${resourceId(artifactId)}/revisions`;
+  const body = await (signal
+    ? api.get<unknown>(path, { signal })
+    : api.get<unknown>(path));
   return Object.freeze(z.array(studioRevisionRecordSchema).parse(body));
 }
 
@@ -301,6 +308,14 @@ export async function reopenStudioReviewComment(commentId: string) {
   );
   return reviewCommentDecisionSchema.parse(body);
 }
+
+/** Production bridge compatibility names map to the canonical ProjectGraph v3 records. */
+export type StudioProjectGraphSnapshot = StudioProjectRecord;
+export type StudioProjectArtifactRecord = StudioArtifactRecord;
+export type StudioProjectRevisionRecord = StudioRevisionRecord;
+
+export const loadStudioProjectGraphByWork = getStudioProjectByWork;
+export const listStudioProjectRevisions = listStudioArtifactRevisions;
 
 export const studioProjectGraphClientTestHelpers = Object.freeze({
   mutationHeaders,
