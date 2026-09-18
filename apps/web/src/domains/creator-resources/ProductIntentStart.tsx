@@ -1,4 +1,3 @@
-import { translateLocaleBranchForLocale } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
   BookOpen,
@@ -7,7 +6,6 @@ import {
   Clock3,
   FileOutput,
   PackageCheck,
-  PlayCircle,
   Search,
   Workflow,
   type LucideIcon,
