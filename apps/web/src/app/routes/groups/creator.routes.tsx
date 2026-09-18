@@ -1,9 +1,7 @@
 import { Navigate } from "react-router-dom";
 
 import { StudioHomeEntryRoute } from "@/domains/creator/studio-router/StudioHomeEntryRoute";
-
 import { studioRoutePath } from "@/domains/creator/studio-route-registry";
-
 import { defineAppRoutes } from "../app-route-definition";
 import {
   CharacterShaperLandingPage,
