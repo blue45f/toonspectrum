@@ -1,9 +1,10 @@
 import { getTitle } from "../../../../../packages/core/src/server";
 
 import {
-  resolvePublicOgPage,
-  type PublicOgReaders,
-} from "./og-public-pages";
+  resolvePublicShareOg,
+  type PublicShareOgReaders,
+  type PublicShareOgSource,
+} from "./og-public-share";
 
 const DEFAULT_CANONICAL_HOST = "www.toonstudio.cloud";
 const CANONICAL_HOST_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/iu;
@@ -51,7 +52,7 @@ type MarketplaceMetadata = Readonly<{
   updatedAt?: string;
 }>;
 
-type OgReaders = PublicOgReaders & Readonly<{
+type OgReaders = PublicShareOgReaders & Readonly<{
   readTitle?: (identifier: string) => TitleMetadata | null | Promise<TitleMetadata | null>;
   readMarketResource?: (identifier: string) => unknown | Promise<unknown>;
 }>;
@@ -59,7 +60,13 @@ type OgReaders = PublicOgReaders & Readonly<{
 export type OgPageResult = Readonly<{
   html: string;
   cacheControl: string;
-  source: "site" | "title" | "market" | "market-resource" | "public" | "fallback";
+  source:
+    | "site"
+    | "title"
+    | "market"
+    | "market-resource"
+    | "fallback"
+    | PublicShareOgSource;
 }>;
 
 type OgPageInput = Readonly<{
@@ -419,23 +426,24 @@ export async function renderOgPage(input: OgPageInput = {}): Promise<OgPageResul
     );
   }
 
-  if (Object.hasOwn(query, "publicPath")) {
-    const publicPage = await resolvePublicOgPage(
-      origin,
-      queryValue(query.publicPath),
-      input.readers ?? {},
-    );
-    return publicPage
-      ? {
-          html: renderHtml(publicPage.metadata, publicPage.structuredData),
-          cacheControl: publicPage.cacheControl,
-          source: "public",
-        }
-      : {
-          html: renderHtml(siteMetadata(origin)),
-          cacheControl: "no-store",
-          source: "fallback",
-        };
+  const publicShare = await resolvePublicShareOg({
+    origin,
+    query,
+    readers: input.readers,
+  });
+  if (publicShare.status === "resolved") {
+    return {
+      html: renderHtml(publicShare.metadata, publicShare.structuredData),
+      cacheControl: publicShare.cacheControl,
+      source: publicShare.source,
+    };
+  }
+  if (publicShare.status === "fallback" || !Object.hasOwn(query, "slug")) {
+    return {
+      html: renderHtml(siteMetadata(origin)),
+      cacheControl: "no-store",
+      source: "fallback",
+    };
   }
 
   const slug = safeDecode(query.slug);
