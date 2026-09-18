@@ -207,7 +207,7 @@
     "test:production-toolchain": "vitest run apps/web/src/domains/creator/toolchain && node --test tools/toonbridge/test/*.test.mjs",
     "verify:studio-production-toolchain": "pnpm run test:production-toolchain",
     "verify:mobile-native-media": "node scripts/verify-mobile-native-media-permissions.mjs",
-    "mobile:doctor": "pnpm run verify:mobile-native-media && cap doctor",
+    "mobile:doctor": "pnpm run verify:mobile-native-media && pnpm run mobile:sync && cap doctor",
     "mobile:sync": "cap sync",
     "mobile:assets": "capacitor-assets generate --android --iconBackgroundColor '#10182d' --iconBackgroundColorDark '#10182d' --splashBackgroundColor '#10182d' --splashBackgroundColorDark '#10182d' && capacitor-assets generate --ios --iconBackgroundColor '#10182d' --iconBackgroundColorDark '#10182d' --splashBackgroundColor '#10182d' --splashBackgroundColorDark '#10182d'",
     "mobile:android:build": "cap sync android && cd android && ./gradlew assembleDebug",

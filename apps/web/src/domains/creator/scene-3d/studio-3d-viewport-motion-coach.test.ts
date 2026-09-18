@@ -8,6 +8,10 @@ import { readStudioVrmPoserImplementationSource } from "../vrm/studio-vrm-poser-
 
 
 const backgroundSource = readStudioBg3dEditorSource();
+const cameraSelectionSource = readFileSync(
+  new URL("../bg3d/studio-bg3d-camera-selection.ts", import.meta.url),
+  "utf8",
+);
 const vrmSource = [
   readFileSync(new URL("../vrm/StudioVrmPoserTypes.ts", import.meta.url), "utf8"),
   readStudioVrmPoserImplementationSource(
@@ -95,7 +99,8 @@ describe("Studio 3D viewport Motion Coach integration", () => {
     expect(toolbar).toContain('unavailableReason={!canRedo ? "다시 적용할 3D 장면 변경이 없습니다."');
     expect(toolbar).toContain("disabled={Boolean(groundSelectionDisabledReason)}");
     expect(toolbar).toContain("disabled={Boolean(focusSelectionDisabledReason)}");
-    expect(backgroundSource).toContain('"화면에 맞출 객체를 하나만 선택해 주세요."');
+    expect(cameraSelectionSource).toContain('"화면에 맞출 객체를 선택해 주세요."');
+    expect(cameraSelectionSource).toContain("Locked objects can be framed");
     expect(backgroundSource).toContain('"선택한 객체의 잠금을 해제하세요."');
   });
 

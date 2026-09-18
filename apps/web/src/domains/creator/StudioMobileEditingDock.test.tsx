@@ -1791,6 +1791,7 @@ describe("StudioMobileEditingDock", () => {
 
     const close = screen.getByRole<HTMLButtonElement>("button", { name: "안내 닫기" });
     expect(close.className).toContain("size-11");
+    expect(close.closest('[data-studio-canvas-transient="coach"]')?.className).toContain("z-[66]");
 
     fireEvent.click(close);
     expect(stableHandlers.dismissMobileHint).toHaveBeenCalledOnce();
