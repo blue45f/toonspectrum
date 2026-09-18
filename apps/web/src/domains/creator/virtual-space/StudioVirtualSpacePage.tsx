@@ -77,6 +77,11 @@ import {
   type StudioVirtualSpaceSnapshot,
 } from "./studio-virtual-space-presence";
 import {
+  STUDIO_VIRTUAL_SPACE_INTERACTIONS,
+  selectNearestStudioVirtualSpaceInteraction,
+  type StudioVirtualSpaceInteraction,
+} from "./studio-virtual-space-interactions";
+import {
   STUDIO_VIRTUAL_SPACE_CLICK_STOP_DISTANCE,
   STUDIO_VIRTUAL_SPACE_WALK_SPEED,
   findStudioVirtualSpacePath,
@@ -815,7 +820,26 @@ function VirtualSpaceExperience({
     }));
   }, [activity]);
 
+  const activateInteraction = useCallback((interaction: StudioVirtualSpaceInteraction) => {
+    writeVirtualSpaceSessionPoint(projectId, selfRef.current);
+    if (interaction.action === "assistant") {
+      openAssistant();
+      return;
+    }
+    if (interaction.action === "community") {
+      navigate("/community");
+      return;
+    }
+    const destination = studioVirtualSpaceDestination(projectId, interaction.action);
+    if (destination) navigate(destination);
+  }, [navigate, openAssistant, projectId]);
+
   const activateCurrentZone = useCallback(() => {
+    const nearbyInteraction = selectNearestStudioVirtualSpaceInteraction(selfRef.current);
+    if (nearbyInteraction) {
+      activateInteraction(nearbyInteraction);
+      return;
+    }
     writeVirtualSpaceSessionPoint(projectId, selfRef.current);
     const zone = STUDIO_VIRTUAL_SPACE_ZONES.find((candidate) => candidate.id === selfRef.current.zoneId);
     if (!zone) return;
@@ -825,7 +849,7 @@ function VirtualSpaceExperience({
     }
     const destination = studioVirtualSpaceDestination(projectId, zone.destination);
     if (destination) navigate(destination);
-  }, [navigate, openAssistant, projectId]);
+  }, [activateInteraction, navigate, openAssistant, projectId]);
 
   useEffect(() => {
     let frame = 0;
@@ -1020,6 +1044,15 @@ function VirtualSpaceExperience({
 
   const currentZone = STUDIO_VIRTUAL_SPACE_ZONES.find((zone) => zone.id === snapshot.self.zoneId)
     ?? STUDIO_VIRTUAL_SPACE_ZONES[0]!;
+  const currentInteraction = selectNearestStudioVirtualSpaceInteraction(snapshot.self);
+  const approachInteraction = useCallback((interaction: StudioVirtualSpaceInteraction) => {
+    const nearby = selectNearestStudioVirtualSpaceInteraction(selfRef.current);
+    if (nearby?.id === interaction.id) {
+      activateInteraction(interaction);
+      return;
+    }
+    queuePathTo({ x: interaction.x, y: interaction.y });
+  }, [activateInteraction, queuePathTo]);
   const followingPeer = followingPeerId
     ? snapshot.peers.find((peer) => peer.participant.sessionId === followingPeerId) ?? null
     : null;
@@ -1192,14 +1225,50 @@ function VirtualSpaceExperience({
                 >
                   <div aria-hidden className="absolute inset-0 opacity-40 [background-image:linear-gradient(to_right,currentColor_1px,transparent_1px),linear-gradient(to_bottom,currentColor_1px,transparent_1px)] [background-size:40px_40px] text-line" />
                   {STUDIO_VIRTUAL_SPACE_ZONES.map((zone) => (
-                  <ZoneSurface
-                    key={zone.id}
-                    zone={zone}
-                    projectId={projectId}
-                    active={currentZone.id === zone.id}
-                    onAssistant={openAssistant}
-                  />
-                ))}
+                    <ZoneSurface
+                      key={zone.id}
+                      zone={zone}
+                      projectId={projectId}
+                      active={currentZone.id === zone.id}
+                      onAssistant={openAssistant}
+                    />
+                  ))}
+
+                  {STUDIO_VIRTUAL_SPACE_INTERACTIONS.map((interaction) => {
+                    const nearby = currentInteraction?.id === interaction.id;
+                    return (
+                      <button
+                        key={interaction.id}
+                        type="button"
+                        className="studio-vspace-hotspot absolute z-[16] -translate-x-1/2 -translate-y-1/2"
+                        style={stagePosition(interaction)}
+                        data-space-interactive="true"
+                        data-nearby={nearby || undefined}
+                        aria-label={nearby
+                          ? bt(
+                              `${interaction.labelKo} 열기`,
+                              `Open ${interaction.labelEn}`,
+                            )
+                          : bt(
+                              `${interaction.labelKo} 근처로 이동`,
+                              `Walk to ${interaction.labelEn}`,
+                            )}
+                        onClick={() => approachInteraction(interaction)}
+                      >
+                        <span className="studio-vspace-hotspot-orb" aria-hidden>
+                          {interaction.emoji}
+                        </span>
+                        <span className="studio-vspace-hotspot-label">
+                          <strong>{bt(interaction.labelKo, interaction.labelEn)}</strong>
+                          <small>
+                            {nearby
+                              ? bt("E · 상호작용", "E · Interact")
+                              : bt("이동", "Walk")}
+                          </small>
+                        </span>
+                      </button>
+                    );
+                  })}
 
                 <div
                   aria-hidden
@@ -1329,7 +1398,9 @@ function VirtualSpaceExperience({
                     data-space-interactive="true"
                     onClick={activateCurrentZone}
                   >
-                    E · {bt("상호작용", "Interact")}
+                    E · {currentInteraction
+                      ? bt(currentInteraction.labelKo, currentInteraction.labelEn)
+                      : bt("방 열기", "Open room")}
                   </button>
                 </div>
 
@@ -1343,12 +1414,16 @@ function VirtualSpaceExperience({
                 </div>
                 <button
                   type="button"
-                  className="absolute bottom-5 left-4 z-50 inline-flex min-h-12 items-center gap-2 rounded-2xl border border-accent/35 bg-panel/90 px-4 text-xs font-black text-accent shadow-xl backdrop-blur lg:hidden"
+                  className="absolute bottom-5 left-4 z-50 inline-flex min-h-12 max-w-[11rem] items-center gap-2 rounded-2xl border border-accent/35 bg-panel/90 px-4 text-xs font-black text-accent shadow-xl backdrop-blur lg:hidden"
                   data-space-interactive="true"
                   onClick={activateCurrentZone}
                 >
                   <Gamepad2 size={15} aria-hidden />
-                  {bt("상호작용", "Interact")}
+                  <span className="truncate">
+                    {currentInteraction
+                      ? bt(currentInteraction.labelKo, currentInteraction.labelEn)
+                      : bt("상호작용", "Interact")}
+                  </span>
                 </button>
                 <div className="absolute left-1/2 top-3 z-50 -translate-x-1/2 rounded-full border border-line bg-panel/85 px-3 py-1.5 text-[0.65rem] font-black text-fg shadow-lg backdrop-blur lg:hidden">
                   {bt(currentZone.labelKo, currentZone.labelEn)}

@@ -96,3 +96,15 @@
 @keyframes studio-vspace-reaction-pop{from{opacity:0;scale:.55;translate:-50% 8px}to{opacity:1;scale:1;translate:-50% 0}}
 @keyframes studio-vspace-reaction-float{0%,75%{opacity:1;translate:-50% 0}100%{opacity:0;translate:-50% -10px}}
 @media(prefers-reduced-motion:reduce){.studio-vspace-reaction{animation:none}}
+
+/* Object-level RPG interactions */
+.studio-vspace-hotspot{display:flex;align-items:center;gap:.35rem;color:var(--color-fg);filter:drop-shadow(0 8px 10px rgb(0 0 0/.35));transition:filter .16s,scale .16s}
+.studio-vspace-hotspot-orb{display:grid;width:2rem;height:2rem;place-items:center;border:1px solid rgb(255 255 255/.28);border-radius:999px;background:color-mix(in srgb,var(--color-panel) 86%,var(--color-accent) 14%);font-size:1rem;box-shadow:0 0 0 4px rgb(255 255 255/.035),0 0 16px color-mix(in srgb,var(--color-accent) 22%,transparent)}
+.studio-vspace-hotspot-label{display:none;min-width:max-content;padding:.32rem .48rem;border:1px solid var(--color-line);border-radius:.6rem;background:color-mix(in srgb,var(--color-panel) 92%,transparent);box-shadow:0 8px 18px rgb(0 0 0/.28);backdrop-filter:blur(8px)}
+.studio-vspace-hotspot-label strong,.studio-vspace-hotspot-label small{display:block;line-height:1.1}.studio-vspace-hotspot-label strong{font-size:.56rem}.studio-vspace-hotspot-label small{margin-top:.12rem;color:var(--color-fg-3);font-size:.47rem}
+.studio-vspace-hotspot:hover,.studio-vspace-hotspot:focus-visible,.studio-vspace-hotspot[data-nearby=true]{z-index:35;scale:1.08;filter:drop-shadow(0 10px 14px rgb(0 0 0/.5))}
+.studio-vspace-hotspot:hover .studio-vspace-hotspot-label,.studio-vspace-hotspot:focus-visible .studio-vspace-hotspot-label,.studio-vspace-hotspot[data-nearby=true] .studio-vspace-hotspot-label{display:block}
+.studio-vspace-hotspot[data-nearby=true] .studio-vspace-hotspot-orb{border-color:color-mix(in srgb,var(--color-accent) 70%,white);background:color-mix(in srgb,var(--color-accent) 32%,var(--color-panel));box-shadow:0 0 0 5px color-mix(in srgb,var(--color-accent) 12%,transparent),0 0 26px color-mix(in srgb,var(--color-accent) 38%,transparent);animation:studio-vspace-hotspot-pulse 1.5s ease-in-out infinite}
+@keyframes studio-vspace-hotspot-pulse{50%{transform:translateY(-3px);box-shadow:0 0 0 8px color-mix(in srgb,var(--color-accent) 8%,transparent),0 0 32px color-mix(in srgb,var(--color-accent) 42%,transparent)}}
+@media(max-width:1023px){.studio-vspace-hotspot-label{display:none!important}.studio-vspace-hotspot-orb{width:1.75rem;height:1.75rem;font-size:.86rem}}
+@media(prefers-reduced-motion:reduce){.studio-vspace-hotspot,.studio-vspace-hotspot-orb{transition:none;animation:none!important}}

@@ -15,6 +15,10 @@ import {
   parseStudioVirtualSpacePacket,
 } from "./studio-virtual-space-presence";
 import {
+  STUDIO_VIRTUAL_SPACE_INTERACTIONS,
+  selectNearestStudioVirtualSpaceInteraction,
+} from "./studio-virtual-space-interactions";
+import {
   findStudioVirtualSpacePath,
   normalizeStudioVirtualSpaceVector,
   resolveStudioVirtualSpaceMovement,
@@ -204,5 +208,26 @@ describe("Studio virtual space pathfinding", () => {
     );
     expect(path.length).toBeGreaterThan(0);
     expect(path.every((point) => studioVirtualSpaceCanOccupy(point))).toBe(true);
+  });
+});
+
+
+describe("Studio virtual space object interactions", () => {
+  it("keeps every interaction approach point on walkable floor", () => {
+    for (const interaction of STUDIO_VIRTUAL_SPACE_INTERACTIONS) {
+      expect(
+        studioVirtualSpaceCanOccupy({ x: interaction.x, y: interaction.y }),
+        interaction.id,
+      ).toBe(true);
+    }
+  });
+
+  it("selects the nearest nearby production object", () => {
+    expect(
+      selectNearestStudioVirtualSpaceInteraction({ x: 520, y: 315 })?.id,
+    ).toBe("drawing-desk");
+    expect(
+      selectNearestStudioVirtualSpaceInteraction({ x: 590, y: 540 })?.id,
+    ).toBe("ai-producer-desk");
   });
 });
