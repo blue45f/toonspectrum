@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /* Extracted render tree from StudioCuttoonEditor.
  * Session props are an `any` bag matching the original editor closure. */
 // @ts-nocheck
@@ -190,8 +194,6 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
     sceneTemplates,
     sceneTemplatesError,
     sceneTemplatesLoading,
-    selectOptionsLaneReserved,
-    selectOptionsStripArmed,
     selectedForInspector,
     serverAiProvider,
     serverAiStatus,
@@ -365,7 +367,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
   return (
     <>
       <StudioAppMenubar
-        aria-label="문서 메뉴"
+        aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "문서 메뉴")}
         className={cn(
           canvasOnlyMode && "hidden",
           mobileImmersive &&
@@ -496,7 +498,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
             aria-expanded={commentsOpen}
             aria-haspopup="dialog"
             aria-controls="studio-comments-review-dialog"
-            aria-label={`댓글 검토함${openStudioCommentCount > 0 ? `, 열린 댓글 ${openStudioCommentCount}개` : ""}`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "댓글 검토함{v0}"), { v0: String(openStudioCommentCount > 0 ? `, 열린 댓글 ${openStudioCommentCount}개` : "") })}
             className={cn(
               buttonClass({ size: "sm", variant: commentsOpen ? "solid" : "quiet" }),
               "relative min-h-11 shrink-0 gap-1.5 px-2.5 text-[0.72rem] disabled:cursor-not-allowed disabled:opacity-50"
@@ -505,8 +507,8 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
               collaborationDocumentLocked && !sharedDocument?.capabilities.view
                 ? collaborationLockMessage()
                 : commentsOpen
-                  ? "댓글 검토함 닫기"
-                  : "댓글 검토함 열기 · 검색, 필터, 읽음 상태 관리"
+                  ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "댓글 검토함 닫기")
+                  : translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "댓글 검토함 열기 · 검색, 필터, 읽음 상태 관리")
             }
           >
             <MessageCircle
@@ -515,7 +517,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
               aria-hidden
               className={studioChromeIconClass({ tone: "default" })}
             />
-            <span className="max-xl:sr-only">댓글</span>
+            <span className="max-xl:sr-only">{translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "댓글")}</span>
             {openStudioCommentCount > 0 ? (
               <span
                 aria-hidden
@@ -543,7 +545,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
             <button
               type="button"
               data-studio-status-error-dismiss
-              aria-label="오류 메시지 닫기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "오류 메시지 닫기")}
               className="-mr-1 grid size-11 shrink-0 place-items-center rounded transition hover:bg-bad/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               onClick={() => setError(null)}
             >
@@ -562,7 +564,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
             <button
               type="button"
               data-studio-status-notice-dismiss
-              aria-label="알림 닫기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "알림 닫기")}
               className="-mr-1 shrink-0 rounded p-0.5 transition hover:bg-accent-soft/60"
               onClick={() => setStudioStatusNotice(null)}
             >
@@ -576,7 +578,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
             className="my-1 flex flex-wrap items-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-2.5 py-1.5 text-xs text-warn"
           >
             <span className="min-w-0 flex-1 break-words">
-              {studioMarketplaceCloudSyncRetry.record.name}의 로컬 설치는 유지됩니다. 계정 설치 확인만 다시 맞춰야 합니다: {studioMarketplaceCloudSyncRetry.issue}
+              {studioMarketplaceCloudSyncRetry.record.name}{translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "의 로컬 설치는 유지됩니다. 계정 설치 확인만 다시 맞춰야 합니다: ")}{studioMarketplaceCloudSyncRetry.issue}
             </span>
             <button
               ref={marketplaceCloudSyncRetryButtonRef}
@@ -592,12 +594,12 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
               }}
             >
               {studioMarketplaceCloudSyncRetryPending
-                ? "계정 설치 확인 중…"
-                : "계정 설치 확인 다시 시도"}
+                ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "계정 설치 확인 중…")
+                : translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "계정 설치 확인 다시 시도")}
             </button>
             <button
               type="button"
-              aria-label="계정 설치 확인 재시도 닫기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "계정 설치 확인 재시도 닫기")}
               className="grid size-11 shrink-0 place-items-center rounded transition hover:bg-warn/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warn"
               onClick={dismissStudioMarketplaceCloudSyncRetry}
             >
@@ -607,13 +609,11 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
         ) : null}
         {densityShowsStatusRail && layerMergeBusy ? (
           <div role="status" className="my-1 rounded-lg border border-accent/35 bg-accent-soft/30 px-2.5 py-1.5 text-xs text-fg-2">
-            레이어를 병합하는 중…
-          </div>
+            {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "레이어를 병합하는 중…")}</div>
         ) : null}
         {densityShowsStatusRail && macroSession.recording ? (
           <div role="status" className="my-1 rounded-lg border border-bad/30 bg-bad/10 px-2.5 py-1.5 text-xs font-semibold text-bad">
-            매크로 녹음 중 · {macroSession.commands.length}단계
-          </div>
+            {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "매크로 녹음 중 · ")}{macroSession.commands.length}{translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "단계")}</div>
         ) : null}
         {densityShowsStatusRail && expectsSharedDocument && (!mobileImmersive || collaborationDocumentLocked) ? (
           <div
@@ -649,19 +649,19 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
               <strong className="block text-sm font-semibold">
                 {!sharedDocument
                   ? workHydrated
-                    ? "공동 문서를 열지 못했어요"
-                    : "공동 문서 권한을 확인하고 있어요"
+                    ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "공동 문서를 열지 못했어요")
+                    : translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "공동 문서 권한을 확인하고 있어요")
                   : collaborationOperationSyncPending
-                    ? "동시 편집 연산 동기화 중"
+                    ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "동시 편집 연산 동기화 중")
                     : collaborationReadOnly
-                    ? `${collaborationRoleLabel()} · 읽기 전용`
-                    : `${collaborationRoleLabel()} · 공동 편집 가능`}
+                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "{v0} · 읽기 전용"), { v0: String(collaborationRoleLabel()) })
+                    : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "{v0} · 공동 편집 가능"), { v0: String(collaborationRoleLabel()) })}
               </strong>
               <span className="mt-0.5 block text-xs leading-relaxed text-fg-2">
                 {collaborationDocumentLocked
                   ? collaborationLockMessage()
                   : sharedDocumentNotice ??
-                    `서버 revision ${sharedDocument?.revision ?? "—"} 기준으로 안전하게 저장합니다.`}
+                    formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "서버 revision {v0} 기준으로 안전하게 저장합니다."), { v0: String(sharedDocument?.revision ?? "—") })}
               </span>
             </span>
             {sharedDocument ? (
@@ -674,8 +674,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
                 onClick={() => globalThis.location.reload()}
                 className="min-h-11 shrink-0 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               >
-                다시 시도
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "다시 시도")}</button>
             ) : null}
           </div>
         ) : null}
@@ -713,27 +712,6 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
         ) : null}
       </div>
 
-      {/*
-        선택 옵션 줄의 자리를 미리 확보한다 — 선택이 생겨도 스트립이 새로 flow 에
-        끼어들지 않으므로 캔버스 원점이 0px 이동한다. 빈 줄로 두면 고장처럼 보여서
-        같은 높이의 안내 줄을 세워 둔다(오버레이가 아니라 예약이라 캔버스를 가리지도
-        않는다).
-      */}
-      {selectOptionsLaneReserved && !studioOptionsBarsSelectionModel.visible ? (
-        <div
-          data-studio-select-options-reserve="true"
-          data-studio-select-options-armed={selectOptionsStripArmed ? "true" : "false"}
-          data-studio-icon-first="true"
-          className="relative z-[40] flex h-11 min-h-11 shrink-0 items-center gap-1.5 overflow-hidden border-b border-line bg-panel/70 px-2.5 text-[0.7rem] text-fg-3"
-        >
-          <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-line" />
-          <span className="truncate">
-            {selectOptionsStripArmed
-              ? "요소를 클릭하면 선택 옵션이 여기에 표시됩니다 · 드래그로 여러 개 선택"
-              : "선택 도구(V)로 요소를 고르면 복제·정렬·잠금 옵션이 여기에 표시됩니다"}
-          </span>
-        </div>
-      ) : null}
       <StudioOptionsBars
         draw={studioOptionsBarsDrawModel}
         selection={studioOptionsBarsSelectionModel}
@@ -747,7 +725,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
             placement={brushCatalogSession.placement}
             triggerElement={brushCatalogSession.trigger}
             activeBrushId={activeCatalogBrush.id}
-            operation={drawMode === "eraser" ? "erase" : "paint"}
+            operation={drawMode === "eraser" ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "en", "erase") : translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "en", "paint")}
             favoriteIds={proDrawPrefs.favoriteBrushIds}
             recentIds={proDrawPrefs.recentBrushIds}
             restoredView={
@@ -1001,15 +979,13 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
           )}
         >
           <span className="inline-flex items-center gap-1.5 font-semibold">
-            <Lock size={13} aria-hidden /> 현재 페이지는 검토 잠금 상태라 콘텐츠 변경이 차단됩니다.
-          </span>
+            <Lock size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "현재 페이지는 검토 잠금 상태라 콘텐츠 변경이 차단됩니다.")}</span>
           <button
             type="button"
             onClick={() => setPageReviewOpen(true)}
             className="rounded-lg border border-warning/35 bg-panel/70 px-2.5 py-1 font-bold hover:bg-panel"
           >
-            검토 설정 열기
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorChrome", "ko", "검토 설정 열기")}</button>
         </div>
       ) : null}
     </>

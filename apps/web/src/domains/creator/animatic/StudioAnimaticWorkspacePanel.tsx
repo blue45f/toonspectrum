@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef, useState } from "react";
 
 import { downloadBlob } from "../export/studio-export";
@@ -124,7 +128,7 @@ export function StudioAnimaticWorkspacePanel({ workScope, pages, workspace, pers
     const waveform = studioAnimaticWaveform(Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index)));
     commit({ ...current, audio: [...current.audio, { id: crypto.randomUUID(), name: file.name.slice(0, 200), asset, durationMs: buffer.duration * 1000, startMs: playhead.current, trimStartMs: 0, trimEndMs: buffer.duration * 1000, volume: 1, muted: false, waveform }] });
   }
-  if (!current) return <section className="p-4" role={error ? "alert" : "status"}>{error ?? "스토리보드 작업을 불러오는 중…"}</section>;
+  if (!current) return <section className="p-4" role={error ? translateCurrentStaticSourceText("domains.creator.animatic.StudioAnimaticWorkspacePanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.animatic.StudioAnimaticWorkspacePanel", "en", "status")}>{error ?? translateCurrentStaticSourceText("domains.creator.animatic.StudioAnimaticWorkspacePanel", "ko", "스토리보드 작업을 불러오는 중…")}</section>;
   return <StudioAnimaticTimelinePanel workScope={workScope} pages={pages} persistence={null}
     externalDocument={current.timeline} reducedMotion={reducedMotion} onClose={onClose} className={className}
     workspaceStatus={{ busy: busy || persistenceStatus.busy || media.busy, error: error ?? media.error ?? persistenceStatus.error }}
@@ -133,7 +137,7 @@ export function StudioAnimaticWorkspacePanel({ workScope, pages, workspace, pers
     onPlaybackChange={(playing, timeMs) => setPlayback((previous) => previous.playing === playing ? previous : { playing, timeMs })}
     previewOwnsTransform
     renderPreview={(sample) => <StudioAnimaticCanvas snapshot={current} images={media.images} sample={sample} />}
-    renderShotThumbnail={(segment) => <StudioAnimaticCanvas snapshot={current} images={media.images} thumbnail label={`${segment.label} 원고 미리보기`} timeMs={plan?.ok ? plan.plan.segments.find((item) => item.segmentId === segment.id)?.transitionEndMs ?? 0 : 0} />}
+    renderShotThumbnail={(segment) => <StudioAnimaticCanvas snapshot={current} images={media.images} thumbnail label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.animatic.StudioAnimaticWorkspacePanel", "ko", "{v0} 원고 미리보기"), { v0: String(segment.label) })} timeMs={plan?.ok ? plan.plan.segments.find((item) => item.segmentId === segment.id)?.transitionEndMs ?? 0 : 0} />}
     workspaceControls={<StudioAnimaticWorkspaceControls workspace={current} images={media.images} selectedShot={selectedShot}
       busy={busy || media.busy} progress={progress} currentTime={() => playhead.current} totalDuration={totalDuration}
       onCommit={applyEdit} onSeek={(timeMs) => setSeekRequest({ timeMs, token: Date.now() })}

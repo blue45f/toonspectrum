@@ -45,6 +45,7 @@ describe("premium world provenance boundary", () => {
   it("retains the existing external source policy", () => {
     expect(isTrustedStudioCc0Source("Poly Haven", "https://polyhaven.com/a/wood_table_001")).toBe(true);
     expect(isTrustedStudioCc0Source("Kenney", "https://kenney.nl/assets/furniture-kit")).toBe(true);
+    // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
     expect(isTrustedStudioCc0Source("Poly Haven", "https://user:secret@polyhaven.com/a/test")).toBe(false);
     expect(isTrustedStudioCc0Source("Poly Haven", "https://polyhaven.com:8443/a/test")).toBe(false);
   });

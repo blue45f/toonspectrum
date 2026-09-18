@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Copy, FileImage, FileText, Layers, Scissors } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -68,6 +72,7 @@ import type {
 import type { StudioInkMlExportResult } from "../studio-inkml-interchange";
 import type { PsdExportResult } from "./studio-psd-export";
 import type { SvgExportResult } from "./studio-svg-export";
+import type { StudioVectorPdfExportResult } from "./studio-vector-pdf-product";
 import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 
@@ -161,6 +166,8 @@ export interface StudioExportMenuPanelProps {
    * (래스터 캡처와 달리 원본 벡터를 보존하되, 픽셀 필터·톤 등 일부는 스킵 집계로 고지.)
    */
   exportCurrentPageToSvg?: () => Promise<SvgExportResult>;
+  /** 현재 렌더 화면을 보존하면서 지원되는 펜 선화를 PDF 1.7 벡터 패스로 함께 기록합니다. */
+  exportCurrentPageToVectorPdf?: () => Promise<StudioVectorPdfExportResult>;
   /** 현재 페이지의 보이는 펜 자유곡선을 검증된 bounded InkML로 내보냅니다. */
   exportCurrentPageToInkMl?: () => Promise<StudioInkMlExportResult>;
   /** 보이는 펜 자유곡선을 ToonSpectrum bounded public-spec WILL v1 Annex B로 내보냅니다. */
@@ -205,6 +212,7 @@ export function StudioExportMenuPanel({
   capturePagesForPreset,
   capturePagesForIndices,
   exportCurrentPageToSvg,
+  exportCurrentPageToVectorPdf,
   exportCurrentPageToInkMl,
   exportCurrentPageToWillV1,
   exportCurrentPageToPsd,
@@ -217,6 +225,8 @@ export function StudioExportMenuPanel({
   // PDF 내보내기 실행 상태 — 규격 슬라이스와 독립 실행이라 상태도 따로 안내한다.
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfStatus, setPdfStatus] = useState<ExportRunStatus | null>(null);
+  const [vectorPdfBusy, setVectorPdfBusy] = useState(false);
+  const [vectorPdfStatus, setVectorPdfStatus] = useState<ExportRunStatus | null>(null);
   // SVG(벡터) 내보내기 결과 안내 — 스킵/근사 집계를 사용자에게 고지한다.
   const [svgBusy, setSvgBusy] = useState(false);
   const [svgStatus, setSvgStatus] = useState<ExportRunStatus | null>(null);
@@ -447,7 +457,7 @@ export function StudioExportMenuPanel({
   async function runOpenRasterExport() {
     if (
       !exportCurrentPageToRasterInterchange || openRasterBusy || psdBusy || svgBusy || pdfBusy ||
-      presetBusy || isExporting || contactBusy || archiveBusy !== null
+      presetBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)
     ) return;
     setOpenRasterBusy(true);
     setOpenRasterStatus({ tone: "info", text: `${openRasterFormat.toUpperCase()} 픽셀을 인코딩하는 중...` });
@@ -478,7 +488,7 @@ export function StudioExportMenuPanel({
 
   async function runArchiveExport(kind: "cbz" | "ora") {
     if (
-      archiveBusy !== null || openRasterBusy || psdBusy || svgBusy || pdfBusy || presetBusy ||
+      (archiveBusy !== null || vectorPdfBusy) || openRasterBusy || psdBusy || svgBusy || pdfBusy || presetBusy ||
       isExporting || contactBusy
     ) return;
     setArchiveBusy(kind);
@@ -570,7 +580,7 @@ export function StudioExportMenuPanel({
 
   async function runInkMlExport() {
     if (
-      !exportCurrentPageToInkMl || archiveBusy !== null || openRasterBusy || psdBusy || svgBusy ||
+      !exportCurrentPageToInkMl || (archiveBusy !== null || vectorPdfBusy) || openRasterBusy || psdBusy || svgBusy ||
       pdfBusy || presetBusy || isExporting || contactBusy
     ) return;
     setArchiveBusy("inkml");
@@ -607,7 +617,7 @@ export function StudioExportMenuPanel({
 
   async function runWillV1Export() {
     if (
-      !exportCurrentPageToWillV1 || archiveBusy !== null || openRasterBusy || psdBusy || svgBusy ||
+      !exportCurrentPageToWillV1 || (archiveBusy !== null || vectorPdfBusy) || openRasterBusy || psdBusy || svgBusy ||
       pdfBusy || presetBusy || isExporting || contactBusy
     ) return;
     setArchiveBusy("will");
@@ -668,7 +678,7 @@ export function StudioExportMenuPanel({
 
   // 선택 범위 페이지 캡처 → JPEG 인코드 → 미니멀 PDF 조립 → 한 파일 다운로드.
   async function runPdfExport() {
-    if (pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null) return;
+    if (pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)) return;
     setPdfBusy(true);
     const pendingRange = exportRangeLabel;
     setPdfStatus({
@@ -704,7 +714,7 @@ export function StudioExportMenuPanel({
   // 페이지 축소판 여러 장을 한 인쇄용 시트에 격자로 배치 → PDF 한 파일. PDF 바이트 조립은
   // exportPagesToPdf와 동일한 buildPdfFromJpegPages를 재사용(studio-pdf-contact-sheet 내부).
   async function runContactSheetExport() {
-    if (contactBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || archiveBusy !== null) return;
+    if (contactBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || (archiveBusy !== null || vectorPdfBusy)) return;
     const preset = CONTACT_SHEET_PAGE_PRESETS.find((p) => p.id === contactPagePresetId) ?? CONTACT_SHEET_PAGE_PRESETS[0];
     setContactBusy(true);
     const pendingRange = exportRangeLabel;
@@ -747,10 +757,41 @@ export function StudioExportMenuPanel({
 
   // 현재 페이지 → 벡터 SVG 한 파일. 요소 직렬화는 StudioPage(exportCurrentPageToSvg)가 하고,
   // 여기선 Blob 다운로드 + 스킵/근사 고지만 담당한다.
+  async function runVectorPdfExport() {
+    if (
+      !exportCurrentPageToVectorPdf || vectorPdfBusy || openRasterBusy || pdfBusy || presetBusy ||
+      psdBusy || svgBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)
+    ) return;
+    setVectorPdfBusy(true);
+    setVectorPdfStatus({ tone: "info", text: "PDF 1.7 벡터 선화 출고를 준비하는 중…" });
+    try {
+      const result = await exportCurrentPageToVectorPdf();
+      if (!mountedRef.current) return;
+      const owned = new Uint8Array(result.bytes.byteLength);
+      owned.set(result.bytes);
+      downloadBlob(
+        new Blob([owned.buffer], { type: "application/pdf" }),
+        `${safeExportBaseName(exportTitle)}.vector.pdf`,
+      );
+      setVectorPdfStatus({
+        tone: result.skippedStrokeCount > 0 || result.warnings.length > 1 ? "warn" : "good",
+        text: [`벡터 선화 ${result.vectorStrokeCount}개를 포함한 PDF를 저장했어요.`, ...result.warnings].join(" "),
+      });
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setVectorPdfStatus({
+        tone: "warn",
+        text: error instanceof Error ? error.message : "벡터 PDF를 만들지 못했습니다.",
+      });
+    } finally {
+      if (mountedRef.current) setVectorPdfBusy(false);
+    }
+  }
+
   async function runSvgExport() {
     if (
       !exportCurrentPageToSvg || svgBusy || psdBusy || pdfBusy || presetBusy || isExporting ||
-      contactBusy || archiveBusy !== null
+      contactBusy || (archiveBusy !== null || vectorPdfBusy)
     ) return;
     setSvgBusy(true);
     setSvgStatus({ tone: "info", text: "벡터 내보내기 엔진을 준비하는 중…" });
@@ -781,7 +822,7 @@ export function StudioExportMenuPanel({
   async function runPsdExport() {
     if (
       !exportCurrentPageToPsd || psdBusy || svgBusy || pdfBusy || presetBusy || isExporting ||
-      contactBusy || archiveBusy !== null
+      contactBusy || (archiveBusy !== null || vectorPdfBusy)
     ) return;
     setPsdBusy(true);
     setPsdStatus({ tone: "info", text: "레이어별로 캡처하는 중…" });
@@ -811,7 +852,7 @@ export function StudioExportMenuPanel({
   // 규격 선택 → 캡처 → 리샘플·분할 → 순차 다운로드까지 한 번에 실행.
   // scope "all"은 패키지 페이지 범위를 존중(전체 문서가 아닌 선택 범위 가능).
   async function runPresetSliceExport(scope: PresetExportScope) {
-    if (!selectedPreset || presetBusy || pdfBusy || psdBusy || svgBusy || contactBusy || archiveBusy !== null) return;
+    if (!selectedPreset || presetBusy || pdfBusy || psdBusy || svgBusy || contactBusy || (archiveBusy !== null || vectorPdfBusy)) return;
     setPresetBusy(true);
     const pendingRange = exportRangeLabel;
     setPresetStatus({
@@ -862,7 +903,7 @@ export function StudioExportMenuPanel({
       className="fixed inset-x-2 top-12 z-[100] max-h-[calc(100dvh-4rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-3 shadow-2xl sm:inset-x-auto sm:right-3 sm:w-72"
     >
       <div className="mb-2.5">
-        <span className="mb-1 block text-xs font-semibold text-fg-2">플랫폼 규격</span>
+        <span className="mb-1 block text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "플랫폼 규격")}</span>
         <div className="flex flex-wrap gap-1">
           {EXPORT_PRESETS.map((preset) => (
             <button
@@ -894,12 +935,12 @@ export function StudioExportMenuPanel({
         className="mb-2.5 space-y-1.5 rounded-lg border border-line/70 bg-card/40 p-2"
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="block text-xs font-semibold text-fg-2">페이지 범위 · 사전검사</span>
+          <span className="block text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "페이지 범위 · 사전검사")}</span>
           <span className="tabular-nums text-[0.58rem] text-fg-3">
-            선택 {exportRangeCount}P · {packagePreflight.canExport ? "통과" : "차단"}
+            {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "선택 ")}{exportRangeCount}P · {packagePreflight.canExport ? translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "통과") : translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "차단")}
           </span>
         </div>
-        <div className="flex flex-wrap gap-1" role="group" aria-label="범위 빠른 선택">
+        <div className="flex flex-wrap gap-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "범위 빠른 선택")}>
           <button
             type="button"
             onClick={() => {
@@ -909,8 +950,7 @@ export function StudioExportMenuPanel({
             }}
             className="min-h-9 rounded-lg border border-line bg-card px-2 text-[0.6rem] font-semibold text-fg-2 hover:bg-raised"
           >
-            전체
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "전체")}</button>
           <button
             type="button"
             onClick={() => {
@@ -920,8 +960,7 @@ export function StudioExportMenuPanel({
             }}
             className="min-h-9 rounded-lg border border-line bg-card px-2 text-[0.6rem] font-semibold text-fg-2 hover:bg-raised"
           >
-            1페이지만
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "1페이지만")}</button>
           {pageCount > 1 ? (
             <button
               type="button"
@@ -932,8 +971,7 @@ export function StudioExportMenuPanel({
               }}
               className="min-h-9 rounded-lg border border-line bg-card px-2 text-[0.6rem] font-semibold text-fg-2 hover:bg-raised"
             >
-              마지막
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "마지막")}</button>
           ) : null}
           <button
             type="button"
@@ -953,8 +991,7 @@ export function StudioExportMenuPanel({
                 : "border-line bg-card text-fg-2 hover:bg-raised"
             )}
           >
-            직접 지정
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "직접 지정")}</button>
           {!usePageSelection && rangeFromPage > rangeToPage ? (
             <button
               type="button"
@@ -964,32 +1001,29 @@ export function StudioExportMenuPanel({
               }}
               className="min-h-9 rounded-lg border border-warn/50 bg-warn/10 px-2 text-[0.6rem] font-semibold text-warn hover:bg-warn/15"
             >
-              시작·끝 맞바꾸기
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "시작·끝 맞바꾸기")}</button>
           ) : null}
         </div>
         {usePageSelection ? (
           <label className="block text-[0.62rem] font-medium text-fg-3">
-            내보낼 페이지
-            <input
+            {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "내보낼 페이지")}<input
               type="text"
               value={pageSelection}
               onChange={(event) => setPageSelection(event.target.value)}
               maxLength={STUDIO_EXPORT_PAGE_SELECTION_MAX_LENGTH}
-              placeholder="예: 1, 3–5, 8"
-              aria-label="내보내기 페이지 직접 지정"
+              placeholder={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "예: 1, 3–5, 8")}
+              aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "내보내기 페이지 직접 지정")}
               aria-describedby="studio-export-page-selection-help"
               aria-invalid={packagePreflight.errors.some((issue) => issue.code.startsWith("PAGE_"))}
               className="mt-0.5 h-9 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             />
             <span id="studio-export-page-selection-help" className="mt-1 block leading-snug">
-              쉼표로 페이지를 고르고, 3–5처럼 범위를 함께 입력하세요. 중복을 빼고 원고 순서로 저장합니다.
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "쉼표로 페이지를 고르고, 3–5처럼 범위를 함께 입력하세요. 중복을 빼고 원고 순서로 저장합니다.")}</span>
           </label>
         ) : (
           <div className="grid grid-cols-2 gap-1.5">
             <label className="text-[0.62rem] font-medium text-fg-3">
-              시작 (1–{Math.max(1, pageCount)})
+              {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "시작 (1–")}{Math.max(1, pageCount)})
               <input
                 type="number"
                 min={1}
@@ -1000,11 +1034,11 @@ export function StudioExportMenuPanel({
                   setRangeFromPage(Math.min(Math.max(1, next), Math.max(1, pageCount)));
                 }}
                 className="mt-0.5 h-9 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                aria-label="내보내기 시작 페이지"
+                aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "내보내기 시작 페이지")}
               />
             </label>
             <label className="text-[0.62rem] font-medium text-fg-3">
-              끝 (1–{Math.max(1, pageCount)})
+              {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "끝 (1–")}{Math.max(1, pageCount)})
               <input
                 type="number"
                 min={1}
@@ -1015,7 +1049,7 @@ export function StudioExportMenuPanel({
                   setRangeToPage(Math.min(Math.max(1, next), Math.max(1, pageCount)));
                 }}
                 className="mt-0.5 h-9 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                aria-label="내보내기 끝 페이지"
+                aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "내보내기 끝 페이지")}
               />
             </label>
           </div>
@@ -1024,8 +1058,8 @@ export function StudioExportMenuPanel({
           {exportRangeLabel} · {exportRangeCount}P
         </p>
         <div className="space-y-1.5 border-t border-line/50 pt-1.5">
-          <span className="block text-[0.62rem] font-semibold text-fg-2">인쇄 지오메트리</span>
-          <div className="flex flex-wrap gap-1" role="group" aria-label="지오메트리 프리셋">
+          <span className="block text-[0.62rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "인쇄 지오메트리")}</span>
+          <div className="flex flex-wrap gap-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "지오메트리 프리셋")}>
             {(
               [
                 { id: "webtoon72" as const, label: "화면 72", testId: "export-geometry-preset-webtoon72" },
@@ -1052,7 +1086,7 @@ export function StudioExportMenuPanel({
           </div>
           <div className="grid grid-cols-2 gap-1.5">
             <label className="text-[0.62rem] font-medium text-fg-3">
-              DPI ({STUDIO_EXPORT_DPI_RANGE.min}–{STUDIO_EXPORT_DPI_RANGE.max})
+              {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "en", "DPI (")}{STUDIO_EXPORT_DPI_RANGE.min}–{STUDIO_EXPORT_DPI_RANGE.max})
               <input
                 type="number"
                 data-testid="export-geometry-dpi"
@@ -1067,19 +1101,18 @@ export function StudioExportMenuPanel({
                   );
                 }}
                 className="mt-0.5 h-9 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                aria-label="내보내기 해상도 DPI"
+                aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "내보내기 해상도 DPI")}
               />
             </label>
             <label className="text-[0.62rem] font-medium text-fg-3">
-              도련 (mm)
-              <input
+              {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "도련 (mm)")}<input
                 type="number"
                 data-testid="export-geometry-bleed"
                 min={STUDIO_EXPORT_BLEED_MM_RANGE.min}
                 max={STUDIO_EXPORT_BLEED_MM_RANGE.max}
                 step={0.5}
                 value={geometryBleed ?? ""}
-                placeholder="없음"
+                placeholder={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "없음")}
                 onChange={(event) => {
                   setGeometryPresetId(null);
                   const raw = event.target.value;
@@ -1092,19 +1125,18 @@ export function StudioExportMenuPanel({
                   );
                 }}
                 className="mt-0.5 h-9 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                aria-label="도련 블리드 밀리미터"
+                aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "도련 블리드 밀리미터")}
               />
             </label>
             <label className="text-[0.62rem] font-medium text-fg-3">
-              트림 폭 (mm)
-              <input
+              {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "트림 폭 (mm)")}<input
                 type="number"
                 data-testid="export-geometry-trim-w"
                 min={STUDIO_EXPORT_TRIM_MM_RANGE.min}
                 max={STUDIO_EXPORT_TRIM_MM_RANGE.max}
                 step={0.1}
                 value={geometryTrimW ?? ""}
-                placeholder="없음"
+                placeholder={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "없음")}
                 onChange={(event) => {
                   setGeometryPresetId(null);
                   const raw = event.target.value;
@@ -1117,19 +1149,18 @@ export function StudioExportMenuPanel({
                   );
                 }}
                 className="mt-0.5 h-9 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                aria-label="재단 트림 폭 밀리미터"
+                aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "재단 트림 폭 밀리미터")}
               />
             </label>
             <label className="text-[0.62rem] font-medium text-fg-3">
-              트림 높이 (mm)
-              <input
+              {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "트림 높이 (mm)")}<input
                 type="number"
                 data-testid="export-geometry-trim-h"
                 min={STUDIO_EXPORT_TRIM_MM_RANGE.min}
                 max={STUDIO_EXPORT_TRIM_MM_RANGE.max}
                 step={0.1}
                 value={geometryTrimH ?? ""}
-                placeholder="없음"
+                placeholder={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "없음")}
                 onChange={(event) => {
                   setGeometryPresetId(null);
                   const raw = event.target.value;
@@ -1142,36 +1173,30 @@ export function StudioExportMenuPanel({
                   );
                 }}
                 className="mt-0.5 h-9 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                aria-label="재단 트림 높이 밀리미터"
+                aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "재단 트림 높이 밀리미터")}
               />
             </label>
           </div>
           <p className="text-[0.6rem] leading-snug text-fg-3">
-            목표 DPI {geometryDpi}
+            {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "목표 DPI ")}{geometryDpi}
             {geometryTrimW != null && geometryTrimH != null
-              ? ` · 트림 ${geometryTrimW}×${geometryTrimH}mm`
-              : " · 웹툰 화면용(트림 없음)"}
-            {geometryBleed != null ? ` · 도련 ${geometryBleed}mm` : ""}
+              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", " · 트림 {v0}×{v1}mm"), { v0: String(geometryTrimW), v1: String(geometryTrimH) })
+              : translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", " · 웹툰 화면용(트림 없음)")}
+            {geometryBleed != null ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", " · 도련 {v0}mm"), { v0: String(geometryBleed) }) : ""}
             {packagePreflight.outputSizeMm
-              ? ` · 출력 ${packagePreflight.outputSizeMm.width}×${packagePreflight.outputSizeMm.height}mm`
+              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", " · 출력 {v0}×{v1}mm"), { v0: String(packagePreflight.outputSizeMm.width), v1: String(packagePreflight.outputSizeMm.height) })
               : ""}
           </p>
           <p data-testid="export-geometry-actual" className="text-[0.6rem] leading-snug text-fg-2">
             {printPlan
-              ? `실제 저장: ${exportScale}× → 약 ${printPlan.currentWidthPx}×${printPlan.currentHeightPx}px `
-                + `· 약 ${Math.round(printPlan.currentDpi)}DPI 기록`
-              : `실제 저장: ${exportScale}× → ${Math.floor(canvasWidth * exportScale)}×${Math.floor(canvasHeight * exportScale)}px `
-                + `· ${Math.round(geometryDpi)}DPI 기록`}
+              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "실제 저장: {v0}× → 약 {v1}×{v2}px "), { v0: String(exportScale), v1: String(printPlan.currentWidthPx), v2: String(printPlan.currentHeightPx) })
+                + formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "· 약 {v0}DPI 기록"), { v0: String(Math.round(printPlan.currentDpi)) })
+              : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "실제 저장: {v0}× → {v1}×{v2}px "), { v0: String(exportScale), v1: String(Math.floor(canvasWidth * exportScale)), v2: String(Math.floor(canvasHeight * exportScale)) })
+                + formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "· {v0}DPI 기록"), { v0: String(Math.round(geometryDpi)) })}
           </p>
           <p className="text-[0.58rem] leading-snug text-fg-3">
-            트림·도련은 픽셀에 적용하지 않습니다 — 캔버스 비율을 유지해 그림을 자르지 않고, 출력
-            크기에 맞춘 해상도만 PNG(pHYs)·JPG(JFIF)·PSD에 기록합니다. WebP·QOI는 규격상 해상도
-            태그를 담지 못합니다. 위 픽셀·DPI는 예상치이며(화면 배율에 따라 1px 차이가 날 수
-            있음), 파일에는 저장된 실제 픽셀에서 실측한 DPI가 기록됩니다.
-            {printPlan && (printPlan.overflowWidthMm > 0.5 || printPlan.overflowHeightMm > 0.5)
-              ? ` 캔버스 비율이 출력 비율과 달라 인쇄 시 ${
-                  printPlan.overflowHeightMm >= printPlan.overflowWidthMm ? "세로" : "가로"
-                }가 ${Math.round(Math.max(printPlan.overflowWidthMm, printPlan.overflowHeightMm))}mm 넘칩니다(재단 영역 밖).`
+            {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "트림·도련은 픽셀에 적용하지 않습니다 — 캔버스 비율을 유지해 그림을 자르지 않고, 출력 크기에 맞춘 해상도만 PNG(pHYs)·JPG(JFIF)·PSD에 기록합니다. WebP·QOI는 규격상 해상도 태그를 담지 못합니다. 위 픽셀·DPI는 예상치이며(화면 배율에 따라 1px 차이가 날 수 있음), 파일에는 저장된 실제 픽셀에서 실측한 DPI가 기록됩니다.")}{printPlan && (printPlan.overflowWidthMm > 0.5 || printPlan.overflowHeightMm > 0.5)
+              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", " 캔버스 비율이 출력 비율과 달라 인쇄 시 {v0}가 {v1}mm 넘칩니다(재단 영역 밖)."), { v0: String(printPlan.overflowHeightMm >= printPlan.overflowWidthMm ? "세로" : "가로"), v1: String(Math.round(Math.max(printPlan.overflowWidthMm, printPlan.overflowHeightMm))) })
               : ""}
           </p>
           {printPlan?.issue ? (
@@ -1194,11 +1219,11 @@ export function StudioExportMenuPanel({
               className="flex h-9 w-full items-center justify-center rounded-lg border border-line bg-card text-[0.62rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               title={
                 printPlan.reachable
-                  ? `${printPlan.recommendedScale}×(${printPlan.recommendedWidthPx}×${printPlan.recommendedHeightPx}px)에서 목표 ${Math.round(printPlan.targetDpi)}DPI를 채웁니다`
-                  : `안전 배율 상한 ${printPlan.maxSafeScale}×에서 낼 수 있는 최대 해상도(${Math.round(printPlan.recommendedDpi)}DPI)를 적용합니다`
+                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "{v0}×({v1}×{v2}px)에서 목표 {v3}DPI를 채웁니다"), { v0: String(printPlan.recommendedScale), v1: String(printPlan.recommendedWidthPx), v2: String(printPlan.recommendedHeightPx), v3: String(Math.round(printPlan.targetDpi)) })
+                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "안전 배율 상한 {v0}×에서 낼 수 있는 최대 해상도({v1}DPI)를 적용합니다"), { v0: String(printPlan.maxSafeScale), v1: String(Math.round(printPlan.recommendedDpi)) })
               }
             >
-              배율 권장 {printPlan.recommendedScale}× · {Math.round(printPlan.recommendedDpi)}DPI
+              {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "배율 권장 ")}{printPlan.recommendedScale}× · {Math.round(printPlan.recommendedDpi)}DPI
             </button>
           ) : null}
         </div>
@@ -1216,9 +1241,8 @@ export function StudioExportMenuPanel({
           </p>
         ) : (
           <p role="status" className="rounded-md bg-good/10 px-2 py-1.5 text-[0.62rem] leading-snug text-good">
-            {packagePreflight.pageIndices.length}페이지 범위가 유효합니다
-            {packagePreflight.dialogueTxt
-              ? ` · 대사 ${packagePreflight.dialogueTxt.cueCount}개`
+            {packagePreflight.pageIndices.length}{translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "페이지 범위가 유효합니다")}{packagePreflight.dialogueTxt
+              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", " · 대사 {v0}개"), { v0: String(packagePreflight.dialogueTxt.cueCount) })
               : ""}
             .
           </p>
@@ -1231,19 +1255,17 @@ export function StudioExportMenuPanel({
               onChange={(event) => setIncludeDialogueTxt(event.target.checked)}
               className="accent-accent"
             />
-            대사 TXT 포함(범위 내 · 검수 필수 시 체크)
-          </label>
+            {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "대사 TXT 포함(범위 내 · 검수 필수 시 체크)")}</label>
         ) : null}
         <button
           type="button"
           onClick={exportDialogueTxtPackage}
           disabled={!dialoguePages || !packagePreflight.canExport || !packagePreflight.dialogueTxt}
           className="flex h-11 w-full items-center justify-center gap-1 rounded-lg border border-line bg-card text-[0.68rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
-          title="선택한 페이지 범위의 대사를 TXT로 저장합니다"
+          title={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "선택한 페이지 범위의 대사를 TXT로 저장합니다")}
         >
-          <FileText size={13} aria-hidden /> 대사 TXT 내보내기
-          {packagePreflight.dialogueTxt
-            ? ` · ${packagePreflight.dialogueTxt.cueCount}개`
+          <FileText size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "대사 TXT 내보내기")}{packagePreflight.dialogueTxt
+            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", " · {v0}개"), { v0: String(packagePreflight.dialogueTxt.cueCount) })
             : ""}
         </button>
         {packageStatus ? (
@@ -1260,7 +1282,7 @@ export function StudioExportMenuPanel({
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-fg-2">배율</span>
+        <span className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "배율")}</span>
         <div className="flex items-center gap-1">
           {EXPORT_SCALES.map((scale) => (
             <button
@@ -1283,7 +1305,7 @@ export function StudioExportMenuPanel({
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-fg-2">포맷</span>
+        <span className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "포맷")}</span>
         <div className="flex items-center gap-1">
           {EXPORT_FORMATS.map((format) => (
             <button
@@ -1307,7 +1329,7 @@ export function StudioExportMenuPanel({
           "mt-2.5 flex items-center gap-1.5 text-xs",
           exportFormat === "jpg" ? "cursor-not-allowed text-fg-3 opacity-50" : "cursor-pointer text-fg-2"
         )}
-        title={exportFormat === "jpg" ? "JPG는 투명도를 지원하지 않아요" : "배경 없이 투명하게 내보내기"}
+        title={exportFormat === "jpg" ? translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "JPG는 투명도를 지원하지 않아요") : translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "배경 없이 투명하게 내보내기")}
       >
         <input
           type="checkbox"
@@ -1316,8 +1338,7 @@ export function StudioExportMenuPanel({
           onChange={(event) => setExportTransparent(event.target.checked)}
           className="size-3.5 cursor-pointer accent-[var(--color-accent)] disabled:cursor-not-allowed"
         />
-        투명 배경 (PNG·WebP)
-      </label>
+        {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "투명 배경 (PNG·WebP)")}</label>
 
       <div className="mt-2.5 border-t border-line pt-2.5">
         <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-fg-2">
@@ -1327,15 +1348,14 @@ export function StudioExportMenuPanel({
             onChange={(event) => setWatermark({ ...watermark, enabled: event.target.checked })}
             className="size-3.5 cursor-pointer accent-[var(--color-accent)]"
           />
-          서명·워터마크
-        </label>
+          {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "서명·워터마크")}</label>
         {watermark.enabled && (
           <div className="mt-1.5 space-y-1.5">
             <input
               type="text"
               value={watermark.text}
               onChange={(event) => setWatermark({ ...watermark, text: event.target.value })}
-              placeholder="© 작가명 / @아이디"
+              placeholder={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "© 작가명 / @아이디")}
               maxLength={60}
               className="w-full rounded-lg border border-line bg-card px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
             />
@@ -1346,7 +1366,7 @@ export function StudioExportMenuPanel({
                   setWatermark({ ...watermark, position: event.target.value as WatermarkSettings["position"] })
                 }
                 className="h-7 flex-1 rounded-lg border border-line bg-card px-1.5 text-[0.7rem] text-fg outline-none focus:border-accent/50"
-                aria-label="워터마크 위치"
+                aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "워터마크 위치")}
               >
                 {WATERMARK_POSITIONS.map((position) => (
                   <option key={position.id} value={position.id}>
@@ -1362,8 +1382,8 @@ export function StudioExportMenuPanel({
                 value={watermark.opacity}
                 onChange={(event) => setWatermark({ ...watermark, opacity: Number(event.target.value) })}
                 className="h-1 w-16 cursor-pointer accent-[var(--color-accent)]"
-                title="워터마크 투명도"
-                aria-label="워터마크 투명도"
+                title={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "워터마크 투명도")}
+                aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "워터마크 투명도")}
               />
             </div>
           </div>
@@ -1376,22 +1396,20 @@ export function StudioExportMenuPanel({
           onClick={onCopyToClipboard}
           disabled={isExporting}
           className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:opacity-50"
-          title="현재 페이지를 클립보드에 이미지로 복사 (붙여넣기로 바로 사용)"
+          title={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "현재 페이지를 클립보드에 이미지로 복사 (붙여넣기로 바로 사용)")}
         >
-          <Copy size={13} /> 클립보드로 복사
-        </button>
+          <Copy size={13} /> {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "클립보드로 복사")}</button>
       )}
 
       {exportCurrentPageToRasterInterchange && (
-        <section className="mt-2.5 rounded-xl border border-line bg-card/45 p-2" aria-label="공개 래스터 포맷">
+        <section className="mt-2.5 rounded-xl border border-line bg-card/45 p-2" aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "공개 래스터 포맷")}>
           <div className="flex items-center gap-2">
             <FileImage size={14} className="shrink-0 text-accent" aria-hidden />
             <label className="min-w-0 flex-1 text-[0.65rem] font-semibold text-fg-2">
-              공개 래스터 포맷
-              <select
+              {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "공개 래스터 포맷")}<select
                 value={openRasterFormat}
                 onChange={(event) => setOpenRasterFormat(event.target.value as StudioRasterInterchangeFormat)}
-                aria-label="공개 래스터 내보내기 형식"
+                aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "공개 래스터 내보내기 형식")}
                 disabled={openRasterBusy || isExporting}
                 className="mt-1 min-h-11 w-full rounded-lg border border-line bg-panel px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
               >
@@ -1408,16 +1426,15 @@ export function StudioExportMenuPanel({
             onClick={() => void runOpenRasterExport()}
             disabled={
               openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy ||
-              archiveBusy !== null
+              (archiveBusy !== null || vectorPdfBusy)
             }
             className="mt-1.5 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-accent/35 bg-accent/10 px-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
           >
             <FileImage size={13} aria-hidden />
-            {openRasterBusy ? "픽셀 인코딩 중" : `${openRasterFormat.toUpperCase()} 저장`}
+            {openRasterBusy ? translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "픽셀 인코딩 중") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "{v0} 저장"), { v0: String(openRasterFormat.toUpperCase()) })}
           </button>
           <p className="mt-1 text-[0.6rem] leading-relaxed text-fg-4">
-            QOI·TGA·PAM·TIFF는 투명도를 보존합니다. BMP·PPM은 호환성을 위해 흰색 배경에 합성합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "QOI·TGA·PAM·TIFF는 투명도를 보존합니다. BMP·PPM은 호환성을 위해 흰색 배경에 합성합니다.")}</p>
           <p
             aria-live="polite"
             className={cx(
@@ -1432,10 +1449,10 @@ export function StudioExportMenuPanel({
         </section>
       )}
 
-      <section className="mt-2.5 rounded-xl border border-line bg-card/45 p-2" aria-label="문서 교환 포맷">
+      <section className="mt-2.5 rounded-xl border border-line bg-card/45 p-2" aria-label={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "문서 교환 포맷")}>
         <div className="mb-1.5 flex items-center gap-1.5">
           <Layers size={14} className="text-accent" aria-hidden />
-          <span className="text-[0.68rem] font-semibold text-fg-2">문서·만화 교환</span>
+          <span className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "문서·만화 교환")}</span>
         </div>
         <div
           className={cx(
@@ -1452,41 +1469,41 @@ export function StudioExportMenuPanel({
             onClick={() => void runArchiveExport("cbz")}
             disabled={
               !packagePreflight.canExport ||
-              archiveBusy !== null || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
+              (archiveBusy !== null || vectorPdfBusy) || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
               isExporting || contactBusy
             }
             className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
-            title={`${exportRangeLabel}(${exportRangeCount}장)를 ComicInfo.xml 메타데이터와 함께 CBZ로 저장`}
+            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "{v0}({v1}장)를 ComicInfo.xml 메타데이터와 함께 CBZ로 저장"), { v0: String(exportRangeLabel), v1: String(exportRangeCount) })}
           >
             <FileImage size={13} aria-hidden />
-            {archiveBusy === "cbz" ? "CBZ 생성 중" : `CBZ · ${exportRangeCount}P`}
+            {archiveBusy === "cbz" ? translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "CBZ 생성 중") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "en", "CBZ · {v0}P"), { v0: String(exportRangeCount) })}
           </button>
           <button
             type="button"
             onClick={() => void runArchiveExport("ora")}
             disabled={
-              archiveBusy !== null || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
+              (archiveBusy !== null || vectorPdfBusy) || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
               isExporting || contactBusy
             }
             className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
-            title="현재 페이지를 OpenRaster 합성 1레이어 파일로 저장"
+            title={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "현재 페이지를 OpenRaster 합성 1레이어 파일로 저장")}
           >
             <Layers size={13} aria-hidden />
-            {archiveBusy === "ora" ? "ORA 중" : "ORA"}
+            {archiveBusy === "ora" ? translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "ORA 중") : translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "en", "ORA")}
           </button>
           {exportCurrentPageToInkMl && (
             <button
               type="button"
               onClick={() => void runInkMlExport()}
               disabled={
-                archiveBusy !== null || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
+                (archiveBusy !== null || vectorPdfBusy) || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
                 isExporting || contactBusy
               }
               className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-1.5 text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
-              title="현재 페이지의 보이는 펜 자유곡선을 필압·기울기 채널이 있는 검증된 InkML로 저장"
+              title={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "현재 페이지의 보이는 펜 자유곡선을 필압·기울기 채널이 있는 검증된 InkML로 저장")}
             >
               <FileText size={13} aria-hidden />
-              {archiveBusy === "inkml" ? "검증 중" : "InkML"}
+              {archiveBusy === "inkml" ? translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "검증 중") : translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "en", "InkML")}
             </button>
           )}
           {exportCurrentPageToWillV1 && (
@@ -1494,22 +1511,21 @@ export function StudioExportMenuPanel({
               type="button"
               onClick={() => void runWillV1Export()}
               disabled={
-                archiveBusy !== null || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
+                (archiveBusy !== null || vectorPdfBusy) || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
                 isExporting || contactBusy
               }
               className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-accent/35 bg-accent-soft/35 px-1.5 text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-accent-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
-              title="현재 페이지의 보이는 펜 자유곡선을 ToonSpectrum bounded WILL v1 Annex B .will 파일로 저장"
+              title={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "현재 페이지의 보이는 펜 자유곡선을 ToonSpectrum bounded WILL v1 Annex B .will 파일로 저장")}
             >
               <FileText size={13} aria-hidden />
-              {archiveBusy === "will" ? "WILL 생성 중" : "WILL v1"}
+              {archiveBusy === "will" ? translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "WILL 생성 중") : translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "en", "WILL v1")}
             </button>
           )}
         </div>
         <p className="mt-1 text-[0.6rem] leading-relaxed text-fg-4">
-          CBZ는 선택 범위와 ComicInfo.xml, ORA는 현재 화면의 합성을 보존합니다.
-          {exportCurrentPageToInkMl ? " InkML은 펜 자유곡선의 입력 채널을 검증해 교환합니다." : null}
+          {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "CBZ는 선택 범위와 ComicInfo.xml, ORA는 현재 화면의 합성을 보존합니다.")}{exportCurrentPageToInkMl ? translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", " InkML은 펜 자유곡선의 입력 채널을 검증해 교환합니다.") : null}
           {exportCurrentPageToWillV1
-            ? " WILL v1은 ToonSpectrum bounded 공개 명세 프로필이며 Wacom 공식 SDK·인증 파일이 아닙니다."
+            ? translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", " WILL v1은 ToonSpectrum bounded 공개 명세 프로필이며 Wacom 공식 SDK·인증 파일이 아닙니다.")
             : null}
         </p>
         <p
@@ -1529,14 +1545,14 @@ export function StudioExportMenuPanel({
       <button
         type="button"
         onClick={() => void runPdfExport()}
-        disabled={!packagePreflight.canExport || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null}
+        disabled={!packagePreflight.canExport || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)}
         className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
-        title={`${exportRangeLabel}(${exportRangeCount}장)를 JPG로 담은 PDF 한 파일로 저장`}
+        title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "{v0}({v1}장)를 JPG로 담은 PDF 한 파일로 저장"), { v0: String(exportRangeLabel), v1: String(exportRangeCount) })}
       >
         <FileText size={13} />{" "}
         {exportRangeIsPartial
-          ? `PDF (${exportRangeLabel} · ${exportRangeCount}장)`
-          : `PDF (전체 ${pageCount}페이지)`}
+          ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "PDF ({v0} · {v1}장)"), { v0: String(exportRangeLabel), v1: String(exportRangeCount) })
+          : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "PDF (전체 {v0}페이지)"), { v0: String(pageCount) })}
       </button>
       <p
         aria-live="polite"
@@ -1550,6 +1566,22 @@ export function StudioExportMenuPanel({
         {pdfStatus?.text}
       </p>
 
+      {exportCurrentPageToVectorPdf ? (
+        <button
+          type="button"
+          onClick={() => void runVectorPdfExport()}
+          disabled={vectorPdfBusy || isExporting}
+          className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft/20 py-1.5 text-xs font-semibold text-fg-2 disabled:opacity-50"
+          title={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "현재 화면을 보존하고 지원되는 펜 선화를 PDF 벡터 패스로 함께 기록")}
+        >
+          <FileText size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "PDF 1.7 · 벡터 선화")}</button>
+      ) : null}
+      {vectorPdfStatus ? (
+        <p aria-live="polite" className="mt-1.5 rounded-md border border-line px-2 py-1 text-[10px] leading-snug text-fg-3">
+          {vectorPdfStatus.text}
+        </p>
+      ) : null}
+
       <StudioContactSheetPanel
         columns={contactColumns}
         rows={contactRows}
@@ -1557,7 +1589,7 @@ export function StudioExportMenuPanel({
         showLabels={contactShowLabels}
         pageCount={exportRangeCount}
         busy={contactBusy}
-        disabled={!packagePreflight.canExport || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || archiveBusy !== null}
+        disabled={!packagePreflight.canExport || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || (archiveBusy !== null || vectorPdfBusy)}
         status={contactStatus}
         setColumns={setContactColumns}
         setRows={setContactRows}
@@ -1576,13 +1608,12 @@ export function StudioExportMenuPanel({
             onPointerDown={preloadStudioSvgExportModule}
             onFocus={preloadStudioSvgExportModule}
             disabled={
-              svgBusy || psdBusy || pdfBusy || presetBusy || isExporting || contactBusy || archiveBusy !== null
+              svgBusy || psdBusy || pdfBusy || presetBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)
             }
             className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
-            title="현재 페이지를 벡터 SVG 파일로 저장 (도형·텍스트·말풍선 벡터 보존)"
+            title={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "현재 페이지를 벡터 SVG 파일로 저장 (도형·텍스트·말풍선 벡터 보존)")}
           >
-            <FileText size={13} /> SVG (벡터, 현재 페이지)
-          </button>
+            <FileText size={13} /> {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "SVG (벡터, 현재 페이지)")}</button>
           <p
             aria-live="polite"
             className={cx(
@@ -1607,13 +1638,12 @@ export function StudioExportMenuPanel({
             onPointerDown={preloadStudioPsdExportModule}
             onFocus={preloadStudioPsdExportModule}
             disabled={
-              psdBusy || svgBusy || pdfBusy || presetBusy || isExporting || contactBusy || archiveBusy !== null
+              psdBusy || svgBusy || pdfBusy || presetBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)
             }
             className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
-            title="현재 페이지를 요소별 레이어를 가진 PSD 파일로 저장 (포토샵에서 레이어별 편집 가능)"
+            title={translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "현재 페이지를 요소별 레이어를 가진 PSD 파일로 저장 (포토샵에서 레이어별 편집 가능)")}
           >
-            <Layers size={13} /> PSD (레이어별)
-          </button>
+            <Layers size={13} /> {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "PSD (레이어별)")}</button>
           <p
             aria-live="polite"
             className={cx(
@@ -1629,8 +1659,8 @@ export function StudioExportMenuPanel({
       )}
 
       <p className="mt-2 text-[10px] tabular-nums text-fg-3">
-        출력 폭 {outW.toLocaleString()}px
-        {quality !== undefined ? ` · 품질 ${Math.round(quality * 100)}%` : ""}
+        {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "출력 폭 ")}{outW.toLocaleString()}px
+        {quality !== undefined ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", " · 품질 {v0}%"), { v0: String(Math.round(quality * 100)) }) : ""}
       </p>
 
       {selectedPreset && validation && (
@@ -1645,13 +1675,11 @@ export function StudioExportMenuPanel({
           ))}
           {slices && maxH !== undefined && (
             <p className="rounded-md border border-line bg-card px-2 py-1 text-[10px] leading-snug text-fg-3">
-              규격 높이 {maxH.toLocaleString()}px 기준 {slices.length}장으로 나눠 올리는 걸 권장해요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "규격 높이 ")}{maxH.toLocaleString()}{translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "px 기준 ")}{slices.length}{translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "장으로 나눠 올리는 걸 권장해요.")}</p>
           )}
           {validation.ok && !slices && (
             <p className="rounded-md border border-good/40 bg-good/10 px-2 py-1 text-[10px] leading-snug text-good">
-              {selectedPreset.label} 규격에 맞아요.
-            </p>
+              {selectedPreset.label} {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "규격에 맞아요.")}</p>
           )}
 
           {/* 규격 실행 — 규격 폭 리샘플 + 규격 높이 자동 분할을 실제 파일 저장으로. */}
@@ -1660,28 +1688,27 @@ export function StudioExportMenuPanel({
               type="button"
               onClick={() => void runPresetSliceExport("current")}
               disabled={
-                presetBusy || pdfBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null
+                presetBusy || pdfBusy || psdBusy || svgBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)
               }
               className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-accent/30 bg-accent/10 px-2 text-[0.68rem] font-semibold text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
-              title={`현재 페이지를 ${selectedPreset.label} 규격(폭 리샘플·세로 분할)으로 저장`}
+              title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "현재 페이지를 {v0} 규격(폭 리샘플·세로 분할)으로 저장"), { v0: String(selectedPreset.label) })}
             >
-              <Scissors size={12} /> 규격으로 저장
-            </button>
+              <Scissors size={12} /> {translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "규격으로 저장")}</button>
             {pageCount > 1 && (
               <button
                 type="button"
                 onClick={() => void runPresetSliceExport("all")}
                 disabled={
                   !packagePreflight.canExport || openRasterBusy ||
-                  presetBusy || pdfBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null
+                  presetBusy || pdfBusy || psdBusy || svgBusy || isExporting || contactBusy || (archiveBusy !== null || vectorPdfBusy)
                 }
                 className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
-                title={`${exportRangeLabel}(${exportRangeCount}장)를 이어 붙여 ${selectedPreset.label} 규격으로 나눠 저장`}
+                title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "{v0}({v1}장)를 이어 붙여 {v2} 규격으로 나눠 저장"), { v0: String(exportRangeLabel), v1: String(exportRangeCount), v2: String(selectedPreset.label) })}
               >
                 <Scissors size={12} />{" "}
                 {exportRangeIsPartial
-                  ? `선택 ${exportRangeCount}페이지`
-                  : `전체 ${pageCount}페이지`}
+                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "선택 {v0}페이지"), { v0: String(exportRangeCount) })
+                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.export.StudioExportMenuPanel", "ko", "전체 {v0}페이지"), { v0: String(pageCount) })}
               </button>
             )}
           </div>
@@ -1703,7 +1730,7 @@ export function StudioExportMenuPanel({
       {renderAdditionalExports?.({
         pageIndices: packagePreflight.pageIndices,
         canExport: packagePreflight.canExport,
-        busy: isExporting || presetBusy || pdfBusy || svgBusy || psdBusy || openRasterBusy || contactBusy || archiveBusy !== null,
+        busy: isExporting || presetBusy || pdfBusy || svgBusy || psdBusy || openRasterBusy || contactBusy || (archiveBusy !== null || vectorPdfBusy),
         rangeLabel: exportRangeLabel,
         capturePages: captureMultiPageExportCanvases,
       })}

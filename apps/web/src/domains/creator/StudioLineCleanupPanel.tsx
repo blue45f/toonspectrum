@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Loader2, PenTool } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -62,19 +65,17 @@ export function StudioLineCleanupPanel({
     <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel/50 p-3">
       <div className="flex items-center gap-1.5 text-sm font-medium text-fg-1">
         <PenTool size={14} />
-        스케치 선화 정리
-      </div>
+        {translateCurrentStaticSourceText("domains.creator.StudioLineCleanupPanel", "ko", "스케치 선화 정리")}</div>
 
       {previewSrc && (
         <div className="overflow-hidden rounded-lg border border-line bg-card">
-          <img src={previewSrc} alt="정리된 선화 미리보기" className="max-h-32 w-full object-contain" />
+          <img src={previewSrc} alt={translateCurrentStaticSourceText("domains.creator.StudioLineCleanupPanel", "ko", "정리된 선화 미리보기")} className="max-h-32 w-full object-contain" />
         </div>
       )}
 
       <div className="space-y-1.5">
         <label className={LABEL_ROW}>
-          임계값
-          <span className="flex items-center gap-1.5">
+          {translateCurrentStaticSourceText("domains.creator.StudioLineCleanupPanel", "ko", "임계값")}<span className="flex items-center gap-1.5">
             <input
               type="range"
               min={LINE_ART_CLEANUP_RANGES.threshold.min}
@@ -89,8 +90,7 @@ export function StudioLineCleanupPanel({
           </span>
         </label>
         <label className={LABEL_ROW}>
-          선명도
-          <span className="flex items-center gap-1.5">
+          {translateCurrentStaticSourceText("domains.creator.StudioLineCleanupPanel", "ko", "선명도")}<span className="flex items-center gap-1.5">
             <input
               type="range"
               min={LINE_ART_CLEANUP_RANGES.strength.min}
@@ -113,16 +113,14 @@ export function StudioLineCleanupPanel({
         className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:opacity-60"
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : <PenTool size={14} />}
-        {busy ? "정리하는 중…" : "선화 정리"}
+        {busy ? translateCurrentStaticSourceText("domains.creator.StudioLineCleanupPanel", "ko", "정리하는 중…") : translateCurrentStaticSourceText("domains.creator.StudioLineCleanupPanel", "ko", "선화 정리")}
       </button>
 
       {error ? (
         <p className="text-xs text-bad">{error}</p>
       ) : (
         <p className="text-[0.7rem] leading-relaxed text-fg-3">
-          흐릿한 스케치를 또렷하게 정리해요 — 100% 브라우저 실행(무료). 임계값을 0으로 두면 이진화 없이
-          그레이 톤 정리만 적용돼요.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioLineCleanupPanel", "ko", "흐릿한 스케치를 또렷하게 정리해요 — 100% 브라우저 실행(무료). 임계값을 0으로 두면 이진화 없이 그레이 톤 정리만 적용돼요.")}</p>
       )}
     </div>
   );

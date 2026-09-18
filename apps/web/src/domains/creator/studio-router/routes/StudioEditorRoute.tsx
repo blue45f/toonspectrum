@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useEffect, useMemo } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
@@ -25,6 +26,13 @@ const LegacyStudioEditorAdapter = lazyRetry(
 // Optional offline guidance must not trigger the global chunk-reload recovery.
 const StudioOfflinePanel = lazy(
   () => import("../../offline/StudioOfflinePanel").then((module) => ({ default: module.StudioOfflinePanel })),
+);
+
+const StudioWorkspaceContextCoach = lazyRetry(
+  () => import("../../studio-shell/StudioWorkspaceContextCoach").then((module) => ({
+    default: module.StudioWorkspaceContextCoach,
+  })),
+  "StudioWorkspaceContextCoach",
 );
 
 export function StudioEditorRoute({ resolution }: {
@@ -79,10 +87,15 @@ export function StudioEditorRoute({ resolution }: {
         draftSessionEpoch={draftScope.epoch}
         studioRoute={route}
       >
+        {route.surface === "bg3d" || route.surface === "poser" || route.surface === "character" ? (
+          <Suspense fallback={null}>
+            <StudioWorkspaceContextCoach surface={route.surface} />
+          </Suspense>
+        ) : null}
         <StudioOfflinePanelBoundary>
           <Suspense fallback={null}><StudioOfflinePanel /></Suspense>
         </StudioOfflinePanelBoundary>
-        <Suspense fallback={<StudioRouteLoading label="Studio 편집기를 여는 중..." />}>
+        <Suspense fallback={<StudioRouteLoading label={translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioEditorRoute", "ko", "Studio 편집기를 여는 중...")} />}>
           <LegacyStudioEditorAdapter
             remixId={route.remixSourceWorkId}
             studioRoute={route}

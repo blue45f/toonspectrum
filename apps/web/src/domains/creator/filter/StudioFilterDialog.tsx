@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ChevronDown,
   Clock3,
   Eye,
@@ -241,10 +245,10 @@ function NumberControl({
         // the slider — "반지름 24" alone does not say 24 of what.
         aria-valuetext={suffix ? `${value}${suffix}` : undefined}
         className="h-11 w-full cursor-pointer accent-accent sm:h-8 pointer-coarse:h-11"
-        data-autofocus={autofocus ? "true" : undefined}
+        data-autofocus={autofocus ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "en", "true") : undefined}
       />
       <label className="flex min-h-11 items-center rounded-xl border border-line bg-card px-2 focus-within:border-accent sm:min-h-10 pointer-coarse:min-h-11">
-        <span className="sr-only">{label} 숫자</span>
+        <span className="sr-only">{label} {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "숫자")}</span>
         <input
           type="text"
           inputMode="decimal"
@@ -261,7 +265,7 @@ function NumberControl({
             }
           }}
           className="h-full min-w-0 flex-1 bg-transparent text-right text-xs font-semibold tabular-nums text-fg outline-none"
-          aria-label={`${label} 숫자`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "{v0} 숫자"), { v0: String(label) })}
         />
         {suffix ? <span className="ml-1 text-[0.65rem] text-fg-3">{suffix}</span> : null}
       </label>
@@ -291,7 +295,7 @@ function ColorControl({ label, value, autofocus, onChange }: ColorControlProps):
           value={value}
           onChange={(event) => onChange(event.target.value)}
           className="size-6 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
-          data-autofocus={autofocus ? "true" : undefined}
+          data-autofocus={autofocus ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "en", "true") : undefined}
           aria-label={label}
         />
         <span className="min-w-0 flex-1 text-right text-xs font-semibold tabular-nums text-fg">
@@ -1002,7 +1006,7 @@ export function StudioFilterDialog({
         tabIndex={-1}
         aria-hidden="true"
         data-studio-modal-backdrop="true"
-        data-studio-filter-preview-cutout={previewCutout ? "true" : undefined}
+        data-studio-filter-preview-cutout={previewCutout ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "en", "true") : undefined}
         onClick={onClose}
         className="absolute inset-0 cursor-default"
       >
@@ -1054,7 +1058,7 @@ export function StudioFilterDialog({
           <span
             role="button"
             tabIndex={0}
-            aria-label="필터 창 옮기기 — 끌어서 이동, 방향키로 미세 이동, Enter로 가운데 정렬"
+            aria-label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "필터 창 옮기기 — 끌어서 이동, 방향키로 미세 이동, Enter로 가운데 정렬")}
             onKeyDown={nudgeDialogWithKey}
             className={cn(
               "grid size-9 shrink-0 cursor-grab place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent active:cursor-grabbing",
@@ -1069,14 +1073,14 @@ export function StudioFilterDialog({
             </h2>
             <p id={descriptionId} className="mt-0.5 text-[0.7rem] leading-relaxed text-fg-3">
               {targetKind === "page-composite"
-                ? "현재 보이는 페이지를 편집 가능한 합성 레이어로 만들고, 원본 레이어를 보존한 채 필터를 적용합니다."
-                : "선택한 이미지 레이어에 비파괴 필터로 적용합니다."}
+                ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "현재 보이는 페이지를 편집 가능한 합성 레이어로 만들고, 원본 레이어를 보존한 채 필터를 적용합니다.")
+                : translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "선택한 이미지 레이어에 비파괴 필터로 적용합니다.")}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label={`${title} 닫기`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "{v0} 닫기"), { v0: String(title) })}
             className={cn(
               "grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised hover:text-fg sm:size-10 pointer-coarse:size-11",
               STUDIO_EASE,
@@ -1091,8 +1095,7 @@ export function StudioFilterDialog({
           <div className="space-y-4">
             {effectPreferenceAuthority === "memory-only" ? (
               <p role="status" className="rounded-lg border border-warning/40 bg-warning/10 px-2.5 py-1.5 text-[0.65rem] text-fg-2">
-                즐겨찾기와 최근 필터는 저장소를 다시 연결하기 전까지 이번 탭에서만 유지됩니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "즐겨찾기와 최근 필터는 저장소를 다시 연결하기 전까지 이번 탭에서만 유지됩니다.")}</p>
             ) : null}
             {/*
               A live region by attribute rather than role="status": the memory-only preferences
@@ -1104,7 +1107,7 @@ export function StudioFilterDialog({
               {galleryPickAnnouncement}
             </p>
             <section
-              aria-label="필터 갤러리"
+              aria-label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "필터 갤러리")}
               className="min-w-0 overflow-hidden rounded-xl border border-line bg-card/45"
             >
               <button
@@ -1123,10 +1126,9 @@ export function StudioFilterDialog({
                   <SlidersHorizontal size={15} aria-hidden />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate">다른 필터 둘러보기</span>
+                  <span className="block truncate">{translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "다른 필터 둘러보기")}</span>
                   <span className="block truncate text-[0.62rem] font-normal text-fg-3">
-                    {STUDIO_FILTER_DIALOG_CATALOG.length}개 필터 · 용도별 분류, 검색, 즐겨찾기
-                  </span>
+                    {STUDIO_FILTER_DIALOG_CATALOG.length}{translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "개 필터 · 용도별 분류, 검색, 즐겨찾기")}</span>
                 </span>
                 <ChevronDown
                   size={17}
@@ -1144,7 +1146,7 @@ export function StudioFilterDialog({
                   className="min-w-0 space-y-2.5 border-t border-line p-2.5"
                 >
                   <label className="relative block min-w-0">
-                    <span className="sr-only">필터 검색</span>
+                    <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "필터 검색")}</span>
                     <Search
                       size={15}
                       aria-hidden
@@ -1154,7 +1156,7 @@ export function StudioFilterDialog({
                       type="search"
                       value={galleryQuery}
                       onChange={(event) => setGalleryQuery(event.target.value)}
-                      placeholder="이름·효과로 검색 (예: 빛줄기, 선화 정리)"
+                      placeholder={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "이름·효과로 검색 (예: 빛줄기, 선화 정리)")}
                       autoComplete="off"
                       className={cn(
                         "min-h-11 w-full min-w-0 rounded-xl border border-line bg-panel pl-9 pr-3 text-xs text-fg outline-none placeholder:text-fg-3 hover:border-line-strong focus:border-accent",
@@ -1165,8 +1167,7 @@ export function StudioFilterDialog({
                   </label>
 
                   <p className="text-[0.65rem] leading-relaxed text-fg-3">
-                    카드 이미지는 효과 예시입니다. 실제 결과는 선택 후 작업 이미지의 미리보기에서 확인하세요.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "카드 이미지는 효과 예시입니다. 실제 결과는 선택 후 작업 이미지의 미리보기에서 확인하세요.")}</p>
 
                   {/*
                     A radiogroup, not independent toggle buttons: exactly one category is ever active, and
@@ -1176,7 +1177,7 @@ export function StudioFilterDialog({
                   */}
                   <div
                     role="radiogroup"
-                    aria-label="필터 분류"
+                    aria-label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "필터 분류")}
                     className="flex min-w-0 gap-1 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]"
                   >
                     {STUDIO_FILTER_GALLERY_VIEWS.map((view) => (
@@ -1206,8 +1207,7 @@ export function StudioFilterDialog({
                   </div>
 
                   <p className="text-[0.62rem] text-fg-3" aria-live="polite">
-                    {visibleGalleryItems.length}개 필터
-                  </p>
+                    {visibleGalleryItems.length}{translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "개 필터")}</p>
 
                   {visibleGalleryItems.length > 0 ? (
                     <>
@@ -1217,12 +1217,11 @@ export function StudioFilterDialog({
                       or produce an invalid tree. Roving tabindex gives the same one-stop behaviour.
                     */}
                     <p id="studio-filter-gallery-keys" className="sr-only">
-                      방향키로 필터 카드를 옮기고, Tab으로 즐겨찾기 버튼에 갑니다.
-                    </p>
+                      {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "방향키로 필터 카드를 옮기고, Tab으로 즐겨찾기 버튼에 갑니다.")}</p>
                     <div
                       data-studio-filter-gallery-grid="true"
                       role="group"
-                      aria-label="필터 카드"
+                      aria-label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "필터 카드")}
                       aria-describedby="studio-filter-gallery-keys"
                       className="grid max-h-[min(44dvh,24rem)] min-w-0 grid-cols-2 gap-2 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin]"
                     >
@@ -1247,7 +1246,7 @@ export function StudioFilterDialog({
                             <button
                               type="button"
                               aria-pressed={selected}
-                              aria-label={`${entryTitle} 필터 선택`}
+                              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "{v0} 필터 선택"), { v0: String(entryTitle) })}
                               data-studio-filter-gallery-card={entry.kind}
                               tabIndex={entry.kind === rovingGalleryKind ? 0 : -1}
                               onFocus={() => setGalleryFocusKind(entry.kind)}
@@ -1280,7 +1279,7 @@ export function StudioFilterDialog({
                               // The name stays put and aria-pressed carries the state. Swapping the
                               // name too announced "즐겨찾기 해제, pressed" — the undo action
                               // described as already done.
-                              aria-label={`${entryTitle} 즐겨찾기`}
+                              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "{v0} 즐겨찾기"), { v0: String(entryTitle) })}
                               // One Tab from the card you are on; every other star is reached by
                               // arrowing to its card first. No arrow handler here on purpose —
                               // arrowing off a star would have to guess between the next card's star
@@ -1294,7 +1293,7 @@ export function StudioFilterDialog({
                                 STUDIO_FOCUS_RING,
                               )}
                             >
-                              <Star size={15} fill={favorite ? "currentColor" : "none"} aria-hidden />
+                              <Star size={15} fill={favorite ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "en", "none")} aria-hidden />
                             </button>
                           </div>
                         );
@@ -1306,8 +1305,7 @@ export function StudioFilterDialog({
                       role="status"
                       className="grid min-h-24 place-items-center rounded-xl border border-dashed border-line px-3 text-center text-xs text-fg-3"
                     >
-                      검색 또는 분류에 맞는 필터가 없습니다.
-                    </div>
+                      {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "검색 또는 분류에 맞는 필터가 없습니다.")}</div>
                   )}
                 </div>
               ) : null}
@@ -1319,15 +1317,14 @@ export function StudioFilterDialog({
                 role="note"
                 className="rounded-lg border border-accent/25 bg-accent-soft/55 px-3 py-2 text-[0.7rem] leading-relaxed text-fg-2"
               >
-                <strong className="font-semibold text-fg">원본은 그대로 유지됩니다.</strong>{" "}
-                적용 후 실행 취소 한 번으로 새 합성 레이어만 제거할 수 있습니다.
-              </p>
+                <strong className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "원본은 그대로 유지됩니다.")}</strong>{" "}
+                {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "적용 후 실행 취소 한 번으로 새 합성 레이어만 제거할 수 있습니다.")}</p>
             ) : null}
 
             {isStudioFilterPackDraft(draft) ? (
               <>
                 <p
-                  role={filterLibraryAuthority === "error" ? "alert" : "status"}
+                  role={filterLibraryAuthority === "error" ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "en", "alert") : translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "en", "status")}
                   data-studio-filter-library-authority={filterLibraryAuthority}
                   className={cn(
                     "rounded-lg border px-3 py-2 text-[0.64rem] font-semibold",
@@ -1337,27 +1334,27 @@ export function StudioFilterDialog({
                   )}
                 >
                   {filterLibraryAuthority === "sqlite"
-                    ? `${filterLibraryTotalCount}개 · 무제한 · 로컬 SQL`
+                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "{v0}개 · 무제한 · 로컬 SQL"), { v0: String(filterLibraryTotalCount) })
                     : filterLibraryAuthority === "memory-session"
-                      ? `${filterLibraryTotalCount}개 · 비영속 메모리 세션 · 브라우저 종료 시 사라짐`
+                      ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "{v0}개 · 비영속 메모리 세션 · 브라우저 종료 시 사라짐"), { v0: String(filterLibraryTotalCount) })
                       : filterLibraryAuthority === "error"
-                        ? "필터 카탈로그 SQL을 읽지 못했습니다. 기존 데이터로 조용히 강등하지 않았습니다."
-                        : "로컬 SQL 필터 카탈로그 연결 중…"}
+                        ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "필터 카탈로그 SQL을 읽지 못했습니다. 기존 데이터로 조용히 강등하지 않았습니다.")
+                        : translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "로컬 SQL 필터 카탈로그 연결 중…")}
                 </p>
                 {installedPackPresets.length > 0 ? (
                   <section
-                    aria-label="설치한 Creator Pack 필터 프리셋"
+                    aria-label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "설치한 Creator Pack 필터 프리셋")}
                     className="rounded-lg border border-accent/25 bg-accent-soft/35 p-2.5"
                   >
                     <p className="text-[0.68rem] font-bold text-fg">
                       {filterLibraryAuthority === "memory-session"
-                        ? "현재 세션 Creator Pack 필터 프리셋"
-                        : "설치한 Creator Pack 필터 프리셋"}
+                        ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "현재 세션 Creator Pack 필터 프리셋")
+                        : translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "설치한 Creator Pack 필터 프리셋")}
                     </p>
                     <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
                       {filterLibraryAuthority === "memory-session"
-                        ? "현재 세션에만 유지됩니다. 선택하면 비파괴 미리보기에 즉시 반영됩니다."
-                        : "선택하면 현재 다이얼로그 값과 비파괴 미리보기에 즉시 반영됩니다."}
+                        ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "현재 세션에만 유지됩니다. 선택하면 비파괴 미리보기에 즉시 반영됩니다.")
+                        : translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "선택하면 현재 다이얼로그 값과 비파괴 미리보기에 즉시 반영됩니다.")}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {installedPackPresets.map((preset) => (
@@ -1390,8 +1387,8 @@ export function StudioFilterDialog({
                         )}
                       >
                         {filterLibraryPageLoading
-                          ? "프리셋 불러오는 중…"
-                          : `더 불러오기 (${installedCreatorPresets.length}/${filterLibraryTotalCount})`}
+                          ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "프리셋 불러오는 중…")
+                          : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "더 불러오기 ({v0}/{v1})"), { v0: String(installedCreatorPresets.length), v1: String(filterLibraryTotalCount) })}
                       </button>
                     ) : null}
                   </section>
@@ -1401,9 +1398,7 @@ export function StudioFilterDialog({
                     role="note"
                     className="rounded-lg border border-line bg-card/70 px-3 py-2 text-[0.68rem] leading-relaxed text-fg-3"
                   >
-                    가장자리는 반복 없이 고정해 빈 틈을 막고, 투명도는 원본 그대로
-                    보존합니다. 같은 시드는 언제나 같은 결과를 만듭니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "가장자리는 반복 없이 고정해 빈 틈을 막고, 투명도는 원본 그대로 보존합니다. 같은 시드는 언제나 같은 결과를 만듭니다.")}</p>
                 ) : null}
                 <FilterPackControls
                   draft={draft}
@@ -1414,7 +1409,7 @@ export function StudioFilterDialog({
 
             {draft.kind === "gaussian-blur" ? (
               <NumberControl
-                label="반지름"
+                label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "반지름")}
                 min={1}
                 max={40}
                 value={draft.radius}
@@ -1427,7 +1422,7 @@ export function StudioFilterDialog({
             {draft.kind === "motion-blur" ? (
               <>
                 <NumberControl
-                  label="거리"
+                  label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "거리")}
                   min={1}
                   max={40}
                   value={draft.distance}
@@ -1436,7 +1431,7 @@ export function StudioFilterDialog({
                   onChange={(distance) => setDraft({ ...draft, distance })}
                 />
                 <NumberControl
-                  label="각도"
+                  label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "각도")}
                   min={-180}
                   max={180}
                   value={draft.angle}
@@ -1449,7 +1444,7 @@ export function StudioFilterDialog({
             {draft.kind === "hue-saturation-brightness" ? (
               <>
                 <NumberControl
-                  label="색조"
+                  label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "색조")}
                   min={-180}
                   max={180}
                   value={draft.hue}
@@ -1458,7 +1453,7 @@ export function StudioFilterDialog({
                   onChange={(hue) => setDraft({ ...draft, hue })}
                 />
                 <NumberControl
-                  label="채도"
+                  label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "채도")}
                   min={-100}
                   max={100}
                   value={draft.saturation}
@@ -1466,7 +1461,7 @@ export function StudioFilterDialog({
                   onChange={(saturation) => setDraft({ ...draft, saturation })}
                 />
                 <NumberControl
-                  label="밝기/명도"
+                  label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "밝기/명도")}
                   min={-80}
                   max={80}
                   value={draft.brightness}
@@ -1479,7 +1474,7 @@ export function StudioFilterDialog({
             {draft.kind === "brightness-contrast" ? (
               <>
                 <NumberControl
-                  label="명도"
+                  label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "명도")}
                   min={-80}
                   max={80}
                   value={draft.brightness}
@@ -1488,7 +1483,7 @@ export function StudioFilterDialog({
                   onChange={(brightness) => setDraft({ ...draft, brightness })}
                 />
                 <NumberControl
-                  label="대비"
+                  label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "대비")}
                   min={-80}
                   max={80}
                   value={draft.contrast}
@@ -1522,8 +1517,7 @@ export function StudioFilterDialog({
               })}
             >
               <RotateCcw className="size-3.5" aria-hidden />
-              기본값
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "기본값")}</button>
             {/*
               Judging a filter means seeing what it replaced. Toggling 캔버스 미리보기 off and on
               costs two clicks and loses the moment of comparison, so this reverts the canvas only
@@ -1533,7 +1527,7 @@ export function StudioFilterDialog({
               type="button"
               disabled={applying || !previewEnabled}
               aria-pressed={comparingOriginal}
-              title="누르고 있는 동안 원본을 보여줍니다"
+              title={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "누르고 있는 동안 원본을 보여줍니다")}
               onPointerDown={(event) => {
                 if (event.button !== 0) return;
                 event.preventDefault();
@@ -1551,8 +1545,7 @@ export function StudioFilterDialog({
               })}
             >
               <Eye className="size-3.5" aria-hidden />
-              원본 비교
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "원본 비교")}</button>
             <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl px-2 text-xs font-semibold text-fg-2 hover:bg-raised">
               <input
                 type="checkbox"
@@ -1560,8 +1553,7 @@ export function StudioFilterDialog({
                 onChange={(event) => setPreviewEnabled(event.target.checked)}
                 className="size-4 accent-accent"
               />
-              캔버스 미리보기
-            </label>
+              {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "캔버스 미리보기")}</label>
           </div>
         </div>
 
@@ -1572,7 +1564,7 @@ export function StudioFilterDialog({
               className="mb-3 min-w-0 space-y-1.5"
               aria-describedby="studio-filter-selection-scope-note"
             >
-              <legend className="text-[0.68rem] font-bold text-fg-2">적용 범위</legend>
+              <legend className="text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "적용 범위")}</legend>
               <div className="grid min-w-0 grid-cols-3 gap-1.5">
                 {([
                   ["whole", "전체 이미지"],
@@ -1604,11 +1596,8 @@ export function StudioFilterDialog({
                 id="studio-filter-selection-scope-note"
                 className="text-[0.66rem] leading-relaxed text-fg-3"
               >
-                현재 선택{selectionInverted ? "(반전)" : ""}
-                {selectionFeatherPx > 0 ? ` · 페더 ${selectionFeatherPx}px` : ""}를 마스크로
-                저장합니다. 미리보기는 필터 값 확인을 위해 전체 이미지로 보이며, 적용 뒤에는
-                필터 마스크에 계속 칠할 수 있어요.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "현재 선택")}{selectionInverted ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "(반전)") : ""}
+                {selectionFeatherPx > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", " · 페더 {v0}px"), { v0: String(selectionFeatherPx) }) : ""}{translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "를 마스크로 저장합니다. 미리보기는 필터 값 확인을 위해 전체 이미지로 보이며, 적용 뒤에는 필터 마스크에 계속 칠할 수 있어요.")}</p>
             </fieldset>
           ) : null}
           {mutationLocked ? (
@@ -1631,8 +1620,7 @@ export function StudioFilterDialog({
                 className: "min-h-11 sm:min-h-10 pointer-coarse:min-h-11",
               })}
             >
-              취소
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "취소")}</button>
             <button
               type="button"
               disabled={mutationLocked || applying}
@@ -1652,12 +1640,12 @@ export function StudioFilterDialog({
               })}
             >
               {applying
-                ? "적용 중…"
+                ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "적용 중…")
                 : applicationScope === "inside"
-                  ? "선택 안에 적용"
+                  ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "선택 안에 적용")
                   : applicationScope === "outside"
-                    ? "선택 밖에 적용"
-                    : "적용"}
+                    ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "선택 밖에 적용")
+                    : translateCurrentStaticSourceText("domains.creator.filter.StudioFilterDialog", "ko", "적용")}
             </button>
           </div>
         </footer>

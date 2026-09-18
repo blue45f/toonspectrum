@@ -185,7 +185,17 @@ describe("StudioCanvasStatusRail", () => {
     expect(document.querySelector("[data-studio-autosave-live-jam='true']")).toBeTruthy();
   });
 
-  it("keeps the recovery banner for the leading tab", () => {
+  it("does not auto-resume when durable document leadership is unresolved", () => {
+    const props = createProps({ hasAutosave: true, autosaveDocumentLeadership: null });
+
+    render(<StudioCanvasStatusRail {...props} />);
+
+    expect(props.onRestoreAutosave).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "저장 상태를 확인해 주세요" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "이어서 그리기" })).toBeTruthy();
+  });
+
+  it("auto-resumes a compatible autosave in the leading tab without a choice gate", () => {
     const props = createProps({
       hasAutosave: true,
       autosaveDocumentLeadership: { role: "leader", basis: "web-lock" },
@@ -193,24 +203,28 @@ describe("StudioCanvasStatusRail", () => {
 
     render(<StudioCanvasStatusRail {...props} />);
 
-    expect(screen.getByRole("button", { name: "이어서 그리기" })).toBeTruthy();
+    expect(props.onRestoreAutosave).toHaveBeenCalledOnce();
+    expect(screen.getByRole("heading", { name: "마지막 작업을 이어 여는 중이에요" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /이어/ })).toBeNull();
     expect(screen.queryByText(/다른 탭에서 편집 중/u)).toBeNull();
   });
 
   it("returns focus to the safe recovery action after the clear decision settles", async () => {
-    // "비우기" 는 유일한 복구본을 영구 삭제하는 승인 창을 연다. 창이 닫힌 뒤 포커스가 파괴
-    // 버튼에 그대로 남으면 Enter 한 번이 두 번째 파괴 시도가 된다 — 안전한 쪽으로 되돌린다.
+    // 자동 복구가 실패한 경우에만 복구 선택을 노출한다. 파괴 승인 뒤에는 삭제 버튼이 아니라
+    // 안전한 "다시 이어 열기" 쪽으로 포커스를 되돌린다.
     let settle!: () => void;
     const decision = new Promise<void>((resolve) => {
       settle = resolve;
     });
     const props = createProps({
       hasAutosave: true,
+      autosaveDocumentLeadership: { role: "leader", basis: "web-lock" },
+      onRestoreAutosave: vi.fn(() => Promise.reject(new Error("restore failed"))),
       onClearAutosave: vi.fn(() => decision),
     });
 
     render(<StudioCanvasStatusRail {...props} />);
-    const restore = screen.getByRole("button", { name: "이어서 그리기" });
+    const restore = await screen.findByRole("button", { name: "다시 이어 열기" });
     fireEvent.click(screen.getByRole("button", { name: "다른 방법" }));
     fireEvent.click(screen.getByRole("button", { name: "이전 그림 삭제…" }));
 
@@ -223,14 +237,17 @@ describe("StudioCanvasStatusRail", () => {
     });
   });
 
-  it("restores a compatible autosave through the semantic callback", () => {
-    const props = createProps({ hasAutosave: true });
+  it("restores a compatible autosave through the semantic callback automatically", () => {
+    const props = createProps({
+      hasAutosave: true,
+      autosaveDocumentLeadership: { role: "leader", basis: "web-lock" },
+    });
 
     render(<StudioCanvasStatusRail {...props} />);
-    fireEvent.click(screen.getByRole("button", { name: "이어서 그리기" }));
 
     expect(props.onRestoreAutosave).toHaveBeenCalledOnce();
     expect(screen.queryByRole("button", { name: "백업 파일 받기" })).toBeNull();
+    expect(screen.queryByRole("link", { name: /새 그림 그리기/ })).toBeNull();
   });
 
   it("reserves the selection command lane so selecting cannot move the canvas", () => {

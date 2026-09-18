@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { AlertCircle, CheckCircle2, Loader2, MailCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -64,14 +68,12 @@ export function VerifyEmailPage() {
           )}
         </div>
         <p className="eyebrow justify-center text-accent">
-          <MailCheck size={14} aria-hidden /> 계정 보안
-        </p>
+          <MailCheck size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.account.VerifyEmailPage", "ko", "계정 보안")}</p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-fg">
-          이메일 주소 확인
-        </h1>
+          {translateCurrentStaticSourceText("domains.account.VerifyEmailPage", "ko", "이메일 주소 확인")}</h1>
         <p
-          className={`mt-3 text-sm leading-relaxed ${phase === "error" ? "text-bad" : "text-fg-2"}`}
-          role={phase === "error" ? "alert" : "status"}
+          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.account.VerifyEmailPage", "en", "mt-3 text-sm leading-relaxed {v0}"), { v0: String(phase === "error" ? "text-bad" : "text-fg-2") })}
+          role={phase === "error" ? translateCurrentStaticSourceText("domains.account.VerifyEmailPage", "en", "alert") : translateCurrentStaticSourceText("domains.account.VerifyEmailPage", "en", "status")}
         >
           {message}
         </p>
@@ -81,15 +83,13 @@ export function VerifyEmailPage() {
               to="/"
               className="inline-flex min-h-10 items-center justify-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
             >
-              홈으로 이동
-            </Link>
+              {translateCurrentStaticSourceText("domains.account.VerifyEmailPage", "ko", "홈으로 이동")}</Link>
             {phase === "error" && (
               <Link
                 to="/settings"
                 className="inline-flex min-h-10 items-center justify-center rounded-xl border border-line px-4 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised"
               >
-                계정 설정 열기
-              </Link>
+                {translateCurrentStaticSourceText("domains.account.VerifyEmailPage", "ko", "계정 설정 열기")}</Link>
             )}
           </div>
         )}

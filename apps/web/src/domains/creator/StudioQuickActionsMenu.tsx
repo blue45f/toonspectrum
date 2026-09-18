@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Move,
   Settings2,
   X,
@@ -119,16 +123,14 @@ export function StudioQuickActionsCustomizationSheet({
         </span>
         <div className="min-w-0 flex-1">
           <h2 id="quick-actions-customize-title" className="text-sm font-bold text-fg">
-            퀵 액션 구성
-          </h2>
+            {translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "ko", "퀵 액션 구성")}</h2>
           <p className="mt-0.5 text-xs leading-relaxed text-fg-3">
-            여섯 방향마다 원하는 작업을 고르세요. 같은 작업을 여러 방향에 둘 수도 있어요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "ko", "여섯 방향마다 원하는 작업을 고르세요. 같은 작업을 여러 방향에 둘 수도 있어요.")}</p>
         </div>
         <button
           type="button"
           onClick={onDone}
-          aria-label="퀵 액션 구성 닫기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "ko", "퀵 액션 구성 닫기")}
           className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <X
@@ -153,9 +155,9 @@ export function StudioQuickActionsCustomizationSheet({
                 <span className="font-normal text-fg-3">{ACTION_PRESENTATION[action].label}</span>
               </span>
               <select
-                data-quick-actions-initial-focus={index === 0 ? "true" : undefined}
+                data-quick-actions-initial-focus={index === 0 ? translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "en", "true") : undefined}
                 data-quick-action-slot={slot}
-                aria-label={`${SLOT_PRESENTATION[slot].label} 액션`}
+                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "ko", "{v0} 액션"), { v0: String(SLOT_PRESENTATION[slot].label) })}
                 value={action}
                 onChange={(event) =>
                   onPreferencesChange(
@@ -185,8 +187,7 @@ export function StudioQuickActionsCustomizationSheet({
           onClick={onDone}
           className="min-h-11 w-full rounded-xl bg-accent px-4 text-sm font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          구성 완료
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "ko", "구성 완료")}</button>
       </div>
     </section>
   );
@@ -426,7 +427,7 @@ export function StudioQuickActionsMenu({
       <button
         type="button"
         tabIndex={-1}
-        aria-label="퀵 액션 닫기"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "ko", "퀵 액션 닫기")}
         onClick={requestClose}
         className="absolute inset-0 cursor-default bg-canvas/65"
       />
@@ -441,7 +442,7 @@ export function StudioQuickActionsMenu({
           <div
             ref={menuRef}
             role="menu"
-            aria-label="캔버스 퀵 액션"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "ko", "캔버스 퀵 액션")}
             tabIndex={-1}
             className="absolute size-0"
             style={{ left: center.x, top: center.y }}
@@ -468,7 +469,7 @@ export function StudioQuickActionsMenu({
                     type="button"
                     role="menuitem"
                     data-quick-action-slot={slot}
-                    data-highlighted={highlighted ? "true" : "false"}
+                    data-highlighted={highlighted ? translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "en", "false")}
                     aria-label={`${slotPresentation.label}: ${actionPresentation.label}${disabled ? " (사용 불가)" : ""}`}
                     aria-disabled={disabled}
                     disabled={disabled}
@@ -485,7 +486,7 @@ export function StudioQuickActionsMenu({
                       {actionPresentation.label}
                     </span>
                     <span className="max-w-full truncate text-[0.58rem] font-medium leading-tight opacity-75">
-                      {disabled ? "사용 불가" : slotPresentation.label}
+                      {disabled ? translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "ko", "사용 불가") : slotPresentation.label}
                     </span>
                   </button>
                 </div>
@@ -496,19 +497,17 @@ export function StudioQuickActionsMenu({
           <button
             ref={hubRef}
             type="button"
-            aria-label="퀵 액션 드래그 선택"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "ko", "퀵 액션 드래그 선택")}
             aria-describedby="quick-actions-drag-hint"
-            data-dragging={dragging ? "true" : "false"}
+            data-dragging={dragging ? translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "en", "false")}
             onClick={focusFirstEnabledAction}
             onPointerDown={handleHubPointerDown}
             onPointerMove={handleHubPointerMove}
             onPointerUp={handleHubPointerUp}
             onPointerCancel={handleHubPointerCancel}
-            className={`absolute grid size-16 -translate-x-1/2 -translate-y-1/2 touch-none place-items-center rounded-full border-2 shadow-2xl transition-[transform,background-color,border-color] duration-200 ease-out-expo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent motion-reduce:transition-none ${
-              dragging
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "en", "absolute grid size-16 -translate-x-1/2 -translate-y-1/2 touch-none place-items-center rounded-full border-2 shadow-2xl transition-[transform,background-color,border-color] duration-200 ease-out-expo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent motion-reduce:transition-none {v0}"), { v0: String(dragging
                 ? "scale-95 border-accent bg-accent text-on-accent"
-                : "border-line-strong bg-panel text-fg hover:border-accent"
-            }`}
+                : "border-line-strong bg-panel text-fg hover:border-accent") })}
             style={{ left: center.x, top: center.y }}
           >
             <span className="flex flex-col items-center gap-0.5">
@@ -518,13 +517,11 @@ export function StudioQuickActionsMenu({
                 aria-hidden
                 className={studioChromeIconClass({ tone: "accent" })}
               />
-              <span className="text-[0.6rem] font-bold">드래그</span>
+              <span className="text-[0.6rem] font-bold">{translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "ko", "드래그")}</span>
             </span>
           </button>
           <p id="quick-actions-drag-hint" className="sr-only">
-            원하는 방향으로 끌었다 놓으면 작업을 실행합니다. 중앙에서 놓으면 아무 작업도 실행하지 않습니다.
-            키보드에서는 Enter 또는 Space로 방향 작업 목록으로 이동합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "ko", "원하는 방향으로 끌었다 놓으면 작업을 실행합니다. 중앙에서 놓으면 아무 작업도 실행하지 않습니다. 키보드에서는 Enter 또는 Space로 방향 작업 목록으로 이동합니다.")}</p>
 
           <button
             type="button"
@@ -534,7 +531,7 @@ export function StudioQuickActionsMenu({
             }}
             className="fixed inset-x-0 bottom-3 mx-auto flex min-h-11 w-fit items-center justify-center gap-2 rounded-xl border border-line-strong bg-panel px-4 text-xs font-bold text-fg shadow-xl transition-colors hover:border-accent hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-            aria-label="퀵 액션 구성 열기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "ko", "퀵 액션 구성 열기")}
           >
             <Settings2
               size={STUDIO_ICON_SIZE.toolCompact}
@@ -542,8 +539,7 @@ export function StudioQuickActionsMenu({
               aria-hidden
               className={studioChromeIconClass({ tone: "accent" })}
             />
-            퀵 액션 구성
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioQuickActionsMenu", "ko", "퀵 액션 구성")}</button>
         </>
       )}
     </div>

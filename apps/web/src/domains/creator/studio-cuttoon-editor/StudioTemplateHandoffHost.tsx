@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { CheckCircle2, LayoutTemplate, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -169,16 +170,14 @@ export function StudioTemplateHandoffHost() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 text-xs font-black text-success">
-            <CheckCircle2 size={14} aria-hidden="true" /> 템플릿 적용됨
-          </p>
+            <CheckCircle2 size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioTemplateHandoffHost", "ko", "템플릿 적용됨")}</p>
           <p className="mt-1 text-sm font-bold text-fg">{appliedTitle}</p>
           <p className="mt-1 text-xs leading-5 text-fg-3">
-            새 문서에 기본 구조와 편집 가능한 항목을 준비했습니다. 이미지와 외부 에셋은 사용 전에 권리를 다시 확인합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioTemplateHandoffHost", "ko", "새 문서에 기본 구조와 편집 가능한 항목을 준비했습니다. 이미지와 외부 에셋은 사용 전에 권리를 다시 확인합니다.")}</p>
         </div>
         <button
           type="button"
-          aria-label="템플릿 적용 안내 닫기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioTemplateHandoffHost", "ko", "템플릿 적용 안내 닫기")}
           onClick={() => setDismissed(true)}
           className={buttonClass({ variant: "quiet", size: "icon", className: "shrink-0" })}
         >

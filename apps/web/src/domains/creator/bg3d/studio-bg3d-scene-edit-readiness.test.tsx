@@ -71,7 +71,26 @@ function useEditorFixture(renderer: object | null, session: object, open = true)
     setIsRestoringScene, setSelectedIds, setCanUndo, setCanRedo, setRefTick });
   h.modalAssetSessionRef.current = session;
   h.isModalAssetSessionCurrent = (candidate: object) => candidate === session;
-  h.physicsRuntimeSourceRef.current = { primitives, customModels, document };
+  const previousRevision = h.physicsRuntimeSourceRef.current?.revision ?? 0;
+  h.physicsRuntimeSourceRef.current = { primitives, customModels, document, revision: previousRevision };
+  h.replaceCanonicalDocumentState = (mutation: {
+    primitives?: readonly object[];
+    customModels?: readonly object[];
+    document?: typeof document;
+  }) => {
+    const current = h.physicsRuntimeSourceRef.current;
+    const next = {
+      primitives: mutation.primitives !== undefined ? [...mutation.primitives] : current.primitives,
+      customModels: mutation.customModels !== undefined ? [...mutation.customModels] : current.customModels,
+      document: mutation.document ?? current.document,
+      revision: current.revision + 1,
+    };
+    h.physicsRuntimeSourceRef.current = next;
+    if (mutation.primitives !== undefined) setPrimitives(next.primitives);
+    if (mutation.customModels !== undefined) setCustomModels(next.customModels);
+    if (mutation.document !== undefined) setSceneBaseDocument(next.document);
+    return next;
+  };
   attachStudioBg3dEditorSceneOpsHost(h);
   useStudioBg3dEditorRestoreEffects(h);
   return h;

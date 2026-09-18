@@ -40,6 +40,27 @@ describe("admin traffic query contracts", () => {
     );
   });
 
+  it("separates opened handoffs from browser-confirmed completions", () => {
+    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).toContain(
+      "FROM public.traffic_share_event",
+    );
+    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).toContain(
+      "outcome = 'opened'",
+    );
+    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).toContain(
+      "outcome = 'completed'",
+    );
+    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).toContain(
+      "campaign = 'content_share'",
+    );
+    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).not.toContain(
+      "outcome = 'success'",
+    );
+    expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).not.toContain(
+      "'successful'",
+    );
+  });
+
   it("publishes the dedicated storage version and avoids duplicate clauses", () => {
     expect(ADMIN_TRAFFIC_OVERVIEW_QUERY).toContain(
       "'storageMode', 'first-party-postgres-v2'",

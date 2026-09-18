@@ -33,6 +33,7 @@ export type {
 
 const MANUAL_MENU_ID = "help/user-manual";
 const BRUSH_LAB_MENU_ID = "brush/brush-lab";
+const FLOATING_LAYOUT_MENU_ID = "view/floating-layout";
 const TRANSPARENT_COLOR_COMMAND_ID: CommandId = "color.toggle-transparent";
 const TRANSPARENT_COLOR_SHORTCUT = "Shift+C";
 const BRUSH_STUDIO_COMMAND_ID: CommandId = "brush.studio";
@@ -122,13 +123,45 @@ const BRUSH_LAB_COMMAND: StudioCommandCatalogEntry = {
   note: "Navigation command to the canonical full Brush Studio while preserving manuscript context; former lab names remain search aliases only.",
 };
 
+const FLOATING_LAYOUT_COMMAND: StudioCommandCatalogEntry = {
+  id: "view.floating-layout",
+  category: "view",
+  labels: [
+    {
+      locale: "ko",
+      label: "플로팅 UI · 배치 설정",
+      description: "플로팅 요소의 표시, 위치, 크기, 잠금과 작업공간 프리셋을 편집합니다.",
+    },
+    {
+      locale: "en",
+      label: "Floating UI · layout settings",
+      description: "Edit visibility, position, size, locking, and workspace presets for floating surfaces.",
+    },
+  ],
+  aliases: [
+    { vendor: "toonstudio", locale: "ko", term: "작업공간 편집" },
+    { vendor: "toonstudio", locale: "ko", term: "플로팅 요소 배치" },
+    { vendor: "toonstudio", locale: "en", term: "workspace layout" },
+  ],
+  helpNodeId: "help/view/floating-layout",
+  origins: [{ source: "menu", nativeId: FLOATING_LAYOUT_MENU_ID, status: "wired" }],
+};
+
 export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
-  Object.freeze([...NORMALIZED_BASE_CATALOG, MANUAL_COMMAND, BRUSH_LAB_COMMAND]);
+  Object.freeze([
+    ...NORMALIZED_BASE_CATALOG,
+    MANUAL_COMMAND,
+    BRUSH_LAB_COMMAND,
+    FLOATING_LAYOUT_COMMAND,
+  ]);
 
 export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   ...BASE_MENU_INVENTORY.flatMap((id) => {
     if (id === "help/current-tool") return [id, MANUAL_MENU_ID];
     if (id === "brush/brush-studio") return [id, BRUSH_LAB_MENU_ID];
+    if (id === "view/production-insights") {
+      return [id, FLOATING_LAYOUT_MENU_ID];
+    }
     return [id];
   }),
 ]);
@@ -137,7 +170,7 @@ export const STUDIO_COMMAND_SOURCES = Object.freeze({
   ...BASE_SOURCES,
   menu: {
     ...BASE_SOURCES.menu,
-    measuredCount: BASE_SOURCES.menu.measuredCount + 2,
+    measuredCount: BASE_SOURCES.menu.measuredCount + 3,
   },
 });
 
@@ -163,10 +196,15 @@ export function findCatalogEntriesBySource(
   if (source !== "menu") return entries;
   if (nativeId === MANUAL_MENU_ID) return [...entries, MANUAL_COMMAND];
   if (nativeId === BRUSH_LAB_MENU_ID) return [...entries, BRUSH_LAB_COMMAND];
+  if (nativeId === FLOATING_LAYOUT_MENU_ID) {
+    return [...entries, FLOATING_LAYOUT_COMMAND];
+  }
   return entries;
 }
 
 export function catalogNativeIds(source: StudioCommandSource): string[] {
   const ids = baseNativeIds(source);
-  return source === "menu" ? [...ids, MANUAL_MENU_ID, BRUSH_LAB_MENU_ID] : ids;
+  return source === "menu"
+    ? [...ids, MANUAL_MENU_ID, BRUSH_LAB_MENU_ID, FLOATING_LAYOUT_MENU_ID]
+    : ids;
 }

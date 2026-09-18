@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioMainMenu — ToonStudio's desktop application menubar.
  *
@@ -528,10 +532,10 @@ function MenuDropdown({
             type="button"
             role={
               item.checked === undefined
-                ? "menuitem"
+                ? translateCurrentStaticSourceText("domains.creator.StudioMainMenu", "en", "menuitem")
                 : item.selectionRole === "radio"
-                  ? "menuitemradio"
-                  : "menuitemcheckbox"
+                  ? translateCurrentStaticSourceText("domains.creator.StudioMainMenu", "en", "menuitemradio")
+                  : translateCurrentStaticSourceText("domains.creator.StudioMainMenu", "en", "menuitemcheckbox")
             }
             aria-checked={item.checked === undefined ? undefined : item.checked}
             aria-disabled={item.disabled || undefined}
@@ -608,7 +612,7 @@ function MenuDropdown({
       ? createPortal(
           <StudioMainMenuFloatingPanel
             panelId={panelId}
-            surfaceId={`main-menu:${surface}:${group.id}`}
+            surfaceId={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioMainMenu", "en", "main-menu:{v0}:{v1}"), { v0: String(surface), v1: String(group.id) })}
             label={group.label}
             coords={coords}
             itemCount={group.items.length}
@@ -622,12 +626,12 @@ function MenuDropdown({
                 renderMenuItem(item, index)
               );
               if (!section.label) {
-                return <Fragment key={`section:${sectionIndex}`}>{rows}</Fragment>;
+                return <Fragment key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioMainMenu", "en", "section:{v0}"), { v0: String(sectionIndex) })}>{rows}</Fragment>;
               }
               const captionId = `${panelId}-section-${sectionIndex}`;
               return (
                 <div
-                  key={`section:${sectionIndex}`}
+                  key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioMainMenu", "en", "section:{v0}"), { v0: String(sectionIndex) })}
                   role="group"
                   aria-labelledby={captionId}
                   data-studio-main-menu-section-group={section.label}
@@ -816,8 +820,8 @@ export function StudioMainMenu({
       ref={menuBarRef}
       role="menubar"
       aria-label={ariaLabel ?? localizeText(t, "Main menu", "studio.mainMenu.aria")}
-      data-studio-main-menu={surface === "primary" ? "true" : undefined}
-      data-studio-main-menu-action={surface === "action" ? "true" : undefined}
+      data-studio-main-menu={surface === "primary" ? translateCurrentStaticSourceText("domains.creator.StudioMainMenu", "en", "true") : undefined}
+      data-studio-main-menu-action={surface === "action" ? translateCurrentStaticSourceText("domains.creator.StudioMainMenu", "en", "true") : undefined}
       data-studio-shortcut-boundary="true"
       className={cn("flex min-w-max shrink-0 flex-nowrap items-center gap-0.5", className)}
     >
@@ -827,13 +831,13 @@ export function StudioMainMenu({
             <span
               role="separator"
               aria-orientation="vertical"
-              aria-label="전문 도구 메뉴"
-              title="전문 도구"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioMainMenu", "ko", "전문 도구 메뉴")}
+              title={translateCurrentStaticSourceText("domains.creator.StudioMainMenu", "ko", "전문 도구")}
               data-studio-main-menu-specialist-boundary="true"
               className="mx-1 inline-flex h-6 shrink-0 items-center gap-1 text-[0.6rem] font-bold text-fg-3"
             >
               <span aria-hidden className="h-4 w-px bg-line-strong" />
-              <span aria-hidden className="hidden 2xl:inline">전문</span>
+              <span aria-hidden className="hidden 2xl:inline">{translateCurrentStaticSourceText("domains.creator.StudioMainMenu", "ko", "전문")}</span>
             </span>
           ) : null}
           <MenuDropdown

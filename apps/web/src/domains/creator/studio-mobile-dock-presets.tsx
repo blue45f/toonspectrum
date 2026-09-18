@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { type ComponentProps, lazy, Suspense } from "react";
 
 import { studioMobileSheetSizeStyle } from "./studio-mobile-sheet-snap";
@@ -43,14 +46,14 @@ export function StudioInspectorAsideFallback({
   return (
     <aside
       ref={propsSheetRef}
-      role={isMobile ? "dialog" : undefined}
+      role={isMobile ? translateCurrentStaticSourceText("domains.creator.studio.mobile.dock.presets", "en", "dialog") : undefined}
       aria-modal={isMobile ? true : undefined}
       aria-busy="true"
-      aria-label="작업 패널 불러오는 중"
+      aria-label={translateCurrentStaticSourceText("domains.creator.studio.mobile.dock.presets", "ko", "작업 패널 불러오는 중")}
       data-studio-sheet-id="props"
-      data-studio-mobile-sheet={isMobile ? "true" : undefined}
+      data-studio-mobile-sheet={isMobile ? translateCurrentStaticSourceText("domains.creator.studio.mobile.dock.presets", "en", "true") : undefined}
       data-studio-sheet-snap={isMobile ? snap : undefined}
-      data-popup-kind={isMobile ? "sheet" : undefined}
+      data-popup-kind={isMobile ? translateCurrentStaticSourceText("domains.creator.studio.mobile.dock.presets", "en", "sheet") : undefined}
       tabIndex={isMobile ? -1 : undefined}
       className={cn(
         "flex min-h-0 flex-col gap-3 overflow-hidden border-line bg-panel/50 p-3",

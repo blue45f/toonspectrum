@@ -34,6 +34,7 @@ export type StudioFloatingSurfaceDock =
 export type StudioFloatingSurfaceResizeEdge =
   (typeof STUDIO_FLOATING_SURFACE_RESIZE_EDGES)[number];
 export type StudioFloatingSurfaceLockKind = "position" | "size";
+export type StudioFloatingSurfaceSizePreset = "minimum" | "default" | "maximum";
 
 export interface StudioFloatingSurfaceLayout {
   readonly version: typeof STUDIO_FLOATING_SURFACE_LAYOUT_VERSION;
@@ -461,6 +462,50 @@ export function resizeStudioFloatingSurfaceRect(
     viewport,
     constraints,
   );
+}
+
+/**
+ * Applies a predictable size preset without teleporting the surface. The current visual center is
+ * retained and then clamped to the safe viewport; callers can preserve a dock by committing the
+ * returned rectangle with the existing dock value.
+ */
+export function resizeStudioFloatingSurfaceRectToPreset(
+  current: StudioFloatingSurfaceRect,
+  preset: StudioFloatingSurfaceSizePreset,
+  viewport: StudioFloatingSurfaceViewport,
+  constraints: StudioFloatingSurfaceConstraints,
+  defaultLayout: StudioFloatingSurfaceLayout = DEFAULT_LAYOUT,
+): StudioFloatingSurfaceRect {
+  const bounds = resolveBounds(viewport);
+  const [minWidth, maxWidth] = resolveDimensionRange(
+    bounds.width,
+    constraints.minWidth,
+    constraints.maxWidth,
+  );
+  const [minHeight, maxHeight] = resolveDimensionRange(
+    bounds.height,
+    constraints.minHeight,
+    constraints.maxHeight,
+  );
+  const normalizedDefault = normalizeStudioFloatingSurfaceLayout(defaultLayout);
+  const width = preset === "minimum"
+    ? minWidth
+    : preset === "maximum"
+      ? maxWidth
+      : clamp(normalizedDefault.width, minWidth, maxWidth);
+  const height = preset === "minimum"
+    ? minHeight
+    : preset === "maximum"
+      ? maxHeight
+      : clamp(normalizedDefault.height, minHeight, maxHeight);
+  const centerX = finite(current.x, bounds.left) + finite(current.width, width) / 2;
+  const centerY = finite(current.y, bounds.top) + finite(current.height, height) / 2;
+  return constrainRect({
+    x: centerX - width / 2,
+    y: centerY - height / 2,
+    width,
+    height,
+  }, viewport, constraints);
 }
 
 /** Returns the nearest safe edge when a committed move lands within the snap threshold. */

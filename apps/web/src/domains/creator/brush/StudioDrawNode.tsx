@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { memo, useEffect, useReducer, useRef, useState } from "react";
 import {
   Arrow,
@@ -615,7 +616,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   return (
     <Group
       studioElementId={exposeSceneIdentity ? el.id : undefined}
-      globalCompositeOperation={isEraserOperation ? "destination-out" : undefined}
+      globalCompositeOperation={isEraserOperation ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawNode", "en", "destination-out") : undefined}
       listening={false}
     >
       {symmetricVariations.map((points, index) => {
@@ -677,7 +678,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 {lineHeads.map((head, headIndex) =>
                   head.kind === "dot" ? (
                     <KCircle
-                      key={`head-${headIndex}`}
+                      key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawNode", "en", "head-{v0}"), { v0: String(headIndex) })}
                       x={head.cx}
                       y={head.cy}
                       radius={head.r}
@@ -687,7 +688,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     />
                   ) : (
                     <Line
-                      key={`head-${headIndex}`}
+                      key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawNode", "en", "head-{v0}"), { v0: String(headIndex) })}
                       points={head.points}
                       closed
                       fill={stroke}
@@ -1045,7 +1046,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               return (
                 <Group
                   key={index}
-                  name={`studio-outline-contract-error:${issueName}`}
+                  name={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawNode", "en", "studio-outline-contract-error:{v0}"), { v0: String(issueName) })}
                   listening={false}
                 >
                   <Rect

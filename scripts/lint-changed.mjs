@@ -1,21 +1,38 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
-const LINTABLE_EXTENSION = /\.(?:[cm]?js|jsx|[cm]?ts|tsx)$/u;
+import {
+  buildEslintArgs,
+  findFullLintTrigger,
+  parseChangedFileList,
+  selectLintableFiles,
+} from "./lint-changed-policy.mjs";
+
 const args = process.argv.slice(2);
 const fix = args.includes("--fix");
 const staged = args.includes("--staged");
+const fullOnConfig = args.includes("--full-on-config");
 const baseArgument = args.find((argument) => argument.startsWith("--base="));
+const filesFromArgument = args.find((argument) => argument.startsWith("--files-from="));
 const base = baseArgument?.slice("--base=".length).trim();
+const filesFrom = filesFromArgument?.slice("--files-from=".length).trim();
 
-if (staged && fix) {
-  process.stderr.write(
-    "lint:quick — --staged와 --fix는 함께 사용할 수 없습니다. ESLint --fix는 Git 인덱스가 아니라 작업 트리를 수정합니다.\n" +
-    "먼저 작업 트리에 --fix를 실행한 뒤 변경을 다시 스테이징하세요.\n"
-  );
+function fail(message) {
+  process.stderr.write(`${message}\n`);
   process.exit(2);
 }
 
+if (staged && fix) {
+  fail(
+    "lint:quick — --staged와 --fix는 함께 사용할 수 없습니다. " +
+    "작업 트리에 --fix를 실행한 뒤 변경을 다시 스테이징하세요.",
+  );
+}
+
+const explicitSources = [staged, Boolean(base), Boolean(filesFrom)].filter(Boolean).length;
+if (explicitSources > 1) {
+  fail("lint:quick — --staged, --base, --files-from 중 하나만 사용할 수 있습니다.");
+}
 function gitLines(gitArgs) {
   const result = spawnSync("git", gitArgs, {
     cwd: process.cwd(),
@@ -29,37 +46,41 @@ function gitLines(gitArgs) {
   return result.stdout.split("\0").filter(Boolean);
 }
 
-let diffArgs;
-if (staged) diffArgs = ["diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z", "--"];
-else if (base) diffArgs = ["diff", "--name-only", "--diff-filter=ACMR", "-z", `${base}...HEAD`, "--"];
-else diffArgs = ["diff", "--name-only", "--diff-filter=ACMR", "-z", "HEAD", "--"];
+let candidates;
+if (filesFrom) {
+  if (!existsSync(filesFrom)) fail(`lint:quick — 변경 파일 목록이 없습니다: ${filesFrom}`);
+  candidates = new Set(parseChangedFileList(readFileSync(filesFrom, "utf8")));
+} else {
+  let diffArgs;
+  if (staged) {
+    diffArgs = ["diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z", "--"];
+  } else if (base) {
+    diffArgs = ["diff", "--name-only", "--diff-filter=ACMR", "-z", `${base}...HEAD`, "--"];
+  } else {
+    diffArgs = ["diff", "--name-only", "--diff-filter=ACMR", "-z", "HEAD", "--"];
+  }
+  candidates = new Set(gitLines(diffArgs));
+}
 
-const candidates = new Set(gitLines(diffArgs));
 if (staged) {
-  const worktreeChanges = new Set(gitLines([
-    "diff",
-    "--name-only",
-    "-z",
-    "--",
-  ]));
+  const worktreeChanges = new Set(gitLines(["diff", "--name-only", "-z", "--"]));
   const partiallyStaged = [...candidates]
     .filter((file) => worktreeChanges.has(file))
     .sort((left, right) => left.localeCompare(right, "en"));
   if (partiallyStaged.length > 0) {
-    const partiallyStagedText = partiallyStaged.map((file) => `  ${file}`).join("\n");
-    process.stderr.write(
-      `lint:quick:staged — 부분 스테이징 파일은 작업 트리와 인덱스 내용이 다릅니다:\n${partiallyStagedText}\n` +
-      "커밋 검증에는 lint-staged를 사용하거나, 변경을 완전히 스테이징한 뒤 다시 실행하세요.\n"
+    fail(
+      "lint:quick — 부분 스테이징 파일은 작업 트리와 인덱스 내용이 다릅니다:\n" +
+      partiallyStaged.map((file) => `  ${file}`).join("\n") +
+      "\n커밋 검증에는 lint-staged를 사용하거나 변경을 완전히 스테이징하세요.",
     );
-    process.exit(2);
   }
 }
-if (!staged) {
+
+if (!staged && !filesFrom) {
   for (const file of gitLines(["ls-files", "--others", "--exclude-standard", "-z"])) {
     candidates.add(file);
   }
   if (base) {
-    // A branch comparison does not include the developer's current unstaged edits.
     for (const file of gitLines([
       "diff",
       "--name-only",
@@ -73,34 +94,42 @@ if (!staged) {
   }
 }
 
-const files = [...candidates]
-  .filter((file) => LINTABLE_EXTENSION.test(file) && existsSync(file))
-  .sort((left, right) => left.localeCompare(right, "en"));
+const changedFiles = [...candidates].sort((left, right) => left.localeCompare(right, "en"));
+const fullLintTrigger = fullOnConfig ? findFullLintTrigger(changedFiles) : null;
 
+if (fullLintTrigger) {
+  process.stdout.write(
+    `lint:quick — ${fullLintTrigger} 변경으로 전체 strict lint를 실행합니다.\n`,
+  );
+  const fullArgs = fix
+    ? buildEslintArgs(["."], {
+        fix: true,
+        cacheLocation: "node_modules/.cache/eslint/full/",
+      })
+    : ["run", "lint:strict"];
+  const fullResult = spawnSync("pnpm", fullArgs, {
+    cwd: process.cwd(),
+    stdio: "inherit",
+  });
+  process.exit(fullResult.status ?? 1);
+}
+
+const files = selectLintableFiles(changedFiles);
 if (files.length === 0) {
   process.stdout.write("lint:quick — 검사할 변경 파일이 없습니다.\n");
   process.exit(0);
 }
 
 process.stdout.write(`lint:quick — 변경 파일 ${files.length}개를 검사합니다.\n`);
-const eslintArgs = [
-  "exec",
-  "eslint",
-  "--max-warnings=0",
-  // 변경 목록에는 의도적으로 전역 ignore 된 설정/생성 파일이 섞일 수 있다. ESLint 10의
-  // ignored-file 경고만 숨기고, 실제 검사 대상의 경고는 max-warnings=0으로 계속 실패시킨다.
-  "--no-warn-ignored",
-  "--cache",
-  "--cache-strategy",
-  "content",
-  "--cache-location",
-  "node_modules/.cache/eslint/quick/",
-  ...(fix ? ["--fix"] : []),
-  "--",
-  ...files,
-];
-const result = spawnSync("pnpm", eslintArgs, {
-  cwd: process.cwd(),
-  stdio: "inherit",
-});
+const result = spawnSync(
+  "pnpm",
+  buildEslintArgs(files, {
+    fix,
+    cacheLocation: process.env.LINT_CACHE_LOCATION || "node_modules/.cache/eslint/quick/",
+  }),
+  {
+    cwd: process.cwd(),
+    stdio: "inherit",
+  },
+);
 process.exit(result.status ?? 1);

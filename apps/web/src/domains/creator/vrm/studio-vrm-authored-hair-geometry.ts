@@ -116,7 +116,7 @@ export function createStudioVrmAuthoredHairClumpGeometry(
       const t = row / CLUMP_LENGTH_SEGMENTS;
       const y = 1 - t * 2;
       const width = clumpWidth(t, part.taper);
-      const depth = width * (0.16 + 0.10 * (1 - t));
+      const depth = width * (0.24 + 0.08 * (1 - t));
       const [centerX, centerZ] = resolveStudioVrmAuthoredHairClumpCenter(part, t);
       for (let column = 0; column < columns; column += 1) {
         const u = column / CLUMP_CROSS_SEGMENTS;
@@ -203,11 +203,97 @@ function setShellColors(geometry: THREE.BufferGeometry, part: AvatarForgeHairPar
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 }
 
+function shapeCapToScalp(geometry: THREE.BufferGeometry): void {
+  const position = geometry.getAttribute("position");
+  if (!position) return;
+  for (let index = 0; index < position.count; index += 1) {
+    const x = position.getX(index);
+    const y = position.getY(index);
+    const z = position.getZ(index);
+    // The lower front of a raw sphere reads as a helmet. Pull that region toward the skull while
+    // retaining crown volume and a little extra occipital mass at the back.
+    const lower = clamp01((0.58 - y) / 1.18);
+    const front = clamp01(z);
+    const side = clamp01(Math.abs(x));
+    const foreheadRelief = lower * front * (0.72 + side * 0.28);
+    const templeRelief = lower * side;
+    const crown = clamp01((y + 0.1) / 1.1);
+    position.setXYZ(
+      index,
+      x * (1 + crown * 0.025 - templeRelief * 0.075),
+      y + crown * (1 - side) * 0.025,
+      z >= 0
+        ? z * (1 - foreheadRelief * 0.24)
+        : z * (1 + lower * 0.075),
+    );
+  }
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
+
+function clipCapForehead(geometry: THREE.BufferGeometry): void {
+  const position = geometry.getAttribute("position");
+  const index = geometry.getIndex();
+  if (!position || !index) return;
+  const kept: number[] = [];
+  const source = index.array;
+  for (let offset = 0; offset + 2 < source.length; offset += 3) {
+    const a = Number(source[offset]);
+    const b = Number(source[offset + 1]);
+    const c = Number(source[offset + 2]);
+    const cx = (position.getX(a) + position.getX(b) + position.getX(c)) / 3;
+    const cy = (position.getY(a) + position.getY(b) + position.getY(c)) / 3;
+    const cz = (position.getZ(a) + position.getZ(b) + position.getZ(c)) / 3;
+    // Actual hairline opening: a sphere cut at one latitude always looks like a helmet. Remove the
+    // lower front triangles with a gentle M-shaped threshold, while keeping the temples/back lower.
+    const centerBias = 1 - Math.min(1, Math.abs(cx));
+    const hairline = 0.12 + centerBias * 0.16;
+    if (cz > 0.12 && cy < hairline) continue;
+    kept.push(a, b, c);
+  }
+  geometry.setIndex(kept);
+  geometry.computeVertexNormals();
+}
+
+function shapeBackShellToDrape(geometry: THREE.BufferGeometry, part: AvatarForgeHairPart): void {
+  const position = geometry.getAttribute("position");
+  if (!position) return;
+  const napeLike = part.id.includes("nape");
+  for (let index = 0; index < position.count; index += 1) {
+    const x = position.getX(index);
+    const y = position.getY(index);
+    const z = position.getZ(index);
+    const lower = clamp01((0.5 - y) / 1.5);
+    const tip = Math.pow(lower, 1.45);
+    const side = clamp01(Math.abs(x));
+    const drape = napeLike ? 0.35 : 1;
+    // Back hair should read as a curtain made of weighted clumps, not a second sphere around the
+    // neck. Flatten the face-facing side, keep the occipital volume, and taper the lower corners.
+    const width = 1 - drape * tip * (0.12 + side * 0.08);
+    const frontDepth = 1 - drape * (0.34 + lower * 0.18);
+    const backDepth = 1 + drape * lower * 0.1;
+    position.setXYZ(
+      index,
+      x * width,
+      y - drape * tip * (1 - side) * 0.035,
+      z >= 0 ? z * frontDepth : z * backDepth,
+    );
+  }
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
+
 function createShellGeometry(part: AvatarForgeHairPart): THREE.BufferGeometry {
   const geometry = part.role === "cap"
     ? new THREE.SphereGeometry(1, RADIAL_SEGMENTS, CAP_HEIGHT_SEGMENTS, 0, Math.PI * 2, 0, Math.PI * 0.72)
     : new THREE.SphereGeometry(1, 28, 20);
+  if (part.role === "cap") {
+    shapeCapToScalp(geometry);
+    clipCapForehead(geometry);
+  } else if (part.role === "back") shapeBackShellToDrape(geometry, part);
   setShellColors(geometry, part);
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
   return geometry;
 }
 
