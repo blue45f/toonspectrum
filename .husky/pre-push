@@ -38,6 +38,8 @@ fi
 # 러너에서 다시 돌렸다 — 노트북이 못 하는 검증까지 포함해서. 게다가 `pnpm audit` 이
 # 네트워크를 요구해 오프라인에서는 푸시 자체가 불가능했다.
 # 무거운 체인은 CI 한 곳에서만 지불하고, 여기서는 빠른 되먹임만 남긴다.
+node scripts/verify-pnpm-lockfile.mjs
+
 BASE="${PRE_PUSH_BASE:-origin/main}"
 git rev-parse --verify --quiet "$BASE" >/dev/null || BASE=""
 
