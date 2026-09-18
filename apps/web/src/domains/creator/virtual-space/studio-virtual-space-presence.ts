@@ -1,6 +1,8 @@
 import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
 import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
 import {
+  STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
+  STUDIO_VIRTUAL_SPACE_AVATAR_COUNT,
   STUDIO_VIRTUAL_SPACE_MAX_PARTICIPANTS,
   STUDIO_VIRTUAL_SPACE_NEARBY_RADIUS,
   clampStudioVirtualSpacePoint,
@@ -160,6 +162,11 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
       state.facing as StudioVirtualSpaceFacing,
       state.activity as StudioVirtualSpaceActivity,
       typeof state.moving === "boolean" ? state.moving : false,
+      Number.isInteger(state.avatarIndex)
+        && Number(state.avatarIndex) >= 0
+        && Number(state.avatarIndex) < STUDIO_VIRTUAL_SPACE_AVATAR_COUNT
+        ? Number(state.avatarIndex)
+        : STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
     ),
   };
 }
@@ -261,9 +268,10 @@ export class StudioVirtualSpacePresenceController {
     facing: StudioVirtualSpaceFacing = this.self.facing,
     activity: StudioVirtualSpaceActivity = this.self.activity,
     moving: boolean = this.self.moving,
+    avatarIndex: number = this.self.avatarIndex,
   ): void {
     if (this.closed) return;
-    const next = studioVirtualSpaceState(point, facing, activity, moving);
+    const next = studioVirtualSpaceState(point, facing, activity, moving, avatarIndex);
     if (
       next.x === this.self.x
       && next.y === this.self.y
@@ -271,6 +279,7 @@ export class StudioVirtualSpacePresenceController {
       && next.facing === this.self.facing
       && next.activity === this.self.activity
       && next.moving === this.self.moving
+      && next.avatarIndex === this.self.avatarIndex
     ) {
       return;
     }
@@ -280,11 +289,15 @@ export class StudioVirtualSpacePresenceController {
   }
 
   setActivity(activity: StudioVirtualSpaceActivity): void {
-    this.update(this.self, this.self.facing, activity, this.self.moving);
+    this.update(this.self, this.self.facing, activity, this.self.moving, this.self.avatarIndex);
   }
 
   setMoving(moving: boolean): void {
-    this.update(this.self, this.self.facing, this.self.activity, moving);
+    this.update(this.self, this.self.facing, this.self.activity, moving, this.self.avatarIndex);
+  }
+
+  setAvatarIndex(avatarIndex: number): void {
+    this.update(this.self, this.self.facing, this.self.activity, this.self.moving, avatarIndex);
   }
 
   sendReaction(reaction: StudioVirtualSpaceReaction): void {
