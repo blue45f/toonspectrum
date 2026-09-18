@@ -1406,12 +1406,7 @@ import type { PaletteSuggestion } from "./studio-palette-suggest";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
 import type { PsdExportEl, PsdExportResult } from "./export/studio-psd-export";
 import type { StudioPublicationAnalyticsDocument } from "./studio-publication-analytics";
-import type {
-  StudioPublishAiProvenance,
-  StudioPublishAiUsage,
-  StudioPublishPreflightInput,
-  StudioPublishProfile,
-} from "./studio-publish-preflight";
+import type { StudioPublishAiProvenance, StudioPublishAiUsage, StudioPublishPreflightInput, StudioPublishProfile } from "./studio-publish-preflight";
 import type { StudioQuickAccessCommandMeta, StudioQuickAccessState } from "./studio-quick-access";
 import type { StudioQuickAccessCommandAvailability } from "./studio-quick-access-integration";
 import { useStudioQuickAccessPersonalKitBridge } from "./use-studio-quick-access-personal-kit";
@@ -1423,10 +1418,7 @@ import type { StudioStockPhoto } from "./studio-stock-image-client";
 import type { StudioTeamCommentMutationPlan } from "./studio-team-comment-mutation-plan";
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { StudioVelocityPressureState } from "./studio-velocity-pressure-response";
-import type {
-  StudioWatermarkPreferenceRuntime,
-  StudioWatermarkPreferenceSnapshot,
-} from "./studio-watermark-preferences-sqlite";
+import type { StudioWatermarkPreferenceRuntime, StudioWatermarkPreferenceSnapshot } from "./studio-watermark-preferences-sqlite";
 import type { StudioWillV1PageExportResult } from "./export/studio-will-v1-export-bridge";
 import type { PendingStudioWillV1Import } from "./studio-will-v1-import-bridge";
 import type { StudioWorkspacePersistenceRuntime } from "./studio-workspace-sqlite-runtime";
@@ -1434,22 +1426,12 @@ import type { StudioAssetShareOptions, StudioAssetSortOrder, StudioAssetTab } fr
 import type { StudioInspectorAsideHandlers } from "./StudioInspectorAside";
 import type { StudioLeftToolRailHandlers } from "./StudioLeftToolRail";
 import type { StudioMenubarContentHandlers } from "./StudioMenubarContent";
-import type {
-  StudioBrushCatalogHandlers,
-  StudioMobileEditingDockHandlers,
-  StudioMobileSheet,
-} from "./StudioMobileEditingDock";
+import type { StudioBrushCatalogHandlers, StudioMobileEditingDockHandlers, StudioMobileSheet } from "./StudioMobileEditingDock";
 import type { StudioPageListPaneHandlers } from "./StudioPageListPane";
 import type { PublishContext } from "./StudioPublishContextBanner";
 import type { StudioWebGpuCanvasHandle } from "./StudioWebGpuCanvas";
 import type { CreatorAssetReportReason } from "@/shared/lib/creator-asset-contract";
-import type {
-  GeneratedAssetQuality,
-  GeneratedAssetSize,
-  SharedAssetCatalogItem,
-  WorkDetail,
-  WorkRevisionSummary,
-} from "@/infrastructure/creator-client";
+import type { GeneratedAssetQuality, GeneratedAssetSize, SharedAssetCatalogItem, WorkDetail, WorkRevisionSummary } from "@/infrastructure/creator-client";
 import type Konva from "konva";
 import { scheduleIdle } from "@/domains/auth/components/schedule-idle";
 import { useIsMobile } from "@/hooks/use-media-query";
