@@ -149,11 +149,9 @@ export function StudioOfflinePanel() {
         ? "서버 연결 확인 중"
         : device?.navigationFallback
           ? "저장된 스튜디오 · 로컬 작업 중"
-          : ready
-            ? "오프라인 자동 준비 완료"
-            : busy
-              ? "오프라인 자동 준비 중"
-              : "오프라인 자동 준비";
+          : storageWarning
+            ? "저장 공간 부족 · 백업 권장"
+            : "스튜디오 연결 상태";
 
   if (!shouldShowPanel) return null;
 
