@@ -1,6 +1,7 @@
 import {
   registerI18nEnglishSourceEntries,
   registerI18nLocaleEntries,
+  useT,
 } from "./i18n-core";
 
 export interface BilingualText {
@@ -94,6 +95,15 @@ export function translateBilingualText(
   value: BilingualText,
 ): string {
   return t(defineBilingualAutoText(scope, value.ko, value.en));
+}
+
+/**
+ * Hook-friendly adapter for legacy components with many inline Korean/English branches.
+ * The returned resolver stays on the global i18n pipeline and rerenders when runtime bundles land.
+ */
+export function useBilingualLocalizer(scope: string): (ko: string, en: string) => string {
+  const t = useT();
+  return (ko, en) => translateBilingualText(t, scope, { ko, en });
 }
 
 function translateParallelNode(
