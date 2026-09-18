@@ -1,9 +1,7 @@
 import {
   formatI18nTemplate,
   translateBilingualValueForActiveLocale,
-  translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, Heart, Search, SlidersHorizontal, X } from "lucide-react";

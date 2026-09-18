@@ -1,9 +1,6 @@
 import {
   formatI18nTemplate,
   translateBilingualValueForActiveLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";

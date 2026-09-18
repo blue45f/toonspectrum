@@ -1,12 +1,6 @@
 import {
-  resolveUiLocale,
-  translateBilingualValueForActiveLocale,
-  translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
   useBilingual,
-  useBilingualI18nRevision,
-  useBilingualLocalizer,
   type BilingualText,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
@@ -58,7 +52,6 @@ import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel";
 
 export type StudioProjectSection = StudioProjectSectionId;
 
-type Locale = string;
 
 type ProjectAction = Readonly<{
   title: BilingualText;
@@ -246,7 +239,6 @@ function projectSectionHref(projectId: string, section: StudioProjectSection): s
 }
 
 function InvalidProject({ locale: _locale }: { readonly locale?: string }) {
-  const l = useBilingualLocalizer("studioProjectShell.invalid");
   return (
     <Container size="wide" className="py-10">
       <section className="rounded-3xl border border-line bg-card p-6" role="alert">
