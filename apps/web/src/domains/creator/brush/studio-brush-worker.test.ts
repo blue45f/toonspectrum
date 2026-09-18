@@ -45,6 +45,7 @@ function respond(worker: FakeBrushWorker, id: string, points: number[]): void {
 
 afterEach(() => {
   disposeStudioBrushWorkerClient();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   FakeBrushWorker.instances = [];
 });
@@ -92,6 +93,45 @@ describe("studio-brush-worker-protocol & client", () => {
 
     await expect(secondPromise).resolves.toEqual(replacementPoints);
     expect(FakeBrushWorker.instances).toHaveLength(2);
+  });
+
+  it("retires a stalled generation after the request deadline and drains retained work", async () => {
+    vi.useFakeTimers();
+    installFakeWorker();
+    const raw = [0, 0, 10, 10, 20, 20];
+
+    const pending = processFreehandPointsInWorker(raw, 2, "pen", 6, 7, { timeoutMs: 25 });
+    const first = FakeBrushWorker.instances[0];
+    expect(first).toBeDefined();
+
+    await vi.advanceTimersByTimeAsync(25);
+    await expect(pending).resolves.toEqual(processFreehandPoints(raw, 2));
+    expect(first!.terminate).toHaveBeenCalledTimes(1);
+
+    const next = processFreehandPointsInWorker(raw, 2, "pen", 6, 8, { timeoutMs: 25 });
+    const replacement = FakeBrushWorker.instances[1];
+    expect(replacement).toBeDefined();
+    const request = replacement!.postMessage.mock.calls[0]?.[0] as { id: string };
+    respond(replacement!, request.id, [0, 0, 20, 20]);
+    await expect(next).resolves.toEqual([0, 0, 20, 20]);
+  });
+
+  it("drops an aborted pending request without retiring a healthy worker", async () => {
+    installFakeWorker();
+    const controller = new AbortController();
+    const raw = [0, 0, 10, 10, 20, 20];
+
+    const pending = processFreehandPointsInWorker(raw, 2, "pen", 6, 7, { signal: controller.signal });
+    const worker = FakeBrushWorker.instances[0];
+    controller.abort();
+
+    await expect(pending).resolves.toEqual(processFreehandPoints(raw, 2));
+    expect(worker!.terminate).not.toHaveBeenCalled();
+
+    const next = processFreehandPointsInWorker(raw, 2, "pen", 6, 8);
+    const request = worker!.postMessage.mock.calls[1]?.[0] as { id: string };
+    respond(worker!, request.id, [0, 0, 20, 20]);
+    await expect(next).resolves.toEqual([0, 0, 20, 20]);
   });
 
   it("retires the generation when postMessage throws synchronously", async () => {
