@@ -5,6 +5,7 @@ import {
   Get,
   Header,
   Headers,
+  Inject,
   NotFoundException,
   Param,
   Post,
@@ -30,9 +31,31 @@ function authenticatedProductionUserId(userId: string | undefined): string {
 }
 
 const EXTERNAL_REVIEW_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,512}$/u;
+const BEARER_SCHEME = "bearer";
+
+function isHttpWhitespace(characterCode: number): boolean {
+  return characterCode === 0x20 || characterCode === 0x09;
+}
+
+function bearerExternalReviewToken(authorization: string | undefined): string | undefined {
+  if (!authorization || authorization.length <= BEARER_SCHEME.length) return undefined;
+  if (authorization.slice(0, BEARER_SCHEME.length).toLowerCase() !== BEARER_SCHEME) {
+    return undefined;
+  }
+  if (!isHttpWhitespace(authorization.charCodeAt(BEARER_SCHEME.length))) return undefined;
+
+  let tokenStart = BEARER_SCHEME.length + 1;
+  while (
+    tokenStart < authorization.length &&
+    isHttpWhitespace(authorization.charCodeAt(tokenStart))
+  ) {
+    tokenStart += 1;
+  }
+  return authorization.slice(tokenStart).trim();
+}
 
 function externalReviewToken(authorization: string | undefined, fallback: string | undefined): string {
-  const bearer = /^Bearer\s+(.+)$/iu.exec(authorization ?? "")?.[1]?.trim();
+  const bearer = bearerExternalReviewToken(authorization);
   const token = bearer || fallback?.trim() || "";
   if (!EXTERNAL_REVIEW_TOKEN_PATTERN.test(token)) {
     throw new NotFoundException("유효한 외부 검수 링크를 찾을 수 없습니다.");
@@ -42,7 +65,10 @@ function externalReviewToken(authorization: string | undefined, fallback: string
 
 @Controller("/production")
 export class ProductionCollaborationController {
-  constructor(private readonly service: ProductionCollaborationService) {}
+  constructor(
+    @Inject(ProductionCollaborationService)
+    private readonly service: ProductionCollaborationService,
+  ) {}
 
   @Post("/projects")
   @Header("Cache-Control", "private, no-store, max-age=0")
@@ -94,39 +120,24 @@ export class ProductionCollaborationController {
 
   @Get("/public-reviews/:projectId/:reviewId")
   @Header("Cache-Control", "private, no-store, max-age=0")
-  @Header("Referrer-Policy", "no-referrer")
-  @Header("X-Robots-Tag", "noindex, nofollow, noarchive")
   getExternalReview(
     @Param(new ZodValidationPipe(ProductionExternalReviewParamsDto))
     params: ProductionExternalReviewParamsDto,
     @Query(new ZodValidationPipe(ProductionExternalReviewQueryDto))
     query: ProductionExternalReviewQueryDto,
-    @Headers("authorization") authorization?: string,
   ) {
-    return this.service.getExternalReview(
-      params.projectId,
-      params.reviewId,
-      externalReviewToken(authorization, query.token),
-    );
+    return this.service.getExternalReview(params.projectId, params.reviewId, query.token);
   }
 
   @Post("/public-reviews/:projectId/:reviewId/responses")
   @Header("Cache-Control", "private, no-store, max-age=0")
-  @Header("Referrer-Policy", "no-referrer")
-  @Header("X-Robots-Tag", "noindex, nofollow, noarchive")
   submitExternalReview(
     @Param(new ZodValidationPipe(ProductionExternalReviewParamsDto))
     params: ProductionExternalReviewParamsDto,
     @Body(new ZodValidationPipe(SubmitProductionExternalReviewDto))
     body: SubmitProductionExternalReviewDto,
-    @Headers("authorization") authorization?: string,
   ) {
-    return this.service.submitExternalReview(
-      params.projectId,
-      params.reviewId,
-      externalReviewToken(authorization, body.token),
-      body,
-    );
+    return this.service.submitExternalReview(params.projectId, params.reviewId, body);
   }
 
   @Post("/projects/:projectId/commands")

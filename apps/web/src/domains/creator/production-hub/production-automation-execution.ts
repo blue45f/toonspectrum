@@ -46,16 +46,10 @@ function dayKey(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
-function sourceStateFingerprint(
+function matchStateFingerprint(
   aggregate: ProductionProjectAggregate,
-  rule: ProductionAutomationRule,
   match: AutomationRuleMatch,
-  now: Date,
 ): string {
-  if (["due-soon", "due-passed", "capacity-exceeded"].includes(rule.trigger)) {
-    return dayKey(now);
-  }
-  if (rule.trigger === "manual") return now.toISOString();
   if (match.sourceType === "task") {
     const task = aggregate.tasks.find((entry) => entry.id === match.sourceId);
     return stableHash(JSON.stringify(task ? {
@@ -77,9 +71,32 @@ function sourceStateFingerprint(
       passedCheckKeys: plan.passedCheckKeys,
     } : match.explanation));
   }
+  return stableHash(JSON.stringify({ explanation: match.explanation }));
+}
+
+function sourceStateFingerprint(
+  aggregate: ProductionProjectAggregate,
+  rule: ProductionAutomationRule,
+  match: AutomationRuleMatch,
+  now: Date,
+): string {
+  if (rule.trigger === "manual") return now.toISOString();
+  const state = matchStateFingerprint(aggregate, match);
+  if (["due-soon", "due-passed", "capacity-exceeded"].includes(rule.trigger)) {
+    return `${dayKey(now)}:${state}`;
+  }
+  return state;
+}
+
+function actionFingerprint(
+  rule: ProductionAutomationRule,
+  action: ProductionAutomationRule["actions"][number],
+): string {
   return stableHash(JSON.stringify({
-    explanation: match.explanation,
-    day: dayKey(now),
+    trigger: rule.trigger,
+    conditions: rule.conditions,
+    failurePolicy: rule.failurePolicy,
+    action,
   }));
 }
 
@@ -115,6 +132,7 @@ export function deriveProductionAutomationExecutionPlan(
     readonly rule: ProductionAutomationRule;
     readonly match: AutomationRuleMatch;
     readonly actionIndex: number;
+    readonly actionFingerprint: string;
     readonly assignmentId: string | null;
     readonly title: string;
     readonly body: string;
@@ -124,6 +142,7 @@ export function deriveProductionAutomationExecutionPlan(
     const id = stableId("automation-notification", [
       input.rule.id,
       input.actionIndex,
+      input.actionFingerprint,
       input.match.sourceType,
       input.match.sourceId,
       input.assignmentId,
@@ -157,6 +176,7 @@ export function deriveProductionAutomationExecutionPlan(
     for (const match of matches) {
       const occurrence = sourceStateFingerprint(aggregate, rule, match, now);
       for (const [actionIndex, action] of rule.actions.entries()) {
+        const semanticAction = actionFingerprint(rule, action);
         if (action.type === "notify") {
           const targets = action.assignmentIds.length > 0 ? action.assignmentIds : [null];
           for (const assignmentId of targets) {
@@ -164,6 +184,7 @@ export function deriveProductionAutomationExecutionPlan(
               rule,
               match,
               actionIndex,
+              actionFingerprint: semanticAction,
               assignmentId,
               title: rule.name,
               body: `${action.message} · ${explanationText(match)}`,
@@ -177,6 +198,7 @@ export function deriveProductionAutomationExecutionPlan(
           const taskId = stableId("automation-task", [
             rule.id,
             actionIndex,
+            semanticAction,
             match.sourceType,
             match.sourceId,
             occurrence,
@@ -216,6 +238,7 @@ export function deriveProductionAutomationExecutionPlan(
             rule,
             match,
             actionIndex,
+            actionFingerprint: semanticAction,
             assignmentId,
             title: `${sourceTask?.title ?? match.sourceId} 상태 변경 검토`,
             body: `${action.taskStatus} 상태 전환은 사람 확인 후 수행해야 합니다. · ${explanationText(match)}`,

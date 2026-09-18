@@ -17,6 +17,7 @@ describe("catalog destination security", () => {
   it.each([
     "http://image-comic.pstatic.net/a.png",
     "https://image-comic.pstatic.net:8443/a.png",
+    // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
     "https://user:pass@image-comic.pstatic.net/a.png",
     "https://image-comic.pstatic.net.evil.test/a.png",
     "https://evil.image-comic.pstatic.net/a.png",

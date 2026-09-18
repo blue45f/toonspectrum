@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { AlertCircle, CheckCircle2, KeyRound, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -71,27 +74,23 @@ export function ResetPasswordPage() {
           )}
         </div>
         <h1 className="text-center text-2xl font-bold tracking-tight text-fg">
-          비밀번호 재설정
-        </h1>
+          {translateCurrentStaticSourceText("domains.account.ResetPasswordPage", "ko", "비밀번호 재설정")}</h1>
         {complete ? (
           <div className="mt-5 text-center">
             <p className="text-sm leading-relaxed text-fg-2" role="status">
-              새 비밀번호로 변경했어요. 보안을 위해 기존 기기에서는 모두 로그아웃됐어요.
-            </p>
+              {translateCurrentStaticSourceText("domains.account.ResetPasswordPage", "ko", "새 비밀번호로 변경했어요. 보안을 위해 기존 기기에서는 모두 로그아웃됐어요.")}</p>
             <Link
               to="/"
               className="mt-6 inline-flex min-h-10 items-center justify-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
             >
-              로그인하러 가기
-            </Link>
+              {translateCurrentStaticSourceText("domains.account.ResetPasswordPage", "ko", "로그인하러 가기")}</Link>
           </div>
         ) : (
           <form className="mt-5 space-y-3" onSubmit={submit}>
             <p className="text-sm leading-relaxed text-fg-2">
-              다른 곳에서 사용하지 않는 15자 이상의 긴 문구를 권장해요.
-            </p>
+              {translateCurrentStaticSourceText("domains.account.ResetPasswordPage", "ko", "다른 곳에서 사용하지 않는 15자 이상의 긴 문구를 권장해요.")}</p>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-fg-2">새 비밀번호</span>
+              <span className="mb-1 block text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.account.ResetPasswordPage", "ko", "새 비밀번호")}</span>
               <input
                 type="password"
                 autoComplete="new-password"
@@ -104,7 +103,7 @@ export function ResetPasswordPage() {
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-fg-2">새 비밀번호 확인</span>
+              <span className="mb-1 block text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.account.ResetPasswordPage", "ko", "새 비밀번호 확인")}</span>
               <input
                 type="password"
                 autoComplete="new-password"
@@ -131,7 +130,7 @@ export function ResetPasswordPage() {
               className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting && <Loader2 className="size-4 animate-spin" aria-hidden />}
-              {submitting ? "변경 중…" : "새 비밀번호로 변경"}
+              {submitting ? translateCurrentStaticSourceText("domains.account.ResetPasswordPage", "ko", "변경 중…") : translateCurrentStaticSourceText("domains.account.ResetPasswordPage", "ko", "새 비밀번호로 변경")}
             </button>
           </form>
         )}

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { CheckCircle2, Cpu, Loader2, TriangleAlert, Zap } from "lucide-react";
 import { useId } from "react";
 
@@ -94,8 +98,7 @@ export function StudioBg3dEnginePanel({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <h3 id={headingId} className="text-xs font-bold text-fg">
-                3D 렌더 엔진
-              </h3>
+                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEnginePanel", "ko", "3D 렌더 엔진")}</h3>
               <span
                 data-testid="studio-bg3d-engine-active-backend"
                 className={cx(
@@ -111,9 +114,7 @@ export function StudioBg3dEnginePanel({
               </span>
             </div>
             <p className="mt-1 text-[0.72rem] leading-relaxed text-fg-3">
-              WebGPU와 WebGL2는 서로 독립된 엔진입니다. 선택한 엔진을 사용할 수 없으면
-              뷰포트를 열지 않으며, 다른 엔진은 여기서 직접 선택해야 합니다.
-              {inApp.isInApp ? ` 지금은 ${inApp.label}에서 열려 있습니다.` : ""}
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEnginePanel", "ko", "WebGPU와 WebGL2는 서로 독립된 엔진입니다. 선택한 엔진을 사용할 수 없으면 뷰포트를 열지 않으며, 다른 엔진은 여기서 직접 선택해야 합니다.")}{inApp.isInApp ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEnginePanel", "ko", " 지금은 {v0}에서 열려 있습니다."), { v0: String(inApp.label) }) : ""}
             </p>
           </div>
         </div>
@@ -121,7 +122,7 @@ export function StudioBg3dEnginePanel({
         <div
           className="mt-3 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2"
           role="group"
-          aria-label="3D 렌더 엔진 선택"
+          aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEnginePanel", "ko", "3D 렌더 엔진 선택")}
           aria-describedby={`${statusId} ${hintId}`}
         >
           {STUDIO_BG3D_ENGINE_PREFERENCES.map((option) => {
@@ -132,9 +133,9 @@ export function StudioBg3dEnginePanel({
               <button
                 key={option}
                 type="button"
-                data-testid={`studio-bg3d-engine-preference-${option}`}
+                data-testid={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEnginePanel", "en", "studio-bg3d-engine-preference-{v0}"), { v0: String(option) })}
                 aria-pressed={isSelected}
-                aria-label={`3D 렌더 엔진 ${optionLabel} 선택`}
+                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEnginePanel", "ko", "3D 렌더 엔진 {v0} 선택"), { v0: String(optionLabel) })}
                 disabled={disabled}
                 onClick={() => onPreferenceChange(option)}
                 className={cx(
@@ -163,7 +164,7 @@ export function StudioBg3dEnginePanel({
               data-testid="studio-bg3d-engine-frame-time"
               className="shrink-0 font-mono text-[0.68rem] tabular-nums text-fg-3"
             >
-              <span className="sr-only">최근 뷰포트 프레임 시간 </span>
+              <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEnginePanel", "ko", "최근 뷰포트 프레임 시간 ")}</span>
               {frameTimeLabel}
             </p>
           ) : null}
@@ -172,8 +173,8 @@ export function StudioBg3dEnginePanel({
         <div
           id={statusId}
           data-testid="studio-bg3d-engine-status"
-          role={deviceLostMessage || selectionUnavailable ? "alert" : "status"}
-          aria-live={deviceLostMessage || selectionUnavailable ? "assertive" : "polite"}
+          role={deviceLostMessage || selectionUnavailable ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEnginePanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEnginePanel", "en", "status")}
+          aria-live={deviceLostMessage || selectionUnavailable ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEnginePanel", "en", "assertive") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEnginePanel", "en", "polite")}
           className={cx(
             "mt-2 flex min-h-11 items-start gap-2 rounded-lg border px-2.5 py-2 text-[0.72rem] leading-relaxed",
             statusTone,

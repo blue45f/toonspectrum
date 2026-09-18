@@ -1,103 +1,118 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  compatibilityReportSchema,
+  compatibilitySourceSchema,
   createCompatibilityReport,
-  deriveCompatibilityGrade,
-  sourcePreservationManifestSchema,
+  type CompatibilityItem,
 } from "../compatibility-report";
 
-const hash = "a".repeat(64);
-const createdAt = "2026-09-17T03:00:00.000Z";
+const HASH = "b".repeat(64);
+const SOURCE = {
+  sourceFileName: "episode-12.psd",
+  sourceFormat: "psd" as const,
+  sourceHash: HASH,
+  sourceSize: 1_024,
+  sourceBlob: {
+    id: `source-${HASH.slice(0, 32)}`,
+    sha256: HASH,
+    size: 1_024,
+    mediaType: "image/vnd.adobe.photoshop",
+    role: "source" as const,
+  },
+  immutable: true as const,
+  importedAt: "2026-09-17T00:00:00.000Z",
+};
 
-function source() {
-  return sourcePreservationManifestSchema.parse({
-    sourceFileName: "episode-001.psd",
-    sourceFormat: "psd",
-    sourceHash: hash,
-    sourceSize: 1_024,
-    sourceBlob: {
-      id: "source-blob-1",
-      sha256: hash,
-      size: 1_024,
-      mediaType: "image/vnd.adobe.photoshop",
-      role: "source",
-    },
-    immutable: true,
-    importedAt: createdAt,
-  });
+function item(
+  outcome: CompatibilityItem["outcome"],
+  impact: CompatibilityItem["impact"],
+  id = `${outcome}-${impact}`,
+): CompatibilityItem {
+  return {
+    id,
+    path: `layers/${id}`,
+    feature: id,
+    outcome,
+    impact,
+    message: `${id} 처리 결과`,
+  };
 }
 
-describe("CompatibilityReport", () => {
-  it("creates an A report only when every object is semantically preserved", () => {
-    const report = createCompatibilityReport({
-      id: "report-a",
-      artifactId: "artifact-1",
-      source: source() as never,
-      items: [{
-        id: "item-layer-1",
-        path: "/layers/1",
-        sourceFeature: "raster-layer",
-        disposition: "preserved",
-        severity: "info",
-        targetFeature: "RasterLayerV3",
-        message: "레이어와 블렌드 모드가 보존됩니다.",
-      }],
-      createdAt,
-    } as never);
-    expect(report.grade).toBe("A");
-    expect(report.requiresApproval).toBe(false);
-    expect(report.summary.preserved).toBe(1);
+function report(items: readonly CompatibilityItem[]) {
+  return createCompatibilityReport({
+    id: `report-${items.length}`,
+    artifactId: "artifact-canvas",
+    source: SOURCE,
+    items: [...items],
+    createdAt: "2026-09-17T00:00:01.000Z",
+  });
+}
+describe("creative-format compatibility reports", () => {
+  it("assigns A only when every feature is preserved without impact", () => {
+    const value = report([
+      item("preserved", "none", "layers"),
+      item("preserved", "none", "masks"),
+    ]);
+    expect(value.grade).toBe("A");
+    expect(value.requiresApproval).toBe(false);
+    expect(value.summary).toEqual({
+      total: 2,
+      preserved: 2,
+      converted: 0,
+      rasterized: 0,
+      excluded: 0,
+      unsupported: 0,
+      blocking: 0,
+    });
   });
 
-  it("cannot hide rasterized or ignored content behind an A/B grade", () => {
-    const items = [
-      {
-        id: "item-smart-filter",
-        path: "/layers/2/smartFilters/0",
-        sourceFeature: "smart-filter",
-        disposition: "rasterized",
-        severity: "warning",
-        targetFeature: "RasterLayerV3",
-        message: "필터 결과만 래스터로 보존됩니다.",
-      },
-    ] as const;
-    expect(deriveCompatibilityGrade(items)).toBe("C");
-    expect(() => compatibilityReportSchema.parse({
-      id: "report-overclaim",
-      source: source(),
-      grade: "A",
-      items,
-      summary: {
-        total: 1,
-        preserved: 0,
-        converted: 0,
-        approximated: 0,
-        rasterized: 1,
-        ignored: 0,
-        opaquePreserved: 0,
-        blocked: 0,
-      },
-      requiresApproval: true,
-      createdAt,
-    })).toThrow(/overclaims/u);
+  it("assigns B to visible but non-destructive conversion", () => {
+    const value = report([item("converted", "minor")]);
+    expect(value.grade).toBe("B");
+    expect(value.requiresApproval).toBe(true);
+    expect(value.summary.converted).toBe(1);
   });
 
-  it("grades opaque CLIP preservation as D until a verified parser maps the object", () => {
-    expect(deriveCompatibilityGrade([{
-      id: "clip-object-1",
-      path: "/unknown/1",
-      sourceFeature: "clip-private-object",
-      disposition: "opaque-preserved",
-      severity: "warning",
-      message: "원본 바이트는 보존되지만 편집 의미는 확인되지 않았습니다.",
-    }])).toBe("D");
+  it("assigns C when editable structure is rasterized", () => {
+    const value = report([item("rasterized", "major")]);
+    expect(value.grade).toBe("C");
+    expect(value.requiresApproval).toBe(true);
+    expect(value.summary.rasterized).toBe(1);
   });
 
-  it("rejects a source manifest whose blob is not the immutable original", () => {
-    expect(() => sourcePreservationManifestSchema.parse({
-      ...source(),
-      sourceBlob: { ...source().sourceBlob, role: "preview" },
-    })).toThrow(/source blob role/u);
+  it("assigns D for exclusions, unsupported features, or blocking loss", () => {
+    expect(report([item("excluded", "major")]).grade).toBe("D");
+    expect(report([item("unsupported", "blocking")]).grade).toBe("D");
+    expect(report([item("converted", "blocking")]).grade).toBe("D");
+  });
+
+  it("counts every disclosed outcome deterministically", () => {
+    const value = report([
+      item("preserved", "none", "a"),
+      item("converted", "minor", "b"),
+      item("rasterized", "major", "c"),
+      item("excluded", "major", "d"),
+      item("unsupported", "blocking", "e"),
+    ]);
+    expect(value.summary).toEqual({
+      total: 5,
+      preserved: 1,
+      converted: 1,
+      rasterized: 1,
+      excluded: 1,
+      unsupported: 1,
+      blocking: 1,
+    });
+  });
+
+  it("rejects source metadata that does not match the immutable blob", () => {
+    expect(compatibilitySourceSchema.safeParse({
+      ...SOURCE,
+      sourceBlob: { ...SOURCE.sourceBlob, size: 999 },
+    }).success).toBe(false);
+    expect(compatibilitySourceSchema.safeParse({
+      ...SOURCE,
+      sourceBlob: { ...SOURCE.sourceBlob, sha256: "c".repeat(64) },
+    }).success).toBe(false);
   });
 });

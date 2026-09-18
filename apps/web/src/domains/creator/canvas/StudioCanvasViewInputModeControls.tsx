@@ -36,7 +36,7 @@ export function StudioViewInputModeControls({
       role="group"
       aria-label={localizeText(t, "캔버스 보기 조작", "studio.canvas.viewInputControls")}
       className={cn(
-        "inline-flex items-center gap-0.5",
+        "inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap [word-break:keep-all]",
         compact ? "" : "rounded-full border border-line/60 bg-card/45 p-0.5",
       )}
     >
@@ -47,7 +47,7 @@ export function StudioViewInputModeControls({
         title={`${wheelLabel} · ${localizeText(t, "클릭해서 줌/스크롤 전환", "studio.canvas.wheelMode.toggleHint")}`}
         onClick={onToggleWheelMode}
         className={cn(
-          "inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-full px-2 text-[0.65rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+          "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full px-2 text-[0.65rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
           wheelScrollMode
             ? "bg-accent-soft text-accent"
             : "text-fg-2 hover:bg-raised hover:text-fg",
@@ -56,7 +56,7 @@ export function StudioViewInputModeControls({
       >
         <Mouse className="size-3.5" aria-hidden />
         {!compact ? (
-          <span>{wheelScrollMode
+          <span className="shrink-0 whitespace-nowrap">{wheelScrollMode
             ? localizeText(t, "스크롤", "studio.canvas.wheelMode.panShort")
             : localizeText(t, "줌", "studio.canvas.wheelMode.zoomShort")}</span>
         ) : null}

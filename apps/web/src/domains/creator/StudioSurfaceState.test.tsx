@@ -49,6 +49,25 @@ describe("StudioSurfaceState", () => {
     expect(loading.getAttribute("aria-busy")).toBe("true");
   });
 
+  it("renders optional visual media without changing the state announcement contract", () => {
+    const { container } = render(
+      <StudioSurfaceState
+        state="empty"
+        announce="none"
+        title="배경이 아직 없어요"
+        visual={{ src: "/brand/theme-scenes/ink-studio.svg", objectPosition: "center 45%" }}
+      />,
+    );
+
+    const visual = container.querySelector('[data-studio-surface-visual="true"]');
+    const image = visual?.querySelector("img");
+    expect(image?.getAttribute("src")).toBe("/brand/theme-scenes/ink-studio.svg");
+    expect(image?.getAttribute("loading")).toBe("lazy");
+    expect(image?.getAttribute("decoding")).toBe("async");
+    expect(image?.getAttribute("alt")).toBe("");
+    expect(container.querySelector('[data-studio-surface-announcement="none"]')).toBeTruthy();
+  });
+
   it("allows a caller to announce a newly appeared blocked state", () => {
     render(
       <StudioSurfaceState

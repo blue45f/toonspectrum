@@ -16,6 +16,8 @@ on:
       - 'apps/web/src/domains/legal/TechnologyPage.tsx'
       - 'apps/web/src/domains/legal/technology/**'
       - 'apps/web/src/domains/catalog/SearchPage*'
+      - 'apps/web/src/domains/learn/**'
+      - 'apps/web/src/domains/market/**'
       - 'apps/web/src/domains/catalog/search-page-layout.css'
       - 'tools/package-non-studio-preview.py'
       - 'apps/web/src/domains/marketing/creator-prism.css'
@@ -37,6 +39,8 @@ on:
       - 'e2e/engineering-story.spec.ts'
       - 'e2e/production-risk-intelligence.spec.ts'
       - 'e2e/helpers/capture-page-evidence.ts'
+      - 'e2e/a11y-smoke.spec.ts'
+      - 'playwright.a11y.config.ts'
       - 'playwright.non-studio.config.ts'
       - '.github/workflows/non-studio-experience-quality.yml'
   workflow_dispatch:
@@ -84,16 +88,20 @@ jobs:
           apps/web/src/domains/legal/site-directory-search.test.ts
           apps/web/src/domains/legal/SiteDirectorySearch.test.tsx
           apps/web/src/domains/legal/SitemapPage.test.ts
+          apps/web/src/domains/legal/technology/engineering-story-content.test.ts
+          apps/web/src/domains/legal/technology/engineering-field-notes-content.test.ts
+          apps/web/src/domains/legal/technology/EngineeringStoryPage.test.tsx
       - name: Production management prediction contracts
         run: >-
           pnpm exec vitest run
           apps/web/src/domains/creator/production-hub/production-risk-intelligence.test.ts
           apps/web/src/domains/creator/production-hub/production-risk-scenarios.test.ts
-          apps/web/src/domains/creator/production-hub/production-automation-execution.test.ts
           apps/web/src/domains/creator/production-hub/production-management-overview.test.ts
           apps/web/src/domains/creator/production-hub/ProductionRecoveryScenarioPanel.test.tsx
+          apps/web/src/domains/creator/production-hub/ProductionOperationsControlWorkspace.test.tsx
           apps/web/src/domains/creator/production-hub/ProductionExternalReviewPage.test.tsx
           apps/web/src/domains/creator/production-hub/ProductionManagementWorkspace.test.tsx
+          apps/api/src/modules/production-collaboration/production-collaboration.service.test.ts
           apps/web/src/domains/creator/production-hub/ProductionScheduleWorkspace.test.tsx
       - name: Production bundle
         run: pnpm run build:bundle
@@ -107,6 +115,8 @@ jobs:
           path: /tmp/non-studio-web-preview.tar.gz
           retention-days: 3
       - run: pnpm exec playwright install --with-deps chromium
+      - name: Axe serious and critical accessibility smoke
+        run: pnpm run test:a11y
       - name: Production-bundle non-studio navigation and resilience
         run: pnpm exec playwright test --config playwright.non-studio.config.ts
       - name: Preserve route report and browser evidence

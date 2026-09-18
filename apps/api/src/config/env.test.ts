@@ -112,11 +112,42 @@ describe("production OAuth alias state authority", () => {
     "KAKAO_OAUTH_CLIENT_ID", "KAKAO_OAUTH_CLIENT_SECRET",
     "NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET",
     "GITHUB_OAUTH_CLIENT_ID", "GITHUB_OAUTH_CLIENT_SECRET",
+    "APPLE_SERVICE_ID", "APPLE_CLIENT_ID",
   ])("requires state signing before accepting %s, and validates the supplied alias", (key) => {
     const source = { NODE_ENV: "production", AUTH_SESSION_SECRET: "fixture-session-secret-with-at-least-32-bytes", [key]: "fixture-oauth-alias-value" };
     const logger = { warn: vi.fn(), error: vi.fn() };
     expect(() => validateEnv(source, logger)).toThrow(/AUTH_STATE_SECRET/u);
     expect(validateEnv({ ...source, AUTH_STATE_SECRET: "fixture-state-secret-with-at-least-32-bytes" }, logger)).toMatchObject({ [key]: "fixture-oauth-alias-value" });
+  });
+});
+
+describe("Sign in with Apple environment validation", () => {
+  it("accepts the Services ID and Apple signing-key metadata", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+    const privateKey = `-----BEGIN PRIVATE KEY-----\n${"A".repeat(128)}\n-----END PRIVATE KEY-----`;
+    expect(validateEnv({
+      NODE_ENV: "test",
+      APPLE_SERVICE_ID: "cloud.toonstudio.web",
+      APPLE_TEAM_ID: "TEAMID1234",
+      APPLE_KEY_ID: "KEYID12345",
+      APPLE_PRIVATE_KEY: privateKey,
+    }, logger)).toMatchObject({
+      APPLE_SERVICE_ID: "cloud.toonstudio.web",
+      APPLE_TEAM_ID: "TEAMID1234",
+      APPLE_KEY_ID: "KEYID12345",
+      APPLE_PRIVATE_KEY: privateKey,
+    });
+  });
+
+  it("rejects malformed Apple team and key identifiers", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+    expect(validateEnv({
+      NODE_ENV: "test",
+      APPLE_SERVICE_ID: "cloud.toonstudio.web",
+      APPLE_TEAM_ID: "too-short",
+      APPLE_KEY_ID: "bad-key",
+      APPLE_PRIVATE_KEY: "x".repeat(120),
+    }, logger)).toBeNull();
   });
 });
 

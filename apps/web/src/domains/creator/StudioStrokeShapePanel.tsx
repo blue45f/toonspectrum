@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Stroke & Shape Panel
  * 선/도형 공용 스트로크 스타일(점선 프리셋 6종·선 끝·시작/끝 화살촉) +
@@ -118,7 +122,7 @@ export function StudioStrokeShapePanel({
     <div className="space-y-2.5">
       {/* 헤더 + 기본값 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">선 스타일</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "선 스타일")}</p>
         <button
           type="button"
           onClick={() => {
@@ -128,15 +132,14 @@ export function StudioStrokeShapePanel({
           }}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title="선 스타일·도형 파라미터·손그림 스케치를 기본값으로 되돌립니다."
+          title={translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "선 스타일·도형 파라미터·손그림 스케치를 기본값으로 되돌립니다.")}
         >
           <RotateCcw className="size-3.5" />
-          기본값
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "기본값")}</button>
       </div>
 
       {/* 점선 프리셋 6종 — 칩 안에 실제 패턴 미리보기(SVG)를 그린다. */}
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="점선 스타일">
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "점선 스타일")}>
         {STROKE_DASH_PRESETS.map((preset) => (
           <StudioToggleChip
             key={preset.id}
@@ -162,8 +165,7 @@ export function StudioStrokeShapePanel({
 
       {/* 선 끝 모양 — 평면/둥근/사각(점선 세그먼트와 선 양끝에 함께 적용). */}
       <div className={PANEL_LABEL_ROW}>
-        선 끝
-        <span className="flex flex-wrap justify-end gap-1.5">
+        {translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "선 끝")}<span className="flex flex-wrap justify-end gap-1.5">
           {STROKE_LINE_CAPS.map((cap) => (
             <StudioToggleChip
               key={cap.id}
@@ -180,14 +182,14 @@ export function StudioStrokeShapePanel({
       {/* 화살촉 — 선 전용. 시작/끝을 각각 없음·화살촉·점으로 지정. */}
       {showArrowHeads && (
         <div className="space-y-2 border-t border-line/40 pt-2.5">
-          <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">화살촉</p>
+          <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "화살촉")}</p>
           <ArrowHeadRow
-            label="시작"
+            label={translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "시작")}
             value={strokeStyle.arrowStart}
             onChange={(next) => onPatchStrokeStyle({ arrowStart: next })}
           />
           <ArrowHeadRow
-            label="끝"
+            label={translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "끝")}
             value={strokeStyle.arrowEnd}
             onChange={(next) => onPatchStrokeStyle({ arrowEnd: next })}
           />
@@ -197,23 +199,23 @@ export function StudioStrokeShapePanel({
       {/* 도형 파라미터 — 별 꼭짓점/내부 반경, 다각형 변 수, 사각형 모서리 반경. */}
       {showShapeSection && (
         <div className="space-y-2 border-t border-line/40 pt-2.5">
-          <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">도형 파라미터</p>
+          <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "도형 파라미터")}</p>
 
           {kind === "star" && (
             <div className="flex items-center gap-3">
               <ShapePreview points={starPathPoints(PREVIEW_CENTER, PREVIEW_CENTER, PREVIEW_RADIUS, shapeParams)} />
               <div className="min-w-0 flex-1 space-y-2">
                 <StudioSliderRow
-                  label="꼭짓점"
+                  label={translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "꼭짓점")}
                   min={SHAPE_PARAM_RANGES.starPoints.min}
                   max={SHAPE_PARAM_RANGES.starPoints.max}
                   step={SHAPE_PARAM_RANGES.starPoints.step}
                   value={shapeParams.starPoints}
                   onChange={(n) => onPatchShapeParams({ starPoints: n })}
-                  readout={`${shapeParams.starPoints}개`}
+                  readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "{v0}개"), { v0: String(shapeParams.starPoints) })}
                 />
                 <StudioSliderRow
-                  label="내부 반경"
+                  label={translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "내부 반경")}
                   min={SHAPE_PARAM_RANGES.starInnerRatio.min * 100}
                   max={SHAPE_PARAM_RANGES.starInnerRatio.max * 100}
                   step={SHAPE_PARAM_RANGES.starInnerRatio.step * 100}
@@ -232,13 +234,13 @@ export function StudioStrokeShapePanel({
               />
               <div className="min-w-0 flex-1">
                 <StudioSliderRow
-                  label="변 수"
+                  label={translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "변 수")}
                   min={SHAPE_PARAM_RANGES.polygonSides.min}
                   max={SHAPE_PARAM_RANGES.polygonSides.max}
                   step={SHAPE_PARAM_RANGES.polygonSides.step}
                   value={shapeParams.polygonSides}
                   onChange={(n) => onPatchShapeParams({ polygonSides: n })}
-                  readout={`${shapeParams.polygonSides}변`}
+                  readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "{v0}변"), { v0: String(shapeParams.polygonSides) })}
                 />
               </div>
             </div>
@@ -246,13 +248,13 @@ export function StudioStrokeShapePanel({
 
           {kind === "rect" && (
             <StudioSliderRow
-              label="모서리 반경"
+              label={translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "모서리 반경")}
               min={SHAPE_PARAM_RANGES.cornerRadius.min}
               max={SHAPE_PARAM_RANGES.cornerRadius.max}
               step={SHAPE_PARAM_RANGES.cornerRadius.step}
               value={shapeParams.cornerRadius}
               onChange={(n) => onPatchShapeParams({ cornerRadius: n })}
-              readout={`${shapeParams.cornerRadius}px`}
+              readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "en", "{v0}px"), { v0: String(shapeParams.cornerRadius) })}
             />
           )}
         </div>
@@ -262,21 +264,20 @@ export function StudioStrokeShapePanel({
       <div className="space-y-2 border-t border-line/40 pt-2.5">
         <div className={PANEL_LABEL_ROW}>
           <span className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
-            손그림 스케치
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "손그림 스케치")}</span>
           <StudioToggleChip
             active={sketch.enabled}
-            title="도형을 손으로 그린 듯한 흔들리는 선(rough.js)으로 그립니다."
+            title={translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "도형을 손으로 그린 듯한 흔들리는 선(rough.js)으로 그립니다.")}
             onClick={() => onPatchSketch({ enabled: !sketch.enabled })}
           >
-            {sketch.enabled ? "켬" : "끔"}
+            {sketch.enabled ? translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "켬") : translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "끔")}
           </StudioToggleChip>
         </div>
 
         {sketch.enabled && (
           <>
             <StudioSliderRow
-              label="거칠기"
+              label={translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "거칠기")}
               min={STUDIO_SKETCH_RANGES.roughness.min}
               max={STUDIO_SKETCH_RANGES.roughness.max}
               step={STUDIO_SKETCH_RANGES.roughness.step}
@@ -285,7 +286,7 @@ export function StudioStrokeShapePanel({
               readout={`${sketchRoughness}`}
             />
             <StudioSliderRow
-              label="휘어짐"
+              label={translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "휘어짐")}
               min={STUDIO_SKETCH_RANGES.bowing.min}
               max={STUDIO_SKETCH_RANGES.bowing.max}
               step={STUDIO_SKETCH_RANGES.bowing.step}
@@ -295,8 +296,7 @@ export function StudioStrokeShapePanel({
             />
             {showSketchFillStyles && (
               <div className={PANEL_LABEL_ROW}>
-                채우기 질감
-                <span className="flex flex-wrap justify-end gap-1.5">
+                {translateCurrentStaticSourceText("domains.creator.StudioStrokeShapePanel", "ko", "채우기 질감")}<span className="flex flex-wrap justify-end gap-1.5">
                   {STUDIO_SKETCH_FILL_STYLES.map((item) => (
                     <StudioToggleChip
                       key={item.id}

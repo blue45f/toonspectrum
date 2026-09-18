@@ -1,0 +1,125 @@
+{
+  "artifactOrder": [
+    "episode-image",
+    "episode-image",
+    "thumbnail:episode",
+    "review-pdf",
+    "credits",
+    "ai-disclosure",
+    "validation-report",
+    "manifest"
+  ],
+  "canExport": true,
+  "destination": "tapas",
+  "errorCodes": [],
+  "generatedAt": "2026-09-17T00:00:00.000Z",
+  "manifest": {
+    "ai": {
+      "disclosure": "색상 아이디어에 AI 보조를 사용하고 창작자가 최종 검수했습니다.",
+      "usage": "assisted"
+    },
+    "artifacts": [
+      {
+        "byteSize": 900000,
+        "fileName": "episode-007-tapas-001.jpeg",
+        "height": 1600,
+        "mimeType": "image/jpeg",
+        "role": "episode-image",
+        "sha256": "b3bea061f4e667028e93b0b29f915c2725a8fa6d021e6490a27c1e8048d9951f",
+        "state": "ready",
+        "width": 940
+      },
+      {
+        "byteSize": 1000000,
+        "fileName": "episode-007-tapas-002.jpeg",
+        "height": 1200,
+        "mimeType": "image/jpeg",
+        "role": "episode-image",
+        "sha256": "a346777b67cb7297a3886e86fabbdcd5c2944d685cc733b6cf53b55a5ac95226",
+        "state": "ready",
+        "width": 940
+      },
+      {
+        "byteSize": 420000,
+        "fileName": "tapas-episode.jpeg",
+        "height": 300,
+        "mimeType": "image/jpeg",
+        "role": "thumbnail",
+        "sha256": "f7de5c32249afacb1d3d50898574b333bb7cdbf994f9b85260115b5a2e2c4860",
+        "slot": "episode",
+        "state": "ready",
+        "width": 300
+      },
+      {
+        "byteSize": 2003,
+        "fileName": "review.pdf",
+        "mimeType": "application/pdf",
+        "role": "review-pdf",
+        "sha256": "43f17c45f2e0924fe50be619557fff84a9da3a2bcce521b27a746c58d8f6c9a2",
+        "state": "ready"
+      },
+      {
+        "byteSize": 2004,
+        "fileName": "credits.txt",
+        "mimeType": "text/plain",
+        "role": "credits",
+        "sha256": "8c65e65d238fc919a284bdc141812caea5e0e771a6cf36dec6a4f521c3bc0b41",
+        "state": "ready"
+      },
+      {
+        "byteSize": 2005,
+        "fileName": "ai-disclosure.json",
+        "mimeType": "application/json",
+        "role": "ai-disclosure",
+        "sha256": "41759281a6cdfab3ca2a1ac3ec9b1612c0678af6f9130ba5c917ce023cd71268",
+        "state": "ready"
+      },
+      {
+        "byteSize": 2006,
+        "fileName": "validation-report.json",
+        "mimeType": "application/json",
+        "role": "validation-report",
+        "sha256": "38e1500b88f38cee7260ff15aba04a634539642f3da2daaac7939539c2713074",
+        "state": "ready"
+      },
+      {
+        "fileName": "manifest.json",
+        "mimeType": "application/json",
+        "role": "manifest",
+        "state": "planned"
+      }
+    ],
+    "creditsIncluded": true,
+    "destination": "tapas",
+    "generatedAt": "2026-09-17T00:00:00.000Z",
+    "preset": {
+      "id": "tapas",
+      "policySnapshotDate": "2026-07-10",
+      "requiresCurrentPolicyReview": true,
+      "revision": "tapas-creator-guide-2026-07"
+    },
+    "publication": {
+      "episodeNumber": 7,
+      "episodeTitle": "첫 번째 단서",
+      "seriesTitle": "별빛 탐정단"
+    },
+    "schema": "toonspectrum.publish-package",
+    "totals": {
+      "episodeImageCount": 2,
+      "knownEpisodeBytes": 1900000,
+      "thumbnailCount": 1
+    },
+    "validation": {
+      "canExport": true,
+      "errorCount": 0,
+      "warningCount": 0
+    },
+    "version": 1
+  },
+  "manifestSha256": "3a1c0b9f235be7b56f713e13eb0f7cbfd2750dc2c08c443b61c64f37154a4bcb",
+  "policySnapshotDate": "2026-07-10",
+  "presetRevision": "tapas-creator-guide-2026-07",
+  "privacyMarkersAbsent": true,
+  "schemaVersion": 1,
+  "warningCodes": []
+}

@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioShared3dStageResolution } from "../studio-shared-3d-stage-document";
 
 import { cx } from "@/shared/lib/cx";
@@ -57,19 +60,16 @@ export function StudioBg3dSharedCharacterStatusOverlay({
       <p className="font-bold text-fg">{headline}</p>
       <p className="max-sm:hidden">
         {includeInCapture
-          ? "배경 카메라·조명을 함께 사용하며, 포즈 원본은 각 캐릭터 레이어에 그대로 보존돼요."
-          : "배치 참고용으로만 보여요. 결과 이미지와 공유 연결에는 포함되지 않아요."}
+          ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterStatusOverlay", "ko", "배경 카메라·조명을 함께 사용하며, 포즈 원본은 각 캐릭터 레이어에 그대로 보존돼요.")
+          : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterStatusOverlay", "ko", "배치 참고용으로만 보여요. 결과 이미지와 공유 연결에는 포함되지 않아요.")}
       </p>
       {includeInCapture && previewOmissionCount > 0 ? (
         <p className="mt-0.5 text-warning">
-          현재 배경 캡처에서 지원하지 않는 캐릭터 설정이 {previewOmissionCount}개 있어요.
-          이 설정이 있는 캐릭터는 원본을 지키기 위해 결과에서 제외돼요.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterStatusOverlay", "ko", "현재 배경 캡처에서 지원하지 않는 캐릭터 설정이 ")}{previewOmissionCount}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterStatusOverlay", "ko", "개 있어요. 이 설정이 있는 캐릭터는 원본을 지키기 위해 결과에서 제외돼요.")}</p>
       ) : null}
       {capacityOmissionCount > 0 ? (
         <p className="mt-0.5 text-warning">
-          기기 보호를 위해 나머지 {capacityOmissionCount}명은 이번 미리보기에서 제외했어요.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterStatusOverlay", "ko", "기기 보호를 위해 나머지 ")}{capacityOmissionCount}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedCharacterStatusOverlay", "ko", "명은 이번 미리보기에서 제외했어요.")}</p>
       ) : null}
     </div>
   );

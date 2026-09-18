@@ -31,6 +31,8 @@ export function StudioRouteLoading({ label = "스튜디오를 여는 중..." }: 
       aria-live="polite"
       aria-atomic="true"
       aria-busy="true"
+      data-route-loading-fallback=""
+      data-route-pending="studio-route"
       data-studio-lazy-surface="route"
     >
       <span className="sr-only">{label}</span>

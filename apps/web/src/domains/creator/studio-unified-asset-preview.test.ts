@@ -120,7 +120,7 @@ describe("studio unified asset rich preview contract", () => {
     const audit = auditStudioUnifiedAssetPreviews(items);
     expect(audit.total).toBe(2);
     expect(audit.templates).toBe(1);
-    expect(audit.generatedFallbacks).toBe(1);
-    expect(audit.coveragePercent).toBe(50);
+    expect(audit.generatedFallbacks).toBe(0);
+    expect(audit.coveragePercent).toBe(100);
   });
 });

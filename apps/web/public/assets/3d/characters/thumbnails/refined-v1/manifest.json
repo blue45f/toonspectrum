@@ -1,7 +1,7 @@
 {
   "version": 1,
   "generator": "generate-refined-avatar-thumbnails.mts",
-  "browser": "152.0.7977.77",
+  "browser": "152.0.7977.83",
   "sourceMaterialsPreserved": true,
   "entries": [
     {
@@ -48,7 +48,7 @@
       "renderedTriangles": 11223,
       "sourceImages": 1,
       "sourceMaterials": 1,
-      "sourceSha256": "f72f70c013c14589125527490f97fcff8caaa74c462ea5e0ddfceb7254110ef1",
+      "sourceSha256": "1fb026140bb6539a79c78557058b46cfcc1f532d3b54ce33d64257156e8e95da",
       "originalThumbnailSha256": "dafe15221ffc1d346e7ce87b62bb62550ffe6e6b27381d8ccbdeed0c19cba43f",
       "thumbnailSha256": "2138f72861ab9be8508208dea1cf21209802f05d65ddeebf6897a2ed7118a19a",
       "thumbnailBytes": 307070
@@ -120,7 +120,7 @@
         "min": [
           -0.39451843749675164,
           -0.000009964871460028262,
-          -0.2797544731724411
+          -0.27975446483510824
         ],
         "max": [
           0.3935632871115211,
@@ -146,10 +146,10 @@
       "renderedTriangles": 40884,
       "sourceImages": 28,
       "sourceMaterials": 16,
-      "sourceSha256": "b1372131bdbf233f46320146d565f342a7e4f6f4b8f2aefb301f1a283ec07e1e",
+      "sourceSha256": "a6cdd81f10fa710303903851b7cf94aea6694fc0f2d63bc695e9df9673b22fed",
       "originalThumbnailSha256": "7803a82a3096b54e96e34b00f4bd408d592814ec6507709f1dbe750b8dcf6592",
-      "thumbnailSha256": "c573b97405feff619329e037b8ec69c5ce2f75ecffaa5f12dcaa96df27ce0fe8",
-      "thumbnailBytes": 291219
+      "thumbnailSha256": "a7e45d812a6df1a7a3805968dcfc906d005aa5cdb5cead42ac9e09a379094415",
+      "thumbnailBytes": 291223
     },
     {
       "id": "unicorn-person",
@@ -218,7 +218,7 @@
         "min": [
           -0.3314485864367125,
           -0.0001118715656779327,
-          -0.23044450996012333
+          -0.2304445030923417
         ],
         "max": [
           0.33095394921140175,
@@ -244,10 +244,10 @@
       "renderedTriangles": 37790,
       "sourceImages": 28,
       "sourceMaterials": 16,
-      "sourceSha256": "eaf902e041a7a810f1423599ae75682f61184ab6ef0206da9a8ed9caa8ec3a9d",
+      "sourceSha256": "17b5c9dc2a5c8f0ce68e2e6f220688c4b2a6842a45b9a9917875e5923cc9cb56",
       "originalThumbnailSha256": "0f9878f16a9600bddf9677ea15876971468ad473e1ab3bb7ebaa6b16512ba99b",
-      "thumbnailSha256": "c3821fd5d58009780d8fd0b14182b2e2f01c846fc3411d1a80c01f8ff5d82879",
-      "thumbnailBytes": 308205
+      "thumbnailSha256": "be950c3243cf4782470214219f166ddc7a000fe69086935d6f03fa7cc80b79fe",
+      "thumbnailBytes": 308233
     }
   ]
 }

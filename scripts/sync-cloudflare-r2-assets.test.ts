@@ -61,6 +61,22 @@ describe("Cloudflare R2 large asset synchronization", () => {
     ]));
   });
 
+  it("routes the product tour video through R2 with the correct media type", () => {
+    const dist = temporaryDist();
+    const relativePath = "brand/toonstudio-product-tour.mp4";
+    sparseFile(
+      join(dist, relativePath),
+      CLOUDFLARE_STATIC_MAX_FILE_BYTES + 1,
+    );
+
+    const assets = discoverR2LargeAssets(dist);
+    expect(assets).toHaveLength(1);
+    expect(assets[0]).toMatchObject({
+      key: relativePath,
+      contentType: "video/mp4",
+    });
+  });
+
   it("fails closed for an unreviewed file above the platform limit", () => {
     const dist = temporaryDist();
     sparseFile(

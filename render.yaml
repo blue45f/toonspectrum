@@ -85,6 +85,14 @@ services:
         sync: false
       - key: GITHUB_OAUTH_CLIENT_SECRET
         sync: false
+      - key: APPLE_SERVICE_ID
+        sync: false
+      - key: APPLE_TEAM_ID
+        sync: false
+      - key: APPLE_KEY_ID
+        sync: false
+      - key: APPLE_PRIVATE_KEY
+        sync: false
       - key: PERSONAL_CLOUD_OAUTH_STATE_SECRET
         sync: false
       - key: PERSONAL_CLOUD_TOKEN_ENCRYPTION_KEY

@@ -29,9 +29,12 @@ describe("large Studio epic product wiring", () => {
     expect(bridge).toContain("cloneElementForProposal");
   });
 
-  it("keeps 3D generation authenticated and sourced from the unified user-key settings", () => {
+  it("keeps 3D generation authenticated and reachable from the AI workspace", () => {
     const advancedTools = source(
       "apps/web/src/domains/creator/ai/StudioAdvancedAiTools.tsx",
+    );
+    const aiWorkspace = source(
+      "apps/web/src/domains/creator/ai/StudioAiToolPopoverBody.tsx",
     );
     const panel = source(
       "apps/web/src/domains/creator/ai/StudioAi3dGenerationPanel.tsx",
@@ -44,6 +47,10 @@ describe("large Studio epic product wiring", () => {
     );
     expect(advancedTools).toContain("onInsertArtifact={");
     expect(advancedTools).toContain("onSaveArtifact={");
+    expect(aiWorkspace).toContain("<StudioAdvancedAiTools");
+    expect(aiWorkspace).toContain("useStudioGenerated3dHostBridge");
+    expect(aiWorkspace).toContain('data-studio-ai-translation-launcher="true"');
+    expect(aiWorkspace).toContain('data-studio-ai-localization-qa-launcher="true"');
     expect(panel).toContain("readonly client: Studio3dGenerationHttpClient");
     expect(panel).toContain("readonly onInsertArtifact?:");
     expect(panel).toContain("readonly onSaveArtifact?:");

@@ -16,6 +16,7 @@ import type { StudioVrmPoserHost } from "./StudioVrmPoserHost";
 vi.mock("react", async (importOriginal) => ({
   ...await importOriginal<typeof import("react")>(),
   useEffect: vi.fn(),
+  useRef: <T,>(initial: T) => ({ current: initial }),
 }));
 vi.mock("./studio-vrm-poser-utils", async (importOriginal) => ({
   ...await importOriginal<typeof import("./studio-vrm-poser-utils")>(),

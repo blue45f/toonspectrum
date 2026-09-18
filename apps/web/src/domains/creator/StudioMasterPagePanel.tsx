@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 // 마스터 페이지 패널(PPT 마스터 슬라이드식) — 문서 전역 공통 요소(로고/워터마크 문구/코너 장식)를
 // (1) 마스터 편집 모드 토글, (2) 페이지별 마스터 숨김 토글, (3) 마스터 비우기로 관리한다.
 // 순수 규약(합성/직렬화/토글)은 studio-master-page, 상태 커밋은 StudioPage(메인 루프)가 담당한다.
@@ -76,19 +80,18 @@ export function StudioMasterPagePanel({
 
   return (
     <section
-      aria-label="마스터 페이지 관리"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "마스터 페이지 관리")}
       className="absolute left-3 top-3 z-40 flex max-h-[calc(100%-5rem)] w-[min(19rem,calc(100%-1.5rem))] flex-col overflow-hidden rounded-xl border border-line bg-panel/95 shadow-xl backdrop-blur"
     >
       <div className="flex items-center justify-between gap-2 border-b border-line/60 px-3 py-2">
         <p className="flex items-center gap-1.5 text-xs font-bold text-fg">
           <LayoutTemplate size={13} className="shrink-0 text-fg-2" aria-hidden />
-          마스터 페이지
-          <span className="font-medium text-fg-3">요소 {masterCount}개</span>
+          {translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "마스터 페이지")}<span className="font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "요소 ")}{masterCount}{translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "개")}</span>
         </p>
         <button
           type="button"
           onClick={onClose}
-          aria-label="마스터 페이지 패널 닫기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "마스터 페이지 패널 닫기")}
           className="grid size-6 shrink-0 place-items-center rounded-lg border border-line text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           <X size={13} />
@@ -109,33 +112,26 @@ export function StudioMasterPagePanel({
                 : "border-line bg-card text-fg-2 hover:bg-raised"
             )}
           >
-            {editMode ? "마스터 편집 종료" : "마스터 편집 시작"}
+            {editMode ? translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "마스터 편집 종료") : translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "마스터 편집 시작")}
           </button>
           {editMode ? (
             <p
               role="status"
               className="rounded-lg border border-accent/40 bg-accent-soft/30 px-2 py-1.5 text-[0.72rem] leading-relaxed text-fg-2"
             >
-              <span className="font-semibold text-accent">마스터 편집 중</span> — 지금 추가·편집하는
-              요소는 모든 페이지 공통으로 저장돼요. 페이지의 일반 요소는 반투명 잠금 표시로만
-              보여요.
-            </p>
+              <span className="font-semibold text-accent">{translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "마스터 편집 중")}</span> {translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "— 지금 추가·편집하는 요소는 모든 페이지 공통으로 저장돼요. 페이지의 일반 요소는 반투명 잠금 표시로만 보여요.")}</p>
           ) : (
             <p className="text-[0.72rem] leading-relaxed text-fg-3">
-              모든 페이지에 반복되는 로고·워터마크 문구·코너 장식을 한 번만 만들어 두는 공통
-              레이어예요. 마스터 요소는 각 페이지의 배경 위, 일반 요소 아래에 깔려요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "모든 페이지에 반복되는 로고·워터마크 문구·코너 장식을 한 번만 만들어 두는 공통 레이어예요. 마스터 요소는 각 페이지의 배경 위, 일반 요소 아래에 깔려요.")}</p>
           )}
         </div>
 
         {/* 페이지별 숨김 — 표지처럼 마스터가 어울리지 않는 페이지만 끈다(실행취소 가능). */}
         <div className="space-y-1.5">
-          <p className="text-[0.72rem] font-semibold text-fg-2">페이지별 표시</p>
+          <p className="text-[0.72rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "페이지별 표시")}</p>
           {masterCount === 0 && !editMode ? (
             <p className="rounded-lg border border-dashed border-line px-2 py-3 text-center text-[0.72rem] leading-relaxed text-fg-3">
-              아직 마스터 요소가 없어요. 위의 &lsquo;마스터 편집 시작&rsquo;을 누르고 로고나 문구를
-              추가해 보세요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "아직 마스터 요소가 없어요. 위의 &lsquo;마스터 편집 시작&rsquo;을 누르고 로고나 문구를 추가해 보세요.")}</p>
           ) : (
             <ul className="space-y-1">
               {pages.map((p, idx) => (
@@ -152,8 +148,7 @@ export function StudioMasterPagePanel({
                     </span>
                     {p.id === currentPageId && (
                       <span className="shrink-0 rounded-full border border-accent/40 bg-accent-soft/40 px-1.5 text-[0.72rem] font-medium text-accent">
-                        현재
-                      </span>
+                        {translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "현재")}</span>
                     )}
                   </span>
                   <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[0.72rem] text-fg-3">
@@ -161,11 +156,10 @@ export function StudioMasterPagePanel({
                       type="checkbox"
                       checked={!p.hideMaster}
                       onChange={() => onToggleHideMaster(p.id)}
-                      aria-label={`${pageDisplayName(p, idx)}에 마스터 표시`}
+                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "{v0}에 마스터 표시"), { v0: String(pageDisplayName(p, idx)) })}
                       className="accent-accent"
                     />
-                    표시
-                  </label>
+                    {translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "표시")}</label>
                 </li>
               ))}
             </ul>
@@ -176,8 +170,7 @@ export function StudioMasterPagePanel({
         <div className="space-y-1.5">
           {confirmClear && (
             <p role="alert" className="text-[0.72rem] leading-relaxed text-fg-2">
-              마스터 요소 {masterCount}개를 모두 삭제할까요? 이 동작은 실행취소할 수 없어요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "마스터 요소 ")}{masterCount}{translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "개를 모두 삭제할까요? 이 동작은 실행취소할 수 없어요.")}</p>
           )}
           <div className="flex items-center gap-1.5">
             <button
@@ -194,7 +187,7 @@ export function StudioMasterPagePanel({
               )}
             >
               <Trash2 size={12} aria-hidden />
-              {confirmClear ? "정말 비우기" : "마스터 비우기"}
+              {confirmClear ? translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "정말 비우기") : translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "마스터 비우기")}
             </button>
             {confirmClear && (
               <button
@@ -202,8 +195,7 @@ export function StudioMasterPagePanel({
                 onClick={() => setConfirmClear(false)}
                 className="rounded-lg border border-line bg-card px-2.5 py-1.5 text-[0.72rem] font-medium text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               >
-                취소
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "취소")}</button>
             )}
           </div>
         </div>
@@ -211,9 +203,9 @@ export function StudioMasterPagePanel({
 
       {/* 정직 고지 — 지원 범위·한계를 그대로 밝힌다. */}
       <div className="space-y-0.5 border-t border-line/60 px-3 py-1.5 text-[0.72rem] leading-snug text-fg-3">
-        <p>게시·다운로드·페이지 썸네일에 마스터가 함께 담겨요.</p>
-        <p>마스터 편집은 실행취소(⌘Z)가 지원되지 않고, 그룹·알파 클리핑은 저장 시 해제돼요.</p>
-        <p>패널을 닫으면 마스터 편집 모드도 함께 종료돼요.</p>
+        <p>{translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "게시·다운로드·페이지 썸네일에 마스터가 함께 담겨요.")}</p>
+        <p>{translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "마스터 편집은 실행취소(⌘Z)가 지원되지 않고, 그룹·알파 클리핑은 저장 시 해제돼요.")}</p>
+        <p>{translateCurrentStaticSourceText("domains.creator.StudioMasterPagePanel", "ko", "패널을 닫으면 마스터 편집 모드도 함께 종료돼요.")}</p>
       </div>
     </section>
   );

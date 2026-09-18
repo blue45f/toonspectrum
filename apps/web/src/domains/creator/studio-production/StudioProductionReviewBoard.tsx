@@ -1,4 +1,7 @@
 import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   CheckCircle2,
   RotateCcw,
   Save,
@@ -157,15 +160,14 @@ function ReviewEditor({
                 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                 : "border-accent/30 bg-accent-soft text-accent",
             )}>
-              {issue.status === "resolved" ? "해결" : "열림"}
+              {issue.status === "resolved" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "해결") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "열림")}
             </span>
             {issue.approvalRequired ? (
               <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[0.6875rem] font-bold text-violet-700 dark:text-violet-300">
-                승인 필수
-              </span>
+                {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "승인 필수")}</span>
             ) : null}
           </div>
-          <p className="mt-1 text-xs text-fg-2">담당 {issue.assignee || "미배정"}</p>
+          <p className="mt-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "담당 ")}{issue.assignee || translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "미배정")}</p>
         </div>
         <button
           type="button"
@@ -178,18 +180,16 @@ function ReviewEditor({
           ) : (
             <RotateCcw className="size-4" aria-hidden="true" />
           )}
-          {issue.status === "open" ? "해결" : "다시 열기"}
+          {issue.status === "open" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "해결") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "다시 열기")}
         </button>
       </div>
 
       <details className="mt-3 rounded-xl border border-line bg-card">
         <summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-bold">
-          범위·승인 조건 편집
-        </summary>
+          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "범위·승인 조건 편집")}</summary>
         <div className="grid gap-3 border-t border-line p-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
-            제목
-            <input
+            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "제목")}<input
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={title}
               onChange={(event) => setTitle(event.currentTarget.value)}
@@ -198,8 +198,7 @@ function ReviewEditor({
             />
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            담당자
-            <input
+            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "담당자")}<input
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={assignee}
               onChange={(event) => setAssignee(event.currentTarget.value)}
@@ -208,8 +207,7 @@ function ReviewEditor({
             />
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            심각도
-            <select
+            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "심각도")}<select
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={severity}
               onChange={(event) => setSeverity(event.currentTarget.value as ProductionReviewSeverity)}
@@ -221,36 +219,33 @@ function ReviewEditor({
             </select>
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            제작 범위
-            <select
+            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "제작 범위")}<select
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={hierarchyNodeId}
               onChange={(event) => setHierarchyNodeId(event.currentTarget.value)}
               disabled={!canEdit}
             >
-              <option value="">프로젝트 전체</option>
+              <option value="">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "프로젝트 전체")}</option>
               {workspace.hierarchy.map((node) => (
                 <option key={node.id} value={node.id}>{node.title}</option>
               ))}
             </select>
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            원고 페이지
-            <select
+            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "원고 페이지")}<select
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={pageId}
               onChange={(event) => setPageId(event.currentTarget.value)}
               disabled={!canEdit}
             >
-              <option value="">페이지 미지정</option>
+              <option value="">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "페이지 미지정")}</option>
               {pageNodes.map((node) => (
                 <option key={node.id} value={node.pageId ?? ""}>{node.title}</option>
               ))}
             </select>
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            요청 역할
-            <select
+            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "요청 역할")}<select
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={requestedByRole}
               onChange={(event) => setRequestedByRole(
@@ -258,7 +253,7 @@ function ReviewEditor({
               )}
               disabled={!canEdit}
             >
-              <option value="">역할 미정</option>
+              <option value="">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "역할 미정")}</option>
               {STUDIO_PRODUCTION_ROLES.map((role) => (
                 <option key={role} value={role}>{ROLE_LABELS[role]}</option>
               ))}
@@ -271,8 +266,7 @@ function ReviewEditor({
               onChange={(event) => setApprovalRequired(event.currentTarget.checked)}
               disabled={!canEdit || !canApprove}
             />
-            해결 시 승인 권한 필요
-          </label>
+            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "해결 시 승인 권한 필요")}</label>
           {error ? (
             <p className="text-xs font-semibold text-red-600 md:col-span-2 xl:col-span-4" role="alert">
               {error}
@@ -290,8 +284,7 @@ function ReviewEditor({
               disabled={!canEdit}
             >
               <Trash2 className="size-4" aria-hidden="true" />
-              검수 삭제
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "검수 삭제")}</button>
             <button
               type="button"
               className={buttonClass({ size: "sm" })}
@@ -299,8 +292,7 @@ function ReviewEditor({
               disabled={!canEdit || !title.trim() || (approvalRequired && status === "resolved" && !canApprove)}
             >
               <Save className="size-4" aria-hidden="true" />
-              검수 정보 저장
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "검수 정보 저장")}</button>
           </div>
         </div>
       </details>
@@ -317,10 +309,9 @@ export function StudioProductionReviewBoard({
   if (workspace.reviews.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-line p-6 text-center">
-        <p className="text-sm font-bold">검수 항목이 없습니다</p>
+        <p className="text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "검수 항목이 없습니다")}</p>
         <p className="mx-auto mt-1 max-w-xl text-xs leading-relaxed text-fg-2">
-          수정 요청을 추가하고 제작 범위·페이지·승인 필수 여부를 지정하세요.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionReviewBoard", "ko", "수정 요청을 추가하고 제작 범위·페이지·승인 필수 여부를 지정하세요.")}</p>
       </div>
     );
   }

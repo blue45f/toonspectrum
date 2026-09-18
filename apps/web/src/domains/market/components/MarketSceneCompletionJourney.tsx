@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Brush, Images, LayoutTemplate, Palette, Sparkles } from "lucide-react";
 
 import { cn } from "@/shared/lib/utils";
@@ -35,10 +38,9 @@ export function MarketSceneCompletionJourney({ record, className }: MarketSceneC
             <Sparkles className="size-4" aria-hidden="true" />
           </span>
           <div>
-            <h2 id="market-scene-completion-title" className="text-sm font-bold text-fg">이 리소스로 장면을 계속 완성해 보세요</h2>
+            <h2 id="market-scene-completion-title" className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.market.components.MarketSceneCompletionJourney", "ko", "이 리소스로 장면을 계속 완성해 보세요")}</h2>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-fg-3">
-              한 종류의 리소스에서 끝내지 않아도 됩니다. 지금 보고 있는 항목과 같은 장르·분위기의 다음 재료를 이어서 찾을 수 있습니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.market.components.MarketSceneCompletionJourney", "ko", "한 종류의 리소스에서 끝내지 않아도 됩니다. 지금 보고 있는 항목과 같은 장르·분위기의 다음 재료를 이어서 찾을 수 있습니다.")}</p>
           </div>
         </div>
       </div>
@@ -57,10 +59,10 @@ export function MarketSceneCompletionJourney({ record, className }: MarketSceneC
                   <Icon className="size-4" aria-hidden="true" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="text-[0.62rem] font-black tracking-[0.12em] text-fg-3">STEP {index + 1}</span>
+                  <span className="text-[0.62rem] font-black tracking-[0.12em] text-fg-3">{translateCurrentStaticSourceText("domains.market.components.MarketSceneCompletionJourney", "en", "STEP ")}{index + 1}</span>
                   <strong className="mt-1 block text-sm text-fg group-hover:text-accent">{meta.label}</strong>
                   <span className="mt-1 block text-xs leading-5 text-fg-3">{meta.description}</span>
-                  {tag ? <span className="mt-2 inline-flex rounded-full bg-accent-soft px-2 py-0.5 text-[0.62rem] font-semibold text-accent">#{tag} 연계</span> : null}
+                  {tag ? <span className="mt-2 inline-flex rounded-full bg-accent-soft px-2 py-0.5 text-[0.62rem] font-semibold text-accent">#{tag} {translateCurrentStaticSourceText("domains.market.components.MarketSceneCompletionJourney", "ko", "연계")}</span> : null}
                 </span>
                 <ArrowRight className="mt-2 size-4 shrink-0 text-fg-3 transition-transform group-hover:translate-x-1 group-hover:text-accent" aria-hidden="true" />
               </Link>

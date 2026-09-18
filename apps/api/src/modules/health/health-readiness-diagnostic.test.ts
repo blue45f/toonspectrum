@@ -6,6 +6,7 @@ import { createReadinessFailureReporter, databaseTargetFingerprint } from "./hea
 
 import type { HealthReadinessReport } from "./health.service";
 
+// secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic diagnostic fixture
 const databaseUrl = "postgresql://runtime:DO_NOT_LOG_PASSWORD@ep-test.example/neondb?sslmode=require";
 const unready = (): HealthReadinessReport => ({
   ready: false, database: true, schema: false, realtime: true,

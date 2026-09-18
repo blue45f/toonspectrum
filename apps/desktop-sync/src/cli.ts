@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
+import { realpathSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   openDesktopConflictResolverBrowser,
@@ -742,10 +743,20 @@ export async function runDesktopSyncCli(
   return conflictSeen ? 2 : 0;
 }
 
-if (
-  process.argv[1]
-  && pathToFileURL(resolve(process.argv[1])).href === import.meta.url
-) {
+export function isDesktopSyncCliEntrypoint(
+  argumentPath: string | undefined,
+  moduleUrl: string = import.meta.url,
+): boolean {
+  if (!argumentPath) return false;
+  try {
+    return realpathSync(resolve(argumentPath))
+      === realpathSync(fileURLToPath(moduleUrl));
+  } catch {
+    return pathToFileURL(resolve(argumentPath)).href === moduleUrl;
+  }
+}
+
+if (isDesktopSyncCliEntrypoint(process.argv[1])) {
   try {
     process.exitCode = await runDesktopSyncCli(process.argv.slice(2));
   } catch (error) {

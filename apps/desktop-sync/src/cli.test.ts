@@ -2,15 +2,18 @@ import {
   mkdtemp,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   executeDesktopSyncCli,
+  isDesktopSyncCliEntrypoint,
   parseDesktopSyncCliArguments,
   parseDesktopSyncResolveArguments,
   runDesktopSyncCli,
@@ -44,6 +47,24 @@ afterEach(async () => {
 });
 
 describe("desktop sync CLI", () => {
+  it("recognizes an executable entrypoint reached through a symbolic path", async () => {
+    if (process.platform === "win32") return;
+    const root = await temporaryRoot("toonstudio-cli-entrypoint");
+    const actual = join(root, "actual-cli.js");
+    const linked = join(root, "linked-cli.js");
+    await writeFile(actual, "export {};\n", "utf8");
+    await symlink(actual, linked);
+
+    expect(isDesktopSyncCliEntrypoint(
+      linked,
+      pathToFileURL(actual).href,
+    )).toBe(true);
+    expect(isDesktopSyncCliEntrypoint(
+      join(root, "other.js"),
+      pathToFileURL(actual).href,
+    )).toBe(false);
+  });
+
   it("parses bounded modes and scan options", () => {
     const options = parseDesktopSyncCliArguments([
       "--local", "./local",

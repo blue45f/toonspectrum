@@ -1,0 +1,125 @@
+{
+  "artifactOrder": [
+    "episode-image",
+    "episode-image",
+    "thumbnail:episode",
+    "review-pdf",
+    "credits",
+    "ai-disclosure",
+    "validation-report",
+    "manifest"
+  ],
+  "canExport": true,
+  "destination": "generic",
+  "errorCodes": [],
+  "generatedAt": "2026-09-17T00:00:00.000Z",
+  "manifest": {
+    "ai": {
+      "disclosure": "색상 아이디어에 AI 보조를 사용하고 창작자가 최종 검수했습니다.",
+      "usage": "assisted"
+    },
+    "artifacts": [
+      {
+        "byteSize": 900000,
+        "fileName": "별빛-탐정단-episode-007-001.jpeg",
+        "height": 1600,
+        "mimeType": "image/jpeg",
+        "role": "episode-image",
+        "sha256": "ee7a4ac718604f3548c0b3551d51df04c6b80e457bbddbb7c733abce26b93e7a",
+        "state": "ready",
+        "width": 1200
+      },
+      {
+        "byteSize": 1000000,
+        "fileName": "별빛-탐정단-episode-007-002.jpeg",
+        "height": 1200,
+        "mimeType": "image/jpeg",
+        "role": "episode-image",
+        "sha256": "9e0f854564a5660aae5e57957c4b2c6ba08ab7f0814166f40912ff3a9a8b0af5",
+        "state": "ready",
+        "width": 1200
+      },
+      {
+        "byteSize": 600000,
+        "fileName": "별빛-탐정단-episode.jpeg",
+        "height": 630,
+        "mimeType": "image/jpeg",
+        "role": "thumbnail",
+        "sha256": "6e1c3d6b78519cd70fb0b5a1878d1a77b11aa2074bc86c92ddca4fb912102428",
+        "slot": "episode",
+        "state": "ready",
+        "width": 1200
+      },
+      {
+        "byteSize": 2003,
+        "fileName": "review.pdf",
+        "mimeType": "application/pdf",
+        "role": "review-pdf",
+        "sha256": "71127d0a68b3e431d36b1026018c1ce34a7b324ebfb861099b6bb9e3adc4f836",
+        "state": "ready"
+      },
+      {
+        "byteSize": 2004,
+        "fileName": "credits.txt",
+        "mimeType": "text/plain",
+        "role": "credits",
+        "sha256": "c8ee82324dbad31a525625899f810247329e2b525a623c48d46eea1573963638",
+        "state": "ready"
+      },
+      {
+        "byteSize": 2005,
+        "fileName": "ai-disclosure.json",
+        "mimeType": "application/json",
+        "role": "ai-disclosure",
+        "sha256": "47e8b176c0bc55bd939f82d3f45f48a3deb5c08319b0720c0ad02b6ab009064e",
+        "state": "ready"
+      },
+      {
+        "byteSize": 2006,
+        "fileName": "validation-report.json",
+        "mimeType": "application/json",
+        "role": "validation-report",
+        "sha256": "635696ca5422f1dc2437f4a05c2ccb06a7716e6b7308cf02983223e693a3b281",
+        "state": "ready"
+      },
+      {
+        "fileName": "manifest.json",
+        "mimeType": "application/json",
+        "role": "manifest",
+        "state": "planned"
+      }
+    ],
+    "creditsIncluded": true,
+    "destination": "generic",
+    "generatedAt": "2026-09-17T00:00:00.000Z",
+    "preset": {
+      "id": "generic",
+      "policySnapshotDate": "2026-07-10",
+      "requiresCurrentPolicyReview": false,
+      "revision": "generic-v1"
+    },
+    "publication": {
+      "episodeNumber": 7,
+      "episodeTitle": "첫 번째 단서",
+      "seriesTitle": "별빛 탐정단"
+    },
+    "schema": "toonspectrum.publish-package",
+    "totals": {
+      "episodeImageCount": 2,
+      "knownEpisodeBytes": 1900000,
+      "thumbnailCount": 1
+    },
+    "validation": {
+      "canExport": true,
+      "errorCount": 0,
+      "warningCount": 0
+    },
+    "version": 1
+  },
+  "manifestSha256": "15d99cf82acb74397519d1f64b8f748e2dc56dd3c5fef69ab57827680da3ce94",
+  "policySnapshotDate": "2026-07-10",
+  "presetRevision": "generic-v1",
+  "privacyMarkersAbsent": true,
+  "schemaVersion": 1,
+  "warningCodes": []
+}

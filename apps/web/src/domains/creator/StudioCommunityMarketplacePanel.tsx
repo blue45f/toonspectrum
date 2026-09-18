@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   BadgeCheck,
   Box,
   Brush,
@@ -441,15 +445,14 @@ function StudioCloudLibraryUnavailableCard({
           <p className="mt-0.5 break-all text-[0.55rem] text-fg-3">{item.packageId}</p>
         </div>
         <span className="rounded-full border border-line px-1.5 py-0.5 text-[0.52rem] font-semibold text-fg-3">
-          {item.membership === "active" ? "계정 활성" : "계정 보관"}
+          {item.membership === "active" ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 활성") : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 보관")}
         </span>
       </div>
       <p
-        role={issue ? "alert" : "status"}
+        role={issue ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "status")}
         className="mt-2 rounded-md border border-warn/25 bg-warn/10 px-2 py-1.5 text-[0.55rem] leading-relaxed text-warn"
       >
-        {reason} 기존 계정 취득·설치 확인 이력은 보존되지만 이 카드에서는 설치할 수 없습니다.
-      </p>
+        {reason} {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "기존 계정 취득·설치 확인 이력은 보존되지만 이 카드에서는 설치할 수 없습니다.")}</p>
       <button
         ref={membershipButtonRef}
         type="button"
@@ -461,10 +464,10 @@ function StudioCloudLibraryUnavailableCard({
           <LoaderCircle size={13} className="mr-1 inline animate-spin" aria-hidden />
         ) : null}
         {membershipPending
-          ? "계정 보관 상태 변경 중…"
+          ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 보관 상태 변경 중…")
           : item.membership === "active"
-            ? "계정 라이브러리에 보관"
-            : "계정 라이브러리로 복원"}
+            ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 라이브러리에 보관")
+            : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 라이브러리로 복원")}
       </button>
     </article>
   );
@@ -1029,12 +1032,11 @@ function CommunityRecordCard({
           <p className="flex items-start gap-1.5 text-[0.55rem] leading-relaxed text-fg-2">
             <Cloud size={12} className="mt-0.5 shrink-0 text-cool" aria-hidden />
             <span>
-              계정 라이브러리 {cloudLibraryItem.membership === "active" ? "활성" : "보관"}
+              {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 라이브러리 ")}{cloudLibraryItem.membership === "active" ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "활성") : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "보관")}
               {cloudLibraryItem.confirmation.state === "confirmed"
-                ? ` · Studio v${cloudLibraryItem.confirmation.resourceVersion} 설치 확인 이력`
-                : " · 확인된 Studio 설치 없음"}
-              . 현재 기기의 설치 상태는 아래 로컬 버튼이 별도로 확인합니다.
-            </span>
+                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", " · Studio v{v0} 설치 확인 이력"), { v0: String(cloudLibraryItem.confirmation.resourceVersion) })
+                : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", " · 확인된 Studio 설치 없음")}
+              {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", ". 현재 기기의 설치 상태는 아래 로컬 버튼이 별도로 확인합니다.")}</span>
           </p>
           {onCloudMembershipChange ? (
             <button
@@ -1051,10 +1053,10 @@ function CommunityRecordCard({
               )}
             >
               {cloudMembershipPending
-                ? "계정 보관 상태 변경 중…"
+                ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 보관 상태 변경 중…")
                 : cloudLibraryItem.membership === "active"
-                  ? "계정 라이브러리에 보관"
-                  : "계정 라이브러리로 복원"}
+                  ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 라이브러리에 보관")
+                  : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 라이브러리로 복원")}
             </button>
           ) : null}
         </div>
@@ -1108,7 +1110,7 @@ function CommunityRecordCard({
             className={PRIMARY}
           >
             {publicActionPending === "asset"
-              ? "공개 상태 확인 중…"
+              ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "공개 상태 확인 중…")
               : t("studio.community.record.addToCanvas")}
           </button>
         </div>
@@ -1132,11 +1134,11 @@ function CommunityRecordCard({
           )}
         >
           {publicActionPending === "install"
-            ? "공개 상태 확인 중…"
+            ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "공개 상태 확인 중…")
             : installPending
             ? cloudSyncPending
-              ? "로컬 설치 완료 · 계정 확인 중…"
-              : "로컬 SQL 확인 중…"
+              ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "로컬 설치 완료 · 계정 확인 중…")
+              : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "로컬 SQL 확인 중…")
             : installActionLabel}
         </button>
       ) : (
@@ -1162,12 +1164,12 @@ function CommunityRecordCard({
             ) : (
               <Cloud size={13} className="mr-1 inline" aria-hidden />
             )}
-            {cloudSyncPending ? "계정 설치 확인 중…" : "계정 설치 확인 다시 동기화"}
+            {cloudSyncPending ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 설치 확인 중…") : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 설치 확인 다시 동기화")}
           </button>
         ) : null}
       {cloudSyncIssue ? (
         <p role="alert" className="mt-2 rounded-md border border-warn/25 bg-warn/10 px-2 py-1.5 text-[0.55rem] leading-relaxed text-warn">
-          로컬 설치는 유지됩니다. 계정 동기화만 다시 시도하세요: {cloudSyncIssue}
+          {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "로컬 설치는 유지됩니다. 계정 동기화만 다시 시도하세요: ")}{cloudSyncIssue}
         </p>
       ) : null}
       <CreatorMarketplaceReportAction
@@ -1481,12 +1483,12 @@ export function ShareResourceForm({
       </div>
       {filterLoadError ? (
         <p role="alert" className="rounded-lg border border-bad/25 bg-bad/10 px-2.5 py-2 text-[0.58rem] text-bad">
-          필터 카탈로그 SQL을 읽지 못했습니다: {filterLoadError}
+          {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "필터 카탈로그 SQL을 읽지 못했습니다: ")}{filterLoadError}
         </p>
       ) : null}
       {creativeLoadError ? (
         <p role="alert" className="rounded-lg border border-bad/25 bg-bad/10 px-2.5 py-2 text-[0.58rem] text-bad">
-          브러시·팔레트 SQLite를 읽지 못했습니다: {creativeLoadError}
+          {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "브러시·팔레트 SQLite를 읽지 못했습니다: ")}{creativeLoadError}
         </p>
       ) : null}
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">
@@ -1522,8 +1524,7 @@ export function ShareResourceForm({
       </div>
       {ownedHeadStatus === "loading" ? (
         <p role="status" className="rounded-lg border border-line bg-card px-2.5 py-2 text-[0.58rem] text-fg-2">
-          이 후보의 현재 릴리스를 확인하는 중…
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "이 후보의 현재 릴리스를 확인하는 중…")}</p>
       ) : null}
       {ownedHeadStatus === "error" ? (
         <div role="alert" className="rounded-lg border border-bad/25 bg-bad/10 px-2.5 py-2 text-[0.58rem] text-bad">
@@ -1533,8 +1534,7 @@ export function ShareResourceForm({
             onClick={() => setOwnedHeadRetryToken((value) => value + 1)}
             className={cx("mt-2", CONTROL)}
           >
-            현재 릴리스 다시 확인
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "현재 릴리스 다시 확인")}</button>
         </div>
       ) : null}
       {ownedHeadStatus === "conflict" ? (
@@ -1547,20 +1547,20 @@ export function ShareResourceForm({
           {ownedHead ? (
             <>
               <p className="flex flex-wrap items-center gap-1.5">
-                <strong className="text-fg">현재 헤드 v{ownedHead.resource.resourceVersion}</strong>
+                <strong className="text-fg">{translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "현재 헤드 v")}{ownedHead.resource.resourceVersion}</strong>
                 <StudioOwnedLifecycleBadge release={ownedHead} />
-                <span className="text-fg-3">릴리스 #{ownedHead.releaseOrdinal}</span>
+                <span className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "릴리스 #")}{ownedHead.releaseOrdinal}</span>
               </p>
               <p className="mt-1">
                 {ownedHead.hidden
-                  ? "관리자 검수로 숨겨진 패키지는 숨김이 해제되기 전까지 다시 공개하거나 새 릴리스를 게시할 수 없습니다."
+                  ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "관리자 검수로 숨겨진 패키지는 숨김이 해제되기 전까지 다시 공개하거나 새 릴리스를 게시할 수 없습니다.")
                   : ownedHead.delistedAt
-                    ? "목록에서 내린 현재 헤드여도 더 높은 새 버전을 게시하면 이 패키지의 후속 헤드가 됩니다."
-                  : "더 높은 새 버전을 게시하면 이 패키지의 후속 헤드가 됩니다."}
+                    ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "목록에서 내린 현재 헤드여도 더 높은 새 버전을 게시하면 이 패키지의 후속 헤드가 됩니다.")
+                  : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "더 높은 새 버전을 게시하면 이 패키지의 후속 헤드가 됩니다.")}
               </p>
             </>
           ) : (
-            <p>이 후보와 정확히 일치하는 기존 packageId가 없어 v1.0.0을 첫 릴리스로 제안합니다.</p>
+            <p>{translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "이 후보와 정확히 일치하는 기존 packageId가 없어 v1.0.0을 첫 릴리스로 제안합니다.")}</p>
           )}
         </div>
       ) : null}
@@ -1569,8 +1569,7 @@ export function ShareResourceForm({
           htmlFor={releaseVersionInputId}
           className="block text-[0.58rem] font-semibold text-fg-2"
         >
-          릴리스 버전 (SemVer)
-        </label>
+          {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "릴리스 버전 (SemVer)")}</label>
         <input
           id={releaseVersionInputId}
           value={resourceVersion}
@@ -1583,20 +1582,20 @@ export function ShareResourceForm({
           spellCheck={false}
           autoComplete="off"
           aria-invalid={!resourceVersionValid}
-          aria-describedby={`${releaseVersionInputId}-help`}
+          aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "{v0}-help"), { v0: String(releaseVersionInputId) })}
           placeholder="1.0.1"
           className={cx("w-full font-mono", CONTROL)}
         />
         <p
-          id={`${releaseVersionInputId}-help`}
+          id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "{v0}-help"), { v0: String(releaseVersionInputId) })}
           className={cx(
             "text-[0.55rem] leading-relaxed",
             resourceVersionValid ? "text-fg-3" : "text-bad",
           )}
         >
           {resourceVersionValid
-            ? "기존 패키지의 새 릴리스는 현재 버전보다 높은 SemVer를 입력하세요."
-            : "1.2.3 또는 1.2.3-rc.1+build.7 형식으로 입력하세요."}
+            ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "기존 패키지의 새 릴리스는 현재 버전보다 높은 SemVer를 입력하세요.")
+            : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "1.2.3 또는 1.2.3-rc.1+build.7 형식으로 입력하세요.")}
         </p>
       </div>
       <textarea
@@ -1616,8 +1615,8 @@ export function ShareResourceForm({
           event.target.value.slice(0, CREATOR_MARKETPLACE_RESOURCE_RELEASE_NOTES_MAX_CHARACTERS),
         )}
         maxLength={CREATOR_MARKETPLACE_RESOURCE_RELEASE_NOTES_MAX_CHARACTERS}
-        placeholder="이번 버전에서 달라진 점 (선택)"
-        aria-label="릴리스 노트 (선택)"
+        placeholder={translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "이번 버전에서 달라진 점 (선택)")}
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "릴리스 노트 (선택)")}
         rows={3}
         className={cx(
           "w-full resize-y rounded-lg border border-line bg-card px-2.5 py-2 text-[0.65rem] text-fg outline-none placeholder:text-fg-3 focus:border-accent",
@@ -1693,7 +1692,7 @@ export function ShareResourceForm({
         </button>
       {status ? (
         <p
-          role={status.error ? "alert" : "status"}
+          role={status.error ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "status")}
           className={cx(
             "rounded-lg border px-2.5 py-2 text-[0.6rem] leading-relaxed",
             status.error
@@ -2286,11 +2285,11 @@ export function StudioCommunityMarketplacePanel({
                     marketplaceTabRefs.current[id] = button;
                   }}
                   key={id}
-                  id={`${tabBaseId}-${id}-tab`}
+                  id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "{v0}-{v1}-tab"), { v0: String(tabBaseId), v1: String(id) })}
                   type="button"
                   role="tab"
                   aria-selected={view === id}
-                  aria-controls={`${tabBaseId}-${id}-panel`}
+                  aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "{v0}-{v1}-panel"), { v0: String(tabBaseId), v1: String(id) })}
                   tabIndex={view === id ? 0 : -1}
                   onKeyDown={(event) => handleMarketplaceTabKeyDown(event, id)}
                   onClick={() => {
@@ -2311,9 +2310,9 @@ export function StudioCommunityMarketplacePanel({
 
             {view === "share" ? (
               <div
-                id={`${tabBaseId}-share-panel`}
+                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "{v0}-share-panel"), { v0: String(tabBaseId) })}
                 role="tabpanel"
-                aria-labelledby={`${tabBaseId}-share-tab`}
+                aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "{v0}-share-tab"), { v0: String(tabBaseId) })}
                 className="mt-2"
               >
                 <ShareResourceForm
@@ -2327,16 +2326,16 @@ export function StudioCommunityMarketplacePanel({
               </div>
             ) : (
               <div
-                id={`${tabBaseId}-${view}-panel`}
+                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "{v0}-{v1}-panel"), { v0: String(tabBaseId), v1: String(view) })}
                 role="tabpanel"
-                aria-labelledby={`${tabBaseId}-${view}-tab`}
+                aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "{v0}-{v1}-tab"), { v0: String(tabBaseId), v1: String(view) })}
                 className="mt-2"
               >
                 {view === "library" ? (
                   <div>
                     <div
                       role="group"
-                      aria-label="계정 라이브러리 보기"
+                      aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 라이브러리 보기")}
                       className="grid grid-cols-2 gap-1"
                     >
                       {([
@@ -2364,8 +2363,7 @@ export function StudioCommunityMarketplacePanel({
                       ))}
                     </div>
                     <p className="mt-1.5 text-[0.55rem] leading-relaxed text-fg-3">
-                      계정 보관 상태는 이 기기의 로컬 설치·제거와 별개입니다. 설치 버튼은 현재 기기의 실제 저장소를 다시 확인합니다.
-                    </p>
+                      {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 보관 상태는 이 기기의 로컬 설치·제거와 별개입니다. 설치 버튼은 현재 기기의 실제 저장소를 다시 확인합니다.")}</p>
                   </div>
                 ) : (
                   <>
@@ -2444,7 +2442,7 @@ export function StudioCommunityMarketplacePanel({
                     aria-label={t("studio.community.panel.reloadAria")}
                     className={cx("grid size-11 place-items-center rounded-lg hover:bg-raised", FOCUS)}
                   >
-                    <RefreshCw size={14} className={loading ? "animate-spin" : ""} aria-hidden />
+                    <RefreshCw size={14} className={loading ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "animate-spin") : ""} aria-hidden />
                   </button>
                 </div>
                 {error ? (
@@ -2464,8 +2462,7 @@ export function StudioCommunityMarketplacePanel({
                     className="mt-2 flex items-center gap-2 rounded-lg border border-line bg-card px-2.5 py-2 text-[0.6rem] leading-relaxed text-fg-2"
                   >
                     <LoaderCircle size={14} className="shrink-0 animate-spin" aria-hidden />
-                    Studio 버전과 기기 렌더링 엔진을 확인하고 있어요.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "Studio 버전과 기기 렌더링 엔진을 확인하고 있어요.")}</p>
                 ) : null}
                 {compatibilityIssue ? (
                   <div
@@ -2483,8 +2480,7 @@ export function StudioCommunityMarketplacePanel({
                           FOCUS,
                         )}
                       >
-                        호환성 다시 확인
-                      </button>
+                        {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "호환성 다시 확인")}</button>
                     </div>
                   </div>
                 ) : null}
@@ -2555,8 +2551,8 @@ export function StudioCommunityMarketplacePanel({
                   <p role="status" className="mt-2 rounded-lg border border-dashed border-line px-3 py-5 text-center text-xs text-fg-3">
                     {view === "library"
                       ? libraryView === "active"
-                        ? "계정 라이브러리의 활성 항목이 없습니다. 공개 마켓 상세에서 먼저 추가하세요."
-                        : "계정 라이브러리에 보관된 항목이 없습니다."
+                        ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 라이브러리의 활성 항목이 없습니다. 공개 마켓 상세에서 먼저 추가하세요.")
+                        : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "계정 라이브러리에 보관된 항목이 없습니다.")
                       : t("studio.community.panel.empty")}
                   </p>
                 ) : null}
@@ -2577,7 +2573,7 @@ export function StudioCommunityMarketplacePanel({
             )}
             {status ? (
               <p
-                role={status.error ? "alert" : "status"}
+                role={status.error ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "status")}
                 className={cx(
                   "mt-2 rounded-lg border px-2.5 py-2 text-[0.6rem] leading-relaxed",
                   status.error

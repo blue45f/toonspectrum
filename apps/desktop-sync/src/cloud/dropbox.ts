@@ -34,6 +34,7 @@ const DROPBOX_API = "https://api.dropboxapi.com/2";
 const DROPBOX_CONTENT = "https://content.dropboxapi.com/2";
 const DROPBOX_SIMPLE_UPLOAD_BYTES = 128 * 1024 * 1024;
 const DROPBOX_CHUNK_BYTES = 8 * 1024 * 1024;
+const DROPBOX_TRASH_ROOT = ".toonstudio-trash";
 
 function normalizeDropboxRoot(value: string | undefined): string {
   const normalized = normalizeCloudRelativePath(value ?? "ToonStudio/Sync");
@@ -240,7 +241,13 @@ export class DropboxDesktopCloudProvider implements DesktopCloudProvider {
       const entries = Array.isArray(body.entries) ? body.entries : [];
       for (const entry of entries) {
         const metadata = dropboxMetadata(entry);
-        if (metadata) files.push(cloudObject(this.rootPath, metadata));
+        if (metadata) {
+          const object = cloudObject(this.rootPath, metadata);
+          if (
+            object.relativePath !== DROPBOX_TRASH_ROOT
+            && !object.relativePath.startsWith(`${DROPBOX_TRASH_ROOT}/`)
+          ) files.push(object);
+        }
       }
       if (body.has_more !== true) break;
       const cursor = stringField(body.cursor);
@@ -568,10 +575,37 @@ export class DropboxDesktopCloudProvider implements DesktopCloudProvider {
         `Dropbox file changed before delete: ${input.file.relativePath}`,
       );
     }
-    await this.api(
-      "files/delete_v2",
-      { path: input.file.id },
-      { signal: input.signal },
+
+    const trashRelativePath = this.trashRelativePath(
+      input.file,
+      input.expectedVersion,
+    );
+    await this.ensureParentFolders(trashRelativePath, input.signal);
+    const moved = await this.moveFile(
+      input.file.id,
+      dropboxPath(this.rootPath, trashRelativePath),
+      input.signal,
+    );
+    if (moved.revision === input.expectedVersion) return;
+
+    try {
+      await this.moveFile(
+        moved.id,
+        dropboxPath(this.rootPath, input.file.relativePath),
+        input.signal,
+      );
+    } catch (error) {
+      throw new DesktopCloudError(
+        this.id,
+        "version-conflict",
+        `Dropbox file changed during delete and was preserved at ${trashRelativePath}`,
+        { cause: error },
+      );
+    }
+    throw new DesktopCloudError(
+      this.id,
+      "version-conflict",
+      `Dropbox file changed during delete and was restored: ${input.file.relativePath}`,
     );
   }
 }

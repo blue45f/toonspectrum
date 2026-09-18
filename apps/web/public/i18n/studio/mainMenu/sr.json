@@ -105,7 +105,7 @@
   "studio.mainMenu.item.view.flip-horizontal": "хоризонтална инверзија",
   "studio.mainMenu.item.view.rotate-left": "Ротирајте за 90° улево",
   "studio.mainMenu.item.view.rotate-right": "Ротирајте за 90° удесно",
-  "studio.mainMenu.item.view.reset-rotation": "Ресетуј ротацију приказа (__ПХ0__°)",
+  "studio.mainMenu.item.view.reset-rotation": "Reset view rotation ({angle}°)",
   "studio.mainMenu.item.view.fit": "Прилагодите се екрану",
   "studio.mainMenu.item.view.actual-pixels": "Прави пиксели (100%)",
   "studio.mainMenu.item.view.canvas-rulers": "цанвас пк лењир",

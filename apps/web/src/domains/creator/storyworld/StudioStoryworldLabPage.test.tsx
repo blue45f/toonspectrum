@@ -44,7 +44,15 @@ describe("Storyworld actual page integration", () => {
     expect(screen.getByRole("link", { name: "Studio 편집기로 돌아가기" }).getAttribute("href")).toBe("/studio/work/work-first/canvas");
     expect(screen.getByText(/예시 데이터 ·/)).toBeTruthy();
     expect(screen.getByLabelText("스토리월드 JSON 가져오기")).toBeTruthy();
-    expect(screen.getByText(/캔버스 원고와 자동 연결되지 않은 로컬 실험/)).toBeTruthy();
+    expect(screen.getByText(/프로젝트 준비도에 투영되는 스토리월드/)).toBeTruthy();
+  });
+  it("does not project the untouched demo seed into project readiness", async () => {
+    const localWrite = vi.spyOn(Storage.prototype, "setItem");
+    await open("work-demo-seed");
+    await waitFor(() => expect(saved("work-demo-seed")?.project.title).toBe(STORYWORLD_DEMO_PROJECT.title));
+    const diagnosticWrites = localWrite.mock.calls.filter(([storageKey]) => storageKey === "toonstudio:project-diagnostic-source:v1:work-demo-seed");
+    expect(diagnosticWrites).toHaveLength(0);
+    expect(screen.getByText(/데모 스토리월드는 저장했지만 실제 프로젝트 준비도에는 반영하지 않았습니다./)).toBeTruthy();
   });
   it("opens every user-facing analysis surface", async () => {
     await open("work-tabs");
@@ -53,13 +61,15 @@ describe("Storyworld actual page integration", () => {
       expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(label);
     }
   });
-  it("saves validated authored JSON only through the shared SQLite authority", async () => {
+  it("keeps authored JSON in SQLite while projecting readiness diagnostics to project storage", async () => {
     const localWrite = vi.spyOn(Storage.prototype, "setItem");
     await open("work-save");
+    localWrite.mockClear();
     editProject("내가 만든 세계");
     await waitFor(() => expect(saved("work-save")?.project.title).toBe("내가 만든 세계"));
     expect(db.kvSet).toHaveBeenCalledWith(STORYWORLD_DRAFT_NAMESPACE, key("work-save"), expect.any(String));
-    expect(localWrite).not.toHaveBeenCalled();
+    await waitFor(() => expect(localWrite).toHaveBeenCalled());
+    expect(localWrite.mock.calls.every(([storageKey]) => storageKey === "toonstudio:project-diagnostic-source:v1:work-save")).toBe(true);
   });
   it("keeps A-to-B-to-A private drafts isolated on real keyed remounts", async () => {
     const view = await open("work-a");

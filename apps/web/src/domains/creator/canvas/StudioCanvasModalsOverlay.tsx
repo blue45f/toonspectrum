@@ -300,6 +300,11 @@ export const StudioCanvasModalsOverlay = memo(function StudioCanvasModalsOverlay
   tool,
 }: StudioCanvasModalsOverlayProps) {
   const t = useT();
+  const shortcutsHelpKey = "studio.shortcuts.row.view.help";
+  const translatedShortcutsHelp = t(shortcutsHelpKey)?.trim();
+  const shortcutsHelpLabel = translatedShortcutsHelp && translatedShortcutsHelp !== shortcutsHelpKey
+    ? translatedShortcutsHelp
+    : "키보드 단축키 도움말";
 
   return (
     <>
@@ -315,8 +320,8 @@ export const StudioCanvasModalsOverlay = memo(function StudioCanvasModalsOverlay
             ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + 1.25rem)" }
             : undefined
         }
-        aria-label={t("studio.shortcuts.row.view.help")}
-        title={t("studio.shortcuts.row.view.help")}
+        aria-label={shortcutsHelpLabel}
+        title={shortcutsHelpLabel}
       >
         <Keyboard size={16} aria-hidden />
       </button>
