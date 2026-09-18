@@ -4,6 +4,12 @@ export const STUDIO_CC0_DELIVERY_ROOT = "/assets/studio/cc0-20260906/";
 const MAX_MANIFEST_BYTES = 4 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/u;
+const CC0_LICENSE_URL = "https://creativecommons.org/publicdomain/zero/1.0/";
+const CC0_PROVIDER_HOSTS = new Map<string, string>([
+  ["Kenney", "kenney.nl"],
+  ["ambientCG", "ambientcg.com"],
+  ["Poly Haven", "polyhaven.com"],
+]);
 
 export type StudioCc0AssetKind = "model" | "effect-mask" | "surface-texture" | "background" | "prop-image";
 export interface StudioCc0OriginalDelivery {
@@ -166,11 +172,15 @@ export function parseStudioCc0Catalog(value: unknown): readonly StudioCc0Asset[]
       || typeof asset.path !== "string" || typeof asset.sha256 !== "string" || !SHA256.test(asset.sha256)
       || !Number.isSafeInteger(asset.bytes) || Number(asset.bytes) <= 0 || Number(asset.bytes) > 64 * 1024 * 1024
       || license?.id !== "CC0-1.0" || license.commercialUse !== true || license.redistributionAllowed !== true
-      || typeof license.provider !== "string" || typeof license.sourceUrl !== "string") {
+      || typeof license.provider !== "string" || typeof license.sourceUrl !== "string"
+      || (license.url !== undefined && license.url !== CC0_LICENSE_URL)
+      || (license.checkedOn !== undefined
+        && (typeof license.checkedOn !== "string" || !/^\d{4}-\d{2}-\d{2}$/u.test(license.checkedOn)))) {
       throw new TypeError("에셋 출처·해시·라이선스 검증에 실패했습니다.");
     }
     const source = new URL(license.sourceUrl);
-    if (source.protocol !== "https:" || !["kenney.nl", "ambientcg.com", "polyhaven.com"].includes(source.hostname)
+    const expectedHost = CC0_PROVIDER_HOSTS.get(license.provider);
+    if (!expectedHost || source.protocol !== "https:" || source.hostname !== expectedHost
       || source.username || source.password || source.port) throw new TypeError("확인되지 않은 에셋 공급처입니다.");
     studioCc0AssetUrl(asset.path);
     if (asset.previewPath !== undefined) {

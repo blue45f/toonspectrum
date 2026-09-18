@@ -17,19 +17,21 @@ import {
 import type { ProductionClientCommand } from "./production-api";
 
 import {
-  listStudioProjectRevisions,
-  loadStudioProjectGraphByWork,
-  type StudioProjectGraphSnapshot,
-  type StudioProjectRevisionRecord,
+  getStudioProjectByWork,
+  listStudioArtifactRevisions,
 } from "../project-graph/studio-project-graph-client";
+import type {
+  StudioProjectRecord,
+  StudioRevisionRecord,
+} from "../project-graph/studio-project-graph-contract";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
 
 interface BridgeData {
-  readonly project: StudioProjectGraphSnapshot;
+  readonly project: StudioProjectRecord;
   readonly revisionsByArtifact: Readonly<
-    Record<string, readonly StudioProjectRevisionRecord[]>
+    Record<string, readonly StudioRevisionRecord[]>
   >;
 }
 
@@ -78,10 +80,10 @@ export function ProductionStudioRevisionBridgePanel({
     }
     setState({ kind: "loading" });
     try {
-      const project = await loadStudioProjectGraphByWork(aggregate.workId, signal);
+      const project = await getStudioProjectByWork(aggregate.workId);
       const pairs = await Promise.all(project.artifacts.map(async (artifact) => [
         artifact.id,
-        await listStudioProjectRevisions(artifact.id, signal),
+        await listStudioArtifactRevisions(artifact.id),
       ] as const));
       if (signal?.aborted) return;
       setState({

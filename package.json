@@ -216,7 +216,11 @@
     "dev:admin": "vite --config vite.admin.config.ts",
     "build:admin": "vite build --config vite.admin.config.ts",
     "typecheck:admin": "tsc -p apps/admin/tsconfig.json",
-    "validate:app-boundaries": "node scripts/validate-app-boundaries.mjs"
+    "validate:app-boundaries": "node scripts/validate-app-boundaries.mjs",
+    "audit:visual-assets:strict": "node scripts/audit-visual-asset-quality.mjs --strict",
+    "audit:marketplace-asset-similarity": "tsx scripts/audit-marketplace-asset-similarity.mts --strict",
+    "audit:studio-cc0-classification": "tsx scripts/audit-studio-cc0-classification.mts --strict",
+    "verify:asset-postcuration": "pnpm run audit:visual-assets:strict && pnpm run audit:studio-cc0-classification && pnpm run audit:marketplace-asset-similarity"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",

@@ -91,6 +91,36 @@ describe("CC0 delivery catalog boundary", () => {
     const asset = fixture();
     expect(() => parseStudioCc0Catalog(manifest([{...asset, license: {...asset.license, sourceUrl}}]))).toThrow();
   });
+  it("binds known provider names to their official source hosts", () => {
+    const asset = fixture();
+    expect(() => parseStudioCc0Catalog(manifest([{
+      ...asset,
+      license: {...asset.license, provider: "Poly Haven"},
+    }]))).toThrow();
+    expect(() => parseStudioCc0Catalog(manifest([{
+      ...asset,
+      license: {...asset.license, provider: "Unknown supplier"},
+    }]))).toThrow();
+  });
+  it("validates optional canonical CC0 URL and review date provenance fields", () => {
+    const asset = fixture();
+    expect(() => parseStudioCc0Catalog(manifest([{
+      ...asset,
+      license: {...asset.license, url: "https://example.com/license"},
+    }]))).toThrow();
+    expect(() => parseStudioCc0Catalog(manifest([{
+      ...asset,
+      license: {...asset.license, checkedOn: "September 6"},
+    }]))).toThrow();
+    expect(parseStudioCc0Catalog(manifest([{
+      ...asset,
+      license: {
+        ...asset.license,
+        url: "https://creativecommons.org/publicdomain/zero/1.0/",
+        checkedOn: "2026-09-06",
+      },
+    }]))).toHaveLength(1);
+  });
   it("rejects missing digests, giant images and format mismatch", () => {
     expect(() => parseStudioCc0Catalog(manifest([{...fixture(), sha256: "unverified"}]))).toThrow();
     expect(() => parseStudioCc0Catalog(manifest([{...fixture(), path: "assets/chair.webp"}]))).toThrow();
