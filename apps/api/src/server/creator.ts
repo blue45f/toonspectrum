@@ -43,7 +43,11 @@ export {
 export {
   getCreatorPublicProfile,
   getFollowStats,
+  searchCreatorDirectory,
   toggleFollow,
+  type CreatorDirectoryEntry,
+  type CreatorDirectoryQuery,
+  type CreatorDirectoryResult,
   type CreatorFollowStats,
   type CreatorPublicProfile,
 } from "./creator/follows";

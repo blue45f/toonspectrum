@@ -2,6 +2,12 @@ import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
 
 import {
+  CREATOR_COLLABORATION_STATUSES,
+  CREATOR_ROLE_IDS,
+  CREATOR_SPECIALTY_IDS,
+} from "@toonspectrum/core/creator-role";
+
+import {
   CREATOR_ASSET_CATALOG_MAX_PAGE_SIZE,
   CREATOR_ASSET_MODERATION_MAX_PAGE_SIZE,
   CREATOR_ASSET_PREVIEW_MAX_DATA_URL_CHARACTERS,
@@ -32,6 +38,17 @@ export const CreatorWorkListQuerySchema = z
 
 export const CreatorWorkParamsSchema = z
   .object({ id: z.string().trim().min(1).max(160) })
+  .strict();
+
+export const CreatorDirectoryQuerySchema = z
+  .object({
+    q: z.string().trim().max(60).optional(),
+    role: z.enum(CREATOR_ROLE_IDS).optional(),
+    specialty: z.enum(CREATOR_SPECIALTY_IDS).optional(),
+    collaborationStatus: z.enum(CREATOR_COLLABORATION_STATUSES).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(24),
+    offset: z.coerce.number().int().min(0).max(10_000).default(0),
+  })
   .strict();
 
 export const CreatorExternalPublicationParamsSchema = CreatorWorkParamsSchema.extend({
@@ -435,6 +452,7 @@ export const ModerateCreatorAssetSchema = z
 
 export class CreatorWorkListQueryDto extends createZodDto(CreatorWorkListQuerySchema) {}
 export class CreatorWorkParamsDto extends createZodDto(CreatorWorkParamsSchema) {}
+export class CreatorDirectoryQueryDto extends createZodDto(CreatorDirectoryQuerySchema) {}
 export class CreatorExternalPublicationParamsDto extends createZodDto(
   CreatorExternalPublicationParamsSchema
 ) {}

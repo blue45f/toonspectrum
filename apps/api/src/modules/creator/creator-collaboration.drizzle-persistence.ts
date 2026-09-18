@@ -414,6 +414,7 @@ export class DrizzleCreatorCollaborationUnitOfWork implements CreatorCollaborati
           userId: users.id,
           name: users.name,
           status: users.status,
+          creatorRoleProfile: users.creatorRoleProfile,
         })
         .from(users)
         .where(eq(users.id, userId))
@@ -463,6 +464,7 @@ export class DrizzleCreatorCollaborationUnitOfWork implements CreatorCollaborati
         updatedAt: creatorWorkCollaborators.updatedAt,
         respondedAt: creatorWorkCollaborators.respondedAt,
         name: users.name,
+        creatorRoleProfile: users.creatorRoleProfile,
       })
       .from(creatorWorkCollaborators)
       .innerJoin(users, eq(users.id, creatorWorkCollaborators.userId))

@@ -1,4 +1,8 @@
 import { api, toApiError } from "@/infrastructure/api";
+import {
+  normalizePublicCreatorRoleProfile,
+  type PublicCreatorRoleProfile,
+} from "@/shared/lib/creator-role-contract";
 
 export const STUDIO_TEAM_ROLES = ["owner", "admin", "editor", "commenter", "viewer"] as const;
 export const STUDIO_TEAM_ASSIGNABLE_ROLES = ["admin", "editor", "commenter", "viewer"] as const;
@@ -40,6 +44,7 @@ export interface StudioTeamMember {
   role: StudioTeamRole;
   status: StudioTeamStatus;
   isOwner: boolean;
+  creatorRoleProfile?: PublicCreatorRoleProfile;
   invitationId?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -274,6 +279,8 @@ function normalizeMember(value: unknown): StudioTeamMember | null {
     status: isOwner ? "active" : isTeamStatus(value.status) ? value.status : "declined",
     isOwner,
   };
+  const creatorRoleProfile = normalizePublicCreatorRoleProfile(value.creatorRoleProfile);
+  if (creatorRoleProfile) member.creatorRoleProfile = creatorRoleProfile;
   const invitationId = normalizeInvitationId(value.invitationId);
   if (!isOwner && member.status === "pending" && invitationId) member.invitationId = invitationId;
   const createdAt = optionalDate(value.createdAt);

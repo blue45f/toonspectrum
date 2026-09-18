@@ -24,7 +24,12 @@ import {
   CREATOR_ASSET_LIST_RESPONSE_MAX_BYTES,
   assertCreatorAssetListResponseBudget,
 } from "@/shared/lib/creator-asset-contract";
-import type { PublicCreatorRoleProfile } from "@/shared/lib/creator-role-contract";
+import type {
+  CreatorCollaborationStatus,
+  CreatorRoleId,
+  CreatorSpecialtyId,
+  PublicCreatorRoleProfile,
+} from "@/shared/lib/creator-role-contract";
 import { ensureArray } from "@/shared/lib/http-safe";
 import { projectRevisionComparisonValue } from "@/shared/lib/revision-comparison-projection";
 import { getAuthUserId } from "@/compat/auth-session-store";
@@ -1131,6 +1136,47 @@ export interface CreatorProfile {
   works: number;
   series: number;
   creatorRoleProfile: PublicCreatorRoleProfile | null;
+}
+
+export interface CreatorDirectoryQuery {
+  readonly q?: string;
+  readonly role?: CreatorRoleId;
+  readonly specialty?: CreatorSpecialtyId;
+  readonly collaborationStatus?: CreatorCollaborationStatus;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface CreatorDirectoryEntry {
+  readonly id: string;
+  readonly name: string;
+  readonly avatar: string;
+  readonly bio: string;
+  readonly createdAt: string | null;
+  readonly creatorRoleProfile: PublicCreatorRoleProfile;
+}
+
+export interface CreatorDirectoryResult {
+  readonly items: readonly CreatorDirectoryEntry[];
+  readonly nextOffset: number | null;
+}
+
+export async function searchCreatorDirectory(
+  query: CreatorDirectoryQuery,
+  signal?: AbortSignal,
+): Promise<CreatorDirectoryResult> {
+  const params = new URLSearchParams();
+  if (query.q?.trim()) params.set("q", query.q.trim());
+  if (query.role) params.set("role", query.role);
+  if (query.specialty) params.set("specialty", query.specialty);
+  if (query.collaborationStatus) params.set("collaborationStatus", query.collaborationStatus);
+  if (query.limit) params.set("limit", String(query.limit));
+  if (query.offset) params.set("offset", String(query.offset));
+  const suffix = params.size > 0 ? `?${params.toString()}` : "";
+  return callOrThrow(
+    () => api.get<CreatorDirectoryResult>(`${BASE}/users${suffix}`, { signal }),
+    "창작자 목록을 불러오지 못했습니다.",
+  );
 }
 
 export async function getCreatorProfile(userId: string, signal?: AbortSignal): Promise<CreatorProfile> {

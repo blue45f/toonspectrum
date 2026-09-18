@@ -103,6 +103,7 @@ export interface CreatorCollaborationUserRecord {
   userId: string;
   name: string | null;
   status: string;
+  creatorRoleProfile?: unknown;
 }
 
 export interface CreatorCollaborationMembershipRecord {
@@ -120,6 +121,7 @@ export interface CreatorCollaborationMembershipRecord {
 export interface CreatorCollaborationMembershipWithUserRecord
   extends CreatorCollaborationMembershipRecord {
   name: string | null;
+  creatorRoleProfile?: unknown;
 }
 
 export interface CreatorCollaborationInvitationRecord {

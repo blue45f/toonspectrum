@@ -79,6 +79,36 @@ describe("studio team client", () => {
     expect(result.viewer.capabilities.manageMembers).toBe(true);
   });
 
+  it("팀원의 공개 직무만 보존하고 개인 작업 모드 필드는 폐기한다", () => {
+    const input = snapshot("work-roles");
+    input.members[0] = {
+      ...input.members[0],
+      creatorRoleProfile: {
+        version: 2,
+        primaryRole: "background",
+        secondaryRoles: ["reviewer"],
+        specialties: ["background-3d"],
+        experienceLevel: "professional",
+        collaborationStatus: "available",
+        activeRole: "producer",
+        projectRolePreferences: [{ projectKey: "secret", activeRole: "producer" }],
+      },
+    };
+
+    const result = normalizeStudioTeamSnapshot(input, "work-roles");
+    expect(result.members[0]?.creatorRoleProfile).toEqual({
+      version: 2,
+      primaryRole: "background",
+      secondaryRoles: ["reviewer"],
+      specialties: ["background-3d"],
+      experienceLevel: "professional",
+      collaborationStatus: "available",
+      roleAliases: [],
+    });
+    expect(JSON.stringify(result)).not.toContain("projectRolePreferences");
+    expect(JSON.stringify(result)).not.toContain("activeRole");
+  });
+
   it("초대함과 감사 기록 URL에 제한된 limit와 정확히 인코딩한 작품 id를 전달한다", async () => {
     apiGet.mockResolvedValue([]);
     const controller = new AbortController();

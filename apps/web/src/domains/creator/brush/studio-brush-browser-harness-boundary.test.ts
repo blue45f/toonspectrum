@@ -49,8 +49,8 @@ describe("Studio brush browser harness catalogue boundary", () => {
       "const PRODUCT_BRUSH_CATALOG_COUNT = STUDIO_ALL_BRUSH_CATALOG_ITEMS.length;",
     );
     expect(harness).toContain("assertProductBrushCatalogContract()");
-    // The shipped library combines the quarantine-aware classic catalogue with V6 recipes. The
-    // browser oracle must audit that exact artist-facing inventory, not the classic-only subset.
+    // The shipped picker is the quarantine-aware classic shelf plus every executable V6 recipe.
+    // Auditing the classic-only LISTED partition would leave the next-generation shelf uncovered.
     expect(harness).toContain(
       "assertUiBrushCatalogMatchesProductCatalog(\n        firstCatalog,\n        STUDIO_LIBRARY_PAINT_BRUSH_CATALOG_ITEMS,\n        \"paint\",\n      )",
     );

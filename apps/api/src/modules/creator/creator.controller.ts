@@ -21,6 +21,7 @@ import { isAdminUser } from "../../server/app-config";
 import {
   CreateCreatorWorkDto,
   CreatorAssetListQueryDto,
+  CreatorDirectoryQueryDto,
   CreatorAssetModerationQueryDto,
   CreatorAssetParamsDto,
   CreatorDraftCollaborationRoomParamsDto,
@@ -578,6 +579,14 @@ export class CreatorController {
   }
 
   // ── 창작자 팔로우/공개 프로필 ─────────────────────────────────────────
+  @Get("/creator/users")
+  @Header("Cache-Control", "public, max-age=30, stale-while-revalidate=120")
+  async searchCreatorDirectory(
+    @Query(new ZodValidationPipe(CreatorDirectoryQueryDto)) query: CreatorDirectoryQueryDto,
+  ) {
+    return this.creatorService.searchCreatorDirectory(query);
+  }
+
   @Get("/creator/users/:id/profile")
   @Header("Cache-Control", "no-store, max-age=0")
   async getCreatorProfile(@Param("id") id: string, @Headers("x-user-id") userId?: string) {

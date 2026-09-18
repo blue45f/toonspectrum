@@ -59,6 +59,7 @@ import {
   reportSharedAsset,
   restoreWorkRevision,
   saveCreatorExternalPublication,
+  searchCreatorDirectory,
   toggleCommentLike,
   toggleCreatorWorkBookmark,
   toggleFollow,
@@ -870,6 +871,17 @@ export class CreatorService {
     const profile = await getCreatorPublicProfile(userId, viewerId);
     if (!profile) throw new NotFoundException("회원을 찾을 수 없습니다.");
     return profile;
+  }
+
+  async searchCreatorDirectory(query: {
+    q?: string;
+    role?: import("@toonspectrum/core/creator-role").CreatorRoleId;
+    specialty?: import("@toonspectrum/core/creator-role").CreatorSpecialtyId;
+    collaborationStatus?: import("@toonspectrum/core/creator-role").CreatorCollaborationStatus;
+    limit?: number;
+    offset?: number;
+  }) {
+    return searchCreatorDirectory(query);
   }
 
   // 팔로잉 피드 — 팔로우한 창작자의 최신 작품.

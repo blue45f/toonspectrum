@@ -13,8 +13,8 @@ import {
   STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
   filterStudioBrushCatalogItems,
 } from "./studio-brush-catalog";
-import { studioBrushPackDescriptorById } from "./studio-brush-pack-index";
 import { STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS } from "./studio-brush-quality-portfolio";
+import { studioBrushPackDescriptorById } from "./studio-brush-pack-index";
 import { materializeStudioBrushCatalogSelection } from "./studio-brush-selection";
 import {
   STUDIO_MATERIAL_BRUSH_DEFINITIONS,
@@ -48,8 +48,10 @@ describe("original material product integration", () => {
     expect(matches.some((entry) => entry.id === id)).toBe(true);
     const descriptor = studioBrushPackDescriptorById(id);
     const selection = await materializeStudioBrushCatalogSelection(id);
-    expect(descriptor).not.toBeNull();
-    expect(descriptor?.authoredWidth).toBe(definition.width);
+    expect(descriptor).toMatchObject({
+      catalogId: id,
+      authoredWidth: definition.width,
+    });
     expect(selection).toMatchObject({
       catalogId: id,
       catalogName: definition.name,
@@ -62,7 +64,7 @@ describe("original material product integration", () => {
     expect(selection?.brushDynamics?.tip.alphaMapBase64?.length).toBeGreaterThan(0);
     const entry = BRUSH_QUALITY_CATALOG.find((candidate) => candidate.id === id);
     expect(entry).toBeDefined();
-    if (!entry || !selection || !descriptor) throw new Error(`material product missing: ${id}`);
+    if (!entry || !selection) throw new Error(`material product missing: ${id}`);
     const selectedSnapshot = JSON.stringify(selection);
     const recipe = resolveProductBrushV6RecipeId(entry);
     expect(recipe).not.toBeNull();

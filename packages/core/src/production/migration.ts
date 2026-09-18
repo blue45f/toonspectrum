@@ -7,6 +7,7 @@ import type {
   ProductionProjectAggregate,
   ProductionRisk,
   ProductionRiskAssessment,
+  ProductionRiskPolicy,
   ProductionRiskResponse,
   ProductionRiskSignal,
   ProductionRiskStatus,
@@ -126,6 +127,73 @@ export function migrateProductionRisk(
   });
 }
 
+function migrateProductionRiskPolicy(
+  value: unknown,
+  projectId: string,
+  fallbackAt: string,
+): ProductionRiskPolicy {
+  const defaults = createDefaultProductionRiskPolicy(projectId, fallbackAt);
+  if (!value || typeof value !== "object" || Array.isArray(value)) return defaults;
+  const policy = value as Record<string, unknown>;
+  return Object.freeze({
+    ...defaults,
+    id: stringValue(policy.id, defaults.id),
+    projectId,
+    timezone: stringValue(policy.timezone, defaults.timezone),
+    workdayEndLocal: stringValue(policy.workdayEndLocal, defaults.workdayEndLocal),
+    dueSoonHours: Math.max(1, Math.round(numberValue(policy.dueSoonHours, defaults.dueSoonHours))),
+    blockedWarningHours: Math.max(1, Math.round(numberValue(policy.blockedWarningHours, defaults.blockedWarningHours))),
+    blockedCriticalHours: Math.max(1, Math.round(numberValue(policy.blockedCriticalHours, defaults.blockedCriticalHours))),
+    capacityWarningPercent: Math.max(1, numberValue(policy.capacityWarningPercent, defaults.capacityWarningPercent)),
+    capacityCriticalPercent: Math.max(1, numberValue(policy.capacityCriticalPercent, defaults.capacityCriticalPercent)),
+    defaultReviewSlaHours: Math.max(1, Math.round(numberValue(policy.defaultReviewSlaHours, defaults.defaultReviewSlaHours))),
+    minimumReadyBufferEpisodes: Math.max(0, Math.round(numberValue(policy.minimumReadyBufferEpisodes, defaults.minimumReadyBufferEpisodes))),
+    autoOpenSeverity: ["warning", "high", "critical"].includes(String(policy.autoOpenSeverity))
+      ? policy.autoOpenSeverity as ProductionRiskPolicy["autoOpenSeverity"]
+      : defaults.autoOpenSeverity,
+    notificationCooldownHours: Math.max(1, Math.round(numberValue(policy.notificationCooldownHours, defaults.notificationCooldownHours))),
+    autoOpenStableHours: Math.max(0, Math.round(numberValue(policy.autoOpenStableHours, defaults.autoOpenStableHours))),
+    thresholdHysteresisPercent: Math.max(0, Math.min(50, numberValue(policy.thresholdHysteresisPercent, defaults.thresholdHysteresisPercent))),
+    autoResolveStableHours: Math.max(1, Math.round(numberValue(policy.autoResolveStableHours, defaults.autoResolveStableHours))),
+    autoOpenMinimumConfidence: ["low", "medium", "high"].includes(String(policy.autoOpenMinimumConfidence))
+      ? policy.autoOpenMinimumConfidence as ProductionRiskPolicy["autoOpenMinimumConfidence"]
+      : defaults.autoOpenMinimumConfidence,
+    revision: Math.max(1, Math.round(numberValue(policy.revision, defaults.revision))),
+    updatedAt: stringValue(policy.updatedAt, fallbackAt),
+  });
+}
+
+function migrateProductionRiskResponse(
+  value: unknown,
+  projectId: string,
+  fallbackAt: string,
+): ProductionRiskResponse {
+  const response = objectValue(value);
+  const statusValues: readonly ProductionRiskResponse["status"][] = [
+    "proposed", "approved", "in-progress", "completed", "cancelled",
+  ];
+  const status = statusValues.includes(response.status as ProductionRiskResponse["status"])
+    ? response.status as ProductionRiskResponse["status"]
+    : "proposed";
+  const createdAt = stringValue(response.createdAt, fallbackAt);
+  return Object.freeze({
+    ...(response as unknown as ProductionRiskResponse),
+    id: stringValue(response.id),
+    projectId: stringValue(response.projectId, projectId),
+    riskId: stringValue(response.riskId),
+    revision: Math.max(1, Math.round(numberValue(response.revision, 1))),
+    actualEffect: typeof response.actualEffect === "string" ? response.actualEffect : null,
+    cancellationReason: typeof response.cancellationReason === "string" ? response.cancellationReason : null,
+    status,
+    approvedAt: typeof response.approvedAt === "string" ? response.approvedAt : null,
+    startedAt: typeof response.startedAt === "string" ? response.startedAt : null,
+    completedAt: typeof response.completedAt === "string" ? response.completedAt : null,
+    cancelledAt: typeof response.cancelledAt === "string" ? response.cancelledAt : null,
+    createdAt,
+    updatedAt: stringValue(response.updatedAt, createdAt),
+  });
+}
+
 export function migrateProductionProjectAggregate(
   value: unknown,
 ): ProductionProjectAggregate {
@@ -148,11 +216,11 @@ export function migrateProductionProjectAggregate(
     ...(aggregate as unknown as ProductionProjectAggregate),
     modelVersion: 2,
     tasks: Object.freeze(tasks),
-    riskPolicy: (aggregate.riskPolicy as ProductionProjectAggregate["riskPolicy"] | undefined)
-      ?? createDefaultProductionRiskPolicy(projectId, createdAt),
+    riskPolicy: migrateProductionRiskPolicy(aggregate.riskPolicy, projectId, updatedAt),
     riskSignals: Object.freeze([...arrayValue<ProductionRiskSignal>(aggregate.riskSignals)]),
     risks: Object.freeze(risks),
-    riskResponses: Object.freeze([...arrayValue<ProductionRiskResponse>(aggregate.riskResponses)]),
+    riskResponses: Object.freeze(arrayValue<unknown>(aggregate.riskResponses).map((response) =>
+      migrateProductionRiskResponse(response, projectId, updatedAt))),
     riskAssessments: Object.freeze([...arrayValue<ProductionRiskAssessment>(aggregate.riskAssessments)]),
   });
 }
