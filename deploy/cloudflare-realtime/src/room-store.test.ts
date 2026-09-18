@@ -2009,6 +2009,40 @@ describe("realtime SQLite room store", () => {
     ).toEqual({ count: 0 });
   });
 
+  it("prunes expired rate budgets without the expiry index", () => {
+    const { store, database } = createStoreContext();
+    database
+      .prepare(
+        `INSERT INTO rate_budget
+          (actor_id, channel, window_started_at_ms, event_count, byte_count, expires_at_ms)
+         VALUES (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        "expired-actor",
+        "presence",
+        1_000,
+        1,
+        10,
+        1_500,
+        "live-actor",
+        "comments",
+        1_000,
+        1,
+        10,
+        3_000,
+      );
+
+    store.prune(2_000, 2_048);
+
+    expect(
+      database
+        .prepare(
+          "SELECT actor_id, channel FROM rate_budget ORDER BY actor_id ASC",
+        )
+        .all(),
+    ).toEqual([{ actor_id: "live-actor", channel: "comments" }]);
+  });
+
   it("enforces durable actor-channel rate and byte budgets independently", () => {
     const store = createStore();
     const limit = { maximumEvents: 2, maximumBytes: 100 };
